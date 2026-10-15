@@ -53,10 +53,11 @@ public final class Uri implements Comparable<Uri>, android.os.Parcelable {
     }
 
     public static Uri fromFile(Object file) {
-        // A shim directory (`getFilesDir()`) is already a `file:` path;
-        // prefixing another scheme gave `file://file:///...`.
-        String s = file instanceof com.codename1.compat.jdk.File
-                ? ((com.codename1.compat.jdk.File) file).storagePath() : String.valueOf(file);
+        // A device's java.io.File keeps the storage path it was made from
+        // (`getFilesDir()` is a `file:` path there), and a JDK's is a plain
+        // absolute path; both are handled below. Prefixing another scheme
+        // to the first gave `file://file:///...`.
+        String s = String.valueOf(file);
         // The path is percent-encoded (everything but `/`) as Android's
         // fromFile does: a raw `#` or `?` in a file name started a fragment
         // or query, so `getPath()` named another file. The authority a

@@ -22,7 +22,7 @@
  */
 package com.codename1.fxcompat.runtime;
 
-import com.codename1.compat.jdk.CompatBoot;
+import com.codename1.generated.compat.CompatRegistry;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
@@ -59,7 +59,7 @@ import javafx.stage.Stage;
 ///   handling); nothing JavaFX runs yet.
 /// - `start()`, the first time: on the event dispatch thread, which is
 ///   the JavaFX application thread, the application's resources are
-///   installed (`CompatBoot.cn1Init()`), [#createApplication()] is called once,
+///   installed (`CompatRegistry.cn1Install()`), [#createApplication()] is called once,
 ///   then `Application.init()`, then `Application.start(Stage)` with a
 ///   new primary stage. The stage is a form (see [StageHosts]); the
 ///   application shows it by calling `Stage.show()`.
@@ -100,7 +100,7 @@ public abstract class FxLifecycle extends Lifecycle {
     @Override
     public void runApp() {
         // Before any application code: its resources and bundles.
-        CompatBoot.cn1Init();
+        CompatRegistry.cn1Install();
         application = createApplication();
         if (application == null) {
             throw new IllegalStateException("createApplication() answered null");

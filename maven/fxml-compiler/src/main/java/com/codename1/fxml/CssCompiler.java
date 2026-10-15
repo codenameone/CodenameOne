@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 import com.codename1.fxml.css.CssDeclaration;
 import com.codename1.fxml.css.CssDeclarations;
 import com.codename1.fxml.css.CssProperties;

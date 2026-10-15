@@ -40,8 +40,8 @@ import java.util.Map;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 
-import com.codename1.compat.jdk.ResourceNames;
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.ResourceNames;
+import com.codename1.impl.compat.Resources;
 import com.codename1.fxcompat.runtime.FxmlDispatch;
 
 import javafx.fxml.FXMLLoader;

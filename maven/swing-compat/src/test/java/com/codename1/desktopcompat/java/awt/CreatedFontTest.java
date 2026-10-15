@@ -30,7 +30,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.Resources;
 import com.codename1.desktopcompat.KernelTestBase;
 import com.codename1.desktopcompat.java.awt.image.BufferedImage;
 import com.codename1.desktopcompat.javax.swing.JFrame;

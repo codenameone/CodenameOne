@@ -22,8 +22,8 @@
  */
 package com.codename1.desktopcompat.rt;
 
-import com.codename1.compat.jdk.CompatBoot;
 import com.codename1.desktopcompat.java.awt.Window;
+import com.codename1.generated.compat.CompatRegistry;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
@@ -58,7 +58,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// The contract, in the order things happen:
 ///
 /// 1. **Start.** The first `start()` installs the application's resources
-///    (`CompatBoot.cn1Init()`) and calls `runMain()` once, on the event
+///    (`CompatRegistry.cn1Install()`) and calls `runMain()` once, on the event
 ///    dispatch thread -- the thread a Swing application is supposed to
 ///    build its frames on, so `SwingUtilities.invokeLater` from `main`
 ///    runs the runnable after `main` returns, and `invokeAndWait` runs it
@@ -124,7 +124,7 @@ public abstract class DesktopLifecycle extends Lifecycle {
             }
         });
         // Before any application code: its resources and bundles.
-        CompatBoot.cn1Init();
+        CompatRegistry.cn1Install();
         try {
             runMain();
         } catch (Exception e) {

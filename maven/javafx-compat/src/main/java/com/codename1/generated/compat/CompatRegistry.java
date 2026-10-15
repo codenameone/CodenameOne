@@ -20,29 +20,23 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.compat.jdk;
+package com.codename1.generated.compat;
 
-import android.content.Intent;
+/// A placeholder for the registry the build generates into every
+/// application with desktop sources, so that the layer's lifecycle, which
+/// installs it, compiles.
+///
+/// The build's remap step writes the real class under this name -- see
+/// `com.codename1.impl.compat.CompatRegistryBase` -- and never copies this
+/// one out of the jar. The Swing and JavaFX layers each carry one; neither
+/// ships.
+public final class CompatRegistry {
 
-import com.codename1.compat.testing.MainThreadRule;
-import org.junit.Rule;
-import org.junit.Test;
+    private CompatRegistry() {
+    }
 
-import static org.junit.Assert.assertEquals;
-
-/// The remap turns `java.io.File` into this shim but leaves method
-/// descriptors that name the JDK class's supertypes, such as
-/// `Intent.putExtra(String, Serializable)`: the shim must have them too.
-public class FileTypeContractTest {
-
-    @Rule
-    public final MainThreadRule mainThread = new MainThreadRule();
-
-    @Test
-    public void aFileGoesIntoAnIntentAsSerializable() {
-        java.io.Serializable file = new File("notes.txt");
-        Intent intent = new Intent();
-        intent.putExtra("file", file);
-        assertEquals("notes.txt", ((File) intent.getSerializableExtra("file")).getName());
+    /// Records what the application ships and installs the registry; here,
+    /// where nothing was generated, nothing.
+    public static void cn1Install() {
     }
 }

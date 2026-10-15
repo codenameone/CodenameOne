@@ -27,7 +27,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.Resources;
 import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.fxcompat.runtime.ResourceUrls;

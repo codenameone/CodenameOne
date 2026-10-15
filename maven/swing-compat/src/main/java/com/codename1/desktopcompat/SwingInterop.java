@@ -84,6 +84,10 @@ public final class SwingInterop {
     ///   component, or is a window. Show a window with `setVisible(true)`,
     ///   or embed its content pane.
     public static com.codename1.ui.Component asComponent(Object awtComponent) {
+        // Library mode has no lifecycle to install the application's
+        // resources, bundles and services first; the first desktop
+        // component it wraps or window it shows does. Idempotent.
+        com.codename1.generated.compat.CompatRegistry.cn1Install();
         if (awtComponent instanceof Window) {
             throw new IllegalArgumentException("A window cannot be embedded; show it with setVisible(true), or "
                     + "embed its content pane");

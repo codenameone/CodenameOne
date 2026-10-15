@@ -138,7 +138,9 @@ public class HeadlessImplementation extends CodenameOneImplementation {
 
     @Override
     public void init(java.lang.Object a0) {
-        // Nothing to set up: there is no screen.
+        // No screen to set up; what the real ports install for the JDK's
+        // resource lookups is installed the same way.
+        JdkResourceSupport.install();
     }
 
     @Override

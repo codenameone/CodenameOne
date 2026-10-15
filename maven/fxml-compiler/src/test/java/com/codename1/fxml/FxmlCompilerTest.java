@@ -771,7 +771,7 @@ public class FxmlCompilerTest {
         File marker = new File(new File(gen, FxmlCompiler.PACKAGE.replace('.', '/')),
                 FxmlClassCompiler.MARKER + ".java");
         File sheet = new File(out, com.codename1.fxml.css.CssSheetData.compiledName(
-                com.codename1.compat.jdk.ResourceNames.flatName("main.css")));
+                com.codename1.impl.compat.ResourceNames.flatName("main.css")));
         assertTrue(marker.isFile());
         assertTrue(sheet.isFile());
         // The JavaFX layer left the build: the generated source names its

@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 import com.codename1.fxml.css.CssSheetData;
 
 /// Compiles the style sheets among an application's desktop resources and

@@ -86,7 +86,7 @@ public final class CssSheetData {
     }
 
     /// The name the compiled form of the style sheet at `flatName` -- the
-    /// name `com.codename1.compat.jdk.ResourceNames.flatName` gives its
+    /// name `com.codename1.impl.compat.ResourceNames.flatName` gives its
     /// resource path -- ships under.
     public static String compiledName(String flatName) {
         return flatName + SUFFIX;

@@ -22,7 +22,7 @@
  */
 package com.codename1.fxcompat.runtime;
 
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.Resources;
 import com.codename1.io.FileSystemStorage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,7 +35,7 @@ import java.io.InputStream;
 /// `jar:file:/app.jar!/com/example/img/logo.png` or a `file:` URL of a
 /// build directory on a desktop. A device keeps every resource at the root
 /// of its bundle under a flat name only
-/// [com.codename1.compat.jdk.Resources] knows, so every loader of the
+/// [com.codename1.impl.compat.Resources] knows, so every loader of the
 /// layer -- images, fonts -- resolves its URL here rather than asking the
 /// platform for a path with directories, which a port refuses outright.
 public final class ResourceUrls {

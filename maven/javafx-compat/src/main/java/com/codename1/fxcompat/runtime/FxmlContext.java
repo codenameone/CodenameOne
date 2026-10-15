@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.binding.StringBinding;

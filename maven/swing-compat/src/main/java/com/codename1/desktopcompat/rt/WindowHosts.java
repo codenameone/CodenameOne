@@ -148,6 +148,10 @@ public final class WindowHosts {
     /// The host that shows `w`, given the one it had before, if any;
     /// `null` when there is no display.
     public static WindowHost open(Window w, WindowHost existing) {
+        // Library mode has no lifecycle to install the application's
+        // resources, bundles and services first; the first desktop
+        // component it wraps or window it shows does. Idempotent.
+        com.codename1.generated.compat.CompatRegistry.cn1Install();
         if (!Display.isInitialized()) {
             return null;
         }

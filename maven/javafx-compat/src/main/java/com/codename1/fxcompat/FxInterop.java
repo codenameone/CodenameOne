@@ -85,6 +85,10 @@ public final class FxInterop {
     ///
     /// the Codename One component that shows it
     public static Component asComponent(Object sceneOrRoot) {
+        // Library mode has no lifecycle to install the application's
+        // resources, bundles and services first; the first desktop
+        // component it wraps or window it shows does. Idempotent.
+        com.codename1.generated.compat.CompatRegistry.cn1Install();
         Scene scene;
         if (sceneOrRoot instanceof Scene) {
             scene = (Scene) sceneOrRoot;

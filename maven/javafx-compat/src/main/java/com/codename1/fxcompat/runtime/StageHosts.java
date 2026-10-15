@@ -66,6 +66,10 @@ public final class StageHosts {
 
     /// Creates the host of a window that is about to be shown.
     public static StageHost create(Window window) {
+        // Library mode has no lifecycle to install the application's
+        // resources, bundles and services first; the first desktop
+        // component it wraps or window it shows does. Idempotent.
+        com.codename1.generated.compat.CompatRegistry.cn1Install();
         if (window instanceof PopupWindow) {
             return new StagePopup((PopupWindow) window);
         }

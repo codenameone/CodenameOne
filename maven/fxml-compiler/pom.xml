@@ -161,7 +161,7 @@
              under, which the compiled style sheets are named by. -->
         <dependency>
             <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-compat-jdk</artifactId>
+            <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -180,11 +180,6 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javafx-compat</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

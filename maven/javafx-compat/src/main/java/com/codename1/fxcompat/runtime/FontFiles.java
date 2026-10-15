@@ -22,8 +22,8 @@
  */
 package com.codename1.fxcompat.runtime;
 
-import com.codename1.compat.jdk.ResourceNames;
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.ResourceNames;
+import com.codename1.impl.compat.Resources;
 import com.codename1.ui.Font;
 import java.io.IOException;
 import java.io.InputStream;

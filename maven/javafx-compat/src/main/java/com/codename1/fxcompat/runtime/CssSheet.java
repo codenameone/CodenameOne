@@ -28,8 +28,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import com.codename1.compat.jdk.ResourceNames;
-import com.codename1.compat.jdk.Resources;
+import com.codename1.impl.compat.ResourceNames;
+import com.codename1.impl.compat.Resources;
 import com.codename1.fxcompat.runtime.css.CssDeclaration;
 import com.codename1.fxcompat.runtime.css.CssSelector;
 import com.codename1.fxcompat.runtime.css.CssSheetData;

@@ -34,7 +34,7 @@ import java.util.Set;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-import com.codename1.compat.jdk.ResourceNames;
+import com.codename1.impl.compat.ResourceNames;
 import com.codename1.fxml.FxmlDocument.Attribute;
 import com.codename1.fxml.FxmlDocument.Element;
 import com.codename1.fxml.css.CssValue;
