@@ -705,6 +705,14 @@ public class UIManager {
     ///
     /// - `style`: the style object to install
     public void setComponentStyle(String id, Style style) {
+        // A deferred base theme (setDeferredBaseTheme) is still pending the
+        // first time app code calls this before any getter. Installing it
+        // eagerly, as every port did before the base theme was deferred,
+        // matches that ordering: the override recorded below survives,
+        // instead of setThemePropsImpl's clearStyleCaches wiping it out from
+        // under a base theme that installs only later, the first time a
+        // getter asks for the theme.
+        ensureBaseTheme();
         if (id == null || id.length() == 0) {
             //if no id return the default style
             id = "";
@@ -735,6 +743,10 @@ public class UIManager {
     ///
     /// - `type`: press, dis or other custom type
     public void setComponentStyle(String id, Style style, String type) {
+        // See the no-type overload above: ensure the deferred base installs
+        // before this override is recorded, matching the pre-deferral eager
+        // ordering.
+        ensureBaseTheme();
         if (type != null && type.length() > 0) {
             if (id == null || id.length() == 0) {
                 //if no id return the default style
@@ -772,6 +784,10 @@ public class UIManager {
     ///
     /// - `style`: the style object to install
     public void setComponentSelectedStyle(String id, Style style) {
+        // See setComponentStyle above: ensure the deferred base installs
+        // before this override is recorded, matching the pre-deferral eager
+        // ordering.
+        ensureBaseTheme();
         if (id == null || id.length() == 0) {
             //if no id return the default style
             id = "";

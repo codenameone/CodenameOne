@@ -136,4 +136,51 @@ public class UIManagerDeferredBaseThemeTest extends UITestBase {
         assertTrue(m.wasThemeInstalled());
         assertEquals(0, base.runs, "asking must not install");
     }
+
+    /// Before the base theme was deferred, a port installed it eagerly while the
+    /// display initialized, so app code calling setComponentStyle always ran
+    /// AFTER the base was in place. Deferred, the first call into any of these
+    /// setters can now run BEFORE the base installs. Each setter must install
+    /// the pending base first (the same ensure call the getters use), or the
+    /// override it records is layered onto an empty table and then wiped out
+    /// -- not merely overwritten -- by setThemePropsImpl's clearStyleCaches the
+    /// first time something actually reads the theme.
+    @Test
+    public void aComponentStyleSetBeforeAnyReadSurvivesTheDeferredBaseInstall() {
+        UIManager m = UIManager.createInstance();
+        Base base = new Base(m);
+        m.setDeferredBaseTheme(base);
+        Style override = new Style();
+        override.setFgColor(0xabcdef);
+        m.setComponentStyle("Override", override);
+        assertEquals(0xabcdef, m.getComponentStyle("Override").getFgColor(),
+                "a style set before any getter must survive the deferred base install");
+        assertEquals(1, base.runs, "the base theme must still install exactly once");
+    }
+
+    @Test
+    public void aTypedComponentStyleSetBeforeAnyReadSurvivesTheDeferredBaseInstall() {
+        UIManager m = UIManager.createInstance();
+        Base base = new Base(m);
+        m.setDeferredBaseTheme(base);
+        Style override = new Style();
+        override.setFgColor(0xabcdef);
+        m.setComponentStyle("Override", override, "press");
+        assertEquals(0xabcdef, m.getComponentCustomStyle("Override", "press").getFgColor(),
+                "a typed style set before any getter must survive the deferred base install");
+        assertEquals(1, base.runs, "the base theme must still install exactly once");
+    }
+
+    @Test
+    public void aComponentSelectedStyleSetBeforeAnyReadSurvivesTheDeferredBaseInstall() {
+        UIManager m = UIManager.createInstance();
+        Base base = new Base(m);
+        m.setDeferredBaseTheme(base);
+        Style override = new Style();
+        override.setFgColor(0xabcdef);
+        m.setComponentSelectedStyle("Override", override);
+        assertEquals(0xabcdef, m.getComponentSelectedStyle("Override").getFgColor(),
+                "a selected style set before any getter must survive the deferred base install");
+        assertEquals(1, base.runs, "the base theme must still install exactly once");
+    }
 }
