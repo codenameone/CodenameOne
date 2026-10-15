@@ -381,12 +381,14 @@ public class SecurityConfig {
             .rateLimit("/api/driving/application/documents",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 3600))
+            // tag::wayline-api-rules[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()
                     .requestMatchers("/api/driver/**").hasRole(Roles.DRIVER)
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .anyRequest().authenticated())
+            // end::wayline-api-rules[]
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)
                     .jwtAuthenticationConverter(roles)));
         return http.build();

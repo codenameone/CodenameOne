@@ -20,17 +20,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.backend.wayline;
+package com.codenameone.developerguide.backend;
 
-/// The states of a ride these examples name; the sample's class has them all.
-public final class RideStates {
-    public static final String REQUESTED = "REQUESTED";
-    public static final String OFFERED = "OFFERED";
-    public static final String ACCEPTED = "ACCEPTED";
-    public static final String ARRIVED = "ARRIVED";
-    public static final String IN_PROGRESS = "IN_PROGRESS";
-    public static final String CANCELLED_BY_RIDER = "CANCELLED_BY_RIDER";
+import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Component;
 
-    private RideStates() {
+import java.io.IOException;
+import java.util.List;
+
+/// Reads from the second database of [ArchiveDatabase].
+@Component
+public class ArchivedRides {
+    private final DataSource db;
+    private final ArchiveDatabase.Archive archive;
+
+    // tag::wayline-second-database-use[]
+    public ArchivedRides(DataSource db, ArchiveDatabase.Archive archive) {
+        this.db = db;
+        this.archive = archive;
     }
+
+    public List olderThan(long millis) throws IOException {
+        return archive.db.query("SELECT id, rider, fare_cents FROM archived_ride "
+                + "WHERE requested_at < ?", new Object[] {Long.valueOf(millis)});
+    }
+    // end::wayline-second-database-use[]
 }

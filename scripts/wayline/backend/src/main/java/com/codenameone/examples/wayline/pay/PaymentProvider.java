@@ -34,6 +34,7 @@ import java.io.IOException;
 /// present, which is what lets a ride be paid for as it ends. The server keeps
 /// the token, a brand and four digits. It never keeps a card number, and with
 /// a hosted setup it never sees one.
+// tag::wayline-payment-provider[]
 public interface PaymentProvider {
     /// `simulated` or `stripe`: what the app is told, so it knows how to add a
     /// card.
@@ -86,6 +87,7 @@ public interface PaymentProvider {
     /// [#REFUND_PENDING] while the processor still does not know, or
     /// [#REFUND_FAILED] when the money did not go back.
     String refundStatus(String refundReference) throws IOException;
+    // end::wayline-payment-provider[]
 
     String REFUND_SUCCEEDED = "succeeded";
     String REFUND_PENDING = "pending";

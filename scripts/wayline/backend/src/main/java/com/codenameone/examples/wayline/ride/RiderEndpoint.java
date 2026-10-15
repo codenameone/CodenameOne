@@ -34,6 +34,7 @@ import com.codenameone.examples.wayline.api.RiderApiServer;
 
 import java.util.List;
 
+// tag::wayline-contract-endpoint[]
 /// The server's half of `RiderApi`. Every method acts as the signed-in user and
 /// on that user's rides only: the rider is never a parameter.
 @Component
@@ -53,6 +54,7 @@ public class RiderEndpoint implements RiderApiServer {
     public RideDto request(RideRequestDto request) throws Exception {
         return rides.request(Caller.name(), request);
     }
+    // end::wayline-contract-endpoint[]
 
     @Override
     public RideDto active() throws Exception {

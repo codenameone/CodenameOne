@@ -7,6 +7,13 @@ on:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'
+      # The Wayline chapters include the sample's own sources by tag, so moving
+      # or deleting a tagged region there changes the guide without touching
+      # docs/. Only the trigger, not the `docs` filter below: the Asciidoctor
+      # lint runs on every trigger and fails on a tag it cannot find, and the
+      # sample itself is compiled and tested by wayline.yml, so the demo build
+      # and the figure render have nothing to add for it.
+      - 'scripts/wayline/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one

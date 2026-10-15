@@ -24,6 +24,7 @@ package com.codenameone.examples.wayline.sms;
 
 import java.io.IOException;
 
+// tag::wayline-sms-sender[]
 /// Sends a text message. The one place the server touches an SMS provider, so
 /// changing provider is one class.
 public interface SmsSender {
@@ -35,3 +36,4 @@ public interface SmsSender {
     /// app in place of the text message nobody is going to receive.
     boolean delivers();
 }
+// end::wayline-sms-sender[]

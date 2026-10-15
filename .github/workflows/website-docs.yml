@@ -59,6 +59,10 @@ on:
       - 'docs/developer-guide/**'
       - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
+      # The developer guide's Wayline chapters include the sample's sources by
+      # tag, so a merged change there changes the published guide. Not on pull
+      # requests: developer-guide-docs.yml already renders the guide for those.
+      - 'scripts/wayline/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'

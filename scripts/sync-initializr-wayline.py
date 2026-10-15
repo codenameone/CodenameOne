@@ -17,8 +17,12 @@ project as a template, from five resources this script derives from it:
 Nothing else is copied. The reactor pom, the platform modules, the launchers and
 the Maven wrapper are the ones every Initializr project gets, from common.zip.
 
-Three things are changed on the way, all of them so that the generator can then
+Four things are changed on the way, all of them so that the generator can then
 make the project the developer's own:
+
+  * The Asciidoctor tag markers (`// tag::name[]`, `// end::name[]`) are taken
+    out. The developer guide includes regions of this project through them, so
+    they belong to the guide and not to a generated project.
 
   * `wayline` in lower case -- an artifact id, a configuration key -- is written
     `myappname`, which is the token the generator replaces with the project's
@@ -51,6 +55,10 @@ TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json')
 HEADER = re.compile(r'\A/\*\n \* Copyright \(c\) .*?\*/\n', re.S)
 HASH_HEADER = re.compile(r'\A((?:#!.*\n)?)(?:#\n)?# Copyright \(c\) .*?(?=^[^#]|\Z)', re.S | re.M)
 XML_HEADER = re.compile(r'<!--\s*Copyright \(c\) .*?-->\n', re.S)
+# A line holding nothing but an Asciidoctor tag marker: `// tag::name[]`,
+# `# end::name[]`, `/* tag::name[] */`.
+TAG_MARKER = re.compile(r'^[ \t]*(?://|#|/\*)[ \t]*(?:tag|end)::[A-Za-z0-9_-]+\[\][ \t]*(?:\*/)?[ \t]*\n',
+                        re.M)
 
 
 def text(path):
@@ -62,6 +70,9 @@ def text(path):
         data = HASH_HEADER.sub(r'\1', data, count=1)
     elif path.suffix == '.xml':
         data = XML_HEADER.sub('', data, count=1)
+    # The developer guide includes regions of the sample by Asciidoctor tag. The
+    # markers are the guide's plumbing and mean nothing in a generated project.
+    data = TAG_MARKER.sub('', data)
     # The application's name wherever it is written in lower case -- an artifact
     # id, a configuration key, a demonstration account's address -- but not in the
     # Java package, which the generator replaces as a package.

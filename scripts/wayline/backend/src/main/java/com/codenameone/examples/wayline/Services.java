@@ -93,12 +93,14 @@ public class Services {
             return missing.length() > 0 ? new MisconfiguredSmsSender(unset("SMS", "twilio",
                     missing)) : new TwilioSmsSender(twilioSid, twilioToken, twilioFrom);
         }
+        // tag::wayline-sms-choice[]
         if ("vonage".equalsIgnoreCase(kind)) {
             String missing = missing("wayline.sms.vonage.", new String[] {"key", vonageKey,
                 "secret", vonageSecret, "from", vonageFrom});
             return missing.length() > 0 ? new MisconfiguredSmsSender(unset("SMS", "vonage",
                     missing)) : new VonageSmsSender(vonageKey, vonageSecret, vonageFrom);
         }
+        // end::wayline-sms-choice[]
         if ("messagebird".equalsIgnoreCase(kind)) {
             String missing = missing("wayline.sms.messagebird.", new String[] {"key", birdKey,
                 "originator", birdOriginator});
@@ -124,6 +126,7 @@ public class Services {
         return new PhotonGeocoder(address);
     }
 
+    // tag::wayline-payment-choice[]
     /// `wayline.payments.provider` is one of:
     ///
     /// - `stripe`: [StripePayments], an untested stub over Stripe's REST API.
@@ -163,6 +166,7 @@ public class Services {
         }
         return new StripePayments(secret, address + "/pay/return");
     }
+    // end::wayline-payment-choice[]
 
     /// The names, after `prefix`, of the settings in `namesAndValues` whose
     /// value is empty, separated by commas.

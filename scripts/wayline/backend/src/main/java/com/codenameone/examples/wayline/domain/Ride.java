@@ -27,6 +27,7 @@ import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 import com.codenameone.examples.wayline.api.RideState;
 
+// tag::wayline-entity[]
 /// A ride, from the request to its end.
 ///
 /// `rider` and `driver` are account names and not references: a ride outlives the
@@ -45,6 +46,7 @@ public class Ride {
 
     @Column(nullable = false)
     private String driver = "";
+    // end::wayline-entity[]
 
     @Column(nullable = false)
     private double pickupLat;
@@ -130,8 +132,10 @@ public class Ride {
     @Column(nullable = false)
     private boolean wheelchair;
 
+    // tag::wayline-column-entity[]
     @Column(nullable = false)
     private boolean pets;
+    // end::wayline-column-entity[]
 
     @Column(nullable = false)
     private String note = "";

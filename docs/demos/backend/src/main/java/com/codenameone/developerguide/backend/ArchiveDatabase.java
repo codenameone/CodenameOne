@@ -20,16 +20,33 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.backend.wayline;
+package com.codenameone.developerguide.backend;
 
-import com.codename1.annotations.Mapped;
+import com.codename1.backend.Config;
+import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Bean;
+import com.codename1.backend.annotations.Configuration;
 
-/// What a ride would cost; the sample's lists one price per kind of ride.
-@Mapped
-public class FareQuoteDto {
-    public long fare;
-    public String currency;
+import java.io.IOException;
 
-    public FareQuoteDto() {
+/// Opens a second database beside the one the server is configured with.
+@Configuration
+public class ArchiveDatabase {
+    // tag::wayline-second-database[]
+    /// A second database, opened beside the server's own. Wrapped in a class
+    /// of its own so that a bean asking for a `DataSource` still gets the
+    /// server's.
+    public static final class Archive {
+        public final DataSource db;
+
+        Archive(DataSource db) {
+            this.db = db;
+        }
     }
+
+    @Bean
+    public Archive archive(Config config) throws IOException {
+        return new Archive(DataSource.open(config.get("wayline.archive.url", ""), 4));
+    }
+    // end::wayline-second-database[]
 }

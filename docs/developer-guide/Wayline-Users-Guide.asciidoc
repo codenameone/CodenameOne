@@ -68,8 +68,8 @@ have something to draw. <<wayline-launch>> has the commands.
 Sign in as the rider in one simulator and as a driver in another to follow a
 ride from both ends.
 
-No money moves on a server that hasn't been given a payment provider's key.
-Cards are simulated, and four numbers behave in four ways:
+No money moves on a development server, which simulates cards unless it's told
+to use a payment provider. Four numbers behave in four ways:
 
 [cols="2,3"]
 |===
@@ -116,8 +116,8 @@ image::img/wayline-register.png["The form for a new account with fields for name
 
 The app then asks for the six-digit code sent to the mobile number. A code is
 good for five minutes and five attempts, and a new one can be requested after
-half a minute. A server with no text-message provider configured can't send a
-text, so on a development profile it shows the code on the screen instead. You
+half a minute. A development server prints the text on its console instead
+of sending it, so it shows the code on the screen as well. You
 can skip this step with **Not now**, but the server refuses a ride request from
 an account whose number isn't verified.
 

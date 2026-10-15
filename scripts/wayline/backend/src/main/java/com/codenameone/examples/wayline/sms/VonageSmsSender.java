@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+// tag::wayline-sms-provider[]
 /// Sends through Vonage's (formerly Nexmo's) SMS API: a form POST to
 /// `https://rest.nexmo.com/sms/json` carrying `api_key`, `api_secret`, `to`,
 /// `from` and `text`.
@@ -83,3 +84,4 @@ public class VonageSmsSender implements SmsSender {
         return true;
     }
 }
+// end::wayline-sms-provider[]

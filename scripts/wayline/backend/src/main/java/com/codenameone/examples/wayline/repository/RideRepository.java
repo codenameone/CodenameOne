@@ -48,6 +48,7 @@ import java.util.List;
 /// A move comes in one of five shapes -- the rider's, the driver's, the
 /// driver's taking an offer, the driver's giving one back, and the server's --
 /// each its own statement rather than one assembled at run time.
+// tag::wayline-repository[]
 @Repository(entity = Ride.class, key = String.class)
 public interface RideRepository extends CrudRepository<Ride, String> {
     /// The ride a rider has in one of `states`, or null.
@@ -55,6 +56,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
 
     /// The ride a driver has in one of `states`, or null.
     Ride findFirstByDriverAndStateIn(String driver, RideState[] states);
+    // end::wayline-repository[]
 
     /// Whether the account is the rider of a ride in one of `asRider` or the
     /// driver of one in one of `asDriver`.
@@ -135,6 +137,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     int moveAsDriver(@Param("id") String id, @Param("from") RideState[] from,
             @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver);
 
+    // tag::wayline-ride-move[]
     /// Takes an offer made to `driver`: refused once the offer has lapsed, as
     /// of `now`, even in the moment before the sweep takes it back.
     @Modifying
@@ -143,6 +146,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             + "and r.offerExpiresAt >= :now")
     int takeOffer(@Param("id") String id, @Param("from") RideState[] from,
             @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver);
+    // end::wayline-ride-move[]
 
     /// Gives a ride of `driver`'s back to be offered again, writing
     /// `newDriver` (empty: nobody) as its driver.

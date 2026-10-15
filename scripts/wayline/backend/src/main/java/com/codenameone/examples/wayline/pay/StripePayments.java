@@ -117,6 +117,7 @@ public class StripePayments implements PaymentProvider {
         }
     }
 
+    // tag::wayline-payment-hosted[]
     @Override
     public Setup startCardSetup(String customer, String setupId) throws IOException {
         Map session = ask("POST", "/v1/checkout/sessions", form("mode", "setup",
@@ -133,6 +134,7 @@ public class StripePayments implements PaymentProvider {
         }
         return setup;
     }
+    // end::wayline-payment-hosted[]
 
     @Override
     public Card finishCardSetup(String customer, String reference, CardDto typed)

@@ -272,17 +272,20 @@ public class Rides {
         return ride.getId();
     }
 
+    // tag::wayline-service-readonly[]
     @Transactional(readOnly = true)
     public RideDto activeForRider(String rider) throws IOException {
         Ride ride = rides.findFirstByRiderAndStateIn(rider, ACTIVE);
         return ride == null ? none() : toDto(ride, rider, new HashMap<String, Profile>());
     }
+    // end::wayline-service-readonly[]
 
     @Transactional(readOnly = true)
     public List<RideDto> historyForRider(String rider) throws IOException {
         return list(rides.findTop50ByRiderOrderByRequestedAtDesc(rider), rider);
     }
 
+    // tag::wayline-service-transaction[]
     public RideDto cancelByRider(String rider, String id) throws IOException {
         Change change = attempt(() -> cancelAsRider(rider, id));
         // The driver it was offered to or who had taken it is told as well.
@@ -296,6 +299,7 @@ public class Rides {
         return new Change(id, RideState.CANCELLED_BY_RIDER, rider, before.getDriver(), "",
                 view(id, rider));
     }
+    // end::wayline-service-transaction[]
 
     /// Rates a completed ride, once, and counts it toward the driver's rating.
     public RideDto rate(String rider, String id, int stars) throws IOException {
@@ -557,6 +561,7 @@ public class Rides {
         return null;
     }
 
+    // tag::wayline-ride-offer[]
     /// Offers a ride to the driver chosen for it, unless they were given
     /// another in the meantime. Returns what it changed, or null for nothing,
     /// in which case [#tick] looks again.
@@ -580,6 +585,7 @@ public class Rides {
         return tryMove(id, RideState.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
                 ? new Change(id, RideState.OFFERED, ride.getRider(), driver, "", null) : null;
     }
+    // end::wayline-ride-offer[]
 
     /// Takes back the offers nobody answered and looks again for every ride
     /// still waiting. Runs every two seconds, on one instance at a time: `lock`
@@ -745,6 +751,7 @@ public class Rides {
     /// @param newDriver the driver to write with the change, or null to leave
     ///     it as it is
     /// @param newOfferExpiresAt when the offer this change makes lapses, or null
+    // tag::wayline-ride-trymove[]
     private boolean tryMove(String id, RideState to, String actor, String ownerField,
             String newDriver, Long newOfferExpiresAt) throws IOException {
         RideState[] sources = RideStateMachine.sources(to);
@@ -774,6 +781,7 @@ public class Rides {
         event(id, to, actor);
         return true;
     }
+    // end::wayline-ride-trymove[]
 
     private void event(String id, RideState state, String actor) throws IOException {
         RideEvent event = new RideEvent();

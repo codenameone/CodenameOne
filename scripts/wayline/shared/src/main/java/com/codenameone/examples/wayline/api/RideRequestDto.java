@@ -24,6 +24,7 @@ package com.codenameone.examples.wayline.api;
 
 import com.codename1.annotations.Mapped;
 
+// tag::wayline-contract-dto[]
 /// Where a ride starts and ends, and how the rider wants it, for a quote and for
 /// the request itself.
 ///
@@ -57,3 +58,4 @@ public record RideRequestDto(
         boolean petFriendly,
         String note) {
 }
+// end::wayline-contract-dto[]

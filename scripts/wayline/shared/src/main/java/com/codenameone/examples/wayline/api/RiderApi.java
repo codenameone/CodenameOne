@@ -33,6 +33,7 @@ import com.codename1.util.OnComplete;
 
 import java.util.List;
 
+// tag::wayline-contract-api[]
 /// Asking for a ride and following it.
 @RestClient
 public interface RiderApi {
@@ -63,3 +64,4 @@ public interface RiderApi {
     void nearby(@Query("lat") double lat, @Query("lng") double lng,
             OnComplete<Response<List<NearbyDriverDto>>> callback);
 }
+// end::wayline-contract-api[]
