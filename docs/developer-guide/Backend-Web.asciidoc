@@ -177,6 +177,10 @@ app and the server reads the same on both sides:
   `getX` (or `isX`) and `setX` methods, and is left out when it has neither.
 * `@JsonProperty("due_at")` renames a field and `@JsonIgnore` leaves one out, both
   from `com.codename1.annotations`.
+* A `record` is written from its accessors and read through its canonical
+  constructor, so it needs no constructor without arguments. A component the body
+  leaves out, or one marked `@JsonIgnore`, is passed its default: `null`, `0` or
+  `false`.
 * A `Date` is written as milliseconds since the epoch, which is Jackson's default
   and what the app's mapper reads, and is read from that or from an ISO-8601 date
   such as `2025-03-01T09:30:00Z`. A `byte[]` is base64, an enum is its name.
@@ -201,8 +205,8 @@ it, would be written forever, so a response that nests more than 64 objects deep
 is answered 500 with a message naming the class; mark the field that points back
 `@JsonIgnore`. The build refuses what it can't write a codec for, and says why: a
 field typed by a type variable, such as `List<T>` in a generic `Page<T>`; a body
-class with no constructor without arguments; an interface; and an array other
-than `byte[]`.
+class other than a record with no constructor without arguments; an interface;
+and an array other than `byte[]`.
 
 A method that throws is answered 500 with the body `internal error`, and the
 exception is logged. The message isn't sent to the client, because an exception

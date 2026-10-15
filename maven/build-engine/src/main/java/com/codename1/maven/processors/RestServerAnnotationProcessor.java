@@ -876,6 +876,22 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         AnnotatedClass cls = ctx.lookup(t.replace('.', '/'));
         if (cls == null || cls.isInterface() || cls.isEnum()) return;
         if (dtos.containsKey(t)) return;
+        if (cls.isRecord()) {
+            // This codec transfers PUBLIC fields and builds the object with its
+            // no-arg constructor. A record has neither: its components are private
+            // final fields, so it would encode as {} and could not be decoded at
+            // all. The backend path (a contract in a dependency, served through
+            // the generated <Api>Server and <Api>Controller) encodes through
+            // BackendJsonCodecs, which reads the accessors and calls the canonical
+            // constructor -- refuse here rather than ship an empty object.
+            ctx.error(t + " is a record, which the cn1.restServer codec cannot "
+                    + "transfer: it encodes public fields and decodes through a no-arg "
+                    + "constructor, and a record has neither. Serve the contract from "
+                    + "the backend, whose generated controller encodes records through "
+                    + "their accessors and canonical constructor, or use a class with "
+                    + "public fields here.");
+            return;
+        }
         requireAssignableFields(t, cls, ctx);
         dtos.put(t, cls);
         for (FieldInfo f : transferredFields(cls, ctx)) {
