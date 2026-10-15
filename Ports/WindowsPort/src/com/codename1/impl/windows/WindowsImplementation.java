@@ -223,6 +223,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches files, preferences, the
+        // network and the EDT through Codename One from here on.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         WindowsNative.initDisplay("Codename One", 800, 600);
         windowGraphicsPeer = WindowsNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);

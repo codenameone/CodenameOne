@@ -256,6 +256,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches files, preferences, the
+        // network and the EDT through Codename One from here on.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         instance = this;
         // Set the metalRendering static gate as early as possible -- before
         // any NativeImage / NativeGraphics is constructed -- so mutable-image

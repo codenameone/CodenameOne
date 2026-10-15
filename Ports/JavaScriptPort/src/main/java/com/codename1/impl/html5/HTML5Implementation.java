@@ -5116,6 +5116,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches files, preferences, the
+        // network and the EDT through Codename One from here on.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         //__init();
         if (m instanceof Runnable) {
             //((Runnable)m).run();

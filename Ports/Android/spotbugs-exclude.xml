@@ -567,4 +567,23 @@
         <Method name="dismissKeyguard" />
         <Bug pattern="DE_MIGHT_IGNORE" />
     </Match>
+
+    <!--
+    JdkHost is the class library's service registry, copied byte for byte from
+    vm/JavaAPI so the core's CoreJdkHost always has its superclass. install and
+    setRegistry store the object they are handed by design: that object IS the
+    installed service. The copy may not diverge to defend against it.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.JdkHost" />
+        <Or>
+            <Method name="install" />
+            <Method name="setRegistry" />
+            <Method name="getRegistry" />
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2" />
+            <Bug pattern="MS_EXPOSE_REP" />
+        </Or>
+    </Match>
 </FindBugsFilter>

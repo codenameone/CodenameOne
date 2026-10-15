@@ -228,7 +228,7 @@ jobs:
             MVN_ARGS="-Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true"
           fi
           cd maven
-          bash ../scripts/ci/retry.sh mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
+          bash ../scripts/ci/retry.sh mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests,jdk-parity-tests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
       - name: Run push service-worker contract
         if: ${{ matrix.java-version == 8 }}

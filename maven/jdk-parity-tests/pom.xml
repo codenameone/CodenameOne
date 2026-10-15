@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Differential tests of the ParparVM class library (vm/JavaAPI) against the JDK.
+
+  Not shipped and not deployed. In process-classes, RelocateJavaApi compiles
+  vm/JavaAPI/src and copies the classes under test into target/classes renamed
+  java/... to jdkparity/java/..., so a test can run the JavaAPI implementation and
+  the JDK's side by side in one JVM and compare what they do. References a
+  relocated class makes to java.* classes that are NOT relocated stay on the JDK,
+  so a JavaAPI class leaning on API the JDK lacks fails here too.
+
+  It also copies com.codename1.impl.JdkHost (unrenamed), the superclass of the
+  core's CoreJdkHost, so the core can install its host in test scope.
+
+  Plain ASM rather than build-engine's ClassRelocator: depending on build-engine
+  drags every port into the reactor with -am, and ClassRelocator also applies the
+  desktop CompatRewrites, which are not under test here.
+
+  Runs in PR CI with core-unittests (pr.yml, build-test job). Enabled by
+  -DunitTests through the unittests profile in maven/pom.xml.
+
+  No double dash inside these comments: XML forbids one.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-jdk-parity-tests</artifactId>
+    <packaging>jar</packaging>
+    <name>Codename One JDK Parity Tests</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <maven.source.skip>true</maven.source.skip>
+        <javaapi.src.dir>${project.basedir}/../../vm/JavaAPI/src</javaapi.src.dir>
+        <!-- The classes renamed under jdkparity/. Each name takes its nested
+             classes with it. A slice adds the classes it tests here. -->
+        <jdkparity.relocate>java/util/Optional</jdkparity.relocate>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-commons</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>relocate-javaapi</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.jdkparity.RelocateJavaApi</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>${javaapi.src.dir}</argument>
+                                <argument>${project.build.directory}/javaapi-classes</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <argument>${jdkparity.relocate}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.1</version>
+                <configuration>
+                    <!-- JdkHost is process-wide state; a fresh JVM per run. -->
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

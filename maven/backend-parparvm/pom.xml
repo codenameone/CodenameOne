@@ -41,6 +41,7 @@
         <backend.dir>${project.basedir}/../../vm/backend</backend.dir>
         <core.src.dir>${project.basedir}/../../CodenameOne/src</core.src.dir>
         <backend.shared.dir>${project.build.directory}/generated-sources/backend-shared</backend.shared.dir>
+        <javaapi.host.dir>${project.build.directory}/generated-sources/javaapi-host</javaapi.host.dir>
     </properties>
 
     <build>
@@ -60,6 +61,7 @@
                             <sources>
                                 <source>${backend.dir}/impl/parparvm</source>
                                 <source>${backend.shared.dir}</source>
+                                <source>${javaapi.host.dir}</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -86,6 +88,15 @@
                                         <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
                                     </fileset>
                                 </copy>
+                                <!-- The production FileIo installs the class
+                                     library's POSIX JdkHost. Both classes are
+                                     vm/JavaAPI's, which the JDK compiled here
+                                     does not have; analysed elsewhere. -->
+                                <delete dir="${javaapi.host.dir}"/>
+                                <copy todir="${javaapi.host.dir}">
+                                    <fileset dir="${project.basedir}/../../vm/JavaAPI/src"
+                                             includes="com/codename1/impl/JdkHost.java,com/codename1/impl/PosixJdkHost.java"/>
+                                </copy>
                             </target>
                         </configuration>
                     </execution>
@@ -105,6 +116,7 @@
                     <excludeRoots>
                         <excludeRoot>${backend.dir}/src</excludeRoot>
                         <excludeRoot>${backend.shared.dir}</excludeRoot>
+                        <excludeRoot>${javaapi.host.dir}</excludeRoot>
                     </excludeRoots>
                 </configuration>
                 <executions>

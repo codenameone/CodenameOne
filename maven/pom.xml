@@ -751,6 +751,8 @@
             </activation>
             <modules>
                 <module>core-unittests</module>
+                <!-- vm/JavaAPI against the JDK, relocated side by side. -->
+                <module>jdk-parity-tests</module>
             </modules>
         </profile>
         <!--

@@ -19,6 +19,15 @@
             <artifactId>codenameone-factory</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- com.codename1.impl.JdkHost, the superclass of CoreJdkHost. It
+             belongs to the class library (Ports/CLDC11 here, vm/JavaAPI on
+             device), so the core compiles against it and does not ship it;
+             the Java SE and Android ports carry their own copy. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>java-runtime</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
     <properties>
         <java.version>1.5</java.version>
