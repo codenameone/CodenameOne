@@ -203,7 +203,7 @@ image::img/wayline-ride-driver-on-the-way.png["The rider screen while a driver a
 On a phone the app doesn't have to stay open for any of this. A notification
 says when a driver accepts, when they arrive, when the trip starts and when it
 ends, and tapping one opens the ride. While a driver is on the way, the ride
-also shows outside the app: on the lock screen and in the Dynamic Island of an
+also shows outside the app: on the lock screen and on the Dynamic Island of an
 iPhone, and as an ongoing notification on Android. It names the driver, the car
 and its plate, counts down the minutes to the pickup and fills a bar as the
 ride goes from on the way to arrived, the trip and its end. It moves on with
@@ -221,7 +221,7 @@ notification in its output instead.
 | Where | What shows
 
 | iPhone
-| A Live Activity on the lock screen and in the Dynamic Island.
+| A Live Activity on the lock screen and on the Dynamic Island.
 
 | Android
 | An ongoing notification. The first ride asks for permission to show

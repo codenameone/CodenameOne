@@ -800,7 +800,7 @@ A refusal carries its status and the service's explanation in `getError()`:
   `-1` when the service didn't say.
 
 Only a request that got no answer at all, because the service was unreachable or
-the connection failed, throws an `IOException`. A send is one HTTPS request on the
+the connection failed, throws an `IOException`. Each notification is one HTTPS request on the
 calling thread, so a server that notifies as part of handling a request can hand it
 to an `@Async` method rather than make its own caller wait. `withEndpoint` points a
 sender at another URL, such as a stub server in a test.

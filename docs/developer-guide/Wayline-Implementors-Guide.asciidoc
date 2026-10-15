@@ -1293,7 +1293,7 @@ own collapse key, so a phone that was out of reach shows the latest step and not
 every one. An offer to a driver lives only as long as the offer, fifteen seconds
 by default: one delivered later would offer a ride that's gone.
 
-The **Notifications** switches in the app's settings decide what's said. A
+The switches under **Notifications** in the app's settings decide what's said. A
 switch that's off silences the notification and nothing else, so the lock screen
 still follows the ride:
 
@@ -1381,7 +1381,7 @@ include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wa
 === The ride on the lock screen
 
 While a driver is on the way, the rider's ride shows outside the app: a Live
-Activity on the lock screen and in the Dynamic Island of an iPhone, an ongoing
+Activity on the lock screen and on the Dynamic Island of an iPhone, an ongoing
 notification on Android, and a small window on the desktop and in the
 simulator. A browser shows none. <<external-surfaces>> covers the API.
 

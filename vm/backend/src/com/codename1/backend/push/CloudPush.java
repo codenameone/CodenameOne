@@ -46,7 +46,7 @@ import java.util.Map;
 /// a credential: keep it in configuration, not in source, and never ship it in
 /// the app.
 ///
-/// A send is one HTTPS request, made with [Web] on the calling thread. Every
+/// Each notification is one HTTPS request, made with [Web] on the calling thread. Every
 /// answer the service gives comes back as a [PushResult], refusals included;
 /// only a request that got no answer at all throws. Nothing here logs, so the
 /// key and the device tokens reach no log through this class.
