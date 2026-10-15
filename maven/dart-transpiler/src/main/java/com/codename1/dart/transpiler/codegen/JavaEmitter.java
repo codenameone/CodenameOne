@@ -3904,6 +3904,12 @@ public final class JavaEmitter {
             if (t.type.is("Null")) {
                 // `x is Null` holds only for null; it mapped to Object, which is the opposite.
                 check = subject + " == null";
+            } else if (reportTypeVariableWitness(t, t.type, ctx,
+                    "'" + (t.negated ? "is! " : "is ") + t.type.name + "'")) {
+                // `instanceof T`/`DartRuntime.isOrNull(x, T.class)` for a bare type-variable
+                // T is not merely wrong -- javac refuses both, since erasure leaves T with no
+                // reifiable class to test against. Diagnosed above rather than emitted.
+                check = "false";
             } else if (t.type.nullable) {
                 // `x is int?` holds for null too. The subject is evaluated once, inside the
                 // helper, so `next() is int?` does not call next() twice.
@@ -3961,7 +3967,11 @@ public final class JavaEmitter {
         String n = t.name;
         if (n.equals("int") || n.equals("double") || n.equals("num") || n.equals("bool")
                 || n.equals("String") || n.equals("Object") || n.equals("dynamic") || n.equals("var")
-                || n.equals("Null") || n.equals("void") || n.equals("Function")) {
+                || n.equals("Null") || n.equals("void") || n.equals("Function")
+                // Duration and Stopwatch are dart:core classes javaType maps by a bare-name
+                // special case, same as CORE_ERRORS below -- neither is a stub or program
+                // class, so without this they would read as unresolved type variables too.
+                || n.equals("Duration") || n.equals("Stopwatch")) {
             return false;
         }
         if (program.resolveClass(n, ctx.library()) != null || program.classesByName.containsKey(n)
@@ -3969,8 +3979,50 @@ public final class JavaEmitter {
                 || stubs.isStubClass(n) || stubs.isStubEnum(n) || typedefSig(n) != null) {
             return false;
         }
+        // dart:core's error/exception hierarchy (StateError, ArgumentError, ...) resolves
+        // through CORE_ERRORS rather than the stub/program registries javaType otherwise
+        // falls through -- it is not a stub class, so without this `e is StateError` on a
+        // caught Object (dart_thrown_values_round14 and friends) was misread as a type
+        // variable, the same bare name javaType leaves unresolved either way. See
+        // isThrowableType for the matching "Error"/"Exception" bare-name policy.
+        if (CORE_ERRORS.containsKey(n) || n.equals("Error") || n.equals("Exception")) {
+            return false;
+        }
         String jt = javaType(t, true, ctx);
         return jt.equals(n);
+    }
+
+    /**
+     * Reports E0142 when {@code t} is an unresolved type VARIABLE (an enclosing generic
+     * method's or class's {@code <T>}, not a concrete class) at a site that needs a runtime
+     * type to check or filter by. Type parameters are erased throughout this transpiler --
+     * there is no reified {@code T} to hand the runtime, the way Dart itself can -- so a
+     * construct that NEEDS one here cannot be lowered correctly. Without this check, each
+     * such site either (a) silently drops the check (a null {@code Class} witness read as
+     * "match everything", as {@code whereType} did), or (b) emits Java that mentions the type
+     * variable where erasure forbids it ({@code instanceof T}, {@code T.class}), which is
+     * always a compile error in the generated sources -- never a clean build with a wrong
+     * answer, but just as opaque to a developer who does not expect generated-code errors.
+     * Reified generics (a hidden {@code Class<T>} witness threaded through every generic
+     * call) would fix this properly; that is a pervasive, deliberately unimplemented cost
+     * (see the DELIBERATE note on erased type arguments in {@link #emitExpr}'s IsTest
+     * branch), so the fix here is a clear diagnostic instead of a silent or opaque failure.
+     *
+     * @return true when {@code t} is a type variable and the error was reported; the caller
+     *         should then emit a placeholder rather than the construct it was building
+     */
+    private boolean reportTypeVariableWitness(Node node, TypeRef t, Ctx ctx, String construct) {
+        if (!isTypeVariable(t, ctx)) {
+            return false;
+        }
+        diags.error(node, "E0142", construct + ": '" + t.name + "' is a type parameter here, "
+                + "not a concrete type. Generics are erased, so there is no runtime Class for "
+                + "'" + t.name + "' to check or filter by, and using it silently matches "
+                + "everything (or fails to compile) instead of doing what Dart does. Pass a "
+                + "concrete type argument at this call site, or add an explicit "
+                + "java.lang.Class<" + t.name + "> parameter to the enclosing method and "
+                + "thread it through by hand.");
+        return true;
     }
 
     /**
@@ -3983,10 +4035,15 @@ public final class JavaEmitter {
         Out o = emitExpr(c.operand, null, ctx);
         String jt = javaType(c.type, true, ctx);
         TypeRef target = c.type;
+        // No class to test a type variable against; Dart reifies it, Java erases it. An
+        // unchecked cast here would never throw even when the value is not a T -- silently
+        // wrong, the same way an unwitnessed whereType<T>() was -- so this is diagnosed
+        // rather than lowered. See reportTypeVariableWitness.
+        if (reportTypeVariableWitness(c, target, ctx, "'as " + target.name + "'")) {
+            return new Out("((" + jt + ") " + o.code + ")", c.type, true);
+        }
         boolean unchecked = target.is("dynamic") || target.is("var")
                 || (target.is("Object") && target.nullable)
-                // No class to test a type variable against; Dart reifies it, Java erases it.
-                || isTypeVariable(target, ctx)
                 // An upcast to the static type it already has cannot fail.
                 || (o.type != null && !isDynamic(o.type) && o.type.args.isEmpty() && target.args.isEmpty()
                     && o.type.name != null && o.type.name.equals(target.name)
@@ -8015,11 +8072,18 @@ public final class JavaEmitter {
                 // class for a type the emitter maps to a Java primitive). No explicit
                 // <T> (whereType<dynamic>()) passes a null witness, which the runtime
                 // treats the same way Dart does: every non-null element passes.
+                //
+                // An ENCLOSING generic method's <T> (only<T>(xs) => xs.whereType<T>()) is
+                // neither: it is a real, specific type at the call site, but this emitter
+                // erases it -- there is no Class to pass -- so it used to fall into the
+                // null-witness branch above and silently filter nothing instead of only T.
+                // Diagnosed instead of lowered: see reportTypeVariableWitness.
                 TypeRef sub = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
-                String token = "null";
-                if (sub != null && !isTypeVariable(sub, ctx)) {
-                    token = javaType(sub, true, ctx) + ".class";
+                if (sub != null && reportTypeVariableWitness(c, sub, ctx, "'whereType<" + sub.name + ">()'")) {
+                    return new Out(target.code + ".whereType(null)",
+                            TypeRef.of("Iterable", TypeRef.DYNAMIC), true);
                 }
+                String token = sub != null ? javaType(sub, true, ctx) + ".class" : "null";
                 return new Out(target.code + ".whereType(" + token + ")",
                         TypeRef.of("Iterable", sub != null ? sub : TypeRef.DYNAMIC));
             }
@@ -9521,12 +9585,23 @@ public final class JavaEmitter {
             TypeRef sub = null;
             if (!c.typeArgs.isEmpty()) {
                 sub = c.typeArgs.get(0);
+                // The explicit <T> can itself be an ENCLOSING generic method's type
+                // variable (e.g. `T lookup<T>(BuildContext ctx) => Provider.of<T>(ctx);`),
+                // which is erased here same as whereType's <T> -- there is no Class<T> to
+                // hand the runtime method, and `T.class` is a compile error besides.
+                // Diagnosed rather than lowered; see reportTypeVariableWitness.
+                if (reportTypeVariableWitness(c, sub, ctx, "'" + m.name + "<" + sub.name + ">'")) {
+                    String placeholderArgs = args.isEmpty() ? "null" : args + ", null";
+                    return new Out(callee + "(" + placeholderArgs + ")", sub, true);
+                }
             } else if (INFERRED_WITNESS_METHODS.contains(m.name)
                     && ctx.methodReturnType != null && isConcreteType(ctx.methodReturnType)
                     && !ctx.methodReturnType.is("void") && !ctx.methodReturnType.is("dynamic")) {
                 // A BuildContext ancestor lookup (`X.of(context) =>
                 // context.dependOnInheritedWidgetOfExactType()`) whose <T> was inferred
                 // from and dropped by the enclosing return type. Recover it from there.
+                // ctx.methodReturnType is already vetted concrete by isConcreteType above,
+                // so it is never a type variable here.
                 sub = ctx.methodReturnType;
             }
             if (sub != null) {
