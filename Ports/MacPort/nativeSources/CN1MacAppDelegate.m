@@ -877,6 +877,20 @@ extern void CN1MacRefreshModifiers(void);
     (void) notification;
 }
 
+/// Reopening through Finder or the Dock is distinct from Cmd-Tab activation.
+/// Restore the existing surface without constructing a new Form or document.
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
+    NSWindow *window = [CN1MacHost sharedHost].builtWindow;
+    if (window != nil && (window.miniaturized || !hasVisibleWindows)) {
+        if (window.miniaturized) {
+            [window deminiaturize:nil];
+        }
+        [window makeKeyAndOrderFront:nil];
+        return NO; // Already handled; suppress AppKit's default untitled-document action.
+    }
+    return YES;
+}
+
 /// Quitting with the last window is the behaviour every other Codename One port
 /// has, and what Display.exitApplication and a window close both mean here. It
 /// is not the Mac convention for a document application -- those stay running

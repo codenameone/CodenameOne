@@ -2482,6 +2482,13 @@ Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 (void* peer, int x, int y, int width, int height) {
+#if TARGET_OS_OSX
+    // This entry point flushes the main PaintSurface. Secondary windows use
+    // macWindowFlush directly. Creating a window's cached Graphics can leave
+    // its view selected before the main surface's pending repaint is flushed;
+    // make the destination explicit so that repaint cannot cover the dialog.
+    [CN1MacHost sharedHost].activeRenderingView = nil;
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl started");
     [[CodenameOne_GLViewController instance] flushBuffer:(BRIDGE_CAST CN1Image *)peer x:x y:y width:width height:height];
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");

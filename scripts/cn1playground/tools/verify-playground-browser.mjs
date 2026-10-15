@@ -144,13 +144,20 @@ try {
   await setCode('class Greeter { String hi() { return "v1"; } }\nSystem.out.println("PG-RUN " + new Greeter().hi());\n'
       + 'Label l = new Label(new Greeter().hi());\nl\n');
   r = await waitFor(l => l.startsWith('PG-RUN'), 30000);
-  check('typed code compiles and runs', r === 'PG-RUN v1', r);
+  // The snippet prints before PlaygroundRunner emits its terminal result. Consume
+  // that result before starting another edit, otherwise it can be mistaken for
+  // the following compilation's result (notably the host-class rejection below).
+  let completed = await waitFor(l => l.startsWith('[playground]'), 30000);
+  check('typed code compiles and runs', r === 'PG-RUN v1' && completed?.includes('preview updated'),
+      [r, completed].join(' | '));
 
   log.length = 0;
   await setCode('class Greeter { String hi() { return "v2"; } }\nSystem.out.println("PG-RUN " + new Greeter().hi());\n'
       + 'Label l = new Label(new Greeter().hi());\nl\n');
   r = await waitFor(l => l.startsWith('PG-RUN'), 30000);
-  check('a re-run redefines classes of the same name', r === 'PG-RUN v2', r);
+  completed = await waitFor(l => l.startsWith('[playground]'), 30000);
+  check('a re-run redefines classes of the same name', r === 'PG-RUN v2' && completed?.includes('preview updated'),
+      [r, completed].join(' | '));
 
   // A class whose VM name is a host class's (java/lang/String is java_lang_String) must be
   // refused before it is evaluated, and leave the running VM intact for the next run.
@@ -161,7 +168,9 @@ try {
   log.length = 0;
   await setCode('System.out.println("PG-RUN after " + "x".length());\nLabel l = new Label("ok");\nl\n');
   r = await waitFor(l => l.startsWith('PG-RUN'), 30000);
-  check('the VM still works after the refused class', r === 'PG-RUN after 1', r);
+  completed = await waitFor(l => l.startsWith('[playground]'), 30000);
+  check('the VM still works after the refused class', r === 'PG-RUN after 1' && completed?.includes('preview updated'),
+      [r, completed].join(' | '));
 
   log.length = 0;
   await setCode('Button b = new Button("Boom");\nb.addActionListener(e -> { String s = null; s.length(); });\n'

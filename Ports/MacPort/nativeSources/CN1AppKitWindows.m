@@ -738,8 +738,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_T
                 other.pendingOwner = nil;
             }
         }
+        NSWindow *owner = rec.pendingOwner;
         [rec.window orderOut:nil];
         [rec.window close];
+        if ([NSApp keyWindow] == nil && owner.isVisible && owner.canBecomeKeyWindow) {
+            // The modal gate can be lifted before this close, while the dialog
+            // is still key. AppKit then has no remaining key window. Restore
+            // its owner without ordering or activating the application.
+            [owner makeKeyWindow];
+        }
         [cn1WindowTable() replaceObjectAtIndex:slot withObject:[NSNull null]];
         // A destroyed window is one fewer on screen.
         CN1MacWindowVisibilityChanged();
@@ -1306,6 +1313,13 @@ static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled) {
     // blocked window could take key focus back from the modal one and then throw
     // away every keystroke aimed at it.
     CN1MacWindowSetAcceptsKey(w, enabled);
+    if (enabled && w.isVisible && [NSApp keyWindow] == nil) {
+        // Closing a modal can leave no key window: AppKit tried to select the
+        // owner while the framework still had its input gate disabled. Once
+        // that gate is lifted, restore keyboard focus without raising an
+        // inactive application or stealing it from another window.
+        [w makeKeyWindow];
+    }
     if (!enabled && w.isKeyWindow) {
         // Already holding it, so the gate alone is too late -- it only refuses
         // the next request. Hand the keyboard to the window that caused the

@@ -43,6 +43,66 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// The opt-in that backs a `Dialog` with a real operating system window.
 class NativeWindowDialogTest extends UITestBase {
 
+    @FormTest
+    void firstNativeDialogEditorKeepsItsInputSessionAfterShowing() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        final TextInputClient[] active = new TextInputClient[1];
+        EditField field = new EditField() {
+            @Override public boolean isTextInputSupported() { return true; }
+            @Override public Object startTextInput(TextInputClient client, TextInputConfig config) {
+                assertNotNull(((Window) getTopLevelContainer()).getNativePeer(),
+                        "input must start after its native owner exists");
+                active[0] = client;
+                return client;
+            }
+            @Override public void stopTextInput(Object handle) {
+                if (active[0] == handle) active[0] = null;
+            }
+        };
+        Dialog dialog = new Dialog("search");
+        dialog.setLayout(new BorderLayout());
+        dialog.add(BorderLayout.NORTH, field);
+        dialog.add(BorderLayout.SOUTH, new Button("Close"));
+        dialog.setNativeWindowMode(true);
+        dialog.showModeless();
+        DisplayTest.flushEdt();
+        try {
+            assertSame(field, field.getTopLevelContainer().getFocused());
+            assertSame(field, active[0], "the initially focused editor must own a live input session");
+        } finally {
+            dialog.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void nativeDialogMeasuresAgainstItsOwnerRatherThanItsInitialWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        Dialog dialog = new Dialog("wide content");
+        dialog.setLayout(new BorderLayout());
+        Label body = new Label("wide cell editor");
+        body.setPreferredW(600);
+        dialog.add(BorderLayout.CENTER, body);
+        dialog.setNativeWindowMode(true);
+        dialog.showModeless();
+        DisplayTest.flushEdt();
+        try {
+            assertSame(main, dialog.resolveHost(),
+                    "moving the payload into its window must not make it its own sizing host");
+            assertTrue(wm.getLastWindow().getWidth() >= 600,
+                    "the initial peer width must not clip wider dialog content");
+        } finally {
+            dialog.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
     private Dialog newDialog(String title) {
         Dialog d = new Dialog(title);
         d.setLayout(new BorderLayout());

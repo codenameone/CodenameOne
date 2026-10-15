@@ -44,6 +44,105 @@ import static org.junit.jupiter.api.Assertions.*;
 class AccessibilitySemanticsTest extends UITestBase {
 
     @FormTest
+    void touchOnlyPortsActivateButtonsAndToggleStateWithoutHardwareKeys() {
+        implementation.setHardwareGameKeysSupported(false);
+        try {
+            Form form = form();
+            Button button = place(form, new Button("Save"), 0, 0, 100, 40);
+            CheckBox check = place(form, new CheckBox("Repeat header"), 0, 50, 150, 40);
+            final int[] clicks = {0};
+            button.addActionListener(e -> clicks[0]++);
+            AccessibilityAction action = find(AccessibilityInspector.snapshot(form), button)
+                    .getAction(AccessibilityAction.ACTIVATE);
+            assertTrue(action.perform(button, null));
+            assertEquals(1, clicks[0]);
+            AccessibilityAction toggle = find(AccessibilityInspector.snapshot(form), check)
+                    .getAction(AccessibilityAction.ACTIVATE);
+            assertTrue(toggle.perform(check, null));
+            assertTrue(check.isSelected());
+            assertTrue(toggle.perform(check, null));
+            assertFalse(check.isSelected());
+            button.setEnabled(false);
+            assertFalse(action.perform(button, null));
+            assertEquals(1, clicks[0]);
+        } finally {
+            implementation.setHardwareGameKeysSupported(true);
+        }
+    }
+
+    @FormTest
+    void touchOnlyListAndComboItemsSelectAndDispatchExactlyOneAction() {
+        implementation.setHardwareGameKeysSupported(false);
+        try {
+            Form form = form();
+            for (com.codename1.ui.List<String> list : new com.codename1.ui.List[] {
+                    new com.codename1.ui.List<String>("Home", "Insert", "Layout"),
+                    new com.codename1.ui.ComboBox<String>("Home", "Insert", "Layout")}) {
+                place(form, list, 0, 0, 200, 160);
+                final int[] changes = {0};
+                list.addActionListener(e -> changes[0]++);
+                AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+                AccessibilityNodeSnapshot item = tree.getNode(find(tree, list).getChildIds().get(1));
+                assertTrue(item.getAction(AccessibilityAction.ACTIVATE).perform(list, null));
+                assertEquals(1, list.getSelectedIndex());
+                assertEquals(1, changes[0]);
+                if (list instanceof com.codename1.ui.ComboBox) {
+                    AccessibilityAction adjust = find(AccessibilityInspector.snapshot(form), list)
+                            .getAction(AccessibilityAction.SCROLL_FORWARD);
+                    assertTrue(adjust.perform(list, null));
+                    assertEquals(2, list.getSelectedIndex());
+                    assertEquals(2, changes[0]);
+                }
+                int previousChanges = changes[0];
+                list.setEnabled(false);
+                assertFalse(item.getAction(AccessibilityAction.ACTIVATE).perform(list, null));
+                assertEquals(previousChanges, changes[0]);
+                list.remove();
+            }
+        } finally {
+            implementation.setHardwareGameKeysSupported(true);
+        }
+    }
+
+    @FormTest
+    void semanticListActivationIsIndependentOfTheLastPointerDrag() throws Exception {
+        java.lang.reflect.Field drag = Display.class.getDeclaredField("dragOccured");
+        drag.setAccessible(true);
+        Display display = Display.getInstance();
+        boolean old = drag.getBoolean(display);
+        try {
+            Form form = form();
+            for (com.codename1.ui.List<String> list : new com.codename1.ui.List[] {
+                    new com.codename1.ui.List<String>("Home", "Insert"),
+                    new com.codename1.ui.ComboBox<String>("Home", "Insert")}) {
+                place(form, list, 0, 0, 200, 160);
+                final int[] actions = {0};
+                list.addActionListener(e -> actions[0]++);
+                drag.setBoolean(display, true);
+                assertTrue(display.hasDragOccured());
+                AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+                AccessibilityNodeSnapshot item = tree.getNode(find(tree, list).getChildIds().get(1));
+                assertTrue(item.getAction(AccessibilityAction.ACTIVATE).perform(list, null));
+                assertEquals(1, list.getSelectedIndex());
+                assertEquals(1, actions[0]);
+                assertTrue(display.hasDragOccured(), "semantic actions must not reset pointer gesture state");
+                list.remove();
+            }
+            class PointerList extends com.codename1.ui.List<String> {
+                PointerList() { super("One", "Two"); }
+                void pointerAction() { fireActionEvent(); }
+            }
+            PointerList pointer = new PointerList();
+            final int[] actions = {0};
+            pointer.addActionListener(e -> actions[0]++);
+            pointer.pointerAction();
+            assertEquals(0, actions[0], "ordinary pointer activation still respects the drag guard");
+        } finally {
+            drag.setBoolean(display, old);
+        }
+    }
+
+    @FormTest
     void associatedLabelChangesInvalidateTheCachedSnapshot() {
         Form form = form();
         TextArea area = new TextArea("Field content");

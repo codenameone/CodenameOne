@@ -35,7 +35,7 @@ import java.util.Vector;
 /**
  * Abstraction of the underlying native API's
  */
-public final class IOSNative {
+public class IOSNative {
 
     native long beginBackgroundTask();
 
@@ -79,8 +79,8 @@ public final class IOSNative {
             int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,
             String hint, int hintColor, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment,
             boolean returnExitsEditing);
-    native void startTextInput(int constraint, boolean autoCorrect, boolean autoCapitalize, boolean multiline, String initialText, int selStart, int selEnd, int actionType);
-    native void updateTextInputState(String text, int selStart, int selEnd, int caretX, int caretY, int caretW, int caretH, int seq);
+    native void startTextInput(int constraint, boolean autoCorrect, boolean autoCapitalize, boolean multiline, String initialText, int selStart, int selEnd, int actionType, int captureId);
+    native void updateTextInputState(String text, int selStart, int selEnd, int caretX, int caretY, int caretW, int caretH, int seq, int captureId);
     native void setTextInputBounds(int x, int y, int w, int h);
     native void stopTextInput();
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
@@ -141,6 +141,7 @@ public final class IOSNative {
     native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
+    native void textRunPositionsNative(long peer, String text, boolean rtl, int[] positions);
     native int charWidthNative(long peer, char ch);
     native int getFontHeightNative(long peer);
     native int fontAscentNative(long peer);
@@ -697,6 +698,7 @@ public final class IOSNative {
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
     native void openFileChooser(String accept);
+    native void openFileChooserWithId(String accept, int requestId);
 
     // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
     // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side

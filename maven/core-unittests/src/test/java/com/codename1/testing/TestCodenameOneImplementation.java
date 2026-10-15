@@ -211,6 +211,27 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean nativeTitle;
     private boolean desktop;
     private String desktopTitleBarMode = "toolbar";
+    private int[] lastTitleBarRegions;
+    private int[] nativeTitleBarInsets;
+
+    public void setNativeTitleBarInsets(int... values) {
+        nativeTitleBarInsets = values;
+    }
+
+    @Override
+    public int[] getNativeWindowTitleBarInsets(Component toolbar) {
+        return nativeTitleBarInsets;
+    }
+
+    @Override
+    public void setNativeWindowTitleBarRegions(Component toolbar, int[] regions) {
+        lastTitleBarRegions = regions;
+    }
+
+    public int[] getLastTitleBarRegions() {
+        return lastTitleBarRegions;
+    }
+
     private java.util.Vector lastNativeCommands;
     private int softkeyCount = 2;
     private boolean thirdSoftButton = false;
@@ -1524,6 +1545,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        hardwareGameKeysSupported = true;
         repaintLog = null;
         // Back to the default a test class starts from. Runs on every UITestBase
         // teardown, so a test that switches touch off and forgets -- or restores the
@@ -1542,6 +1564,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         shiftKeyDown = false;
         nativeCommandsSupported = true;
         lastNativeCommands = null;
+        lastTitleBarRegions = null;
+        nativeTitleBarInsets = null;
         clearFileSystem();
         clearSockets();
         clearConnections();
@@ -2678,12 +2702,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public int getGameAction(int keyCode) {
-        return keyCode;
+        return hardwareGameKeysSupported ? keyCode : -1;
+    }
+
+    private boolean hardwareGameKeysSupported = true;
+
+    public void setHardwareGameKeysSupported(boolean supported) {
+        hardwareGameKeysSupported = supported;
     }
 
     @Override
     public int getKeyCode(int gameAction) {
-        return gameAction;
+        return hardwareGameKeysSupported ? gameAction : -1;
     }
 
     @Override

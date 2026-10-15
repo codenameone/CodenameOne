@@ -158,7 +158,7 @@ public class Dialog extends Form implements AbstractDialog {
     private static boolean defaultInteractionDialogModeInitialized;
     private static boolean defaultTitleCentered;
     /// Indicates whether the dialog has been disposed
-    private boolean disposed;
+    private volatile boolean disposed; // NOPMD AvoidUsingVolatile - publishes EDT disposal to the modal waiting thread
     /// Indicates the time in which the alert should be disposed
     private long time;
     /// The off-surface half of the timeout, so it still arrives while the surface
@@ -2040,6 +2040,12 @@ public class Dialog extends Form implements AbstractDialog {
     TopLevelContainer resolveHost() {
         if (hostTopLevel != null) {
             return hostTopLevel;
+        }
+        if (nativeWindow != null) {
+            // Its payload is now parented to this new window. The owner still
+            // supplies the sizing context; measuring against the initial peer
+            // would cap wider content at that peer's default width forever.
+            return nativeWindow.getOwnerWindow();
         }
         if (getParent() != null) {
             TopLevelContainer attached = getTopLevelContainer();
@@ -3939,7 +3945,11 @@ public class Dialog extends Form implements AbstractDialog {
     /// Allows us to indicate disposed state for dialogs
     @Override
     boolean isDisposed() {
-        return disposed || isTimedOut();
+        // RunnableWrapper polls this from invokeAndBlock's worker. Expiring a
+        // timeout disposes UI and removes an animation; doing that here off the
+        // EDT races Form.loopAnimations(). The animation poll and timeout clock
+        // both run on the EDT, so the worker only needs to observe their result.
+        return disposed || (Display.getInstance().isEdt() && isTimedOut());
     }
 
     /// Allows us to indicate disposed state for dialogs

@@ -2824,6 +2824,34 @@ public abstract class CodenameOneImplementation {
     /// the width of the given string in this font instance
     public abstract int stringWidth(Object nativeFont, String str);
 
+    /// Bulk caret measurement for a single directional text run. Ports with a shaping engine
+    /// should override this compatibility fallback to shape the run once.
+    public int[] getTextRunPositions(Object nativeFont, String text, boolean rtl) {
+        int[] positions = new int[text.length() + 1];
+        for (int i = 0; i < positions.length; i++) {
+            positions[i] = stringWidth(nativeFont, rtl ? text.substring(i) : text.substring(0, i));
+        }
+        return positions;
+    }
+
+    /// Revalidates a pure text client's top level and reveals its caret after the keyboard changes
+    /// the available viewport. Called on the EDT, independently of legacy native text widgets.
+    protected void revealTextInputClient(com.codename1.ui.TextInputClient client) {
+        if (!(client instanceof Component)) {
+            return;
+        }
+        Component component = (Component) client;
+        com.codename1.ui.TopLevelContainer top = component.getTopLevelContainer();
+        if (top == null) {
+            return;
+        }
+        component.requestFocus();
+        top.asContainer().revalidate();
+        int[] caret = client.getCaretRect();
+        component.scrollRectToVisible(caret[0] - component.getAbsoluteX(),
+                caret[1] - component.getAbsoluteY(), Math.max(1, caret[2]), Math.max(1, caret[3]), component);
+    }
+
     /// Return the width of the specific character when rendered alone
     ///
     /// #### Parameters
@@ -5313,6 +5341,23 @@ public abstract class CodenameOneImplementation {
     /// Closes the native desktop window when the application draws its own (custom mode)
     /// window chrome. No-op on platforms without a native window.
     public void closeNativeWindow() {
+    }
+
+    /// Publishes the custom Toolbar's native title-bar hit regions. Coordinates are
+    /// absolute component pixels relative to its window. The first x/y/width/height
+    /// rectangle is the title band; subsequent rectangles exclude interactive children.
+    /// An empty array clears the regions. Ports with native event tracking can use this
+    /// to start an OS window drag before dispatching a component pointer event.
+    public void setNativeWindowTitleBarRegions(Component toolbar, int[] regions) {
+    }
+
+    /// Returns reserved title-bar space for an integrated custom Toolbar, in component pixels.
+    /// The five entries are physical left, right, top, bottom insets and minimum band height.
+    /// Return null when native integration is unavailable. Called on the EDT during layout;
+    /// implementations must not call Java UI code while querying their native UI thread.
+    /// Mobile and browser ports retain the null implementation.
+    public int[] getNativeWindowTitleBarInsets(Component toolbar) {
+        return null;
     }
 
     /// Begins dragging the native desktop window (custom mode title bar). The arguments are

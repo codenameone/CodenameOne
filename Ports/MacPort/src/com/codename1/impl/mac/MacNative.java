@@ -60,6 +60,9 @@ class MacNative {
     /// Cmd-Q or a window close does. See MacImplementation.exitApplication.
     native void requestTerminate();
 
+    native void macTitleBarInsets(int[] result);
+    native void macSetTitleBarRegions(int windowId, int[] regions);
+
     native void macWindowDestroy(int slot);
 
     native void macWindowShow(int slot, boolean visible);

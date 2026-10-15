@@ -91,6 +91,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 @end
 
+@interface METALView ()
+- (BOOL)cn1DeferNativeEdit:(void (^)(void))edit;
+- (void)cn1SendEditorKeyCommand:(int)command modifiers:(int)modifiers;
+- (void)cn1SendEditorKeyCommand:(int)command;
+@end
+
 @implementation METALView {
     NSTrackingArea *cn1TrackingArea;
     NSMutableIndexSet *consumedKeys;
@@ -258,6 +264,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 @synthesize projectionMatrix;
 @synthesize cn1WindowId;
 @synthesize cn1InputEnabled;
+@synthesize cn1TitleBarRegions;
 
 /// Custom setter so the peer blocker follows the flag wherever it is set from.
 - (void)setCn1InputEnabled:(BOOL)enabled {
@@ -1171,6 +1178,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.renderPassDescriptor = nil;
     self.renderCommandEncoder = nil;
     self.peerComponentsLayer = nil;
+    self.cn1TitleBarRegions = nil;
     if (cn1TrackingArea != nil) {
         [self removeTrackingArea:cn1TrackingArea];
         [cn1TrackingArea release];
@@ -1496,7 +1504,45 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
     }
 }
 
+- (BOOL)cn1IsTitleBarEvent:(NSEvent *)event {
+    if (!self.cn1InputEnabled || self.cn1TitleBarRegions.length < 4 * sizeof(int32_t)) {
+        return NO;
+    }
+    CGPoint p = [self cn1PointFromEvent:event];
+    const int32_t *regions = self.cn1TitleBarRegions.bytes;
+    NSUInteger count = self.cn1TitleBarRegions.length / (4 * sizeof(int32_t));
+    for (NSUInteger i = 0; i < count; i++) {
+        const int32_t *r = regions + i * 4;
+        BOOL inside = p.x >= r[0] && p.y >= r[1] && p.x < r[0] + r[2] && p.y < r[1] + r[3];
+        if ((i == 0 && !inside) || (i > 0 && inside)) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 - (void)mouseDown:(NSEvent *)event {
+    if ([self cn1IsTitleBarEvent:event]) {
+        if (event.clickCount == 2) {
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            NSString *action = [defaults stringForKey:@"AppleActionOnDoubleClick"];
+            if ((action != nil && [action caseInsensitiveCompare:@"Minimize"] == NSOrderedSame)
+                    || (action == nil && [defaults boolForKey:@"AppleMiniaturizeOnDoubleClick"])) {
+                [self.window performMiniaturize:nil];
+            } else if (action == nil || [action caseInsensitiveCompare:@"Maximize"] == NSOrderedSame
+                    || [action caseInsensitiveCompare:@"Zoom"] == NSOrderedSame
+                    || [action caseInsensitiveCompare:@"Fill"] == NSOrderedSame) {
+                // These canvas windows use AppKit's full visible-frame standard
+                // size, so native zoom also provides Fill and restores on repeat.
+                [self.window performZoom:nil];
+            }
+        } else {
+            // AppKit owns tracking, screen snapping and the final release. No
+            // Java press is sent, so dragging cannot activate a document control.
+            [self.window performWindowDragWithEvent:event];
+        }
+        return;
+    }
     CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
@@ -1507,6 +1553,7 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
 }
 
 - (void)mouseUp:(NSEvent *)event {
+    if (!cn1PointerPressActive) { return; }
     CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
@@ -1863,6 +1910,10 @@ static int CN1MacKeyCode(NSEvent *event) {
         // rather than reading characters directly is what buys dead keys, CJK
         // input methods, dictation and the Emacs key bindings for free.
         [[self cn1ConsumedKeys] addIndex:event.keyCode];
+        if ([self cn1DeferNativeEdit:^{
+            cn1CurrentModifiers = cn1ModifiersOf(event);
+            [self interpretKeyEvents:@[event]];
+        }]) { return; }
         [self interpretKeyEvents:@[event]];
         return;
     }
@@ -1968,6 +2019,7 @@ static int CN1MacKeyCode(NSEvent *event) {
 }
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if ([self cn1DeferNativeEdit:^{ [self insertText:string replacementRange:replacementRange]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         return;
@@ -2010,6 +2062,7 @@ static int CN1MacKeyCode(NSEvent *event) {
 - (void)setMarkedText:(id)string
         selectedRange:(NSRange)selectedRange
      replacementRange:(NSRange)replacementRange {
+    if ([self cn1DeferNativeEdit:^{ [self setMarkedText:string selectedRange:selectedRange replacementRange:replacementRange]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         return;
@@ -2078,6 +2131,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         // the discard, so re-entering it here would only come straight back.
         return;
     }
+    if ([self cn1DeferNativeEdit:^{ [self unmarkText]; }]) { return; }
     CN1MacTextInputNotifyFinishComposing();
     session.markedRange = NSMakeRange(NSNotFound, 0);
     [[NSTextInputContext currentInputContext] discardMarkedText];
@@ -2318,6 +2372,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)doCommandBySelector:(SEL)selector {
+    if ([self cn1DeferNativeEdit:^{ [self doCommandBySelector:selector]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!cn1OwnsSession(self, session)) {
         [super doCommandBySelector:selector];
@@ -2335,6 +2390,14 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     if (selector == @selector(insertTab:) || selector == @selector(insertBacktab:)) {
+        BOOL forward = (selector == @selector(insertTab:));
+        if (session.pureEditor && session.multiline) {
+            // TextInputClient owns indentation in a multiline editor, as on
+            // iOS. Do not end its session or move focus before delivering Tab.
+            // Single-line fields and the legacy text path still traverse below.
+            [self cn1SendEditorKeyCommand:18 modifiers:forward ? 0 : 1];
+            return;
+        }
         // Tab moves focus rather than inserting, which is the AppKit convention.
         //
         // The two are told apart, and traversal is asked for explicitly. Ending
@@ -2342,7 +2405,6 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         // pure editor reads that action as 0, which is "insert a newline", so Tab
         // put a line break into the field it was supposed to leave -- and
         // Shift-Tab, arriving here as the same case, did whatever Tab did.
-        BOOL forward = (selector == @selector(insertTab:));
         [session commitFinished:YES];
         extern JAVA_VOID com_codename1_impl_mac_MacImplementation_macTraverseTextEditing___boolean(
                 CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN forward);
@@ -2430,6 +2492,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     // fixed for the plain movement and left standing for the selecting
     // variant, which is the same key with Shift held.
     if (selector == @selector(moveToBeginningOfLineAndModifySelection:)
+        || selector == @selector(moveToLeftEndOfLineAndModifySelection:)
         || selector == @selector(moveToBeginningOfParagraphAndModifySelection:)) {
         NSUInteger anchor = [self cn1SelectionAnchor:sel];
         NSUInteger to = [self cn1LineStart:cn1ActiveEdge(sel, anchor) inText:session.text];
@@ -2438,6 +2501,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     if (selector == @selector(moveToEndOfLineAndModifySelection:)
+        || selector == @selector(moveToRightEndOfLineAndModifySelection:)
         || selector == @selector(moveToEndOfParagraphAndModifySelection:)) {
         NSUInteger anchor = [self cn1SelectionAnchor:sel];
         NSUInteger to = [self cn1LineEnd:cn1ActiveEdge(sel, anchor) inText:session.text];
@@ -2462,12 +2526,14 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     // offset 0 and End jumped to the end of the whole field -- which is a
     // different key's behaviour, not a rough approximation of this one.
     if (selector == @selector(moveToBeginningOfLine:)
+        || selector == @selector(moveToLeftEndOfLine:)
         || selector == @selector(moveToBeginningOfParagraph:)) {
         [self cn1SetSelection:NSMakeRange([self cn1LineStart:sel.location
                                                      inText:session.text], 0)];
         return;
     }
     if (selector == @selector(moveToEndOfLine:)
+        || selector == @selector(moveToRightEndOfLine:)
         || selector == @selector(moveToEndOfParagraph:)) {
         [self cn1SetSelection:NSMakeRange([self cn1LineEnd:NSMaxRange(sel)
                                                    inText:session.text], 0)];
@@ -2693,12 +2759,28 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 ///
 /// Reported as a key COMMAND rather than an editor action: an action ends the
 /// session, and undo is something done inside one.
-- (void)cn1SendEditorKeyCommand:(int)command {
-    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-            CODENAME_ONE_THREAD_STATE, JAVA_INT cmd, JAVA_INT modifiers);
+- (BOOL)cn1DeferNativeEdit:(void (^)(void))edit {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    return session.pureEditor && cn1OwnsSession(self, session) && [session deferNativeEdit:edit];
+}
+
+- (void)cn1SendEditorKeyCommand:(int)command modifiers:(int)modifiers {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    // The Java editor owns rich paste/undo results. Hold subsequent native edits
+    // until its sequenced state echo supplies the new text and selection.
+    if (session.markedRange.location != NSNotFound) {
+        session.markedRange = NSMakeRange(NSNotFound, 0);
+        CN1MacTextInputNotifyFinishComposing();
+    }
+    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int_int(
+            CODENAME_ONE_THREAD_STATE, JAVA_INT cmd, JAVA_INT modifiers, JAVA_INT sequence);
     struct ThreadLocalData *threadStateData = getThreadLocalData();
-    com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
-            threadStateData, (JAVA_INT)command, (JAVA_INT)0);
+    com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int_int(
+            threadStateData, (JAVA_INT)command, (JAVA_INT)modifiers, [session beginEditorCommand]);
+}
+
+- (void)cn1SendEditorKeyCommand:(int)command {
+    [self cn1SendEditorKeyCommand:command modifiers:0];
 }
 
 /// Guarded here as well as in validateUserInterfaceItem:, for the reason -copy:
@@ -2712,6 +2794,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 /// The condition is the same one validation answers with, deliberately: two
 /// spellings of "may this view undo" would eventually disagree.
 - (void)cn1PerformEditorUndoRedo:(int)command {
+    if ([self cn1DeferNativeEdit:^{ [self cn1PerformEditorUndoRedo:command]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!session.pureEditor || !cn1OwnsSession(self, session)) {
         return;
@@ -2728,6 +2811,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)copy:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self copy:sender]; }]) { return; }
     // Checked here as well as in validation: a key equivalent reaches the
     // responder chain directly and never asks whether the menu item is
     // enabled, so validation alone leaves Command-C working.
@@ -2746,6 +2830,12 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
     if (sel.length == 0) {
         return;
     }
+    if ([CN1MacTextInputSession sharedSession].pureEditor) {
+        // The Java editor owns rich clipboard representations, not just the
+        // plain-text shadow used by AppKit for IME and selection queries.
+        [self cn1SendEditorKeyCommand:12]; // TextInputClient.KEY_COPY
+        return;
+    }
     NSPasteboard *pb = [NSPasteboard generalPasteboard];
     [pb clearContents];
     [pb writeObjects:@[[[CN1MacTextInputSession sharedSession].text
@@ -2753,6 +2843,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)cut:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self cut:sender]; }]) { return; }
     if (cn1CutBlocked(self, [CN1MacTextInputSession sharedSession])) {
         return;
     }
@@ -2760,11 +2851,17 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
     if (sel.length == 0) {
         return;
     }
+    if ([CN1MacTextInputSession sharedSession].pureEditor
+            && cn1OwnsSession(self, [CN1MacTextInputSession sharedSession])) {
+        [self cn1SendEditorKeyCommand:13]; // TextInputClient.KEY_CUT
+        return;
+    }
     [self copy:sender];
     [self delete:sender];
 }
 
 - (void)delete:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self delete:sender]; }]) { return; }
     NSRange sel = [self cn1SelectionForEditing];
     if (sel.length == 0) {
         return;
@@ -2785,11 +2882,16 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)paste:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self paste:sender]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (cn1PasteBlocked(self, session)) {
         return;
     }
     if (!cn1OwnsSession(self, session)) {
+        return;
+    }
+    if (session.pureEditor) {
+        [self cn1SendEditorKeyCommand:14]; // TextInputClient.KEY_PASTE
         return;
     }
     NSString *pasted = [[NSPasteboard generalPasteboard]
@@ -2803,6 +2905,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 }
 
 - (void)selectAll:(id)sender {
+    if ([self cn1DeferNativeEdit:^{ [self selectAll:sender]; }]) { return; }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     // Ownership, like every other Edit action. Command-A is a key equivalent and
     // arrives here directly, so testing only "a session is active" let the key

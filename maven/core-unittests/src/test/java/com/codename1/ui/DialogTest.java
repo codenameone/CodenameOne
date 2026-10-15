@@ -224,6 +224,33 @@ class DialogTest extends UITestBase {
     }
 
     @FormTest
+    void modalWaiterDoesNotDisposeExpiredDialogOffEdt() throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        Dialog dialog = new Dialog("Timeout thread", new BorderLayout());
+        dialog.showModeless();
+        try {
+            dialog.setTimeout(0);
+            java.util.concurrent.atomic.AtomicBoolean observedDisposed =
+                    new java.util.concurrent.atomic.AtomicBoolean();
+            Thread waiter = new Thread(() -> observedDisposed.set(dialog.isDisposed()));
+            waiter.start();
+            // Hold the EDT until the modal waiter's poll completes. Expiration must
+            // not remove an animation from this thread's list on the worker thread.
+            waiter.join(1000L);
+            assertFalse(waiter.isAlive(), "the disposal poll must not block on the EDT");
+            assertFalse(observedDisposed.get(), "the waiter must only observe disposal");
+            dialog.animate();
+            Thread observer = new Thread(() -> observedDisposed.set(dialog.isDisposed()));
+            observer.start();
+            observer.join(1000L);
+            assertFalse(observer.isAlive());
+            assertTrue(observedDisposed.get(), "EDT disposal must be visible to the waiter");
+        } finally {
+            dialog.dispose();
+        }
+    }
+
+    @FormTest
     void staticConfigurationCarriesToNewDialogs() {
         boolean originalAutoAdjust = Dialog.isAutoAdjustDialogSize();
         String originalPosition = Dialog.getDefaultDialogPosition();

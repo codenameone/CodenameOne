@@ -212,7 +212,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /** The port's bundled native (material) theme, embedded in the executable. */
     private static final String NATIVE_THEME_RES = "windowsNativeTheme.res";
 
-    private int screenDpi = 96;
+    private volatile int screenDpi = 96;
 
     /**
      * The live implementation instance, captured for {@link #runMainEventLoop()}
@@ -843,6 +843,40 @@ public class WindowsImplementation extends CodenameOneImplementation {
         windowPointerHover(windowId, x, y);
     }
 
+    // WM_DPICHANGED carries the new monitor DPI; ordinary appearance events carry zero.
+    // Publish it before the EDT rebuilds any theme metrics using convertToPixels().
+    void dispatchThemeSettingsChanged(int dpi) {
+        if (dpi > 0 && dpi != screenDpi) {
+            screenDpi = dpi;
+            refreshForDpiChange();
+        }
+        Display.getInstance().nativeThemeSettingsChanged();
+    }
+
+    void refreshForDpiChange() {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                // A monitor change can leave all appearance settings equal. Rebuild
+                // physical-unit fonts and invalidate preferred sizes regardless.
+                com.codename1.ui.plaf.UIManager.getInstance().refreshTheme();
+                com.codename1.ui.Form form = Display.getInstance().getCurrent();
+                if (form != null) {
+                    form.refreshTheme(true);
+                    form.repaint();
+                }
+                for (com.codename1.ui.Window window : Desktop.getInstance().getWindows()) {
+                    window.refreshTheme(true);
+                    window.revalidateLater();
+                    window.repaint();
+                }
+            }
+        });
+    }
+
     private void drainInput() {
         while (WindowsNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -890,7 +924,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     Desktop.getInstance().windowCloseRequested(windowId);
                     break;
                 case EVENT_THEME_SETTINGS_CHANGED:
-                    Display.getInstance().nativeThemeSettingsChanged();
+                    dispatchThemeSettingsChanged(key);
                     break;
                 case EVENT_WINDOW_FOCUS:
                     if (key != 0) { Display.getInstance().nativeThemeSettingsChanged(); }
@@ -3367,6 +3401,25 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return (WindowsNative.currentModifiers() & 4) != 0;
     }
 
+    @Override
+    public int[] getNativeWindowTitleBarInsets(com.codename1.ui.Component toolbar) {
+        if (!(toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form)
+                || toolbar.getComponentForm() instanceof com.codename1.ui.Dialog) {
+            return null;
+        }
+        int[] result = new int[5];
+        WindowsNative.mainWindowTitleBarInsets(result);
+        return result;
+    }
+
+    @Override
+    public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
+        if (toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form
+                && !(toolbar.getComponentForm() instanceof com.codename1.ui.Dialog)) {
+            WindowsNative.mainWindowTitleBarRegions(regions);
+        }
+    }
+
     // ---- native menu bar ----------------------------------------------------
 
     /// Commands published to the native menu bar, keyed by the id the bar echoes back.
@@ -3417,7 +3470,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// after it was dismissed.
     @Override
     public void refreshNativeTitle() {
-        if (!isNativeTitle()) {
+        if (!isDesktop()) {
             return;
         }
         com.codename1.ui.Form f = getCurrentForm();

@@ -38,6 +38,7 @@ extern JAVA_OBJECT fromNSString(CN1_THREAD_STATE_MULTI_ARG NSString* str);
 extern NSString* toNSString(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o);
 
 // Java callbacks (generated for the static methods on IOSImplementation)
+extern void com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_INT captureId, JAVA_BOOLEAN accepted);
 extern void com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end, JAVA_OBJECT text, JAVA_INT seq);
 extern void com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end, JAVA_INT seq);
 extern void com_codename1_impl_ios_IOSImplementation_tiCommit___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text, JAVA_INT seq);
@@ -376,6 +377,7 @@ static CN1TextInputView* cn1TextInputView = nil;
 // Java echoes the seq of the last edit it APPLIED with each state push, and cn1SyncText drops
 // echoes whose seq is stale so a slow round trip can never regress the shadow under fast typing.
 - (int)cn1NextSeq {
+    com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG 0, JAVA_FALSE);
     return ++_editSeq;
 }
 
@@ -661,30 +663,34 @@ static CN1TextInputView* cn1TextInputView = nil;
 
 #pragma mark sync from Java
 
-- (void)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
+- (BOOL)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
           caretRect:(CGRect)caretPixels seq:(NSInteger)seq {
+    // Reject stale echoes before changing either text or geometry.
+    if (seq != (NSInteger)_editSeq) {
+        return NO;
+    }
+    NSInteger len = text != nil ? (NSInteger)text.length : (NSInteger)_shadow.length;
+    NSInteger s = MAX((NSInteger)0, MIN(selStart, len));
+    NSInteger e = MAX((NSInteger)0, MIN(selEnd, len));
+    NSRange selection = NSMakeRange(MIN(s, e), (NSUInteger)(s > e ? s - e : e - s));
+    if (_markedRange.location != NSNotFound) {
+        // IME owns the marked text. Its matching Java echo may still refresh layout.
+        if ((text != nil && ![_shadow isEqualToString:text]) || !NSEqualRanges(selection, _selectedRange)) {
+            return NO;
+        }
+    } else {
+        if (text != nil) {
+            [_shadow setString:text];
+        }
+        _selectedRange = selection;
+    }
     CGFloat scale = [UIScreen mainScreen].scale;
     if (scale <= 0) {
         scale = 1;
     }
     _caretRectPoints = CGRectMake(caretPixels.origin.x / scale, caretPixels.origin.y / scale,
             MAX((CGFloat)2, caretPixels.size.width / scale), caretPixels.size.height / scale);
-    // A stale echo (the state push for edit N arriving after the user already typed edit N+1)
-    // must not regress the shadow text or caret; only the caret geometry above is refreshed.
-    if (seq != (NSInteger)_editSeq) {
-        return;
-    }
-    // Never disturb an active IME composition; only the caret geometry is refreshed above.
-    if (_markedRange.location != NSNotFound) {
-        return;
-    }
-    if (text != nil) {
-        [_shadow setString:text];
-    }
-    NSInteger len = (NSInteger)_shadow.length;
-    NSInteger s = MAX((NSInteger)0, MIN(selStart, len));
-    NSInteger e = MAX((NSInteger)0, MIN(selEnd, len));
-    _selectedRange = NSMakeRange(MIN(s, e), (NSUInteger)(s > e ? s - e : e - s));
+    return YES;
 }
 
 - (void)cn1ResetComposition {
@@ -698,7 +704,7 @@ static CN1TextInputView* cn1TextInputView = nil;
 
 #pragma mark - native bridge (declared native in IOSNative.java)
 
-void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
+void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType, JAVA_INT captureId) {
     NSString* startText = initialText != NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG initialText) : @"";
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
@@ -777,6 +783,7 @@ void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boole
             cn1TextInputView.returnKeyType = rk;
             [cn1TextInputView cn1ResetComposition];
             [cn1TextInputView cn1SyncText:(startText != nil ? startText : @"") selStart:selStart selEnd:selEnd caretRect:CGRectMake(0, 0, 2, 16) seq:0];
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
             UIViewController* vc = [CodenameOne_GLViewController instance];
             if (vc != nil) {
                 cn1TextInputView.frame = vc.view.bounds;
@@ -804,14 +811,14 @@ void com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CN1_T
     });
 }
 
-void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
+void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq, JAVA_INT captureId) {
     NSString* nsText = text != NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG text) : nil;
     CGRect caret = CGRectMake(caretX, caretY, caretW, caretH);
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
-            if (cn1TextInputView != nil) {
-                [cn1TextInputView cn1SyncText:nsText selStart:selStart selEnd:selEnd caretRect:caret seq:seq];
-            }
+            BOOL accepted = cn1TextInputView != nil &&
+                    [cn1TextInputView cn1SyncText:nsText selStart:selStart selEnd:selEnd caretRect:caret seq:seq];
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, accepted);
         }
     });
 }
@@ -830,10 +837,14 @@ void com_codename1_impl_ios_IOSNative_stopTextInput__(CN1_THREAD_STATE_MULTI_ARG
 
 #else
 
+extern void com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_INT captureId, JAVA_BOOLEAN accepted);
+
 // watchOS has no UIKeyInput / UITextInput keyboard support; provide stubs so the symbols still link.
-void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
+void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType, JAVA_INT captureId) {
+    com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
 }
-void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
+void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq, JAVA_INT captureId) {
+    com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
 }
 void com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 }
