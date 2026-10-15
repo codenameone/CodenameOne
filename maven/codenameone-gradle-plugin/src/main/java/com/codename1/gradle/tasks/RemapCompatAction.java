@@ -52,8 +52,7 @@ public class RemapCompatAction implements Action<Task> {
     private final File onClickNames;
     private final boolean relocateOnly;
     private final FileCollection handlerDirs;
-    private File desktopEntry;
-    private String applicationMain;
+    private File desktopDir;
     private FileCollection shipWhenEmpty;
     private FileCollection libraries;
     private File fxmlSources;
@@ -67,19 +66,12 @@ public class RemapCompatAction implements Action<Task> {
         this.handlerDirs = handlerDirs;
     }
 
-    /// The record of the desktop application's entry point
-    /// (`src/main/desktop/cn1-desktop.properties`), for the entry point
-    /// generators.
-    public RemapCompatAction withDesktopEntryRecord(File record) {
-        this.desktopEntry = record;
-        return this;
-    }
-
-    /// The project's main class (`codename1.packageName` and
-    /// `codename1.mainName`), which a desktop application's entry point is
-    /// generated as.
-    public RemapCompatAction withApplicationMain(String className) {
-        this.applicationMain = className;
+    /// The module's desktop source directory (`src/main/desktop`), whose
+    /// `resources` the desktop runtime indexes. The application's main
+    /// class is a source file of the project and is relocated like any other
+    /// class; nothing here generates one.
+    public RemapCompatAction withDesktopSourceDirectory(File dir) {
+        this.desktopDir = dir;
         return this;
     }
 
@@ -123,8 +115,7 @@ public class RemapCompatAction implements Action<Task> {
         }
         Log log = new GradleLog(task.getLogger());
         CompatRemapper r = new CompatRemapper(classesDir, classpath, onClickNames, log)
-                .withDesktopEntryRecord(desktopEntry)
-                .withApplicationMain(applicationMain)
+                .withDesktopSourceDirectory(desktopDir)
                 .withFxmlSourceDirectory(fxmlSources);
         if (libraries != null) {
             List<File> jars = new ArrayList<File>();

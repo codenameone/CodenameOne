@@ -35,19 +35,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.TreeMap;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /// cn1:import-desktop-project over small Maven and Gradle desktop projects:
-/// what is copied where, how the entry point is found and recorded, what a
-/// second import does, and how the project's dependencies are reported.
+/// what is copied where, how the entry point is found, the main class that
+/// is written to start it, what a second import does, and how the project's
+/// dependencies are reported.
 public class DesktopProjectImporterTest {
 
     @Rule
@@ -182,11 +181,13 @@ public class DesktopProjectImporterTest {
 
         assertEquals("com.acme.fx.App", r.mainClass);
         assertEquals("javafx", r.kind);
-        Properties record = DesktopSources.readEntryRecord(desktop);
-        assertNotNull(record);
-        assertEquals("com.acme.fx.App", record.getProperty("mainClass"));
-        assertEquals("javafx", record.getProperty("kind"));
-        assertEquals(new File(desktop, "cn1-desktop.properties"), DesktopSources.entryRecord(desktop));
+        // Not told the application's main class, so none is written; and
+        // nothing in the desktop directory says how the application starts.
+        assertNull(r.generatedMain);
+        assertFalse(new File(common, "src/main/java").exists());
+        assertEquals(new java.util.TreeSet<String>(Arrays.asList("java", "resources",
+                DesktopProjectImporter.IMPORT_RECORD)),
+                new java.util.TreeSet<String>(Arrays.asList(desktop.list())));
 
         assertEquals(Arrays.asList("org.openjfx:javafx-controls (JavaFX controls)", "org.openjfx:javafx-fxml (FXML)"),
                 r.covered);
@@ -218,7 +219,6 @@ public class DesktopProjectImporterTest {
         assertEquals("title=Hello\n", read(new File(desktop, "resources/messages.properties")));
         assertEquals("com.acme.swing.Main", r.mainClass);
         assertEquals("swing", r.kind);
-        assertEquals("swing", DesktopSources.readEntryRecord(desktop).getProperty("kind"));
         assertEquals(Collections.singletonList("org.swinglabs.swingx:swingx-core (SwingX)"), r.covered);
         // MiG Layout is a library written against Swing, not part of a layer:
         // the build relocates it with the application.
@@ -308,52 +308,139 @@ public class DesktopProjectImporterTest {
         return source;
     }
 
-    /// The build generates the application's main class from the entry
-    /// record, so the one the project template wrote has to make room.
+    /// The application's main class is written to start the Swing
+    /// application, and the one the project template wrote is kept beside it.
     @Test
-    public void theTemplatesMainClassIsSetAsideForTheGeneratedOne() throws Exception {
+    public void theTemplatesMainClassIsRewrittenToStartTheApplication() throws Exception {
         File common = common();
         String template = "package com.acme;\npublic class MyApp extends com.codename1.system.Lifecycle {\n}\n";
         File main = write(common, "src/main/java/com/acme/MyApp.java", template);
 
-        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("setaside"),
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("rewrite"),
                 null, common, null, "com.acme", "MyApp");
         assertEquals("com.acme.MyApp", r.generatedMain);
-        assertFalse(main.exists());
+        assertEquals(main, r.mainSource);
+        assertFalse(r.library);
+        String written = read(main);
+        assertEquals(DesktopProjectImporter.mainClassSource("com.acme.MyApp",
+                new DesktopProjectImporter.Candidate("com.acme.swing.Main"), false), written);
+        assertTrue(written, written.startsWith(DesktopProjectImporter.WRITTEN_BY + "\npackage com.acme;\n"));
+        assertTrue(written, written.contains("public class MyApp extends "
+                + "com.codename1.desktopcompat.rt.DesktopLifecycle {\n"));
+        assertTrue(written, written.contains("    protected void runMain() throws Exception {\n"
+                + "        com.acme.swing.Main.main(new String[0]);\n    }\n"));
         File aside = new File(main.getPath() + DesktopProjectImporter.SET_ASIDE_SUFFIX);
         assertEquals(aside, r.setAside);
         assertEquals(template, read(aside));
 
-        // Importing again has nothing left to move, and keeps the copy.
-        r = new DesktopProjectImporter(log).importProject(swingProject("setaside2"), null, common, null, "com.acme",
+        // Importing again writes the same class, and keeps the first copy.
+        r = new DesktopProjectImporter(log).importProject(swingProject("rewrite2"), null, common, null, "com.acme",
                 "MyApp");
         assertEquals("com.acme.MyApp", r.generatedMain);
         assertNull(r.setAside);
+        assertEquals(written, read(main));
         assertEquals(template, read(aside));
 
-        // A main class written since is the developer's to resolve.
-        write(common, "src/main/java/com/acme/MyApp.java", template);
-        logged.clear();
-        r = new DesktopProjectImporter(log).importProject(swingProject("setaside3"), null, common, null, "com.acme",
-                "MyApp");
-        assertTrue(main.isFile());
-        assertNull(r.setAside);
-        assertTrue(logged.toString(), logged.toString().contains("warn: MyApp.java was written after"));
-    }
-
-    @Test
-    public void aLifecycleOfTheDevelopersOwnIsKept() throws Exception {
-        File common = common();
+        // A main class the developer has changed since is theirs.
         String own = "package com.acme;\npublic class MyApp extends com.codename1.desktopcompat.rt.DesktopLifecycle {\n"
-                + "    protected void runMain() { com.acme.swing.Main.main(new String[0]); }\n}\n";
-        File main = write(common, "src/main/java/com/acme/MyApp.java", own);
-        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("own"), null,
-                common, null, "com.acme", "MyApp");
+                + "    protected void runMain() { com.acme.swing.Main.main(new String[] {\"-x\"}); }\n}\n";
+        write(common, "src/main/java/com/acme/MyApp.java", own);
+        logged.clear();
+        r = new DesktopProjectImporter(log).importProject(swingProject("rewrite3"), null, common, null, "com.acme",
+                "MyApp");
         assertEquals(own, read(main));
-        assertNull(r.setAside);
+        assertNull(r.generatedMain);
+        assertEquals(template, read(aside));
+        assertTrue(logged.toString(), logged.toString().contains("warn: MyApp.java was changed after an earlier"));
     }
 
-    /// The generated class cannot share a name with a class of the imported
+    /// A JavaFX application's main class creates the Application subclass.
+    @Test
+    public void aJavaFxApplicationIsCreatedByTheMainClass() throws Exception {
+        File common = common();
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(javafxMavenProject(), null,
+                common, null, "com.acme", "MyApp");
+        File main = new File(common, "src/main/java/com/acme/MyApp.java");
+        assertEquals(main, r.mainSource);
+        assertNull("there was nothing to keep", r.setAside);
+        String written = read(main);
+        assertTrue(written, written.contains("public class MyApp extends com.codename1.fxcompat.runtime.FxLifecycle {\n"
+                + "    @Override\n    protected javafx.application.Application createApplication() {\n"
+                + "        return new com.acme.fx.App();\n    }\n}\n"));
+        // The desktop main is not what starts a JavaFX application.
+        assertFalse(written, written.contains("main("));
+    }
+
+    /// A main class that is not public is reached through a launcher in its
+    /// own package; a Kotlin main without parameters is called as one.
+    @Test
+    public void whatTheMainClassCannotNameIsCalledThroughALauncher() throws Exception {
+        File source = tmp.newFolder("hidden");
+        write(source, "src/main/java/com/acme/swing/Hidden.java", "package com.acme.swing;\n\nclass Hidden {\n"
+                + "    public static void main(String[] args) {\n    }\n}\n");
+        File common = common();
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(source, null, common, null,
+                "com.acme", "MyApp");
+        assertEquals("com.acme.swing.Hidden", r.mainClass);
+        String main = read(r.mainSource);
+        assertTrue(main, main.contains("        com.acme.swing." + DesktopProjectImporter.LAUNCHER + ".launch();\n"));
+        String launcher = read(new File(common, "src/main/java/com/acme/swing/" + DesktopProjectImporter.LAUNCHER
+                + ".java"));
+        assertTrue(launcher, launcher.contains("public static void launch() throws Exception {\n"
+                + "        com.acme.swing.Hidden.main(new String[0]);\n"));
+
+        Map<String, DesktopProjectImporter.Candidate> out = new TreeMap<String, DesktopProjectImporter.Candidate>();
+        DesktopProjectImporter.scanKotlin("App", "package k\n\nfun main() {\n}\n", out);
+        DesktopProjectImporter.Candidate kotlin = out.get("k.AppKt");
+        assertTrue(kotlin.noArgMain);
+        assertTrue(DesktopProjectImporter.mainClassSource("a.B", kotlin, false), DesktopProjectImporter
+                .mainClassSource("a.B", kotlin, false).contains("        k.AppKt.main();\n"));
+        assertFalse(DesktopProjectImporter.javaPublic("package a;\nfinal class X {\n}\n", "X"));
+        assertTrue(DesktopProjectImporter.javaPublic("package a;\n@Deprecated public final class X {\n"
+                + "    public static class Y {\n    }\n}\n", "X$Y"));
+        assertFalse(DesktopProjectImporter.javaPublic("package a;\npublic class X {\n    static class Y {\n"
+                + "    }\n}\n", "X$Y"));
+    }
+
+    /// Imported as a library, the sources are copied and the application's
+    /// main class is left alone; a project with nothing to start is fine.
+    @Test
+    public void aLibraryImportLeavesTheMainClassAlone() throws Exception {
+        File common = common();
+        String template = "package com.acme;\npublic class MyApp extends com.codename1.system.Lifecycle {\n}\n";
+        File main = write(common, "src/main/java/com/acme/MyApp.java", template);
+        File source = tmp.newFolder("screens");
+        write(source, "src/main/java/com/acme/screens/Screen.java", "package com.acme.screens;\n\n"
+                + "public class Screen extends javax.swing.JPanel {\n}\n");
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(source, null, common, null,
+                "com.acme", "MyApp", true);
+        assertTrue(r.library);
+        assertNull(r.generatedMain);
+        assertNull(r.mainClass);
+        assertEquals(template, read(main));
+        assertTrue(new File(common, "src/main/desktop/java/com/acme/screens/Screen.java").isFile());
+    }
+
+    /// A project whose main class starts an imported Android application
+    /// starts that one: the desktop sources are its library.
+    @Test
+    public void anAndroidMainClassMakesTheDesktopSourcesALibrary() throws Exception {
+        File common = common();
+        String android = "package com.acme;\n\npublic class MyApp extends "
+                + "com.codename1.androidcompat.runtime.AndroidLifecycle {\n"
+                + "    public MyApp() {\n        super(new com.codename1.generated.android.AndroidAppImpl());\n"
+                + "    }\n}\n";
+        File main = write(common, "src/main/java/com/acme/MyApp.java", android);
+        DesktopProjectImporter.Result r = new DesktopProjectImporter(log).importProject(swingProject("both"), null,
+                common, null, "com.acme", "MyApp");
+        assertTrue(r.library);
+        assertNull(r.generatedMain);
+        assertEquals(android, read(main));
+        assertFalse(new File(main.getPath() + DesktopProjectImporter.SET_ASIDE_SUFFIX).exists());
+        assertTrue(new File(common, "src/main/desktop/java/com/acme/swing/Main.java").isFile());
+    }
+
+    /// The main class cannot share a name with a class of the imported
     /// application: nothing is copied, and the message says what to change.
     @Test
     public void anImportedClassNamedLikeTheMainClassStopsTheImport() throws Exception {
@@ -414,9 +501,6 @@ public class DesktopProjectImporterTest {
 
         DesktopProjectImporter.Result r = new DesktopProjectImporter(log)
                 .importProject(source, null, common, "com.acme.swing.Tool");
-        assertEquals("com.acme.swing.Tool", r.mainClass);
-        // Imported again without the override, the recorded choice stands.
-        r = new DesktopProjectImporter(log).importProject(source, null, common, null);
         assertEquals("com.acme.swing.Tool", r.mainClass);
 
         try {
@@ -630,7 +714,6 @@ public class DesktopProjectImporterTest {
         assertFalse(DesktopSources.isDesktopProject(new File(desktop, "missing")));
         assertTrue(DesktopSources.isDesktopProject(desktop));
         assertEquals("", DesktopSources.toolkitsNamedIn(desktop));
-        assertNull(DesktopSources.readEntryRecord(desktop));
     }
 
     private static String libraries(File module) throws Exception {

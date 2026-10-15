@@ -61,7 +61,7 @@ import static org.junit.Assert.assertTrue;
 /// and MigLayout onto the layer, the compliance check has to find nothing,
 /// and the result is loaded into a class loader that holds nothing but those
 /// classes, the framework and the headless implementation the layers' own
-/// tests use. There the generated main class is started on the event
+/// tests use. There the main class the importer writes is started on the event
 /// dispatch thread, and every tab is selected and painted into an image.
 ///
 /// No window is opened anywhere: the display is a 1080 by 1920 buffer.
@@ -151,21 +151,25 @@ public class SwingGallerySampleTest {
         File classes = tmp.newFolder("classes");
         List<String> sources = new ArrayList<String>();
         sources(new File(sample(), "src/main/java"), "", sources);
-        // The JDK's Swing, and the two libraries: nothing of the layer.
-        CompatFixtures.compileAgainst(Arrays.asList(swingx, migCore, migSwing), tmp.newFolder(), classes,
-                sources.toArray(new String[sources.size()]));
+        // The main class cn1:import-desktop-project writes into the
+        // application's src/main/java, word for word.
+        sources.add(MAIN.replace('.', '/') + ".java");
+        sources.add(DesktopProjectImporter.mainClassSource(MAIN,
+                new DesktopProjectImporter.Candidate("com.example.gallery.GalleryApp"), false));
+        // The JDK's Swing and the two libraries; of the layer only what the
+        // main class extends, which is under the names it ships with.
+        List<File> compile = new ArrayList<File>(jars);
+        compile.addAll(Arrays.asList(swingx, migCore, migSwing));
+        CompatFixtures.compileAgainst(compile, tmp.newFolder(), classes, sources.toArray(new String[sources.size()]));
 
         // The build tool's resources step, which runs before the remap.
         File resources = new File(sample(), "src/main/resources");
         copy(resources, classes);
 
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.example.gallery.GalleryApp\nkind=swing\n".getBytes("UTF-8"));
         List<File> cp = new ArrayList<File>(jars);
         cp.add(swingx);
         cp.addAll(libraries);
         assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(record).withApplicationMain(MAIN)
                 .withResourceDirectories(Collections.singletonList(resources))
                 .withApplicationLibraries(libraries).run());
 
@@ -193,10 +197,7 @@ public class SwingGallerySampleTest {
                 "package com.acme.tiny;\npublic class Main {\n"
                 + "    public static void main(String[] args) { new javax.swing.JFrame(\"tiny\").setVisible(true); }\n"
                 + "}\n");
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.acme.tiny.Main\nkind=swing\n".getBytes("UTF-8"));
-        assertTrue(new CompatRemapper(classes, runtimes(), null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(record).withApplicationMain("com.acme.tiny.TinyMain").run());
+        assertTrue(new CompatRemapper(classes, runtimes(), null, CompatRemapperTest.LOG).run());
 
         int shipped = 0;
         for (File jar : new File[] {RealCompatJars.swing(scratch), RealCompatJars.jdk(scratch)}) {

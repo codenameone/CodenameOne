@@ -115,11 +115,9 @@ public class PropertyAccessRemapTest {
     }
 
     private CompatRemapper remapper(File classes) throws Exception {
-        File dir = tmp.newFolder();
-        File record = DesktopSources.entryRecord(dir);
-        Files.write(record.toPath(), "mainClass=com.acme.fx.Shop\nkind=javafx\n".getBytes("UTF-8"));
+        File desktop = tmp.newFolder();
         return new CompatRemapper(classes, classpath(), null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(record).withApplicationMain("com.acme.MyApp");
+                .withDesktopSourceDirectory(desktop);
     }
 
     @Test

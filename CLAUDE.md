@@ -887,10 +887,17 @@ What holds it together:
   (Display property `desktopcompat.scale` overrides; both layers read it) and
   snapped edge by edge. Never hand a Swing or JavaFX coordinate to Codename One
   unscaled.
-- **The entry point is generated into the classes directory by the remap**
-  (`DesktopEntryPoints`), since only compiled classes say whether the recorded
-  class is an `Application` or holds a `main`. `main`/`start` run on the EDT,
-  which is the Swing EDT and the JavaFX application thread.
+- **The application's own main class starts the desktop app**, as editable
+  source in `common/src/main/java`. `cn1:import-desktop-project`
+  (`DesktopProjectImporter`) writes it: a Swing app's extends
+  `DesktopLifecycle` and calls its `main` in `runMain`, a JavaFX app's extends
+  `FxLifecycle` and `new`s the `Application` in `createApplication` -- no
+  reflection, no generated class, no properties file. An entry class the main
+  class cannot name (not public) is reached through a `CN1DesktopLauncher` in
+  its own package. The remap renames every static `main(String[])` and its
+  call sites to `cn1DesktopMain`, the main class's call included.
+  `main`/`start` run on the EDT, which is the Swing EDT and the JavaFX
+  application thread.
 - **Registries are generated over placeholders.** `CompatRegistry` (resources
   and bundles, in `compat-jdk`) and the FXML dispatch class ship as empty
   placeholders with the right shape and are replaced per application; a new
@@ -900,13 +907,15 @@ What holds it together:
   Compile- and runtime-scope dependency jars that name a layer are unpacked and relocated as
   application code (`CompatLibraries`).
 
-- **Library mode: desktop sources inside a Codename One app.** No
-  `cn1-desktop.properties` beside a compiled main class of the project's own,
-  or `kind=library`, generates no entry point; the classes ship relocated.
+- **Library mode: desktop sources inside a Codename One app.** A main class
+  that extends neither lifecycle -- `-Dcn1.desktop.library=true` on the
+  import, or a main class that starts an Android application -- leaves the
+  desktop classes shipping relocated as a library. Extending the lifecycle is
+  what installs the exit hook: there closing the last window exits, otherwise
   `SwingInterop.asComponent` / `FxInterop.asComponent` wrap a component, a
   parent or a scene as a `com.codename1.ui.Component`, and a `JFrame` or
-  `Stage` shown with no generated entry point is a form over the host's --
-  closing the last one returns there and never exits. Both `asComponent`
+  `Stage` shown is a form over the host's -- closing the last one returns
+  there and never exits. Both `asComponent`
   parameters are `Object` **on purpose**: the remap copies the relocated
   runtime into `target/classes`, which shadows the jar on the next non-clean
   compile, so a non-relocated public class naming a toolkit type in a

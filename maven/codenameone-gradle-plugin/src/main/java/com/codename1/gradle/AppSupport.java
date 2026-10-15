@@ -219,9 +219,6 @@ final class AppSupport {
         // style sheet sits beside the path of its source, and ships flat too.
         main.getResources().exclude(new NestedDesktopResources(
                 new File(layout.buildDir(), "generated/resources/cn1-desktop").getAbsoluteFile()));
-        final File desktopEntry = com.codename1.maven.DesktopSources.entryRecord(desktopDir);
-        // The class a desktop application's entry point is generated as.
-        final String desktopMain = applicationMain(settings);
 
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -297,13 +294,9 @@ final class AppSupport {
                 // edit that leaves its ABI alone leaves this task up to date.
                 // The toolkits the sources name are therefore an input: the
                 // first Kotlin line to use JavaFX reruns this task, and the
-                // action ships the runtime. The entry record is one for the
-                // same reason: the entry point is generated from it.
+                // action ships the runtime.
                 compile.getInputs().property("cn1DesktopToolkits", project.provider(
                         () -> com.codename1.maven.DesktopSources.toolkitsNamedIn(desktopDir)));
-                compile.getInputs().files(desktopEntry).withPropertyName("cn1DesktopEntry").optional();
-                // And so is the name it is generated under.
-                compile.getInputs().property("cn1DesktopMain", desktopMain == null ? "" : desktopMain);
             }
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             compile.getInputs().property("cn1DesktopReport", reportInput);
@@ -322,7 +315,7 @@ final class AppSupport {
             compile.doLast("cn1RemapCompat", new com.codename1.gradle.tasks.RemapCompatAction(
                     compile.getDestinationDirectory().getAsFile().get(), main.getCompileClasspath(),
                     onClickNamesFile(androidState), false, main.getOutput().getClassesDirs())
-                    .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                    .withDesktopSourceDirectory(desktopDir)
                     // The FXML documents are compiled by this action, first:
                     // after javac, so that a document can name a class of
                     // the application, and before the relocation.
@@ -408,7 +401,7 @@ final class AppSupport {
             registerKotlinRelocation(project.getTasks(), main.getCompileJavaTaskName(), main.getClassesTaskName(),
                     kotlinRelocation(t -> new com.codename1.gradle.tasks.RemapCompatAction(
                             kotlinDir.get(), compileClasspath, onClickNames, true, null)
-                            .withDesktopEntryRecord(desktopEntry).withApplicationMain(desktopMain)
+                            .withDesktopSourceDirectory(desktopDir)
                             .withFxmlSourceDirectory(fxmlSources).withApplicationLibraries(shippedJars)
                             .shippingWhenEmpty(javaSources).execute(t),
                             kotlinCompliance));
@@ -1072,16 +1065,5 @@ final class AppSupport {
             File parent = element.getFile().getAbsoluteFile().getParentFile();
             return root.equals(parent);
         }
-    }
-
-    /// `codename1.packageName` and `codename1.mainName` as one class name,
-    /// or null when the settings name no main class.
-    private static String applicationMain(java.util.Properties settings) {
-        String pkg = settings.getProperty("codename1.packageName", "").trim();
-        String main = settings.getProperty("codename1.mainName", "").trim();
-        if (main.length() == 0) {
-            return null;
-        }
-        return pkg.length() == 0 ? main : pkg + "." + main;
     }
 }

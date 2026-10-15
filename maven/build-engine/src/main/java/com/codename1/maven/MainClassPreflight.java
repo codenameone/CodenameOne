@@ -23,7 +23,6 @@
 package com.codename1.maven;
 
 import com.codename1.build.BuildFailureException;
-import com.codename1.maven.annotations.AnnotatedClass;
 import com.codename1.maven.annotations.ClassScanner;
 import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.processors.BuildHintAnnotationProcessor;
@@ -113,14 +112,7 @@ final class MainClassPreflight {
                 return true;
             }
             try (InputStream in = staged.getInputStream(entry)) {
-                AnnotatedClass cls = ClassScanner.readClass(in, input);
-                // The desktop layer's remap generates the main class into the
-                // classes directory and marks it with its own SourceFile; no
-                // source file ever backs it, and that is not staleness.
-                if (DesktopEntryPoints.GENERATED_SOURCE.equals(cls.getSourceFile())) {
-                    return true;
-                }
-                return BuildHintAnnotationProcessor.hasBackingSource(cls,
+                return BuildHintAnnotationProcessor.hasBackingSource(ClassScanner.readClass(in, input),
                         roots, sources.encodingFor(input));
             } catch (ProcessingException ex) {
                 throw new BuildFailureException("Could not inspect the main class source for " + entry.getName(), ex);

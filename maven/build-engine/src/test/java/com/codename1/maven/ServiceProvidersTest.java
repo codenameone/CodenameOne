@@ -177,10 +177,9 @@ public class ServiceProvidersTest {
     private CompatRemapper remapper(File classes, File resources, File lib) throws Exception {
         List<File> cp = runtimes();
         cp.add(lib);
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.acme.swingapp.Main\nkind=swing\n".getBytes("UTF-8"));
-        return new CompatRemapper(classes, cp, null, log).withDesktopEntryRecord(record)
-                .withApplicationMain("com.acme.MyApp").withResourceDirectories(Collections.singletonList(resources))
+        File desktop = tmp.newFolder();
+        return new CompatRemapper(classes, cp, null, log).withDesktopSourceDirectory(desktop)
+                .withResourceDirectories(Collections.singletonList(resources))
                 .withApplicationLibraries(Collections.singletonList(lib));
     }
 
@@ -305,10 +304,9 @@ public class ServiceProvidersTest {
             Files.write(f.toPath(), "com.acme.swingapp.Nowhere # never written\n".getBytes("UTF-8"));
         }
         List<File> cp = runtimes();
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.acme.swingapp.Main\nkind=swing\n".getBytes("UTF-8"));
-        assertTrue(new CompatRemapper(classes, cp, null, log).withDesktopEntryRecord(record)
-                .withApplicationMain("com.acme.MyApp").withResourceDirectories(Collections.singletonList(resources))
+        File desktop = tmp.newFolder();
+        assertTrue(new CompatRemapper(classes, cp, null, log).withDesktopSourceDirectory(desktop)
+                .withResourceDirectories(Collections.singletonList(resources))
                 .withApplicationLibraries(Collections.<File>emptyList()).run());
         assertEquals(Collections.singletonList("warn: The service provider com.acme.swingapp.Nowhere, listed in "
                 + "META-INF/services/java.lang.Runnable, is not among the classes the application ships. "

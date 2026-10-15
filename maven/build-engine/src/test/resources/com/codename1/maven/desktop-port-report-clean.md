@@ -4,7 +4,7 @@ What it takes for this application to build and run as a Codename One applicatio
 
 ## Summary
 
-- 3 application classes from 2 source files.
+- 2 application classes from 2 source files.
 - 7 of 7 call sites into Swing, AWT and JavaFX are supported (100%).
 - 2 source files have no finding; 0 have at least one.
 - The compliance check passes: every API the application and its libraries use is available on a device.

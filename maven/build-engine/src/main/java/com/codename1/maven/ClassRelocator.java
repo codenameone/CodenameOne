@@ -179,19 +179,14 @@ public final class ClassRelocator {
     /// failed its translation for iOS, macOS, Windows and Linux before a line
     /// of it was translated; only the JavaScript target, which names its main
     /// class to the translator, built. Nothing on a device calls `main` by
-    /// that name -- the generated lifecycle ([DesktopEntryPoints]) is what
-    /// starts the application -- so the method is renamed here, together with
-    /// every call of it, and the name ParparVM reserves stays the stub's.
+    /// that name -- the application's Codename One main class is what starts
+    /// it, by calling the desktop `main` from source -- so the method is
+    /// renamed here, together with every call of it (that one included), and
+    /// the name ParparVM reserves stays the stub's.
     static final String DESKTOP_MAIN = "cn1DesktopMain";
 
     /// The descriptor of a `main(String[])`.
     static final String MAIN_DESCRIPTOR = "([Ljava/lang/String;)V";
-
-    /// Whether `name` and `descriptor` are those of a `main(String[])`,
-    /// under the name it was compiled with or the one it ships under.
-    static boolean isMain(String name, String descriptor) {
-        return MAIN_DESCRIPTOR.equals(descriptor) && ("main".equals(name) || DESKTOP_MAIN.equals(name));
-    }
 
     /// Renames every static `main(String[])` to [#DESKTOP_MAIN], and every
     /// static call or method reference that names one. Applied to each class

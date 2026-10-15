@@ -41,7 +41,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -49,12 +48,13 @@ import static org.junit.Assert.assertTrue;
 /// (`scripts/hellocodenameone/common/src/main/desktop`), taken through what
 /// that application's build does to them and then SHOWN, without a device.
 ///
-/// The screens are Swing, SwingX and JavaFX code in an application that has
-/// a main class of its own, so there is no entry record and the build is in
-/// library mode. Here the FXML document and the style sheet are compiled,
-/// the sources are compiled by javac against the JDK's Swing, the real SwingX
-/// jar and the layers' jars, the remap relocates them and has to generate no
-/// main class, and the compliance check has to find nothing. The result is
+/// The screens are Swing, SwingX and JavaFX code in an application whose
+/// main class is a plain Codename One one that extends neither desktop
+/// lifecycle: library mode. Here the FXML document and the style sheet are
+/// compiled, the sources are compiled by javac against the JDK's Swing, the
+/// real SwingX jar and the layers' jars, the remap relocates them and leaves
+/// the main class as javac wrote it, and the compliance check has to find
+/// nothing. The result is
 /// loaded into a class loader that holds nothing but those classes, the
 /// framework and the headless implementation. There every scene builder the
 /// device tests call is called, its component is put in a form of the
@@ -175,13 +175,11 @@ public class DesktopCompatScenesTest {
         copy(resources, classes);
         copy(resourcesOut, classes);
 
-        // The remap, with no entry record: library mode.
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        assertFalse(record.exists());
+        // The remap. Nothing in it depends on whether the application is a
+        // desktop one or uses the screens as a library; its main class says.
         List<File> cp = new ArrayList<File>(jars);
         cp.add(swingx);
         assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(record).withApplicationMain(HOST_MAIN)
                 .withResourceDirectories(Arrays.asList(resources, resourcesOut))
                 .withApplicationLibraries(Collections.<File>emptyList()).run());
         assertTrue(new File(classes, "com/codename1/desktopcompat/SwingInterop.class").isFile());
@@ -289,7 +287,7 @@ public class DesktopCompatScenesTest {
         // The headless implementation decodes an image only when asked to.
         headless.getField("pixelImages").setBoolean(null, true);
         invoke(headless, null, "install");
-        assertEquals("No main class was generated over the application's own", "java.lang.Object",
+        assertEquals("The remap left the application's own main class as it was", "java.lang.Object",
                 loader.loadClass(HOST_MAIN).getSuperclass().getName());
         final Class<?> displayClass = loader.loadClass("com.codename1.ui.Display");
         final Object display = invoke(displayClass, null, "getInstance");

@@ -291,9 +291,9 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- The desktop layers' real runtimes: DesktopEntryPointsTest compiles a
-             Swing and a JavaFX fixture against them, remaps it and loads the
-             main class the remap generated. -->
+        <!-- The desktop layers' real runtimes: the sample tests compile a Swing
+             and a JavaFX application, with the main class the importer writes,
+             against them, remap it and start that main class headless. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-swing-compat</artifactId>

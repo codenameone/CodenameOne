@@ -172,10 +172,9 @@ public class IkonliFontIconTest {
 
         List<File> cp = new ArrayList<File>(runtimes);
         cp.addAll(ikonli);
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.acme.icons.Main\nkind=swing\n".getBytes("UTF-8"));
-        assertTrue(new CompatRemapper(classes, cp, null, log).withDesktopEntryRecord(record)
-                .withApplicationMain("com.acme.MyApp").withResourceDirectories(Collections.<File>emptyList())
+        File desktop = tmp.newFolder();
+        assertTrue(new CompatRemapper(classes, cp, null, log).withDesktopSourceDirectory(desktop)
+                .withResourceDirectories(Collections.<File>emptyList())
                 .withApplicationLibraries(ikonli).run());
 
         // The handlers are reached through the services file alone, and the

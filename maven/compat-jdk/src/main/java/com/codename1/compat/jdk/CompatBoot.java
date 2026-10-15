@@ -27,7 +27,8 @@ package com.codename1.compat.jdk;
 /// about the application -- which classpath resources it ships, and its
 /// resource bundles.
 ///
-/// The generated lifecycle class of a Swing or JavaFX application calls
+/// The lifecycle a Swing or JavaFX application's main class extends (the Swing
+/// layer's `DesktopLifecycle`, the JavaFX layer's `FxLifecycle`) calls
 /// [#cn1Init()] before any application code runs. [Resources] and
 /// [ResourceBundle] call it as well on first use, so an application started
 /// some other way is not left without its resources; the explicit call only

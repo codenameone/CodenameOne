@@ -149,11 +149,9 @@ public class DesktopPortReportTest {
                 "com/acme/port/Clean.java", CLEAN));
         all.addAll(Arrays.asList(sources));
         CompatFixtures.compileAgainst(cp, tmp.newFolder(), classes, all.toArray(new String[0]));
-        File dir = tmp.newFolder();
-        File record = DesktopSources.entryRecord(dir);
-        Files.write(record.toPath(), "mainClass=com.acme.port.Main\nkind=swing\n".getBytes("UTF-8"));
-        assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG).withDesktopEntryRecord(record)
-                .withApplicationMain("com.acme.MyApp").withApplicationLibraries(Arrays.asList(fancy, plain, unused))
+        File desktop = tmp.newFolder();
+        assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG).withDesktopSourceDirectory(desktop)
+                .withApplicationLibraries(Arrays.asList(fancy, plain, unused))
                 .run());
         TestProjectHost host = RealCompatJars.host(classes, tmp.newFolder(), scratch);
         host.projectDir = tmp.newFolder();

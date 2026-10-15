@@ -22,6 +22,7 @@
  */
 package com.codename1.desktopcompat.rt;
 
+import com.codename1.compat.jdk.CompatBoot;
 import com.codename1.desktopcompat.java.awt.Window;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
@@ -30,22 +31,34 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 
-/// The Codename One lifecycle of a desktop application.
+/// The Codename One lifecycle of a Swing application.
 ///
-/// The build generates one subclass per application. It implements the
-/// one abstract method by calling the application's entry point:
+/// The application's Codename One main class -- the class
+/// `codename1.packageName` and `codename1.mainName` name, an ordinary source
+/// file of the project -- extends it and implements the one abstract method
+/// by calling the Swing application's `main`. `cn1:import-desktop-project`
+/// writes that class:
 ///
 /// ```java
-/// public final class MyAppLifecycle extends DesktopLifecycle {
+/// public class MyApp extends DesktopLifecycle {
 ///     protected void runMain() throws Exception {
-///         com.example.MyApp.main(new String[0]);
+///         com.example.Main.main(new String[0]);
 ///     }
 /// }
 /// ```
 ///
+/// Extending this class is what makes the Swing windows THE application:
+/// [#runApp()] installs the [WindowHosts#setExitHook(Runnable)] hook that
+/// exits it, so `EXIT_ON_CLOSE` and the last window being disposed of end
+/// the application, as they end a desktop JVM. A Codename One application
+/// that only uses some Swing screens (library mode) has a main class that
+/// does not extend it, installs no hook, and closing the last window shows
+/// the form it was shown over.
+///
 /// The contract, in the order things happen:
 ///
-/// 1. **Start.** The first `start()` calls `runMain()` once, on the event
+/// 1. **Start.** The first `start()` installs the application's resources
+///    (`CompatBoot.cn1Init()`) and calls `runMain()` once, on the event
 ///    dispatch thread -- the thread a Swing application is supposed to
 ///    build its frames on, so `SwingUtilities.invokeLater` from `main`
 ///    runs the runnable after `main` returns, and `invokeAndWait` runs it
@@ -110,6 +123,8 @@ public abstract class DesktopLifecycle extends Lifecycle {
                 }
             }
         });
+        // Before any application code: its resources and bundles.
+        CompatBoot.cn1Init();
         try {
             runMain();
         } catch (Exception e) {

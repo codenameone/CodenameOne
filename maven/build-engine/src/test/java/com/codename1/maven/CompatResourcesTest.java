@@ -494,7 +494,7 @@ public class CompatResourcesTest {
         List<File> classpath = Arrays.asList(swing, jdk);
 
         assertTrue(new CompatRemapper(classes, classpath, null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(DesktopSources.entryRecord(desktop)).run());
+                .withDesktopSourceDirectory(desktop).run());
 
         // Flat, and only flat.
         for (String flat : new String[] {"p__img__a.png", "x__y.txt", "root.txt", "p__Messages.properties",
@@ -509,7 +509,7 @@ public class CompatResourcesTest {
         // A second run is a no-op, the registry included.
         Map<String, byte[]> first = snapshot(classes);
         assertTrue(new CompatRemapper(classes, classpath, null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(DesktopSources.entryRecord(desktop)).run());
+                .withDesktopSourceDirectory(desktop).run());
         assertSameTree(first, snapshot(classes));
 
         // Everything that ships exists on the device.

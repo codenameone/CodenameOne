@@ -35,7 +35,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -43,16 +42,61 @@ import java.util.regex.Pattern;
 
 /// Imports a Swing or JavaFX project (a Maven or Gradle project, or one
 /// module of it) into a Codename One application: copies its `src/main`
-/// sources and resources into `src/main/desktop`, records how the application
-/// starts ([DesktopSources#ENTRY_RECORD]), makes room for the main class the
-/// build generates from that record ([DesktopEntryPoints]), and reports what
-/// becomes of each of its dependencies.
+/// sources and resources into `src/main/desktop`, writes the application's
+/// Codename One main class so that it starts the imported application, and
+/// reports what becomes of each of its dependencies.
+///
+/// #### The main class
+///
+/// The class `codename1.packageName` and `codename1.mainName` name is written
+/// as an ordinary source file in `src/main/java` ([#mainClassSource]). It
+/// is the application's own from then on, edited like any main class:
+///
+/// - for a Swing application it extends the Swing layer's `DesktopLifecycle`
+///   and its `runMain()` calls the desktop application's `main` with no
+///   arguments;
+/// - for a JavaFX one it extends the JavaFX layer's `FxLifecycle` and its
+///   `createApplication()` answers `new` of the `Application` subclass. The
+///   desktop `main` is not called: all a JavaFX `main` does is `launch`, and
+///   the lifecycle is what launches here.
+///
+/// Both are plain calls the compiler checks; nothing is looked up by name. A
+/// class the main class cannot reach from its package (a `main` class that is
+/// not public) is called through a small public launcher written beside it
+/// ([#LAUNCHER]). The source the main class replaces is kept as
+/// `<name>.java.pre-desktop-import`.
+///
+/// #### Library mode
+///
+/// Desktop sources need not BE the application. Imported with `library` set,
+/// or into a project whose main class starts an imported Android application
+/// (it extends `AndroidLifecycle`), nothing is written to the main class: the
+/// desktop classes ship relocated, and the application uses them as it uses
+/// any library (`SwingInterop.asComponent`, `FxInterop.asComponent`).
 ///
 /// Nothing is asked. The entry point is found by reading the sources, and
 /// where they leave a choice the source project's own main-class setting
 /// decides it; when that does not either, the import stops before copying
 /// anything and lists the candidates.
 public final class DesktopProjectImporter {
+
+    /// The kind of an application started through a `main` method.
+    public static final String KIND_SWING = "swing";
+
+    /// The kind of an application started through its
+    /// `javafx.application.Application` subclass.
+    public static final String KIND_JAVAFX = "javafx";
+
+    /// The class written beside a desktop entry point the main class cannot
+    /// reach from its own package, to call it from inside that package.
+    static final String LAUNCHER = "CN1DesktopLauncher";
+
+    /// The first line of every source the import writes, which is how a later
+    /// import tells its own output from a class the developer wrote.
+    static final String WRITTEN_BY = "// Written by cn1:import-desktop-project.";
+
+    static final String SWING_LIFECYCLE = "com.codename1.desktopcompat.rt.DesktopLifecycle";
+    static final String FX_LIFECYCLE = "com.codename1.fxcompat.runtime.FxLifecycle";
 
     /// The record an import leaves in `src/main/desktop`; see [ImportedFiles].
     static final String IMPORT_RECORD = ".desktop-import-files";
@@ -92,7 +136,7 @@ public final class DesktopProjectImporter {
         return coordinate.startsWith("org.openjfx:");
     }
 
-    /// The suffix a main class source is set aside under.
+    /// The suffix the main class source the import replaced is kept under.
     static final String SET_ASIDE_SUFFIX = ".pre-desktop-import";
 
     /// Dependencies that only matter to tests.
@@ -105,9 +149,6 @@ public final class DesktopProjectImporter {
         /// not copied: add each to the application's own build, where it is
         /// handled as [#BUNDLED_NOTE] says.
         public final List<String> uncovered = new ArrayList<String>();
-        /// The class the build generates to start the application
-        /// (`codename1.packageName` and `codename1.mainName`), or null when
-        /// the import was not told the project's.
         /// What the import could not read from the project's build, as
         /// sentences.
         public final List<String> unresolved = new ArrayList<String>();
@@ -116,18 +157,27 @@ public final class DesktopProjectImporter {
         /// there; see [Library]. A plugin adds them to the build it is
         /// importing into.
         public final List<Library> libraries = new ArrayList<Library>();
+        /// The application's main class (`codename1.packageName` and
+        /// `codename1.mainName`) when the import wrote it to start the
+        /// desktop application; null in library mode, when the import was
+        /// not told the project's main class, or when it kept a main class
+        /// the developer changed since an earlier import.
         public String generatedMain;
-        /// The source of the project's previous main class, where the import
-        /// set it aside to make room for the generated one; null when there
-        /// was none to move.
+        /// The source file of [#generatedMain].
+        public File mainSource;
+        /// Where the main class source the import replaced was kept; null
+        /// when there was none, or an earlier import already kept it.
         public File setAside;
+        /// True when the desktop sources were imported as a library: no main
+        /// class was written, and the application starts as it did.
+        public boolean library;
         /// The `module-info.java` files that were left out, relative to
         /// `src/main/desktop`. A Codename One application is not a module.
         public final List<String> droppedModuleInfo = new ArrayList<String>();
-        /// The recorded entry point; null when the import kept an existing
-        /// record it could not improve on.
+        /// The class the application starts through, as the desktop sources
+        /// declare it; null in library mode when none was chosen.
         public String mainClass;
-        /// [DesktopSources#KIND_SWING] or [DesktopSources#KIND_JAVAFX].
+        /// [#KIND_SWING] or [#KIND_JAVAFX]; null with [#mainClass].
         public String kind;
         public boolean kotlin;
         public int copiedFiles;
@@ -174,15 +224,33 @@ public final class DesktopProjectImporter {
 
     /// A class the application could be started through.
     static final class Candidate {
+        /// The binary name: `pkg.Outer$Nested`.
         final String name;
         boolean javafx;
+        /// False when the class, or a class it is nested in, is not public:
+        /// only its own package can name it.
+        boolean accessible = true;
+        /// True for a Kotlin `fun main()` without parameters, which Java
+        /// calls as `main()`: the `main(String[])` Kotlin adds beside it is
+        /// synthetic, and javac does not see it.
+        boolean noArgMain;
 
         Candidate(String name) {
             this.name = name;
         }
 
         String kind() {
-            return javafx ? DesktopSources.KIND_JAVAFX : DesktopSources.KIND_SWING;
+            return javafx ? KIND_JAVAFX : KIND_SWING;
+        }
+
+        /// The name source code uses for the class.
+        String sourceName() {
+            return name.replace('$', '.');
+        }
+
+        String packageName() {
+            int dot = name.lastIndexOf('.');
+            return dot < 0 ? "" : name.substring(0, dot);
         }
     }
 
@@ -243,39 +311,59 @@ public final class DesktopProjectImporter {
         return importProject(source, module, commonDir, mainClassOverride, null, null);
     }
 
-    /// As [#importProject(File, String, File, String)], for an application
-    /// whose main class is `mainPackage`.`mainName` (its
-    /// `codename1.packageName` and `codename1.mainName`). The build generates
-    /// that class from the entry record, so a source of the same name -- the
-    /// one the project template wrote -- is set aside as
-    /// `<name>.java.pre-desktop-import`; one that already extends a desktop
-    /// lifecycle is the developer's own and stays.
+    /// As [#importProject(File, String, File, String, String, String, boolean)]
+    /// for an application whose desktop sources are not a library.
     public Result importProject(File source, String module, File commonDir, String mainClassOverride,
                                 String mainPackage, String mainName) throws BuildException {
+        return importProject(source, module, commonDir, mainClassOverride, mainPackage, mainName, false);
+    }
+
+    /// As [#importProject(File, String, File, String)], for an application
+    /// whose main class is `mainPackage`.`mainName` (its
+    /// `codename1.packageName` and `codename1.mainName`). That class is
+    /// written to start the imported application; see the class
+    /// documentation. With `library` set -- or when the main class starts an
+    /// imported Android application -- it is left alone and the desktop
+    /// sources are imported as a library.
+    public Result importProject(File source, String module, File commonDir, String mainClassOverride,
+                                String mainPackage, String mainName, boolean library) throws BuildException {
         File moduleDir = moduleDir(source, module);
         File main = new File(moduleDir, "src/main");
         File target = new File(commonDir, "src/main/desktop");
         Result r = new Result();
         try {
+            String generated = mainName == null || mainName.trim().length() == 0 ? null
+                    : (mainPackage == null || mainPackage.trim().length() == 0 ? "" : mainPackage.trim() + ".")
+                    + mainName.trim();
+            if (!library && generated != null && startsAndroidApplication(commonDir, generated)) {
+                // A project starts ONE application, and this one already
+                // starts an Android application: the desktop classes are
+                // what its code can use.
+                log.info(generated + " starts the imported Android application and is kept; the desktop sources "
+                        + "are imported as a library");
+                library = true;
+            }
+            r.library = library;
             // Decided from the source project, before anything is copied: an
             // import that cannot tell how the application starts leaves the
             // application as it found it.
             Map<String, Candidate> candidates = new TreeMap<String, Candidate>();
             scan(new File(main, "java"), candidates);
             scan(new File(main, "kotlin"), candidates);
-            Properties existing = DesktopSources.readEntryRecord(target);
-            Candidate entry = chooseEntry(candidates, mainClassOverride, declaredMainClasses(source, moduleDir),
-                    existing == null ? null : existing.getProperty("mainClass"), existing != null);
-
-            String generated = mainName == null || mainName.trim().length() == 0 ? null
-                    : (mainPackage == null || mainPackage.trim().length() == 0 ? "" : mainPackage.trim() + ".")
-                    + mainName.trim();
+            Candidate entry = library ? null
+                    : chooseEntry(candidates, mainClassOverride, declaredMainClasses(source, moduleDir));
             if (generated != null && declares(main, generated)) {
                 throw new BuildException("Nothing was imported: the desktop project has a class named " + generated
                         + ", which is the name of this application's main class (codename1.packageName and "
-                        + "codename1.mainName). The build generates the main class, so it needs a name the "
-                        + "imported sources do not use: change codename1.mainName in "
+                        + "codename1.mainName). A project has one class of a name, so the main class needs a name "
+                        + "the imported sources do not use: change codename1.mainName in "
                         + "codenameone_settings.properties and import again.");
+            }
+            if (entry != null && generated != null && entry.packageName().length() == 0
+                    && generated.indexOf('.') > 0) {
+                throw new BuildException("Nothing was imported: " + entry.name + " is in the default package, and "
+                        + "the main class " + generated + " is not, so it cannot call it: Java has no way to name "
+                        + "a class of the default package from another. Move " + entry.name + " into a package.");
             }
 
             ImportedFiles files = new ImportedFiles(target, IMPORT_RECORD, "the desktop project", log)
@@ -300,14 +388,9 @@ public final class DesktopProjectImporter {
             if (entry != null) {
                 r.mainClass = entry.name;
                 r.kind = entry.kind();
-                writeEntryRecord(target, existing, entry);
-            } else if (existing != null) {
-                r.mainClass = existing.getProperty("mainClass");
-                r.kind = existing.getProperty("kind");
-            }
-            if (generated != null && r.mainClass != null) {
-                r.generatedMain = generated;
-                r.setAside = setAsideMainClass(commonDir, generated);
+                if (generated != null) {
+                    writeMainClass(commonDir, generated, entry, r);
+                }
             }
             readDependencies(moduleDir, r);
             r.javaLevel = javaLevel(source, moduleDir);
@@ -382,52 +465,165 @@ public final class DesktopProjectImporter {
         }
     }
 
-    /// Moves the application's own main class source out of the compiler's
-    /// way, so that the class the build generates under that name is the
-    /// only one. Answers where it went, or null when nothing was moved.
-    private File setAsideMainClass(File commonDir, String className) throws IOException {
+    /// The source files the class `className` could have in the application:
+    /// Java, then Kotlin.
+    private static File[] mainSources(File commonDir, String className) {
         String path = className.replace('.', '/');
-        File[] sources = {new File(commonDir, "src/main/java/" + path + ".java"),
+        return new File[] {new File(commonDir, "src/main/java/" + path + ".java"),
             new File(commonDir, "src/main/kotlin/" + path + ".kt")};
-        File moved = null;
-        for (File f : sources) {
-            if (!f.isFile()) {
-                continue;
-            }
-            String text = code(new String(Files.readAllBytes(f.toPath()), UTF8));
-            if (text.indexOf("DesktopLifecycle") >= 0 || text.indexOf("FxLifecycle") >= 0) {
-                log.info(f.getName() + " already extends a desktop lifecycle and was kept; the build generates no "
-                        + "main class beside it");
-                continue;
-            }
-            File backup = new File(f.getPath() + SET_ASIDE_SUFFIX);
-            if (backup.exists()) {
-                // An earlier import's copy of the original, which is the one
-                // worth keeping; this file was written since.
-                log.warn(f.getName() + " was written after an earlier import set the original aside ("
-                        + backup.getName() + "). The build fails while both it and " + DesktopSources.ENTRY_RECORD
-                        + " ask to start the application: delete one of them.");
-                continue;
-            }
-            Files.move(f.toPath(), backup.toPath());
-            log.info("Set " + f.getName() + " aside as " + backup.getName() + ": the build generates " + className
-                    + " to start the imported application");
-            moved = backup;
-        }
-        return moved;
     }
 
-    /// Picks the entry point. Answers null only when there is no candidate
-    /// and an existing record to keep.
+    /// Whether the application's main class is the one an Android import
+    /// wrote, or one like it: a class that starts an Android application.
+    private static boolean startsAndroidApplication(File commonDir, String className) throws IOException {
+        for (File f : mainSources(commonDir, className)) {
+            if (f.isFile() && code(read(f)).indexOf("AndroidLifecycle") >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The source of the main class `className` (`pkg.Name`) that starts
+    /// `entry`: what the import writes. `launcher` is true when the entry
+    /// point is called through [#LAUNCHER] in its own package.
+    static String mainClassSource(String className, Candidate entry, boolean launcher) {
+        int dot = className.lastIndexOf('.');
+        String pkg = dot < 0 ? "" : className.substring(0, dot);
+        String simple = className.substring(dot + 1);
+        String callee = launcher ? entry.packageName() + "." + LAUNCHER : entry.sourceName();
+        StringBuilder b = new StringBuilder();
+        b.append(WRITTEN_BY).append('\n');
+        if (pkg.length() > 0) {
+            b.append("package ").append(pkg).append(";\n\n");
+        }
+        if (entry.javafx) {
+            b.append("/// This application's Codename One main class. It starts the JavaFX application\n"
+                    + "/// ").append(entry.name).append(": on the event dispatch thread, which is the\n"
+                    + "/// JavaFX application thread, FxLifecycle creates it, then calls its init() and\n"
+                    + "/// start(Stage).\n");
+        } else {
+            b.append("/// This application's Codename One main class. It starts the Swing application\n"
+                    + "/// ").append(entry.name).append(" by calling its main method on the event\n"
+                    + "/// dispatch thread, which is the Swing event dispatch thread.\n");
+        }
+        b.append("///\n"
+                + "/// Edit it as any main class. Extending the lifecycle is what makes the desktop\n"
+                + "/// windows the application: closing the last one exits it. A main class that\n"
+                + "/// extends com.codename1.system.Lifecycle instead uses the desktop classes as a\n"
+                + "/// library, and closing the last window shows the form it was shown over.\n");
+        if (entry.javafx) {
+            b.append("public class ").append(simple).append(" extends ").append(FX_LIFECYCLE).append(" {\n"
+                    + "    @Override\n"
+                    + "    protected javafx.application.Application createApplication() {\n"
+                    + "        return ").append(launcher ? callee + ".create()" : "new " + callee + "()")
+                    .append(";\n    }\n}\n");
+        } else {
+            b.append("public class ").append(simple).append(" extends ").append(SWING_LIFECYCLE).append(" {\n"
+                    + "    @Override\n"
+                    + "    protected void runMain() throws Exception {\n"
+                    + "        ").append(launcher ? callee + ".launch()" : swingCall(callee, entry))
+                    .append(";\n    }\n}\n");
+        }
+        return b.toString();
+    }
+
+    private static String swingCall(String callee, Candidate entry) {
+        return callee + (entry.noArgMain ? ".main()" : ".main(new String[0])");
+    }
+
+    /// The source of [#LAUNCHER] in the package of `entry`: a public class
+    /// the main class can name, which calls an entry point only its own
+    /// package can.
+    static String launcherSource(Candidate entry) {
+        StringBuilder b = new StringBuilder();
+        b.append(WRITTEN_BY).append('\n')
+                .append("package ").append(entry.packageName()).append(";\n\n")
+                .append("/// Calls ").append(entry.name).append(", which is not public, for the application's\n"
+                        + "/// main class in another package.\n")
+                .append("public final class ").append(LAUNCHER).append(" {\n")
+                .append("    private ").append(LAUNCHER).append("() {\n    }\n\n");
+        if (entry.javafx) {
+            b.append("    public static javafx.application.Application create() {\n"
+                    + "        return new ").append(entry.sourceName()).append("();\n    }\n}\n");
+        } else {
+            b.append("    public static void launch() throws Exception {\n"
+                    + "        ").append(swingCall(entry.sourceName(), entry)).append(";\n    }\n}\n");
+        }
+        return b.toString();
+    }
+
+    /// Writes the application's main class, and the launcher beside the
+    /// entry point when the main class cannot name it.
+    ///
+    /// The source it replaces -- the one the project template wrote, say --
+    /// is kept as `<name>.java.pre-desktop-import`. A second import keeps
+    /// that first copy, and rewrites the main class only while it is what an
+    /// import wrote ([#WRITTEN_BY]): one the developer has edited since is
+    /// theirs, and is kept with a warning. A Kotlin source of the same class
+    /// is moved aside the same way, since a project has one class of a name.
+    private void writeMainClass(File commonDir, String className, Candidate entry, Result r) throws IOException {
+        int dot = className.lastIndexOf('.');
+        boolean launcher = !entry.accessible && !entry.packageName().equals(dot < 0 ? "" : className.substring(0, dot));
+        File[] sources = mainSources(commonDir, className);
+        File javaFile = sources[0];
+        File kotlinFile = sources[1];
+        byte[] text = mainClassSource(className, entry, launcher).getBytes(UTF8);
+        if (javaFile.isFile()) {
+            byte[] current = Files.readAllBytes(javaFile.toPath());
+            if (!Arrays.equals(current, text)) {
+                File backup = new File(javaFile.getPath() + SET_ASIDE_SUFFIX);
+                if (!backup.exists()) {
+                    Files.copy(javaFile.toPath(), backup.toPath());
+                    r.setAside = backup;
+                    log.info("Kept the previous " + javaFile.getName() + " as " + backup.getName());
+                } else if (!new String(current, UTF8).startsWith(WRITTEN_BY)) {
+                    // The backup holds the original already, and this file
+                    // is the developer's since: there is no slot to keep it.
+                    log.warn(javaFile.getName() + " was changed after an earlier import and was left as it is; "
+                            + "delete it and import again to have it written to start " + entry.name);
+                    return;
+                }
+            }
+        }
+        if (kotlinFile.isFile()) {
+            File backup = new File(kotlinFile.getPath() + SET_ASIDE_SUFFIX);
+            if (backup.exists()) {
+                throw new IOException(kotlinFile + " and " + backup + " both exist; delete one of them");
+            }
+            Files.move(kotlinFile.toPath(), backup.toPath());
+            r.setAside = r.setAside == null ? backup : r.setAside;
+            log.info("Moved " + kotlinFile.getName() + " aside as " + backup.getName() + ": " + className
+                    + " is now written in Java, to start the imported application");
+        }
+        File parent = javaFile.getParentFile();
+        if (!parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("Cannot create " + parent);
+        }
+        Files.write(javaFile.toPath(), text);
+        if (launcher) {
+            File l = new File(commonDir, "src/main/java/" + entry.packageName().replace('.', '/') + "/" + LAUNCHER
+                    + ".java");
+            if (!l.getParentFile().isDirectory() && !l.getParentFile().mkdirs()) {
+                throw new IOException("Cannot create " + l.getParentFile());
+            }
+            Files.write(l.toPath(), launcherSource(entry).getBytes(UTF8));
+        }
+        r.generatedMain = className;
+        r.mainSource = javaFile;
+        log.info("Wrote " + className + " to start " + entry.name + " (" + entry.kind() + ")");
+    }
+
+    /// Picks the entry point.
     ///
     /// In order: the override; the only candidate; the candidate the source
-    /// project's build names as its main class; the candidate an earlier
-    /// import recorded. A build that names a plain launcher class, in a
-    /// project with exactly one `javafx.application.Application` subclass,
-    /// means that subclass: the launcher only exists to call it, and the
-    /// JavaFX layer starts the application class itself.
-    Candidate chooseEntry(Map<String, Candidate> candidates, String override, List<String> declared,
-                          String recorded, boolean hasRecord) throws BuildException {
+    /// project's build names as its main class. A build that names a plain
+    /// launcher class, in a project with exactly one
+    /// `javafx.application.Application` subclass, means that subclass: the
+    /// launcher only exists to call it, and the JavaFX layer starts the
+    /// application class itself.
+    Candidate chooseEntry(Map<String, Candidate> candidates, String override, List<String> declared)
+            throws BuildException {
         if (override != null && override.length() > 0) {
             Candidate c = candidates.get(override);
             if (c == null) {
@@ -438,11 +634,10 @@ public final class DesktopProjectImporter {
             return c;
         }
         if (candidates.isEmpty()) {
-            if (hasRecord) {
-                return null;
-            }
             throw new BuildException("Nothing was imported: no class extends javafx.application.Application or "
-                    + "declares public static void main(String[]), so there is nothing to start.");
+                    + "declares public static void main(String[]), so there is nothing to start. To use the "
+                    + "classes from this application's own code instead, import them as a library "
+                    + "(-Dcn1.desktop.library=true).");
         }
         if (candidates.size() == 1) {
             return candidates.values().iterator().next();
@@ -469,9 +664,6 @@ public final class DesktopProjectImporter {
             }
             return c;
         }
-        if (recorded != null && candidates.containsKey(recorded)) {
-            return candidates.get(recorded);
-        }
         throw new BuildException("Nothing was imported: the project has several classes it could start through, "
                 + "and its build names none of them as the main class. " + describe(candidates)
                 + " Name one with -Dcn1.desktop.mainClass=");
@@ -487,26 +679,6 @@ public final class DesktopProjectImporter {
         }
         b.append('\n');
         return b.toString();
-    }
-
-    private void writeEntryRecord(File target, Properties existing, Candidate entry) throws IOException {
-        if (existing != null && entry.name.equals(existing.getProperty("mainClass"))
-                && entry.kind().equals(existing.getProperty("kind"))) {
-            // Already says so; whatever else the developer wrote in it stays.
-            return;
-        }
-        String text = "# How the desktop application in this directory starts; read by the Codename One build.\n"
-                + "# mainClass: the class that starts it, as the sources declare it.\n"
-                + "# kind: " + DesktopSources.KIND_JAVAFX + " when that class extends javafx.application.Application, "
-                + DesktopSources.KIND_SWING + " when it is started through its main method.\n"
-                + "mainClass=" + entry.name + "\n"
-                + "kind=" + entry.kind() + "\n";
-        if (!target.isDirectory() && !target.mkdirs()) {
-            throw new IOException("Cannot create " + target);
-        }
-        Files.write(DesktopSources.entryRecord(target).toPath(), text.getBytes(UTF8));
-        log.info("Recorded the entry point " + entry.name + " (" + entry.kind() + ") in "
-                + DesktopSources.ENTRY_RECORD);
     }
 
     // ---- entry point detection -------------------------------------------
@@ -582,7 +754,10 @@ public final class DesktopProjectImporter {
                 continue;
             }
             String cls = ext.group(1);
-            candidate(out, prefix + (cls.equals(fileClass) ? cls : fileClass + "$" + cls)).javafx = true;
+            String binary = cls.equals(fileClass) ? cls : fileClass + "$" + cls;
+            Candidate c = candidate(out, prefix + binary);
+            c.javafx = true;
+            c.accessible = javaPublic(code, binary);
         }
         Matcher main = JAVA_MAIN.matcher(code);
         while (main.find()) {
@@ -591,9 +766,33 @@ public final class DesktopProjectImporter {
             // top-level class. Recording the file's name for either leaves
             // an entry the build then rejects for having no main.
             String declared = declaration(code, main.start(), JAVA_DECLARATION);
-            candidate(out, prefix + (declared == null ? fileClass : declared));
+            String binary = declared == null ? fileClass : declared;
+            candidate(out, prefix + binary).accessible = javaPublic(code, binary);
         }
     }
+
+    /// Whether every class of the binary name `binary` (without its package,
+    /// `Outer$Nested`) is declared `public` in `code`, so that another
+    /// package can name it.
+    static boolean javaPublic(String code, String binary) {
+        for (String simple : binary.split("\\$")) {
+            Matcher m = Pattern.compile("(?<![\\w.])((?:[\\w-]+\\s+)*)(?:class|interface|enum|record)\\s+"
+                    + Pattern.quote(simple) + "\\b").matcher(code);
+            boolean found = false;
+            while (m.find()) {
+                found = true;
+                if (!PUBLIC.matcher(m.group(1)).find()) {
+                    return false;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final Pattern PUBLIC = Pattern.compile("\\bpublic\\b");
 
     /// A Java type declaration, in the two groups [#declaration] reads.
     /// `X.class` is not one.
@@ -682,14 +881,30 @@ public final class DesktopProjectImporter {
             // The class is the declaration the function is written in, which
             // Kotlin does not tie to the file's name.
             String declared = kotlinDeclaration(code, staticMain.start());
-            candidate(out, prefix + (declared == null ? fileClass : declared));
+            candidate(out, prefix + (declared == null ? fileClass : declared)).noArgMain =
+                    noParameters(code, staticMain.end());
         }
-        if (KOTLIN_TOP_MAIN.matcher(code).find()) {
+        Matcher topMain = KOTLIN_TOP_MAIN.matcher(code);
+        if (topMain.find()) {
             // A top-level function compiles into the file's facade class.
             String facade = named.find() ? named.group(1)
                     : Character.toUpperCase(fileClass.charAt(0)) + fileClass.substring(1) + "Kt";
-            candidate(out, prefix + facade);
+            candidate(out, prefix + facade).noArgMain = noParameters(code, topMain.end());
         }
+    }
+
+    /// Whether the parameter list opened just before `at` is empty.
+    private static boolean noParameters(String code, int at) {
+        for (int i = at; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == ')') {
+                return true;
+            }
+            if (!Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+        return false;
     }
 
     // ---- the source project's build --------------------------------------

@@ -25,20 +25,23 @@ package com.codename1.maven;
 import com.codename1.builders.BuildException;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
 
 /// The desktop sources of an application module: `src/main/desktop`, holding
 /// a Swing or JavaFX application as its own build laid it out.
 ///
 /// ```
-/// src/main/desktop/java                   Java sources
-/// src/main/desktop/kotlin                 Kotlin sources (optional)
-/// src/main/desktop/resources              classpath resources: .fxml, .css, .properties, images
-/// src/main/desktop/cn1-desktop.properties the application's entry point
+/// src/main/desktop/java       Java sources
+/// src/main/desktop/kotlin     Kotlin sources (optional)
+/// src/main/desktop/resources  classpath resources: .fxml, .css, .properties, images
 /// ```
+///
+/// Nothing in the directory says how the application starts. That is the
+/// project's Codename One main class, an ordinary source file in
+/// `src/main/java` that `cn1:import-desktop-project` writes
+/// ([DesktopProjectImporter]): it extends the Swing or JavaFX lifecycle and
+/// calls the desktop application from source. A project whose main class
+/// does neither uses the desktop sources as a library.
 ///
 /// The directory existing is what switches the desktop layers on: the project
 /// templates add both runtime jars when it does, and the remap step ships
@@ -46,35 +49,6 @@ import java.util.Properties;
 /// ([CompatLayers#active(Iterable, Iterable)]). Both build plugins read the
 /// layout from here, so they cannot disagree on it.
 public final class DesktopSources {
-
-    /// The file, directly inside the desktop source directory, that records
-    /// how the application starts. A properties file with two keys:
-    ///
-    /// - `mainClass`: the fully qualified name of the class that starts the
-    ///   application, as its sources declare it (never a relocated name) --
-    ///   the `javafx.application.Application` subclass of a JavaFX
-    ///   application, the class holding `public static void main(String[])`
-    ///   of a Swing one.
-    /// - `kind`: `javafx` or `swing`, which says which of the two that is --
-    ///   or `library`, which says the sources are not an application at all:
-    ///   they are screens another application uses, no main class is
-    ///   generated, and `mainClass` is not read.
-    ///
-    /// `cn1:import-desktop-project` writes it; a developer who places sources
-    /// in the directory by hand writes it too. Without the file, a project
-    /// whose own main class exists is treated as `kind=library`.
-    public static final String ENTRY_RECORD = "cn1-desktop.properties";
-
-    /// The `kind` of desktop sources that another application uses rather
-    /// than starts: nothing is generated for them.
-    public static final String KIND_LIBRARY = "library";
-
-    /// The `kind` of an application started through a `main` method.
-    public static final String KIND_SWING = "swing";
-
-    /// The `kind` of an application started through its
-    /// `javafx.application.Application` subclass.
-    public static final String KIND_JAVAFX = "javafx";
 
     private DesktopSources() {
     }
@@ -95,27 +69,6 @@ public final class DesktopSources {
 
     public static File resourcesDir(File desktopDir) {
         return new File(desktopDir, "resources");
-    }
-
-    /// Where the entry point is recorded; see [#ENTRY_RECORD].
-    public static File entryRecord(File desktopDir) {
-        return new File(desktopDir, ENTRY_RECORD);
-    }
-
-    /// The entry record's contents, or null when the module has none.
-    public static Properties readEntryRecord(File desktopDir) throws IOException {
-        File f = entryRecord(desktopDir);
-        if (!f.isFile()) {
-            return null;
-        }
-        Properties p = new Properties();
-        InputStream in = new FileInputStream(f);
-        try {
-            p.load(in);
-        } finally {
-            in.close();
-        }
-        return p;
     }
 
     /// The desktop layers whose API the sources under `desktopDir` name, as

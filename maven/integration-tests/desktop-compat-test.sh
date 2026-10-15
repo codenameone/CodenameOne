@@ -3,8 +3,9 @@
 # imported into an archetype application and built for every target, by Maven
 # and by Gradle. Checks, for each sample:
 #
-#   - cn1:import-desktop-project copies the sources and records the
-#     application's entry point in src/main/desktop/cn1-desktop.properties;
+#   - cn1:import-desktop-project copies the sources and rewrites the
+#     application's main class (common/src/main/java) to start the imported
+#     application, extending the Swing or the JavaFX lifecycle;
 #   - the build relocated every reference to the toolkits: no class the
 #     application ships may name java/awt/, javax/swing/, java/beans/,
 #     org/jdesktop/ or javafx/, because no device has those classes and the
@@ -87,20 +88,24 @@ for sample_dir in "$SAMPLES"/*/; do
       "-Dcn1.desktop.import=$sample_dir") > "$W/import.log" 2>&1 \
     || { tail -40 "$W/import.log"; fail "$sample: import-desktop-project"; }
   desktop="$MAPP/common/src/main/desktop"
-  record="$desktop/cn1-desktop.properties"
-  [ -f "$record" ] || fail "$sample: the import recorded no entry point"
-  main_class=$(sed -n 's/^mainClass=//p' "$record" | tr -d '\r' | tail -1)
-  kind=$(sed -n 's/^kind=//p' "$record" | tr -d '\r' | tail -1)
-  [ -n "$main_class" ] || fail "$sample: the entry record names no mainClass"
-  case "$kind" in
-    swing)  RUNTIME=com/codename1/desktopcompat ;;
-    javafx) RUNTIME=com/codename1/fxcompat ;;
-    *)      fail "$sample: the entry record's kind is '$kind', neither swing nor javafx" ;;
-  esac
-  MAIN_ENTRY=$(echo "$main_class" | tr . /)
+  # The application's main class is what starts the imported one, and the
+  # lifecycle it extends says which toolkit that is.
+  main_source="$MAPP/common/src/main/java/com/acme/desktop/DesktopApp.java"
+  [ -f "$main_source" ] || fail "$sample: the import left no main class"
+  grep -q '^// Written by cn1:import-desktop-project\.' "$main_source" \
+    || fail "$sample: the import did not write the main class"
+  if grep -q 'extends com\.codename1\.desktopcompat\.rt\.DesktopLifecycle' "$main_source"; then
+    kind=swing; RUNTIME=com/codename1/desktopcompat
+  elif grep -q 'extends com\.codename1\.fxcompat\.runtime\.FxLifecycle' "$main_source"; then
+    kind=javafx; RUNTIME=com/codename1/fxcompat
+  else
+    fail "$sample: the main class extends neither desktop lifecycle"
+  fi
+  MAIN_ENTRY=com/acme/desktop/DesktopApp
   [ -d "$desktop/java" ] || [ -d "$desktop/kotlin" ] || fail "$sample: the import copied no sources"
   [ -z "$(find "$desktop" -name module-info.java)" ] || fail "$sample: the import kept a module descriptor"
-  echo "   $kind application, started by $main_class"
+  echo "   $kind application, started by com.acme.desktop.DesktopApp:"
+  grep -E '^ +(return new |[A-Za-z_$][A-Za-z0-9_$.]*\.(main|launch|create)\()' "$main_source" | sed 's/^ */     /'
 
   compat_build_common "$sample" "$W" "$MAPP"
   classes="$MAPP/common/target/classes"
@@ -116,7 +121,7 @@ for sample_dir in "$SAMPLES"/*/; do
 
   compat_convert_to_gradle "$sample" "$W" "$MAPP"
   GAPP="$W/app-gradle"
-  [ -f "$GAPP/src/main/desktop/cn1-desktop.properties" ] || fail "$sample: the Gradle conversion dropped src/main/desktop"
+  [ -d "$GAPP/src/main/desktop" ] || fail "$sample: the Gradle conversion dropped src/main/desktop"
 
   compat_stage_all "$sample" "$W" "$MAPP" "$GAPP" check_desktop_upload
   for target in android-device ios-device javascript mac-os-x-desktop; do
@@ -126,12 +131,11 @@ for sample_dir in "$SAMPLES"/*/; do
 done
 
 # An Android application and a desktop one in the SAME project. A project has
-# one main class and each layer's build generates it, so the two cannot both
-# start: with the entry record in place the build has to stop and say so --
-# never pick one silently -- and without the record the Android application
-# starts while the desktop classes ship beside it, relocated like any library
-# the Android code could call. Staged for one target; the relocation is the
-# same for all of them and the loop above covers the rest.
+# one main class: the Android import makes it start the Android application,
+# and the desktop import that follows has to leave it alone and bring the
+# desktop sources in as a library, relocated like any library the Android code
+# could call. Staged for one target; the relocation is the same for all of them
+# and the loop above covers the rest.
 ANDROID_SAMPLE="$SCRIPTPATH/../../scripts/android-compat-samples/gallery"
 SWING_SAMPLE="$SAMPLES/swing-gallery"
 if [ -d "$ANDROID_SAMPLE" ] && [ -d "$SWING_SAMPLE" ]; then
@@ -146,14 +150,12 @@ if [ -d "$ANDROID_SAMPLE" ] && [ -d "$SWING_SAMPLE" ]; then
   (cd "$MAPP" && mvn_local "com.codenameone:codenameone-maven-plugin:$CN1_VERSION:import-desktop-project" \
       "-Dcn1.desktop.import=$SWING_SAMPLE") > "$W/import-desktop.log" 2>&1 \
     || { tail -40 "$W/import-desktop.log"; fail "both: import-desktop-project"; }
-  if (cd "$MAPP" && JAVA_HOME="$GRADLE_JDK" mvn_local install -DskipTests -pl common -am) > "$W/mvn-conflict.log" 2>&1; then
-    fail "both: two applications built as if one of them had been chosen"
-  fi
-  grep -q 'This project holds an Android application (src/main/android) and a desktop application' "$W/mvn-conflict.log" \
-    || { tail -40 "$W/mvn-conflict.log"; fail "both: the build failed without naming the two applications"; }
-  echo "   with the entry record: the build stops and names both applications"
+  grep -q 'AndroidLifecycle' "$MAPP/common/src/main/java/com/acme/both/BothApp.java" \
+    || fail "both: the desktop import replaced the Android application's main class"
+  grep -q 'Imported as a library' "$W/import-desktop.log" \
+    || { tail -40 "$W/import-desktop.log"; fail "both: the desktop import did not say it imported a library"; }
+  echo "   the desktop import kept the Android main class and imported a library"
 
-  rm -f "$MAPP/common/src/main/desktop/cn1-desktop.properties"
   compat_build_common both "$W" "$MAPP"
   (cd "$MAPP" && JAVA_HOME="$GRADLE_JDK" mvn_local package -DskipTests -Dopen=false -Dcodename1.platform=ios \
       -Dcodename1.buildTarget=ios-device -Dcodename1.stageOnly=true < /dev/null) > "$W/maven-ios-device.log" 2>&1 \
@@ -171,7 +173,7 @@ if [ -d "$ANDROID_SAMPLE" ] && [ -d "$SWING_SAMPLE" ]; then
     echo "$bad" | head -20
     FAILED=1
   fi
-  echo "   without it: the Android application starts, both runtimes ship relocated"
+  echo "   the Android application starts, both runtimes ship relocated"
   desktop_shipped_size "ios-device (both layers)" "$staged"
 fi
 

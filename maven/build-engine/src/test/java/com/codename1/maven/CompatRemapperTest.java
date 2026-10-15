@@ -490,11 +490,13 @@ public class CompatRemapperTest {
     }
 
     @Test
-    public void theDesktopEntryRecordReachesTheGenerators() throws Exception {
-        File record = new File(tmp.getRoot(), DesktopSources.ENTRY_RECORD);
+    public void theDesktopSourceDirectorySuppliesTheDefaultResources() throws Exception {
+        File desktop = new File(tmp.getRoot(), "desktop");
         CompatRemapper remapper = new CompatRemapper(tmp.newFolder("classes"), null, null, LOG)
-                .withDesktopEntryRecord(record);
-        assertEquals(record, remapper.desktopEntryRecord());
+                .withDesktopSourceDirectory(desktop);
+        assertEquals(desktop, remapper.desktopSourceDirectory());
+        assertEquals(java.util.Collections.singletonList(DesktopSources.resourcesDir(desktop.getAbsoluteFile())),
+                remapper.resourceDirectories());
     }
 
     @Test

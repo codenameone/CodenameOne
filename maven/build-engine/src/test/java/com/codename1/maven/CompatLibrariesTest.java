@@ -165,11 +165,9 @@ public class CompatLibrariesTest {
     private CompatRemapper remapper(File classes, List<File> shipped, File... onClasspath) throws Exception {
         List<File> cp = runtimes();
         cp.addAll(Arrays.asList(onClasspath));
-        File dir = tmp.newFolder();
-        File record = DesktopSources.entryRecord(dir);
-        Files.write(record.toPath(), "mainClass=com.acme.swingapp.Main\nkind=swing\n".getBytes("UTF-8"));
-        return new CompatRemapper(classes, cp, null, log).withDesktopEntryRecord(record)
-                .withApplicationMain("com.acme.MyApp").withApplicationLibraries(shipped);
+        File desktop = tmp.newFolder();
+        return new CompatRemapper(classes, cp, null, log).withDesktopSourceDirectory(desktop)
+                .withApplicationLibraries(shipped);
     }
 
     private static String superName(File cls) throws Exception {

@@ -34,7 +34,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -142,6 +141,13 @@ public class JavaFxGallerySampleTest {
         all.remove(descriptor);
         all.remove(descriptor);
         SwingGallerySampleTest.sources(javaOut, "", all);
+        // The main class cn1:import-desktop-project writes into the
+        // application's src/main/java, word for word.
+        DesktopProjectImporter.Candidate entry = new DesktopProjectImporter.Candidate(
+                "com.example.fxgallery.GalleryApp");
+        entry.javafx = true;
+        all.add(MAIN.replace('.', '/') + ".java");
+        all.add(DesktopProjectImporter.mainClassSource(MAIN, entry, false));
         File classes = tmp.newFolder("classes");
         CompatFixtures.compileAgainst(cp, tmp.newFolder(), classes, all.toArray(new String[all.size()]));
 
@@ -150,10 +156,7 @@ public class JavaFxGallerySampleTest {
         SwingGallerySampleTest.copy(resourcesOut, classes);
 
         // remap-compat, which compiles the documents first.
-        File record = DesktopSources.entryRecord(tmp.newFolder());
-        Files.write(record.toPath(), "mainClass=com.example.fxgallery.GalleryApp\nkind=javafx\n".getBytes("UTF-8"));
         assertTrue(new CompatRemapper(classes, cp, null, CompatRemapperTest.LOG)
-                .withDesktopEntryRecord(record).withApplicationMain(MAIN)
                 .withResourceDirectories(Arrays.asList(resources, resourcesOut)).run());
 
         // Throws on a single finding, in the application, in the classes

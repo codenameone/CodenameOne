@@ -62,9 +62,7 @@ public final class CompatRemapper {
     private ClassRelocator relocator;
     private final List<File> handlerDirs = new ArrayList<File>();
     private boolean shipRuntime = true;
-    private File desktopEntry;
-    private String applicationMain;
-    private boolean entryGenerated;
+    private File desktopDir;
     private List<File> applicationLibraries;
     /// Null until [#withResourceDirectories] is called; see
     /// [#resourceDirectories()].
@@ -115,22 +113,17 @@ public final class CompatRemapper {
         return this;
     }
 
-    /// The record of the desktop application's entry point
-    /// ([DesktopSources#entryRecord]), which the Swing and JavaFX entry point
-    /// generators read; null, or a file that does not exist, for an
-    /// application that has none.
-    public CompatRemapper withDesktopEntryRecord(File record) {
-        this.desktopEntry = record;
-        return this;
-    }
-
-    /// The project's main class, as `codename1.packageName` and
-    /// `codename1.mainName` name it (`com.example.MyApp`): the class the
-    /// entry point of a desktop application is generated as. Without it the
-    /// class is generated only for an application with an entry record, as
-    /// [DesktopEntryPoints#DEFAULT_MAIN].
-    public CompatRemapper withApplicationMain(String className) {
-        this.applicationMain = className;
+    /// The module's desktop source directory (`src/main/desktop`, see
+    /// [DesktopSources]); null, or a directory that does not exist, for an
+    /// application that has none. Only its `resources` directory is read,
+    /// and only when [#withResourceDirectories] is not called.
+    ///
+    /// Nothing here starts the application: its Codename One main class is a
+    /// source file of the project, which `cn1:import-desktop-project` writes
+    /// ([DesktopProjectImporter]), and the remap relocates it like any other
+    /// class.
+    public CompatRemapper withDesktopSourceDirectory(File dir) {
+        this.desktopDir = dir;
         return this;
     }
 
@@ -140,9 +133,10 @@ public final class CompatRemapper {
     /// the classes directory and indexed for the runtime; see
     /// [CompatResources]. A directory that does not exist is ignored.
     ///
-    /// A caller that never calls this gets the `resources` directory beside
-    /// the desktop entry record, which is where a desktop application's
-    /// resources are unless the build was told otherwise.
+    /// A caller that never calls this gets the `resources` directory of the
+    /// desktop source directory ([#withDesktopSourceDirectory]), which is
+    /// where a desktop application's resources are unless the build was told
+    /// otherwise.
     public CompatRemapper withResourceDirectories(List<File> dirs) {
         resourceDirs = new ArrayList<File>();
         if (dirs != null) {
@@ -161,15 +155,15 @@ public final class CompatRemapper {
             return resourceDirs;
         }
         List<File> out = new ArrayList<File>();
-        if (desktopEntry != null && desktopEntry.getAbsoluteFile().getParentFile() != null) {
-            out.add(DesktopSources.resourcesDir(desktopEntry.getAbsoluteFile().getParentFile()));
+        if (desktopDir != null) {
+            out.add(DesktopSources.resourcesDir(desktopDir.getAbsoluteFile()));
         }
         return out;
     }
 
-    /// The file given to [#withDesktopEntryRecord], or null.
-    File desktopEntryRecord() {
-        return desktopEntry;
+    /// The directory given to [#withDesktopSourceDirectory], or null.
+    File desktopSourceDirectory() {
+        return desktopDir;
     }
 
     /// The layers this application has switched on, in the order their rules
@@ -317,7 +311,6 @@ public final class CompatRemapper {
         try {
             jdkJar = CompatLayers.jdkJar(classpath);
             resourcesShipped = false;
-            entryGenerated = false;
             List<String> appClasses;
             int runtime = 0;
             boolean android = isActive(AndroidRemapper.RELOCATION);
@@ -358,11 +351,9 @@ public final class CompatRemapper {
             }
             List<String> unmodifiable = Collections.unmodifiableList(appClasses);
             if (isActive(CompatLayers.SWING)) {
-                generateSwingEntryPoint(unmodifiable);
                 generateSwingResources(unmodifiable);
             }
             if (isActive(CompatLayers.JAVAFX)) {
-                generateJavaFxEntryPoint(unmodifiable);
                 generateFxmlDispatch(unmodifiable);
                 generatePropertyAccess(unmodifiable);
                 generateJavaFxResources(unmodifiable);
@@ -386,33 +377,13 @@ public final class CompatRemapper {
         }
     }
 
-    /// Generates the class that starts a Swing application -- the Codename
-    /// One lifecycle class that calls the application's `main`, since nothing
-    /// on a device runs a `main` method: [DesktopEntryPoints]. `appClasses`
-    /// are the application's relocated internal names. Called after every
-    /// runtime is in place, on a full (not relocate-only) run with the Swing
-    /// layer active. Whatever it writes must be written with
-    /// [ClassRelocator#writeIfDifferent], to keep a second run a no-op.
-    void generateSwingEntryPoint(List<String> appClasses) throws IOException, BuildException {
-        generateDesktopEntryPoint(appClasses);
-    }
-
-    /// The one main class of a desktop application, generated once per run
-    /// however many desktop layers are active: which of the two kinds it is
-    /// comes from the entry record, not from the layer that asked.
-    private void generateDesktopEntryPoint(List<String> appClasses) throws IOException, BuildException {
-        if (entryGenerated) {
-            return;
-        }
-        entryGenerated = true;
-        new DesktopEntryPoints(classesDir, handlerDirs, relocator, active, jdkJar != null, log)
-                .generate(DesktopEntryPoints.read(desktopEntry), applicationMain, appClasses);
-    }
-
     /// Ships what a Swing application loads by name -- `Class.getResource`
     /// images, `ResourceBundle` properties -- in the form the runtime looks
-    /// them up: [#shipDesktopResources()]. Same contract as
-    /// [#generateSwingEntryPoint].
+    /// them up: [#shipDesktopResources()]. `appClasses` are the application's
+    /// relocated internal names. Called after every runtime is in place, on
+    /// a full (not relocate-only) run with the Swing layer active. Whatever
+    /// it writes must be written with [ClassRelocator#writeIfDifferent], to
+    /// keep a second run a no-op.
     void generateSwingResources(List<String> appClasses) throws IOException {
         shipDesktopResources();
     }
@@ -427,9 +398,9 @@ public final class CompatRemapper {
     /// The generated class is `com.codename1.compat.jdk.CompatRegistry`, and
     /// `com.codename1.compat.jdk.CompatBoot.cn1Init()` installs it. The
     /// resource and bundle lookups call that themselves on first use, so
-    /// nothing is required of an entry point; one that wants the cost paid
-    /// at startup calls `CompatBoot.cn1Init()` before the application's own
-    /// code.
+    /// nothing is required of a main class; the desktop lifecycles
+    /// (`DesktopLifecycle`, `FxLifecycle`) call `CompatBoot.cn1Init()` before
+    /// the application's own code, so the cost is paid at startup.
     private void shipDesktopResources() throws IOException {
         if (resourcesShipped || jdkJar == null) {
             // Without the shared JDK classes there is no runtime to read
@@ -446,14 +417,6 @@ public final class CompatRemapper {
         }
     }
 
-    /// Generates the class that starts a JavaFX application, instantiating
-    /// its `javafx.application.Application` subclass with `new` rather than
-    /// by reflection: [DesktopEntryPoints]. Same contract as
-    /// [#generateSwingEntryPoint], for the JavaFX layer.
-    void generateJavaFxEntryPoint(List<String> appClasses) throws IOException, BuildException {
-        generateDesktopEntryPoint(appClasses);
-    }
-
     /// Generates what FXML resolves by name at run time on a desktop --
     /// the compiled documents, controller classes, `fx:id` fields and
     /// `onAction="#handler"` methods -- as direct calls, the way
@@ -461,7 +424,7 @@ public final class CompatRemapper {
     /// [com.codename1.fxml.FxmlDispatchGenerator]. It replaces the layer's
     /// placeholder registry, which is why [#activeLayers()] keeps that
     /// class from being copied out of the runtime jar. Same contract as
-    /// [#generateSwingEntryPoint], for the JavaFX layer.
+    /// [#generateSwingResources], for the JavaFX layer.
     void generateFxmlDispatch(List<String> appClasses) throws IOException {
         com.codename1.fxml.FxmlDispatchGenerator generator = new com.codename1.fxml.FxmlDispatchGenerator(
                 classesDir, new com.codename1.fxml.FxmlDispatchGenerator.Names(
@@ -481,7 +444,7 @@ public final class CompatRemapper {
     /// classes -- as direct calls: [PropertyAccessGenerator]. It replaces
     /// the layer's placeholder registry, which [#activeLayers()] keeps from
     /// being copied out of the runtime jar. Same contract as
-    /// [#generateSwingEntryPoint], for the JavaFX layer.
+    /// [#generateSwingResources], for the JavaFX layer.
     void generatePropertyAccess(List<String> appClasses) throws IOException {
         PropertyAccessGenerator generator = new PropertyAccessGenerator(classesDir,
                 relocator.map(PropertyAccessGenerator.REGISTRY), relocator.map(PropertyAccessGenerator.ACCESS),
@@ -494,7 +457,7 @@ public final class CompatRemapper {
 
     /// Ships the FXML documents, stylesheets and images a JavaFX application
     /// loads by name: [#shipDesktopResources()]. Same contract as
-    /// [#generateSwingEntryPoint], for the JavaFX layer.
+    /// [#generateSwingResources], for the JavaFX layer.
     void generateJavaFxResources(List<String> appClasses) throws IOException {
         shipDesktopResources();
     }

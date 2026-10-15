@@ -22,6 +22,7 @@
  */
 package com.codename1.fxcompat.runtime;
 
+import com.codename1.compat.jdk.CompatBoot;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
@@ -29,27 +30,36 @@ import com.codename1.ui.Display;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
-/// The Codename One entry point of a JavaFX application.
+/// The Codename One lifecycle of a JavaFX application.
 ///
 /// #### Contract
 ///
-/// The generated main class extends this class and implements one
-/// method:
+/// The application's Codename One main class -- the class
+/// `codename1.packageName` and `codename1.mainName` name, an ordinary source
+/// file of the project -- extends this class and implements one method.
+/// `cn1:import-desktop-project` writes that class:
 ///
 /// ```java
-/// public class MyAppMain extends FxLifecycle {
+/// public class MyApp extends FxLifecycle {
 ///     protected Application createApplication() {
-///         return new MyApp();
+///         return new com.example.MyFxApp();
 ///     }
 /// }
 /// ```
+///
+/// Extending this class is what makes the JavaFX stages THE application:
+/// [#runApp()] installs the [StageHosts#setExitHook(Runnable)] hook that
+/// exits it. A Codename One application that only uses some JavaFX scenes
+/// (library mode) has a main class that does not extend it, and the last
+/// stage closing returns to the form it was shown over.
 ///
 /// Codename One then drives it as any `Lifecycle`:
 ///
 /// - `init(Object)`: the inherited behaviour (theme, network error
 ///   handling); nothing JavaFX runs yet.
 /// - `start()`, the first time: on the event dispatch thread, which is
-///   the JavaFX application thread, [#createApplication()] is called once,
+///   the JavaFX application thread, the application's resources are
+///   installed (`CompatBoot.cn1Init()`), [#createApplication()] is called once,
 ///   then `Application.init()`, then `Application.start(Stage)` with a
 ///   new primary stage. The stage is a form (see [StageHosts]); the
 ///   application shows it by calling `Stage.show()`.
@@ -89,6 +99,8 @@ public abstract class FxLifecycle extends Lifecycle {
 
     @Override
     public void runApp() {
+        // Before any application code: its resources and bundles.
+        CompatBoot.cn1Init();
         application = createApplication();
         if (application == null) {
             throw new IllegalStateException("createApplication() answered null");

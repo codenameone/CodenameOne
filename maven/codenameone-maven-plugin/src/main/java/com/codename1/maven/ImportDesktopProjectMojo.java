@@ -34,15 +34,19 @@ import java.io.File;
 /// ```
 /// mvn cn1:import-desktop-project -Dcn1.desktop.import=/path/to/MyDesktopApp
 ///     [-Dcn1.desktop.module=app] [-Dcn1.desktop.mainClass=com.example.Main]
+///     [-Dcn1.desktop.library=true]
 /// ```
 ///
 /// Copies the project's (or the named module's) `src/main/java`,
 /// `src/main/kotlin` and `src/main/resources` into
-/// `common/src/main/desktop`, records how the application starts in
-/// `cn1-desktop.properties` there, sets the application's own main class
-/// source aside so that the build generates the one that starts the imported
-/// application, and lists what becomes of the project's dependencies. Build
-/// and run as usual afterwards.
+/// `common/src/main/desktop`, writes the application's Codename One main
+/// class (`codename1.packageName`.`codename1.mainName`, in
+/// `common/src/main/java`) so that it starts the imported application, and
+/// lists what becomes of the project's dependencies. The main class is an
+/// ordinary source file, the application's own from then on. With
+/// `cn1.desktop.library` the main class is left alone and the desktop
+/// classes are a library the application's own code uses. Build and run as
+/// usual afterwards.
 /// See [DesktopProjectImporter].
 @Mojo(name = "import-desktop-project", requiresProject = true, aggregator = true)
 public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
@@ -60,6 +64,11 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
     /// project's build leave more than one to choose from.
     @Parameter(property = "cn1.desktop.mainClass")
     private String mainClass;
+
+    /// Imports the sources as a library: the application's main class is not
+    /// written, and the application starts as it did.
+    @Parameter(property = "cn1.desktop.library", defaultValue = "false")
+    private boolean library;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -80,7 +89,7 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
             declared = wireDesktopCompat(common, DesktopProjectImporter.moduleDir(source, module));
             r = new DesktopProjectImporter(MavenLog.of(getLog())).importProject(source, module, common, mainClass,
                     properties == null ? null : properties.getProperty("codename1.packageName"),
-                    properties == null ? null : properties.getProperty("codename1.mainName"));
+                    properties == null ? null : properties.getProperty("codename1.mainName"), library);
             imported = true;
         } catch (com.codename1.builders.BuildException e) {
             throw new MojoFailureException(e.getMessage(), e);
@@ -100,8 +109,11 @@ public class ImportDesktopProjectMojo extends AbstractCN1Mojo {
             getLog().info("  supported: " + c);
         }
         if (r.generatedMain != null) {
-            getLog().info("The build generates this application's main class, " + r.generatedMain
-                    + ", to start it on every target");
+            getLog().info("Wrote this application's main class, " + r.generatedMain + " (" + r.mainSource
+                    + "), to start it on every target" + (r.setAside == null ? ""
+                    : "; the previous source is kept as " + r.setAside.getName()));
+        } else if (r.library) {
+            getLog().info("Imported as a library: the application's main class was left as it is");
         }
         for (String u : r.uncovered) {
             if (DesktopProjectImporter.isToolkitModule(u)) {

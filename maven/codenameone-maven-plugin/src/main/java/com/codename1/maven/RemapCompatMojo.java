@@ -99,9 +99,6 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                     // one can name a class of the application; see
                     // PrepareDesktopSourcesMojo.compileDesktopResources.
                     .withFxmlSourceDirectory(new File(project.getBuild().getDirectory(), "generated-fxml"))
-                    .withDesktopEntryRecord(desktopSourceDir == null ? null
-                            : DesktopSources.entryRecord(desktopSourceDir))
-                    .withApplicationMain(applicationMain())
                     .withApplicationLibraries(libraries)
                     .run();
         } catch (com.codename1.builders.BuildException ex) {
@@ -119,20 +116,5 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
     static boolean ships(String scope, String type, String groupId) {
         return (Artifact.SCOPE_COMPILE.equals(scope) || Artifact.SCOPE_RUNTIME.equals(scope))
                 && "jar".equals(type) && !"com.codenameone".equals(groupId);
-    }
-
-    /// The project's main class, which the entry point of a desktop
-    /// application is generated as; null for a module that is not an
-    /// application's.
-    private String applicationMain() {
-        if (!isCN1ProjectDir()) {
-            return null;
-        }
-        String pkg = properties == null ? null : properties.getProperty("codename1.packageName");
-        String main = properties == null ? null : properties.getProperty("codename1.mainName");
-        if (main == null || main.trim().length() == 0) {
-            return null;
-        }
-        return pkg == null || pkg.trim().length() == 0 ? main.trim() : pkg.trim() + "." + main.trim();
     }
 }

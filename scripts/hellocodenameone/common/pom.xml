@@ -44,9 +44,9 @@
     <profiles>
 
         <!-- The desktop compatibility layers: active while src/main/desktop
-             exists, as in a generated project. The desktop sources there name no
-             entry point (there is no cn1-desktop.properties), so they are built
-             in library mode and this app keeps its own main class. SwingX is
+             exists, as in a generated project. This app's own main class extends
+             neither desktop lifecycle, so the desktop sources there are built
+             in library mode. SwingX is
              only compiled against: the Swing layer has its own. -->
         <profile>
             <id>desktop-compat</id>
