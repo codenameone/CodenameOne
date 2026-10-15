@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source = fs.readFileSync(new URL('../../maven/build-engine/src/main/resources/com/codename1/builders/javascript/pwa-worker.js', import.meta.url), 'utf8');
+const scope = 'https://example.com/cn1test/';
+const prefix = 'cn1-pwa:' + encodeURIComponent(scope) + ':';
+const handlers = new Map();
+const deleted = [];
+let added;
+let failInstall = false;
+let claimed = false;
+const context = {
+    URL, Set, Request, Promise, encodeURIComponent,
+    self: {
+        registration: {scope},
+        cn1Pwa: {version:'new', assets:['index.html', 'worker.js', 'translated_app_1.js', 'assets/font%20name.ttf']},
+        clients: {claim:async () => { claimed = true; }},
+        addEventListener: (name, handler) => handlers.set(name, handler),
+        skipWaiting: () => assert.fail('must not replace the worker of an open app')
+    },
+    caches: {
+        open: async name => {
+            assert.equal(name, prefix + 'new');
+            return {
+                addAll: async requests => { added = requests; if (failInstall) throw Error('missing asset'); },
+                match: async url => ({cached:url})
+            };
+        },
+        keys: async () => [prefix+'old', prefix+'new', 'cn1-pwa:another-app:old', 'other-cache'],
+        delete: async name => { deleted.push(name); }
+    },
+    fetch: async () => assert.fail('a cached resource should not require the network')
+};
+vm.runInNewContext(source, context);
+async function lifecycle(name) {
+    let pending;
+    handlers.get(name)({waitUntil:promise => { pending = promise; }});
+    assert.ok(pending, name + ' must extend the event lifetime');
+    await pending;
+}
+await lifecycle('install');
+assert.deepEqual(Array.from(added, request => request.url), ['index.html','worker.js','translated_app_1.js','assets/font%20name.ttf'].map(p => scope+p));
+assert.ok(added.every(request => request.cache === 'reload'));
+failInstall = true;
+await assert.rejects(lifecycle('install'), /missing asset/, 'a partial cache must not install');
+await lifecycle('activate');
+assert.deepEqual(deleted, [prefix+'old']);
+assert.ok(claimed);
+async function cached(url, mode = 'cors', method = 'GET') {
+    let response;
+    handlers.get('fetch')({request:{url, mode, method}, respondWith:promise => { response = promise; }});
+    return response ? await response : null;
+}
+assert.equal((await cached(scope+'?installed=1', 'navigate')).cached, scope+'index.html');
+assert.equal((await cached(scope+'index.html?installed=1', 'navigate')).cached, scope+'index.html');
+assert.equal((await cached(scope+'translated_app_1.js')).cached, scope+'translated_app_1.js');
+for (const url of [scope+'api/private', scope+'cn1-cors-proxy?_target=x', 'https://example.com/other/', 'https://cdn.example.com/file.js', scope+'worker.js?dynamic=1']) {
+    assert.equal(await cached(url), null, url);
+}
+assert.equal(await cached(scope+'index.html', 'cors', 'POST'), null);
+console.log('PASS: atomic precache, waiting updates, scope isolation, navigation queries and API exclusion');
