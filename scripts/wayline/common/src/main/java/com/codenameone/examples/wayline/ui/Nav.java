@@ -33,6 +33,7 @@ import com.codenameone.examples.wayline.admin.AdminForm;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.driver.ApplyForm;
 import com.codenameone.examples.wayline.driver.DriverForm;
+import com.codenameone.examples.wayline.driver.Shift;
 import com.codenameone.examples.wayline.live.LiveChannel;
 import com.codenameone.examples.wayline.net.Account;
 import com.codenameone.examples.wayline.net.Session;
@@ -72,6 +73,7 @@ public final class Nav {
     /// The first screen: wherever the stored session leads.
     public static void launch() {
         Session.onSignedOut(() -> {
+            Shift.end();
             LiveChannel.stop();
             Telemetry.signedOut("expired");
             WelcomeForm.show();
@@ -124,6 +126,11 @@ public final class Nav {
         Telemetry.role(mode);
         // Driving is for the approved. Anyone else who chooses it gets the
         // way there: the application, and what has become of it.
+        if (!DRIVER.equals(mode)) {
+            // Out of the driver's side of the app is off line as far as the
+            // phone is concerned: nothing goes on reporting where it is.
+            Shift.end();
+        }
         Home home = ADMIN.equals(mode) ? new AdminForm()
                 : !DRIVER.equals(mode) ? new RiderForm()
                 : user.driver() ? new DriverForm() : new ApplyForm();
@@ -196,6 +203,7 @@ public final class Nav {
 
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
+        Shift.end();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";

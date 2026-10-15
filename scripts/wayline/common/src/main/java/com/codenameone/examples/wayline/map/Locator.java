@@ -25,6 +25,7 @@ package com.codenameone.examples.wayline.map;
 import com.codename1.location.Location;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
+import com.codename1.location.LocationRequest;
 import com.codename1.maps.LatLng;
 import com.codename1.ui.CN;
 import com.codenameone.examples.wayline.AppConfig;
@@ -64,6 +65,8 @@ public final class Locator {
 
     /// How long a search may go unanswered before a screen says so.
     private static final int PATIENCE = 8000;
+    /// How often a tracking search asks for a position.
+    private static final long TRACK_MILLIS = 5000L;
 
     /// Told every time the search gets somewhere, on the event thread.
     public interface Watcher {
@@ -77,6 +80,13 @@ public final class Locator {
     private static LatLng found;
     private static int state = SIMULATED;
     private static boolean started;
+    /// Whether the position is wanted precisely and in the background: a
+    /// driver on line. See [#track].
+    private static boolean tracking;
+    /// Whether the search was put down because the app went to the
+    /// background, to be taken up again when it returns.
+    private static boolean paused;
+    private static double heading;
     /// Counts the searches, so that the patience of one that has been
     /// restarted does not run out on the next.
     private static int search;
@@ -106,6 +116,56 @@ public final class Locator {
         }
         return new LatLng(AppConfig.DEFAULT_LAT, AppConfig.DEFAULT_LNG);
     }
+
+    /// The direction the device last moved in, in degrees from north.
+    public static double heading() {
+        return heading;
+    }
+
+    // tag::wayline-locator-track[]
+    /// Asks for the position precisely, often, and on in the background, or
+    /// goes back to the ordinary search. A driver on line tracks: riders follow
+    /// the car on a map, and the server offers rides by distance.
+    ///
+    /// The platform decides what "in the background" allows. With the
+    /// `location` background mode an iPhone goes on reporting after the app is
+    /// put away; Android does while the app runs a foreground service, which is
+    /// what [com.codenameone.examples.wayline.driver.Shift] starts.
+    public static void track(boolean on) {
+        if (tracking == on) {
+            return;
+        }
+        tracking = on;
+        if (started && !simulated()) {
+            LocationManager.getLocationManager().setLocationListener(null);
+            start(true);
+        }
+    }
+
+    /// The app went to the background. Unless a driver is tracking, the
+    /// platform is told to stop looking: an app with a background location
+    /// mode is otherwise kept running, and draining the battery, for a map
+    /// nobody is looking at.
+    public static void paused() {
+        if (!started || tracking || simulated()) {
+            return;
+        }
+        paused = true;
+        search++;
+        LocationManager.getLocationManager().setLocationListener(null);
+    }
+
+    /// The app is back: whatever [#paused] put down is taken up again.
+    public static void resumed() {
+        if (!paused) {
+            return;
+        }
+        paused = false;
+        if (started && !simulated()) {
+            start(true);
+        }
+    }
+    // end::wayline-locator-track[]
 
     /// How the search stands: one of the constants above.
     public static int state() {
@@ -138,6 +198,7 @@ public final class Locator {
         WATCHERS.remove(watcher);
         if (started && WATCHERS.isEmpty()) {
             started = false;
+            paused = false;
             // Whatever the listener or the patience of this search still has
             // to say is about a search nobody is following.
             search++;
@@ -161,13 +222,16 @@ public final class Locator {
         // arrived -- already knows where the device is, and says so, where
         // a first search has only that it is looking.
         set(resumed && found != null ? FOUND : SEARCHING);
-        LocationManager.getLocationManager().setLocationListener(new LocationListener() {
+        LocationListener listener = new LocationListener() {
             @Override
             public void locationUpdated(Location location) {
                 if (mine != search || location == null) {
                     return;
                 }
                 found = new LatLng(location.getLatitude(), location.getLongitude());
+                if (location.getDirection() >= 0f) {
+                    heading = location.getDirection();
+                }
                 set(FOUND);
             }
 
@@ -184,7 +248,16 @@ public final class Locator {
                     set(UNAVAILABLE);
                 }
             }
-        });
+        };
+        if (tracking) {
+            // Every few seconds, as precisely as the device can: what a car on
+            // a rider's map needs. The ordinary search takes the platform's
+            // default, which on an iPhone waits for 100 meters of movement.
+            LocationManager.getLocationManager().setLocationListener(listener,
+                    new LocationRequest(LocationRequest.PRIORITY_HIGH_ACCUARCY, TRACK_MILLIS));
+        } else {
+            LocationManager.getLocationManager().setLocationListener(listener);
+        }
         CN.setTimeout(PATIENCE, new Runnable() {
             @Override
             public void run() {

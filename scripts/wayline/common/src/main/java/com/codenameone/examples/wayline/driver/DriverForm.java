@@ -139,6 +139,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
         // Picks up where the driver left off: still online, perhaps mid-ride.
         Api.driver().me(Net.to(me -> {
             online = me.online();
+            shift();
             showing = "";
             display();
             refresh();
@@ -172,6 +173,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
         Api.driver().status(status, Net.to(me -> {
             if (online != me.online()) {
                 online = me.online();
+                shift();
                 Telemetry.driverOnline(online);
                 showing = "";
                 display();
@@ -181,6 +183,16 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void refresh() {
         Api.driver().active(Net.to(this::update, QUIET));
+    }
+
+    /// Keeps the phone reporting in the background exactly while the server
+    /// has this driver on line.
+    private void shift() {
+        if (online) {
+            Shift.begin();
+        } else {
+            Shift.end();
+        }
     }
 
     @Override

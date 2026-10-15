@@ -23,6 +23,8 @@
 package com.codenameone.examples.wayline;
 
 import com.codename1.system.Lifecycle;
+import com.codenameone.examples.wayline.driver.Shift;
+import com.codenameone.examples.wayline.map.Locator;
 import com.codenameone.examples.wayline.net.Account;
 import com.codenameone.examples.wayline.net.Session;
 import com.codenameone.examples.wayline.notify.Notifications;
@@ -64,19 +66,28 @@ public class Wayline extends Lifecycle {
     /// page is noticed: the browser it opened in tells the app nothing.
     ///
     /// It is also when the app asks for its push token, which the platform
-    /// answers at once when nothing has changed.
+    /// answers at once when nothing has changed, and when the position is
+    /// looked for again if going to the background put the search down.
     @Override
     public void start() {
         super.start();
         CardForm.resumed();
+        Shift.resumed();
+        Locator.resumed();
         Notifications.start();
     }
 
     /// The app is put away, which is the last sure moment to send the usage
     /// reports gathered since the last batch.
+    ///
+    /// A driver on line goes on reporting where the car is from the
+    /// background; anyone else's search for the position is put down until
+    /// the app is back.
     @Override
     public void stop() {
         super.stop();
         Telemetry.flush();
+        Shift.paused();
+        Locator.paused();
     }
 }
