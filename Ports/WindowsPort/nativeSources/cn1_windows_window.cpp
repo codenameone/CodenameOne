@@ -684,7 +684,17 @@ int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
 /* ------------------------------------------------------------- window proc */
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    LRESULT chromeResult;
+    if (cn1WinChromeMessage(hwnd, msg, wParam, lParam, &chromeResult)) return chromeResult;
     switch (msg) {
+        case WM_DPICHANGED: {
+            RECT* suggested = (RECT*)lParam;
+            SetWindowPos(hwnd, NULL, suggested->left, suggested->top,
+                    suggested->right - suggested->left, suggested->bottom - suggested->top,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            cn1WinPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, (int)LOWORD(wParam));
+            return 0;
+        }
         case WM_SETTINGCHANGE:
         case WM_THEMECHANGED:
         case WM_SYSCOLORCHANGE:
@@ -1180,6 +1190,13 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENA
  * mm-based theme metrics correctly instead of using the mobile density
  * heuristic, which over-scales everything. */
 JAVA_INT com_codename1_impl_windows_WindowsNative_screenDpi___R_int(CODENAME_ONE_THREAD_STATE) {
+    // LOGPIXELSX reports system DPI even for a per-monitor-aware window.
+    typedef UINT (WINAPI *GetDpiFn)(HWND);
+    GetDpiFn getDpi = (GetDpiFn)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow");
+    if (getDpi != NULL) {
+        UINT current = getDpi(cn1Win.hwnd);
+        if (current > 0) return (JAVA_INT)current;
+    }
     int dpi = 96;
     HDC dc = GetDC(cn1Win.hwnd);
     if (dc != NULL) {

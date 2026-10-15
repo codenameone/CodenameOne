@@ -330,6 +330,10 @@ LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
  * place before the native returns, and a form shown immediately afterwards cannot race it.
  * lParam carries the UTF-8 spec; see cn1WinMenuSetCommands. */
 #define WM_CN1_MENU (WM_APP + 26)
+#define WM_CN1_CHROME_METRICS (WM_APP + 27)
+#define WM_CN1_CHROME_REGIONS (WM_APP + 28)
+void cn1WinMenuSetIntegrated(BOOL integrated);
+BOOL cn1WinChromeMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT* result);
 void cn1WinDesktopHandleMessage(WPARAM wParam, LPARAM lParam);
 HWND cn1WinDesktopHwnd(int slot);
 int  cn1WinDesktopSlotForHwnd(HWND hwnd);

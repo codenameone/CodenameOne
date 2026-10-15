@@ -332,6 +332,28 @@ composing text, preserve UTF-16 offsets, map native navigation and clipboard act
 `TextInputClient.KEY_*`, update native selection state after programmatic edits, and anchor candidate
 UI with the supplied caret geometry.
 
+Some native protocols, including iOS `UITextInput`, request geometry synchronously on the native
+UI thread. That thread must not wait for the Codename One EDT: the EDT may already be waiting for
+native drawing or font measurement. The iOS port captures an immutable `TextInputGeometry` on the
+EDT when starting or updating input and after painting layout or scroll changes, then answers native
+geometry queries from that snapshot. Native selection changes also refresh the snapshot after the
+editor scrolls its caret into view.
+
+Custom editors can implement `TextInputGeometry.Provider` to collect visible caret positions in a
+single layout pass. `getGeometrySnapshot()` runs on the EDT and returns a non-null immutable
+snapshot. Caret records contain a UTF-16 document offset followed by absolute screen pixel
+coordinates `{offset, x, y, width, height}`; selection rectangles use `{x, y, width, height}`.
+Include visible insertion positions in document order, including line endpoints, and supply the
+active caret as the fallback for offsets outside the snapshot. The default capture samples a
+bounded range around the visible area and caret. Editors with expensive per-offset geometry should
+provide their own snapshot to avoid repeating layout work for each character.
+
+The built-in `EditorView`, `CodeView` and `RichView` collect their visible geometry by line and
+font run. `Font.getTextRunPositions(text, rtl)` lets the Apple ports shape each run once with Core
+Text, including styled and directional runs, instead of measuring thousands of prefixes on every
+input update. Other ports have a compatibility fallback. Editor subclasses that change character
+measurement should override `measureLineCaretPositions()` alongside `measureColumnX()`.
+
 A port with a better platform editor can instead supply a native peer and implement the existing
 semantic command/query channel. In both cases application code, change listeners, ready handling, and
 asynchronous queries remain the same.

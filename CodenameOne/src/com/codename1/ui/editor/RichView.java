@@ -618,7 +618,7 @@ public class RichView extends EditorView {
         }
         TextStyle st = inline.styleAt(lineStart + from);
         Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));
-        return rf.stringWidth(text.substring(from, to));
+        return rf.substringWidth(text, from, to - from);
     }
 
     private int atomWidth(String text, int lineStart, int[] atom, RichBlocks.BlockAttr b) {
@@ -648,6 +648,33 @@ public class RichView extends EditorView {
             x += w;
         }
         return out;
+    }
+
+    @Override
+    protected int[] measureLineCaretPositions(int line, String text, Font font) {
+        int start = getDocument().getLineStart(line);
+        RichBlocks.BlockAttr block = blocks.get(line);
+        int[] positions = new int[text.length() + 1];
+        boolean[] assigned = new boolean[positions.length];
+        for (int[] atom : richVisualAtoms(line, text, start)) {
+            int[] run;
+            if (atom[3] == 1) {
+                run = (atom[2] & 1) == 0 ? new int[]{0, atom[5]} : new int[]{atom[5], 0};
+            } else {
+                TextStyle style = inline.styleAt(start + atom[0]);
+                Font runFont = fontFor(style.isBold() || isHeading(block.type), style.isItalic(),
+                        runPx(block.type, style.getFontSizeLevel(), style.getFontSizePx()));
+                run = runFont.getTextRunPositions(text.substring(atom[0], atom[1]), (atom[2] & 1) != 0);
+            }
+            for (int i = 0; i < run.length; i++) {
+                int column = atom[0] + i;
+                if (!assigned[column]) {
+                    positions[column] = atom[4] + run[i];
+                    assigned[column] = true;
+                }
+            }
+        }
+        return positions;
     }
 
     @Override
@@ -691,7 +718,7 @@ public class RichView extends EditorView {
                 runEnd++;
             }
             Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));
-            x += rf.stringWidth(text.substring(c, runEnd));
+            x += rf.substringWidth(text, c, runEnd - c);
             c = runEnd;
         }
         return x;
