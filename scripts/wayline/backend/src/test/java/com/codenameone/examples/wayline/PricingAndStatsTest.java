@@ -22,16 +22,21 @@
  */
 package com.codenameone.examples.wayline;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.account.DemoAccounts;
+import com.codenameone.examples.wayline.api.PricingDto;
+import com.codenameone.examples.wayline.ride.Fares;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static com.codename1.backend.test.MockMvcRequestBuilders.post;
@@ -50,6 +55,10 @@ class PricingAndStatsTest {
     private MockMvc mvc;
     @Autowired
     private Accounts accounts;
+    @Autowired
+    private Fares fares;
+    @Autowired
+    private DataSource db;
 
     private MockRequestBuilder admin(MockRequestBuilder request) {
         return People.asAdmin(request, DemoAccounts.ADMIN);
@@ -115,6 +124,69 @@ class PricingAndStatsTest {
                     .andExpect(status().isOk());
         }
         assertEquals(was, quoted(rider));
+    }
+
+    @Test
+    void adminsSavingPricesTogetherAllSave() throws Exception {
+        // As a fresh server has it: the row a migration created, which nobody
+        // has saved over. The prices are the settings' until somebody does.
+        PricingDto before = fares.pricing();
+        db.execute("UPDATE pricing SET updated_at = 0 WHERE id = 1", new Object[0]);
+        assertEquals(250L, fares.pricing().baseFare());
+        Map rows = db.queryOne("SELECT COUNT(*) AS n FROM pricing", new Object[0]);
+        assertEquals(1L, ((Number) rows.get("n")).longValue());
+
+        // Several admins save at once. When the first save created the row,
+        // they all found none, all inserted it, and all but one failed.
+        final int admins = 6;
+        final AtomicInteger saved = new AtomicInteger();
+        final AtomicInteger ready = new AtomicInteger();
+        final AtomicBoolean go = new AtomicBoolean();
+        final Throwable[] failed = new Throwable[admins];
+        Thread[] threads = new Thread[admins];
+        try {
+            for (int iter = 0; iter < admins; iter++) {
+                final int slot = iter;
+                threads[iter] = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ready.incrementAndGet();
+                        long giveUp = System.currentTimeMillis() + 30000L;
+                        while (!go.get() && System.currentTimeMillis() < giveUp) {
+                            Thread.yield();
+                        }
+                        try {
+                            fares.save(DemoAccounts.ADMIN, new PricingDto("USD", 300L + slot,
+                                    120L, 30L, 500L, 10d, 20d, 1d, 1.35d, 1.7d));
+                            saved.incrementAndGet();
+                        } catch (Throwable err) {
+                            failed[slot] = err;
+                        }
+                    }
+                }, "pricing-" + iter);
+                threads[iter].start();
+            }
+            long giveUp = System.currentTimeMillis() + 30000L;
+            while (ready.get() < admins) {
+                assertTrue(System.currentTimeMillis() < giveUp, "the threads started");
+                Thread.sleep(1L);
+            }
+            go.set(true);
+            for (int iter = 0; iter < admins; iter++) {
+                threads[iter].join(60000L);
+                if (failed[iter] != null) {
+                    throw new AssertionError("save " + iter + " failed", failed[iter]);
+                }
+            }
+            assertEquals(admins, saved.get(), "every save was saved");
+            long base = fares.pricing().baseFare();
+            assertTrue(base >= 300L && base < 300L + admins, "one of them is in force: " + base);
+            rows = db.queryOne("SELECT COUNT(*) AS n FROM pricing", new Object[0]);
+            assertEquals(1L, ((Number) rows.get("n")).longValue(), "and there is one row");
+        } finally {
+            // The other tests share these prices.
+            fares.save(DemoAccounts.ADMIN, before);
+        }
     }
 
     @Test

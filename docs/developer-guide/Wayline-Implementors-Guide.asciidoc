@@ -633,8 +633,8 @@ The map's pins, car and route take their colors from the `WlMarkerPickup`,
 
 ==== Products and prices
 
-The prices start as settings and are in the database from the first time an
-admin saves the pricing screen. To start a deployment with your own, set them
+The prices start as settings and are the ones in force until an admin saves
+the pricing screen, which writes them to the database. To start a deployment with your own, set them
 in `backend/application.properties`. The amounts are in the currency's smallest
 unit:
 
@@ -1796,12 +1796,16 @@ starts. <<backend-schema-migrations>> describes the rules.
 | `V5__payments.sql`
 | Payments, the provider's customers, saved methods and setups, payout
   accounts, payouts and the prices.
+
+| `V6__pricing_row.sql`
+| The one row of prices, marked as not yet set, so that saving prices always
+  updates it and two admins saving at once can't both try to create it.
 |===
 
 The sign-in tables are separate. The security layer creates them because
 `cn1.security.schema.enabled` is set, as <<backend-security-schema>> describes.
 
-Four of the five scripts are written once, in SQL that all three engines
+Five of the six scripts are written once, in SQL that all three engines
 accept. They use no generated keys and no boolean or timestamp types: an id is
 text the server makes, a yes or no is a `SMALLINT` of 0 or 1, and a time is
 milliseconds in a `BIGINT`. That's also how the ORM stores a `boolean` and a

@@ -91,7 +91,8 @@ public class Fares {
     }
 
     private PricingDto toDto(Pricing row) {
-        if (row == null) {
+        // The row a migration created and nobody has saved over yet.
+        if (row == null || row.getUpdatedAt() == 0L) {
             return defaults;
         }
         // The currency is a setting and stays one. Rides already taken are in
@@ -118,27 +119,21 @@ public class Fares {
         between(wanted.surgeMultiplier(), 1d, 5d, "the surge multiplier");
         between(wanted.comfortMultiplier(), 1d, 5d, "the comfort multiplier");
         between(wanted.xlMultiplier(), 1d, 5d, "the XL multiplier");
-        Pricing row = prices.findById(PricingRepository.ONLY);
-        boolean first = row == null;
-        if (first) {
-            row = new Pricing();
+        // The row is always there (V6 creates it), so this only ever updates
+        // it. Inserting it on the first save was a race: two admins saving
+        // before anyone had both inserted id 1, and one of them failed.
+        if (prices.change(PricingRepository.ONLY.intValue(), wanted.baseFare(), wanted.perKm(),
+                wanted.perMinute(), wanted.minimumFare(), wanted.serviceFeePercent(),
+                wanted.commissionPercent(), wanted.surgeMultiplier(),
+                wanted.comfortMultiplier(), wanted.xlMultiplier(), System.currentTimeMillis(),
+                by) == 0) {
+            throw new IllegalStateException("The pricing row is missing; the V6 migration "
+                    + "creates it");
         }
-        row.setBaseCents(wanted.baseFare());
-        row.setPerKmCents(wanted.perKm());
-        row.setPerMinuteCents(wanted.perMinute());
-        row.setMinimumCents(wanted.minimumFare());
-        row.setFeePercent(wanted.serviceFeePercent());
-        row.setCommissionPercent(wanted.commissionPercent());
-        row.setSurge(wanted.surgeMultiplier());
-        row.setComfort(wanted.comfortMultiplier());
-        row.setXl(wanted.xlMultiplier());
-        row.setUpdatedAt(System.currentTimeMillis());
-        row.setUpdatedBy(by);
-        if (first) {
-            row.setId(PricingRepository.ONLY.intValue());
-            prices.insert(row);
-        }
-        return toDto(row);
+        return new PricingDto(defaults.currency(), wanted.baseFare(), wanted.perKm(),
+                wanted.perMinute(), wanted.minimumFare(), wanted.serviceFeePercent(),
+                wanted.commissionPercent(), wanted.surgeMultiplier(), wanted.comfortMultiplier(),
+                wanted.xlMultiplier());
     }
 
     /// The length of the ride to price, in metres.
