@@ -493,9 +493,15 @@ public class Applications {
     /// that has none yet has no row to hold: the first save, upload or
     /// hand-in makes it, and two at once would both insert one under the same
     /// name, so they take turns on the profile instead.
+    ///
+    /// No profile to hold means Accounts.erase committed first, after
+    /// forget() had already deleted the application and its documents: going
+    /// on would make a new draft and store identity documents for an account
+    /// that no longer exists, which nothing would ever delete. 404 instead, as
+    /// PushDevices.register does.
     private void hold(String username) {
-        if (applications.hold(username) == 0) {
-            profiles.hold(username);
+        if (applications.hold(username) == 0 && profiles.hold(username) == 0) {
+            throw new ResponseStatusException(404, "No such account");
         }
     }
 

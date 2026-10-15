@@ -1059,6 +1059,10 @@ public class MapView extends Container implements MapSurface {
             pinchLastX = fx;
             pinchLastY = fy;
         }
+        // The scale is since the gesture began, so it is applied to the zoom it
+        // began at. A producer with no gesture phases (a desktop trackpad's
+        // magnify steps) delimits each step as a gesture of its own, see
+        // JavaSEPort.fireMagnify, so this never sees steps as one gesture.
         double nz = pinchStartZoom + MathUtil.log(scale) / MathUtil.log(2);
         // Zoomed about where the fingers were and then carried to where they
         // are, so two fingers that travel as they spread take the map along.

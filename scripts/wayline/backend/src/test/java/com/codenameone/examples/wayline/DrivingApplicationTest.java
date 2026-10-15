@@ -297,6 +297,24 @@ class DrivingApplicationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /// A save or an upload authorized just before the account closed, and
+    /// run just after, keeps nothing: the closure already forgot the
+    /// application, and nothing would forget it again.
+    @Test
+    void aClosedAccountKeepsNoApplication() throws Exception {
+        String who = People.rider(accounts, "applies-gone");
+        upload(who, "photo_id");
+        accounts.close(who, People.PASSWORD);
+        mvc.perform(People.asRider(Trips.body(put("/api/driving/application"), FORM), who))
+                .andExpect(status().isNotFound());
+        mvc.perform(People.asRider(Trips.body(post("/api/driving/application/documents"),
+                picture("selfie", PNG)), who)).andExpect(status().isNotFound());
+        mvc.perform(admin(get("/api/admin/applications/" + who)))
+                .andExpect(status().isNotFound());
+        mvc.perform(admin(get("/api/admin/applications/" + who + "/documents/selfie")))
+                .andExpect(status().isNotFound());
+    }
+
     @Test
     void theDemoApplicantIsWaitingAndTheDemoDriversAreApproved() throws Exception {
         mvc.perform(admin(get("/api/admin/applications/" + DemoAccounts.APPLICANT)))

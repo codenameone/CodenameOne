@@ -4115,7 +4115,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // Routed by window id like every other input this canvas
                     // produces: the canvas a trackpad magnify arrived on is the
                     // window whose component tree has to see it.
+                    //
+                    // Each step is a whole gesture, begun and released. A
+                    // component reads pinch(scale) as the scale since the
+                    // gesture began, as a touch pinch reports it, and this
+                    // listener reports no phases: undelimited, every 1.14 step
+                    // read as the same one step from where the first began,
+                    // and a component that waits for pinchReleased (MapView,
+                    // ImageViewer) never left its pinch.
+                    Display d = Display.getInstance();
+                    d.firePinchBeginGesture();
                     com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+                    d.firePinchReleaseGesture(x, y);
                 }
             });
         }
