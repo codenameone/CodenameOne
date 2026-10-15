@@ -22,6 +22,11 @@
  */
 
 package java.lang;
+
+import com.codename1.impl.JdkHost;
+
+import java.util.ArrayList;
+
 /**
  * Every Java application has a single instance of class Runtime that allows the application to interface with the environment in which the application is running. The current runtime can be obtained from the getRuntime method.
  * An application cannot create its own instance of this class.
@@ -29,13 +34,122 @@ package java.lang;
  */
 public class Runtime {
     private static final Runtime instance = new Runtime();
-    
+
+    /** The registered shutdown hooks; also the lock for them and for {@link #shuttingDown}. */
+    private final ArrayList<Thread> hooks = new ArrayList<Thread>();
+
+    /** Whether exit has begun, after which hooks are neither run again nor accepted. */
+    private boolean shuttingDown;
+
+    private Runtime() {
+    }
+
     /**
      * Terminates the currently running Java application. This method never returns normally.
      * The argument serves as a status code; by convention, a nonzero status code indicates abnormal termination.
+     *
+     * The registered shutdown hooks run first, one after another on this
+     * thread, each in its own try so one that throws does not stop the rest.
+     * Then the platform is asked to close the application through
+     * com.codename1.impl.JdkHost -- a Codename One application closes the
+     * way Display.exitApplication closes it -- and if that returns, the
+     * process ends with the status.
+     *
+     * A second call, including one the platform's own close makes, skips
+     * all of that and ends the process at once.
      */
     public void exit(int status){
-        System.exit(status);
+        // An array, not a list: the element is typed without a cast, so no
+        // checkcast sits inside the try below (ParparVM does not check one).
+        Thread[] run = null;
+        synchronized (hooks) {
+            if (!shuttingDown) {
+                shuttingDown = true;
+                run = hooks.toArray(new Thread[hooks.size()]);
+                hooks.clear();
+            }
+        }
+        if (run != null) {
+            for (int i = 0; i < run.length; i++) {
+                Thread hook = run[i];
+                try {
+                    hook.run();
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+            JdkHost.get().exit(status);
+        }
+        exitImpl(status);
+    }
+
+    /**
+     * Ends the process at once, without running the shutdown hooks or asking
+     * the platform to close the application.
+     */
+    public void halt(int status) {
+        synchronized (hooks) {
+            shuttingDown = true;
+            hooks.clear();
+        }
+        exitImpl(status);
+    }
+
+    private static native void exitImpl(int status);
+
+    /**
+     * Registers a hook that exit runs before the application closes. The
+     * hook's run method is called on the exiting thread; the thread is never
+     * started.
+     */
+    public void addShutdownHook(Thread hook) {
+        if (hook == null) {
+            throw new NullPointerException();
+        }
+        synchronized (hooks) {
+            if (shuttingDown) {
+                throw new IllegalStateException("Shutdown in progress");
+            }
+            if (hook.isAlive()) {
+                throw new IllegalArgumentException("Hook already running");
+            }
+            if (hooks.contains(hook)) {
+                throw new IllegalArgumentException("Hook previously registered");
+            }
+            hooks.add(hook);
+        }
+    }
+
+    /**
+     * Unregisters a hook; whether it was registered.
+     */
+    public boolean removeShutdownHook(Thread hook) {
+        if (hook == null) {
+            throw new NullPointerException();
+        }
+        synchronized (hooks) {
+            if (shuttingDown) {
+                throw new IllegalStateException("Shutdown in progress");
+            }
+            return hooks.remove(hook);
+        }
+    }
+
+    /**
+     * The number of processors available to the program. The class library
+     * cannot ask the platform, so it answers 1, the one answer that is
+     * never too many for a program sizing a thread pool by it.
+     */
+    public int availableProcessors() {
+        return 1;
+    }
+
+    /**
+     * The most memory the program may use; the runtime does not expose a
+     * limit, so this is the total memory, as totalMemory answers it.
+     */
+    public long maxMemory() {
+        return totalMemory();
     }
 
     /**

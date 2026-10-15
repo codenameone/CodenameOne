@@ -232,8 +232,17 @@ public abstract class JdkHost {
         return null;
     }
 
-    /// Ends the application. The defaults cannot, and return.
+    /// Asks the platform to close the application, after the shutdown hooks
+    /// ran; `Runtime.exit` ends the process itself if this returns. The
+    /// defaults leave it to that.
     public void exit(int status) {
+    }
+
+    /// Called when the program installs a default uncaught exception
+    /// handler, so that a host whose UI thread catches what its tasks throw
+    /// can hand that to `Thread.getDefaultUncaughtExceptionHandler()` too.
+    /// Called on every such install; the defaults do nothing.
+    public void watchUncaughtExceptions() {
     }
 
     // ------------------------------------------------------------------

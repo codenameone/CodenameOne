@@ -5637,7 +5637,7 @@ bindNative(["cn1_java_lang_Short_cn1Value_R_short"], function(__cn1ThisObject) {
 bindNative(["cn1_java_lang_Short_valueOf_short_R_java_lang_Short"], function*(v) {
   return yield* adaptVirtualResult(cn1_java_lang_Short_valueOfHeap_short_R_java_lang_Short(v));
 });
-bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
+bindNative(["cn1_java_lang_Runtime_exitImpl_int", "cn1_java_lang_Runtime_exitImpl___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
 bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });
 bindNative(["cn1_java_lang_Throwable_fillInStack"], function(__cn1ThisObject) {

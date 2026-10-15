@@ -128,6 +128,63 @@ public class Thread implements java.lang.Runnable{
         return; //TODO codavaj!!
     }
 
+    /// Waits at most `millis` milliseconds for this thread to die; 0 waits
+    /// for as long as it takes.
+    public final synchronized void join(long millis) throws java.lang.InterruptedException {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Waits at most `millis` milliseconds plus `nanos` nanoseconds for this
+    /// thread to die.
+    public final synchronized void join(long millis, int nanos) throws java.lang.InterruptedException {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Sleeps for `millis` milliseconds plus `nanos` nanoseconds.
+    public static void sleep(long millis, int nanos) throws java.lang.InterruptedException {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Changes this thread's name.
+    public final void setName(String name) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// A number that identifies this thread for its lifetime.
+    public long getId() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Handles what a thread's run method throws.
+    public interface UncaughtExceptionHandler {
+        /// Called with the thread and what its run method threw.
+        void uncaughtException(Thread t, Throwable e);
+    }
+
+    /// Sets the handler for what this thread's run method throws; null
+    /// leaves it to the default handler.
+    public void setUncaughtExceptionHandler(UncaughtExceptionHandler handler) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// This thread's handler, or the default handler when it has none.
+    public UncaughtExceptionHandler getUncaughtExceptionHandler() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Sets the handler for what any thread without its own handler throws.
+    /// In a Codename One application it also receives what an event dispatch
+    /// thread task throws, which then no longer reaches the platform's own
+    /// error handling.
+    public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler handler) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// The handler `setDefaultUncaughtExceptionHandler` set, or null.
+    public static UncaughtExceptionHandler getDefaultUncaughtExceptionHandler() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
     /// If this thread was constructed using a separate Runnable run object, then that Runnable object's run method is called; otherwise, this method does nothing and returns.
     /// Subclasses of Thread should override this method.
     public void run(){

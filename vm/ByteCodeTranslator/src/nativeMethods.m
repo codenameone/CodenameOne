@@ -2956,7 +2956,7 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
+JAVA_VOID java_lang_Runtime_exitImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
     exit(i);
 }
 

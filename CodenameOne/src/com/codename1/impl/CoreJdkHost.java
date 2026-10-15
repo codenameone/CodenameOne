@@ -30,6 +30,8 @@ import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.security.Hash;
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -251,6 +253,35 @@ public class CoreJdkHost extends JdkHost {
     public void exit(int status) {
         if (Display.isInitialized()) {
             Display.getInstance().exitApplication();
+        }
+    }
+
+    /// Hands what an event dispatch thread task throws to the default
+    /// uncaught exception handler, when one is set, instead of the
+    /// platform's error handling. Registered once, the first time a handler
+    /// is installed after the display is initialized.
+    @Override
+    public void watchUncaughtExceptions() {
+        if (edtErrorsWatched || !Display.isInitialized()) {
+            return;
+        }
+        edtErrorsWatched = true;
+        Display.getInstance().addEdtErrorHandler(new EdtErrorForwarder());
+    }
+
+    private boolean edtErrorsWatched;
+
+    /// Forwards an event dispatch thread error to the default uncaught
+    /// exception handler, as it stands when the error happens.
+    private static final class EdtErrorForwarder implements ActionListener<ActionEvent> {
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            Thread.UncaughtExceptionHandler handler = Thread.getDefaultUncaughtExceptionHandler();
+            Object source = evt.getSource();
+            if (handler != null && source instanceof Throwable) {
+                evt.consume();
+                handler.uncaughtException(Thread.currentThread(), (Throwable) source);
+            }
         }
     }
 

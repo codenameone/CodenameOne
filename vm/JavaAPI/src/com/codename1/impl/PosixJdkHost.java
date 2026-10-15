@@ -97,9 +97,12 @@ public class PosixJdkHost extends JdkHost {
         return abs.length() == 0 || ".".equals(abs) ? "/" : abs;
     }
 
+    /// `/tmp`. Not the `java.io.tmpdir` property: `System` answers that
+    /// property from this method, so reading it here would ask itself.
+    /// `TMPDIR` is honoured when the environment sets it.
     @Override
     public String cachesDir() {
-        String tmp = System.getProperty("java.io.tmpdir");
+        String tmp = System.getenv("TMPDIR");
         return tmp == null || tmp.length() == 0 ? "/tmp" : tmp;
     }
 
@@ -116,16 +119,6 @@ public class PosixJdkHost extends JdkHost {
     @Override
     public long fileUsableSpace(String path) {
         return new File(path).getUsableSpace();
-    }
-
-    @Override
-    public String property(String key) {
-        return System.getProperty(key);
-    }
-
-    @Override
-    public void exit(int status) {
-        System.exit(status);
     }
 
     /// Reads `/dev/urandom`, which every POSIX system the translator and the
