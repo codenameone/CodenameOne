@@ -32,6 +32,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -533,6 +534,16 @@ public final class BackendWebApp {
     }
 
     private static void delete(File file) throws IOException {
+        // A symbolic link is removed as a link and never descended into.
+        // listFiles() follows it, so a link in the old output (or in a copy
+        // destination) to a directory outside the tree would otherwise have
+        // that directory's contents deleted before the link itself. A dangling
+        // link is caught here too: File.exists() follows the link, answers
+        // false for one, and the link would have been left behind.
+        if (Files.isSymbolicLink(file.toPath())) {
+            Files.delete(file.toPath());
+            return;
+        }
         File[] children = file.listFiles();
         if (children != null) {
             for (File child : children) {

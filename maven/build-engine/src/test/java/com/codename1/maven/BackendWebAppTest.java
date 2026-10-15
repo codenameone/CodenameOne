@@ -35,6 +35,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class BackendWebAppTest {
     @TempDir
@@ -196,6 +198,42 @@ class BackendWebAppTest {
         assertThrows(BuildFailureException.class,
                 () -> webApp.stage(archive, tmp.resolve("site").toFile()));
         assertTrue(archive.isFile());
+    }
+
+    /// A symbolic link in the old output, or in a copy destination, is
+    /// unlinked; the directory it points at, outside the tree, keeps its files.
+    @Test
+    void replacingTheOutputNeverFollowsALinkOutOfIt() throws Exception {
+        File outside = tmp.resolve("precious").toFile();
+        outside.mkdirs();
+        Files.write(new File(outside, "keep.txt").toPath(), "keep".getBytes("UTF-8"));
+
+        File out = tmp.resolve("webapp").toFile();
+        webApp.stage(zip(tmp.resolve("one.zip").toFile(), "index.html", "one"), out);
+        Path link = new File(out, "linked").toPath();
+        Path dangling = new File(out, "dangling").toPath();
+        try {
+            Files.createSymbolicLink(link, outside.toPath());
+            Files.createSymbolicLink(dangling, tmp.resolve("no-such-dir"));
+        } catch (UnsupportedOperationException | IOException | SecurityException noLinks) {
+            assumeTrue(false, "this filesystem cannot create a symbolic link: " + noLinks);
+        }
+
+        webApp.stage(zip(tmp.resolve("two.zip").toFile(), "index.html", "two"), out);
+        assertEquals("two", read(new File(out, "index.html")));
+        assertFalse(Files.exists(link, LinkOption.NOFOLLOW_LINKS));
+        assertFalse(Files.exists(dangling, LinkOption.NOFOLLOW_LINKS));
+        assertEquals("keep", read(new File(outside, "keep.txt")));
+
+        // The same through copy(), whose destination is emptied the same way.
+        File destination = tmp.resolve("elsewhere").toFile();
+        destination.mkdirs();
+        Path copyLink = new File(destination, "linked").toPath();
+        Files.createSymbolicLink(copyLink, outside.toPath());
+        webApp.copy(out, destination);
+        assertEquals("two", read(new File(destination, "index.html")));
+        assertFalse(Files.exists(copyLink, LinkOption.NOFOLLOW_LINKS));
+        assertEquals("keep", read(new File(outside, "keep.txt")));
     }
 
     @Test
