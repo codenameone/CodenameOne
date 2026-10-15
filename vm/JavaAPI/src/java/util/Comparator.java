@@ -182,6 +182,148 @@ public interface Comparator<T> {
         // collection traversal keys on, in every application.
         return (Comparator<T>) NaturalOrder.INSTANCE.reversed();
     }
+
+    /// This ordering, ties broken by a key in the order `keyComparator` gives.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @param keyComparator orders the keys
+    /// @param <U> the key type
+    /// @return the combined comparator
+    default <U> Comparator<T> thenComparing(java.util.function.Function<? super T, ? extends U> keyExtractor,
+            Comparator<? super U> keyComparator) {
+        return thenComparing(Comparator.<T, U>comparing(keyExtractor, keyComparator));
+    }
+
+    /// This ordering, ties broken by an `int` key.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @return the combined comparator
+    default Comparator<T> thenComparingInt(java.util.function.ToIntFunction<? super T> keyExtractor) {
+        return thenComparing(Comparator.<T>comparingInt(keyExtractor));
+    }
+
+    /// This ordering, ties broken by a `long` key.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @return the combined comparator
+    default Comparator<T> thenComparingLong(java.util.function.ToLongFunction<? super T> keyExtractor) {
+        return thenComparing(Comparator.<T>comparingLong(keyExtractor));
+    }
+
+    /// This ordering, ties broken by a `double` key, compared as [Double#compare] does.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @return the combined comparator
+    default Comparator<T> thenComparingDouble(java.util.function.ToDoubleFunction<? super T> keyExtractor) {
+        return thenComparing(Comparator.<T>comparingDouble(keyExtractor));
+    }
+
+    /// Compares by an `int` key.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @param <T> the compared type
+    /// @return the comparator
+    static <T> Comparator<T> comparingInt(final java.util.function.ToIntFunction<? super T> keyExtractor) {
+        if (keyExtractor == null) {
+            throw new NullPointerException();
+        }
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                int x = keyExtractor.applyAsInt(a);
+                int y = keyExtractor.applyAsInt(b);
+                return x < y ? -1 : x == y ? 0 : 1;
+            }
+        };
+    }
+
+    /// Compares by a `long` key.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @param <T> the compared type
+    /// @return the comparator
+    static <T> Comparator<T> comparingLong(final java.util.function.ToLongFunction<? super T> keyExtractor) {
+        if (keyExtractor == null) {
+            throw new NullPointerException();
+        }
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                long x = keyExtractor.applyAsLong(a);
+                long y = keyExtractor.applyAsLong(b);
+                return x < y ? -1 : x == y ? 0 : 1;
+            }
+        };
+    }
+
+    /// Compares by a `double` key, as [Double#compare] does: NaN above
+    /// everything and `-0.0` below `0.0`.
+    ///
+    /// @param keyExtractor extracts the key
+    /// @param <T> the compared type
+    /// @return the comparator
+    static <T> Comparator<T> comparingDouble(final java.util.function.ToDoubleFunction<? super T> keyExtractor) {
+        if (keyExtractor == null) {
+            throw new NullPointerException();
+        }
+        return new Comparator<T>() {
+            public int compare(T a, T b) {
+                return Double.compare(keyExtractor.applyAsDouble(a), keyExtractor.applyAsDouble(b));
+            }
+        };
+    }
+
+    /// Orders null before every other value, and the rest by `comparator`;
+    /// with a null `comparator` the others are all equal.
+    ///
+    /// @param comparator orders the values that are not null, or null
+    /// @param <T> the compared type
+    /// @return the comparator
+    static <T> Comparator<T> nullsFirst(Comparator<? super T> comparator) {
+        return new NullOrder<T>(true, comparator);
+    }
+
+    /// Orders null after every other value, and the rest by `comparator`;
+    /// with a null `comparator` the others are all equal.
+    ///
+    /// @param comparator orders the values that are not null, or null
+    /// @param <T> the compared type
+    /// @return the comparator
+    static <T> Comparator<T> nullsLast(Comparator<? super T> comparator) {
+        return new NullOrder<T>(false, comparator);
+    }
+}
+
+/// The order [Comparator#nullsFirst] and [Comparator#nullsLast] hand out. Its
+/// [#reversed] keeps null on the same side and reverses the rest, as the JDK's does.
+final class NullOrder<T> implements Comparator<T> {
+    private final boolean nullFirst;
+    private final Comparator<T> real;
+
+    @SuppressWarnings("unchecked")
+    NullOrder(boolean nullFirst, Comparator<? super T> real) {
+        this.nullFirst = nullFirst;
+        this.real = (Comparator<T>) real;
+    }
+
+    public int compare(T a, T b) {
+        if (a == null) {
+            return b == null ? 0 : nullFirst ? -1 : 1;
+        }
+        if (b == null) {
+            return nullFirst ? 1 : -1;
+        }
+        return real == null ? 0 : real.compare(a, b);
+    }
+
+    public Comparator<T> thenComparing(Comparator<? super T> other) {
+        if (other == null) {
+            throw new NullPointerException();
+        }
+        return new NullOrder<T>(nullFirst, real == null ? other : real.thenComparing(other));
+    }
+
+    public Comparator<T> reversed() {
+        return new NullOrder<T>(!nullFirst, real == null ? null : real.reversed());
+    }
 }
 
 /** The natural ordering {@link Comparator#naturalOrder()} hands out. */

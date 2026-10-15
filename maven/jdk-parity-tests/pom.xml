@@ -46,7 +46,29 @@
         <javaapi.src.dir>${project.basedir}/../../vm/JavaAPI/src</javaapi.src.dir>
         <!-- The classes renamed under jdkparity/. Each name takes its nested
              classes with it. A slice adds the classes it tests here. -->
-        <jdkparity.relocate>java/util/Optional,java/util/prefs/Preferences,java/util/prefs/BackingStoreException,java/util/logging/Logger,java/util/logging/Level,java/net/URL,java/net/MalformedURLException,java/security/MessageDigest,java/security/SecureRandom,java/security/GeneralSecurityException,java/security/NoSuchAlgorithmException,java/util/ResourceBundle,java/util/PropertyResourceBundle,java/util/ListResourceBundle,java/util/MissingResourceException,java/util/ServiceLoader,java/util/ServiceConfigurationError,java/util/StringJoiner,java/util/UUID,java/util/Base64,java/util/HexFormat,java/util/WeakHashMap,java/util/EventObject,java/util/Properties,java/io/UncheckedIOException,java/lang/MatchException,java/lang/reflect/InvocationTargetException,java/io/BufferedReader,java/io/BufferedWriter,java/io/BufferedInputStream,java/io/BufferedOutputStream,java/io/PrintWriter,java/nio/file/AccessDeniedException,java/nio/file/CopyOption,java/nio/file/DirectoryIteratorException,java/nio/file/DirectoryNotEmptyException,java/nio/file/DirectoryStream,java/nio/file/FileAlreadyExistsException,java/nio/file/FileSystemException,java/nio/file/FileVisitOption,java/nio/file/FileVisitResult,java/nio/file/FileVisitor,java/nio/file/Files,java/nio/file/Glob,java/nio/file/InvalidPathException,java/nio/file/LinkOption,java/nio/file/NoSuchFileException,java/nio/file/NotDirectoryException,java/nio/file/OpenOption,java/nio/file/Path,java/nio/file/PathImpl,java/nio/file/Paths,java/nio/file/SimpleFileVisitor,java/nio/file/StandardCopyOption,java/nio/file/StandardOpenOption,java/nio/file/attribute/BasicFileAttributes,java/nio/file/attribute/FileAttribute,java/nio/file/attribute/FileTime</jdkparity.relocate>
+        <jdkparity.relocate>java/util/Optional,java/util/prefs/Preferences,java/util/prefs/BackingStoreException,java/util/logging/Logger,java/util/logging/Level,java/net/URL,java/net/MalformedURLException,java/security/MessageDigest,java/security/SecureRandom,java/security/GeneralSecurityException,java/security/NoSuchAlgorithmException,java/util/ResourceBundle,java/util/PropertyResourceBundle,java/util/ListResourceBundle,java/util/MissingResourceException,java/util/ServiceLoader,java/util/ServiceConfigurationError,java/util/StringJoiner,java/util/UUID,java/util/Base64,java/util/HexFormat,java/util/WeakHashMap,java/util/EventObject,java/util/Properties,java/io/UncheckedIOException,java/lang/MatchException,java/lang/reflect/InvocationTargetException,java/io/BufferedReader,java/io/BufferedWriter,java/io/BufferedInputStream,java/io/BufferedOutputStream,java/io/PrintWriter,java/nio/file/AccessDeniedException,java/nio/file/CopyOption,java/nio/file/DirectoryIteratorException,java/nio/file/DirectoryNotEmptyException,java/nio/file/DirectoryStream,java/nio/file/FileAlreadyExistsException,java/nio/file/FileSystemException,java/nio/file/FileVisitOption,java/nio/file/FileVisitResult,java/nio/file/FileVisitor,java/nio/file/Files,java/nio/file/Glob,java/nio/file/InvalidPathException,java/nio/file/LinkOption,java/nio/file/NoSuchFileException,java/nio/file/NotDirectoryException,java/nio/file/OpenOption,java/nio/file/Path,java/nio/file/PathImpl,java/nio/file/Paths,java/nio/file/SimpleFileVisitor,java/nio/file/StandardCopyOption,java/nio/file/StandardOpenOption,java/nio/file/attribute/BasicFileAttributes,java/nio/file/attribute/FileAttribute,java/nio/file/attribute/FileTime,
+            ${jdkparity.relocate.function}</jdkparity.relocate>
+        <!-- The primitive function interfaces. Function, Predicate, Consumer and
+             the other object-typed ones stay the JDK's: renamed, they would no
+             longer be what the JDK collections the relocated code calls accept. -->
+        <jdkparity.relocate.function>java/util/function/BiPredicate,java/util/function/BooleanSupplier,
+            java/util/function/DoubleBinaryOperator,java/util/function/DoubleConsumer,
+            java/util/function/DoubleFunction,java/util/function/DoublePredicate,
+            java/util/function/DoubleSupplier,java/util/function/DoubleToIntFunction,
+            java/util/function/DoubleToLongFunction,java/util/function/DoubleUnaryOperator,
+            java/util/function/IntBinaryOperator,java/util/function/IntConsumer,
+            java/util/function/IntFunction,java/util/function/IntPredicate,
+            java/util/function/IntSupplier,java/util/function/IntToDoubleFunction,
+            java/util/function/IntToLongFunction,java/util/function/IntUnaryOperator,
+            java/util/function/LongBinaryOperator,java/util/function/LongConsumer,
+            java/util/function/LongFunction,java/util/function/LongPredicate,
+            java/util/function/LongSupplier,java/util/function/LongToDoubleFunction,
+            java/util/function/LongToIntFunction,java/util/function/LongUnaryOperator,
+            java/util/function/ObjDoubleConsumer,java/util/function/ObjIntConsumer,
+            java/util/function/ObjLongConsumer,java/util/function/ToDoubleBiFunction,
+            java/util/function/ToDoubleFunction,java/util/function/ToIntBiFunction,
+            java/util/function/ToIntFunction,java/util/function/ToLongBiFunction,
+            java/util/function/ToLongFunction</jdkparity.relocate.function>
     </properties>
 
     <dependencies>

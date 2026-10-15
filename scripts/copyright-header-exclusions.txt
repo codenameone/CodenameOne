@@ -199,6 +199,7 @@ Ports/CLDC11/src/java/text/DateFormatSymbols.java | Codename One contribution wh
 Ports/CLDC11/src/java/text/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 Ports/CLDC11/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 Ports/CLDC11/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/util/Comparator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
 maven/cn1app-archetype/src/main/resources/archetype-resources/common/src/test/java/MyFirstTest.java | Archetype template copied into user projects, which carries no Codename One header by design
 maven/cn1lib-archetype/src/main/resources/archetype-resources/common/src/test/java/FilechooserTest.java | Archetype template copied into user projects, which carries no Codename One header by design
 maven/build-engine/src/main/java/com/codename1/builders/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
