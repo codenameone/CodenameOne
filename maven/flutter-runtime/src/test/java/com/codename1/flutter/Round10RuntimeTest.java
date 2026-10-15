@@ -110,7 +110,12 @@ class Round10RuntimeTest {
         assertFalse(FlutterAssets.isRatioDir("x"));
         assertFalse(FlutterAssets.isRatioDir("0x"));
         assertFalse(FlutterAssets.isRatioDir(".5x"));
-        assertFalse(FlutterAssets.isRatioDir("2.x"));
+        // Review finding: Flutter's own rule, r'/?(\d+(\.\d*)?)x$' (also
+        // FlutterProjectImporter.VARIANT_DIR, "\\d+(\\.\\d*)?x"), allows the dot's
+        // digit group to be EMPTY -- "2.x" means ratio 2.0, same as "2x" -- so this
+        // must be accepted, not rejected; isRatioDir used to additionally require a
+        // digit after the dot.
+        assertTrue(FlutterAssets.isRatioDir("2.x"));
         assertFalse(FlutterAssets.isRatioDir("2.5.1x"));
         assertFalse(FlutterAssets.isRatioDir("box"));
         assertNull(FlutterAssets.parseManifest("").get("x"));

@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -145,6 +146,47 @@ class FlutterAssetsTest {
         assertEquals(3.0, FlutterAssets.ratioOf("a/3.0x/b.png", "a/b.png"), 0.001);
         assertEquals(1.5, FlutterAssets.ratioOf("a/1.5x/b.png", "a/b.png"), 0.001);
         assertEquals(1.0, FlutterAssets.ratioOf("a/b.png", "a/b.png"), 0.001);
+    }
+
+    /**
+     * Regression: Flutter's own variant-directory rule, {@code r'/?(\d+(\.\d*)?)x$'}
+     * (the same one {@code FlutterProjectImporter.VARIANT_DIR} uses), accepts a dot
+     * with nothing after it -- {@code "2.x"} means ratio {@code 2.0}, exactly like
+     * {@code "2x"}. {@code isRatioDir} used to additionally require a digit after
+     * the dot, so a {@code 2.x} variant directory a Flutter build actually produces
+     * was never recognized as a variant of its nominal asset.
+     */
+    @Test
+    void isRatioDirAcceptsADotWithNothingAfterIt() {
+        assertTrue(FlutterAssets.isRatioDir("2.x"), "digit, dot, no trailing digits");
+        assertTrue(FlutterAssets.isRatioDir("2x"), "no dot at all");
+        assertTrue(FlutterAssets.isRatioDir("2.5x"), "digit after the dot too");
+        assertFalse(FlutterAssets.isRatioDir("x"), "no digits at all");
+        assertFalse(FlutterAssets.isRatioDir(".5x"), "dot before any digit");
+        assertFalse(FlutterAssets.isRatioDir("2..x"), "two dots");
+        assertFalse(FlutterAssets.isRatioDir("2.5.x"), "two dots, one with digits");
+    }
+
+    @Test
+    void ratioOfADotOnlyVariantIsTheWholeNumberRatio() {
+        assertEquals(2.0, FlutterAssets.ratioOf("a/2.x/b.png", "a/b.png"), 0.001);
+    }
+
+    /**
+     * Regression: {@code parseManifest} groups {@code dir/<N>x/name} under its
+     * nominal asset {@code dir/name} only when the directory passes
+     * {@code isRatioDir} -- a {@code 2.x} directory used to fail that check and so
+     * was kept as its own, unrelated main asset instead of a variant of {@code
+     * a/b.png}.
+     */
+    @Test
+    void parseManifestGroupsADotOnlyVariantUnderItsNominalAsset() {
+        java.util.Map<String, java.util.List<String>> manifest =
+                FlutterAssets.parseManifest("a/b.png\na/2.x/b.png\n");
+        assertTrue(manifest.containsKey("a/b.png"), manifest.toString());
+        assertEquals(java.util.Arrays.asList("a/b.png", "a/2.x/b.png"), manifest.get("a/b.png"));
+        assertFalse(manifest.containsKey("a/2.x/b.png"),
+                "the variant must not also appear as its own main asset: " + manifest);
     }
 
     // ------------------------------------------------------------------

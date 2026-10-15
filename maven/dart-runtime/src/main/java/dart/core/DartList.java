@@ -223,6 +223,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         }
     }
 
+    // Dart's List.setAll, setRange, fillRange, shuffle, replaceRange and
+    // removeRange have no equivalent here yet -- not merely unguarded, there is
+    // no method of any name for the transpiler to target (confirmed: neither
+    // dart-transpiler's JavaEmitter nor this class names any of them), so the
+    // entry-guard review finding does not apply to them. Giving any of them a
+    // body later must open with checkGrowable() (removeRange, replaceRange,
+    // shuffle if it is ever made length-changing by a future Dart semantic) or
+    // checkWritable() (setAll, setRange, fillRange: element-writing, so Dart
+    // throws only when the list is unmodifiable, not merely fixed-length) BEFORE
+    // doing any work, the same way clear() and sort() above now do -- a loop
+    // that only checks per element skips the check entirely when its argument or
+    // range is empty.
+
     // ------------------------------------------------------------------
     // java.util.List plumbing — the storage accessors (overridden by
     // primitive-backed subclasses). Everything below routes through these.
@@ -269,6 +282,54 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         RangeError.checkValidIndex(index, size());
         modCount++;
         return impl.remove(index);
+    }
+
+    /**
+     * Dart's {@code List.clear()}. Not left to the inherited {@code
+     * AbstractList.clear()}: that calls {@code removeRange(0, size())}, whose
+     * loop body runs zero times when the list is ALREADY empty, so the
+     * length-changing check -- reached only through this class's overridden
+     * {@link #remove(int)}, which that empty loop never calls -- never ran
+     * either. {@code List.filled(0, v).clear()} and {@code const
+     * <int>[].clear()} therefore silently succeeded instead of throwing
+     * UnsupportedError, exactly as Dart's own fixed-length and unmodifiable
+     * empty lists do. Checked up front here instead, and then driven through
+     * {@link #remove(int)} (not the backing storage directly) so the
+     * primitive-backed subclasses clear correctly too.
+     */
+    @Override
+    public void clear() {
+        checkGrowable("clear");
+        for (int i = size() - 1; i >= 0; i--) {
+            remove(i);
+        }
+    }
+
+    /**
+     * Overrides {@code java.util.List.addAll(Collection)} for the same reason
+     * {@link #addAllIterable} already checks up front: the inherited {@code
+     * AbstractCollection.addAll(Collection)} loop only ever reaches {@link
+     * #add}, which an EMPTY argument never calls, so a fixed-length or
+     * unmodifiable list's {@code addAll([])} -- reachable through this plain
+     * {@code java.util.Collection} surface as well as through {@code
+     * addAllIterable} -- silently no-opped instead of throwing.
+     */
+    @Override
+    public boolean addAll(java.util.Collection<? extends E> c) {
+        checkGrowable("addAll");
+        return super.addAll(c);
+    }
+
+    /**
+     * Overrides {@code java.util.List.addAll(int, Collection)} -- Dart's {@code
+     * List.insertAll(index, elements)} -- with the identical up-front check:
+     * {@code AbstractList.addAll(int, Collection)} loops calling {@link #add(int,
+     * Object)} per element, which an EMPTY {@code elements} never reaches.
+     */
+    @Override
+    public boolean addAll(int index, java.util.Collection<? extends E> c) {
+        checkGrowable("insertAll");
+        return super.addAll(index, c);
     }
 
     // ------------------------------------------------------------------
@@ -540,8 +601,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return sublist(start, size());
     }
 
+    /**
+     * Dart's {@code List.sort([compare])}. {@code checkWritable()} is called up
+     * front rather than relying only on the final {@link #set} loop below:
+     * element-writing ops throw on an unmodifiable list regardless of length
+     * (Dart's own fixed-length, non-readOnly empty list sorts without throwing,
+     * since a fixed length does not forbid overwriting the elements it has),
+     * but for an EMPTY list that loop runs zero times, so {@code set}'s own
+     * {@code checkWritable()} was never reached and {@code const <int>[].sort()}
+     * silently no-opped instead of throwing UnsupportedError.
+     */
     @SuppressWarnings("unchecked")
     public void sort(Funcs.Func2<E, E, Long> compare) {
+        checkWritable();
         int n = size();
         Object[] arr = new Object[n];
         for (int i = 0; i < n; i++) {

@@ -1685,6 +1685,39 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void aConstListRefusesEmptyBulkMutationsToo() {
+        // The same hole as aConstSetRefusesEmptyBulkMutationsToo, in DartList: a
+        // mutator whose own check sits only inside a per-element call (set() inside
+        // sort()'s final loop, add() inside the inherited AbstractCollection.addAll)
+        // never reaches it when the list is already empty / the argument is empty,
+        // so these used to silently no-op on a const (unmodifiable) empty list
+        // instead of throwing -- recorded from the real Dart SDK, where an
+        // unmodifiable list's clear()/sort()/addAll() always throw regardless of
+        // whether anything would actually change.
+        DartList<String> xs = DartList.constant(DartList.<String>of());
+        assertThrows(UnsupportedError.class, xs::clear);
+        assertThrows(UnsupportedError.class, xs::sortDefault);
+        assertThrows(UnsupportedError.class, () -> xs.addAll(java.util.Collections.<String>emptyList()));
+        assertThrows(UnsupportedError.class, () -> xs.addAll(0, java.util.Collections.<String>emptyList()));
+        assertEquals(0, xs.size(), "none of the refused calls may have mutated the list");
+    }
+
+    @Test
+    public void aFixedLengthEmptyListDistinguishesLengthFromElementChecks() {
+        // List.filled(0, v) (growable: false by default) is fixed-length but NOT
+        // unmodifiable. Dart throws on it for a length-changing op (clear, addAll --
+        // even with nothing to add) but NOT for a pure element-writing op (sort),
+        // since a fixed length does not forbid overwriting the elements it has --
+        // there just happen to be none. Recorded from the real Dart SDK.
+        DartList<String> fixed = DartList.filled(0, "x");
+        assertThrows(UnsupportedError.class, fixed::clear);
+        assertThrows(UnsupportedError.class, () -> fixed.addAll(java.util.Collections.<String>emptyList()));
+        assertThrows(UnsupportedError.class, () -> fixed.addAll(0, java.util.Collections.<String>emptyList()));
+        fixed.sortDefault();
+        assertEquals(0, fixed.size());
+    }
+
+    @Test
     public void aConstSetRefusesWrites() {
         DartSet<String> s = DartSet.constant(DartSet.of("a", "b"));
         assertThrows(UnsupportedError.class, () -> s.add("c"));

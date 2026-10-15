@@ -345,7 +345,13 @@ public class FlutterAssets {
         return out;
     }
 
-    /** Whether {@code dir} names a resolution variant: a positive decimal and an 'x'. */
+    /**
+     * Whether {@code dir} names a resolution variant, matching Flutter's own rule
+     * {@code r'/?(\d+(\.\d*)?)x$'} exactly: one or more digits, then optionally a
+     * dot and zero or more further digits, then {@code 'x'}. A bare trailing dot
+     * is therefore legal -- {@code "2.x"} means the same ratio as {@code "2x"},
+     * {@code 2.0} -- the dot only needs a digit *before* it, never after.
+     */
     static boolean isRatioDir(String dir) {
         int n = dir.length();
         if (n < 2 || dir.charAt(n - 1) != 'x') {
@@ -357,7 +363,7 @@ public class FlutterAssets {
             char c = dir.charAt(i);
             if (c >= '0' && c <= '9') {
                 digit = true;
-            } else if (c == '.' && !dot && i > 0 && i < n - 2) {
+            } else if (c == '.' && !dot && i > 0) {
                 dot = true;
             } else {
                 return false;
