@@ -1003,6 +1003,38 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void asMapKeySetAndEntrySetIteratorsDetectConcurrentModification() {
+        // Regression: asMap()'s keySet()/entrySet() iterators compared against the
+        // LIVE list.size() on every step instead of the length snapshotted when the
+        // iterator was created -- mirroring DartList's own ListIterator (reversed(),
+        // getRange()), which already gets this right. A growth during iteration
+        // silently started handing back keys/entries under indices that did not exist
+        // yet, and a shrink truncated the iteration instead of reporting the change,
+        // exactly the ConcurrentModificationError Dart itself throws here.
+        DartList<Object> l = DartList.of((Object) 1L, 2L, 3L);
+        DartMap<Long, Object> m = l.asMap();
+
+        java.util.Iterator<Long> keys = m.keySet().iterator();
+        assertEquals(0L, keys.next());
+        l.add(4L);
+        assertThrows(ConcurrentModificationError.class, keys::hasNext,
+                "a grown list must be detected by keySet()'s iterator");
+
+        java.util.Iterator<Long> keysAfterShrink = m.keySet().iterator();
+        assertEquals(0L, keysAfterShrink.next());
+        l.removeLast();
+        assertThrows(ConcurrentModificationError.class, keysAfterShrink::next,
+                "a shrunk list must be detected by keySet()'s iterator, not silently "
+                        + "truncate the iteration");
+
+        java.util.Iterator<java.util.Map.Entry<Long, Object>> entries = m.entrySet().iterator();
+        assertEquals(0L, entries.next().getKey());
+        l.add(5L);
+        assertThrows(ConcurrentModificationError.class, entries::hasNext,
+                "a grown list must be detected by entrySet()'s iterator too");
+    }
+
+    @Test
     public void doubleParseFollowsDartsGrammar() {
         // Each recorded from the Dart SDK.
         assertEquals(null, DString.tryParseDouble("1d"));

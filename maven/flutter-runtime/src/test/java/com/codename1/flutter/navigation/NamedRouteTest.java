@@ -180,6 +180,30 @@ class NamedRouteTest {
     }
 
     @Test
+    void secondPushReplacementOfTheImplicitBaseCompletesTheFirstsFuture() {
+        // Reported bug: replacing the implicit base route installs the replacement as
+        // the new non-poppable base (see the test above) but used to just discard the
+        // RouteEntry that tracked it -- so a LATER pushReplacementNamed, which replaces
+        // THAT base in turn, had nothing left to find and complete. A caller awaiting
+        // the first pushReplacementNamed's future hung forever: nothing -- not a pop,
+        // not a second replace -- ever completed it.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+
+        dart.async.Future<Object> first = state.pushReplacementNamed("/a", null, null);
+        assertEquals(0, Navigator.stackSize());
+        assertNull(first.getNow(), "not replaced yet -- must still be pending");
+
+        state.pushReplacementNamed("/b", null, "second result");
+
+        assertEquals(0, Navigator.stackSize(), "the second replacement also becomes the base");
+        assertEquals("second result", first.getNow(),
+                "replacing the implicit base must complete the route it replaced's own "
+                        + "future with the supplied result, as Flutter's contract says, "
+                        + "exactly as popping a stacked route would");
+    }
+
+    @Test
     void pushReplacementOfAPushedRouteStaysPoppableToWhatWasBelowIt() {
         // Contrast case: replacing a route that is NOT the implicit base must keep the
         // normal (poppable) behavior -- only the implicit-base case is special-cased.

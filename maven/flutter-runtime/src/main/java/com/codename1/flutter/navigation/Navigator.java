@@ -462,6 +462,16 @@ public class Navigator extends StatelessWidget {
     }
 
     /**
+     * The implicit base route's OWN entry, once some earlier {@link #replaceNamed}
+     * call has installed one -- kept off the poppable {@link #stack} (Flutter's base
+     * route is never popped) but retained here so the NEXT replacement can still find
+     * it and complete its future, exactly as a pop completes a stacked route's future.
+     * Null while the base is still the pristine, never-replaced {@code runApp} route,
+     * which was never pushed and so has no future to complete.
+     */
+    private static RouteEntry baseEntry;
+
+    /**
      * pushReplacementNamed: the route is resolved FIRST, and the current one is popped
      * (completing with {@code result}, as Flutter's is) only when there is a replacement
      * to show. Popping first sent the user back a page whenever the name was unknown or
@@ -493,6 +503,18 @@ public class Navigator extends StatelessWidget {
         if (replacingImplicitBase) {
             RouteEntry e = stack.remove(stack.size() - 1);
             e.previousForm = null;
+            // pop(context, result) just above was a no-op on the then-empty stack (the
+            // base route is never popped), so it never touched baseEntry. If an EARLIER
+            // replaceNamed call already installed one, THIS call is what replaces it --
+            // complete ITS future with this call's result now, or nothing ever will and
+            // a caller awaiting that earlier pushReplacementNamed hangs forever. Guarded
+            // the way Completer#isCompleted documents: a second complete() throws
+            // StateError, and pop(context, result) above may already have reached it
+            // (e.g. via an open dialog) in a path that does not apply here.
+            if (baseEntry != null && !baseEntry.popped.isCompleted()) {
+                baseEntry.popped.complete(result);
+            }
+            baseEntry = e;
         }
         return pushed;
     }
@@ -533,6 +555,7 @@ public class Navigator extends StatelessWidget {
      */
     public static void reset() {
         stack.clear();
+        baseEntry = null;
         rootScopeContext = null;
     }
 

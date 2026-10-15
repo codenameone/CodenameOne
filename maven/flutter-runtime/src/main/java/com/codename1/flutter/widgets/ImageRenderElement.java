@@ -288,6 +288,7 @@ public class ImageRenderElement extends RenderElement {
         }
         final com.codename1.io.ConnectionRequest req = new com.codename1.io.ConnectionRequest(url, false);
         req.setDuplicateSupported(true);
+        addNetworkFailureListeners(req, source);
         if (headers != null) {
             for (java.util.Map.Entry<?, ?> e : headers.entrySet()) {
                 if (e.getKey() != null && e.getValue() != null) {
@@ -332,6 +333,42 @@ public class ImageRenderElement extends RenderElement {
             }
         });
         com.codename1.io.NetworkManager.getInstance().addToQueue(req);
+    }
+
+    /**
+     * Wires {@code req}'s failure-side listeners for a network image load: DNS failures, a
+     * refused/timed-out connection and TLS handshake errors never produce a response at
+     * all, and a non-2xx/non-redirect status (404, 500...) never reaches the plain
+     * response listener in {@link #fetchNetworkImage} either -- both instead go to
+     * {@code ConnectionRequest}'s own exception and response-code listeners. Without this,
+     * neither path ever called {@link #onLoadFailed}, so the image stayed blank --
+     * {@link #loadedSource} stuck on the failed source, blocking even a retry -- forever on
+     * a DNS/connect/TLS/timeout failure or an HTTP error status, rather than only on an
+     * empty or undecodable response body.
+     *
+     * <p>{@code setFailSilently(true)} additionally keeps {@code ConnectionRequest} from
+     * popping its own "Error"/"Exception" retry dialog for what is a background image
+     * load, matching {@code URLImage}'s own network fetch -- belt and suspenders alongside
+     * the two listeners just added, which already take priority over that dialog on their
+     * own ({@code handleException} and {@code handleErrorResponseCode} both check for a
+     * registered listener before ever reaching it).</p>
+     *
+     * <p>Package-private, and kept separate from {@link #fetchNetworkImage} rather than
+     * inlined there, so a test can wire a bare {@code ConnectionRequest} and drive its
+     * {@code handleException}/{@code handleErrorResponseCode} directly -- without a real
+     * network round trip, {@code Storage} or {@code Display}.</p>
+     */
+    void addNetworkFailureListeners(com.codename1.io.ConnectionRequest req, final String source) {
+        com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent> onFailure =
+                new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.io.NetworkEvent evt) {
+                onLoadFailed(source);
+            }
+        };
+        req.addExceptionListener(onFailure);
+        req.addResponseCodeListener(onFailure);
+        req.setFailSilently(true);
     }
 
     private static com.codename1.ui.Image encodedWithKnownSize(java.io.InputStream in)

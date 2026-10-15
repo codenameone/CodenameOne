@@ -202,19 +202,35 @@ final class DartListMapView<E> extends DartMap<Long, E> {
             @Override
             public Iterator<Long> iterator() {
                 return new Iterator<Long>() {
+                    // Dart's List.asMap() keys: the length at iterator creation, checked
+                    // on every step -- mirrors DartList's own ListIterator (reversed(),
+                    // getRange()). Reading the LIVE list.size() instead let a list that
+                    // grew mid-iteration hand back keys under indices that did not exist
+                    // when the iterator was made, and a shrink truncated the iteration
+                    // silently instead of reporting the change.
+                    final int length = list.size();
                     int i;
 
                     @Override
                     public boolean hasNext() {
-                        return i < list.size();
+                        checkLength();
+                        return i < length;
                     }
 
                     @Override
                     public Long next() {
-                        if (i >= list.size()) {
+                        checkLength();
+                        if (i >= length) {
                             throw new NoSuchElementException();
                         }
                         return Long.valueOf(i++);
+                    }
+
+                    private void checkLength() {
+                        if (list.size() != length) {
+                            throw new ConcurrentModificationError("list length changed from "
+                                    + length + " to " + list.size());
+                        }
                     }
                 };
             }
@@ -232,16 +248,21 @@ final class DartListMapView<E> extends DartMap<Long, E> {
             @Override
             public Iterator<Map.Entry<Long, E>> iterator() {
                 return new Iterator<Map.Entry<Long, E>>() {
+                    // Mirrors keySet()'s iterator above -- the length at creation, not
+                    // the live size.
+                    final int length = list.size();
                     int i;
 
                     @Override
                     public boolean hasNext() {
-                        return i < list.size();
+                        checkLength();
+                        return i < length;
                     }
 
                     @Override
                     public Map.Entry<Long, E> next() {
-                        if (i >= list.size()) {
+                        checkLength();
+                        if (i >= length) {
                             throw new NoSuchElementException();
                         }
                         final int at = i++;
@@ -261,6 +282,13 @@ final class DartListMapView<E> extends DartMap<Long, E> {
                                 throw unmodifiable();
                             }
                         };
+                    }
+
+                    private void checkLength() {
+                        if (list.size() != length) {
+                            throw new ConcurrentModificationError("list length changed from "
+                                    + length + " to " + list.size());
+                        }
                     }
                 };
             }
