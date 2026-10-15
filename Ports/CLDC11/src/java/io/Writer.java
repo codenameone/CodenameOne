@@ -24,7 +24,7 @@
 package java.io;
 /// Abstract class for writing to character streams. The only methods that a subclass must implement are write(char[], int, int), flush(), and close(). Most subclasses, however, will override some of the methods defined here in order to provide higher efficiency, additional functionality, or both.
 /// Since: JDK1.1, CLDC 1.0 See Also:OutputStreamWriter, Reader
-public abstract class Writer implements AutoCloseable {
+public abstract class Writer implements Appendable, Closeable, Flushable {
     /// The object used to synchronize operations on this stream. For efficiency, a character-stream object may use an object other than itself to protect critical sections. A subclass should therefore use the object in this field rather than this or a synchronized method.
     protected java.lang.Object lock;
 
@@ -37,6 +37,21 @@ public abstract class Writer implements AutoCloseable {
     /// lock - Object to synchronize on.
     protected Writer(java.lang.Object lock){
          //TODO codavaj!!
+    }
+
+    /// Writes `csq`, or "null" when it is null.
+    public Writer append(CharSequence csq) throws IOException {
+        return this;
+    }
+
+    /// Writes `c`.
+    public Writer append(char c) throws IOException {
+        return this;
+    }
+
+    /// Writes the characters of `csq` from `start` up to `end`.
+    public Writer append(CharSequence csq, int start, int end) throws IOException {
+        return this;
     }
 
     /// Close the stream, flushing it first. Once a stream has been closed, further write() or flush() invocations will cause an IOException to be thrown. Closing a previously-closed stream, however, has no effect.

@@ -20,15 +20,15 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package java.io;
 
-/**
- * Here to simplify porting, won't actually work...
- *
- */
+/// An object that writes and reads its own state through [ObjectOutput] and
+/// [ObjectInput].
 public interface Externalizable extends Serializable {
+
+    /// Restores this object's state from `in`.
     void readExternal(ObjectInput in) throws IOException, ClassNotFoundException;
 
+    /// Writes this object's state to `out`.
     void writeExternal(ObjectOutput out) throws IOException;
 }
