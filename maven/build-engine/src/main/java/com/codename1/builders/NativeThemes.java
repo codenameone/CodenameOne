@@ -149,14 +149,34 @@ final class NativeThemes {
     /// IOSImplementation answers it with the configured generation's modern theme.
     static final String NATIVE_THEME_RESOURCE_PROPERTY = "cn1.nativeThemeResource";
 
+    /// The build hint that disables Apple native-theme pruning outright, for an
+    /// application that opens one by a name it computes or reads from
+    /// configuration -- `Resources.openLayered("/" + configuredTheme)`, say --
+    /// rather than a string literal [#referencesTheme] can find in the compiled
+    /// classes. That pattern built and ran fine before this pruning existed, and
+    /// silently loses its theme once pruning deletes the `.res` it was reaching
+    /// for at a name no scan could see.
+    ///
+    /// Mirrors the JavaScript build's own escape hatch for the identical problem,
+    /// `javascript.pruneThemes=false` (`JavaScriptBuildHints.themesToShip`). Read
+    /// by every caller of {@link #removeUnusedApple}, which covers both Apple
+    /// builders that prune themes -- IPhoneBuilder (iOS) and MacOSNativeBuilder
+    /// (native macOS) -- so one hint covers both the way `ios.teamId` and the
+    /// other shared `ios.*` hints already do.
+    static final String KEEP_ALL_HINT = "ios.nativeThemes.keepAll";
+
     /// Removes the Apple native themes this build does not need from `dir`: every
     /// one except the theme the stub's mode will install, a theme the application
     /// names itself, and -- when the application asks the port for its modern
     /// theme through {@link #NATIVE_THEME_RESOURCE_PROPERTY} -- that modern theme.
+    /// None at all when `keepAll` is set (see {@link #KEEP_ALL_HINT}).
     ///
     /// @return the names removed, for the build log
     static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
-            File appClasses) throws IOException {
+            File appClasses, boolean keepAll) throws IOException {
+        if (keepAll) {
+            return new ArrayList<String>();
+        }
         Set<String> keep = new LinkedHashSet<String>();
         String theme = themeFor(mode, generation, mac);
         if (theme != null) {

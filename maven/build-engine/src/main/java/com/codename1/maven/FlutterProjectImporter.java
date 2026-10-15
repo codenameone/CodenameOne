@@ -205,16 +205,26 @@ public final class FlutterProjectImporter {
                 declaredAssetKeys.add(clean);
                 int before = r.copiedAssets;
                 boolean singleFile = assetSrc.isFile();
-                r.copiedAssets += copy(assetSrc, new File(target, clean.replace('/', File.separatorChar)), clean,
-                        previous, imported);
                 if (singleFile) {
-                    // A directory key ("assets/icons/") already recurses through any
-                    // "<N>x/" sibling on its own, via #copy; only a single-file key
-                    // ("assets/logo.png") needs its resolution variants found
-                    // separately, because Flutter bundles them without a second
-                    // pubspec entry.
+                    r.copiedAssets += copy(assetSrc, new File(target, clean.replace('/', File.separatorChar)),
+                            clean, previous, imported);
+                    // A single-file key ("assets/logo.png") needs its resolution
+                    // variants found separately, because Flutter bundles them
+                    // without a second pubspec entry.
                     r.copiedAssets += copyAssetVariants(assetSrc, clean, target, previous, imported,
                             declaredAssetKeys);
+                } else {
+                    // A directory key ("assets/icons/") is NOT the same as
+                    // recursing #copy through the whole subtree -- that copied
+                    // every nested subdirectory unconditionally, but Flutter's
+                    // own asset resolution for a declared directory bundles only
+                    // the files directly inside it, plus the resolution-variant
+                    // siblings (VARIANT_DIR) of those SAME files; any other
+                    // subdirectory needs its own pubspec assets:/fonts: entry to
+                    // be bundled at all. Copying it anyway shipped files no real
+                    // `flutter build` would have included.
+                    r.copiedAssets += copyAssetDirectory(assetSrc,
+                            new File(target, clean.replace('/', File.separatorChar)), clean, previous, imported);
                 }
                 if (r.copiedAssets == before) {
                     // A declared directory with nothing in it yet; not an error.
@@ -438,9 +448,12 @@ public final class FlutterProjectImporter {
         Files.write(new File(target, ASSET_KEYS_RECORD).toPath(), b.toString().getBytes(Charset.forName("UTF-8")));
     }
 
-    /// Copies `src` to `dest` (recursing when `src` is a directory), recording
-    /// each copied file's path (relative to `src/main/flutter`, `/`
-    /// separated) and content hash in `imported`.
+    /// Copies `src` to `dest` (recursing through EVERY subdirectory
+    /// unconditionally when `src` is a directory), recording each copied
+    /// file's path (relative to `src/main/flutter`, `/` separated) and
+    /// content hash in `imported`. Correct for `lib/`, whose Dart sources
+    /// have no resolution-variant concept; a directory asset key goes
+    /// through [#copyAssetDirectory] instead, which recurses selectively.
     private int copy(File src, File dest, String path, Map<String, String> previous, Map<String, String> imported)
             throws IOException {
         if (src.isDirectory()) {
@@ -511,6 +524,47 @@ public final class FlutterProjectImporter {
                     previous, imported);
         }
         return copied;
+    }
+
+    /// Copies a directory asset key (`"assets/icons/"`) the way Flutter's own
+    /// asset resolution limits it, rather than the unconditional recursion
+    /// [#copy] does for `lib/`: the files directly inside `srcDir`, plus --
+    /// for each sibling subdirectory matching [#VARIANT_DIR] -- only the
+    /// files inside it that share a name with one of those direct files
+    /// (the same per-file rule [#copyAssetVariants] applies to a single-file
+    /// key, applied here to every file the directory declares at once). Any
+    /// OTHER subdirectory is left alone: Flutter does not bundle it either
+    /// unless the pubspec declares it as its own `assets:`/`fonts:` entry.
+    private int copyAssetDirectory(File srcDir, File destDir, String path, Map<String, String> previous,
+            Map<String, String> imported) throws IOException {
+        File[] children = srcDir.listFiles();
+        if (children == null) {
+            return 0;
+        }
+        Set<String> directFileNames = new LinkedHashSet<String>();
+        for (File f : children) {
+            if (f.isFile()) {
+                directFileNames.add(f.getName());
+            }
+        }
+        int n = 0;
+        for (File f : children) {
+            if (f.isFile()) {
+                n += copy(f, new File(destDir, f.getName()), path + "/" + f.getName(), previous, imported);
+            } else if (f.isDirectory() && VARIANT_DIR.matcher(f.getName()).matches()) {
+                File[] variantFiles = f.listFiles();
+                if (variantFiles == null) {
+                    continue;
+                }
+                for (File vf : variantFiles) {
+                    if (vf.isFile() && directFileNames.contains(vf.getName())) {
+                        n += copy(vf, new File(destDir, f.getName() + File.separator + vf.getName()),
+                                path + "/" + f.getName() + "/" + vf.getName(), previous, imported);
+                    }
+                }
+            }
+        }
+        return n;
     }
 
     /// Removes what an earlier import copied and this one did not -- a Dart

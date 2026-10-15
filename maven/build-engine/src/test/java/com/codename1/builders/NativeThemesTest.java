@@ -137,7 +137,7 @@ public class NativeThemesTest {
         File cls = new File(classes, "com/example/tests/DualAppearanceBaseTest.class");
         cls.getParentFile().mkdirs();
         Files.write(cls.toPath(), bytesWith("cn1.nativeThemeResource"));
-        NativeThemes.removeUnusedApple(dir, "auto", "27", false, classes);
+        NativeThemes.removeUnusedApple(dir, "auto", "27", false, classes, false);
         assertTrue(new File(dir, "iOS7Theme.res").isFile());
         assertTrue(new File(dir, "iOSModern27Theme.res").isFile());
         assertFalse(new File(dir, "iOSModernTheme.res").isFile());
@@ -147,9 +147,32 @@ public class NativeThemesTest {
     @Test
     public void anAppThatDoesNotAskKeepsOnlyTheModeTheme() throws IOException {
         File dir = portDir();
-        NativeThemes.removeUnusedApple(dir, "auto", "27", false, tmp.newFolder("plain"));
+        NativeThemes.removeUnusedApple(dir, "auto", "27", false, tmp.newFolder("plain"), false);
         assertTrue(new File(dir, "iOS7Theme.res").isFile());
         assertFalse(new File(dir, "iOSModern27Theme.res").isFile());
+    }
+
+    @Test
+    public void keepAllHintStopsAppleThemePruningEntirely() throws IOException {
+        // A theme opened by a name computed at run time -- Resources.openLayered("/"
+        // + configuredTheme) -- names no theme as a string literal anywhere in the
+        // compiled classes, so #referencesTheme can never find it; that application
+        // worked before this pruning existed and silently lost its theme once pruning
+        // started deleting the .res it was reaching for. ios.nativeThemes.keepAll
+        // (NativeThemes.KEEP_ALL_HINT) is the escape hatch, mirroring the JavaScript
+        // build's javascript.pruneThemes=false.
+        File dir = portDir();
+        List<String> removed = NativeThemes.removeUnusedApple(dir, "auto", "27", false,
+                tmp.newFolder("keepAllClasses"), true);
+        assertTrue("nothing removed when keepAll is set", removed.isEmpty());
+        for (String name : NativeThemes.ALL) {
+            assertTrue(name + " must survive keepAll", new File(dir, name + ".res").isFile());
+        }
+    }
+
+    @Test
+    public void keepAllHintNameIsTheOneTheBuildLogNames() {
+        assertEquals("ios.nativeThemes.keepAll", NativeThemes.KEEP_ALL_HINT);
     }
 
     @Test
@@ -214,7 +237,7 @@ public class NativeThemesTest {
         assertNull(NativeThemes.themeFor(" CUSTOM ", null, true));
         File dir = portDir();
         List<String> removed = NativeThemes.removeUnusedApple(dir, "custom", "26", false,
-                tmp.newFolder("customClasses"));
+                tmp.newFolder("customClasses"), false);
         assertEquals(Arrays.asList(NativeThemes.ALL), removed);
         assertTrue("not a native theme", new File(dir, "CN1Resource.res").isFile());
     }

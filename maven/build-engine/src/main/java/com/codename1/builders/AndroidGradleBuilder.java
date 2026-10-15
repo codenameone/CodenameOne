@@ -5712,13 +5712,14 @@ public class AndroidGradleBuilder extends Executor {
         File manifestFile = new File(projectDir + "/src/main", "AndroidManifest.xml");
         int intVersion = computeVersionCode(request);
         // android:versionName (below, at the "versionName" build.gradle line) wants the
-        // raw float, independent of the android.versionCode override that intVersion
-        // may have taken -- unchanged from before computeVersionCode was extracted.
-        float version = 1.0f;
-        try {
-            version = Float.parseFloat(request.getVersion());
-        } catch (Throwable notAFloat) {
-        }
+        // raw version string, independent of the android.versionCode override that
+        // intVersion may have taken -- unchanged from before computeVersionCode was
+        // extracted. It used to be re-derived from a Float.parseFloat of the SAME
+        // string that just failed to parse as one above (silently narrowing a
+        // 3-segment semver such as "1.2.3" -- which the Flutter importer now writes
+        // from pubspec.yaml -- down to the hardcoded default of "1.0"); see
+        // gradleVersionName for why it is now the original string instead.
+        String version = gradleVersionName(request);
 
         String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n"
                 + "<service android:name=\"com.codename1.location.BackgroundLocationHandler\" android:exported=\"false\" />\n"
@@ -9774,6 +9775,46 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Throwable notAFloat) {
             return 1;
         }
+    }
+
+    /**
+     * The Gradle build.gradle {@code versionName}: {@code request.getVersion()}, kept
+     * as the original string instead of being re-derived through
+     * {@code Float.parseFloat}, the way this method's caller (and
+     * {@link #computeVersionCode}'s own {@code versionCode} integer) still are.
+     * {@code android:versionName} in AndroidManifest.xml already writes
+     * {@code request.getVersion()} straight through; narrowing it only here, for the
+     * SAME build, meant the manifest and build.gradle disagreed about the app's own
+     * version whenever the version was not float-parseable -- any 3-segment semver
+     * such as {@code "1.2.3"}, which the Flutter importer now writes from
+     * pubspec.yaml's marketing half, became {@code "1.0"} in build.gradle while the
+     * manifest still said {@code "1.2.3"}.
+     *
+     * <p>The value is written into a Gradle/Groovy double-quoted string literal
+     * ({@code versionName "..."}), so it is validated rather than trusted: a quote
+     * would close the literal early, and a backslash or an actual newline would
+     * either change what the literal means or fail to parse as one at all (Groovy's
+     * single-line string does not accept a literal newline). None of those belong in
+     * a version string, so they are refused rather than silently rewritten.</p>
+     *
+     * @return {@code request.getVersion()} unmodified, or {@code "1.0"} when it is
+     * null or empty, matching the previous float-parse fallback for that case
+     * @throws BuildException if the version contains a {@code "}, a {@code \} or a
+     * newline/carriage return, which cannot be written into the literal
+     */
+    static String gradleVersionName(BuildRequest request) throws BuildException {
+        String v = request.getVersion();
+        if (v == null || v.length() == 0) {
+            return "1.0";
+        }
+        if (v.indexOf('"') >= 0 || v.indexOf('\\') >= 0
+                || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) {
+            throw new BuildException("codename1.version is \"" + v
+                    + "\", which cannot be written into the Gradle build file's "
+                    + "versionName string literal (it contains a quote, a backslash "
+                    + "or a newline). Use a plain version string such as \"1.2.3\".");
+        }
+        return v;
     }
 
     /**

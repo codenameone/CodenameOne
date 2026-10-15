@@ -357,6 +357,50 @@ public class FlutterProjectImporterTest {
                 Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
     }
 
+    /// A declared ASSET DIRECTORY ("assets/icons/") follows Flutter's own asset
+    /// resolution, not a plain recursive copy: only the files directly inside the
+    /// directory, plus the resolution-variant siblings of those SAME files, are
+    /// bundled. A plain nested subdirectory needs its own pubspec entry to be
+    /// bundled at all, and a file inside a real variant directory with no
+    /// matching top-level file belongs to some other (undeclared) asset. #copy
+    /// used to recurse through every subdirectory of a directory key
+    /// unconditionally, shipping files no real `flutter build` would include.
+    @Test
+    public void aDirectoryAssetKeyCopiesOnlyDirectFilesAndTheirResolutionVariants() throws Exception {
+        File root = Files.createTempDirectory("flutter-dir-asset-variants").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/icons/\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "assets/icons/a.png"), "A-1X");
+        write(new File(flutterProject, "assets/icons/2.0x/a.png"), "A-2X");
+        // Not a resolution variant of anything in icons/: a plain nested
+        // subdirectory Flutter does not bundle unless it is declared on its own.
+        write(new File(flutterProject, "assets/icons/archived/old.png"), "ARCHIVED");
+        // A file inside a real variant directory with no matching top-level file
+        // in icons/ belongs to some other (undeclared) asset, not to "a.png".
+        write(new File(flutterProject, "assets/icons/2.0x/orphan.png"), "ORPHAN");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertEquals("A-1X", read(new File(flutterDir, "assets/icons/a.png")));
+        assertEquals("A-2X", read(new File(flutterDir, "assets/icons/2.0x/a.png")));
+        assertFalse("a plain nested subdirectory must not be swept in",
+                new File(flutterDir, "assets/icons/archived/old.png").exists());
+        assertFalse("a variant-directory file with no matching top-level file is not this asset's",
+                new File(flutterDir, "assets/icons/2.0x/orphan.png").exists());
+
+        // The directory key itself is still the one key recorded, unchanged by
+        // this restriction -- TranscodeFlutterMojo rescans assets/ wholesale.
+        File record = new File(flutterDir, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        assertEquals(java.util.Collections.singletonList("assets/icons"),
+                Files.readAllLines(record.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     /// The same bundling rule applies to a package asset resolved through
     /// `.dart_tool/package_config.json`: the variant lives beside the file in
     /// the package's own `lib/`, not in the importing app's tree.
