@@ -200,6 +200,40 @@ plate, and the car moves on the map as the driver reports in.
 .A driver on the way to the pickup
 image::img/wayline-ride-driver-on-the-way.png["The rider screen while a driver approaches: the car on the route, the time to pickup, and the driver's name, car and plate",scaledwidth=40%]
 
+On a phone the app doesn't have to stay open for any of this. A notification
+says when a driver accepts, when they arrive, when the trip starts and when it
+ends, and tapping one opens the ride. While a driver is on the way, the ride
+also shows outside the app: on the lock screen and in the Dynamic Island of an
+iPhone, and as an ongoing notification on Android. It names the driver, the car
+and its plate, counts down the minutes to the pickup and fills a bar as the
+ride goes from on the way to arrived, the trip and its end. It moves on with
+every step of the ride and, every minute or so, with the minutes left. It goes
+when the ride is canceled, and stays a short while to say you've arrived when
+the trip is complete.
+
+Notifications reach a phone only from a server connected to the push service,
+which <<wayline-push>> sets up. A server started for development prints each
+notification in its output instead.
+
+.The ride on the lock screen
+[cols="1,3"]
+|===
+| Where | What shows
+
+| iPhone
+| A Live Activity on the lock screen and in the Dynamic Island.
+
+| Android
+| An ongoing notification. The first ride asks for permission to show
+  notifications.
+
+| Desktop and the simulator
+| A small window beside the app, while the app runs.
+
+| A browser
+| Nothing. The page shows the ride while it's open.
+|===
+
 **Call** and **Message** open the phone's dialer and its messaging app, so
 they're offered only on a device that can dial. **Share** opens the device's
 share sheet with a sentence naming the destination, the driver and the car.
@@ -296,6 +330,22 @@ image::img/wayline-driver-offline.png["The driving screen while offline: the day
 **Looking for rides**, and the app reports the car's position to the server
 every few seconds. **Go offline** stops the offers. A driver who is online and
 stops reporting for a minute is no longer offered rides either.
+
+A driver doesn't have to keep the app on the screen. While they're online the
+phone goes on reporting where the car is with the app in the background, when
+the driver switches to a navigation app or locks the phone. It reports when the
+car has moved about 25 meters, and every twenty seconds when it hasn't, which
+spares the battery and keeps the driver well inside the minute. On Android a
+notification that reads **You're online** stays while it does. An iPhone asks
+the driver whether Wayline may use the location while the app isn't in use,
+and the reports from the background need that answer to be yes. Going
+offline, signing out or switching to the rider's side of the app stops the
+reports. The simulator and a browser don't report from the background.
+
+A new ride request arrives as a notification too, and tapping it opens the
+driving screen with the offer. The offer is open for fifteen seconds, so the
+notification is too: one that can't be delivered within that time may never
+arrive. A rider who cancels is also announced in a notification.
 
 An offer shows the fare, how far the pickup is and how long the trip is, with a
 ring counting down the time left to answer.
@@ -477,7 +527,9 @@ image::img/wayline-settings-dark.png[The settings screen in the dark theme,scale
 | The wallet, the method that pays by default, and the tip offered first.
 
 | Notifications
-| Switches for ride updates, receipts and offers.
+| Switches for ride updates, receipts and offers. With **Ride updates** off
+  the phone gets no notification of a ride's steps, and with **Receipts** off
+  none when a trip ends. The ride on the lock screen goes on either way.
 
 | Appearance
 | The language, the theme, and whether distances are in kilometers or miles.
@@ -509,10 +561,11 @@ carry.
 .The usage statistics switch
 image::img/wayline-settings-analytics.png["The privacy and safety section of the settings, with the switch for usage statistics",scaledwidth=40%]
 
-Three of these settings are stored and do nothing more in the sample:
+Three of these settings are stored and do little or nothing more in the
+sample:
 
-* The notification switches are saved with the account, but the server sends no
-  push notifications.
+* The **Offers** switch is saved with the account, but the server sends no
+  offers or promotions to switch off.
 // vale-skip: Microsoft.FirstPerson: "Share my trips" is the label on the screen.
 * **Share my trips** and the emergency contact are saved with the account, and
   the screen says that no message is sent. Sharing a trip is the **Share**
