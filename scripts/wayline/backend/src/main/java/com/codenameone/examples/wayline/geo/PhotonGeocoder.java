@@ -27,6 +27,7 @@ import com.codename1.backend.Web;
 import com.codenameone.examples.wayline.api.PlaceDto;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ public class PhotonGeocoder implements Geocoder {
 
     @Override
     public List<PlaceDto> search(String text, double lat, double lng) throws IOException {
-        String url = base + "/api?limit=8&q=" + UrlText.encode(text);
+        String url = base + "/api?limit=8&q=" + URLEncoder.encode(text, "UTF-8");
         if (Geo.isPoint(lat, lng)) {
             url += "&lat=" + lat + "&lon=" + lng;
         }

@@ -29,34 +29,84 @@ import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.wayline.geo.Geocoder;
 import com.codenameone.examples.wayline.geo.PhotonGeocoder;
 import com.codenameone.examples.wayline.geo.StubGeocoder;
+import com.codenameone.examples.wayline.pay.MisconfiguredPayments;
 import com.codenameone.examples.wayline.pay.PaymentProvider;
 import com.codenameone.examples.wayline.pay.SimulatedPayments;
 import com.codenameone.examples.wayline.pay.StripePayments;
-import com.codenameone.examples.wayline.sms.LoggingSmsSender;
+import com.codenameone.examples.wayline.sms.ConsoleSmsSender;
+import com.codenameone.examples.wayline.sms.MessageBirdSmsSender;
+import com.codenameone.examples.wayline.sms.MisconfiguredSmsSender;
 import com.codenameone.examples.wayline.sms.SmsSender;
 import com.codenameone.examples.wayline.sms.TwilioSmsSender;
+import com.codenameone.examples.wayline.sms.VonageSmsSender;
 
 import java.io.IOException;
 
 /// The services this server reaches outside itself for, each behind an
 /// interface and each chosen here from the settings.
 ///
-/// A server started with none of them configured still works from end to end:
-/// text messages are logged, cards are simulated. That is what a checkout
-/// runs as, and what the tests run against.
+/// Each is named by one setting -- `wayline.sms.provider` and
+/// `wayline.payments.provider` -- and, when that is not set, a development
+/// profile (dev, test, local) gets the one that needs no account: codes printed
+/// on the console, cards simulated. Any other profile gets the real provider,
+/// and when its settings are missing the server still starts, logs a
+/// configuration error naming each missing setting, and fails every call to
+/// that provider with the same message. It never quietly falls back to a
+/// development stand-in.
+///
+/// Every setting is also read from the environment, in upper case with `_`
+/// for each `.` (`WAYLINE_SMS_TWILIO_TOKEN`), which is where secrets belong.
 @Configuration
 public class Services {
-    /// Twilio when its three settings are present -- `wayline.sms.twilio.sid`,
-    /// `.token` and `.from`, which are also read from the environment, in upper
-    /// case with `_` for each `.` -- and the log otherwise.
+    /// `wayline.sms.provider` is one of:
+    ///
+    /// - `twilio`: `wayline.sms.twilio.sid`, `.token` and `.from`
+    /// - `vonage`: `wayline.sms.vonage.key`, `.secret` and `.from`
+    /// - `messagebird`: `wayline.sms.messagebird.key` and `.originator`
+    /// - `console`: prints the message, on a development profile only
+    ///
+    /// Unset, it is `console` on a development profile and `twilio` otherwise.
     @Bean
-    public SmsSender smsSender(@Value("${wayline.sms.twilio.sid:}") String sid,
-            @Value("${wayline.sms.twilio.token:}") String token,
-            @Value("${wayline.sms.twilio.from:}") String from) throws IOException {
-        if (sid.length() > 0 && token.length() > 0 && from.length() > 0) {
-            return new TwilioSmsSender(sid, token, from);
+    public SmsSender smsSender(Config config,
+            @Value("${wayline.sms.provider:}") String chosen,
+            @Value("${wayline.sms.twilio.sid:}") String twilioSid,
+            @Value("${wayline.sms.twilio.token:}") String twilioToken,
+            @Value("${wayline.sms.twilio.from:}") String twilioFrom,
+            @Value("${wayline.sms.vonage.key:}") String vonageKey,
+            @Value("${wayline.sms.vonage.secret:}") String vonageSecret,
+            @Value("${wayline.sms.vonage.from:}") String vonageFrom,
+            @Value("${wayline.sms.messagebird.key:}") String birdKey,
+            @Value("${wayline.sms.messagebird.originator:}") String birdOriginator) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : config.isDevelopmentProfile() ? "console" : "twilio";
+        if ("console".equalsIgnoreCase(kind)) {
+            if (!config.isDevelopmentProfile()) {
+                return new MisconfiguredSmsSender("wayline.sms.provider=console only prints codes "
+                        + "and is refused on the '" + config.getProfile() + "' profile; set it to "
+                        + "twilio, vonage or messagebird");
+            }
+            return new ConsoleSmsSender();
         }
-        return new LoggingSmsSender();
+        if ("twilio".equalsIgnoreCase(kind)) {
+            String missing = missing("wayline.sms.twilio.", new String[] {"sid", twilioSid,
+                "token", twilioToken, "from", twilioFrom});
+            return missing.length() > 0 ? new MisconfiguredSmsSender(unset("SMS", "twilio",
+                    missing)) : new TwilioSmsSender(twilioSid, twilioToken, twilioFrom);
+        }
+        if ("vonage".equalsIgnoreCase(kind)) {
+            String missing = missing("wayline.sms.vonage.", new String[] {"key", vonageKey,
+                "secret", vonageSecret, "from", vonageFrom});
+            return missing.length() > 0 ? new MisconfiguredSmsSender(unset("SMS", "vonage",
+                    missing)) : new VonageSmsSender(vonageKey, vonageSecret, vonageFrom);
+        }
+        if ("messagebird".equalsIgnoreCase(kind)) {
+            String missing = missing("wayline.sms.messagebird.", new String[] {"key", birdKey,
+                "originator", birdOriginator});
+            return missing.length() > 0 ? new MisconfiguredSmsSender(unset("SMS", "messagebird",
+                    missing)) : new MessageBirdSmsSender(birdKey, birdOriginator);
+        }
+        return new MisconfiguredSmsSender("wayline.sms.provider is '" + kind + "', which is "
+                + "none of twilio, vonage, messagebird or console");
     }
 
     /// Photon, at `wayline.geocoder.url`. `wayline.geocoder=stub` selects the
@@ -74,9 +124,13 @@ public class Services {
         return new PhotonGeocoder(address);
     }
 
-    /// Stripe when `wayline.payments.stripe.secret` is set (or
-    /// `WAYLINE_PAYMENTS_STRIPE_SECRET` in the environment), and otherwise
-    /// simulated: test card numbers, and no money moves.
+    /// `wayline.payments.provider` is one of:
+    ///
+    /// - `stripe`: [StripePayments], an untested stub over Stripe's REST API.
+    ///   It needs `wayline.payments.stripe.secret`.
+    /// - `simulated`: test card numbers, and no money moves.
+    ///
+    /// Unset, it is `simulated` on a development profile and `stripe` otherwise.
     ///
     /// With Stripe a card is typed into Stripe's own page, which then sends the
     /// browser back to `/pay/return` on this server. That address has to be the
@@ -84,21 +138,48 @@ public class Services {
     /// and the issuer -- the public address of this server, which a deployment
     /// sets anyway -- when it is not.
     @Bean
-    public PaymentProvider paymentProvider(
+    public PaymentProvider paymentProvider(Config config,
+            @Value("${wayline.payments.provider:}") String chosen,
             @Value("${wayline.payments.stripe.secret:}") String secret,
             @Value("${wayline.public.url:}") String publicUrl,
-            @Value("${" + SecurityConfig.ISSUER_KEY + ":}") String issuer) throws IOException {
-        if (secret.length() == 0) {
+            @Value("${" + SecurityConfig.ISSUER_KEY + ":}") String issuer) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : config.isDevelopmentProfile() ? "simulated" : "stripe";
+        if ("simulated".equalsIgnoreCase(kind)) {
             return new SimulatedPayments();
         }
+        if (!"stripe".equalsIgnoreCase(kind)) {
+            return new MisconfiguredPayments(kind, "wayline.payments.provider is '" + kind
+                    + "', which is neither stripe nor simulated");
+        }
         String address = publicUrl.length() > 0 ? publicUrl : issuer;
-        if (address.length() == 0) {
-            throw new IOException("wayline.payments.stripe.secret is set, so wayline.public.url "
-                    + "must say where this server is reached");
+        String missing = missing("", new String[] {"wayline.payments.stripe.secret", secret,
+            "wayline.public.url (or " + SecurityConfig.ISSUER_KEY + ")", address});
+        if (missing.length() > 0) {
+            return new MisconfiguredPayments("stripe", unset("payments", "stripe", missing));
         }
         while (address.endsWith("/")) {
             address = address.substring(0, address.length() - 1);
         }
         return new StripePayments(secret, address + "/pay/return");
+    }
+
+    /// The names, after `prefix`, of the settings in `namesAndValues` whose
+    /// value is empty, separated by commas.
+    private static String missing(String prefix, String[] namesAndValues) {
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter + 1 < namesAndValues.length; iter += 2) {
+            if (namesAndValues[iter + 1] == null || namesAndValues[iter + 1].trim().length() == 0) {
+                if (out.length() > 0) {
+                    out.append(", ");
+                }
+                out.append(prefix).append(namesAndValues[iter]);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String unset(String service, String provider, String missing) {
+        return service + " provider '" + provider + "' is not configured; set " + missing;
     }
 }

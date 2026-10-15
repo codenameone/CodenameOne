@@ -24,13 +24,20 @@ package com.codenameone.examples.wayline.sms;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.Web;
-import com.codenameone.examples.wayline.geo.UrlText;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
-/// Sends through Twilio's Messages API.
+/// Sends through Twilio's Messages API: a form POST to
+/// `/2010-04-01/Accounts/{sid}/Messages.json`, authenticated with the account
+/// SID and auth token as HTTP Basic credentials. Twilio answers 201 when it
+/// has queued the message.
+///
+/// Settings: `wayline.sms.twilio.sid`, `wayline.sms.twilio.token` and
+/// `wayline.sms.twilio.from` (a Twilio number in E.164 form, or a messaging
+/// service's sender).
 ///
 /// The account's credentials are settings of the server and never leave it: the
 /// app asks the server for a code and has no SMS credentials of its own to leak.
@@ -51,13 +58,12 @@ public class TwilioSmsSender implements SmsSender {
         headers.add("Authorization: Basic "
                 + Base64.encode((accountSid + ":" + authToken).getBytes("UTF-8")));
         headers.add("Content-Type: application/x-www-form-urlencoded");
-        String form = "To=" + UrlText.encode(phone) + "&From=" + UrlText.encode(from)
-                + "&Body=" + UrlText.encode(text);
         Web.Result sent = Web.request("POST", "https://api.twilio.com/2010-04-01/Accounts/"
-                + UrlText.encode(accountSid) + "/Messages.json", headers, form.getBytes("UTF-8"));
+                + URLEncoder.encode(accountSid, "UTF-8") + "/Messages.json", headers,
+                SmsForm.of("To", phone, "From", from, "Body", text));
         if (!sent.isSuccess()) {
             // The status only: the body can echo the number back.
-            throw new IOException("The SMS provider answered " + sent.getStatus());
+            throw new IOException("Twilio answered " + sent.getStatus());
         }
     }
 

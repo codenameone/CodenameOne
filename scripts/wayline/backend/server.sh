@@ -12,7 +12,7 @@
 #
 # The profile comes from CN1_PROFILE. `test` and `dev` need nothing else: an
 # in-memory database, four demo accounts, a geocoder that knows ten places
-# (`test`) and text messages that are logged, not sent. Anything else is a
+# (`test`) and text messages that are printed, not sent. Anything else is a
 # deployment and reads its settings from the environment -- see
 # application.properties.
 #

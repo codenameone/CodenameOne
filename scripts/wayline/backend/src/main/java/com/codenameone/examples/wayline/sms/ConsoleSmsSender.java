@@ -22,9 +22,14 @@
  */
 package com.codenameone.examples.wayline.sms;
 
-/// Writes the message to the server's log instead of sending it. What a server
-/// with no SMS account uses.
-public class LoggingSmsSender implements SmsSender {
+/// Prints the message on the server's console instead of sending it.
+///
+/// For development only: [com.codenameone.examples.wayline.Services] hands it
+/// out on the `dev`, `test` and `local` profiles alone, and a production server
+/// that asks for it is refused with a configuration error. It is not a stand-in
+/// for a provider -- nobody receives the text, which is exactly why a
+/// development server may then hand the code back to the app.
+public class ConsoleSmsSender implements SmsSender {
     @Override
     public void send(String phone, String text) {
         System.out.println("[sms] to " + phone + ": " + text);

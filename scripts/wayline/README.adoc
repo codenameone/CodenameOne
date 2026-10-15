@@ -65,7 +65,7 @@ To see it running first, the two commands under <<Running it>> are all it takes.
 == Running it
 
 Start the server on the development profile. It needs nothing installed: the
-database is in memory, and text messages are written to the log.
+database is in memory, and text messages are printed on the console.
 
 [source,bash]
 ----
@@ -144,24 +144,32 @@ cancels and refunds rides, and sets the prices.
 
 Maps, search and routes are real and need no key: the map tiles come from
 OpenFreeMap, routes from the public OSRM server, and place search from Photon,
-which the server calls so the app never talks to a third party directly. Text
-messages are logged unless Twilio credentials are configured on the server.
+which the server calls so the app never talks to a third party directly.
 
-Payments are simulated until the server is given a Stripe key. Simulated, the
-card `4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
-money moves. With `WAYLINE_PAYMENTS_STRIPE_SECRET` set in the server's
-environment, a card is added on Stripe's own page, so its number never reaches
-the app or this server, and a ride is charged when it completes. Use a Stripe
-test key first: this path is covered by tests that answer for Stripe, and has
-to be tried against a real account before it is trusted with money. Paying a
+Text messages go through the provider `wayline.sms.provider` names: `twilio`,
+`vonage` or `messagebird`, each with its own credentials. On a development
+profile they are printed on the console instead, and the app is handed the code
+so a sign-up can finish. Any other profile needs a provider; one whose
+credentials are missing is logged as a configuration error, naming the missing
+settings, and the app is told the code could not be sent.
+
+Payments are simulated on a development profile. Simulated, the card
+`4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
+money moves. With `wayline.payments.provider=stripe` and
+`WAYLINE_PAYMENTS_STRIPE_SECRET` set in the server's environment, a card is
+added on Stripe's own page, so its number never reaches the app or this server,
+and a ride is charged when it completes. The Stripe provider is an untested
+stub: it is covered by tests that answer for Stripe, has never been run against
+a live account, and has to be tried with a Stripe test key before it is trusted
+with money. Paying a
 driver out is a ledger entry in both cases; moving that money to a bank is left
 to the deployment.
 
 `backend/application.properties` lists every setting a deployment supplies. The
 database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
-address, or the path of a SQLite file. Text messages go to Twilio once
-`WAYLINE_SMS_TWILIO_SID`, `WAYLINE_SMS_TWILIO_TOKEN` and
-`WAYLINE_SMS_TWILIO_FROM` are set.
+address, or the path of a SQLite file. The SMS and payment settings are listed
+there too, each also read from the environment in upper case with `_` for every
+dot (`WAYLINE_SMS_TWILIO_TOKEN`).
 
 == Tests
 

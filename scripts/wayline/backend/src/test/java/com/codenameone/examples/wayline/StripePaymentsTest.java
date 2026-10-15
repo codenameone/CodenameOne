@@ -84,7 +84,7 @@ class StripePaymentsTest {
         // Escaped, name and value both: an ampersand in a name must not start
         // another field.
         has(form, "email=ada%40wayline.example");
-        has(form, "name=Ada%20%26%20Co");
+        has(form, "name=Ada+%26+Co");
         has(form, "metadata%5Bwayline_user%5D=ada%40wayline.example");
         // The same request made twice makes one customer: the same key, which
         // does not spell the address out.
@@ -203,7 +203,7 @@ class StripePaymentsTest {
         has(form, "payment_method=pm_1");
         has(form, "off_session=true");
         has(form, "confirm=true");
-        has(form, "description=Wayline%20ride");
+        has(form, "description=Wayline+ride");
         has(form, "metadata%5Bwayline_charge%5D=ride-77");
         // The key that makes a charge sent twice a charge made once.
         assertEquals("ride-77", script.keys.get(0));

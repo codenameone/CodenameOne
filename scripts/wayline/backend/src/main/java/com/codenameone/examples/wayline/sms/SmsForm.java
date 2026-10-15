@@ -20,31 +20,27 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.examples.wayline.geo;
+package com.codenameone.examples.wayline.sms;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 
-/// Percent-encodes text for a query string or a form body.
-public final class UrlText {
-    private static final char[] HEX = "0123456789ABCDEF".toCharArray();
-
-    private UrlText() {
+/// Builds an `application/x-www-form-urlencoded` body, which is what all three
+/// providers' send calls take.
+final class SmsForm {
+    private SmsForm() {
     }
 
-    /// Everything but the unreserved characters of RFC 3986 is escaped, as the
-    /// bytes of its UTF-8 form.
-    public static String encode(String text) throws IOException {
-        byte[] bytes = text.getBytes("UTF-8");
-        StringBuilder out = new StringBuilder(bytes.length + 16);
-        for (int iter = 0; iter < bytes.length; iter++) {
-            int b = bytes[iter] & 0xff;
-            if ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
-                    || b == '-' || b == '.' || b == '_' || b == '~') {
-                out.append((char) b);
-            } else {
-                out.append('%').append(HEX[b >> 4]).append(HEX[b & 0xf]);
+    /// Names and values in turn, each escaped as UTF-8.
+    static byte[] of(String... pairs) throws IOException {
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter + 1 < pairs.length; iter += 2) {
+            if (out.length() > 0) {
+                out.append('&');
             }
+            out.append(URLEncoder.encode(pairs[iter], "UTF-8")).append('=')
+                    .append(URLEncoder.encode(pairs[iter + 1], "UTF-8"));
         }
-        return out.toString();
+        return out.toString().getBytes("UTF-8");
     }
 }

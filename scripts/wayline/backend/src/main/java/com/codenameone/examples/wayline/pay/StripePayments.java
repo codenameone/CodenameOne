@@ -26,15 +26,24 @@ import com.codename1.backend.Json;
 import com.codename1.backend.Web;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.api.CardDto;
-import com.codenameone.examples.wayline.geo.UrlText;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /// Payments by Stripe, over its REST API. No SDK: five requests, form encoded,
 /// with the account's secret key as a bearer token.
+///
+/// **This is an untested stub.** It has never been run against a live Stripe
+/// account: the requests follow Stripe's published API, and the tests hold it
+/// to canned answers through [Transport], but nothing here has seen a real
+/// card, a bank asking its cardholder to approve a charge, or a refund settle.
+/// Treat it as a starting point, and run it against a Stripe test-mode key
+/// before any money depends on it.
+///
+/// Selected with `wayline.payments.provider=stripe`.
 ///
 /// - **A customer** is made the first time a rider adds a card.
 /// - **A card is added on Stripe's own page.** [#startCardSetup] opens a
@@ -100,8 +109,8 @@ public class StripePayments implements PaymentProvider {
     public void forgetCustomer(String customer) throws IOException {
         // Deleting a customer detaches its payment methods too. 404 is the
         // answer for one deleted by a request whose answer never arrived.
-        Reply reply = transport.send("DELETE", "/v1/customers/" + UrlText.encode(customer), null,
-                "");
+        Reply reply = transport.send("DELETE", "/v1/customers/"
+                + URLEncoder.encode(customer, "UTF-8"), null, "");
         if (reply.status != 404 && (reply.status < 200 || reply.status >= 300)) {
             throw new IOException("The payment processor answered " + reply.status
                     + " to deleting a customer");
@@ -128,7 +137,7 @@ public class StripePayments implements PaymentProvider {
     @Override
     public Card finishCardSetup(String customer, String reference, CardDto typed)
             throws IOException {
-        Map session = ask("GET", "/v1/checkout/sessions/" + UrlText.encode(reference)
+        Map session = ask("GET", "/v1/checkout/sessions/" + URLEncoder.encode(reference, "UTF-8")
                 + "?expand%5B%5D=setup_intent.payment_method", null, "");
         Object intent = session.get("setup_intent");
         Object method = intent instanceof Map ? ((Map) intent).get("payment_method") : null;
@@ -187,8 +196,8 @@ public class StripePayments implements PaymentProvider {
 
     @Override
     public String refundStatus(String refundReference) throws IOException {
-        return refundState(text(ask("GET", "/v1/refunds/" + UrlText.encode(refundReference),
-                null, null), "status"));
+        return refundState(text(ask("GET", "/v1/refunds/"
+                + URLEncoder.encode(refundReference, "UTF-8"), null, null), "status"));
     }
 
     /// Stripe's five refund states as three. `requires_action` waits on the
@@ -238,15 +247,17 @@ public class StripePayments implements PaymentProvider {
     }
 
     /// A form body from names and values in turn. Both are escaped: a name
-    /// such as `metadata[wayline_user]` has brackets in it.
+    /// such as `metadata[wayline_user]` has brackets in it. A space is written
+    /// as `+`, which a form body allows.
     static String form(String... pairs) throws IOException {
         StringBuilder out = new StringBuilder();
         for (int iter = 0; iter + 1 < pairs.length; iter += 2) {
             if (out.length() > 0) {
                 out.append('&');
             }
-            out.append(UrlText.encode(pairs[iter])).append('=')
-                    .append(UrlText.encode(pairs[iter + 1] == null ? "" : pairs[iter + 1]));
+            out.append(URLEncoder.encode(pairs[iter], "UTF-8")).append('=')
+                    .append(URLEncoder.encode(pairs[iter + 1] == null ? "" : pairs[iter + 1],
+                            "UTF-8"));
         }
         return out.toString();
     }

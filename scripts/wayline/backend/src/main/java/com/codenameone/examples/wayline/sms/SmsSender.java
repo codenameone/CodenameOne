@@ -30,8 +30,8 @@ public interface SmsSender {
     /// - `IOException`: when the message could not be handed to the provider
     void send(String phone, String text) throws IOException;
 
-    /// Whether a message really reaches a phone. False for the sender that only
-    /// logs, which is what lets a development server hand the code back to the
+    /// Whether a message really reaches a phone. False for the console sender used in
+    /// development, which is what lets a development server hand the code back to the
     /// app in place of the text message nobody is going to receive.
     boolean delivers();
 }
