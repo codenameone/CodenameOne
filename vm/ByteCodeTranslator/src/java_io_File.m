@@ -726,20 +726,58 @@ JAVA_BOOLEAN java_io_File_renameToImpl___java_lang_String_java_lang_String_R_boo
     }
 }
 
+/* The permission setters, as the JDK implements them on each platform: on POSIX
+   a chmod of the OWNER bit (File.setX(on) is setX(on, true)), and setReadOnly
+   clears every write bit. They used to answer false without touching the file,
+   so a file could never be locked on Linux or the clean target and everything
+   that relies on that (a move that must fail to delete its source, a read-only
+   cache) silently did something else. Found by the bulk conformance run.
+   Windows has only the read-only attribute, which _chmod sets: reading cannot be
+   taken away and there is no execute bit, so those answer whether the request
+   already holds, as the JDK does there. */
+static JAVA_BOOLEAN cn1FileSetMode(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, int which, JAVA_BOOLEAN on) {
+    const char* p;
+    struct stat st;
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    p = stringToUTF8(threadStateData, path);
+    if(p == NULL || stat(p, &st) != 0) return JAVA_FALSE;
+#ifdef _WIN32
+    if(which == 'w') {
+        return _chmod(p, on ? (_S_IREAD | _S_IWRITE) : _S_IREAD) == 0 ? JAVA_TRUE : JAVA_FALSE;
+    }
+    if(which == 'o') {
+        return _chmod(p, _S_IREAD) == 0 ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return on ? JAVA_TRUE : JAVA_FALSE;
+#else
+    {
+        mode_t mode = st.st_mode & 07777;
+        mode_t bit = which == 'r' ? S_IRUSR : which == 'x' ? S_IXUSR : which == 'w' ? S_IWUSR
+                : (S_IWUSR | S_IWGRP | S_IWOTH);
+        if(which == 'o' || !on) {
+            mode &= ~bit;
+        } else {
+            mode |= bit;
+        }
+        return chmod(p, mode) == 0 ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
+}
+
 JAVA_BOOLEAN java_io_File_setReadOnlyImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
-    return JAVA_FALSE; // Not implemented for POSIX here
+    return cn1FileSetMode(threadStateData, path, 'o', JAVA_FALSE);
 }
 
 JAVA_BOOLEAN java_io_File_setWritableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN writable) {
-    return JAVA_FALSE;
+    return cn1FileSetMode(threadStateData, path, 'w', writable);
 }
 
 JAVA_BOOLEAN java_io_File_setReadableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN readable) {
-    return JAVA_FALSE;
+    return cn1FileSetMode(threadStateData, path, 'r', readable);
 }
 
 JAVA_BOOLEAN java_io_File_setExecutableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN executable) {
-    return JAVA_FALSE;
+    return cn1FileSetMode(threadStateData, path, 'x', executable);
 }
 
 JAVA_BOOLEAN java_io_File_canReadImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {

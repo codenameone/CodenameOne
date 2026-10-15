@@ -689,8 +689,26 @@ public final class Files {
             if (!from.isDirectory()) {
                 throw new IOException("Could not move " + source + " to " + target);
             }
+            // The copy fallback must not run when the source cannot leave its
+            // directory: the JDK's rename fails there and touches nothing,
+            // while copying first left a full copy at the target and emptied
+            // the source of every entry that could be deleted.
+            File fromParent = from.getAbsoluteFile().getParentFile();
+            if (fromParent != null && !fromParent.canWrite()) {
+                throw new AccessDeniedException(source.toString());
+            }
             copyTree(from, to);
-            deleteTree(from);
+            try {
+                deleteTree(from);
+            } catch (IOException e) {
+                // Undo the copy, so a failed move leaves no second tree.
+                try {
+                    deleteTree(to);
+                } catch (IOException ignored) {
+                    // The original error is the one to report.
+                }
+                throw e;
+            }
         }
         return target;
     }

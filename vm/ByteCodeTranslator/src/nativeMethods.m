@@ -1995,6 +1995,12 @@ JAVA_DOUBLE java_lang_Math_floor___double_R_double(CODENAME_ONE_THREAD_STATE, JA
 }
 
 JAVA_DOUBLE java_lang_Math_max___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a, JAVA_DOUBLE b){
+    // Java semantics, not C's comparison: NaN wins over any value, and
+    // -0.0 is smaller than 0.0 although the two compare equal. A plain
+    // comparison answered the other operand for both (found by the bulk
+    // conformance run, through DoubleStream.min/max).
+    if(a != a) return a;
+    if(a == 0 && b == 0) return signbit(a) ? b : a;
     if(a > b) return a;
     return b;
 }
@@ -2004,6 +2010,9 @@ JAVA_DOUBLE java_lang_Math_pow___double_double_R_double(CODENAME_ONE_THREAD_STAT
 }
 
 JAVA_FLOAT java_lang_Math_max___float_float_R_float(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT a, JAVA_FLOAT b){
+    // See max(double, double).
+    if(a != a) return a;
+    if(a == 0 && b == 0) return signbit(a) ? b : a;
     if(a > b) return a;
     return b;
 }
@@ -2019,11 +2028,17 @@ JAVA_LONG java_lang_Math_max___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_
 }
 
 JAVA_DOUBLE java_lang_Math_min___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a, JAVA_DOUBLE b){
+    // See max(double, double).
+    if(a != a) return a;
+    if(a == 0 && b == 0) return signbit(a) ? a : b;
     if(a < b) return a;
     return b;
 }
 
 JAVA_FLOAT java_lang_Math_min___float_float_R_float(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT a, JAVA_FLOAT b){
+    // See max(double, double).
+    if(a != a) return a;
+    if(a == 0 && b == 0) return signbit(a) ? a : b;
     if(a < b) return a;
     return b;
 }
@@ -3356,8 +3371,21 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     data->ownerThread = 0;
     data->counter = 0;
 
+    // INTERRUPTION. Publish the object before reading the status, and read the
+    // status with the monitor mutex still held: java_lang_Thread_interrupt0__
+    // stores the status before it reads waitingOn, so either this read sees the
+    // interrupt and the thread never blocks, or the interrupter sees the object
+    // and broadcasts its condition -- which it does only once it holds this mutex
+    // or has seen another thread own the monitor, i.e. once pthread_cond_wait
+    // below has released it. A wakeup can therefore not fall between the check
+    // and the wait. Both sides are sequentially consistent for that argument.
+    __atomic_store_n(&threadStateData->waitingOn, obj, __ATOMIC_SEQ_CST);
+    JAVA_BOOLEAN interruptedBeforeWait = __atomic_load_n(&threadStateData->interrupted, __ATOMIC_SEQ_CST);
+
     int errCode = 0;
-    if(timeout == 0 && nanos == 0) {
+    if(interruptedBeforeWait) {
+        // already interrupted: the JDK throws without waiting
+    } else if(timeout == 0 && nanos == 0) {
         errCode = pthread_cond_wait(&data->__codenameOneCondition, &data->__codenameOneMutex);
         if(errCode != 0) {
             printf("Error with wait %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", errCode, EINVAL, ETIMEDOUT, EPERM);
@@ -3408,12 +3436,22 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
 
+    __atomic_store_n(&threadStateData->waitingOn, JAVA_NULL, __ATOMIC_SEQ_CST);
+
     // restore the ownership of the thread
     data->ownerThread = CN1_MONITOR_SELF();
     data->counter = counter;
     
     threadStateData->threadActive = JAVA_TRUE;
     //printf("Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
+
+    // An interrupted wait throws once the monitor is owned again, and clears
+    // the status, as the JDK's does. The exception comes from Thread so that
+    // this file names no class a translated application might not keep.
+    if(__atomic_load_n(&threadStateData->interrupted, __ATOMIC_SEQ_CST)) {
+        threadStateData->interrupted = JAVA_FALSE;
+        throwException(threadStateData, java_lang_Thread_newInterruptedException___R_java_lang_InterruptedException(threadStateData));
+    }
 }
 
 JAVA_VOID java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
@@ -3516,11 +3554,10 @@ JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG
     // deadline and resume across early wakeups. Chunked below 1s because POSIX
     // allows usleep() to reject arguments >= 1000000 outright (EINVAL on musl),
     // which silently turned long sleeps into no-ops on those libcs.
-    // INTERRUPT SEMANTICS UNCHANGED: this VM has never delivered
-    // InterruptedException from sleep (interrupt() only sets the flag), so the
-    // resume loop deliberately does NOT exit early on it -- waking without the
-    // exception would be a third behavior, neither historical nor Java's.
-    // Proper interrupt delivery is a separate change.
+    // INTERRUPTION: the loop ends as soon as the thread's interrupt status is
+    // set, and Thread.sleep -- the Java caller -- turns that into the
+    // InterruptedException the JDK throws. interrupt0 cannot wake a usleep, so
+    // an interrupt is seen within one chunk; the chunk is 50ms for that reason.
     // Saturate instead of overflowing: Thread.sleep(Long.MAX_VALUE) is a real
     // "park this thread" idiom, and millis * 1000 would wrap negative and make
     // it return immediately.
@@ -3529,12 +3566,15 @@ JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG
     JAVA_LONG deltaMicros = (millis > maxMicros / 1000) ? maxMicros : millis * 1000;
     JAVA_LONG deadline = (deltaMicros > maxMicros - now) ? maxMicros : now + deltaMicros;
     for(;;) {
+        if(__atomic_load_n(&threadStateData->interrupted, __ATOMIC_SEQ_CST)) {
+            break;
+        }
         JAVA_LONG remainMicros = deadline - cn1SleepNowMicros();
         if(remainMicros <= 0) {
             break;
         }
-        if(remainMicros > 500000) {
-            remainMicros = 500000;
+        if(remainMicros > 50000) {
+            remainMicros = 50000;
         }
         // JAVA_INT cast, not useconds_t: the MSVC/clang-cl target's cn1_win_compat
         // usleep shim has no useconds_t typedef (same reason the old code cast here)
@@ -3686,16 +3726,56 @@ JAVA_LONG java_lang_Thread_getNativeThreadId___R_long(CODENAME_ONE_THREAD_STATE)
     return currentThreadId();
 }
 
+// Sets the status and, when the thread is in Object.wait, wakes it (the waiter
+// throws InterruptedException; see java_lang_Object_wait___long_int for the
+// ordering argument). Thread.sleep notices the status by itself.
+//
+// The wake broadcasts the waited-on object's condition, which is safe from a
+// lost wakeup only once the waiter has released the monitor mutex inside
+// pthread_cond_wait. That is known when this thread can take the mutex, or when
+// some OTHER thread owns the monitor (it could only have entered after the waiter
+// released it). Neither is ever waited for while holding the critical section:
+// a thread inside synchronized(obj) may itself be about to lock it (starting a
+// thread, say), so blocking on obj's mutex here could deadlock. Hence trylock,
+// and a short back-off with the critical section released, which also keeps the
+// monitor data alive: the waiter clears waitingOn before it returns, and the
+// object cannot be collected while it is still waiting on it.
 JAVA_VOID java_lang_Thread_interrupt0__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {
-    lockCriticalSection();
-    for(int i=0; i<NUMBER_OF_SUPPORTED_THREADS; i++) {
-        struct ThreadLocalData* d = allThreads[i];
-        if(d && d->currentThreadObject == me) {
-            d->interrupted = JAVA_TRUE;
-            break;
+    for(int attempt = 0 ; ; attempt++) {
+        JAVA_BOOLEAN retry = JAVA_FALSE;
+        lockCriticalSection();
+        for(int i=0; i<NUMBER_OF_SUPPORTED_THREADS; i++) {
+            struct ThreadLocalData* d = allThreads[i];
+            if(d && d->currentThreadObject == me) {
+                __atomic_store_n(&d->interrupted, JAVA_TRUE, __ATOMIC_SEQ_CST);
+                JAVA_OBJECT waitingOn = __atomic_load_n(&d->waitingOn, __ATOMIC_SEQ_CST);
+                if(waitingOn != JAVA_NULL && d != threadStateData) {
+                    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(waitingOn);
+                    if(data != 0) {
+                        if(pthread_mutex_trylock(&data->__codenameOneMutex) == 0) {
+                            pthread_cond_broadcast(&data->__codenameOneCondition);
+                            pthread_mutex_unlock(&data->__codenameOneMutex);
+                        } else if(data->ownerThread != 0 || attempt >= 2000) {
+                            // Another thread owns the monitor, so the waiter is
+                            // inside pthread_cond_wait (or already awake). The
+                            // attempt bound is a last resort that cannot be
+                            // reached by the protocol: every holder of the mutex
+                            // with no owner recorded is between two statements.
+                            pthread_cond_broadcast(&data->__codenameOneCondition);
+                        } else {
+                            retry = JAVA_TRUE;
+                        }
+                    }
+                }
+                break;
+            }
         }
+        unlockCriticalSection();
+        if(!retry) {
+            return;
+        }
+        usleep(50);
     }
-    unlockCriticalSection();
 }
 
 JAVA_BOOLEAN java_lang_Thread_isInterrupted___boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_BOOLEAN clear) {
@@ -3724,48 +3804,29 @@ JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(
     int length = java_lang_String_length___R_int(threadStateData, s);
     JAVA_ARRAY arrayData = (JAVA_ARRAY)java_lang_String_toCharNoCopy___R_char_1ARRAY(threadStateData, s);
     JAVA_ARRAY_CHAR* chrs = CN1_ARRAY_DATA(arrayData);
-    char data[length + 1];
+    // The exponent is handed to strtod with the digits, so the value is
+    // rounded once, correctly, and strtod itself answers HUGE_VAL or 0 past
+    // the range. Scaling afterwards rounded at every step and, for a positive
+    // exponent past 18, DIVIDED by ten where it meant to multiply: 1e40 parsed
+    // as 1.0E-4 and 1.5E400 as 0.0. The digits are ASCII only (StringToReal
+    // has already taken off the sign, the point and the exponent), so the
+    // locale's decimal separator never matters here. Issue #3250 (a long
+    // accumulator overflowing past 18 digits) cannot recur: there is none.
+    char data[length + 16];
     for(int iter = 0 ; iter < length ; iter++) {
         data[iter] = (char)chrs[iter];
     }
     data[length] = 0;
     char *err;
-    JAVA_DOUBLE db = strtod(data, &err);
+    strtod(data, &err);
     if (data == err) {
         JAVA_OBJECT numberFormatException = java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(threadStateData, s, JAVA_TRUE);
         throwException(threadStateData,numberFormatException);
     }
-    JAVA_LONG exp = 1;
     if(e != 0) {
-        if(e < 0) {
-            while (e < -18) {
-                // Long accumulator will overflow past 18 digits so we do
-                // floating point math until we get there.
-                // fixes https://github.com/codenameone/CodenameOne/issues/3250
-                e++;
-                db /= 10;
-            }
-            while(e < 0) {
-                e++;
-                exp *= 10;
-            }
-            db /= exp;
-        } else {
-            while (e > 18) {
-                // Long accumulator will overflow past 18 digits so we do
-                // floating point math until we get there.
-                // fixes https://github.com/codenameone/CodenameOne/issues/3250
-                e--;
-                db /= 10;
-            }
-            while(e > 0) {
-                e--;
-                exp *= 10;
-            }
-            db *= exp;
-        }
+        snprintf(data + length, 16, "e%d", (int)e);
     }
-    return db;
+    return strtod(data, NULL);
 }
 
 void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {

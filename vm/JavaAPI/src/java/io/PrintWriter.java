@@ -82,7 +82,15 @@ public class PrintWriter extends Writer {
         if (csn == null) {
             throw new NullPointerException("charsetName");
         }
-        "".getBytes(csn);
+        // Asked of Charset, not of String.getBytes: on ParparVM the string
+        // natives fall back to a default encoding for a name they do not know
+        // rather than throwing, so that check let every name through.
+        try {
+            java.nio.charset.Charset.forName(csn);
+        } catch (IllegalArgumentException e) {
+            // UnsupportedCharsetException and IllegalCharsetNameException.
+            throw new UnsupportedEncodingException(csn);
+        }
         return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), csn));
     }
 

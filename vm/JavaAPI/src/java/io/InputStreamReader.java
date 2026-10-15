@@ -70,8 +70,11 @@ public class InputStreamReader extends java.io.Reader{
      * - If the named encoding is not supported
      */
     public InputStreamReader(java.io.InputStream is, java.lang.String enc) throws java.io.UnsupportedEncodingException{
+         if (enc == null) {
+             throw new NullPointerException("charsetName");
+         }
          internal = is;
-         this.enc = enc.intern();
+         this.enc = OutputStreamWriter.knownEncoding(enc);
     }
 
     /// An InputStreamReader that decodes with `cs`.

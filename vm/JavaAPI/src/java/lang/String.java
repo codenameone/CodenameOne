@@ -246,7 +246,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, off, len, enc));
+        this(bytesToChars(bytes, off, len, knownEncoding(enc)));
     }
     
     /// Decodes `bytes` with `charset`. Unlike the constructor taking a
@@ -262,7 +262,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, 0, bytes.length, enc));
+        this(bytesToChars(bytes, 0, bytes.length, knownEncoding(enc)));
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 
@@ -669,6 +669,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
+        enc = knownEncoding(enc);
         if(isLatin1()) {
             byte[] compact = compactBytes(enc);
             if(compact != null) return compact;
@@ -685,6 +686,37 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return charsToBytes(toCharArray(), enc.toCharNoCopy()); 
     }
     
+    /// The name the encoding natives know `enc` by: the canonical name of a
+    /// charset, so an alias or another case reaches them as the name they
+    /// compare with. `null` stays `null`, which they read as UTF-8.
+    ///
+    /// UTF-16 and ISO-8859-2 have no `Charset` here but the natives encode them
+    /// on Apple platforms, so they are names this runtime knows.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedEncodingException`: for a name this runtime has no
+    ///   encoding for, as the JDK throws. The natives used to encode such a
+    ///   name as UTF-8 without a word.
+    private static String knownEncoding(String enc) throws java.io.UnsupportedEncodingException {
+        if (enc == null || "UTF-8".equals(enc)) {
+            return enc;
+        }
+        if (enc.equalsIgnoreCase("UTF-16") || enc.equalsIgnoreCase("UTF16")) {
+            return "UTF-16";
+        }
+        if (enc.equalsIgnoreCase("ISO-8859-2") || enc.equalsIgnoreCase("ISO8859-2")
+                || enc.equalsIgnoreCase("ISO8859_2") || enc.equalsIgnoreCase("LATIN2")) {
+            return "ISO-8859-2";
+        }
+        try {
+            return Charset.forName(enc).name();
+        } catch (IllegalArgumentException e) {
+            // UnsupportedCharsetException and IllegalCharsetNameException
+            throw new java.io.UnsupportedEncodingException(enc);
+        }
+    }
+
     /// The string encoded with `charset`. Unlike `getBytes(String)`, this
     /// throws no checked exception, as in the JDK.
     public byte[] getBytes(Charset charset) {

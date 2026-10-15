@@ -148,3 +148,18 @@ The file is distributed under the GNU General Public License version 2 with the
 "Classpath" exception, the license of Codename One itself (see LICENSE):
 
   Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+
+================================================================================
+FloatingDecimal digit generation
+================================================================================
+
+The class java.text.LegacyDoubleDigits, in vm/JavaAPI/src/java/text and
+Ports/CLDC11/src/java/text, is a rewrite of the digit generation in OpenJDK's
+sun.misc.FloatingDecimal (BinaryToASCIIBuffer.dtoa) and the FDBigInteger
+arithmetic it uses, reduced to what java.text.DecimalFormat needs so that the
+class formats a double with the digits the JDK's DecimalFormat produces. The
+file is distributed under the GNU General Public License version 2 with the
+"Classpath" exception, the license of Codename One itself (see LICENSE), and
+keeps OpenJDK's notice:
+
+  Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.

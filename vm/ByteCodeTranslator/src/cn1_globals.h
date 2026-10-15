@@ -2092,6 +2092,10 @@ struct ThreadLocalData {
     int utf8BufferSize;
     JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
     JAVA_BOOLEAN interrupted;
+    // The object this thread is blocked on in Object.wait, or JAVA_NULL. Written
+    // by the waiter with the object's monitor mutex held, read by Thread.interrupt
+    // (java_lang_Thread_interrupt0__), which wakes the wait through it.
+    JAVA_OBJECT waitingOn;
 
     // Dead-thread pending-migration queue (single-writer allObjectsInHeap):
     // markDeadThread queues the dying thread's TLD (critical section held)

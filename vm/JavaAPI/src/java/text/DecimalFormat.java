@@ -176,68 +176,24 @@ public class DecimalFormat extends NumberFormat {
             trim();
         }
 
-        /// Takes the shortest decimal text that identifies a finite,
-        /// non-negative `double`, as `Double.toString` writes it: digits with
-        /// a decimal point, and an optional exponent.
+        /// Takes the digits of a finite, non-negative `double` as the JDK's
+        /// `DecimalFormat` sees them. Those are NOT the shortest digits
+        /// `Double.toString` writes (`1.0E23` is `9.999999999999999E22`
+        /// here); see `LegacyDoubleDigits` for why.
         void setDouble(double value) {
-            String s = Double.toString(value);
-            int exponent = 0;
-            int e = s.indexOf('E');
-            if (e < 0) {
-                e = s.indexOf('e');
-            }
-            int end = s.length();
-            if (e >= 0) {
-                exponent = parseExponent(s, e + 1);
-                end = e;
-            }
             count = 0;
-            int pointAt = -1;
-            int seen = 0;
-            boolean leading = true;
-            int leadingZerosAfterPoint = 0;
-            for (int i = 0; i < end; i++) {
-                char c = s.charAt(i);
-                if (c == '.' || c == ',') {
-                    // Some ports write the device locale's decimal comma.
-                    pointAt = seen;
-                    continue;
-                }
-                if (c < '0' || c > '9') {
-                    continue;
-                }
-                if (leading && c == '0') {
-                    if (pointAt >= 0) {
-                        leadingZerosAfterPoint++;
-                    }
-                    continue;
-                }
-                leading = false;
-                append(c);
-                seen++;
+            decimalAt = 0;
+            // Zero has no digits. So does NaN, which reaches here from an
+            // infinity times a multiplier of zero.
+            if (!(value > 0.0)) {
+                return;
             }
-            if (pointAt < 0) {
-                pointAt = seen;
+            LegacyDoubleDigits converted = new LegacyDoubleDigits(value);
+            for (int i = 0; i < converted.count; i++) {
+                append(converted.digits[converted.first + i]);
             }
-            decimalAt = pointAt - leadingZerosAfterPoint + exponent;
+            decimalAt = converted.decExponent;
             trim();
-        }
-
-        private static int parseExponent(String s, int from) {
-            boolean negative = false;
-            int i = from;
-            if (i < s.length() && (s.charAt(i) == '-' || s.charAt(i) == '+')) {
-                negative = s.charAt(i) == '-';
-                i++;
-            }
-            int value = 0;
-            for (; i < s.length(); i++) {
-                char c = s.charAt(i);
-                if (c >= '0' && c <= '9') {
-                    value = value * 10 + (c - '0');
-                }
-            }
-            return negative ? -value : value;
         }
 
         /// Multiplies by a positive integer.
@@ -926,6 +882,18 @@ public class DecimalFormat extends NumberFormat {
                 sb.append('0');
             }
             longResult = Long.parseLong(sb.toString());
+        } else if (decimalAt > 309) {
+            // At least ten to the 309th, past Double.MAX_VALUE: the JDK
+            // answers an infinity. Settled here rather than handed to
+            // Double.parseDouble, which on some ports answers 0.0 for an
+            // exponent this large.
+            gotDouble = true;
+            doubleResult = positive ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        } else if (decimalAt < -323) {
+            // Below ten to the -324th, under half of Double.MIN_VALUE: the
+            // JDK answers a zero of the parsed sign.
+            gotDouble = true;
+            doubleResult = positive ? 0.0 : -0.0;
         } else {
             gotDouble = true;
             StringBuilder sb = new StringBuilder();

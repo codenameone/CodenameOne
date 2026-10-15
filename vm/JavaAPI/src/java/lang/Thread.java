@@ -376,10 +376,27 @@ public class Thread implements java.lang.Runnable{
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
+        // An interrupt that is pending, or that arrives while the thread
+        // sleeps, ends the sleep with InterruptedException and clears the
+        // status, as the JDK does. The native returns early when the status
+        // is set; the JavaScript runtime's throws by itself.
+        if (interrupted()) {
+            throw new InterruptedException();
+        }
         sleepImpl(millis);
+        if (interrupted()) {
+            throw new InterruptedException();
+        }
     }
 
     private static native void sleepImpl(long millis);
+
+    /// The exception the native `Object.wait` throws when the waiting thread
+    /// is interrupted. Called from `nativeMethods.m`, which is what keeps it
+    /// (and the exception class) in a translated application.
+    private static InterruptedException newInterruptedException() {
+        return new InterruptedException();
+    }
 
     public static void sleep(long millis, int nanos) throws java.lang.InterruptedException {
         if (millis < 0) {

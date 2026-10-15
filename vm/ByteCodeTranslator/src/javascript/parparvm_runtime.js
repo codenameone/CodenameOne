@@ -5451,6 +5451,17 @@ bindNative([
   "cn1_java_lang_Object_wait_long_int",
   "cn1_java_lang_Object_wait___long_int"
 ], function*(__cn1ThisObject, timeout, nanos) {
+  // A thread already interrupted throws without waiting, as the JDK's does
+  // (and as the native wait in nativeMethods.m does). The monitor must still
+  // be owned, which waitOn would otherwise have checked.
+  const current = jvm.currentThread;
+  if (current && current.object && current.object.__interrupted) {
+    const monitor = __cn1ThisObject.__monitor;
+    if (!monitor || monitor.owner !== current.id) {
+      throw new Error("IllegalMonitorStateException");
+    }
+    yield* throwInterruptedException();
+  }
   const resumed = yield jvm.waitOn(jvm.currentThread, __cn1ThisObject, timeout || 0);
   if (resumed && resumed.interrupted) {
     yield* throwInterruptedException();
@@ -5939,11 +5950,15 @@ bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_doub
   // The previous implementation returned Number("14")=14, which was the root
   // cause of the huge Switch pills and any other CN1 path that uses fractional
   // theme constants / scale factors. Apply the exponent.
+  // The exponent goes into the text, so Number rounds once, correctly, and
+  // reaches Infinity or 0 itself: multiplying by Math.pow(10, exp) rounded
+  // twice (14 * 0.1 is 1.4000000000000001) and overflowed the power before
+  // the digits could bring it back into range.
   const text = jvm.toNativeString(value);
-  const parsed = Number(text);
-  if (isNaN(parsed)) return 0;
   const exp = exponentIndex | 0;
-  return exp === 0 ? parsed : parsed * Math.pow(10, exp);
+  const parsed = Number(exp === 0 ? text : text + "e" + exp);
+  if (isNaN(parsed)) return 0;
+  return parsed;
 });
 bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function(enumType, name) {
   if (!enumType || !enumType.__classDef) {

@@ -400,3 +400,7 @@ vm/JavaAPI/src/java/util/Iterator.java | Apache Harmony source retaining its ori
 vm/JavaAPI/src/java/util/List.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Map.java | Apache Harmony source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Set.java | Apache Harmony source retaining its original Apache-2.0 notice
+# Rewrite of OpenJDK's FloatingDecimal digit generation (see NOTICE), keeping the Oracle notice verbatim.
+vm/JavaAPI/src/java/text/LegacyDoubleDigits.java | Rewrite of OpenJDK sun.misc.FloatingDecimal.BinaryToASCIIBuffer.dtoa and FDBigInteger (Oracle GPLv2 + Classpath exception), retaining the original Oracle notice; recorded in NOTICE
+Ports/CLDC11/src/java/text/LegacyDoubleDigits.java | Rewrite of OpenJDK sun.misc.FloatingDecimal.BinaryToASCIIBuffer.dtoa and FDBigInteger (Oracle GPLv2 + Classpath exception), retaining the original Oracle notice; recorded in NOTICE
+vm/JavaAPI/src/java/util/Random.java | Apache Harmony source under the Apache License 2.0, retaining its original ASF notice
