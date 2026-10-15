@@ -1348,11 +1348,16 @@ Then put the push key the Console shows for the app in `AppConfig.PUSH_APP_KEY`,
 and configure each platform's credentials in the Console as
 <<push-notifications-section>> describes.
 
-IMPORTANT: The Android build needs the app's push configuration before it
-builds at all: `google-services.json` from Firebase, `agconnect-services.json`
-from Huawei, or both, in the Android native files as
-<<push-notifications-section>> describes. Because the app uses `PushClient`,
-an Android build without either stops with an error that names the two files. A server that's missing a setting
+IMPORTANT: Push on Android starts switched off, so the generated project
+builds for Android before you have a Firebase project. An app that uses
+`PushClient` needs `google-services.json` from Firebase,
+`agconnect-services.json` from Huawei, or both, in the Android native files
+as <<push-notifications-section>> describes, and the build stops with an
+error without them. Until then `codenameone_settings.properties` carries
+`codename1.arg.android.messagingService=none`, which builds the app without
+push. Add the file and delete that line, and Android gets notifications too.
+
+A server that's missing a setting
 still starts and serves rides; the sender it gets instead, `MisconfiguredPushSender`,
 logs a `[config]` line naming the setting when the server starts and again for
 every notification it can't send. `CloudPushSender` sends on a thread of its own,
