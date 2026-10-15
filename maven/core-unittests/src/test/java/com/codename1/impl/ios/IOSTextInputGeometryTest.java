@@ -35,9 +35,18 @@ class IOSTextInputGeometryTest extends UITestBase {
         int[] bounds;
         int sequence;
         String text;
+        boolean deferPublication;
+        final java.util.List<Integer> captures = new java.util.ArrayList<Integer>();
+        void publish(int captureId) {
+            if (deferPublication) {
+                captures.add(captureId);
+            } else {
+                IOSImplementation.tiPublishGeometry(captureId, true);
+            }
+        }
         @Override void startTextInput(int constraint, boolean correct, boolean caps, boolean multi,
-                String text, int start, int end, int action) { }
-        @Override void updateTextInputState(String text, int start, int end, int x, int y, int w, int h, int seq) { sequence = seq; this.text = text; }
+                String text, int start, int end, int action, int captureId) { publish(captureId); }
+        @Override void updateTextInputState(String text, int start, int end, int x, int y, int w, int h, int seq, int captureId) { sequence = seq; this.text = text; publish(captureId); }
         @Override void setTextInputBounds(int x, int y, int w, int h) { bounds = new int[]{x, y, w, h}; }
         @Override void stopTextInput() { }
         @Override public boolean isAsyncEditMode() { return false; }
@@ -55,6 +64,59 @@ class IOSTextInputGeometryTest extends UITestBase {
         @Override public void scrollRectToVisible(int x, int y, int w, int h, Component space) {
             revealCount++;
             super.scrollRectToVisible(x, y, w, h, space);
+        }
+    }
+
+    @FormTest
+    void geometryWaitsForItsMatchingNativeShadowAndDropsClosedSessions() {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        NativeStub nativeStub = new NativeStub();
+        Port port = new Port();
+        Client client = new Client();
+        try {
+            IOSImplementation.nativeInstance = nativeStub;
+            IOSImplementation.instance = port;
+            client.setWidth(400);
+            client.setHeight(100);
+            client.setText("old document");
+            port.startTextInput(client, client.getConfig());
+            int[] oldRect = IOSImplementation.tiRectForOffset(3);
+            nativeStub.deferPublication = true;
+            client.setText("new document with a different layout");
+            client.setY(80);
+            port.updateTextInputState(client, client.getEditingState());
+            int first = nativeStub.captures.get(nativeStub.captures.size() - 1);
+            int[] firstRect = client.rectForOffset(3);
+            assertArrayEquals(oldRect, IOSImplementation.tiRectForOffset(3),
+                    "EDT capture must not replace geometry while the native shadow is still old");
+            assertEquals("old document", IOSImplementation.tiTextRange(0, 100));
+            client.setText("second update");
+            client.setY(160);
+            port.paintDirty();
+            int second = nativeStub.captures.get(nativeStub.captures.size() - 1);
+            IOSImplementation.tiPublishGeometry(first, true);
+            assertArrayEquals(firstRect, IOSImplementation.tiRectForOffset(3),
+                    "each queued native update must publish its own capture, not the latest EDT paint");
+            assertEquals("new document with a different layout", IOSImplementation.tiTextRange(0, 100));
+            IOSImplementation.tiPublishGeometry(second, false);
+            assertEquals(0, IOSImplementation.tiSelectionRects(0, 3).length,
+                    "a rejected native echo must not expose geometry for a different shadow");
+            port.updateTextInputState(client, client.getEditingState());
+            int stale = nativeStub.captures.get(nativeStub.captures.size() - 1);
+            port.stopTextInput(client);
+            nativeStub.deferPublication = false;
+            client.setText("replacement session");
+            client.setY(240);
+            port.startTextInput(client, client.getConfig());
+            int[] replacementRect = IOSImplementation.tiRectForOffset(3);
+            IOSImplementation.tiPublishGeometry(stale, true);
+            assertArrayEquals(replacementRect, IOSImplementation.tiRectForOffset(3));
+            assertEquals("replacement session", IOSImplementation.tiTextRange(0, 100));
+        } finally {
+            port.stopTextInput(client);
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
         }
     }
 

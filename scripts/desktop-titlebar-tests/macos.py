@@ -10,6 +10,9 @@ root = pathlib.Path(__file__).resolve().parents[2]
 source = (root / "Ports/MacPort/nativeSources/CN1MacChrome.m").read_text()
 start = source.index("static int cn1TitleInsets[5];")
 end = source.index("void CN1MacHostSetWindowUndecorated", start)
+delegate = (root / "Ports/MacPort/nativeSources/CN1MacAppDelegate.m").read_text()
+reopen_start = delegate.index("- (BOOL)applicationShouldHandleReopen:")
+reopen_end = delegate.index("/// Quitting with the last window", reopen_start)
 harness = r'''
 #import <AppKit/AppKit.h>
 #include <assert.h>
@@ -22,12 +25,29 @@ typedef struct { int length; int data[5]; } Array;
 @interface CN1MacHost : NSObject
 @property(nonatomic, strong) NSWindow* window;
 @property(nonatomic, strong) NSView* renderingView;
+- (NSWindow*)builtWindow;
 + (instancetype)sharedHost;
 @end
 @implementation CN1MacHost
+- (NSWindow*)builtWindow { return self.window; }
 + (instancetype)sharedHost { static CN1MacHost* h; if (!h) h = [CN1MacHost new]; return h; }
 @end
 PRODUCTION
+@interface ReopenWindow : NSWindow
+@property(nonatomic) BOOL testMiniaturized;
+@property(nonatomic) int restored;
+@property(nonatomic) int shown;
+@end
+@implementation ReopenWindow
+- (BOOL)isMiniaturized { return self.testMiniaturized; }
+- (void)deminiaturize:(id)sender { self.testMiniaturized = NO; self.restored++; }
+- (void)makeKeyAndOrderFront:(id)sender { self.shown++; }
+@end
+@interface ReopenDelegate : NSObject
+@end
+@implementation ReopenDelegate
+/*REOPEN*/
+@end
 int main(void) {
     @autoreleasepool {
         [NSApplication sharedApplication];
@@ -51,10 +71,23 @@ int main(void) {
             [host.window standardWindowButton:type.integerValue].hidden = YES;
         cn1MacUpdateTitleInsets();
         assert(cn1TitleInsets[0] == 0 && cn1TitleInsets[4] == 0);
-        puts("APPKIT_TITLEBAR_INSETS_OK");
+        ReopenWindow* window = [[ReopenWindow alloc] initWithContentRect:NSMakeRect(0,0,100,100)
+                styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+        host.window = window;
+        ReopenDelegate* delegate = [ReopenDelegate new];
+        assert(![delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:NO]);
+        assert(window.shown == 1);
+        assert([delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:YES]);
+        assert(window.shown == 1);
+        window.testMiniaturized = YES;
+        assert(![delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:YES]);
+        assert(window.shown == 2 && window.restored == 1);
+        host.window = nil;
+        assert([delegate applicationShouldHandleReopen:NSApp hasVisibleWindows:NO]);
+        puts("APPKIT_TITLEBAR_INSETS_AND_REOPEN_OK");
     }
 }
-'''.replace("PRODUCTION", source[start:end])
+'''.replace("PRODUCTION", source[start:end]).replace("/*REOPEN*/", delegate[reopen_start:reopen_end])
 with tempfile.TemporaryDirectory(prefix="cn1-titlebar-appkit-") as directory:
     path = pathlib.Path(directory)
     (path / "test.m").write_text(harness)

@@ -51,9 +51,9 @@
 
 /// Replaces the shadow mirror with the authoritative Java state (text + selection + caret rect in
 /// screen pixels) without echoing the change back to Java. `seq` is the generation of the last
-/// native edit the Java side had applied when it pushed this state; a stale seq only refreshes
-/// the caret geometry.
-- (void)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
+/// native edit the Java side had applied when it pushed this state. Returns YES only when
+/// the shadow matches this capture, so its geometry can be published on the same main queue.
+- (BOOL)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
           caretRect:(CGRect)caretPixels seq:(NSInteger)seq;
 
 /// Clears any leftover IME composition state; called when a session starts or stops so a stale marked

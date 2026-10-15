@@ -85,6 +85,10 @@ static void cn1TitleEnable(gboolean enabled) {
         gtk_container_add(GTK_CONTAINER(overlay), cn1TitleCanvas);
         cn1TitleFixed = gtk_fixed_new();
         gtk_overlay_add_overlay(GTK_OVERLAY(overlay), cn1TitleFixed);
+        // Pass through only the empty host. GDK still hit-tests non-pass-through
+        // child windows (GtkEntry, WebKit, etc.), so native peers keep pointer input.
+        // Disabling this would let the full-size host swallow blank caption gestures.
+        // https://docs.gtk.org/gdk3/method.Window.set_pass_through.html
         gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(overlay), cn1TitleFixed, TRUE);
         cn1TitleAccessibilityFixed = gtk_fixed_new();
         gtk_widget_set_opacity(cn1TitleAccessibilityFixed, 0.01);

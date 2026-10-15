@@ -135,6 +135,42 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void changingDragEligibilityRepaintsTheToolbarThatPublishesNativeRegions() {
+        desktopMode("custom");
+        Form form = new Form("Repaint regions");
+        Label title = new Label("Document title");
+        Toolbar toolbar = form.getToolbar();
+        toolbar.setTitleComponent(title);
+        form.show();
+        DisplayTest.flushEdt();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        int originalLength = implementation.getLastTitleBarRegions().length;
+        java.util.List<Object> repaints = new java.util.ArrayList<Object>();
+        implementation.recordRepaints(repaints);
+        try {
+            Toolbar.setTitleBarDragRegion(title, false);
+            assertTrue(repaints.contains(toolbar), "a child-only repaint leaves the native hit map stale");
+            toolbar.paint(graphics);
+            assertTrue(implementation.getLastTitleBarRegions().length > originalLength);
+            repaints.clear();
+            Toolbar.setTitleBarDragRegion(title, true);
+            assertTrue(repaints.contains(toolbar));
+            toolbar.paint(graphics);
+            assertEquals(originalLength, implementation.getLastTitleBarRegions().length);
+        } finally {
+            implementation.recordRepaints(null);
+        }
+    }
+
+    @FormTest
+    void resetClearsNativeTitleInsets() {
+        implementation.setNativeTitleBarInsets(10, 20, 3, 4, 30);
+        implementation.reset();
+        assertNull(implementation.getNativeWindowTitleBarInsets(null));
+    }
+
+    @FormTest
     void customTitleRegionsFollowResizeAndClearWhenToolbarIsRemoved() {
         desktopMode("custom");
         Form f = new Form("Document");

@@ -18,10 +18,10 @@ directory. No Maven repository is used by these harnesses.
 
 * **macOS:** requires Xcode command-line tools and AppKit. Checks actual native
   window-button geometry, backing scale, copied metric snapshots, and hidden
-  controls without launching a document editor.
+  controls, and handled/unhandled Dock reopen decisions without launching a document editor.
 * **Linux:** requires GCC, GTK 3 and Pango development headers, `pkg-config`,
   `xvfb-run`, Openbox, and `xdotool`. Checks left/right system decoration layouts,
-  title/body coordinates, interactive exclusions, native-peer reparenting,
+  title/body coordinates, interactive exclusions, native-peer click/focus/typing and reparenting,
   double-click maximize, mode switching, and the real GTK close button. This is
   X11 validation; acceptance under a Wayland compositor remains separate.
 * **Windows:** requires Clang, an x86_64 MinGW sysroot/linker, and Wine. Compiles

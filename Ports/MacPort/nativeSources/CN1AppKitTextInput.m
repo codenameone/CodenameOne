@@ -48,6 +48,8 @@ extern void com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(
 extern void com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT action);
 
+extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_INT captureId, JAVA_BOOLEAN accepted);
+
 /// Reports one replacement to the pure editor. No-op for the legacy path, whose
 /// edits travel as a whole-document stringEdit instead.
 void CN1MacTextInputNotifyReplace(NSRange range, NSString *text) {
@@ -290,6 +292,9 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
 }
 
 - (int)nextEditSeq {
+    if (self.pureEditor) {
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG 0, JAVA_FALSE);
+    }
     return ++editSeq;
 }
 
@@ -326,7 +331,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(
     session.editorBounds = CGRectMake(x, y, w, h);
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType, JAVA_INT captureId) {
     // autoCorrect / autoCapitalize / constraint have no AppKit equivalent for a
     // custom drawn surface: correction and capitalization are a system wide
     // input source behaviour rather than a per field one. They are accepted and
@@ -356,13 +361,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_
                                                 selStart:selStart
                                                   selEnd:selEnd
                                                multiline:multiline != 0];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
+    });
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_stopTextInput__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     [[CN1MacTextInputSession sharedSession] stop];
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq, JAVA_INT captureId) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     NSString *snapshot = text != JAVA_NULL
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG text) : nil;
@@ -374,6 +382,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!session.active || !session.pureEditor
                 || generation != [session currentSessionGeneration]) {
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
             return;
         }
         // The caret geometry is taken from every push, stale or not: it is where the
@@ -387,12 +396,14 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
         // the user has moved past, losing or misplacing what they typed. The UIKit
         // path drops the same echo for the same reason.
         if (seq != (JAVA_INT)[session currentEditSeq]) {
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
             return;
         }
         if (session.markedRange.location != NSNotFound) {
             // Mid composition the input method owns the text. Taking the
             // framework's copy back here would drop the marked run and make the
             // composition look like it did nothing.
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
             return;
         }
         if (snapshot != nil) {
@@ -402,6 +413,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
         NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
         NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
         session.selectedRange = NSMakeRange(start, end - start);
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
         [session completeEditorCommand:(int)seq];
     });
 }

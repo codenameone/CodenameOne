@@ -1565,6 +1565,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativeCommandsSupported = true;
         lastNativeCommands = null;
         lastTitleBarRegions = null;
+        nativeTitleBarInsets = null;
         clearFileSystem();
         clearSockets();
         clearConnections();

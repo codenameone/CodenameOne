@@ -2785,7 +2785,16 @@ public class Toolbar extends Container {
     /// @param dragRegion true for a passive background that can drag the window
     public static void setTitleBarDragRegion(Component component, boolean dragRegion) {
         component.putClientProperty("Toolbar.titleBarDragRegion", dragRegion ? Boolean.TRUE : Boolean.FALSE);
-        component.repaint();
+        Component ancestor = component;
+        while (ancestor != null && !(ancestor instanceof Toolbar)) {
+            ancestor = ancestor.getParent();
+        }
+        // Regions are published by Toolbar.paint(), not by a child's independent repaint.
+        if (ancestor != null) {
+            ancestor.repaint();
+        } else {
+            component.repaint();
+        }
     }
 
     private boolean isPassiveTitleBarComponent(Component component) {

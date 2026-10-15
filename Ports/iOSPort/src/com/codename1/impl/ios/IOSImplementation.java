@@ -1816,6 +1816,61 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// separate ParparVM thread, so reading the live document there would race edits).
     private static volatile com.codename1.ui.TextInputState tiSnapshot;
     private static volatile com.codename1.ui.TextInputGeometry tiGeometry;
+    // Retain each immutable capture until the matching native main-queue update consumes it.
+    // A newer EDT paint must not replace geometry still used by the native shadow document.
+    private static final java.util.Map<Integer, TextInputCapture> tiPendingCaptures =
+            new java.util.HashMap<Integer, TextInputCapture>();
+    private static int tiCaptureId;
+
+    private static class TextInputCapture {
+        private final com.codename1.ui.TextInputState state;
+        private final com.codename1.ui.TextInputGeometry geometry;
+
+        TextInputCapture(com.codename1.ui.TextInputState state, com.codename1.ui.TextInputClient client) {
+            this.state = state;
+            geometry = com.codename1.ui.TextInputGeometry.capture(client);
+        }
+    }
+
+    private static int queueTextInputCapture(com.codename1.ui.TextInputState state,
+            com.codename1.ui.TextInputClient client) {
+        TextInputCapture capture = new TextInputCapture(state, client);
+        synchronized (tiPendingCaptures) {
+            int id = ++tiCaptureId;
+            if (id == 0) {
+                id = ++tiCaptureId;
+            }
+            tiPendingCaptures.put(id, capture);
+            return id;
+        }
+    }
+
+    /// Native main-queue acknowledgement: publish only with the matching shadow state.
+    /// Rejected echoes discard their capture; callbacks from closed sessions are ignored.
+    public static void tiPublishGeometry(int captureId, boolean accepted) {
+        synchronized (tiPendingCaptures) {
+            if (captureId == 0) {
+                // A native edit has advanced the shadow ahead of any Java echo.
+                tiSnapshot = null;
+                tiGeometry = null;
+                return;
+            }
+            TextInputCapture capture = tiPendingCaptures.remove(captureId);
+            if (capture != null) {
+                tiSnapshot = accepted ? capture.state : null;
+                tiGeometry = accepted ? capture.geometry : null;
+            }
+        }
+    }
+
+    private static void clearTextInputCaptures() {
+        synchronized (tiPendingCaptures) {
+            tiPendingCaptures.clear();
+            tiSnapshot = null;
+            tiGeometry = null;
+        }
+    }
+
     private int[] tiBounds;
     /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
     /// with every state push so the native shadow can drop echoes that predate a newer local
@@ -1831,8 +1886,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
         tiClient = client;
         com.codename1.ui.TextInputState st = client.getEditingState();
-        tiSnapshot = st;
-        tiGeometry = com.codename1.ui.TextInputGeometry.capture(client);
+        clearTextInputCaptures();
+        int captureId = queueTextInputCapture(st, client);
         tiNativeSeq = 0;
         int constraint = config != null ? config.getConstraint() : 0;
         boolean autoCorrect = config == null || config.isAutoCorrect();
@@ -1840,9 +1895,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean multiline = config == null || config.isMultiline();
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
                 st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
-                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT);
+                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT, captureId);
         tiBounds = null;
-        refreshTextInputGeometry();
+        refreshTextInputBounds(client);
+        tiKeepNativeCallbacksAlive();
         return client;
     }
 
@@ -1855,10 +1911,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
-        tiSnapshot = state;
-        refreshTextInputGeometry();
+        int captureId = queueTextInputCapture(state, c);
+        refreshTextInputBounds(c);
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
-                r[0], r[1], r[2], r[3], tiNativeSeq);
+                r[0], r[1], r[2], r[3], tiNativeSeq, captureId);
         tiKeepNativeCallbacksAlive();
     }
 
@@ -1869,7 +1925,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (client == null) {
             return;
         }
-        tiGeometry = com.codename1.ui.TextInputGeometry.capture(client);
+        updateTextInputState(client, client.getEditingState());
+    }
+
+    private void refreshTextInputBounds(com.codename1.ui.TextInputClient client) {
         if (client instanceof Component) {
             Component component = (Component) client;
             int x = component.getAbsoluteX() + component.getScrollX();
@@ -1897,6 +1956,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private static void tiKeepNativeCallbacksAlive() {
         if (tiKeepAlive) {
+            tiPublishGeometry(0, false);
             tiCommit("", 0);
             tiSetComposing("", 0, 0);
             tiFinishComposing(0);
@@ -1923,8 +1983,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         tiClient = null;
-        tiSnapshot = null;
-        tiGeometry = null;
+        clearTextInputCaptures();
         tiBounds = null;
         nativeInstance.stopTextInput();
     }

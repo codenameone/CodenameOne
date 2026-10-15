@@ -125,6 +125,29 @@ int main(int argc, char** argv) {
     GtkWidget* edit = gtk_entry_new();
     cn1LinuxOverlayAdd(CN1_MAIN_WINDOW_SLOT, edit, right[0] + 5, right[2] + 5, 100, 22);
     assert(gtk_widget_get_parent(edit) == cn1TitleFixed);
+    settle();
+    // Use real pointer/key events: parentage alone cannot detect a pass-through host.
+    gtk_window_set_focus(GTK_WINDOW(cn1Window), NULL);
+    int editX, editY;
+    gtk_widget_translate_coordinates(edit, cn1TitleCanvas, 10, 10, &editX, &editY);
+    int canvasX, canvasY;
+    gdk_window_get_origin(gtk_widget_get_window(cn1TitleCanvas), &canvasX, &canvasY);
+    char input[200];
+    snprintf(input, sizeof(input), "xdotool mousemove %d %d click 1", canvasX + editX, canvasY + editY);
+    assert(g_spawn_command_line_sync(input, NULL, NULL, NULL, NULL));
+    settle();
+    assert(gtk_widget_has_focus(edit));
+    assert(g_spawn_command_line_sync("xdotool type native-title-input", NULL, NULL, NULL, NULL));
+    settle();
+    assert(!strcmp(gtk_entry_get_text(GTK_ENTRY(edit)), "native-title-input"));
+    // A blank portion of the same overlay must still reach the title canvas.
+    snprintf(input, sizeof(input), "xdotool mousemove %d %d click --repeat 2 --delay 80 1",
+            canvasX + 300, canvasY + 20);
+    assert(g_spawn_command_line_sync(input, NULL, NULL, NULL, NULL));
+    settle();
+    assert(gtk_window_is_maximized(GTK_WINDOW(cn1Window)));
+    gtk_window_unmaximize(GTK_WINDOW(cn1Window));
+    settle();
     cn1LinuxOverlayMove(CN1_MAIN_WINDOW_SLOT, edit, 20, cn1TitleHeight + 30, 100, 22);
     assert(gtk_widget_get_parent(edit) == cn1Fixed);
     cn1LinuxOverlayRemove(CN1_MAIN_WINDOW_SLOT, edit);

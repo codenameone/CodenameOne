@@ -882,6 +882,7 @@ extern void CN1MacRefreshModifiers(void);
             [window deminiaturize:nil];
         }
         [window makeKeyAndOrderFront:nil];
+        return NO; // Already handled; suppress AppKit's default untitled-document action.
     }
     return YES;
 }
