@@ -119,6 +119,12 @@ public class SimulatedPayments implements PaymentProvider {
     }
 
     @Override
+    public void detachCard(String customer, String token) throws IOException {
+        // Nothing is kept of a card here; its token is all there is, and the
+        // server deletes that.
+    }
+
+    @Override
     public String charge(String key, String customer, String token, long amountCents,
             String currency, String description) throws IOException {
         if (token.startsWith(FAILING_TOKEN)) {

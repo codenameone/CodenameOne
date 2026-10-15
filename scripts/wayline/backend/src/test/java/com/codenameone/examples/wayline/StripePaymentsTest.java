@@ -120,6 +120,40 @@ class StripePaymentsTest {
     }
 
     @Test
+    void aRemovedCardIsDetachedAndOneAlreadyDetachedCountsAsDetached() throws Exception {
+        Script script = new Script()
+                .reply(200, "{\"id\":\"pm_1\",\"object\":\"payment_method\",\"customer\":null}")
+                // Gone with its customer.
+                .reply(404, "{\"error\":{\"type\":\"invalid_request_error\","
+                        + "\"code\":\"resource_missing\"}}")
+                // Asked again after an answer that was lost: Stripe refuses to
+                // detach a card attached to nobody, and the card says so.
+                .reply(400, "{\"error\":{\"type\":\"invalid_request_error\"}}")
+                .reply(200, "{\"id\":\"pm_1\",\"object\":\"payment_method\",\"customer\":null}")
+                // Refused while the card is still this customer's: not detached.
+                .reply(400, "{\"error\":{\"type\":\"invalid_request_error\"}}")
+                .reply(200, "{\"id\":\"pm_1\",\"object\":\"payment_method\","
+                        + "\"customer\":\"cus_123\"}")
+                .reply(500, "{}")
+                .reply(500, "{}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        stripe.detachCard("cus_123", "pm_1");
+        assertEquals("POST /v1/payment_methods/pm_1/detach", script.asked.get(0));
+        stripe.detachCard("cus_123", "pm_1");
+        stripe.detachCard("cus_123", "pm_1");
+        assertEquals("GET /v1/payment_methods/pm_1", script.asked.get(3));
+        for (int iter = 0; iter < 2; iter++) {
+            try {
+                stripe.detachCard("cus_123", "pm_1");
+                throw new AssertionError("A card still attached must not read as detached");
+            } catch (IOException expected) {
+                assertTrue(expected.getMessage().indexOf("detaching") >= 0,
+                        expected.getMessage());
+            }
+        }
+    }
+
+    @Test
     void aCardIsAddedOnAHostedPageAndReadBack() throws Exception {
         Script script = new Script()
                 .reply(200, "{\"id\":\"cs_test_1\",\"object\":\"checkout.session\","

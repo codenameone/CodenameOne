@@ -90,6 +90,10 @@ public class Payments {
     private static final int MAX_CARDS = 8;
     /// A setup not finished within this long is abandoned.
     private static final long SETUP_MILLIS = 3600000L;
+    /// How many setups an account may have open at once. Each is a session
+    /// made at the processor and a row here; someone adding a card has one,
+    /// or two after giving up on the first.
+    private static final int MAX_OPEN_SETUPS = 5;
     private static final long MAX_TIP_CENTS = 20000L;
     /// The states of a ride that has not ended.
     private static final RideState[] UNDER_WAY = {RideState.REQUESTED, RideState.OFFERED,
@@ -177,14 +181,43 @@ public class Payments {
     }
 
     /// The rider's reference at the processor, or null when they have none
-    /// yet. Answers 409 for an account that has all the cards it may.
+    /// yet. Answers 409 for an account that has all the cards it may, and
+    /// 429 for one with as many setups open as it may have.
     @Transactional(readOnly = true)
     private String customerForSetup(String username) {
         if (cards.countByUsername(username) >= MAX_CARDS) {
             throw new ResponseStatusException(409, "Remove a card before adding another");
         }
+        // Refused before the processor is asked: every setup is a session
+        // made there, so a loop of these would otherwise make sessions
+        // without end in the service's name.
+        refuseTooManySetups(username);
         PaymentCustomer row = customers.findById(username);
         return row == null ? null : row.getReference();
+    }
+
+    /// Answers 429 when the account already has [#MAX_OPEN_SETUPS] setups
+    /// that are neither finished nor abandoned.
+    private void refuseTooManySetups(String username) {
+        if (setups.countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(username,
+                System.currentTimeMillis() - SETUP_MILLIS) >= MAX_OPEN_SETUPS) {
+            throw new ResponseStatusException(429,
+                    "Too many cards are being added. Finish one, or try again later");
+        }
+    }
+
+    /// Deletes the setups nobody can use any more: the finished ones, whose
+    /// card is saved, and the abandoned ones. Without it every setup ever
+    /// started would stay, one row for each tap of "Add card".
+    ///
+    /// An abandoned setup is kept for twice the time it can be finished in.
+    /// One finished just inside the hour is still at the processor when the
+    /// hour passes, and its row is what saves the card when the answer comes.
+    @Scheduled(fixedDelay = 600000, initialDelay = 60000, lock = "wayline-card-setups")
+    @Transactional
+    public void sweepSetups() throws IOException {
+        setups.deleteByCompletedTrue();
+        setups.deleteByCreatedAtLessThan(System.currentTimeMillis() - 2L * SETUP_MILLIS);
     }
 
     /// Keeps the reference the processor made for a rider on first use, and
@@ -217,6 +250,9 @@ public class Payments {
         if (profiles.hold(username) == 0) {
             throw new ResponseStatusException(404, "No such account");
         }
+        // Counted again with the account held: several requests sent together
+        // all pass the count made before the processor was asked.
+        refuseTooManySetups(username);
         PaymentSetup row = new PaymentSetup();
         row.setId(id);
         row.setUsername(username);
@@ -315,8 +351,18 @@ public class Payments {
         return card(chosen);
     }
 
-    /// Forgets a card. Cash cannot be removed, and neither can the card a ride
-    /// under way is to be paid with.
+    /// Forgets a card, here and at the processor. Cash cannot be removed, and
+    /// neither can the card a ride under way is to be paid with.
+    ///
+    /// The card is detached at the processor before its row is deleted, and
+    /// inside the transaction that deletes it, as [#forget] deletes a
+    /// customer: the token is the only way back to the card, so a processor
+    /// that cannot be reached fails the removal and the card stays, to be
+    /// removed again. Detaching a card that is already detached succeeds, so
+    /// a removal whose commit failed after the processor answered finishes
+    /// the second time. The account's row is held across the request, which
+    /// holds back only that rider's own ride requests, and removing a card is
+    /// rare enough for that.
     @Transactional
     public PaymentMethodDto remove(String username, String id) throws IOException {
         if (CASH.equals(id)) {
@@ -339,6 +385,15 @@ public class Payments {
         if (awaitsCharge(username, id, retriedSince())) {
             throw new ResponseStatusException(409,
                     "That card is still paying for a ride. Try again in a few minutes");
+        }
+        PaymentCustomer customer = customers.findById(username);
+        if (customer != null && customer.getReference().length() > 0) {
+            try {
+                provider.detachCard(customer.getReference(), row.getToken());
+            } catch (IOException failed) {
+                // A runtime exception, so the transaction rolls back with it.
+                throw unavailable("card removal", failed);
+            }
         }
         cards.deleteById(row.getId());
         return dto;
@@ -688,6 +743,12 @@ public class Payments {
     /// for good. It is refunded again instead, which is safe because a refund
     /// is keyed by the charge it returns: the processor answers a repeat with
     /// the refund it already made, and makes one if it never did.
+    ///
+    /// It cannot tell such a ride from one whose refund is still at the
+    /// processor, so it also lets a second request through while the first
+    /// is under way. That is safe for the same reason, and [#releaseRefund]
+    /// and [#keepRefund] keep the ride agreeing with the payment however the
+    /// two end.
     private boolean refundUnfinished(Ride ride) {
         if (!REFUNDED.equals(ride.getPaymentStatus())) {
             return false;
@@ -701,27 +762,50 @@ public class Payments {
         return payments.findById(rideId);
     }
 
+    /// Gives back the claim of a refund the processor did not take: the ride
+    /// is paid again -- unless another request has recorded a refund of it
+    /// meanwhile.
+    ///
+    /// Two refunds can overlap: the second is let through by
+    /// [#refundUnfinished] while the first is at the processor, which is
+    /// what lets a refund cut short be asked for again. Should one of them
+    /// record a refund and the other then fail, putting the ride back to paid
+    /// would leave a refunded payment on a ride its driver is paid for, and
+    /// the fare would be cashed out after it went back to the rider. So the
+    /// payment decides: the ride is paid again only while its payment is.
+    ///
+    /// The ride's row is written first, as in [#keepRefund], so the two take
+    /// turns on it: whichever comes second sees what the first wrote.
     @Transactional
     private void releaseRefund(String rideId) {
-        rides.paymentStatus(rideId, PAID);
+        if (rides.releaseRefund(rideId) != 1) {
+            // No longer marked refunded: a refund was recorded as pending.
+            return;
+        }
+        Payment payment = payments.findById(rideId);
+        if (payment != null && !PAID.equals(payment.getStatus())) {
+            rides.paymentStatus(rideId, payment.getStatus());
+        }
     }
 
     /// Records the refunds the processor took. Refunded when both are known
     /// to have returned the money; otherwise the payment and its ride are
     /// [#REFUND_PENDING], for [#settleRefunds] to finish.
+    ///
+    /// The ride is written as well, and first, although its claim already
+    /// marked it refunded: an overlapping request that failed may have put it
+    /// back to paid in the meantime. See [#releaseRefund].
     @Transactional
     private void keepRefund(String rideId, PaymentProvider.Refund fare,
             PaymentProvider.Refund tip, String reason) {
         boolean pending = fare.pending || (tip != null && tip.pending);
+        rides.paymentStatus(rideId, pending ? REFUND_PENDING : REFUNDED);
         Payment payment = payments.findById(rideId);
         payment.setStatus(pending ? REFUND_PENDING : REFUNDED);
         payment.setRefundRef(cut(fare.reference, 64));
         payment.setTipRefundRef(tip == null ? "" : cut(tip.reference, 64));
         payment.setRefundReason(reason);
         payment.setRefundedAt(pending ? 0L : System.currentTimeMillis());
-        if (pending) {
-            ride(rideId).setPaymentStatus(REFUND_PENDING);
-        }
     }
 
     // -------------------------------------------------------------- receipts

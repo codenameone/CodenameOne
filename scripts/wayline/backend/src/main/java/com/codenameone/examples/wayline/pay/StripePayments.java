@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/// Payments by Stripe, over its REST API. No SDK: five requests, form encoded,
+/// Payments by Stripe, over its REST API. No SDK: a few requests, form encoded,
 /// with the account's secret key as a bearer token.
 ///
 /// **This is an untested stub.** It has never been run against a live Stripe
@@ -58,6 +58,8 @@ import java.util.Map;
 ///   confirmed in the same request, because the rider is in a car and not at a
 ///   payment form.
 /// - **A refund** returns a charge to the card.
+/// - **A card removed** in the app is detached from the customer, so Stripe
+///   no longer offers it for a charge.
 ///
 /// The secret key is a setting of the server (`wayline.payments.stripe.secret`)
 /// and is used for the `Authorization` header and nothing else: it is never
@@ -163,6 +165,38 @@ public class StripePayments implements PaymentProvider {
             card.expYear = (int) number((Map) details, "exp_year");
         }
         return card;
+    }
+
+    @Override
+    public void detachCard(String customer, String token) throws IOException {
+        String path = "/v1/payment_methods/" + URLEncoder.encode(token, "UTF-8");
+        Reply reply = transport.send("POST", path + "/detach", "", "");
+        if ((reply.status >= 200 && reply.status < 300) || reply.status == 404) {
+            // Detached, or no such card: 404 is the answer for one deleted
+            // with its customer, or never there.
+            return;
+        }
+        // Stripe refuses to detach a card that is attached to nobody, which
+        // is what a second request finds after the first one's answer was
+        // lost. Rather than read that from an error's wording, the card is
+        // looked at: no longer this customer's, it is detached.
+        Reply now = transport.send("GET", path, null, "");
+        if (now.status == 404) {
+            return;
+        }
+        if (now.status >= 200 && now.status < 300) {
+            Map method;
+            try {
+                method = Json.parseObject(now.body == null ? "" : now.body);
+            } catch (IOException unreadable) {
+                method = null;
+            }
+            if (method != null && !customer.equals(text(method, "customer"))) {
+                return;
+            }
+        }
+        throw new IOException("The payment processor answered " + reply.status
+                + " to detaching a card");
     }
 
     @Override

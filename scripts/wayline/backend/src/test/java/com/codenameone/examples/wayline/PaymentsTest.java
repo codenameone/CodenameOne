@@ -65,6 +65,72 @@ class PaymentsTest {
         return People.asAdmin(request, DemoAccounts.ADMIN);
     }
 
+    private long setupsOf(String username) throws Exception {
+        Map row = db.queryOne("SELECT COUNT(*) AS n FROM payment_setup WHERE username = ?",
+                new Object[] {username});
+        return ((Number) row.get("n")).longValue();
+    }
+
+    @Test
+    void openSetupsAreCappedAndTheFinishedAndAbandonedAreSwept() throws Exception {
+        String rider = People.rider(accounts, "setup-looper");
+        // Five open at once is as many as an account may have; each is a
+        // session made at the processor.
+        String first = null;
+        for (int iter = 0; iter < 5; iter++) {
+            Map setup = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"),
+                    rider));
+            first = first == null ? (String) setup.get("id") : first;
+        }
+        mvc.perform(People.asRider(post("/api/payments/methods/setup"), rider))
+                .andExpect(status().is(429));
+        // Finishing one makes room for another.
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/" + first
+                        + "/complete"), Trips.card(Trips.VISA)), rider))
+                .andExpect(status().isOk());
+        String last = (String) Trips.json(mvc, People.asRider(
+                post("/api/payments/methods/setup"), rider)).get("id");
+        assertEquals(6L, setupsOf(rider));
+        // So does an hour going by: abandoned setups do not count.
+        db.execute("UPDATE payment_setup SET created_at = ? WHERE username = ? AND id <> ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 90L * 60L * 1000L),
+                    rider, last});
+        Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+
+        // The sweep deletes the finished one, and an abandoned one once it is
+        // two hours old; younger ones, and the open ones, stay.
+        payments.sweepSetups();
+        assertEquals(6L, setupsOf(rider));
+        db.execute("UPDATE payment_setup SET created_at = ? WHERE username = ? AND created_at < ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 3L * 60L * 60L * 1000L),
+                    rider, Long.valueOf(System.currentTimeMillis() - 60L * 60L * 1000L)});
+        payments.sweepSetups();
+        assertEquals(2L, setupsOf(rider));
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/" + last
+                        + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void todaysTripsCountTodaysRidesAlone() throws Exception {
+        // Tallinn.
+        String rider = People.rider(accounts, "tll-rider");
+        String driver = People.driver(accounts, "tll-driver");
+        Trips.online(mvc, driver, 59.4370, 24.7536);
+        String yesterday = (String) Trips.complete(mvc, rider, driver, People.ride(59.4370,
+                24.7536, 59.4470, 24.7636)).get("id");
+        Trips.complete(mvc, rider, driver, People.ride(59.4370, 24.7536, 59.4470, 24.7636));
+        long now = System.currentTimeMillis();
+        db.execute("UPDATE ride SET updated_at = ? WHERE id = ?", new Object[] {
+            Long.valueOf(now - now % (24L * 60L * 60L * 1000L) - 60L * 60L * 1000L), yesterday});
+        Map earned = Trips.json(mvc, People.asDriver(get("/api/driver/earnings"), driver));
+        // Both are trips the driver made; one of them was today's, and the
+        // header's count is of the rides its amount is made of.
+        assertEquals(2L, Trips.number(earned, "rides"));
+        assertEquals(1L, Trips.number(earned, "todayRides"));
+        Trips.offline(mvc, driver);
+    }
+
     @Test
     void cardsAreSavedChosenAndRemoved() throws Exception {
         String rider = People.rider(accounts, "card-holder");

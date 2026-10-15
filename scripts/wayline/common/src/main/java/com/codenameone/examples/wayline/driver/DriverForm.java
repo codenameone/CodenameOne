@@ -363,7 +363,7 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
             Container today = new Container(BoxLayout.y());
             today.add(Ui.label(Ui.money(earnings.todayCents(), earnings.currency()),
                     "WlStatusValue"));
-            today.add(Ui.label(Lang.tr("Today, {0} trips", String.valueOf(earnings.rides())),
+            today.add(Ui.label(Lang.tr("Today, {0} trips", String.valueOf(earnings.todayRides())),
                     "WlStatusDetail"));
             card.add(BorderLayout.EAST, today);
         }

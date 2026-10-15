@@ -42,5 +42,14 @@ public interface PaymentSetupRepository extends CrudRepository<PaymentSetup, Str
     @Query("update PaymentSetup s set s.completed = TRUE where s.id = :id and s.completed = FALSE")
     int claim(@Param("id") String id);
 
+    /// How many setups an account began after `since` and has not finished.
+    long countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(String username, long since);
+
     int deleteByUsername(String username);
+
+    /// Deletes the setups that saved their card.
+    int deleteByCompletedTrue();
+
+    /// Deletes the setups begun before `before`, finished or not.
+    int deleteByCreatedAtLessThan(long before);
 }

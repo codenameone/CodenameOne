@@ -73,6 +73,11 @@ public class MisconfiguredPayments implements PaymentProvider {
     }
 
     @Override
+    public void detachCard(String customer, String token) throws IOException {
+        throw fail();
+    }
+
+    @Override
     public String charge(String key, String customer, String token, long amountCents,
             String currency, String description) throws IOException {
         throw fail();

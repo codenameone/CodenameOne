@@ -22,6 +22,7 @@
  */
 package com.codenameone.examples.wayline.net;
 
+import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.api.PlaceDto;
@@ -41,10 +42,21 @@ import com.codenameone.examples.wayline.api.UserDto;
 /// A change is not sent the moment it is made. A name typed into a field
 /// changes with every letter, so changes are gathered for a moment and sent as
 /// one request with everything in it.
+///
+/// A change is not forgotten when its request fails, either. The device's
+/// values stay marked as unsent, on the device, until the server has taken
+/// them: they are sent again a little later, and an account load that finds
+/// them unsent -- the app restarted before the network came back -- sends them
+/// rather than overwriting them with what the server still holds.
 public final class Account {
     /// How long after the last change the values are sent.
     private static final int SETTLE_MILLIS = 700;
-    private static final Net.Failed QUIET = (status, message) -> { };
+    /// How long after a request failed it is sent again.
+    private static final int RETRY_MILLIS = 30000;
+    /// The keys under which each half is marked unsent; the value is the
+    /// account it was not sent for.
+    private static final String UNSENT_PREFERENCES = "wayline.account.unsent.preferences";
+    private static final String UNSENT_PROFILE = "wayline.account.unsent.profile";
 
     /// True while the account's values are being put into `Prefs`, which
     /// reports each of them as a change like any other.
@@ -62,6 +74,10 @@ public final class Account {
     private static ProfileDto profile;
     /// What a request carries beyond the settings, for a test to look at.
     private static PreferencesDto sent;
+    /// How many requests of each half were sent. An answer clears the unsent
+    /// mark only if no later request of its half went out after it.
+    private static int preferencesSends;
+    private static int profileSends;
 
     private Account() {
     }
@@ -83,6 +99,14 @@ public final class Account {
         profile = null;
         preferencesLoaded = false;
         profileLoaded = false;
+        // What another account left unsent is not this one's to send.
+        String owner = Session.user().username();
+        if (!isUnsent(UNSENT_PREFERENCES, owner)) {
+            Preferences.delete(UNSENT_PREFERENCES);
+        }
+        if (!isUnsent(UNSENT_PROFILE, owner)) {
+            Preferences.delete(UNSENT_PROFILE);
+        }
         fetch(done);
     }
 
@@ -95,8 +119,18 @@ public final class Account {
             }
             Api.account().profile(Net.to(described -> {
                 if (signedInAs(owner)) {
-                    apply(described);
-                    profileLoaded = described != null;
+                    if (described != null && isUnsent(UNSENT_PROFILE, owner)) {
+                        // The device has a change the server never took:
+                        // the server's name and gender are kept, the rest is
+                        // the device's, and is sent.
+                        profile = described;
+                        profileLoaded = true;
+                        profileChanged = true;
+                        schedule(SETTLE_MILLIS);
+                    } else {
+                        apply(described);
+                        profileLoaded = described != null;
+                    }
                 }
                 done.run();
             }, (status, message) -> done.run()));
@@ -107,8 +141,15 @@ public final class Account {
         }
         Api.account().preferences(Net.to(preferences -> {
             if (signedInAs(owner)) {
-                apply(preferences);
-                preferencesLoaded = preferences != null;
+                if (preferences != null && isUnsent(UNSENT_PREFERENCES, owner)) {
+                    // As for the profile: the device's are newer.
+                    preferencesLoaded = true;
+                    preferencesChanged = true;
+                    schedule(SETTLE_MILLIS);
+                } else {
+                    apply(preferences);
+                    preferencesLoaded = preferences != null;
+                }
             }
             thenProfile.run();
         }, (status, message) -> thenProfile.run()));
@@ -170,9 +211,15 @@ public final class Account {
                 && !Prefs.WORK.equals(name)) {
             preferencesChanged = true;
         }
+        schedule(SETTLE_MILLIS);
+    }
+
+    /// Sends what has changed `millis` from now, unless a send is already
+    /// waiting.
+    private static void schedule(int millis) {
         if (!waiting) {
             waiting = true;
-            CN.setTimeout(SETTLE_MILLIS, () -> CN.callSerially(() -> {
+            CN.setTimeout(millis, () -> CN.callSerially(() -> {
                 if (waiting) {
                     waiting = false;
                     send();
@@ -197,16 +244,39 @@ public final class Account {
             profileChanged = profileChanged && profileLoaded;
             fetch(() -> { });
         }
+        final String owner = Session.user().username();
         if (preferencesChanged) {
             preferencesChanged = false;
             sent = preferences();
-            Api.account().savePreferences(sent, Net.to(saved -> { }, QUIET));
+            // Marked before it goes, and cleared once the server has it: until
+            // then the device's values are the account's newest.
+            Preferences.set(UNSENT_PREFERENCES, owner);
+            final int send = ++preferencesSends;
+            Api.account().savePreferences(sent, Net.to(saved -> {
+                if (send == preferencesSends) {
+                    Preferences.delete(UNSENT_PREFERENCES);
+                }
+            }, (status, message) -> {
+                if (refused(status)) {
+                    // Refused: sent again, it would be refused again.
+                    if (send == preferencesSends) {
+                        Preferences.delete(UNSENT_PREFERENCES);
+                    }
+                } else if (signedInAs(owner)) {
+                    preferencesChanged = true;
+                    schedule(RETRY_MILLIS);
+                }
+            }));
         }
         if (profileChanged) {
             profileChanged = false;
             final ProfileDto wanted = described();
-            final String owner = Session.user().username();
+            Preferences.set(UNSENT_PROFILE, owner);
+            final int send = ++profileSends;
             Api.account().saveProfile(wanted, Net.to(user -> {
+                if (send == profileSends) {
+                    Preferences.delete(UNSENT_PROFILE);
+                }
                 // Signing out sends what is waiting and does not wait for the
                 // answer. If somebody else has signed in by the time it comes,
                 // this profile is not theirs: kept, its name and gender would
@@ -214,8 +284,31 @@ public final class Account {
                 if (signedInAs(owner)) {
                     profile = wanted;
                 }
-            }, QUIET));
+            }, (status, message) -> {
+                if (refused(status)) {
+                    if (send == profileSends) {
+                        Preferences.delete(UNSENT_PROFILE);
+                    }
+                } else if (signedInAs(owner)) {
+                    profileChanged = true;
+                    schedule(RETRY_MILLIS);
+                }
+            }));
         }
+    }
+
+    /// Whether the server refused a request for what it carried, so that sent
+    /// again it would be refused again. Anything else -- the server not
+    /// reached (0), busy, failing, or the session needing a new token -- may
+    /// succeed later, and the change is kept for then.
+    private static boolean refused(int status) {
+        return status >= 400 && status < 500 && status != 401 && status != 408
+                && status != 429;
+    }
+
+    /// Whether `key` marks a change that `owner`'s account has not taken.
+    private static boolean isUnsent(String key, String owner) {
+        return owner != null && owner.equals(Preferences.get(key, ""));
     }
 
     /// Whether the account signed in now is `username`: an answer that comes

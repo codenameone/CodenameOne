@@ -385,6 +385,12 @@ claiming a refund leaves the ride marked refunded with no refund recorded.
 The next request for that ride finds the payment row unchanged and asks the
 provider again. That's safe because a refund carries a key made from the
 charge it returns, so the provider answers a repeat with the refund it made.
+The same rule lets a second refund through while the first is still at the
+provider. Whichever of the two fails gives its claim back only while the
+payment row is still unrefunded, and whichever succeeds writes the ride's
+status along with the payment's. Both write the ride's row first, so they take
+turns, and the ride ends up agreeing with its payment in either order. A
+refunded fare can't come back as earnings for the driver to cash out.
 
 `Accounts.setRoles` and `Accounts.suspend` hold two rows: the profile of the
 admin who asks and the profile of the account being changed, in the order of
@@ -943,6 +949,16 @@ rest. A provider that can't be reached fails the closure and leaves the
 account as it was. A record that's already gone counts as deleted, so closing
 again finishes a closure that was interrupted.
 
+Removing a card works the same way for that one card. `Payments.remove` asks
+`PaymentProvider.detachCard` to take the card off the rider's record before it
+deletes the row, in the same transaction. A provider that can't be reached
+leaves the card saved, and a card that's already detached counts as detached.
+
+Each card setup is a session made at the provider. An account can have five
+open at once, and a sixth is refused with 429 until one is finished or an hour
+has passed. `Payments.sweepSetups` runs every ten minutes and deletes the
+finished setups and the ones abandoned more than two hours ago.
+
 Two implementations come with the sample, and the setting
 `wayline.payments.provider` chooses between them:
 
@@ -997,6 +1013,10 @@ with the configuration error described above.
 * A refund is a Stripe refund of that PaymentIntent. One that Stripe answers
   `pending` or `requires_action` is read again with `GET /v1/refunds/{id}`
   until it succeeds, fails or is canceled.
+* Removing a card detaches its PaymentMethod with
+  `POST /v1/payment_methods/{id}/detach`. If Stripe refuses, the server reads
+  the PaymentMethod, and one that's no longer attached to the rider counts as
+  detached.
 
 WARNING: The tests cover this path with stand-in answers in place of Stripe's.
 Nothing in the project has run against a Stripe account. Use a test-mode key
@@ -1994,8 +2014,8 @@ address `AppConfig` falls back to, and remove the Android clear-text
 attribute listed in <<_before_its_a_product,Before it's a product>>.
 
 *What's rate limited.* `SecurityConfig` limits registration, the phone codes,
-the password change, the document uploads and the address search under
-`/api/geo`. Each search is a request the server makes of the geocoder you
+the password change, the document uploads, the card setups and the address
+search under `/api/geo`. Each search is a request the server makes of the geocoder you
 configured, so the limit protects that service's allowance and not only this
 server.
 
@@ -2005,36 +2025,3 @@ Two things are held in one process's memory: the open sockets in `LiveHub`,
 and the counters of the `InMemoryRateLimiter` that `SecurityConfig` gives each
 rate limit, so every instance allows the full number of attempts.
 
-==== A second database
-
-A server has one configured database. It's the one every repository works on, and the one injected wherever a bean asks for a
-`DataSource`. A second one, such as an archive or a database
-another system owns, is a pool you open yourself with `DataSource.open` and
-publish as a bean. Wrap it in a class of your own so that the two can't be
-confused:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ArchiveDatabase.java[tag=wayline-second-database,indent=0]
-----
-
-A service then asks for both:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ArchivedRides.java[tag=wayline-second-database-use,indent=0]
-----
-
-The sample has one database, so this is a pattern and not something its tests
-exercise. Its limits come from the runtime:
-
-* Migrations run against the configured database only, and so do the
-  entities. The schema of the second one is yours to manage, and its rows are
-  read with SQL through its `DataSource`.
-* A transaction is on one database: the first pool the method touches.
-  Statements sent to another pool inside the same `@Transactional` method run
-  outside it and commit on their own. Nothing spans the two.
-* The first connection is opened when the pool is, so a wrong address stops the
-  server at start-up and not on the first request.
-* The engines can differ. The portable SQL described in <<backend-data>> is
-  what lets one statement run on both.

@@ -24,12 +24,14 @@ package com.codenameone.examples.wayline.api;
 
 import com.codename1.annotations.Mapped;
 
-/// What a driver has earned.
+/// What a driver has earned. `rides` counts every paid ride the driver ever
+/// completed, and `todayRides` those of them that `todayCents` is made of.
 @Mapped
 public record EarningsDto(
         long todayCents,
         long weekCents,
         long totalCents,
         int rides,
+        int todayRides,
         String currency) {
 }

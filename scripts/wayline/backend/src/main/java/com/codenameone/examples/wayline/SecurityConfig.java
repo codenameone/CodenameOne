@@ -381,6 +381,12 @@ public class SecurityConfig {
             .rateLimit("/api/driving/application/documents",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 3600))
+            // Every card setup is a session made at the payment processor.
+            // `Payments` caps how many an account has open; this caps how
+            // often it may start one, so abandoning setups in a loop is slow.
+            .rateLimit("/api/payments/methods/setup",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(30, 3600))
             // tag::wayline-api-rules[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",

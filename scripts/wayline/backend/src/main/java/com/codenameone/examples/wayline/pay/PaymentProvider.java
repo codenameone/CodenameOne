@@ -61,6 +61,13 @@ public interface PaymentProvider {
     ///   not finished
     Card finishCardSetup(String customer, String reference, CardDto typed) throws IOException;
 
+    /// Takes a saved card off `customer`, so that it can't be charged again.
+    /// A card that is already off, or gone, is detached: this is asked again
+    /// when the first answer was lost.
+    ///
+    /// @param token what [#finishCardSetup] returned as the card's token
+    void detachCard(String customer, String token) throws IOException;
+
     /// Charges a saved card with its owner absent.
     ///
     /// @param key names this charge and no other. A processor asked twice with

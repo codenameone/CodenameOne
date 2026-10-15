@@ -272,12 +272,16 @@ public class Drivers {
     @Transactional(readOnly = true)
     public EarningsDto earnings(String driver) throws IOException {
         long now = System.currentTimeMillis();
-        long today = Rows.number(rides.paidSince(driver, now - now % DAY_MILLIS));
+        // The day's trips and the day's money from one query, so the header
+        // that shows them together counts the rides that made the sum.
+        Object[] day = rides.paidTotalsSince(driver, now - now % DAY_MILLIS);
+        int todayCount = day == null ? 0 : (int) Rows.number(day[0]);
+        long today = day == null ? 0L : Rows.number(day[1]);
         long week = Rows.number(rides.paidSince(driver, now - 7 * DAY_MILLIS));
         Object[] total = rides.paidTotals(driver);
         int count = total == null ? 0 : (int) Rows.number(total[0]);
         long all = total == null ? 0L : Rows.number(total[1]);
-        return new EarningsDto(today, week, all, count, fares.currency());
+        return new EarningsDto(today, week, all, count, todayCount, fares.currency());
     }
 
     /// @param application the account's application to drive, or null

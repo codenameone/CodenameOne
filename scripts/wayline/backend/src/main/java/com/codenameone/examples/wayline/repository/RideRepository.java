@@ -217,6 +217,15 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             + "and r.paymentStatus = 'PAID'")
     int claimRefund(@Param("id") String id);
 
+    /// Gives a refund's claim back: the ride is paid again, if it is still
+    /// marked refunded.
+    ///
+    /// @return 1 when the ride was
+    @Modifying(clearAutomatically = true)
+    @Query("update Ride r set r.paymentStatus = 'PAID' where r.id = :id "
+            + "and r.paymentStatus = 'REFUNDED'")
+    int releaseRefund(@Param("id") String id);
+
     // ---------------------------------------------------------------- sums
     // A sum over no rows is null and not zero, on every database, so each
     // one is wrapped in `coalesce(..., 0)`.
@@ -234,6 +243,12 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("select count(r), coalesce(sum(r.driverCents), 0) from Ride r "
             + "where r.driver = :driver and r.state = 'COMPLETED' and r.paymentStatus = 'PAID'")
     Object[] paidTotals(@Param("driver") String driver);
+
+    /// [#paidTotals] for the rides that ended since a time: `{count, cents}`.
+    @Query("select count(r), coalesce(sum(r.driverCents), 0) from Ride r "
+            + "where r.driver = :driver and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' "
+            + "and r.updatedAt >= :since")
+    Object[] paidTotalsSince(@Param("driver") String driver, @Param("since") long since);
 
     /// What the driver's share of their completed, paid rides came to since
     /// a time.
