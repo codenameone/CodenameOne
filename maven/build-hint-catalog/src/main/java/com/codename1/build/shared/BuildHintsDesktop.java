@@ -50,6 +50,31 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .platform("desktop"));
 
+        h.add(new Hint("javascript.background_color")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("Legacy alias for the PWA background color. `javascript.manifest.background_color` takes precedence."));
+
+        h.add(new Hint("javascript.theme_color")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("Legacy alias for the PWA theme color. `javascript.manifest.theme_color` takes precedence."));
+
+        h.add(new Hint("javascript.short_name")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("Legacy alias for the PWA short name. `javascript.manifest.short_name` takes precedence."));
+
+        h.add(new Hint("javascript.orientation")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("Legacy alias for the PWA screen orientation. `javascript.manifest.orientation` takes precedence."
+                        + " Omitted by default so the browser can use any orientation."));
+
         h.add(new Hint("javascript.includeVideoJS")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.BOOLEAN)
