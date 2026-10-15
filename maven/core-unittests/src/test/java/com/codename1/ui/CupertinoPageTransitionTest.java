@@ -30,21 +30,18 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
-import org.mockito.InOrder;
-import org.mockito.Mockito;
-
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.spy;
 
 /**
  * Tests for {@link CupertinoPageTransition}'s back-mode paint order.
  *
  * <p>Lives in this package rather than alongside its subject
- * ({@code com.codename1.ui.animations}) because verifying draw order needs to spy on
+ * ({@code com.codename1.ui.animations}) because verifying draw order needs to override
  * {@link Image#drawImage(Graphics, Object, int, int)}, which is {@code protected} and
  * only reachable from {@code com.codename1.ui} itself or a subclass -- the same reason
  * {@link OffscreenFormPaintTest} lives here instead of beside the screenshot suite it
@@ -61,9 +58,11 @@ public class CupertinoPageTransitionTest extends UITestBase {
     /// Pixel-level verification is not possible in this harness:
     /// {@code TestCodenameOneImplementation.drawImage(Object, Object, int, int)} is a
     /// documented no-op, so nothing a {@code Graphics.drawImage} call paints is ever
-    /// readable back from the destination buffer. Spying on the two page buffers and
-    /// checking invocation ORDER is the narrowest substitute that still exercises the
-    /// real {@code paint()} method rather than re-deriving its arithmetic.
+    /// readable back from the destination buffer. Recording which of the two page
+    /// buffers draws first is the narrowest substitute that still exercises the real
+    /// {@code paint()} method rather than re-deriving its arithmetic. A small Image
+    /// subclass records it: a Mockito spy did the same, but building the spies took
+    /// seconds on a cold JVM and pushed the test past FormTest's 5s EDT timeout.
     @FormTest
     public void backModePaintsTheDepartingSourcePageOnTop() throws Exception {
         int w = 300;
@@ -87,18 +86,36 @@ public class CupertinoPageTransitionTest extends UITestBase {
 
         Field sourceBufferField = field(back, "sourceBuffer");
         Field destBufferField = field(back, "destBuffer");
-        Image sourceBuffer = spy((Image) sourceBufferField.get(back));
-        Image destBuffer = spy((Image) destBufferField.get(back));
-        sourceBufferField.set(back, sourceBuffer);
-        destBufferField.set(back, destBuffer);
+        List<String> drawn = new ArrayList<String>();
+        sourceBufferField.set(back, new RecordingImage((Image) sourceBufferField.get(back), "source", drawn));
+        destBufferField.set(back, new RecordingImage((Image) destBufferField.get(back), "dest", drawn));
 
         Image frame = Image.createImage(w, h, 0xffffffff);
         Graphics g = frame.getGraphics();
         back.paint(g);
 
-        InOrder order = Mockito.inOrder(sourceBuffer, destBuffer);
-        order.verify(destBuffer).drawImage(any(Graphics.class), any(), anyInt(), anyInt());
-        order.verify(sourceBuffer).drawImage(any(Graphics.class), any(), anyInt(), anyInt());
+        assertTrue(drawn.contains("source") && drawn.contains("dest"), "both pages must be painted: " + drawn);
+        assertEquals("source", drawn.get(drawn.size() - 1),
+                "the departing source page must be painted last, on top: " + drawn);
+        assertTrue(drawn.indexOf("dest") < drawn.lastIndexOf("source"), "dest before source: " + drawn);
+    }
+
+    /// Wraps a page buffer's native image and records each draw of it, in order.
+    private static final class RecordingImage extends Image {
+        private final String name;
+        private final List<String> log;
+
+        RecordingImage(Image wrapped, String name, List<String> log) {
+            super(wrapped.getImage());
+            this.name = name;
+            this.log = log;
+        }
+
+        @Override
+        protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+            log.add(name);
+            super.drawImage(g, nativeGraphics, x, y);
+        }
     }
 
     /// A Form whose content pane is entirely covered by one full-bleed child, matching
