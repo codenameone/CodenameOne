@@ -38,7 +38,9 @@ import java.io.IOException;
 import java.util.Map;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /// Paying, against a processor that fails when a test says so: what is left
@@ -131,6 +133,43 @@ class ProcessorFaultsTest {
         assertEquals(token, processor.detached.get(0));
         mvc.perform(People.asRider(get("/api/payments/methods"), rider))
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void aCardTheLimitRefusesIsDetachedAtTheProcessor() throws Exception {
+        processor.reset();
+        String rider = People.rider(accounts, "card-overflow");
+        for (int iter = 0; iter < 7; iter++) {
+            Trips.addCard(mvc, rider, Trips.VISA);
+        }
+        // Two setups started with room for one card, and a third.
+        Map first = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+        Map second = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+        Map third = Trips.json(mvc, People.asRider(post("/api/payments/methods/setup"), rider));
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/"
+                        + first.get("id") + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isOk());
+        assertEquals(0, processor.detached.size());
+
+        // The processor attached the second card before the limit refused it;
+        // with no row here, it is detached there, and no card that was kept.
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/"
+                        + second.get("id") + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isConflict());
+        assertEquals(1, processor.detached.size());
+        Map kept = db.queryOne("SELECT COUNT(*) AS n FROM payment_method WHERE token = ?",
+                new Object[] {processor.detached.get(0)});
+        assertEquals(0L, ((Number) kept.get("n")).longValue());
+
+        // A detach that fails is logged, and the rider still hears the limit.
+        processor.detachFails = true;
+        mvc.perform(People.asRider(Trips.body(post("/api/payments/methods/setup/"
+                        + third.get("id") + "/complete"), Trips.card(Trips.MASTERCARD)), rider))
+                .andExpect(status().isConflict());
+        assertEquals(1, processor.detached.size());
+        mvc.perform(People.asRider(get("/api/payments/methods"), rider))
+                .andExpect(jsonPath("$.length()").value(9));
+        processor.reset();
     }
 
     @Test

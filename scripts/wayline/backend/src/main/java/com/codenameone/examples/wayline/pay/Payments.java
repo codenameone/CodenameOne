@@ -276,7 +276,41 @@ public class Payments {
         } catch (IOException failed) {
             throw unavailable("card setup", failed);
         }
-        return keepCard(username, setupId, Ids.next(), card);
+        try {
+            return keepCard(username, setupId, Ids.next(), card);
+        } catch (ResponseStatusException refused) {
+            // The processor attached the card when the setup finished. Refused
+            // here by the card limit -- two setups finishing together for the
+            // last slot, or a slot filled meanwhile -- it has no row, so the
+            // rider has nothing to remove it through: it is detached here
+            // instead. keepCard has rolled back by now, so this runs outside
+            // its transaction and nothing undoes it.
+            //
+            // Undone after the fact rather than a slot reserved before the
+            // processor is asked: a reservation is one more row with a life of
+            // its own, given back when the processor declines, times out or
+            // the server stops between the two, and swept when nothing gives
+            // it back. A refusal is the rare case, and this costs only it.
+            //
+            // Only the limit's 409. The 404 is a setup claimed by a request
+            // sent twice, whose other copy may have saved this very card.
+            if (refused.getStatus() == 409) {
+                discard(username, references[0], card);
+            }
+            throw refused;
+        }
+    }
+
+    /// Detaches a card the processor attached that this server did not keep.
+    /// A failure is logged and not answered: the rider's answer is the refusal
+    /// that brought us here, and the card is no worse off than before.
+    private void discard(String username, String customer, PaymentProvider.Card card) {
+        try {
+            provider.detachCard(customer, card.token);
+        } catch (IOException failed) {
+            System.err.println("a card refused for " + username + " is still attached at the "
+                    + "processor, as " + card.token + ": " + failed.getMessage());
+        }
     }
 
     /// What the processor calls the rider and a setup of theirs that is still

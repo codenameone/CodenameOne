@@ -959,6 +959,13 @@ open at once, and a sixth is refused with 429 until one is finished or an hour
 has passed. `Payments.sweepSetups` runs every ten minutes and deletes the
 finished setups and the ones abandoned more than two hours ago.
 
+The limit of eight cards is checked again when a setup finishes, because
+several setups can start while there's room for one. By then the provider has
+already attached the card, so when the limit refuses it, `Payments` detaches
+it with `PaymentProvider.detachCard` after the refused transaction has rolled
+back. If that detach fails, the server logs the card's token and still answers
+409.
+
 Two implementations come with the sample, and the setting
 `wayline.payments.provider` chooses between them:
 
