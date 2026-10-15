@@ -33,9 +33,9 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Point;
@@ -111,7 +111,7 @@ public class MapView extends Container implements MapSurface {
     private int zoomFocusY;
     private long lastStep;
     private boolean moving;
-    private Form movingOn;
+    private TopLevelContainer movingOn;
     private boolean wheelZoom;
     // Where the pointer was last seen over the map, for a gesture that says
     // how much to zoom and not where.
@@ -748,8 +748,8 @@ public class MapView extends Container implements MapSurface {
         zooming = false;
     }
 
-    // Takes the map off the form it registered with -- the one remembered, not
-    // the one it is on now, which is none once it has been removed.
+    // Takes the map off the top level it registered with -- the one remembered,
+    // not the one it is on now, which is none once it has been removed.
     private void stopAnimating() {
         if (moving) {
             moving = false;
@@ -763,10 +763,15 @@ public class MapView extends Container implements MapSurface {
     private void move() {
         lastStep = System.currentTimeMillis();
         if (!moving) {
-            Form form = getComponentForm();
-            if (form != null) {
-                form.registerAnimated(this);
-                movingOn = form;
+            // The top level, not the form: getComponentForm() is null by design
+            // inside a desktop Window, and a map there would never be animated --
+            // wheel zoom, double-tap zoom and the glide after a fling all did
+            // nothing. Remembered here rather than through Component's
+            // registerForAnimation(), whose single slot Component uses itself.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.registerAnimated(this);
+                movingOn = top;
                 moving = true;
             }
         }

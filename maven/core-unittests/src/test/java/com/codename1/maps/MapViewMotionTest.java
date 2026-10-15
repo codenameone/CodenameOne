@@ -34,6 +34,7 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// How the map moves once the gesture that moved it is over, and what a zoom
@@ -201,6 +202,38 @@ class MapViewMotionTest extends UITestBase {
         map.remove();
         assertFalse(animatedBy(form).contains(map),
                 "and not once it has been removed from it");
+    }
+
+    @FormTest
+    void aMapInADesktopWindowIsAnimatedByThatWindow() throws Exception {
+        // getComponentForm() is null inside a Window, so registering with the form
+        // left a map there unanimated: the glide after a fling, double-tap and
+        // wheel zoom all stopped dead after their first frame.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form(new BorderLayout());
+        main.show();
+        com.codename1.ui.Window window = new com.codename1.ui.Window("map", new BorderLayout());
+        MapView map = sizedMap();
+        window.add(BorderLayout.CENTER, map);
+        window.show();
+        assertSame(window, map.getTopLevelContainer());
+
+        map.setWheelZoom(true);
+        assertTrue(map.mouseWheel(new WheelEvent(map, 40, 60, 0, 200, true, 0)));
+        assertTrue(animatedBy(window).contains(map),
+                "a wheel zoom in a window is animated by that window");
+
+        map.remove();
+        assertFalse(animatedBy(window).contains(map),
+                "and not once the map has been removed from it");
+        window.dispose();
+    }
+
+    private static java.util.List<?> animatedBy(com.codename1.ui.Window window) throws Exception {
+        java.lang.reflect.Field field = com.codename1.ui.Window.class.getDeclaredField("animatableComponents");
+        field.setAccessible(true);
+        Object value = field.get(window);
+        return value == null ? java.util.Collections.emptyList() : (java.util.List<?>) value;
     }
 
     // The form keeps what it animates to itself; nothing public says whether a
