@@ -89,13 +89,25 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         }
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
+        // This build is already reported, as the simulator, for as long as the nested
+        // one runs; the nested build would report the same session a second time.
+        request.addShellEnvironment(com.codename1.build.FirstBuildTelemetry.LAUNCHER_ENV, "1");
 
         Invoker invoker = new DefaultInvoker();
+        InvocationResult result;
         try {
-            invoker.execute( request );
+            result = invoker.execute( request );
         } catch (MavenInvocationException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex);
 
+        }
+        // A nested build that fails -- compiling, resolving dependencies, starting the
+        // simulator -- returns its exit code rather than throwing. It has to fail this
+        // build: it is the one that reports the session, and the nested one does not.
+        // Closing the simulator exits 0, so an ordinary session still ends cleanly.
+        if (result.getExitCode() != 0) {
+            throw new MojoFailureException("The simulator build failed with exit code "
+                    + result.getExitCode() + "; see the output above.", result.getExecutionException());
         }
     }
 }

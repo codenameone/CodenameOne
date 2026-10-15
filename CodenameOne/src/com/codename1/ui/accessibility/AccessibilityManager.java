@@ -1322,7 +1322,12 @@ public final class AccessibilityManager {
             if (!source.isEnabled()) {
                 return false;
             }
-            source.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
+            // Touch-only ports need not map a hardware GAME_FIRE key. Invoke
+            // the button's semantic action, including CheckBox/RadioButton
+            // state changes, without routing it through keyboard translation.
+            Button button = (Button) source;
+            button.pressed();
+            button.released();
             return true;
         }
     }
@@ -1341,9 +1346,7 @@ public final class AccessibilityManager {
             if (!list.isEnabled()) {
                 return false;
             }
-            list.setSelectedIndex(index);
-            list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
-            return true;
+            return list.accessibilityActivateItem(index);
         }
     }
 
@@ -1369,6 +1372,9 @@ public final class AccessibilityManager {
             }
             if (selected == list.getSelectedIndex()) {
                 return false;
+            }
+            if (list instanceof com.codename1.ui.ComboBox) {
+                return list.accessibilityActivateItem(selected);
             }
             list.setSelectedIndex(selected);
             return true;

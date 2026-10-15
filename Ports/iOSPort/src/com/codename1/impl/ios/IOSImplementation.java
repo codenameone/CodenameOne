@@ -799,10 +799,10 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @return The root pane of the form.  If there is no layered pane, then this should just
      * return the content pane.  Otherwise it may return the parent of the layered pane and content pane.
      */
-    private static Container getRootPane(Form f) {
+    private static Container getRootPane(com.codename1.ui.TopLevelContainer f) {
         Container root = f.getContentPane();
         Container parent = null;
-        while ((parent = root.getParent()) != null && parent != f) {
+        while ((parent = root.getParent()) != null && parent != f.asContainer()) {
             root = parent;
         }
         return root;
@@ -912,10 +912,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int getInvisibleAreaUnderVKB() {
+        // Secondary scenes reserve space in their own content pane. The main
+        // form must not shrink in response to another window's keyboard.
+        if (keyboardLayoutOwner() instanceof com.codename1.ui.Window) {
+            return 0;
+        }
         if (areaUnderVKBOverride >= 0) {
             return areaUnderVKBOverride;
         }
-        if(isAsyncEditMode()) {
+        if(isAsyncEditMode() || tiClient != null) {
             return nativeInstance.getVKBHeight();
         }
         return 0;
@@ -1045,6 +1050,36 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     boolean keyboardShowing;
+    private volatile KeyboardLayout keyboardLayout;
+    private KeyboardLayout paddedKeyboardLayout;
+
+    private static class KeyboardLayout {
+        final com.codename1.ui.TopLevelContainer owner;
+        float bottomPadding;
+        byte bottomUnit;
+        KeyboardLayout(com.codename1.ui.TopLevelContainer owner) { this.owner = owner; }
+    }
+
+    private com.codename1.ui.TopLevelContainer keyboardLayoutOwner() {
+        Component client = tiClient instanceof Component ? (Component) tiClient : currentEditing;
+        com.codename1.ui.TopLevelContainer top = client == null ? null : client.getTopLevelContainer();
+        return top != null ? top : Display.getInstance().getCurrent();
+    }
+
+    private boolean isKeyboardLayoutOwner(com.codename1.ui.TopLevelContainer owner) {
+        return owner == keyboardLayoutOwner()
+                && (!(owner instanceof Form) || owner == Display.getInstance().getCurrent());
+    }
+
+    private void restoreKeyboardPadding(KeyboardLayout layout) {
+        if (layout == null || paddedKeyboardLayout != layout) {
+            return;
+        }
+        Style style = getRootPane(layout.owner).getUnselectedStyle();
+        style.setPaddingUnitBottom(layout.bottomUnit);
+        style.setPadding(Component.BOTTOM, layout.bottomPadding);
+        paddedKeyboardLayout = null;
+    }
     
     /**
      * Callback for native.  Called when keyboard is shown.  Used for async editing 
@@ -1052,18 +1087,30 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeShown(){
         instance.keyboardShowing = true;
-        if(nativeInstance.isAsyncEditMode()) {
+        final KeyboardLayout layout = new KeyboardLayout(instance.keyboardLayoutOwner());
+        instance.keyboardLayout = layout;
+        if(nativeInstance.isAsyncEditMode() || tiClient != null) {
             // revalidate the parent since the size of form is now larger due to the vkb
-            final Form current = Display.getInstance().getCurrent();
+            final com.codename1.ui.TopLevelContainer current = layout.owner;
             //final Component currentEditingFinal = instance.currentEditing;
             if (current != null) {
-                if(current.isFormBottomPaddingEditingMode()) {
+                if (current instanceof com.codename1.ui.Window || ((Form) current).isFormBottomPaddingEditingMode()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (current != null) {
-                                getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                                getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                                current.revalidate();
+                            if (instance.keyboardLayout == layout && instance.isKeyboardLayoutOwner(current)) {
+                                instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
+                                Style style = getRootPane(current).getUnselectedStyle();
+                                layout.bottomPadding = style.getPaddingFloatValue(false, Component.BOTTOM);
+                                byte[] units = style.getPaddingUnit();
+                                layout.bottomUnit = units == null ? Style.UNIT_TYPE_PIXELS : units[Component.BOTTOM];
+                                style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+                                style.setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                                instance.paddedKeyboardLayout = layout;
+                                current.asContainer().revalidate();
+                                if (tiClient instanceof Component) {
+                                    instance.revealTextInputClient(tiClient);
+                                    instance.refreshTextInputGeometry();
+                                }
                                 Display.getInstance().callSerially(new Runnable() {
                                     public void run() {
                                         updateNativeTextEditorFrame();
@@ -1075,15 +1122,19 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            if (current != null) {
-                                if (instance.currentEditing != null) {
+                            if (instance.keyboardLayout == layout && instance.isKeyboardLayoutOwner(current)) {
+                                instance.restoreKeyboardPadding(instance.paddedKeyboardLayout);
+                                if (tiClient instanceof Component) {
+                                    instance.revealTextInputClient(tiClient);
+                                    instance.refreshTextInputGeometry();
+                                } else if (instance.currentEditing != null) {
                                     instance.doNotHideTextEditorSemaphore++;
                                     try {
                                         instance.currentEditing.requestFocus();
                                     } finally {
                                         instance.doNotHideTextEditorSemaphore--;
                                     }
-                                    current.revalidate();
+                                    current.asContainer().revalidate();
                                     Display.getInstance().callSerially(new Runnable() {
                                         public void run() {
                                             updateNativeTextEditorFrame();
@@ -1107,20 +1158,28 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     static void keyboardWillBeHidden(){
         instance.keyboardShowing = false;
+        final KeyboardLayout layout = instance.keyboardLayout;
+        instance.keyboardLayout = null;
         Display.getInstance().callSerially(new Runnable(){
 
             @Override
             public void run() {
-                Form current = Display.getInstance().getCurrent();
-                if (current != null) {
+                if (layout == null || layout.owner == null) {
+                    return;
+                }
+                instance.restoreKeyboardPadding(layout);
+                com.codename1.ui.TopLevelContainer current = layout.owner;
+                // Editing may already have stopped, so resolve layout against the
+                // saved owner, not the active client. A newer show still takes precedence.
+                if (instance.keyboardLayout == null) {
                     instance.areaUnderVKBOverride = 0;
                     try {
-                        current.revalidate();
+                        current.asContainer().revalidate();
                         //Now that screen size is changed, the scroll positions may
                         // be caught in a negative state, leaving a gap at the
                         // top.
                         //https://github.com/codenameone/CodenameOne/issues/2476
-                        Accessor.fixNegativeScrolls(current);
+                        if (current instanceof Form) { Accessor.fixNegativeScrolls((Form) current); }
                     } finally {
                         instance.areaUnderVKBOverride = -1;
                     }
@@ -1756,6 +1815,63 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// text/selection queries are answered from this on the iOS main thread (the EDT is a
     /// separate ParparVM thread, so reading the live document there would race edits).
     private static volatile com.codename1.ui.TextInputState tiSnapshot;
+    private static volatile com.codename1.ui.TextInputGeometry tiGeometry;
+    // Retain each immutable capture until the matching native main-queue update consumes it.
+    // A newer EDT paint must not replace geometry still used by the native shadow document.
+    private static final java.util.Map<Integer, TextInputCapture> tiPendingCaptures =
+            new java.util.HashMap<Integer, TextInputCapture>();
+    private static int tiCaptureId;
+
+    private static class TextInputCapture {
+        private final com.codename1.ui.TextInputState state;
+        private final com.codename1.ui.TextInputGeometry geometry;
+
+        TextInputCapture(com.codename1.ui.TextInputState state, com.codename1.ui.TextInputClient client) {
+            this.state = state;
+            geometry = com.codename1.ui.TextInputGeometry.capture(client);
+        }
+    }
+
+    private static int queueTextInputCapture(com.codename1.ui.TextInputState state,
+            com.codename1.ui.TextInputClient client) {
+        TextInputCapture capture = new TextInputCapture(state, client);
+        synchronized (tiPendingCaptures) {
+            int id = ++tiCaptureId;
+            if (id == 0) {
+                id = ++tiCaptureId;
+            }
+            tiPendingCaptures.put(id, capture);
+            return id;
+        }
+    }
+
+    /// Native main-queue acknowledgement: publish only with the matching shadow state.
+    /// Rejected echoes discard their capture; callbacks from closed sessions are ignored.
+    public static void tiPublishGeometry(int captureId, boolean accepted) {
+        synchronized (tiPendingCaptures) {
+            if (captureId == 0) {
+                // A native edit has advanced the shadow ahead of any Java echo.
+                tiSnapshot = null;
+                tiGeometry = null;
+                return;
+            }
+            TextInputCapture capture = tiPendingCaptures.remove(captureId);
+            if (capture != null) {
+                tiSnapshot = accepted ? capture.state : null;
+                tiGeometry = accepted ? capture.geometry : null;
+            }
+        }
+    }
+
+    private static void clearTextInputCaptures() {
+        synchronized (tiPendingCaptures) {
+            tiPendingCaptures.clear();
+            tiSnapshot = null;
+            tiGeometry = null;
+        }
+    }
+
+    private int[] tiBounds;
     /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
     /// with every state push so the native shadow can drop echoes that predate a newer local
     /// edit (fast typing would otherwise regress the shadow text and caret).
@@ -1770,7 +1886,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
         tiClient = client;
         com.codename1.ui.TextInputState st = client.getEditingState();
-        tiSnapshot = st;
+        clearTextInputCaptures();
+        int captureId = queueTextInputCapture(st, client);
         tiNativeSeq = 0;
         int constraint = config != null ? config.getConstraint() : 0;
         boolean autoCorrect = config == null || config.isAutoCorrect();
@@ -1778,7 +1895,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean multiline = config == null || config.isMultiline();
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
                 st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
-                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT);
+                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT, captureId);
+        tiBounds = null;
+        refreshTextInputBounds(client);
+        tiKeepNativeCallbacksAlive();
         return client;
     }
 
@@ -1791,17 +1911,36 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
-        tiSnapshot = state;
+        int captureId = queueTextInputCapture(state, c);
+        refreshTextInputBounds(c);
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
-                r[0], r[1], r[2], r[3], tiNativeSeq);
-        // Push the editor component's absolute bounds so the native input view can gate its touch region to
-        // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
-        if (c instanceof com.codename1.ui.Component) {
-            com.codename1.ui.Component comp = (com.codename1.ui.Component) c;
-            nativeInstance.setTextInputBounds(comp.getAbsoluteX(), comp.getAbsoluteY(),
-                    comp.getWidth(), comp.getHeight());
-        }
+                r[0], r[1], r[2], r[3], tiNativeSeq, captureId);
         tiKeepNativeCallbacksAlive();
+    }
+
+    // Called on the EDT after layout/painting as well as text changes. UIKit only reads the
+    // volatile immutable result; it never synchronously waits for the EDT to measure fonts.
+    private void refreshTextInputGeometry() {
+        com.codename1.ui.TextInputClient client = tiClient;
+        if (client == null) {
+            return;
+        }
+        updateTextInputState(client, client.getEditingState());
+    }
+
+    private void refreshTextInputBounds(com.codename1.ui.TextInputClient client) {
+        if (client instanceof Component) {
+            Component component = (Component) client;
+            int x = component.getAbsoluteX() + component.getScrollX();
+            int y = component.getAbsoluteY() + component.getScrollY();
+            int width = component.getWidth();
+            int height = component.getHeight();
+            if (tiBounds == null || tiBounds[0] != x || tiBounds[1] != y
+                    || tiBounds[2] != width || tiBounds[3] != height) {
+                tiBounds = new int[]{x, y, width, height};
+                nativeInstance.setTextInputBounds(x, y, width, height);
+            }
+        }
     }
 
     // The ti* callbacks below are invoked ONLY from native code (CN1TextInputView.m). ParparVM's dead
@@ -1817,11 +1956,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private static void tiKeepNativeCallbacksAlive() {
         if (tiKeepAlive) {
+            tiPublishGeometry(0, false);
             tiCommit("", 0);
             tiSetComposing("", 0, 0);
             tiFinishComposing(0);
             tiDeleteBackward(0);
             tiKeyCommand(0, 0);
+            tiKeyCommandWithSequence(0, 0, 0);
             tiEditorAction(0);
             tiReplaceRange(0, 0, "", 0);
             tiSetSelection(0, 0, 0);
@@ -1842,6 +1983,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         tiClient = null;
+        clearTextInputCaptures();
+        tiBounds = null;
         nativeInstance.stopTextInput();
     }
 
@@ -1915,6 +2058,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
 
+    /// macOS commands wait for this acknowledged state before replaying native edits.
+    public static void tiKeyCommandWithSequence(final int command, final int modifiers, final int seq) {
+        final com.codename1.ui.TextInputClient client = tiClient;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (client == null || client != tiClient) {
+                    return;
+                }
+                try {
+                    client.onKeyCommand(command, modifiers);
+                } finally {
+                    if (client == tiClient) {
+                        tiNativeSeq = seq;
+                        instance.updateTextInputState(client, client.getEditingState());
+                    }
+                }
+            }
+        });
+    }
+
     /// Callback from native: keyboard return / action key.
     public static void tiEditorAction(final int action) {
         final com.codename1.ui.TextInputClient c = tiClient;
@@ -1931,7 +2094,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     // ---- UITextInput text/selection/geometry queries. These arrive synchronously on the iOS
     // MAIN thread while the EDT (a separate ParparVM thread) may be mid-edit, so text and
     // selection are answered from the volatile immutable snapshot pushed with each state
-    // update, and layout-dependent geometry marshals onto the EDT. ----
+    // update, including immutable layout geometry captured on the EDT. ----
 
     /// Total document length in UTF-16 characters.
     public static int tiTextLength() {
@@ -1963,60 +2126,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return s != null ? s.getSelectionEnd() : 0;
     }
 
-    /// Runs a geometry query against the live editor on the EDT and returns its result. The main
-    /// thread never holds locks the EDT needs (all native UI work is dispatched asynchronously),
-    /// so the bounded wait cannot deadlock.
-    private static int[] tiGeometryQuery(final TiGeometryOp op) {
-        final com.codename1.ui.TextInputClient c = tiClient;
-        if (c == null) {
-            return new int[0];
-        }
-        Display d = Display.getInstance();
-        if (d.isEdt()) {
-            return op.run(c);
-        }
-        final int[][] out = new int[1][];
-        d.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                if (c == tiClient) {
-                    out[0] = op.run(c);
-                }
-            }
-        });
-        return out[0] != null ? out[0] : new int[0];
-    }
-
-    private interface TiGeometryOp {
-        int[] run(com.codename1.ui.TextInputClient c);
-    }
-
-    /// Caret rectangle for an offset, absolute screen pixels `{x, y, w, h}`.
+    // UIKit geometry callbacks must not synchronously wait for the EDT. Rendering, font
+    // metrics and other EDT operations can synchronously dispatch to the main queue.
+    // Geometry is captured with each editing-state update and queried as immutable data.
     public static int[] tiRectForOffset(final int offset) {
-        int[] r = tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return c.rectForOffset(offset);
-            }
-        });
-        return r.length >= 4 ? r : new int[]{0, 0, 0, 0};
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? new int[]{0, 0, 0, 0} : g.rectForOffset(offset);
     }
 
-    /// Document offset nearest an absolute screen point (pixels).
     public static int tiOffsetAtPoint(final int x, final int y) {
-        int[] r = tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return new int[]{c.offsetAtPoint(x, y)};
-            }
-        });
-        return r.length > 0 ? r[0] : 0;
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? 0 : g.offsetAtPoint(x, y);
     }
 
-    /// Selection rectangles for `[start, end)`, flat array of absolute-pixel `{x, y, w, h, ...}`.
     public static int[] tiSelectionRects(final int start, final int end) {
-        return tiGeometryQuery(new TiGeometryOp() {
-            public int[] run(com.codename1.ui.TextInputClient c) {
-                return c.selectionRects(start, end);
-            }
-        });
+        com.codename1.ui.TextInputGeometry g = tiGeometry;
+        return g == null ? new int[0] : g.selectionRects(start, end);
     }
 
     /// Callback from native: replace a range with text (range based edit).
@@ -2041,8 +2166,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                if (c != tiClient) {
+                    return;
+                }
                 tiNativeSeq = seq;
                 c.setSelectionRange(start, end);
+                instance.updateTextInputState(c, c.getEditingState());
             }
         });
     }
@@ -2126,7 +2255,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// mode exists to make.
     @Override
     public void paintDirty() {
-        if (isDirectToDrawable() && hasPendingPaints()) {
+        boolean painted = hasPendingPaints();
+        if (isDirectToDrawable() && painted) {
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
                 // Painted HERE rather than enqueued. repaint(f) would append,
@@ -2149,6 +2279,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         super.paintDirty();
+        if (painted && tiClient != null) {
+            refreshTextInputGeometry();
+        }
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
@@ -5153,6 +5286,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         return stringWidthNative(fnt.peer, str);
     }
     
+    @Override
+    public int[] getTextRunPositions(Object nativeFont, String text, boolean rtl) {
+        int[] positions = new int[text.length() + 1];
+        nativeInstance.textRunPositionsNative(f(nativeFont).peer, text, rtl, positions);
+        return positions;
+    }
+
     class FontStringCache {
         String txt;
         long peer;
@@ -5936,10 +6076,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// native's dispatch_sync back onto the main queue it was already occupying
     /// and deadlocked.
     ///
-    /// dropEvents is cleared HERE, immediately, and only the listener is
-    /// marshalled. That flag suppresses input while a modal picker is up, and
-    /// deferring it to the EDT would leave events dropped for a turn after the
-    /// picker closed.
+    /// AppKit scopes input suppression to each document sheet's owner. These
+    /// requests must not change the global dropEvents flag: another window can
+    /// remain interactive while a sheet is open, and unrelated capture requests
+    /// own their own suppression lifetime. Only the listener is marshalled.
     ///
     /// New methods rather than a change to the shared ones, so the iOS document
     /// picker and the Mac share callback keep the behaviour they have. Note
@@ -5947,13 +6087,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// deadlock the same way -- that is pre-existing, framework-wide, and wants
     /// fixing inside fileChooserResult/capturePictureResult where every caller
     /// benefits.
-    public static void macFileChooserResult(final String r) {
-        dropEvents = false;
-        // Bound to the request NOW, on the thread the native answered on,
-        // rather than read later from the shared slot: by the time the EDT runs
-        // the delivery a second openFileChooser() may have replaced it, and
-        // this result would then fire the wrong listener and orphan its own.
-        final EventDispatcher target = macDequeue(macFileChooserQueue);
+    public static void macFileChooserResult(final String r, final int requestId) {
+        final EventDispatcher target;
+        synchronized (macFileChooserRequests) {
+            target = macFileChooserRequests.remove(requestId);
+        }
+        if (target == null) {
+            return; // Duplicate or unknown completion cannot consume another request.
+        }
         if (target != null && target == fileChooserCallback) {
             // Nothing else has claimed the slot, so keep it in step: the shared
             // path clears it after delivering, and leaving a fired dispatcher
@@ -5971,7 +6112,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fileChooserResult(r, target);
     }
 
-    /// @see #macFileChooserResult(String)
+    /// @see #macFileChooserResult(String, int)
     public static void macCapturePictureResult(final String r) {
         dropEvents = false;
         final MacCaptureRequest request = macDequeueCapture();
@@ -6047,13 +6188,13 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native document picker.
      */
     public static void fileChooserResult(String r) {
+        dropEvents = false;
         fileChooserResult(r, fileChooserCallback);
         fileChooserCallback = null;
     }
 
     /// @see #capturePictureResult(String, EventDispatcher)
     private static void fileChooserResult(String r, EventDispatcher fileChooserCallback) {
-        dropEvents = false;
         if(fileChooserCallback != null) {
             if(r != null) {
                 if(r.startsWith("file:")) {
@@ -6110,30 +6251,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static EventDispatcher captureCallback;
     private static EventDispatcher fileChooserCallback;
 
-    /// The dispatchers of chooser requests the native has not answered yet,
-    /// oldest first. macOS only.
+    /// Outstanding macOS chooser dispatchers, keyed by request identity.
     ///
-    /// The shared callbacks above are ONE slot read at DELIVERY time, which is
-    /// only sound while a request cannot be outstanding when the next is made.
-    /// It can here: openFileChooser() returns as soon as it has queued the
-    /// panel, so two calls in a single EDT turn overwrite the slot before
-    /// either answer arrives -- the first panel's selection is then delivered
-    /// to the SECOND listener and clears the slot, and the second selection
-    /// finds it null and is dropped. Neither listener hears its own result and
-    /// one hears nothing at all.
-    ///
-    /// A queue rather than a single slot, because pairing by ORDER is exactly
-    /// right on this port: the panel runs through -[NSOpenPanel runModal],
-    /// which is application modal on the main queue, so a second panel cannot
-    /// start until the first returns and the answers come back in the order the
-    /// requests were made.
-    ///
-    /// iOS keeps the single slot. Its pickers are presented rather than run
-    /// modally and its result path is the shared one; changing it belongs with
-    /// a fix to fileChooserResult/capturePictureResult where every caller
-    /// benefits, not smuggled in here.
-    private static final java.util.ArrayList<EventDispatcher> macFileChooserQueue =
-            new java.util.ArrayList<EventDispatcher>();
+    /// Document-owned sheets can finish in any order across windows. Each native
+    /// completion carries the identity assigned before its panel was presented.
+    private static final java.util.HashMap<Integer, EventDispatcher> macFileChooserRequests =
+            new java.util.HashMap<Integer, EventDispatcher>();
+    private static int macFileChooserSequence;
 
     /// One outstanding capture request: who asked, and what SHAPE of answer it
     /// asked for.
@@ -6177,30 +6301,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// Remembers a chooser request's dispatcher so its own result can find it.
-    private static void macEnqueue(java.util.ArrayList<EventDispatcher> queue,
-            EventDispatcher dispatcher) {
-        if (!isMacPlatformStatic() || dispatcher == null) {
-            return;
-        }
-        synchronized (queue) {
-            queue.add(dispatcher);
-        }
-    }
-
-    /// The dispatcher for the oldest unanswered request, or null when there is
-    /// none -- a result the framework never asked for, which is dropped exactly
-    /// as the single-slot path dropped it.
-    private static EventDispatcher macDequeue(
-            java.util.ArrayList<EventDispatcher> queue) {
-        synchronized (queue) {
-            if (queue.isEmpty()) {
-                return null;
-            }
-            return queue.remove(0);
-        }
-    }
-    
     /**
      * Captures a photo and notifies with the image data when available
      * @param response callback for the resulting image
@@ -6629,11 +6729,29 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openFileChooser(ActionListener response, String accept) {
-        fileChooserCallback = new EventDispatcher();
-        fileChooserCallback.addListener(response);
-        macEnqueue(macFileChooserQueue, fileChooserCallback);
-        nativeInstance.openFileChooser(accept);
-        dropEvents = true;
+        EventDispatcher callback = new EventDispatcher();
+        callback.addListener(response);
+        fileChooserCallback = callback;
+        if (isMacPlatform()) {
+            final int requestId;
+            synchronized (macFileChooserRequests) {
+                requestId = ++macFileChooserSequence;
+                macFileChooserRequests.put(requestId, callback);
+            }
+            try {
+                nativeInstance.openFileChooserWithId(accept, requestId);
+            } catch (RuntimeException failure) {
+                synchronized (macFileChooserRequests) {
+                    macFileChooserRequests.remove(requestId);
+                }
+                if (fileChooserCallback == callback) { fileChooserCallback = null; }
+                throw failure;
+            }
+            if (tiKeepAlive) { macFileChooserResult(null, 0); }
+        } else {
+            dropEvents = true;
+            nativeInstance.openFileChooser(accept);
+        }
     }
     
     

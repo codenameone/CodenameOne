@@ -2764,6 +2764,49 @@ JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_Str
     //XMLVM_END_WRAPPER
 }
 
+// One Core Text layout serves every UTF-16 insertion position. Measuring every
+// prefix separately makes long editor lines quadratic on each state update.
+void com_codename1_impl_ios_IOSNative_textRunPositionsNative___long_java_lang_String_boolean_int_1ARRAY(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer,
+        JAVA_OBJECT textObject, JAVA_BOOLEAN rtl, JAVA_OBJECT positionsObject) {
+    POOL_BEGIN();
+    NSString *text = toNSString(CN1_THREAD_STATE_PASS_ARG textObject);
+    CN1Font *font = (BRIDGE_CAST CN1Font *)(void *)peer;
+    if (font == nil) { font = [CN1Font systemFontOfSize:16.0]; }
+    NSDictionary *attributes = @{
+        NSFontAttributeName: font,
+        (BRIDGE_CAST id)kCTWritingDirectionAttributeName: @[@((rtl ? kCTWritingDirectionRightToLeft
+                : kCTWritingDirectionLeftToRight) | kCTWritingDirectionOverride)]
+    };
+    NSAttributedString *attributed = [[NSAttributedString alloc] initWithString:text attributes:attributes];
+    CTLineRef line = CTLineCreateWithAttributedString((BRIDGE_CAST CFAttributedStringRef)attributed);
+    JAVA_ARRAY array = (JAVA_ARRAY)positionsObject;
+    JAVA_ARRAY_INT *positions = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(array);
+    NSUInteger count = MIN((NSUInteger)array->length, text.length + 1);
+    for (NSUInteger i = 0; i < count; i++) { positions[i] = -1; }
+    // CTLineGetOffsetForStringIndex scans glyphs for each query, so calling it
+    // once per character is still quadratic even when the CTLine is shared.
+    // Enumerate the shaped caret edges in one pass instead.
+    CTLineEnumerateCaretOffsets(line, ^(double offset, CFIndex index, bool leading, bool *stop) {
+        CFIndex insertion = leading ? index : index + 1;
+        if (insertion >= 0 && insertion < count && (leading || positions[insertion] == -1)) {
+            positions[insertion] = (JAVA_ARRAY_INT)offset;
+        }
+    });
+    // Interior UTF-16 units of a surrogate pair or composed character share its
+    // logical leading edge. Core Text only enumerates legal cluster boundaries.
+    JAVA_ARRAY_INT previous = 0;
+    for (NSUInteger i = 0; i < count; i++) {
+        if (positions[i] == -1) { positions[i] = previous; }
+        previous = positions[i];
+    }
+    CFRelease(line);
+#if !__has_feature(objc_arc)
+    [attributed release];
+#endif
+    POOL_END();
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_charWidthNative___long_char(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_CHAR n2)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_charWidthNative___long_char]
@@ -9026,7 +9069,12 @@ static void cn1AddFileChooserDocumentType(NSMutableArray *types, CFStringRef tag
     if (tag == nil || [tag length] == 0) {
         return;
     }
-    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, NULL);
+    // Unknown extensions produce dynamic UTIs. Filesystem URLs classify these
+    // as data, so creating an unconstrained dynamic UTI makes the picker reject
+    // the very extension requested by the caller (e.g. a saved .cn1doc file).
+    // The stable UTI string also works on older iOS versions, without referencing
+    // the kUTTypeData constant deprecated in iOS 15.
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, CFSTR("public.data"));
     if (uti != NULL) {
 #if __has_feature(objc_arc)
         NSString *type = CFBridgingRelease(uti);
@@ -9065,7 +9113,14 @@ static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
 }
 #endif
 
+void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept, JAVA_INT requestId);
+
 void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+    com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(
+        CN1_THREAD_STATE_PASS_ARG instanceObject, accept, 0);
+}
+
+void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept, JAVA_INT requestId) {
 #if TARGET_OS_OSX
     NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
     NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
@@ -9083,40 +9138,26 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         if (documentTypes.count > 0) {
             panel.allowedFileTypes = documentTypes;
         }
-        NSInteger response = [panel runModal];
-        NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
-        // Called from the AppKit main queue, not the EDT -- the same thread
-        // contract the UIKit twin of this callback has always had:
-        // -documentPicker:didPickDocumentsAtURLs: in
-        // CodenameOne_GLViewController.m calls this very method straight from a
-        // UIKit main thread delegate, and the EDT is a separate thread on both
-        // platforms. The share callback in CN1MacShare.m does the same.
-        //
-        // An application listener that dispatch_syncs to the main queue from
-        // here deadlocks on itself, and setURL() does exactly that through the
-        // shared browser native -- so these two call sites go through
-        // macFileChooserResult / macCapturePictureResult, which clear
-        // dropEvents immediately and hand the listener to the EDT.
-        //
-        // This used to argue the opposite: that marshalling macOS alone would
-        // put the port out of step with the iOS twin and the mac share
-        // callback. Consistency is worth something, but not a deadlock, and
-        // running an application listener on the EDT is the framework's
-        // contract rather than a local preference. The iOS twin still fires off
-        // the EDT and can still deadlock the same way; that is pre-existing and
-        // wants fixing where every caller benefits.
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
-            threadStateData,
-            // path, not absoluteString. fileChooserResult prefixes "file:" and
-            // unfile() strips it again WITHOUT percent decoding, so an encoded
-            // URL reached FileSystemStorage.openInputStream() as a literal
-            // "My%20File.txt" and the documented workflow simply failed on any
-            // name with a space, a '#' or a non-ASCII character. A single path
-            // needs no encoding: unlike the multi-select gallery beside it,
-            // there is no separator here for a filename to collide with.
-            picked == nil ? JAVA_NULL
-                          : fromNSString(threadStateData, [picked path]));
+        NSWindow *owner = [CN1MacKeyRenderingHostView() window];
+        void (^completed)(NSModalResponse) = ^(NSModalResponse response) {
+            POOL_BEGIN();
+            NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
+            [panel orderOut:nil];
+            if (owner != nil && owner.visible) [owner makeKeyAndOrderFront:nil];
+            // AppKit releases this sheet's owner; Java delivers the path on the EDT.
+            // FileSystemStorage expects an unescaped path, not a URL string.
+            struct ThreadLocalData *threadStateData = getThreadLocalData();
+            com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String_int(
+                threadStateData, picked == nil ? JAVA_NULL : fromNSString(threadStateData, [picked path]), requestId);
+            POOL_END();
+        };
+        if (owner != nil) {
+            // A document-owned sheet avoids a nested application-modal event loop and
+            // returns keyboard/accessibility focus to the window that opened it.
+            [panel beginSheetModalForWindow:owner completionHandler:completed];
+        } else {
+            [panel beginWithCompletionHandler:completed];
+        }
         POOL_END();
 #ifndef CN1_USE_ARC
         [documentTypes release];

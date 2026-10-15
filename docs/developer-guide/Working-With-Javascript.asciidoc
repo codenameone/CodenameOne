@@ -602,7 +602,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 [id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
 === Deploying as a progressive web app
 
-Out of the box, your app is ready to be deployed as a progressive web app (PWA). That means that users can access the app directly in their browser, but once the browser determines that the user is frequenting the app, it will prompt the user to install the app on their home screen. Once installed on the home screen, the app will behave like a native app. It will continue to work while offline, and if the user launches the app, it will open without the browser's navigation bar. If you were to install the native and PWA versions of your app side by side, you would be hard-pressed to find the difference - especially on newer devices.
+JavaScript application builds include the files needed for progressive web app (PWA) installation. Users can open the app in a browser and install it on browsers that support installation. The default manifest requests a standalone window without browser navigation controls. Offline launch becomes available after the service worker finishes caching the application files; network-dependent features still require a connection.
 
 Below is a screenshot from Chrome for Android where the browser is prompting the user to add the app to their home screen.
 
@@ -615,7 +615,7 @@ If the app is available as a native app, in the Play store, you can indicate thi
 image::img/javascript-pwa-add-native-app-banner.png[Add native app banner,scaledwidth=20%]
 
 
-NOTE: The PWA standard requires that you host your app on over HTTPS. For testing purposes, it will also work when accessed at a `localhost` address. You can use the https://developers.google.com/web/ilt/pwa/lighthouse-pwa-analysis-tool[Lighthouse PWA analysis tool] to ensure compliance.
+NOTE: Host the app over HTTPS. For local testing, browsers also allow service workers on `localhost`. In Chrome DevTools, use the `Application` panel to inspect the manifest, icons, service-worker status and cache contents, then test an offline reload.
 
 For more information about Progressive Web Apps see https://developers.google.com/web/progressive-web-apps/[Google's introduction to the subject].
 
@@ -633,6 +633,14 @@ You can find a full list of available manifest keys https://developer.mozilla.or
 
 NOTE: The `javascript.manifest.related_applications` build hint expects a JSON formatted list, like in the raw manifest file.
 
+==== Offline use and updates
+
+ParparVM JavaScript application builds generate `manifest.json`, home-screen icons, and `sw.js` automatically. No PWA enablement hint is required. Deploy the complete bundle over HTTPS (or localhost for testing), including its subdirectories. Relative manifest and asset URLs allow deployment under a path such as `/cn1test/`.
+
+The service worker caches the generated application files, including the runtime, translated JavaScript chunks, themes and bundled resources. Wait for its first installation to finish while online before testing offline launch. API responses, proxy requests and external resources aren't included; application features that need those services still require a connection.
+
+A content change creates a new cache even when the application version is unchanged. An update waits until the previous app's tabs/windows close before activating, so a running app doesn't mix runtime and resource versions. Each deployment path has its own cache. Allow browsers to revalidate `sw.js` and deploy the files together.
+
 ==== Related applications
 
 One nice feature (discussed above) of progressive web apps, is the ability to specify related applications in the app manifest. Browsers that support the PWA standard use some heuristics to "offer" the user to install the associated native app when it's clear that the user is using the app on a regular basis. Use the `javascript.manifest.related_applications` build hint to specify the location of the native version of your app. For example, `javascript.manifest.related_applications=[{"platform":"play", "id":"my.app.id"}]`
@@ -643,7 +651,7 @@ NOTE: According to the https://developer.mozilla.org/en-US/docs/Web/Manifest[app
 
 ==== Device/Browser support for PWAs
 
-Chrome and Firefox both support PWAs on desktop and on Android. iOS doesn't support the PWA standard, however, many aspects of it are supported. For example, On iOS you can add the app to your home screen, after which time it will appear and behave like a native app - and it will continue to work while offline. However, many other nice features of PWA like "Install this app on your home screen" banners, push notifications, and invitations to install the native version of the app, aren't supported. It's unclear when, or even, whether Apple will ever add full support; but most experts predict that they will join the rest of the civilized world and add PWA support in the near future.
+Installation controls vary by browser. Chrome on Android and Chromium browsers on desktop can install a web app from its manifest. On iOS and iPadOS, use Safari's Share menu and choose `Add to Home Screen`. Home Screen web apps support offline service workers; https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/[Web Push is available starting with iOS and iPadOS 16.4]. Browser support doesn't by itself configure an application's push provider or permissions.
 
 On the desktop, Chrome provides an analogous feature to "add to your homescreen": `Add to shelf`. If it looks like the user is using the app on a regular basis, and it isn't yet installed, it will show a banner at the top of the page asking the user if they want to add to their shelf.
 

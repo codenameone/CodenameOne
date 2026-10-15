@@ -229,6 +229,8 @@ public final class LinuxNative {
     /// Window peers by slot; this is the one the form title goes to in desktop "native"
     /// title-bar mode, where the CN1 title area is suppressed. A no-op when headless.
     public static native void mainWindowSetTitle(String title);
+    public static native void mainWindowTitleBarInsets(int[] result);
+    public static native void mainWindowTitleBarRegions(int[] regions);
 
     public static native void desktopWindowSetTitle(int slot, String title);
 

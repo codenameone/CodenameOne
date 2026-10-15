@@ -25,10 +25,12 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
 
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -42,6 +44,289 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * legacy {@code toolbar} mode and mobile remain unchanged.
  */
 class DesktopChromeTest extends UITestBase {
+
+    @FormTest
+    void customChromePublishesOriginalOnTopSideMenuCommandsAndLaterChanges() {
+        boolean onTop = Toolbar.isOnTopSideMenu();
+        try {
+            Toolbar.setOnTopSideMenu(true);
+            desktopMode("custom");
+            Form f = new Form("Document");
+            Command save = new Command("Save");
+            save.setDesktopMenu("File");
+            f.getToolbar().addCommandToSideMenu(save);
+            f.show();
+            DisplayTest.flushEdt();
+            assertTrue(implementation.getLastNativeCommands().contains(save));
+            Command later = new Command("Export");
+            f.getToolbar().addCommandToSideMenu(later);
+            assertTrue(implementation.getLastNativeCommands().contains(later));
+            f.getToolbar().removeCommand(later);
+            assertFalse(implementation.getLastNativeCommands().contains(later));
+        } finally {
+            Toolbar.setOnTopSideMenu(onTop);
+        }
+    }
+
+    @FormTest
+    void customTitleBarExcludesButtonsAndPointerListenersFromWindowDrags() {
+        desktopMode("custom");
+        Form f = new Form("Document");
+        Toolbar toolbar = f.getToolbar();
+        Button save = new Button("Save");
+        save.setEnabled(false);
+        Label rename = new Label("Rename");
+        rename.addPointerReleasedListener(e -> { });
+        Label title = new Label("Document");
+        Container content = BoxLayout.encloseX(save, rename, title);
+        toolbar.setTitleComponent(content);
+        f.show();
+        DisplayTest.flushEdt();
+        assertFalse(toolbar.isTitleBarDragPoint(save.getAbsoluteX() + 1, save.getAbsoluteY() + 1),
+                "even a disabled button must not initiate a window drag");
+        assertFalse(toolbar.isTitleBarDragPoint(rename.getAbsoluteX() + 1, rename.getAbsoluteY() + 1),
+                "custom pointer controls keep their gestures");
+        assertTrue(toolbar.isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1),
+                "an ordinary title label remains a native drag region");
+        assertFalse(toolbar.isTitleBarDragPoint(toolbar.getAbsoluteX() + 1,
+                toolbar.getAbsoluteY() + toolbar.getHeight()), "the document below is not a title bar");
+    }
+
+    @FormTest
+    void customPointerHandlersAndLongPressListenersAreNotWindowDragRegions() {
+        desktopMode("custom");
+        Form form = new Form("Custom controls");
+        Label custom = new Label("Custom click") {
+            @Override public void pointerReleased(int x, int y) { }
+        };
+        Label longPress = new Label("Long press");
+        longPress.addLongPressListener(e -> { });
+        Label ordinary = new Label("Plain title");
+        form.getToolbar().setTitleComponent(BoxLayout.encloseX(custom, longPress, ordinary));
+        form.show();
+        DisplayTest.flushEdt();
+        assertFalse(form.getToolbar().isTitleBarDragPoint(custom.getAbsoluteX() + 1,
+                custom.getAbsoluteY() + 1), "an overridden pointer handler must keep its press");
+        assertFalse(form.getToolbar().isTitleBarDragPoint(longPress.getAbsoluteX() + 1,
+                longPress.getAbsoluteY() + 1), "a long-press listener must keep its press");
+        assertTrue(form.getToolbar().isTitleBarDragPoint(ordinary.getAbsoluteX() + 1,
+                ordinary.getAbsoluteY() + 1));
+    }
+
+    @FormTest
+    void passiveCustomTitleBackgroundCanOptInWithoutTakingChildInput() {
+        desktopMode("custom");
+        Form form = new Form("Passive custom title");
+        Container custom = new Container(BoxLayout.x()) { };
+        Label title = new Label("Title");
+        Button button = new Button("Save");
+        custom.add(title).add(button);
+        Toolbar.setTitleBarDragRegion(custom, true);
+        form.getToolbar().setTitleComponent(custom);
+        form.show();
+        DisplayTest.flushEdt();
+        assertTrue(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+        assertFalse(form.getToolbar().isTitleBarDragPoint(button.getAbsoluteX() + 1, button.getAbsoluteY() + 1));
+        Toolbar.setTitleBarDragRegion(title, false);
+        assertFalse(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+        Toolbar.setTitleBarDragRegion(title, true);
+        title.addLongPressListener(e -> { });
+        assertFalse(form.getToolbar().isTitleBarDragPoint(title.getAbsoluteX() + 1, title.getAbsoluteY() + 1));
+    }
+
+    @FormTest
+    void changingDragEligibilityRepaintsTheToolbarThatPublishesNativeRegions() {
+        desktopMode("custom");
+        Form form = new Form("Repaint regions");
+        Label title = new Label("Document title");
+        Toolbar toolbar = form.getToolbar();
+        toolbar.setTitleComponent(title);
+        form.show();
+        DisplayTest.flushEdt();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        int originalLength = implementation.getLastTitleBarRegions().length;
+        java.util.List<Object> repaints = new java.util.ArrayList<Object>();
+        implementation.recordRepaints(repaints);
+        try {
+            Toolbar.setTitleBarDragRegion(title, false);
+            assertTrue(repaints.contains(toolbar), "a child-only repaint leaves the native hit map stale");
+            toolbar.paint(graphics);
+            assertTrue(implementation.getLastTitleBarRegions().length > originalLength);
+            repaints.clear();
+            Toolbar.setTitleBarDragRegion(title, true);
+            assertTrue(repaints.contains(toolbar));
+            toolbar.paint(graphics);
+            assertEquals(originalLength, implementation.getLastTitleBarRegions().length);
+        } finally {
+            implementation.recordRepaints(null);
+        }
+    }
+
+    @FormTest
+    void resetClearsNativeTitleInsets() {
+        implementation.setNativeTitleBarInsets(10, 20, 3, 4, 30);
+        implementation.reset();
+        assertNull(implementation.getNativeWindowTitleBarInsets(null));
+    }
+
+    @FormTest
+    void customTitleRegionsFollowResizeAndClearWhenToolbarIsRemoved() {
+        desktopMode("custom");
+        Form f = new Form("Document");
+        f.show();
+        DisplayTest.flushEdt();
+        Toolbar toolbar = f.getToolbar();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        int width = toolbar.getWidth();
+        assertEquals(width, implementation.getLastTitleBarRegions()[2]);
+        toolbar.setWidth(width + 100);
+        toolbar.paint(graphics);
+        assertEquals(width + 100, implementation.getLastTitleBarRegions()[2]);
+        toolbar.deinitialize();
+        assertEquals(0, implementation.getLastTitleBarRegions().length,
+                "a removed title bar must not leave invisible window drag handles");
+    }
+
+    @FormTest
+    void hidingToolbarImmediatelyClearsNativeAndFallbackDragRegions() {
+        desktopMode("custom");
+        Form form = new Form("Document");
+        form.show();
+        DisplayTest.flushEdt();
+        Toolbar toolbar = form.getToolbar();
+        Graphics graphics = Image.createImage(800, 800).getGraphics();
+        toolbar.paint(graphics);
+        assertTrue(implementation.getLastTitleBarRegions().length > 0);
+        toolbar.setVisible(false);
+        assertEquals(0, implementation.getLastTitleBarRegions().length,
+                "hiding must clear regions before any subsequent paint");
+        assertFalse(toolbar.isTitleBarDragPoint(toolbar.getAbsoluteX() + 1, toolbar.getAbsoluteY() + 1));
+        toolbar.paint(graphics); // a manual paint must not republish a hidden band
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+        toolbar.setVisible(true);
+        toolbar.paint(graphics);
+        assertTrue(implementation.getLastTitleBarRegions().length > 0);
+    }
+
+    @FormTest
+    void hidingTitleToolbarBeforeFirstPaintClearsNativeChrome() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Not painted yet");
+        form.show();
+        Toolbar toolbar = form.getToolbar();
+        toolbar.calcPreferredSize(); // native ports enable integrated chrome here
+        assertNull(implementation.getLastTitleBarRegions(), "no paint regions published yet");
+        toolbar.setVisible(false);
+        assertNotNull(implementation.getLastTitleBarRegions(), "hide must send a native clear");
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+        toolbar.setVisible(true);
+        toolbar.paint(Image.createImage(800, 800).getGraphics());
+        assertTrue(implementation.getLastTitleBarRegions().length > 0,
+                "showing again must restore native drag regions");
+    }
+
+    @FormTest
+    void removingTitleToolbarBeforeFirstPaintClearsNativeChrome() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Removed before paint");
+        form.show();
+        Toolbar toolbar = form.getToolbar();
+        toolbar.doLayout(); // layout also queries the native insets
+        assertNull(implementation.getLastTitleBarRegions(), "no paint regions published yet");
+        toolbar.remove();
+        assertNotNull(implementation.getLastTitleBarRegions(), "removal must send a native clear");
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+    }
+
+    @FormTest
+    void nativeControlsReservePhysicalSpaceWithoutChangingApplicationStyle() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Document");
+        Toolbar toolbar = form.getToolbar();
+        toolbar.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        toolbar.getAllStyles().setPadding(2, 3, 5, 7);
+        toolbar.setTitleCentered(false);
+        Container content = new Container(new com.codename1.ui.layouts.BorderLayout());
+        Button left = new Button("Save");
+        Button right = new Button("Search");
+        content.add(com.codename1.ui.layouts.BorderLayout.WEST, left);
+        content.add(com.codename1.ui.layouts.BorderLayout.EAST, right);
+        toolbar.setTitleComponent(content);
+        form.show();
+        DisplayTest.flushEdt();
+        assertTrue(toolbar.getPreferredH() >= 50);
+        assertTrue(content.getX() >= 75);
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 137);
+        assertEquals(5, toolbar.getStyle().getPaddingLeftNoRTL());
+        assertEquals(7, toolbar.getStyle().getPaddingRightNoRTL());
+        assertEquals(2, toolbar.getStyle().getPaddingTop());
+        assertEquals(3, toolbar.getStyle().getPaddingBottom());
+        int x = content.getX();
+        toolbar.layoutContainer();
+        assertEquals(x, content.getX(), "repeated layouts must not accumulate native insets");
+        implementation.setNativeTitleBarInsets(0, 90, 0, 0, 35);
+        toolbar.setShouldCalcPreferredSize(true);
+        toolbar.layoutContainer();
+        assertTrue(content.getX() < x, "changed native geometry releases the old reserved space");
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 97);
+        toolbar.setRTL(true);
+        toolbar.layoutContainer();
+        assertTrue(content.getX() + content.getWidth() <= toolbar.getWidth() - 90,
+                "OS controls stay on their physical side in an RTL document");
+    }
+
+    @FormTest
+    void nativeTitleInsetsPreserveMixedPaddingUnitsAcrossMeasurementsAndLayouts() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Mixed units");
+        Toolbar toolbar = form.getToolbar();
+        form.show();
+        DisplayTest.flushEdt();
+        Style style = toolbar.getStyle();
+        byte[] units = {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_SCREEN_PERCENTAGE, Style.UNIT_TYPE_REM};
+        style.setPaddingUnit(units);
+        style.setPadding(2, 3, 5, 7);
+        for (boolean rtl : new boolean[]{false, true}) {
+            toolbar.setRTL(rtl);
+            for (int pass = 0; pass < 3; pass++) {
+                toolbar.calcPreferredSize();
+                assertArrayEquals(units, style.getPaddingUnit(), "measurement must preserve per-side units");
+                toolbar.doLayout();
+                assertArrayEquals(units, style.getPaddingUnit(), "layout must preserve per-side units");
+                assertEquals(2f, style.getPaddingFloatValue(false, Component.TOP));
+                assertEquals(3f, style.getPaddingFloatValue(false, Component.BOTTOM));
+                assertEquals(5f, style.getPaddingFloatValue(false, Component.LEFT));
+                assertEquals(7f, style.getPaddingFloatValue(false, Component.RIGHT));
+            }
+        }
+        style.setPaddingUnit((byte[]) null);
+        toolbar.calcPreferredSize();
+        toolbar.doLayout();
+        assertNull(style.getPaddingUnit(), "implicit pixel units must stay implicit");
+    }
+
+    @FormTest
+    void mobileAndLegacyToolbarsDoNotReserveDesktopControls() {
+        implementation.setNativeTitleBarInsets(200, 200, 50, 50, 300);
+        Toolbar.setGlobalToolbar(true);
+        implementation.setDesktop(false);
+        Form mobile = new Form("Mobile");
+        mobile.show();
+        DisplayTest.flushEdt();
+        assertTrue(mobile.getToolbar().getPreferredH() < 300);
+        desktopMode("toolbar");
+        Form legacy = new Form("Legacy");
+        legacy.show();
+        DisplayTest.flushEdt();
+        assertTrue(legacy.getToolbar().getPreferredH() < 300);
+    }
 
     private void desktopMode(String titleBarMode) {
         implementation.setDesktop(true);

@@ -290,6 +290,21 @@ static GtkWidget* cn1Window = 0;
 /* Set by initDisplay before publishing the GTK window. */
 static pthread_t cn1GtkThread;
 static GtkWidget* cn1DrawingArea = 0;
+static GtkWidget* cn1TitleHeader;
+static GtkWidget* cn1TitleCanvas;
+static GtkWidget* cn1TitleFixed;
+static GtkWidget* cn1TitleAccessibilityFixed;
+static int cn1TitleHeight;
+static int cn1TitleX;
+static int cn1TitleY;
+static int* cn1TitleRegions;
+static int cn1TitleRegionCount;
+static int cn1TitleEventX(GtkWidget* widget, double x) {
+    return (int)x + (widget == cn1TitleCanvas ? cn1TitleX : 0);
+}
+static int cn1TitleEventY(GtkWidget* widget, double y) {
+    return (int)y + (widget == cn1TitleCanvas ? cn1TitleY : cn1TitleHeight);
+}
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
 static GtkWidget* cn1RootBox = 0;       /* GtkBox: optional menu bar above the overlay */
 static GtkWidget* cn1MenuBar = 0;       /* the native menu bar, when commands published one */
@@ -344,6 +359,18 @@ static GtkWidget* cn1LinuxOverlayHost(int slot) {
  * must run on the GTK main thread (callers marshal via gdk_threads_add_idle). */
 void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height) {
     GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (slot == CN1_MAIN_WINDOW_SLOT) {
+        // The header overlay clips to its allocation. Spanning peers belong in
+        // the body overlay so their document portion remains visible.
+        if (cn1TitleHeader && y >= 0 && y < cn1TitleHeight
+                && height >= 0 && height <= cn1TitleHeight - y) {
+            host = cn1TitleFixed;
+            x -= cn1TitleX;
+            y -= cn1TitleY;
+        } else {
+            y -= cn1TitleHeight;
+        }
+    }
     if (host == 0 || w == 0) {
         return;
     }
@@ -354,16 +381,34 @@ void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int hei
 
 void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height) {
     GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (slot == CN1_MAIN_WINDOW_SLOT) {
+        if (cn1TitleHeader && y >= 0 && y < cn1TitleHeight
+                && height >= 0 && height <= cn1TitleHeight - y) {
+            host = cn1TitleFixed;
+            x -= cn1TitleX;
+            y -= cn1TitleY;
+        } else {
+            y -= cn1TitleHeight;
+        }
+    }
     if (host == 0 || w == 0) {
         return;
     }
     gtk_widget_set_size_request(w, width, height);
-    gtk_fixed_move(GTK_FIXED(host), w, x, y);
+    if (gtk_widget_get_parent(w) != host) {
+        g_object_ref(w);
+        if (gtk_widget_get_parent(w)) gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(w)), w);
+        gtk_fixed_put(GTK_FIXED(host), w, x, y);
+        g_object_unref(w);
+    } else {
+        gtk_fixed_move(GTK_FIXED(host), w, x, y);
+    }
 }
 
 void cn1LinuxOverlayRemove(int slot, GtkWidget* w) {
-    GtkWidget* host = cn1LinuxOverlayHost(slot);
-    if (host != 0 && w != 0 && gtk_widget_get_parent(w) == host) {
+    GtkWidget* host = w ? gtk_widget_get_parent(w) : NULL;
+    (void)slot;
+    if (host != 0 && GTK_IS_CONTAINER(host)) {
         gtk_container_remove(GTK_CONTAINER(host), w);
     }
 }
@@ -473,7 +518,9 @@ static gboolean cn1OnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
      * blit. */
     pthread_mutex_lock(&cn1BufferLock);
     if (cn1WindowG.surface) {
-        cairo_set_source_surface(cr, cn1WindowG.surface, 0, 0);
+        cairo_set_source_surface(cr, cn1WindowG.surface,
+                widget == cn1TitleCanvas ? -cn1TitleX : 0,
+                widget == cn1TitleCanvas ? -cn1TitleY : -cn1TitleHeight);
         cairo_paint(cr);
     }
     pthread_mutex_unlock(&cn1BufferLock);
@@ -483,9 +530,9 @@ static gboolean cn1OnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
 static gboolean cn1OnConfigure(GtkWidget* widget, GdkEventConfigure* e, gpointer data) {
     (void) widget;
     (void) data;
-    if (e->width != cn1DisplayWidth || e->height != cn1DisplayHeight) {
+    if (e->width != cn1DisplayWidth || e->height + cn1TitleHeight != cn1DisplayHeight) {
         cn1DisplayWidth = e->width;
-        cn1DisplayHeight = e->height;
+        cn1DisplayHeight = e->height + cn1TitleHeight;
         /* Recorded, not applied: this is the GTK thread and the event dispatch
          * thread may be part way through a frame on the current buffer. */
         pthread_mutex_lock(&cn1BufferLock);
@@ -556,7 +603,7 @@ static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data)
         return TRUE;
     }
     cn1LinuxPushEvent(e->type == GDK_BUTTON_PRESS ? CN1_EVENT_POINTER_PRESSED : CN1_EVENT_POINTER_RELEASED,
-            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
+            cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), cn1LinuxButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     return TRUE;
 }
 
@@ -568,7 +615,7 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
     }
     int mask = cn1LinuxStateMask(e->state);
     if (mask != 0) {
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y,
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y),
                 mask | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     } else {
         /* No button held: this is hover, and it used to be dropped here.
@@ -576,7 +623,7 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
          * nothing else to fire it, so every hover rule in a desktop theme was
          * inert. Droppable rather than protected: a lost hover costs nothing
          * because hover is idempotent and the next motion re-establishes it. */
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, (int) e->x, (int) e->y,
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y),
                 cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return TRUE;
@@ -613,13 +660,13 @@ static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
         case GDK_TOUCH_BEGIN:
             if (cn1TouchSeq == NULL) {
                 cn1TouchSeq = e->sequence;
-                cn1LinuxPushEvent(CN1_EVENT_POINTER_PRESSED, (int) e->x, (int) e->y,
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_PRESSED, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y),
                         CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
             }
             return TRUE;
         case GDK_TOUCH_UPDATE:
             if (e->sequence == cn1TouchSeq) {
-                cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y,
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y),
                         CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
             }
             return TRUE;
@@ -627,7 +674,7 @@ static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
         case GDK_TOUCH_CANCEL:
             if (e->sequence == cn1TouchSeq) {
                 cn1TouchSeq = NULL;
-                cn1LinuxPushEvent(CN1_EVENT_POINTER_RELEASED, (int) e->x, (int) e->y,
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_RELEASED, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y),
                         CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
             }
             return TRUE;
@@ -669,7 +716,7 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
          * so a keystroke that arrives while one of them holds the GTK focus is still
          * Codename One's. Forwarding it typed into an entry drawn at 1% opacity:
          * the text went nowhere the user could see. */
-        if (focus != 0 && focus != cn1DrawingArea
+        if (focus != 0 && focus != cn1DrawingArea && focus != cn1TitleCanvas
                 && !(cn1AccessibilityFixed != 0 && gtk_widget_is_ancestor(focus, cn1AccessibilityFixed))) {
             return FALSE;
         }
@@ -706,17 +753,17 @@ static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data)
          * deliver the whole gesture to one component and, more importantly,
          * end it: a touchpad emits no pointer events, so the two-pointer path
          * that normally calls pinchReleased() never runs here. */
-        cn1LinuxPushEvent(CN1_EVENT_PINCH_BEGIN, (int) pe->x, (int) pe->y, 0);
+        cn1LinuxPushEvent(CN1_EVENT_PINCH_BEGIN, cn1TitleEventX(widget, pe->x), cn1TitleEventY(widget, pe->y), 0);
     } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_END
             || pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_CANCEL) {
         /* CANCEL as well as END: a cancelled gesture leaves the component
          * mid-pinch exactly as a dropped END would, and the Java side treats
          * both as "the fingers left the touchpad". */
         cn1PinchLastScale = 1.0;
-        cn1LinuxPushEvent(CN1_EVENT_PINCH_END, (int) pe->x, (int) pe->y, 0);
+        cn1LinuxPushEvent(CN1_EVENT_PINCH_END, cn1TitleEventX(widget, pe->x), cn1TitleEventY(widget, pe->y), 0);
     } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
-        int x = (int) pe->x;
-        int y = (int) pe->y;
+        int x = cn1TitleEventX(widget, pe->x);
+        int y = cn1TitleEventY(widget, pe->y);
         if (pe->scale > 0 && cn1PinchLastScale > 0) {
             double inc = pe->scale / cn1PinchLastScale;
             cn1PinchLastScale = pe->scale;
@@ -762,13 +809,13 @@ static gboolean cn1OnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data)
     (void) data;
     /* One notch == 120 units (the WHEEL_DELTA the impl converts to pixels). */
     if (e->direction == GDK_SCROLL_UP) {
-        cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, 120);
+        cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), 120);
     } else if (e->direction == GDK_SCROLL_DOWN) {
-        cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, -120);
+        cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), -120);
     } else if (e->direction == GDK_SCROLL_LEFT) {
-        cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, -120);
+        cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), -120);
     } else if (e->direction == GDK_SCROLL_RIGHT) {
-        cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, 120);
+        cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), 120);
     } else if (e->direction == GDK_SCROLL_SMOOTH) {
         /* Two-finger touchpad scrolling arrives here and nowhere else: a touchpad
          * reports no discrete steps, so GDK emits only a smooth event for it, and
@@ -789,10 +836,10 @@ static gboolean cn1OnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data)
         if (vertical != 0) {
             /* delta_y grows downwards, which GDK_SCROLL_DOWN reports as negative
              * units above. */
-            cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, -vertical * 120);
+            cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), -vertical * 120);
         }
         if (horizontal != 0) {
-            cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, horizontal * 120);
+            cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, cn1TitleEventX(widget, e->x), cn1TitleEventY(widget, e->y), horizontal * 120);
         }
     }
     return TRUE;
@@ -1122,6 +1169,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1WindowOpen = 1;
 }
 
+#include "cn1_linux_chrome.h"
+
 /* ------------------------------------------------------------- menu bar */
 
 /*
@@ -1419,7 +1468,9 @@ typedef struct { int x, y, w, h; } CN1Rect;
 static gboolean cn1QueueDrawIdle(gpointer data) {
     CN1Rect* r = (CN1Rect*) data;
     if (cn1DrawingArea != 0) {
-        gtk_widget_queue_draw_area(cn1DrawingArea, r->x, r->y, r->w, r->h);
+        gtk_widget_queue_draw_area(cn1DrawingArea, r->x, r->y - cn1TitleHeight, r->w, r->h);
+        if (cn1TitleCanvas && r->y < cn1TitleHeight)
+            gtk_widget_queue_draw(cn1TitleCanvas);
     }
     free(r);
     return FALSE; /* one-shot */
@@ -1539,6 +1590,11 @@ static AtkRole cn1A11yRole(const char* role) {
 static void cn1A11yBeginMain(void* ignored) {
     (void) ignored;
     cn1A11yFreeEntries();
+    if (cn1TitleAccessibilityFixed) {
+        GList* titleChildren = gtk_container_get_children(GTK_CONTAINER(cn1TitleAccessibilityFixed));
+        for (GList* child = titleChildren; child; child = child->next) gtk_widget_destroy(GTK_WIDGET(child->data));
+        g_list_free(titleChildren);
+    }
     if (cn1AccessibilityFixed) {
         GList* children = gtk_container_get_children(GTK_CONTAINER(cn1AccessibilityFixed));
         GList* item;
@@ -1585,6 +1641,10 @@ static void cn1A11yNodeMain(void* pointer) {
     CN1A11yNodeCall* call = (CN1A11yNodeCall*) pointer;
     CN1A11yEntry* parent = cn1A11yFind(call->parentId);
     GtkWidget* host = parent ? parent->widget : cn1AccessibilityFixed;
+    gboolean titleRoot = cn1TitleAccessibilityFixed && call->y >= 0
+            && call->y + call->height <= cn1TitleHeight
+            && (!parent || !gtk_widget_is_ancestor(parent->widget, cn1TitleAccessibilityFixed));
+    if (titleRoot) host = cn1TitleAccessibilityFixed;
     GtkWidget* widget = cn1A11yWidget(call->role, call->label, call->value, call->flags);
     AtkObject* accessible = gtk_widget_get_accessible(widget);
     atk_object_set_role(accessible, cn1A11yRole(call->role));
@@ -1595,9 +1655,10 @@ static void cn1A11yNodeMain(void* pointer) {
     gtk_widget_set_size_request(widget, call->width > 0 ? call->width : 1,
             call->height > 0 ? call->height : 1);
     if (host && GTK_IS_FIXED(host)) {
-        int px = parent ? call->x - parent->x : call->x;
-        int py = parent ? call->y - parent->y : call->y;
-        gtk_fixed_put(GTK_FIXED(host), widget, px, py);
+        int px = titleRoot ? call->x - cn1TitleX : parent ? call->x - parent->x : call->x;
+        int py = titleRoot ? call->y - cn1TitleY : parent ? call->y - parent->y : call->y;
+        gtk_fixed_put(GTK_FIXED(host), widget, px,
+                host == cn1AccessibilityFixed ? py - cn1TitleHeight : py);
     } else if (host && GTK_IS_CONTAINER(host)) {
         gtk_container_add(GTK_CONTAINER(host), widget);
     }
@@ -1652,7 +1713,12 @@ static void cn1A11yActionMain(void* pointer) {
         atk_object_set_description(accessible, "Custom accessibility action");
         gtk_widget_set_size_request(custom, entry->widget ? gtk_widget_get_allocated_width(entry->widget) : 1,
                 entry->widget ? gtk_widget_get_allocated_height(entry->widget) : 1);
-        gtk_fixed_put(GTK_FIXED(cn1AccessibilityFixed), custom, entry->x, entry->y);
+        gboolean inTitle = cn1TitleAccessibilityFixed && entry->widget
+                && gtk_widget_is_ancestor(entry->widget, cn1TitleAccessibilityFixed);
+        GtkWidget* actionHost = inTitle ? cn1TitleAccessibilityFixed : cn1AccessibilityFixed;
+        gtk_fixed_put(GTK_FIXED(actionHost), custom,
+                entry->x - (inTitle ? cn1TitleX : 0),
+                entry->y - (inTitle ? cn1TitleY : cn1TitleHeight));
         gtk_widget_show(custom);
         g_signal_connect_data(custom, "clicked", G_CALLBACK(cn1A11yActionActivated), action,
                 cn1A11yActionFree, 0);

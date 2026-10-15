@@ -4401,7 +4401,11 @@ public class Window extends Container implements TopLevelContainer {
         Container scope = keyInputScopes == null ? null
                 : keyInputScopes.get(keyInputScopes.size() - 1);
         this.keyInputScope = scope;
-        if (scope != null && (focused == null || !scope.contains(focused))) {
+        // A dialog installs its scope before show() creates the native peer.
+        // Starting an editor here would bind its input session to the main
+        // window, since this window has no native surface yet. show() initializes
+        // focus once the peer and component hierarchy are ready.
+        if (nativePeer != null && scope != null && (focused == null || !scope.contains(focused))) {
             focused = null;
             initFocused();
         }

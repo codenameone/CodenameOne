@@ -3669,6 +3669,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private int tabDirection;
     private long tabDirectionUntil;
 
+    @Override
+    public int[] getNativeWindowTitleBarInsets(com.codename1.ui.Component toolbar) {
+        if (!(toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form)
+                || toolbar.getComponentForm() instanceof com.codename1.ui.Dialog) {
+            return null;
+        }
+        int[] result = new int[5];
+        LinuxNative.mainWindowTitleBarInsets(result);
+        return result;
+    }
+
+    @Override
+    public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
+        if (toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form
+                && !(toolbar.getComponentForm() instanceof com.codename1.ui.Dialog)) {
+            LinuxNative.mainWindowTitleBarRegions(regions);
+        }
+    }
+
     // ---- native menu bar ----------------------------------------------------
 
     /// Commands published to the native menu bar, keyed by the id the bar echoes back.
@@ -3718,7 +3737,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// after it was dismissed.
     @Override
     public void refreshNativeTitle() {
-        if (!isNativeTitle()) {
+        if (!isDesktop()) {
             return;
         }
         com.codename1.ui.Form f = getCurrentForm();

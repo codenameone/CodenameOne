@@ -227,7 +227,7 @@ public class Toolbar extends Container {
     private Container permanentRightSideMenuContainer;
     /// The form of a toolbar the desktop {@code native} title-bar mode keeps detached, null otherwise
     private Form desktopHiddenHost;
-    /// Side menu commands added while detached, only bridged to the native menu bar
+    /// Original side menu commands bridged to the desktop native menu bar.
     private Vector<Command> desktopHiddenSideMenuCommands;
     private Command searchCommand;
     /// Component placed on the bottom (south) portion of the permanent/on-top
@@ -1474,7 +1474,9 @@ public class Toolbar extends Container {
     }
 
     private boolean addDesktopHiddenSideMenuCommand(Command cmd) {
-        if (!isDesktopHidden()) {
+        boolean hidden = isDesktopHidden();
+        Form host = getHostForm();
+        if (!hidden && (host == null || !host.isDesktopNativeChrome())) {
             return false;
         }
         if (cmd != null) {
@@ -1486,17 +1488,19 @@ public class Toolbar extends Container {
                 refreshDesktopHiddenNativeCommands();
             }
         }
-        return true;
+        // Custom desktop chrome still draws a toolbar. Keep the original command
+        // for the native menu too: on-top side menus hold wrapped commands in a
+        // detached container, so harvesting the toolbar tree cannot find them.
+        return hidden;
     }
 
     /// `Form.initComponentImpl` publishes the commands when the form is shown, this covers later changes.
     /// Every mutation of the Toolbar's command lists calls it -- the left and right bars and the
-    /// overflow as well as the side menu -- because with the Toolbar hidden by the desktop chrome
-    /// the native menu is the only place those commands can be reached. A no-op unless this
-    /// Toolbar's hidden host form is the one on screen.
+    /// overflow as well as the side menu. Both native and custom desktop title bars publish
+    /// these commands. A no-op unless this Toolbar's host form is the one on screen.
     private void refreshDesktopHiddenNativeCommands() {
-        Form host = desktopHiddenHost;
-        if (host != null && host.isInitialized() && host.getParent() == null
+        Form host = getHostForm();
+        if (host != null && host.isDesktopNativeChrome() && host.isInitialized() && host.getParent() == null
                 && Display.getInstance().getCurrent() == host) { //NOPMD CompareObjectsWithEquals
             Display.impl.setNativeCommands(getAllNativeMenuCommands());
         }
@@ -2675,6 +2679,243 @@ public class Toolbar extends Container {
         }
     }
 
+    private boolean applyingTitleInsets;
+    private int[] laidOutTitleInsets;
+    private boolean nativeTitleBarInsetsActive;
+
+    private int[] titleInsets() {
+        Form form = getComponentForm();
+        int[] insets = isVisible() && form != null && !(form instanceof Dialog) && form.isDesktopToolbarTitle()
+                ? Display.impl.getNativeWindowTitleBarInsets(this) : null;
+        // Querying metrics can enable native chrome before paint publishes any
+        // regions. Remember that activation until hide/removal clears it.
+        if (insets != null) {
+            nativeTitleBarInsetsActive = true;
+        }
+        return insets;
+    }
+
+    // Native reserved space is additive and temporary: changing the platform metrics must
+    // not overwrite an application's theme, units, RTL padding or preferred-size settings.
+    private final class TitlePadding {
+        private final Style style = getStyle();
+        private final float[] padding = new float[4];
+        private final byte[] units;
+        private final boolean suppressed = style.isSuppressChangeEvents();
+
+        TitlePadding(int[] insets) {
+            int[] sides = {LEFT, RIGHT, TOP, BOTTOM};
+            byte[] originalUnits = style.getPaddingUnit();
+            // Style's unit array uses Component side indices, not padding's
+            // top/bottom/left/right argument order. Preserve null (pixels) too.
+            units = originalUnits == null ? null : originalUnits.clone();
+            for (int i = 0; i < 4; i++) {
+                padding[i] = style.getPaddingFloatValue(false, sides[i]);
+            }
+            int left = style.getPaddingLeftNoRTL();
+            int right = style.getPaddingRightNoRTL();
+            int top = style.getPaddingTop();
+            int bottom = style.getPaddingBottom();
+            style.setSuppressChangeEvents(true);
+            style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+            style.setPadding(TOP, top + insets[2], true);
+            style.setPadding(BOTTOM, bottom + insets[3], true);
+            style.setPadding(LEFT, left + insets[isRTL() ? 1 : 0], true);
+            style.setPadding(RIGHT, right + insets[isRTL() ? 0 : 1], true);
+            style.setSuppressChangeEvents(suppressed);
+        }
+
+        void restore() {
+            int[] sides = {LEFT, RIGHT, TOP, BOTTOM};
+            style.setSuppressChangeEvents(true);
+            for (int i = 0; i < 4; i++) {
+                style.setPadding(sides[i], padding[i], true);
+            }
+            style.setPaddingUnit(units);
+            style.setSuppressChangeEvents(suppressed);
+        }
+    }
+
+    @Override
+    void doLayout() {
+        int[] insets = applyingTitleInsets ? null : titleInsets();
+        if (insets == null) {
+            laidOutTitleInsets = null;
+            super.doLayout();
+            return;
+        }
+        applyingTitleInsets = true;
+        TitlePadding padding = new TitlePadding(insets);
+        try {
+            super.doLayout();
+            laidOutTitleInsets = insets;
+        } finally {
+            padding.restore();
+            applyingTitleInsets = false;
+        }
+    }
+
+    @Override
+    protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+        int[] insets = applyingTitleInsets ? null : titleInsets();
+        if (insets == null) {
+            return super.calcPreferredSize();
+        }
+        applyingTitleInsets = true;
+        TitlePadding padding = new TitlePadding(insets);
+        try {
+            com.codename1.ui.geom.Dimension size = super.calcPreferredSize();
+            return new com.codename1.ui.geom.Dimension(size.getWidth(), Math.max(size.getHeight(), insets[4]));
+        } finally {
+            padding.restore();
+            applyingTitleInsets = false;
+        }
+    }
+
+    private int[] nativeTitleBarRegions;
+
+    /// Marks a custom title component's background as eligible for window dragging.
+    /// Plain Label and Container instances are eligible by default; subclasses and
+    /// other components keep their pointer input unless explicitly opted in here.
+    /// Focusable controls, pointer/long-press listeners and interactive descendants
+    /// remain excluded. Set false to keep even a plain label's background interactive.
+    /// Call on the EDT. Has no effect outside an integrated desktop title toolbar.
+    ///
+    /// @param component the title component to configure
+    /// @param dragRegion true for a passive background that can drag the window
+    public static void setTitleBarDragRegion(Component component, boolean dragRegion) {
+        component.putClientProperty("Toolbar.titleBarDragRegion", dragRegion ? Boolean.TRUE : Boolean.FALSE);
+        Component ancestor = component;
+        while (ancestor != null && !(ancestor instanceof Toolbar)) {
+            ancestor = ancestor.getParent();
+        }
+        // Regions are published by Toolbar.paint(), not by a child's independent repaint.
+        if (ancestor != null) {
+            ancestor.repaint();
+        } else {
+            component.repaint();
+        }
+    }
+
+    private boolean isPassiveTitleBarComponent(Component component) {
+        Object configured = component.getClientProperty("Toolbar.titleBarDragRegion");
+        if (configured != null) {
+            return Boolean.TRUE.equals(configured);
+        }
+        // Without reflection there is no portable way to detect overridden pointer
+        // methods. Only known passive classes opt in implicitly; subclasses are safe.
+        return Label.class.equals(component.getClass()) || Container.class.equals(component.getClass());
+    }
+
+    // Native hit testing must see the actual laid-out controls, including disabled
+    // buttons. A disabled Save button is not an unexpected window-drag handle.
+    private void collectTitleBarControls(Container parent, Vector<Component> controls) {
+        for (Component child : parent) {
+            if (!child.isVisible()) {
+                continue;
+            }
+            if (!isPassiveTitleBarComponent(child) || child instanceof Button || child.isFocusable() || child.isGrabsPointerEvents()
+                    || child.isDraggable() || child.isScrollable() || child.getLeadComponent() != null
+                    || child.pointerPressedListeners != null && child.pointerPressedListeners.hasListeners()
+                    || child.pointerReleasedListeners != null && child.pointerReleasedListeners.hasListeners()
+                    || child.pointerDraggedListeners != null && child.pointerDraggedListeners.hasListeners()
+                    || child.longPressListeners != null && child.longPressListeners.hasListeners()
+                    || child.contextMenuListeners != null && child.contextMenuListeners.hasListeners()
+                    || child.stylusListeners != null && child.stylusListeners.hasListeners()
+                    || child.getContextMenuCommands() != null && child.getContextMenuCommands().length > 0) {
+                controls.addElement(child);
+            } else if (child instanceof Container) {
+                collectTitleBarControls((Container) child, controls);
+            }
+        }
+    }
+
+    int[] titleBarRegions() {
+        Vector<Component> controls = new Vector<Component>();
+        collectTitleBarControls(this, controls);
+        int[] regions = new int[(controls.size() + 1) * 4];
+        regions[0] = getAbsoluteX();
+        regions[1] = getAbsoluteY();
+        regions[2] = getWidth();
+        regions[3] = getHeight();
+        for (int i = 0; i < controls.size(); i++) {
+            Component c = controls.elementAt(i);
+            int offset = (i + 1) * 4;
+            regions[offset] = c.getAbsoluteX();
+            regions[offset + 1] = c.getAbsoluteY();
+            regions[offset + 2] = c.getWidth();
+            regions[offset + 3] = c.getHeight();
+        }
+        return regions;
+    }
+
+    boolean isTitleBarDragPoint(int x, int y) {
+        if (!isVisible()) {
+            return false;
+        }
+        int[] regions = titleBarRegions();
+        for (int i = 0; i < regions.length; i += 4) {
+            boolean inside = x >= regions[i] && y >= regions[i + 1]
+                    && x < regions[i] + regions[i + 2] && y < regions[i + 1] + regions[i + 3];
+            if (i == 0 && !inside || i > 0 && inside) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void clearNativeTitleBarRegions() {
+        if (nativeTitleBarInsetsActive || nativeTitleBarRegions != null) {
+            Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
+            nativeTitleBarRegions = null;
+            nativeTitleBarInsetsActive = false;
+        }
+    }
+
+    @Override
+    public void setVisible(boolean visible) {
+        if (!visible) {
+            clearNativeTitleBarRegions();
+        }
+        super.setVisible(visible);
+    }
+
+    @Override
+    public void paint(Graphics g) {
+        int[] insets = titleInsets();
+        boolean changedInsets = (insets == null) != (laidOutTitleInsets == null);
+        if (insets != null && laidOutTitleInsets != null) {
+            for (int i = 0; i < 5; i++) {
+                changedInsets |= insets[i] != laidOutTitleInsets[i];
+            }
+        }
+        if (changedInsets) {
+            setShouldCalcPreferredSize(true);
+            revalidateLater();
+        }
+        Form parent = getComponentForm();
+        if (isVisible() && parent != null && !(parent instanceof Dialog) && parent.isDesktopToolbarTitle()) {
+            int[] regions = titleBarRegions();
+            boolean changed = nativeTitleBarRegions == null || nativeTitleBarRegions.length != regions.length;
+            for (int i = 0; !changed && i < regions.length; i++) {
+                changed = regions[i] != nativeTitleBarRegions[i];
+            }
+            if (changed) {
+                nativeTitleBarRegions = regions;
+                Display.impl.setNativeWindowTitleBarRegions(this, regions);
+            }
+        } else {
+            clearNativeTitleBarRegions();
+        }
+        super.paint(g);
+    }
+
+    @Override
+    protected void deinitialize() {
+        clearNativeTitleBarRegions();
+        super.deinitialize();
+    }
+
     /// Wires the visible Toolbar to act as the draggable title bar of an undecorated desktop window
     /// (the {@code custom} desktop title-bar mode). The listener is registered at the form level (so
     /// it fires reliably for every pointer drag) and starts a window move only when the press falls
@@ -2708,9 +2949,13 @@ public class Toolbar extends Container {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
+            if (!toolbar.isVisible()) {
+                dragging = false;
+                return;
+            }
             ActionEvent.Type t = evt.getEventType();
             if (t == ActionEvent.Type.PointerPressed) {
-                dragging = toolbar.isWithinTitleBarBand(evt.getY());
+                dragging = toolbar.isTitleBarDragPoint(evt.getX(), evt.getY());
                 if (dragging) {
                     Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
                 }
