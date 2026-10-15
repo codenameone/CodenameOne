@@ -1117,7 +1117,14 @@ public class BackendPackager {
     /// Use the explicit JDK or the build JVM; retain the legacy override for Java 8 projects.
     File resolveJdk() throws BuildFailureException {
         // The legacy environment override only applies to Java 8 projects.
-        String[] configured = {jdkHome, requiredJavaFeature() <= 8 ? jdk8Home : null};
+        // ...and only while every dependency is Java 8 bytecode too. A Java 8
+        // application may depend on a contract module compiled at release 17
+        // (records as transfer objects are the reason to), and JDK 8's javac
+        // cannot read a version 61 class file: the compile fails with "class
+        // file has wrong version 61.0, should be 52.0" on a project the JVM
+        // build and tests accept.
+        String[] configured = {jdkHome,
+                requiredJavaFeature() <= 8 && !dependencyNeedsNewerThanJava8() ? jdk8Home : null};
         for (int i = 0; i < configured.length; i++) {
             if (configured[i] != null && configured[i].length() > 0) {
                 File home = new File(configured[i]);
@@ -1140,6 +1147,106 @@ public class BackendPackager {
                 + System.getProperty("java.home") + " has no javac -- Maven is "
                 + "running on a JRE. Run it on a JDK, or point "
                 + "-Dcn1.backend.jdk at one.");
+    }
+
+    /**
+     * True when a class file on the compile classpath is newer than Java 8.
+     *
+     * `module-info.class` and everything under `META-INF/` are skipped: many Java 8
+     * libraries ship a version 53 module descriptor or multi-release classes
+     * that a Java 8 compile never reads. A classpath that cannot be resolved here
+     * answers false, which keeps the configured JDK 8 -- the compile that follows
+     * reports the real problem.
+     */
+    boolean dependencyNeedsNewerThanJava8() {
+        List<String> classpath;
+        try {
+            classpath = compileClasspathWithoutRuntime();
+        } catch (Exception unresolved) {
+            return false;
+        }
+        for (String element : classpath) {
+            File file = new File(element);
+            try {
+                if (file.isDirectory() ? newerThanJava8(file, file) : file.isFile()
+                        && newerThanJava8(file)) {
+                    return true;
+                }
+            } catch (IOException unreadable) {
+                // Not a class container we can read; javac will say so if it matters.
+            }
+        }
+        return false;
+    }
+
+    private static boolean newerThanJava8(File root, File dir) throws IOException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                if (!(dir.equals(root) && "META-INF".equals(child.getName()))
+                        && newerThanJava8(root, child)) {
+                    return true;
+                }
+            } else if (child.getName().endsWith(".class")
+                    && !"module-info.class".equals(child.getName())) {
+                java.io.InputStream in = new java.io.FileInputStream(child);
+                try {
+                    if (classMajor(in) > 52) {
+                        return true;
+                    }
+                } finally {
+                    in.close();
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean newerThanJava8(File jar) throws IOException {
+        java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar);
+        try {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (entry.isDirectory() || !name.endsWith(".class") || name.startsWith("META-INF/")
+                        || name.endsWith("module-info.class")) {
+                    continue;
+                }
+                java.io.InputStream in = zip.getInputStream(entry);
+                try {
+                    if (classMajor(in) > 52) {
+                        return true;
+                    }
+                } finally {
+                    in.close();
+                }
+            }
+        } finally {
+            zip.close();
+        }
+        return false;
+    }
+
+    /// The class file major version, or -1 for anything that is not a class file.
+    static int classMajor(java.io.InputStream in) throws IOException {
+        byte[] head = new byte[8];
+        int read = 0;
+        while (read < head.length) {
+            int n = in.read(head, read, head.length - read);
+            if (n < 0) {
+                return -1;
+            }
+            read += n;
+        }
+        if ((head[0] & 0xff) != 0xCA || (head[1] & 0xff) != 0xFE
+                || (head[2] & 0xff) != 0xBA || (head[3] & 0xff) != 0xBE) {
+            return -1;
+        }
+        return ((head[6] & 0xff) << 8) | (head[7] & 0xff);
     }
 
     /**
