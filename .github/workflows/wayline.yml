@@ -20,6 +20,10 @@ name: Wayline (full-stack sample)
 #   android     the Android Gradle project builds
 #   ios         the Xcode project generates and builds for the simulator
 #
+# The project has the minimal layout, with no platform modules: common builds
+# the simulator, the desktop, Android, iOS and the browser, and
+# build-android-app.sh and build-ios-app.sh find the device projects there.
+#
 # The two device builds stop at a build: the screens are covered by the
 # simulator run, and neither port holds screenshot baselines for this sample.
 

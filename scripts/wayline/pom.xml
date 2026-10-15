@@ -294,7 +294,6 @@
         <file>
           <exists>${basedir}/javase/pom.xml</exists>
         </file>
-        <activeByDefault>true</activeByDefault>
       </activation>
       <modules>
         <module>javase</module>

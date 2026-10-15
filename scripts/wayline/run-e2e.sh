@@ -12,7 +12,7 @@
 # administer it, while a second user acts through the API. They capture a few
 # screens into target/e2e-shots and hold them against screenshots/.
 #
-# Needs JAVA_HOME on a JDK 17, and the Codename One artifacts this project
+# Needs JAVA_HOME on JDK 17 or newer, and the Codename One artifacts this project
 # builds against in the local Maven repository. The simulator needs a display:
 # xvfb-run is used when there is one, which is what makes this run on a CI
 # machine and in a container.
@@ -112,7 +112,7 @@ XML
   # The last two are the project's own build hints, from
   # common/codenameone_settings.properties. A packaged desktop app is given
   # them by its launcher; a test run starts the simulator in
-  # javase/target/cn1-reports, from where it does not find the project's
+  # common/target/cn1-reports, from where it does not find the project's
   # settings, so it has to be told.
   export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dwayline.e2e.desktop=true -Djava.util.prefs.userRoot=$PREFS -Dcodename1.arg.nativeTheme=native -Dcodename1.arg.desktop.titleBar=native"
   set +e

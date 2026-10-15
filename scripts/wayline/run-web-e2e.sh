@@ -13,7 +13,7 @@
 # in as the demo rider and reaches the home screen, with the live channel open.
 # Screenshots of each step and the browser's log go to target/web-e2e.
 #
-# Needs JAVA_HOME on a JDK 17, the Codename One artifacts this project builds
+# Needs JAVA_HOME on JDK 17 or newer, the Codename One artifacts this project builds
 # against in the local Maven repository, and Node with Playwright and its
 # Chromium: `npm ci && npx playwright install chromium` in scripts/, or a
 # NODE_PATH that has it. Nothing here opens a window.

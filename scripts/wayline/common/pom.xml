@@ -690,7 +690,6 @@
                                     <executable>java</executable>
                                     <arguments combine.self="override">
                                         <argument>-Xmx1024M</argument>
-                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
                                         <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
                                         <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
                                         <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
@@ -771,10 +770,6 @@
                                         <argument>${codename1.mainClass}</argument>
                                     </arguments>
                                     <systemProperties>
-                                        <systemProperty>
-                                            <key>codename1.designer.jar</key>
-                                            <value>${codename1.designer.jar}</value>
-                                        </systemProperty>
                                         <systemProperty>
                                             <key>codename1.css.compiler.args.input</key>
                                             <value>${codename1.css.compiler.args.input}</value>
@@ -863,7 +858,6 @@
                                         <argument>-Xdebug</argument>
                                         <argument>-Xrunjdwp:transport=dt_socket,server=n,address=${jpda.address}</argument>
                                         <argument>-Xmx1024M</argument>
-                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
                                         <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
                                         <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
                                         <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>
@@ -940,7 +934,6 @@
                                         <argument>-Xdebug</argument>
                                         <argument>-Xrunjdwp:transport=dt_socket,server=y,address=${jpda.address},suspend=y</argument>
                                         <argument>-Xmx1024M</argument>
-                                        <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>
                                         <argument>-Dcodename1.css.compiler.args.input=${codename1.css.compiler.args.input}</argument>
                                         <argument>-Dcodename1.css.compiler.args.output=${codename1.css.compiler.args.output}</argument>
                                         <argument>-Dcodename1.css.compiler.args.merge=${codename1.css.compiler.args.merge}</argument>

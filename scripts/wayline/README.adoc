@@ -58,9 +58,10 @@ To see it running first, the two commands under <<Running it>> are all it takes.
   `src/main/resources/db/migration`, and the same server runs on SQLite,
   PostgreSQL, MySQL and MariaDB.
 
-| `javase`, `android`, `ios`
-| The platforms the application is built for.
 |===
+
+There are no platform modules: `common` builds the application for the
+simulator, the desktop, Android, iOS and the browser itself.
 
 == Running it
 
@@ -201,7 +202,8 @@ mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledT
     to `target/web-e2e`.
 
 `.github/workflows/wayline.yml` runs all five, and builds the application for
-Android and iOS.
+Android and iOS through `scripts/build-android-app.sh` and
+`scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/wayline`.
 
 == The Initializr template
 

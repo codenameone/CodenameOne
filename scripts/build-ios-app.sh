@@ -262,7 +262,10 @@ if [ -f "$ARTIFACTS_DIR/iphone-builder-stats.txt" ]; then
     fi
 fi
 
+# The ios module builds the project where there is one. An application in the
+# minimal layout has none, and common builds every platform itself.
 IOS_TARGET_DIR="$APP_DIR/ios/target"
+[ -f "$APP_DIR/ios/pom.xml" ] || IOS_TARGET_DIR="$APP_DIR/common/target"
 if [ ! -d "$IOS_TARGET_DIR" ]; then
   bia_log "iOS target directory not found at $IOS_TARGET_DIR" >&2
   exit 1

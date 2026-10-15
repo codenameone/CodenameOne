@@ -7,8 +7,7 @@
 #   server.sh web
 #
 # --jvm (the default) runs the server on this JDK, which is how you work on it.
-# --native translates it to a binary, which is how it ships; that needs clang and
-# the OpenSSL, libcurl and nghttp2 headers.
+# --native compiles it to a native binary, which is how it ships.
 #
 # The profile comes from CN1_PROFILE. `test` and `dev` need nothing else: an
 # in-memory database, four demo accounts, a geocoder that knows ten places
