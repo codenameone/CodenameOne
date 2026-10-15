@@ -208,6 +208,24 @@ public class Matcher {
         return near;
     }
 
+    /// Whether `driver` is still one a ride could be offered to: on line and
+    /// heard from lately, free, in reach, approved, not blocked, and fit for
+    /// what the rider asked. [#pick] read all of that in a transaction of its
+    /// own, and any of it can have changed before the offer is made; the
+    /// offer asks again once it holds the driver.
+    @Transactional(readOnly = true)
+    public boolean fits(Ride ride, String driver, long waitedMillis) throws IOException {
+        List<Candidate> near = nearby(ride.getPickupLat(), ride.getPickupLng(),
+                radius(waitedMillis), ride.getProduct(), ride.isWomenOnly(),
+                ride.isWheelchair(), ride.isPets());
+        for (int iter = 0; iter < near.size(); iter++) {
+            if (driver.equals(near.get(iter).username)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether the account of this name exists and has not been blocked.
     boolean enabled(String username) {
         return users.userExists(username) && users.loadUserByUsername(username).isEnabled();

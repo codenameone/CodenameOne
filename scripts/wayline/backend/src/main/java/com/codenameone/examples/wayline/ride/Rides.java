@@ -88,6 +88,9 @@ public class Rides {
         {"Wayline", "Affordable everyday rides", "4"},
         {"Comfort", "Newer cars with extra legroom", "4"},
         {"XL", "Room for up to six", "6"}};
+    /// How many drivers one search may choose before it leaves the ride to the
+    /// next tick; see [#search].
+    private static final int SEARCH_TRIES = 3;
     /// The two people a move can be held to; see [#tryMove].
     private static final String RIDER = "rider";
     private static final String DRIVER = "driver";
@@ -534,11 +537,24 @@ public class Rides {
     /// each read the same driver as free; the second transaction is where
     /// they take turns over that driver, and it has to open with that -- see
     /// [#offer].
+    ///
+    /// A driver the offer finds no longer fit for the ride is passed over for
+    /// the next, as a decline or a lapse would be, without waiting for the
+    /// next tick: choosing again reads them as they now are, and does not pick
+    /// them. Bounded, so drivers changing faster than this can choose cost the
+    /// ride a tick and no more.
     void search(String id) throws IOException {
         String[] chosen = new String[1];
-        Change change = attempt(() -> choose(id, chosen));
-        if (chosen[0] != null) {
+        Change change = null;
+        for (int tries = 0; tries < SEARCH_TRIES; tries++) {
+            change = attempt(() -> choose(id, chosen));
+            if (chosen[0] == null) {
+                break;
+            }
             change = attempt(() -> offer(id, chosen[0]));
+            if (change != null) {
+                break;
+            }
         }
         tell(change);
     }
@@ -571,8 +587,14 @@ public class Rides {
     /// reads the offer the first one committed. The update of the ride cannot
     /// do this on its own: it is conditional on its own ride's row, and each
     /// of the two has a row of its own.
+    ///
+    /// Everything that made the driver the choice is asked again once they
+    /// are held: a driver who went off line, drove out of reach, lost their
+    /// approval or was blocked since [#choose] read them would otherwise get
+    /// the offer and keep the rider waiting for it to lapse. Not private, so
+    /// that a test can make the offer to a driver who changed in between.
     @Transactional
-    private Change offer(String id, String driver) throws IOException {
+    Change offer(String id, String driver) throws IOException {
         if (drivers.hold(driver) == 0
                 || rides.findFirstByDriverAndStateIn(driver, WITH_DRIVER) != null) {
             return null;
@@ -582,6 +604,9 @@ public class Rides {
             return null;
         }
         long now = System.currentTimeMillis();
+        if (!matcher.fits(ride, driver, now - ride.getRequestedAt())) {
+            return null;
+        }
         return tryMove(id, RideState.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
                 ? new Change(id, RideState.OFFERED, ride.getRider(), driver, "", null) : null;
     }
