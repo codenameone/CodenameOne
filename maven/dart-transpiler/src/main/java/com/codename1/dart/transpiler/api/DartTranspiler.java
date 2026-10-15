@@ -71,8 +71,9 @@ public final class DartTranspiler {
                 + "-pkg:" + req.packageName;
         if (req.stateFile != null && req.stateFile.exists() && req.outputDir != null && req.outputDir.exists()) {
             try {
-                String prev = new String(Files.readAllBytes(req.stateFile.toPath()), StandardCharsets.UTF_8).trim();
-                if (prev.equals(digest)) {
+                List<String> lines = Files.readAllLines(req.stateFile.toPath(), StandardCharsets.UTF_8);
+                if (!lines.isEmpty() && lines.get(0).trim().equals(digest)
+                        && generatedFilesStillMatch(req, lines)) {
                     return new TranspileResult(diags.asList(), new ArrayList<GeneratedFile>(), true);
                 }
             } catch (IOException ignore) {
@@ -127,7 +128,7 @@ public final class DartTranspiler {
             } else if (req.stateFile != null) {
                 try {
                     req.stateFile.getParentFile().mkdirs();
-                    Files.write(req.stateFile.toPath(), digest.getBytes(StandardCharsets.UTF_8));
+                    Files.write(req.stateFile.toPath(), stateFileContent(digest, files).getBytes(StandardCharsets.UTF_8));
                 } catch (IOException e) {
                     diags.warn(null, "W0001", "Could not write transpiler state file: " + e);
                 }
@@ -180,7 +181,12 @@ public final class DartTranspiler {
         }
         String prev;
         try {
-            prev = new String(Files.readAllBytes(req.stateFile.toPath()), StandardCharsets.UTF_8).trim();
+            // Only the first line is the digest (see stateFileContent) -- the file-list
+            // lines that follow can themselves contain "-pkg:" style substrings in a
+            // generated path, so reading the whole file here would glue them onto the
+            // package name taken from lastIndexOf below.
+            List<String> lines = Files.readAllLines(req.stateFile.toPath(), StandardCharsets.UTF_8);
+            prev = lines.isEmpty() ? "" : lines.get(0).trim();
         } catch (IOException e) {
             return;
         }
@@ -338,6 +344,59 @@ public final class DartTranspiler {
                 out.add(c);
             }
         }
+    }
+
+    /**
+     * The state file's content: the input digest on its own first line, followed by one
+     * line per generated file ({@code relativePath<TAB>byteLength}, relative to the
+     * output package directory) recording what the matching transpile actually wrote.
+     *
+     * <p>The digest alone says the INPUTS have not changed since the recorded run; it says
+     * nothing about whether that run's OUTPUT is still on disk. A generated .java file
+     * deleted (by hand, by a clean script that only knew about some paths, by a half
+     * finished edit) after a successful transpile left the digest matching on the next
+     * build, which skipped regenerating and handed javac a source set with files missing
+     * -- a compile failure the transpiler itself reported as "up to date". Recording the
+     * file set here lets a cache hit verify it is still true before trusting it.</p>
+     */
+    private static String stateFileContent(String digest, List<GeneratedFile> files) {
+        StringBuilder sb = new StringBuilder(digest);
+        for (GeneratedFile gf : files) {
+            sb.append('\n').append(gf.relativePath).append('\t')
+                    .append(gf.content.getBytes(StandardCharsets.UTF_8).length);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Validates the generated-file lines a matching-digest state file recorded (see
+     * {@link #stateFileContent}) against what is actually in {@code req.outputDir} right
+     * now: every recorded file must still exist at its recorded byte length. {@code lines}
+     * has already been confirmed to start with a matching digest; this checks the rest.
+     */
+    private static boolean generatedFilesStillMatch(TranspileRequest req, List<String> lines) {
+        File pkgDir = new File(req.outputDir, req.packageName.replace('.', File.separatorChar));
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.isEmpty()) {
+                continue;
+            }
+            int tab = line.indexOf('\t');
+            long expectedLength;
+            if (tab < 0) {
+                return false;  // not a line this method wrote -- do not trust the cache
+            }
+            try {
+                expectedLength = Long.parseLong(line.substring(tab + 1));
+            } catch (NumberFormatException e) {
+                return false;
+            }
+            File f = new File(pkgDir, line.substring(0, tab));
+            if (!f.isFile() || f.length() != expectedLength) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String digest(List<File> files) {

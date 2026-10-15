@@ -261,7 +261,12 @@ class ListView extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.GridView')
 class GridView extends Widget {
-  external static GridView count({Key? key, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
+  // Named parameters are emitted positionally in this declared order (see the
+  // header comment), so this order must match GridView.count's real Java
+  // parameter list -- restorationId/physics/primary sit before crossAxisCount
+  // there, and a stub that put crossAxisCount first would pass it into the
+  // restorationId slot instead.
+  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
 }
 
 @JavaName('com.codename1.flutter.widgets.SingleChildScrollView')
@@ -390,12 +395,16 @@ class MaterialPageRoute {
 
 @JavaName('com.codename1.flutter.navigation.Navigator')
 abstract class Navigator {
-  external static void push(BuildContext context, MaterialPageRoute route);
+  // push completes with the value the route is popped with, as Flutter's does
+  // (and as the runtime stub -- com.codename1.flutter.navigation.Navigator --
+  // declares it); a void return here makes `final r = await Navigator.push(...)`
+  // emit invalid Java the same way an un-synced showDialog did.
+  external static Future<Object?> push(BuildContext context, MaterialPageRoute route);
   external static void pop(BuildContext context);
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')
-external void showDialog({BuildContext context, WidgetBuilder builder});
+external Future<dynamic> showDialog({BuildContext context, WidgetBuilder builder});
 
 @JavaName('com.codename1.flutter.material.AlertDialog')
 class AlertDialog extends Widget {

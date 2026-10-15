@@ -108,4 +108,38 @@ public class IncrementalCacheKeyTest {
         TestSupport.write(dart, "int answer() => 42;\n");
         assertFalse(run(src, out, state, "com.example.three").isUpToDate());
     }
+
+    /**
+     * The digest alone says the INPUTS have not changed; it says nothing about whether a
+     * generated .java file is still where the previous run left it. Deleting one (by hand,
+     * by a clean script, by a half finished edit) must not leave the next build trusting a
+     * cache hit onto an incomplete source set -- Maven would then fail compiling against a
+     * source file javac cannot find, right after the transpiler itself reported "up to date".
+     */
+    @Test
+    public void aDeletedGeneratedFileIsNotTrustedAsUpToDate() throws Exception {
+        File src = new File(tmp, "src4");
+        src.mkdirs();
+        TestSupport.write(new File(src, "a.dart"), "int answer() => 42;\n");
+        File out = new File(tmp, "out4");
+        File state = new File(tmp, "state4.txt");
+
+        TranspileResult first = run(src, out, state, "com.example.four");
+        assertFalse(first.isUpToDate(), "the first run transpiles");
+        assertTrue(run(src, out, state, "com.example.four").isUpToDate(),
+                "nothing changed and the output is intact, so the second run is skipped");
+
+        File pkgDir = new File(out, "com/example/four");
+        File[] generated = pkgDir.listFiles();
+        assertTrue(generated != null && generated.length > 0, "the first run generated sources");
+        for (File f : generated) {
+            assertTrue(f.delete(), "could not delete " + f);
+        }
+
+        TranspileResult afterDelete = run(src, out, state, "com.example.four");
+        assertFalse(afterDelete.isUpToDate(),
+                "a generated file missing from disk must not be reported up to date");
+        assertTrue(pkgDir.listFiles() != null && pkgDir.listFiles().length > 0,
+                "the rebuild must regenerate what was deleted");
+    }
 }
