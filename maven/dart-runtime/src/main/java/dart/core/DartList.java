@@ -392,9 +392,16 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /** Dart's List.indexOf — long-typed; named to avoid clashing with java.util.List.indexOf(Object). */
     /**
      * Dart's {@code lastIndexOf(element, [start])}: searching backward from {@code start}
-     * (clamped to the last index), with Dart's {@code ==}.
+     * (clamped to the last index), with Dart's {@code ==}. A negative {@code start}
+     * answers -1 directly -- real Dart's backward loop simply never runs when its own
+     * start index is negative -- rather than being narrowed to {@code int} first: {@code
+     * (int) -4294967296L} wraps to 0, which read as "start searching from the front" and
+     * answered a found index instead of -1.
      */
     public long lastIndexOfDart(E element, long start) {
+        if (start < 0) {
+            return -1;
+        }
         long from = Math.min(start, (long) size() - 1);
         for (int i = (int) from; i >= 0; i--) {
             if (DartRuntime.eq(get(i), element)) {
@@ -458,8 +465,16 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
      * {@code lastIndexWhere(test, start)}: searches backward FROM {@code start}, which
      * Dart clamps to the last index. The start was dropped, so the search always began
      * at the end: [1, 2, 1].lastIndexWhere((x) => x == 1, 1) answered 2, not 0.
+     *
+     * <p>A negative {@code start} answers -1 directly, for the same reason {@link
+     * #lastIndexOfDart(Object, long)} now does: narrowing a very negative {@code long}
+     * to {@code int} first can wrap to a small non-negative value and search from the
+     * front instead of not searching at all.</p>
      */
     public long lastIndexWhere(Funcs.Func1<E, Boolean> test, long start) {
+        if (start < 0) {
+            return -1;
+        }
         long from = Math.min(start, (long) size() - 1);
         for (int i = (int) from; i >= 0; i--) {
             if (Boolean.TRUE.equals(test.call(get(i)))) {

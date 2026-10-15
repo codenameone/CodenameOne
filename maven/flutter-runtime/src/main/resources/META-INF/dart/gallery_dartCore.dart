@@ -96,7 +96,7 @@ class RegExp {
   external RegExp(String source, {bool multiLine, bool caseSensitive, bool unicode, bool dotAll});
   external bool hasMatch(String input);
   external RegExpMatch? firstMatch(String input);
-  external Iterable<RegExpMatch> allMatches(String input);
+  external Iterable<RegExpMatch> allMatches(String input, [int start = 0]);
   external String? stringMatch(String input);
   external String get pattern;
 }

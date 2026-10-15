@@ -223,14 +223,37 @@ public final class RegExp {
     }
 
     /**
-     * Dart's {@code RegExp.allMatches(input)}: lazy, as Dart's is. Each match is
-     * searched for when the iteration reaches it, so {@code allMatches(s).first}
-     * or {@code .take(1)} does one search, not one per match in the whole input,
-     * and every iteration searches afresh.
+     * Dart's {@code RegExp.allMatches(input)} -- see {@link #allMatches(String, int)},
+     * which this delegates to with {@code start} 0.
      */
     public DartIterable<RegExpMatch> allMatches(final String input) {
+        return allMatches(input, 0);
+    }
+
+    /**
+     * Dart's {@code RegExp.allMatches(input, [start = 0])}: lazy, as Dart's is.
+     * Each match is searched for when the iteration reaches it, so {@code
+     * allMatches(s).first} or {@code .take(1)} does one search, not one per
+     * match in the whole input, and every iteration searches afresh. Matches
+     * carry offsets absolute into {@code input}, never relative to {@code
+     * start}: the first match is simply the first one found at or after
+     * {@code start}, via the same {@link #matchFrom(String, int)} the
+     * no-argument overload already used with {@code from} 0.
+     *
+     * <p>Throws {@link RangeError} when {@code start} is negative or greater
+     * than {@code input.length()}, as Dart does. A null {@code input} is
+     * accepted leniently as an empty match sequence (the no-argument overload's
+     * existing behaviour); there is then no length to range-check {@code
+     * start} against, so only a negative {@code start} is rejected.</p>
+     */
+    public DartIterable<RegExpMatch> allMatches(final String input, final int start) {
+        if (input != null) {
+            RangeError.checkValueInInterval(start, 0, input.length(), "start");
+        } else if (start < 0) {
+            throw new RangeError("RangeError (start): Invalid value: Not in inclusive range 0..: " + start);
+        }
         return new DartIterable<RegExpMatch>(() -> new Iterator<RegExpMatch>() {
-            private int from;
+            private int from = start;
             private RegExpMatch pending;
             private boolean exhausted = input == null;
 
@@ -241,14 +264,14 @@ public final class RegExp {
                     if (pending == null) {
                         exhausted = true;
                     } else {
-                        int start = (int) pending.start();
-                        int end = (int) pending.end();
+                        int matchStart = (int) pending.start();
+                        int matchEnd = (int) pending.end();
                         // An empty match must still advance, or this never terminates -- and
                         // it must advance past ITS OWN position, not the previous search
                         // offset. Comparing the end with `from` let an empty match found
                         // later than `from` (RegExp(r'$') on "abc", found at 3 from 0) set
                         // `from` to 3 and be found again there.
-                        from = end > start ? end : end + 1;
+                        from = matchEnd > matchStart ? matchEnd : matchEnd + 1;
                     }
                 }
                 return pending != null;

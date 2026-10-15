@@ -141,9 +141,46 @@ public final class Path {
         }
     }
 
+    /**
+     * {@code Path.addPath(path, offset)} -- appends a copy of {@code path}'s
+     * segments translated by {@code offset}, as Flutter's dart:ui does.
+     */
     public void addPath(Path path, Offset offset) {
+        double dx = offset.dx();
+        double dy = offset.dy();
         for (Segment s : path.segments) {
-            segments.add(s);
+            segments.add(new Segment(s.verb, translateCoords(s.verb, s.coords, dx, dy)));
+        }
+    }
+
+    /**
+     * {@code Path.addPath(path, offset, {matrix4})} -- like {@link
+     * #addPath(Path, Offset)}, but when {@code matrix4} is given the source
+     * segments are also transformed by its 2D affine part. {@code matrix4} is
+     * Flutter's column-major 4x4 {@code Float64List} (as produced by {@code
+     * vector_math}'s {@code Matrix4.storage}); only the 2x2 linear part
+     * (entries 0, 1, 4, 5) and the translation column (entries 12, 13) are
+     * used -- this class has no projective path support. Matching dart:ui's
+     * native {@code CanvasPath.addPathWithMatrix}, {@code offset} is folded
+     * into the matrix's own translation rather than applied separately.
+     */
+    public void addPath(Path path, Offset offset, double[] matrix4) {
+        if (matrix4 == null) {
+            addPath(path, offset);
+            return;
+        }
+        if (matrix4.length != 16) {
+            throw new IllegalArgumentException("matrix4 must have 16 entries");
+        }
+        double m00 = matrix4[0];
+        double m10 = matrix4[1];
+        double m01 = matrix4[4];
+        double m11 = matrix4[5];
+        double tx = matrix4[12] + offset.dx();
+        double ty = matrix4[13] + offset.dy();
+        for (Segment s : path.segments) {
+            segments.add(new Segment(s.verb,
+                    transformCoords(s.verb, s.coords, m00, m10, m01, m11, tx, ty)));
         }
     }
 
@@ -161,16 +198,85 @@ public final class Path {
         return false;
     }
 
+    /**
+     * {@code Path.shift(offset)} -- a copy of this path translated by {@code
+     * offset}. Only the position-valued operands of each segment move; a
+     * segment's shape parameters (an arc's angles and radii, a conic's
+     * weight, the boolean flags) are invariant under translation.
+     */
     public Path shift(Offset offset) {
         Path p = new Path();
+        double dx = offset.dx();
+        double dy = offset.dy();
         for (Segment s : segments) {
-            double[] c = s.coords.clone();
-            for (int i = 0; i + 1 < c.length; i += 2) {
-                c[i] += offset.dx();
-                c[i + 1] += offset.dy();
-            }
-            p.segments.add(new Segment(s.verb, c));
+            p.segments.add(new Segment(s.verb, translateCoords(s.verb, s.coords, dx, dy)));
         }
         return p;
+    }
+
+    /**
+     * The {@code coords} offsets, for every verb {@link #segments} can hold,
+     * where a position (x, y) pair starts -- the only operands a translation
+     * or an affine transform may touch. Everything else in a segment's
+     * {@code coords} is a shape parameter that such a transform leaves alone:
+     * {@code arcTo}'s {@code startAngle}/{@code sweepAngle} and
+     * {@code forceMoveTo} flag, {@code arcToPoint}'s {@code radius},
+     * {@code rotation} and {@code largeArc}/{@code clockwise} flags, and
+     * {@code conicTo}'s weight {@code w} (a ratio, invariant under any affine
+     * map of the control points). {@code close} has no operands at all.
+     */
+    private static int[] positionPairStarts(String verb) {
+        switch (verb) {
+            case "moveTo":
+            case "lineTo":
+                // {x, y}
+                return new int[] {0};
+            case "arcToPoint":
+                // {arcEnd.dx, arcEnd.dy, radius.x, radius.y, rotation, largeArc, clockwise}
+                return new int[] {0};
+            case "quadraticBezierTo":
+                // {x1, y1, x2, y2}
+                return new int[] {0, 2};
+            case "conicTo":
+                // {x1, y1, x2, y2, w}
+                return new int[] {0, 2};
+            case "arcTo":
+                // {left, top, right, bottom, startAngle, sweepAngle, forceMoveTo}
+                return new int[] {0, 2};
+            case "addRect":
+            case "addOval":
+            case "addRRect":
+                // {left, top, right, bottom}
+                return new int[] {0, 2};
+            case "cubicTo":
+                // {x1, y1, x2, y2, x3, y3}
+                return new int[] {0, 2, 4};
+            case "close":
+                // no operands
+                return new int[0];
+            default:
+                return new int[0];
+        }
+    }
+
+    private static double[] translateCoords(String verb, double[] coords, double dx, double dy) {
+        double[] c = coords.clone();
+        for (int i : positionPairStarts(verb)) {
+            c[i] += dx;
+            c[i + 1] += dy;
+        }
+        return c;
+    }
+
+    private static double[] transformCoords(String verb, double[] coords,
+            double m00, double m10, double m01, double m11, double tx, double ty) {
+        double[] c = coords.clone();
+        for (int i : positionPairStarts(verb)) {
+            double x = c[i];
+            double y = c[i + 1];
+            c[i] = m00 * x + m01 * y + tx;
+            c[i + 1] = m10 * x + m11 * y + ty;
+        }
+        return c;
     }
 }

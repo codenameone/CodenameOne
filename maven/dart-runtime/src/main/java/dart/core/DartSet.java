@@ -272,13 +272,32 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return remove(value);
     }
 
-    /** Dart's {@code Set.addAll(elements)} — named to avoid the Collection overload. */
+    /**
+     * Dart's {@code Set.addAll(elements)} -- named to avoid the Collection overload.
+     * Checked up front, not just through {@link #add}'s own check: an EMPTY {@code
+     * elements} never reaches {@link #add}, so a loop that only checked there left a
+     * read-only set's {@code addAll([])} silently a no-op instead of throwing.
+     */
     public void addAllIterable(Iterable<? extends E> elements) {
+        checkWritable();
         if (elements != null) {
             for (E e : elements) {
                 add(e);
             }
         }
+    }
+
+    /**
+     * Overrides {@code java.util.Set.addAll(Collection)} so a read-only set's {@code
+     * addAll([])} throws through the plain {@code java.util.Collection} surface too,
+     * for the same reason {@link #addAllIterable} now checks up front: the inherited
+     * {@code AbstractCollection.addAll(Collection)} loop only ever reaches {@link
+     * #add}, which an empty argument never calls.
+     */
+    @Override
+    public boolean addAll(java.util.Collection<? extends E> c) {
+        checkWritable();
+        return super.addAll(c);
     }
 
     /**
@@ -298,7 +317,13 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return modified;
     }
 
+    /**
+     * Checked up front for the same reason {@link #addAllIterable} is: an EMPTY
+     * {@code elements} never reaches {@link #remove}, so a read-only set's {@code
+     * removeAll([])} was silently a no-op instead of throwing.
+     */
     public void removeAll(Iterable<?> elements) {
+        checkWritable();
         removeAllInternal(elements);
     }
 
@@ -318,6 +343,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
      */
     @Override
     public boolean removeAll(java.util.Collection<?> c) {
+        checkWritable();
         return removeAllInternal(c);
     }
 

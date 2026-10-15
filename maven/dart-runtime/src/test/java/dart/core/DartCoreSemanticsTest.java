@@ -337,6 +337,23 @@ public class DartCoreSemanticsTest {
     }
 
     @Test
+    public void allMatchesTakesAnOptionalStartAndKeepsAbsoluteOffsets() {
+        StringBuilder found = new StringBuilder();
+        for (RegExpMatch m : new RegExp("[0-9]+").allMatches("a1 b22 c333", 1)) {
+            found.append(m.start()).append(':').append(m.group(0)).append(',');
+        }
+        // Starting the search AT offset 1 (inside "1") must not shift the reported
+        // offsets: the match found is still "1" at absolute offset 1, exactly as with
+        // no start argument, not renumbered as if the search began at a new offset 0.
+        assertEquals("1:1,4:22,8:333,", found.toString());
+        // start == input.length() is valid -- an empty remaining range to search --
+        // recorded from the real Dart SDK, same as sublist/getRange's own end == length.
+        assertEquals(0, new RegExp("a").allMatches("abc", 3).length());
+        assertThrows(RangeError.class, () -> new RegExp("a").allMatches("abc", -1));
+        assertThrows(RangeError.class, () -> new RegExp("a").allMatches("abc", 4));
+    }
+
+    @Test
     public void portDefaultsToTheSchemes() {
         assertEquals(443, DartUri.parse("https://example.com/path").port());
         assertEquals(80, DartUri.parse("http://example.com/").port());
@@ -866,6 +883,22 @@ public class DartCoreSemanticsTest {
         DartList<Object> l = DartList.of((Object) 1L);
         assertEquals(-1, l.indexOfDart(1L, 4294967296L), "2^32 must not wrap to 0");
         assertEquals(-1, l.indexWhere(x -> true, 4294967296L));
+    }
+
+    @Test
+    public void aNegativeStartFarBelowIntDoesNotWrapForLastIndex() {
+        // Recorded from the real Dart SDK: [1].lastIndexOf(1, -4294967296) is -1, because
+        // Dart's own backward loop starts at a negative index and never runs at all.
+        // Narrowing -4294967296L (exactly -2^32) to int first wrapped it to 0, which read
+        // as "search from the front" and found the element instead of answering -1.
+        DartList<Object> l = DartList.of((Object) 1L);
+        assertEquals(-1, l.lastIndexOfDart(1L, -4294967296L), "-2^32 must not wrap to 0");
+        assertEquals(-1, l.lastIndexOfDart(1L, -1L));
+        DartList<Object> three = DartList.of((Object) 1L, 2L, 1L);
+        assertEquals(-1, three.lastIndexWhere(x -> x.equals(1L), -4294967296L));
+        // The non-overflowing case keeps working: searching backward from index 1 finds
+        // the earlier "1", not the one after it.
+        assertEquals(0, three.lastIndexWhere(x -> x.equals(1L), 1L));
     }
 
     @Test
@@ -1666,6 +1699,24 @@ public class DartCoreSemanticsTest {
         plain.add("b");
         plain.removeWhere(e -> e.equals("a"));
         assertEquals("{b}", plain.toString());
+    }
+
+    @Test
+    public void aConstSetRefusesEmptyBulkMutationsToo() {
+        // A bulk mutator that loops over its argument and calls add()/remove() per
+        // element never reaches either when the argument is empty, so checking
+        // writability only inside that single-element call let addAll([]) etc. through
+        // silently instead of throwing -- recorded from the real Dart SDK, where a
+        // const set's addAll/removeAll/retainAll always throw regardless of whether
+        // anything would actually change.
+        DartSet<String> s = DartSet.constant(DartSet.of("a", "b"));
+        assertThrows(UnsupportedError.class, () -> s.addAllIterable(java.util.Collections.<String>emptyList()));
+        assertThrows(UnsupportedError.class, () -> s.addAll(java.util.Collections.<String>emptyList()));
+        assertThrows(UnsupportedError.class, () -> s.removeAll((Iterable<?>) java.util.Collections.emptyList()));
+        assertThrows(UnsupportedError.class, () -> s.removeAll((java.util.Collection<?>) java.util.Collections.emptyList()));
+        assertThrows(UnsupportedError.class, () -> s.retainAll((Iterable<?>) s));
+        assertThrows(UnsupportedError.class, () -> s.retainAll((java.util.Collection<?>) s));
+        assertEquals(2, s.size(), "none of the refused calls may have mutated the set");
     }
 
     @Test
