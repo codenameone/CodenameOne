@@ -303,6 +303,7 @@ void com_codename1_impl_mac_MacNative_macSetTitleBarRegions___int_int_1ARRAY(COD
 
 // AppKit updates the snapshot. EDT layout can hold the render lock, so it
 // must not dispatch_sync to AppKit merely to measure window controls.
+extern void com_codename1_impl_mac_MacImplementation_macTitleBarInsetsChanged__(CODENAME_ONE_THREAD_STATE);
 static int cn1TitleInsets[5];
 static void cn1MacUpdateTitleInsets(void) {
     NSWindow *window = [CN1MacHost sharedHost].window;
@@ -319,8 +320,15 @@ static void cn1MacUpdateTitleInsets(void) {
         CGFloat bottom = view.isFlipped ? NSMaxY(rect) : NSHeight(view.bounds) - NSMinY(rect);
         metrics[4] = MAX(metrics[4], (int)ceil((bottom + 4) * scale));
     }
+    BOOL changed;
     @synchronized ([CN1MacHost class]) {
+        changed = memcmp(cn1TitleInsets, metrics, sizeof(metrics)) != 0;
         memcpy(cn1TitleInsets, metrics, sizeof(metrics));
+    }
+    // The query already returned the previous snapshot. Schedule a fresh EDT layout
+    // after publishing a change, outside the cache lock. Unchanged metrics stay quiet.
+    if (changed) {
+        com_codename1_impl_mac_MacImplementation_macTitleBarInsetsChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
 }
 void com_codename1_impl_mac_MacNative_macTitleBarInsets___int_1ARRAY(CODENAME_ONE_THREAD_STATE,

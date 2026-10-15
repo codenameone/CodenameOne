@@ -60,6 +60,36 @@ static GtkWidget* closeButton(GtkWidget* widget) {
     }
     return NULL;
 }
+static gboolean titleTouch(GdkEventType type, GdkEventSequence* sequence, double x) {
+    GdkEventTouch event = {0};
+    event.type = type;
+    event.sequence = sequence;
+    event.x = x;
+    event.y = 10;
+    gboolean handled = FALSE;
+    g_signal_emit_by_name(cn1TitleCanvas, "touch-event", &event, &handled);
+    return handled;
+}
+static void touchOwnership(void) {
+    int nativeToken, javaToken;
+    GdkEventSequence* native = (GdkEventSequence*)&nativeToken;
+    GdkEventSequence* java = (GdkEventSequence*)&javaToken;
+    assert(!titleTouch(GDK_TOUCH_BEGIN, native, 200));
+    assert(cn1TouchSeq == NULL);
+    assert(!titleTouch(GDK_TOUCH_UPDATE, native, 10)); // native drag crosses a control
+    assert(titleTouch(GDK_TOUCH_BEGIN, java, 10));
+    assert(cn1TouchSeq == java);
+    assert(!titleTouch(GDK_TOUCH_END, native, 10)); // concurrent native touch stays native
+    assert(cn1TouchSeq == java);
+    assert(titleTouch(GDK_TOUCH_UPDATE, java, 200)); // control drag crosses blank caption
+    assert(titleTouch(GDK_TOUCH_END, java, 200));
+    assert(cn1TouchSeq == NULL && cn1TitleJavaTouches == NULL);
+    assert(titleTouch(GDK_TOUCH_BEGIN, java, 10));
+    assert(titleTouch(GDK_TOUCH_CANCEL, java, 200));
+    assert(cn1TouchSeq == NULL && cn1TitleJavaTouches == NULL);
+    assert(!titleTouch(GDK_TOUCH_BEGIN, native, 200));
+    assert(!titleTouch(GDK_TOUCH_CANCEL, native, 200));
+}
 int main(int argc, char** argv) {
     gtk_init(&argc, &argv);
     cn1GtkThread = pthread_self();
@@ -110,6 +140,7 @@ int main(int argc, char** argv) {
     int regions[] = {0, 0, cn1DisplayWidth, cn1TitleHeight, right[0], right[2], 80, 28};
     memcpy(cn1TitleRegions, regions, sizeof(regions));
     cn1TitleRegionCount = 8;
+    touchOwnership();
     GdkEventButton event = {0};
     event.type = GDK_BUTTON_PRESS;
     event.button = 1;

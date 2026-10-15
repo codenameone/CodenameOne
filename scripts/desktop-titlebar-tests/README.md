@@ -18,10 +18,12 @@ directory. No Maven repository is used by these harnesses.
 
 * **macOS:** requires Xcode command-line tools and AppKit. Checks actual native
   window-button geometry, backing scale, copied metric snapshots, and hidden
-  controls, and handled/unhandled Dock reopen decisions without launching a document editor.
+  controls, asynchronous change notifications (without repeat notifications for
+  unchanged geometry), and handled/unhandled Dock reopen decisions without launching a document editor.
 * **Linux:** requires GCC, GTK 3 and Pango development headers, `pkg-config`,
   `xvfb-run`, Openbox, and `xdotool`. Checks left/right system decoration layouts,
-  title/body coordinates, interactive exclusions, native-peer click/focus/typing and reparenting,
+  title/body coordinates, interactive exclusions, touch ownership across caption/control
+  boundaries and cancellation, native-peer click/focus/typing and reparenting,
   double-click maximize, mode switching, and the real GTK close button. This is
   X11 validation; acceptance under a Wayland compositor remains separate.
 * **Windows:** requires Clang, an x86_64 MinGW sysroot/linker, and Wine. Compiles
@@ -40,3 +42,7 @@ a minimal host backed by a real `NSWindow`.
 The portable Toolbar layout regressions live in `DesktopChromeTest` in
 `maven/core-unittests`. They cover additive physical insets, RTL, changes to
 system geometry, restored application padding, and mobile/legacy behavior.
+
+`WindowsDpiTest` in `maven/windows` checks DPI conversion and density updates before
+requesting layout refresh, including unchanged DPI and ordinary appearance events.
+It does not replace a physical multi-monitor Windows check.

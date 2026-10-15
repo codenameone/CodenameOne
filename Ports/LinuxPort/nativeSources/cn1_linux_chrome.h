@@ -25,6 +25,38 @@
 /* Included by cn1_linux_window.c. GTK owns the header, decorations and controls.
  * The custom-title drawing area shows the Toolbar slice of the same back buffer
  * as the body. No independent Java component tree or synthetic window controls. */
+static gboolean cn1TitleDragPoint(GtkWidget* widget, double eventX, double eventY) {
+    int x = cn1TitleEventX(widget, eventX), y = cn1TitleEventY(widget, eventY);
+    gboolean drag = cn1TitleRegionCount >= 4;
+    for (int i = 0; drag && i < cn1TitleRegionCount; i += 4) {
+        int* r = cn1TitleRegions + i;
+        gboolean inside = x >= r[0] && y >= r[1] && x - r[0] < r[2] && y - r[1] < r[3];
+        if ((i == 0 && !inside) || (i > 0 && inside)) drag = FALSE;
+    }
+    return drag;
+}
+
+// Decide ownership at touch-begin and retain it across boundaries until end/cancel.
+// Returning FALSE lets GtkWindow's native gestures handle blank caption touches.
+static GHashTable* cn1TitleJavaTouches;
+static gboolean cn1TitleTouch(GtkWidget* widget, GdkEventTouch* event, gpointer data) {
+    if (event->type == GDK_TOUCH_BEGIN) {
+        if (cn1TitleDragPoint(widget, event->x, event->y)) return FALSE;
+        if (!cn1TitleJavaTouches) cn1TitleJavaTouches = g_hash_table_new(g_direct_hash, g_direct_equal);
+        g_hash_table_add(cn1TitleJavaTouches, event->sequence);
+    }
+    if (!cn1TitleJavaTouches || !g_hash_table_contains(cn1TitleJavaTouches, event->sequence)) return FALSE;
+    gboolean handled = cn1OnTouch(widget, event, data);
+    if (event->type == GDK_TOUCH_END || event->type == GDK_TOUCH_CANCEL) {
+        g_hash_table_remove(cn1TitleJavaTouches, event->sequence);
+        if (g_hash_table_size(cn1TitleJavaTouches) == 0) {
+            g_hash_table_destroy(cn1TitleJavaTouches);
+            cn1TitleJavaTouches = NULL;
+        }
+    }
+    return handled;
+}
+
 static int cn1TitlePointerButtons;
 static gboolean cn1TitleButton(GtkWidget* widget, GdkEventButton* event, gpointer data) {
     int button = cn1LinuxButtonMask(event->button);
@@ -34,13 +66,7 @@ static gboolean cn1TitleButton(GtkWidget* widget, GdkEventButton* event, gpointe
         cn1TitlePointerButtons &= ~button;
         return cn1OnButton(widget, event, data);
     }
-    int x = cn1TitleEventX(widget, event->x), y = cn1TitleEventY(widget, event->y);
-    gboolean drag = cn1TitleRegionCount >= 4;
-    for (int i = 0; drag && i < cn1TitleRegionCount; i += 4) {
-        int* r = cn1TitleRegions + i;
-        gboolean inside = x >= r[0] && y >= r[1] && x - r[0] < r[2] && y - r[1] < r[3];
-        if ((i == 0 && !inside) || (i > 0 && inside)) drag = FALSE;
-    }
+    gboolean drag = cn1TitleDragPoint(widget, event->x, event->y);
     // Propagation lets GtkWindow apply gtk-titlebar-{double,middle,right}-click
     // actions and compositor move tracking, on both X11 and Wayland.
     if (drag) return FALSE;
@@ -103,7 +129,7 @@ static void cn1TitleEnable(gboolean enabled) {
         g_signal_connect(cn1TitleCanvas, "button-release-event", G_CALLBACK(cn1TitleButton), NULL);
         g_signal_connect(cn1TitleCanvas, "motion-notify-event", G_CALLBACK(cn1OnMotion), NULL);
         g_signal_connect(cn1TitleCanvas, "leave-notify-event", G_CALLBACK(cn1OnLeave), NULL);
-        g_signal_connect(cn1TitleCanvas, "touch-event", G_CALLBACK(cn1OnTouch), NULL);
+        g_signal_connect(cn1TitleCanvas, "touch-event", G_CALLBACK(cn1TitleTouch), NULL);
         g_signal_connect(cn1TitleCanvas, "scroll-event", G_CALLBACK(cn1OnScroll), NULL);
         g_signal_connect(cn1TitleCanvas, "event", G_CALLBACK(cn1OnGenericEvent), NULL);
         g_signal_connect(cn1TitleCanvas, "size-allocate", G_CALLBACK(cn1TitleAllocated), NULL);
@@ -112,6 +138,11 @@ static void cn1TitleEnable(gboolean enabled) {
         gtk_widget_get_preferred_height(cn1TitleHeader, &minimum, &natural);
         cn1TitleHeight = natural;
     } else {
+        if (cn1TitleJavaTouches) {
+            if (g_hash_table_contains(cn1TitleJavaTouches, cn1TouchSeq)) cn1TouchSeq = NULL;
+            g_hash_table_destroy(cn1TitleJavaTouches);
+            cn1TitleJavaTouches = NULL;
+        }
         // Destroying a titlebar must not destroy native peers still owned by Java.
         GList* children = gtk_container_get_children(GTK_CONTAINER(cn1TitleFixed));
         for (GList* child = children; child; child = child->next) {

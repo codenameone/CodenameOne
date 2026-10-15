@@ -19,6 +19,7 @@ harness = r'''
 #define CODENAME_ONE_THREAD_STATE void* state
 #define JAVA_OBJECT void*
 #define JAVA_NULL NULL
+#define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG NULL
 typedef struct { int length; int data[5]; } Array;
 #define JAVA_ARRAY Array*
 #define CN1_ARRAY_DATA(a) (((Array*)a)->data)
@@ -32,6 +33,11 @@ typedef struct { int length; int data[5]; } Array;
 - (NSWindow*)builtWindow { return self.window; }
 + (instancetype)sharedHost { static CN1MacHost* h; if (!h) h = [CN1MacHost new]; return h; }
 @end
+static int insetNotifications;
+void com_codename1_impl_mac_MacImplementation_macTitleBarInsetsChanged__(void* state) {
+    assert([NSThread isMainThread]);
+    insetNotifications++;
+}
 PRODUCTION
 @interface ReopenWindow : NSWindow
 @property(nonatomic) BOOL testMiniaturized;
@@ -60,6 +66,7 @@ int main(void) {
         host.window.titleVisibility = NSWindowTitleHidden;
         host.renderingView = host.window.contentView;
         cn1MacUpdateTitleInsets();
+        assert(insetNotifications == 1);
         CGFloat scale = host.window.backingScaleFactor;
         assert(cn1TitleInsets[0] > 60 * scale && cn1TitleInsets[0] < 130 * scale);
         assert(cn1TitleInsets[1] == 0);
@@ -69,8 +76,19 @@ int main(void) {
         assert(result.data[0] == cn1TitleInsets[0]);
         for (NSNumber* type in @[@(NSWindowCloseButton), @(NSWindowMiniaturizeButton), @(NSWindowZoomButton)])
             [host.window standardWindowButton:type.integerValue].hidden = YES;
-        cn1MacUpdateTitleInsets();
+        // The query must return promptly with the old cache, then notify after
+        // the AppKit refresh changes it. No manual resize or repaint is needed.
+        com_codename1_impl_mac_MacNative_macTitleBarInsets___int_1ARRAY(NULL,NULL,&result);
+        assert(result.data[0] > 0 && insetNotifications == 1);
+        NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:2];
+        while (insetNotifications == 1 && deadline.timeIntervalSinceNow > 0)
+            [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+        assert(insetNotifications == 2);
         assert(cn1TitleInsets[0] == 0 && cn1TitleInsets[4] == 0);
+        com_codename1_impl_mac_MacNative_macTitleBarInsets___int_1ARRAY(NULL,NULL,&result);
+        assert(result.data[0] == 0 && result.data[4] == 0);
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+        assert(insetNotifications == 2); // unchanged metrics must not loop repaint
         ReopenWindow* window = [[ReopenWindow alloc] initWithContentRect:NSMakeRect(0,0,100,100)
                 styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
         host.window = window;
