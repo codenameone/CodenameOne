@@ -114,8 +114,8 @@ class PaymentsTest {
     @Test
     void todaysTripsCountTodaysRidesAlone() throws Exception {
         // Tallinn.
-        String rider = People.rider(accounts, "tll-rider");
-        String driver = People.driver(accounts, "tll-driver");
+        String rider = People.rider(accounts, "tll-pay-rider");
+        String driver = People.driver(accounts, "tll-pay-driver");
         Trips.online(mvc, driver, 59.4370, 24.7536);
         String yesterday = (String) Trips.complete(mvc, rider, driver, People.ride(59.4370,
                 24.7536, 59.4470, 24.7636)).get("id");
@@ -531,8 +531,8 @@ class PaymentsTest {
     @Test
     void aRideLeftCompletedAndUnpaidIsSettledLater() throws Exception {
         // Lisbon.
-        String rider = People.rider(accounts, "lis-rider");
-        String driver = People.driver(accounts, "lis-driver");
+        String rider = People.rider(accounts, "lis-pay-rider");
+        String driver = People.driver(accounts, "lis-pay-driver");
         Trips.addCard(mvc, rider, Trips.VISA);
         Trips.online(mvc, driver, 38.7223, -9.1393);
         Map done = Trips.complete(mvc, rider, driver, People.ride(38.7223, -9.1393, 38.7323,
@@ -569,8 +569,8 @@ class PaymentsTest {
     @Test
     void aChargeNobodyCanVouchForIsLeftPendingAndAskedForAgain() throws Exception {
         // Prague.
-        String rider = People.rider(accounts, "prg-rider");
-        String driver = People.driver(accounts, "prg-driver");
+        String rider = People.rider(accounts, "prg-pay-rider");
+        String driver = People.driver(accounts, "prg-pay-driver");
         String card = (String) Trips.addCard(mvc, rider, Trips.NO_ANSWER_WHEN_CHARGED).get("id");
         Trips.online(mvc, driver, 50.0755, 14.4378);
         Map done = Trips.complete(mvc, rider, driver, Trips.ride(50.0755, 14.4378, 50.0855,
@@ -618,8 +618,8 @@ class PaymentsTest {
     @Test
     void aTipNobodyCanVouchForStaysOnTheRideUntilItIsAskedForAgain() throws Exception {
         // Vienna.
-        String rider = People.rider(accounts, "vie-rider");
-        String driver = People.driver(accounts, "vie-driver");
+        String rider = People.rider(accounts, "vie-pay-rider");
+        String driver = People.driver(accounts, "vie-pay-driver");
         String card = (String) Trips.addCard(mvc, rider, Trips.VISA).get("id");
         Trips.online(mvc, driver, 48.2082, 16.3738);
         String id = (String) Trips.complete(mvc, rider, driver, People.ride(48.2082, 16.3738,
