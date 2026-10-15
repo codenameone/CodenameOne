@@ -62,18 +62,12 @@ public class PushDevices {
         String id = key(target);
         long now = System.currentTimeMillis();
         PushDevice row = devices.findById(id);
+        if (row == null || !username.equals(row.getUsername())) {
+            // A device new to this account, whether its token is new or moves
+            // here from another account, takes a place under the cap.
+            makeRoom(username);
+        }
         if (row == null) {
-            List<PushDevice> held = new ArrayList<PushDevice>(devices.findByUsername(username));
-            while (held.size() >= MAX_PER_ACCOUNT) {
-                PushDevice oldest = held.get(0);
-                for (PushDevice each : held) {
-                    if (each.getUpdatedAt() < oldest.getUpdatedAt()) {
-                        oldest = each;
-                    }
-                }
-                devices.deleteById(oldest.getId());
-                held.remove(oldest);
-            }
             row = new PushDevice();
             row.setId(id);
             row.setProvider(target.getProvider());
@@ -84,6 +78,22 @@ public class PushDevices {
             fill(row, username, device, now);
         }
         return new PushDeviceDto(target.getProvider(), target.getToken(), row.getPlatform());
+    }
+
+    /// Removes `username`'s devices heard from longest ago until one more fits
+    /// under [#MAX_PER_ACCOUNT].
+    private void makeRoom(String username) {
+        List<PushDevice> held = new ArrayList<PushDevice>(devices.findByUsername(username));
+        while (held.size() >= MAX_PER_ACCOUNT) {
+            PushDevice oldest = held.get(0);
+            for (PushDevice each : held) {
+                if (each.getUpdatedAt() < oldest.getUpdatedAt()) {
+                    oldest = each;
+                }
+            }
+            devices.deleteById(oldest.getId());
+            held.remove(oldest);
+        }
     }
 
     /// Forgets a device, if it is this account's. Somebody else's is left alone.

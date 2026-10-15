@@ -121,6 +121,12 @@ public final class AppConfig {
         Preferences.set(MODE_OWNER_KEY, username == null ? "" : username);
     }
 
+    /// Whether `url` names the server `current` does, as [#setServerUrl]
+    /// would store it.
+    public static boolean sameServer(String url, String current) {
+        return clean(url).equals(current);
+    }
+
     private static String clean(String url) {
         String text = url == null ? "" : url.trim();
         while (text.endsWith("/")) {

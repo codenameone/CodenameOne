@@ -221,11 +221,31 @@ public final class Nav {
     }
 
     /// Points the app at another server, which ends the session with this one.
-    public static void changeServer(String url) {
+    public static void changeServer(final String url) {
+        Runnable switchOver = () -> {
+            AppConfig.setServerUrl(url);
+            Session.start(AppConfig.serverUrl());
+            launch();
+        };
+        if (AppConfig.sameServer(url, Session.serverUrl()) || Session.user() == null) {
+            LiveChannel.stop();
+            switchOver.run();
+            return;
+        }
+        // Signed in: sign out the way the Sign out button does, against the
+        // server still in use, before pointing anywhere else. Session.start
+        // only forgets the tokens on this phone, so the old server would keep
+        // a live refresh token and this phone's push registration, and go on
+        // notifying it about that account's rides.
+        Account.flush();
+        Shift.end();
         LiveChannel.stop();
-        AppConfig.setServerUrl(url);
-        Session.start(AppConfig.serverUrl());
-        launch();
+        homeForm = null;
+        homeMode = "";
+        Notifications.signingOut(() -> {
+            Telemetry.signedOut("server");
+            Session.signOut(switchOver);
+        });
     }
 
     /// There is a session, and no server to use it with.

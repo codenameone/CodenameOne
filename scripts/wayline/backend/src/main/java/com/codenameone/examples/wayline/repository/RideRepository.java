@@ -157,6 +157,18 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver,
             @Param("newDriver") String newDriver);
 
+    /// Holds `rider`'s ride while it is in one of `states`, answering 0 when
+    /// it is not. The update writes nothing new; it is there for the row lock
+    /// it takes until the transaction ends, so a move that would take the ride
+    /// out of `states` waits for this transaction, or has already happened
+    /// and makes it answer 0. The state is checked by the database at that
+    /// moment, never from a copy read earlier.
+    @Modifying
+    @Query("update Ride r set r.rider = :rider "
+            + "where r.id = :id and r.rider = :rider and r.state in :states")
+    int holdWhile(@Param("id") String id, @Param("rider") String rider,
+            @Param("states") RideState[] states);
+
     /// A move the server makes itself, whoever has the ride.
     @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "

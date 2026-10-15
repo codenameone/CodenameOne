@@ -334,6 +334,66 @@ class PushTest {
         assertEquals(1L, devices(second));
     }
 
+    @Test
+    void anActivityIsRefusedOnceTheRideHasEnded() throws Exception {
+        // Helsinki: the ride is completed. Oslo: the driver cancels it.
+        String rider = People.rider(accounts, "push-hel-rider");
+        String driver = People.driver(accounts, "push-hel-driver");
+        Trips.online(mvc, driver, 60.1699, 24.9384);
+        String done = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(60.1700, 24.9383, 60.1800, 24.9500)), rider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + done + "/accept"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + done + "/arrived"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + done + "/start"), driver))
+                .andExpect(status().isOk());
+        // Still on the road: the activity is taken.
+        mvc.perform(People.asRider(body(post("/api/rides/" + done + "/activity"),
+                "{\"activityId\":\"act-hel\"}"), rider)).andExpect(status().isOk());
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + done + "/complete"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + done + "/activity"),
+                "{\"activityId\":\"act-hel-2\"}"), rider)).andExpect(status().isConflict());
+
+        String oslo = People.rider(accounts, "push-osl-rider");
+        String oslodriver = People.driver(accounts, "push-osl-driver");
+        Trips.online(mvc, oslodriver, 59.9139, 10.7522);
+        String canceled = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(59.9140, 10.7521, 59.9250, 10.7600)), oslo)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + canceled + "/accept"),
+                oslodriver)).andExpect(status().isOk());
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + canceled + "/cancel"),
+                oslodriver)).andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + canceled + "/activity"),
+                "{\"activityId\":\"act-osl\"}"), oslo)).andExpect(status().isConflict());
+    }
+
+    @Test
+    void aTokenTakenFromAnotherAccountStillRespectsTheCap() throws Exception {
+        String full = People.rider(accounts, "push-cap-full");
+        String other = People.rider(accounts, "push-cap-other");
+        for (int i = 0; i < 8; i++) {
+            register(full, "fcm", "cap-full-" + i);
+        }
+        assertEquals(8L, devices(full));
+        // Make one device clearly the one heard from longest ago.
+        db.execute("UPDATE push_device SET updated_at = 1 WHERE token = ?",
+                new Object[] {"cap-full-3"});
+        register(other, "fcm", "cap-moving-phone");
+        register(full, "fcm", "cap-moving-phone");
+        assertEquals(8L, devices(full));
+        assertEquals(0L, devices(other));
+        assertEquals(0L, tokens("cap-full-3"));
+        assertEquals(1L, tokens("cap-moving-phone"));
+    }
+
+    private long tokens(String token) throws Exception {
+        Map row = db.queryOne("SELECT COUNT(*) AS n FROM push_device WHERE token = ?",
+                new Object[] {token});
+        return ((Number) row.get("n")).longValue();
+    }
+
     private long devices(String username) throws Exception {
         Map row = db.queryOne("SELECT COUNT(*) AS n FROM push_device WHERE username = ?",
                 new Object[] {username});

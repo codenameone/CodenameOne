@@ -153,7 +153,14 @@ public class RidePushes {
         if (ride == null || !ride.getRider().equals(rider)) {
             throw new ResponseStatusException(404, "No such ride");
         }
-        if (!meeting(ride.getState())) {
+        // The state check and the insert have to be one step against the ride
+        // ending: checked from the ride read above, a driver completing it or
+        // an admin cancelling it could commit in between, its compose() would
+        // find no activity to end, and this one would be inserted after it and
+        // stay on the lock screen. holdWhile checks the state in the database
+        // and keeps the ride's row locked until this commits, so an ending
+        // either happened first (409 here) or waits and then finds the row.
+        if (rides.holdWhile(rideId, rider, MEETING) == 0) {
             throw new ResponseStatusException(409, "That ride has no driver on the way");
         }
         RideActivity row = activities.findById(rideId);
@@ -395,10 +402,9 @@ public class RidePushes {
                         ride.getPickupLng());
     }
 
-    private static boolean meeting(RideState state) {
-        return RideState.ACCEPTED == state || RideState.ARRIVED == state
-                || RideState.IN_PROGRESS == state;
-    }
+    private static final RideState[] MEETING = {
+        RideState.ACCEPTED, RideState.ARRIVED, RideState.IN_PROGRESS
+    };
 
     private static String describe(Profile who) {
         String vehicle = who.getVehicle() == null ? "" : who.getVehicle().trim();
