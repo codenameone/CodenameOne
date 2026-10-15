@@ -133,6 +133,38 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void hidingTitleToolbarBeforeFirstPaintClearsNativeChrome() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Not painted yet");
+        form.show();
+        Toolbar toolbar = form.getToolbar();
+        toolbar.calcPreferredSize(); // native ports enable integrated chrome here
+        assertNull(implementation.getLastTitleBarRegions(), "no paint regions published yet");
+        toolbar.setVisible(false);
+        assertNotNull(implementation.getLastTitleBarRegions(), "hide must send a native clear");
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+        toolbar.setVisible(true);
+        toolbar.paint(Image.createImage(800, 800).getGraphics());
+        assertTrue(implementation.getLastTitleBarRegions().length > 0,
+                "showing again must restore native drag regions");
+    }
+
+    @FormTest
+    void removingTitleToolbarBeforeFirstPaintClearsNativeChrome() {
+        desktopMode("custom");
+        implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);
+        Form form = new Form("Removed before paint");
+        form.show();
+        Toolbar toolbar = form.getToolbar();
+        toolbar.doLayout(); // layout also queries the native insets
+        assertNull(implementation.getLastTitleBarRegions(), "no paint regions published yet");
+        toolbar.remove();
+        assertNotNull(implementation.getLastTitleBarRegions(), "removal must send a native clear");
+        assertEquals(0, implementation.getLastTitleBarRegions().length);
+    }
+
+    @FormTest
     void nativeControlsReservePhysicalSpaceWithoutChangingApplicationStyle() {
         desktopMode("custom");
         implementation.setNativeTitleBarInsets(70, 130, 6, 4, 50);

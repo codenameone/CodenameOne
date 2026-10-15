@@ -2681,11 +2681,18 @@ public class Toolbar extends Container {
 
     private boolean applyingTitleInsets;
     private int[] laidOutTitleInsets;
+    private boolean nativeTitleBarInsetsActive;
 
     private int[] titleInsets() {
         Form form = getComponentForm();
-        return isVisible() && form != null && !(form instanceof Dialog) && form.isDesktopToolbarTitle()
+        int[] insets = isVisible() && form != null && !(form instanceof Dialog) && form.isDesktopToolbarTitle()
                 ? Display.impl.getNativeWindowTitleBarInsets(this) : null;
+        // Querying metrics can enable native chrome before paint publishes any
+        // regions. Remember that activation until hide/removal clears it.
+        if (insets != null) {
+            nativeTitleBarInsetsActive = true;
+        }
+        return insets;
     }
 
     // Native reserved space is additive and temporary: changing the platform metrics must
@@ -2821,9 +2828,10 @@ public class Toolbar extends Container {
     }
 
     private void clearNativeTitleBarRegions() {
-        if (nativeTitleBarRegions != null) {
+        if (nativeTitleBarInsetsActive || nativeTitleBarRegions != null) {
             Display.impl.setNativeWindowTitleBarRegions(this, new int[0]);
             nativeTitleBarRegions = null;
+            nativeTitleBarInsetsActive = false;
         }
     }
 
@@ -2859,7 +2867,7 @@ public class Toolbar extends Container {
                 nativeTitleBarRegions = regions;
                 Display.impl.setNativeWindowTitleBarRegions(this, regions);
             }
-        } else if (nativeTitleBarRegions != null) {
+        } else {
             clearNativeTitleBarRegions();
         }
         super.paint(g);
@@ -2867,9 +2875,7 @@ public class Toolbar extends Container {
 
     @Override
     protected void deinitialize() {
-        if (nativeTitleBarRegions != null) {
-            clearNativeTitleBarRegions();
-        }
+        clearNativeTitleBarRegions();
         super.deinitialize();
     }
 
