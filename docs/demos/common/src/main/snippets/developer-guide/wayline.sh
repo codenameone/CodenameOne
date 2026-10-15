@@ -1,7 +1,6 @@
 // Snippets of the Wayline chapters of the developer guide. Edit them here, not inline.
 
 // tag::wayline-sh-server[]
-cd scripts/wayline
 CN1_PROFILE=dev backend/server.sh run
 // end::wayline-sh-server[]
 
@@ -17,9 +16,6 @@ CN1_PROFILE=dev backend/server.sh run
 // tag::wayline-sh-tests[]
 mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
 mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
-./run-e2e.sh   # <3>
-./check-template.sh   # <4>
-./run-web-e2e.sh   # <5>
 // end::wayline-sh-tests[]
 
 // tag::wayline-sh-native[]

@@ -8,16 +8,14 @@ sample leaves for you to finish: taking real money, map data at production
 volume, native maps, sign-in through another identity provider, real text
 messages, analytics, and the database it's deployed on.
 
-The project is in `scripts/wayline` in the Codename One repository. The
-Initializr generates the same project under your own name and package, and
-that's the copy to build a product on. Paths in this chapter are relative to the
-project's root.
+The Initializr's ride-hailing template generates the project under your own
+name and package. Paths in this chapter are relative to the project's root.
 
 [[wayline-launch]]
 === Running it
 
-The server needs JDK 17 and Maven, and nothing else installed. Start it on the
-development profile:
+The project needs JDK 17 or newer and Maven, and nothing else installed. Start
+the server on the development profile:
 
 [source,bash]
 ----
@@ -53,10 +51,8 @@ include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=waylin
 Then open `http://localhost:8080/`. <<backend-hosting-the-app>> describes what
 the server does with the staged files and how to deploy them.
 
-`backend/server.sh` wraps the Maven goals. On the JVM it starts in a few
-seconds, which suits development. A deployment runs the server compiled to a
-native binary, which needs `clang` and the development headers of OpenSSL,
-libcurl and nghttp2:
+`backend/server.sh` runs the server on the JVM for development. For a
+deployment it builds a native binary with one command:
 
 [source,bash]
 ----
@@ -87,10 +83,10 @@ include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=waylin
   settings in
   `application.properties` beside the module's `pom.xml`.
 
-| `javase`, `android`, `ios`
-| The platforms the app is built for. `javase` is the simulator and the
-  desktop build.
 |===
+
+There are no platform modules: `common` builds the app for the simulator, the
+desktop, Android, iOS and the browser.
 
 === The contract both sides share
 
@@ -554,7 +550,7 @@ window is resized across it. Screens that have no wide layout are kept to a
 column 150 mm wide. On the desktop the `nativeTheme=native` build hint gives
 the app the operating system's own look.
 
-=== Tests and continuous integration
+=== Tests
 
 [source,bash]
 ----
@@ -566,33 +562,12 @@ include::../demos/common/src/main/snippets/developer-guide/wayline.sh[tag=waylin
     pricing, statistics, moderation, the live socket and the browser sign-in.
 <2> The same tests again with the server compiled to a native binary, which is
     how it ships.
-<3> Starts the server on the `test` profile and runs the app's tests against it
-    in the simulator. They register, apply to drive and are approved, request a
-    ride, drive it, pay for it and administer it, and compare screens with the
-    pictures in `screenshots/`. On Linux a second pass runs the simulator as a
-    desktop window for the wide console.
-<4> Generates a project from the Initializr template under another name and
-    package, runs its server tests and builds its app.
-<5> Builds the browser version, starts the server hosting it, and drives it in
-    headless Chromium with Playwright: sign in as the rider, reach the home
-    screen and the live channel, sign out, sign in as the admin and reach the
-    console.
 
-The app's tests draw the map from 24 tiles bundled with the tests and take
-straight lines for routes, so a run asks no outside service for anything. The
-`test` profile also swaps the place search for one that knows ten places.
+<<backend-testing>> covers the server test support.
 
-`.github/workflows/wayline.yml` runs all five and builds the app for Android
-and iOS. <<backend-testing>> covers the server test support.
+=== Your project's names
 
-=== The Initializr template
-
-The Initializr's ride-hailing template is this project. A script in the
-repository, `scripts/sync-initializr-wayline.py`, derives the template from
-`scripts/wayline` and fails the build when the two differ, so the template is
-always the project that the tests above ran against.
-
-A generated project differs from the sample in its names:
+The Initializr generates the project under the name and package you choose:
 
 * The Java package becomes yours.
 * `wayline` in artifact ids and configuration keys becomes your project's name
@@ -601,10 +576,7 @@ A generated project differs from the sample in its names:
 * `WAYLINE` in environment variable names becomes the name in upper case.
 * The main class takes the project's name.
 
-The server's tests come with the generated project. The app's simulator tests,
-their reference pictures and the browser test stay behind.
-
-This chapter uses the sample's names. In your project read `wayline` as your
+This chapter uses the name Wayline. In your project read `wayline` as your
 own.
 
 === Making it yours: A ride-sharing service

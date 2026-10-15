@@ -4,8 +4,8 @@
 Wayline is a sample app with a server behind it. A rider asks for a ride, the
 nearest suitable driver is offered it, both follow the trip on a map, the ride is
 paid for when it ends, and an administrator runs the service. The app and the
-server are one Maven project in `scripts/wayline`, written in Java on both sides,
-and the Initializr generates the same project under your own name.
+server are one Maven project, written in Java on both sides, and the
+Initializr's ride-hailing template generates it under your own name.
 
 This chapter is the user's guide: what each of the three kinds of user sees and
 can do. <<wayline-implementors-guide>> is the other half. It explains how the

@@ -571,8 +571,9 @@ with `provided` scope, so the server doesn't inherit the client library. A
 contract method can't answer with a status of its own, so the implementation
 throws `ResponseStatusException` to refuse a request.
 
-The ride-hailing application in `scripts/wayline` is built this way, and the
-Initializr generates it as a starting point under your own name and package.
+The Initializr's ride-hailing template is built this way and generates a
+starting point under your own name and package. <<wayline-implementors-guide>>
+describes it.
 
 === Real-time with WebSockets
 
