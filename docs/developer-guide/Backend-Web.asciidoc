@@ -4,8 +4,8 @@
 A controller turns HTTP into method calls. This chapter covers how requests are
 mapped to methods and how their parts are bound to parameters, how a return value
 becomes a response, how the app and the server share one declaration of their
-API, and how a server holds WebSocket connections open. <<A first server>>
-introduced the shape; this is the detail.
+API, how a server holds WebSocket connections open, and how it sends push
+notifications. <<A first server>> introduced the shape; this is the detail.
 
 === Mapping requests
 
@@ -726,3 +726,81 @@ suite can't shrink unnoticed to the ones that happen to pass.
 Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They're
 excluded rather than tolerated: accepting their result as a pass would also accept
 it for a case that used to work.
+
+[[backend-push]]
+=== Sending push notifications
+
+A WebSocket reaches an app that's running. A push notification reaches a phone
+whose app isn't: a server tells a rider their driver has arrived, or moves the
+countdown on the lock screen. The server hands the message to the Codename One
+push service, which delivers it through Firebase, APNs, Huawei, WNS, or Web Push,
+and the app receives it with `PushClient`. <<push-notifications-section>> covers the
+app's half and the Console.
+
+A server needs two values from the Console, both described in
+<<push-notifications-section,Push notifications>>: the application UUID of the push
+application, and a server API key created with the `push` scope. The key is a
+credential; keep it in configuration or the environment, never in source and never
+in the app.
+
+`CloudPush` sends, `PushNotification` builds the message, and `PushTarget` names a
+device:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-send,indent=0]
+----
+
+A device is a provider and that provider's token. `PushTarget.of("fcm", token)`
+takes the two values and accepts the older spellings the app can report (`gcm`,
+`ios`, `hms`). `PushTarget.fromDeviceKey` reads the `cn1-fcm-...` form that
+`Push.getPushKey()` returns. One `send` can address many devices at once.
+
+`PushNotification` writes the same envelope the app's `PushMessage` reads: title,
+body, image, deep link, collapse key, time to live, silent delivery, application
+data, and options for one provider. A message needs a body, data, or a surface
+command.
+
+==== Live Activities and widgets
+
+A message can carry a command the app applies before its listener runs, which keeps
+a Live Activity or a widget current while the app is in the background. Three
+helpers build the command:
+
+* `PushNotification.liveUpdate(id, state)` gives a running activity new state.
+* `PushNotification.liveEnd(id, finalState, dismissImmediately)` ends it, optionally
+  with a last state.
+* `PushNotification.widget(kind, timelineJson)` publishes new widget content.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-live-activity,indent=0]
+----
+
+The `id` is the one the app started the activity under, and the state map uses the
+names the activity's layout binds. The helpers turn the map into the JSON string
+the envelope carries, with its keys sorted the way the app writes state itself.
+<<push-notifications-section>> describes how each platform applies a command.
+
+==== What the answer means
+
+`send` returns a `PushResult` for every answer the service gives, a refusal
+included. `isAccepted()` is true for a `202`, and that means _admitted_: the
+service has queued the message durably, but no provider or device has seen it yet.
+Whether it arrived is reported later, through delivery feedback. `getDeliveryIds()`
+lists one id per admitted target, to match against that feedback.
+
+A refusal carries its status and the service's explanation in `getError()`:
+
+* *400*: the request is malformed, such as an unknown provider or an `appId` that
+  isn't the application UUID.
+* *401*: the key is missing, wrong, or lacks the `push` scope.
+* *402*: the account doesn't include what the message asked for.
+* *429*: slow down. `getRetryAfterSeconds()` says how long to wait, or answers
+  `-1` when the service didn't say.
+
+Only a request that got no answer at all, because the service was unreachable or
+the connection failed, throws an `IOException`. A send is one HTTPS request on the
+calling thread, so a server that notifies as part of handling a request can hand it
+to an `@Async` method rather than make its own caller wait. `withEndpoint` points a
+sender at another URL, such as a stub server in a test.
