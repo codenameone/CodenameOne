@@ -24,6 +24,7 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.DeclaredCharset;
 import com.codename1.io.Log;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
@@ -127,15 +128,11 @@ public class WebBrowser extends Container {
                     protected void buildRequestBody(OutputStream os) throws IOException {
                         // PMD Fix (CollapsibleIfStatements): Merge the post and parameter checks into a single conditional.
                         if (isPost() && docInfo.getParams() != null) {
-                            String enc = docInfo.getEncoding();
-                            if (enc.indexOf('/') > -1) {
-                                if (enc.indexOf("charset=") > -1) {
-                                    enc = enc.substring(enc.indexOf("charset=") + 8);
-                                } else {
-                                    enc = DocumentInfo.ENCODING_UTF8;
-                                }
-                            }
-                            OutputStreamWriter w = new OutputStreamWriter(os, enc);
+                            // A media type's charset parameter, a bare name, or
+                            // UTF-8 for a media type naming none -- and UTF-8
+                            // too for a name the page declares that this
+                            // platform cannot convert.
+                            OutputStreamWriter w = DeclaredCharset.writer(os, docInfo.getEncoding()); //NOPMD CloseResource
                             w.write(docInfo.getParams());
                             w.flush();
                         }

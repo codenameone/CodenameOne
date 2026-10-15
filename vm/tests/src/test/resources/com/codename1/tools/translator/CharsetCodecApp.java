@@ -37,7 +37,7 @@ import java.nio.charset.Charset;
  * ASCII, and every result is printed as hex.
  *
  * Two things are deliberately left out. Charsets the JDK supports and this
- * library does not (windows-1252, UTF-32, ...) answer differently by design,
+ * library does not (Shift_JIS, UTF-32, ...) answer differently by design,
  * so no name used here may be one of those. And a decoded U+FFFE is printed as
  * U+FFFD: JDK 11 reads the unit as malformed and replaces it, JDK 17 and later
  * keep it, and the reference JDK this runs on may be either.
@@ -57,12 +57,14 @@ public class CharsetCodecApp {
         "UTF-16LE", "UTF_16LE", "UnicodeLittleUnmarked", "X-UTF-16LE", "utf-16le",
         "ISO-8859-2", "8859_2", "912", "ISO8859-2", "ISO_8859-2", "ISO_8859-2:1987",
         "cp912", "csISOLatin2", "ibm-912", "ibm912", "iso-ir-101", "iso8859_2", "l2",
-        "latin2", "LATIN2"
+        "latin2", "LATIN2",
+        "windows-1252", "WINDOWS-1252", "cp1252", "Cp1252", "cp5348"
     };
 
     /** The canonical names: the conversions are printed once per charset. */
     private static final String[] CANONICAL = {
-        "UTF-8", "ISO-8859-1", "US-ASCII", "UTF-16", "UTF-16BE", "UTF-16LE", "ISO-8859-2"
+        "UTF-8", "ISO-8859-1", "US-ASCII", "UTF-16", "UTF-16BE", "UTF-16LE", "ISO-8859-2",
+        "windows-1252"
     };
 
     /** Names no JDK supports either, and the empty name. */
@@ -83,6 +85,10 @@ public class CharsetCodecApp {
             // Lone surrogates, a high at the end and a low on its own.
             "x" + (char) 0xD800, "" + (char) 0xDC00 + "y", "" + (char) 0xD800 + (char) 0xD800,
             "" + (char) 0xFEFF + "bom",
+            // What windows-1252 puts where ISO-8859-1 has C1 controls, and
+            // the C1 controls it leaves undefined.
+            "" + (char) 0x20AC + (char) 0x201C + (char) 0x2122 + (char) 0x0178 + (char) 0x0192
+                + (char) 0x81 + (char) 0x8D + (char) 0x9D + (char) 0xFFFD,
             // Long enough to leave any short-input fast path.
             repeat(accented + latin2 + "0123456789", 20)
         };

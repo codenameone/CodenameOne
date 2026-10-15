@@ -32,7 +32,7 @@ public class Charset implements Comparable<Charset> {
     private String name;
     // Indexed by CharsetSupport's constants, which list every charset this
     // class library converts.
-    private static final Charset[] CHARSETS = new Charset[7];
+    private static final Charset[] CHARSETS = new Charset[CharsetSupport.COUNT];
     protected Charset(String canonicalName, String[] aliases) {
         name = canonicalName;
     }

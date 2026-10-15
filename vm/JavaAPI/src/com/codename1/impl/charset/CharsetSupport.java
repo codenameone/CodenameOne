@@ -64,6 +64,15 @@ public final class CharsetSupport {
     public static final int UTF_16LE = 5;
     /** ISO-8859-2. */
     public static final int ISO_8859_2 = 6;
+    /**
+     * windows-1252: ISO-8859-1 with printable characters in place of most of
+     * the C1 controls. It is the label the web most often gets wrong -- a page
+     * or feed declared ISO-8859-1 is usually this -- so it is converted here
+     * rather than refused.
+     */
+    public static final int WINDOWS_1252 = 7;
+    /** How many charsets there are; the constants above run from 0 to this, exclusive. */
+    public static final int COUNT = 8;
 
     /**
      * Indexed by the constants above; the first name of each row is the
@@ -84,7 +93,10 @@ public final class CharsetSupport {
         {"UTF-16LE", "UTF_16LE", "UnicodeLittleUnmarked", "X-UTF-16LE"},
         {"ISO-8859-2", "8859_2", "912", "ISO8859-2", "ISO_8859-2", "ISO_8859-2:1987",
             "cp912", "csISOLatin2", "ibm-912", "ibm912", "iso-ir-101", "iso8859_2", "l2",
-            "latin2"}
+            "latin2"},
+        // JDK 8 reports only cp1252 and cp5348; ibm1252 and ibm-1252 were
+        // added later, and accepting them on every runtime is the JDK 11+ answer.
+        {"windows-1252", "cp1252", "cp5348", "ibm1252", "ibm-1252"}
     };
 
     /**
@@ -104,6 +116,18 @@ public final class CharsetSupport {
         0x010D, 0x00E9, 0x0119, 0x00EB, 0x011B, 0x00ED, 0x00EE, 0x010F,
         0x0111, 0x0144, 0x0148, 0x00F3, 0x00F4, 0x0151, 0x00F6, 0x00F7,
         0x0159, 0x016F, 0x00FA, 0x0171, 0x00FC, 0x00FD, 0x0163, 0x02D9
+    };
+
+    /**
+     * windows-1252 bytes 0x80..0x9F; outside that range it agrees with
+     * ISO-8859-1. The five bytes it leaves undefined read as U+FFFD, as the
+     * JDK's decoder reads them. Generated from the JDK's decoder.
+     */
+    private static final char[] CP1252_C1 = {
+        0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD,
+        0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178
     };
 
     private static final char REPLACEMENT = (char) 0xFFFD;
@@ -154,7 +178,8 @@ public final class CharsetSupport {
             return encodeUtf16(charset, chars, len);
         }
         // Below this every charset here writes the character as its own byte.
-        int direct = charset == US_ASCII ? 0x80 : charset == ISO_8859_2 ? 0xA0 : 0x100;
+        int direct = charset == US_ASCII || charset == WINDOWS_1252 ? 0x80
+                : charset == ISO_8859_2 ? 0xA0 : 0x100;
         byte[] out = new byte[len];
         int count = 0;
         for (int i = 0; i < len; i++) {
@@ -165,6 +190,12 @@ public final class CharsetSupport {
             }
             if (charset == ISO_8859_2) {
                 int b = latin2Byte(c);
+                if (b >= 0) {
+                    out[count++] = (byte) b;
+                    continue;
+                }
+            } else if (charset == WINDOWS_1252) {
+                int b = c >= 0xA0 && c <= 0xFF ? c : cp1252Byte(c);
                 if (b >= 0) {
                     out[count++] = (byte) b;
                     continue;
@@ -204,6 +235,8 @@ public final class CharsetSupport {
                 out[i] = REPLACEMENT;
             } else if (charset == ISO_8859_2 && b >= 0xA0) {
                 out[i] = LATIN2_HIGH[b - 0xA0];
+            } else if (charset == WINDOWS_1252 && b >= 0x80 && b < 0xA0) {
+                out[i] = CP1252_C1[b - 0x80];
             } else {
                 out[i] = (char) b;
             }
@@ -215,6 +248,20 @@ public final class CharsetSupport {
         for (int i = 0; i < LATIN2_HIGH.length; i++) {
             if (LATIN2_HIGH[i] == c) {
                 return 0xA0 + i;
+            }
+        }
+        return -1;
+    }
+
+    // U+FFFD marks a byte windows-1252 leaves undefined; it is never written
+    // as one, so a C1 control and U+FFFD itself both become '?'.
+    private static int cp1252Byte(char c) {
+        if (c == REPLACEMENT) {
+            return -1;
+        }
+        for (int i = 0; i < CP1252_C1.length; i++) {
+            if (CP1252_C1[i] == c) {
+                return 0x80 + i;
             }
         }
         return -1;

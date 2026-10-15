@@ -24,6 +24,7 @@
 package com.codename1.ui.html;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.DeclaredCharset;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
@@ -131,7 +132,11 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
                 if (docInfo.getParams() != null) {
                     // Flushed for the reason ConnectionRequest.buildRequestBody gives: a
                     // writer may keep what it was given, and this one is dropped here.
-                    OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding()); //NOPMD CloseResource
+                    // The encoding comes from the page (a form's enctype, a
+                    // linked stylesheet's charset), so a name this platform
+                    // cannot convert is written as UTF-8 rather than failing
+                    // the request on a device while the simulator sends it.
+                    OutputStreamWriter w = DeclaredCharset.writer(os, docInfo.getEncoding()); //NOPMD CloseResource
                     w.write(docInfo.getParams());
                     w.flush();
                 }

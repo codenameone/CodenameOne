@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.html;
 
+import com.codename1.io.DeclaredCharset;
 import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
@@ -1022,7 +1023,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         try {
             try {
                 if (is != null) {
-                    isr = new InputStreamReader(is, docInfo.getEncoding());
+                    // The encoding may be a whole media type (a form's enctype)
+                    // or a quoted name; only the charset it carries is looked
+                    // up, and a media type that carries none is read as UTF-8.
+                    // A name that IS unsupported still reaches the catch below,
+                    // which reports it through the callback before falling back.
+                    String enc = DeclaredCharset.name(docInfo.getEncoding());
+                    isr = enc == null ? Util.getReader(is) : new InputStreamReader(is, enc);
                 }
             } catch (Exception uee) {
                 boolean cont = true;
