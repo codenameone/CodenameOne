@@ -65,4 +65,28 @@ public class DefaultLookAndFeelLazyGlyphsTest extends UITestBase {
         laf.refreshTheme(true);
         assertNotNull(laf.getCheckBoxImages());
     }
+
+    /// The pending flags have to start armed, not at the boolean default.
+    ///
+    /// `refreshTheme()` is what normally arms them, but a brand new `UIManager`
+    /// (`UIManager.createInstance()`, or the very first `UIManager()` a JVM ever
+    /// builds) never has it called: the constructor goes straight to
+    /// `resetThemeProps()`, which does not touch these flags. A caller that asks
+    /// for a combo/check/radio image before anything calls
+    /// setThemeProps/addThemeProps/zoomFonts for the first time must still see
+    /// one built -- and, having seen `pending` false already, must see one on
+    /// every later ask too, since nothing but `refreshTheme()` ever sets it back
+    /// to true.
+    @Test
+    public void aFreshLookAndFeelBuildsItsGlyphsWithoutARefreshFirst() {
+        UIManager fresh = UIManager.createInstance();
+        DefaultLookAndFeel laf = (DefaultLookAndFeel) fresh.getLookAndFeel();
+        assertNotNull(laf.getCheckBoxImages(), "never refreshed, first ask");
+        assertNotNull(laf.getCheckBoxFocusImages(), "never refreshed, first ask");
+        assertNotNull(laf.getRadioButtonImages(), "never refreshed, first ask");
+        assertNotNull(laf.getRadioButtonFocusImages(), "never refreshed, first ask");
+        // And again, so a build that only happened to work once is not mistaken
+        // for the flag having been armed correctly.
+        assertNotNull(laf.getCheckBoxImages(), "never refreshed, second ask");
+    }
 }

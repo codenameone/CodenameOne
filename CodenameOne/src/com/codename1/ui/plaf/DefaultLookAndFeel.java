@@ -77,11 +77,23 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     // refreshTheme. Each flag says its group still has to be built from the current
     // theme, and a setter clears its own group's, so an image an application set
     // itself is never overwritten by a late build.
-    private boolean comboImagePending;
-    private boolean chkBoxImagesPending;
-    private boolean chkBoxImagesFocusPending;
-    private boolean rButtonImagesPending;
-    private boolean rButtonImagesFocusPending;
+    //
+    // Each one starts true, not at the boolean default. refreshTheme() is what
+    // normally arms them, but the very first LookAndFeel a UIManager constructs
+    // never has refreshTheme() called on it -- the constructor calls
+    // resetThemeProps() directly, which never touches these -- so a caller that
+    // asks for a combo/check/radio image before anything else happens to call
+    // setThemeProps/addThemeProps/zoomFonts first saw `pending` at its Java
+    // default of false, which this code reads as "nothing to build," and the
+    // image was null forever: ensureXxx() short-circuits on `!pending` and
+    // refreshTheme() is the only thing that ever sets it back to true. The same
+    // trap caught a freshly built UIManager.createInstance() instance, which
+    // never gets a refreshTheme() call unless the caller makes one.
+    private boolean comboImagePending = true;
+    private boolean chkBoxImagesPending = true;
+    private boolean chkBoxImagesFocusPending = true;
+    private boolean rButtonImagesPending = true;
+    private boolean rButtonImagesFocusPending = true;
     private boolean tickWhenFocused = true;
     private char passwordChar = '\u25CF';
     //used for the pull to refresh feature
