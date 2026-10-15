@@ -249,12 +249,24 @@ public class Earnings {
 
     /// Everything earned less everything paid out.
     ///
-    /// Earned is the driver's share of the fares of every ride they completed
-    /// and that was paid for, plus their tips. The dashboard's totals count
-    /// the same rides.
+    /// The dashboard's totals count the same rides as [#earned].
     private long balance(String driver) {
-        return Rows.number(rides.driverShare(driver)) + tips(driver)
-                - Rows.number(payouts.paidOut(driver));
+        return earned(driver) - Rows.number(payouts.paidOut(driver));
+    }
+
+    /// Everything a driver has earned, before anything was paid out: their
+    /// share of the fares of every ride they completed and that was paid for,
+    /// plus their tips as [#tips] counts them.
+    ///
+    /// The administrator's view of an account shows this figure, and takes it
+    /// from here rather than from a sum of its own, so the two can never
+    /// disagree about a charge that failed, a refund or a tip whose charge has
+    /// not come back.
+    ///
+    /// @param driver the driver's user name
+    /// @return the cents earned
+    public long earned(String driver) {
+        return Rows.number(rides.driverShare(driver)) + tips(driver);
     }
 
     /// The tips a driver has been given: those handed over in cash, and those

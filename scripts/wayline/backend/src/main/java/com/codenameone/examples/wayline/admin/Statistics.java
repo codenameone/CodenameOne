@@ -38,6 +38,7 @@ import com.codenameone.examples.wayline.api.UserDetailDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.domain.DriverState;
 import com.codenameone.examples.wayline.driver.Drivers;
+import com.codenameone.examples.wayline.driver.Earnings;
 import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.repository.DriverStateRepository;
 import com.codenameone.examples.wayline.repository.ProfileRepository;
@@ -85,10 +86,13 @@ public class Statistics {
     private final Moderation moderation;
     private final Fares fares;
     private final Applications applications;
+    private final Earnings earnings;
 
     public Statistics(ProfileRepository profiles, DriverStateRepository cars,
             RideRepository rides, RideEventRepository events, Accounts accounts,
-            Drivers drivers, Moderation moderation, Fares fares, Applications applications) {
+            Drivers drivers, Moderation moderation, Fares fares, Applications applications,
+            Earnings earnings) {
+        this.earnings = earnings;
         this.profiles = profiles;
         this.cars = cars;
         this.rides = rides;
@@ -283,7 +287,10 @@ public class Statistics {
         // A rating is a driver's; an account that has never driven has none.
         double rating = car == null ? 0d : car.rating();
         long spent = sum(rides.spent(username, RideState.COMPLETED, PAID));
-        long earned = sum(rides.earned(username, RideState.COMPLETED));
+        // What the driver's own screens call earned, from the same sum: a
+        // card ride whose charge failed, is pending or was refunded, and a
+        // tip whose charge has not come back, are not money the driver has.
+        long earned = earnings.earned(username);
         return new UserDetailDto(user, taken, cancellations, rating, spent, earned,
                 moderation.events(username));
     }

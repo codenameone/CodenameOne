@@ -328,9 +328,4 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             + "where r.rider = :who and r.state = :state and r.paymentStatus = :paid")
     Object[] spent(@Param("who") String username, @Param("state") RideState state,
             @Param("paid") String paid);
-
-    /// What a driver made from rides in `state`: `{driver's share, tips}`.
-    @Query("select coalesce(sum(r.driverCents), 0), coalesce(sum(r.tipCents), 0) from Ride r "
-            + "where r.driver = :who and r.state = :state")
-    Object[] earned(@Param("who") String username, @Param("state") RideState state);
 }

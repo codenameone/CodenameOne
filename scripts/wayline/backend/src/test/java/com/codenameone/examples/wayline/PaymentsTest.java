@@ -417,6 +417,48 @@ class PaymentsTest {
     }
 
     @Test
+    void theAdminSeesWhatTheDriverEarnedAndNoMore() throws Exception {
+        // Vilnius.
+        String rider = People.rider(accounts, "vno-rider");
+        String driver = People.driver(accounts, "vno-driver");
+        Trips.addCard(mvc, rider, Trips.VISA);
+        Trips.online(mvc, driver, 54.6872, 25.2797);
+        String paid = (String) Trips.complete(mvc, rider, driver, People.ride(54.6872, 25.2797,
+                54.6972, 25.2897)).get("id");
+        String pending = (String) Trips.complete(mvc, rider, driver, People.ride(54.6872,
+                25.2797, 54.6972, 25.2897)).get("id");
+        String refunded = (String) Trips.complete(mvc, rider, driver, People.ride(54.6872,
+                25.2797, 54.6972, 25.2897)).get("id");
+        // A charge nobody has answered yet, a ride refunded, and a tip on the
+        // paid ride whose charge has not come back.
+        db.execute("UPDATE ride SET payment_status = 'PENDING' WHERE id = ?",
+                new Object[] {pending});
+        mvc.perform(admin(Trips.body(post("/api/admin/rides/" + refunded + "/refund"),
+                        "{\"reason\":\"Wrong address\"}")))
+                .andExpect(status().isOk());
+        db.execute("UPDATE ride SET tip_cents = 300 WHERE id = ?", new Object[] {paid});
+
+        long share = ((Number) db.queryOne("SELECT driver_cents FROM ride WHERE id = ?",
+                new Object[] {paid}).get("driver_cents")).longValue();
+        Map summary = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"),
+                driver));
+        Map detail = Trips.json(mvc, admin(get("/api/admin/users/" + driver)));
+        // The paid ride's share alone, on both screens.
+        assertEquals(share, Trips.number(summary, "balance"));
+        assertEquals(share, Trips.number(summary, "month"));
+        assertEquals(share, Trips.number(detail, "earned"));
+
+        // Once the tip's charge is on record it is earned on both.
+        db.execute("UPDATE payment SET tip_ref = 'sim_ch_tip' WHERE ride_id = ?",
+                new Object[] {paid});
+        summary = Trips.json(mvc, People.asDriver(get("/api/driver/earnings/summary"), driver));
+        detail = Trips.json(mvc, admin(get("/api/admin/users/" + driver)));
+        assertEquals(share + 300L, Trips.number(summary, "balance"));
+        assertEquals(share + 300L, Trips.number(detail, "earned"));
+        Trips.offline(mvc, driver);
+    }
+
+    @Test
     void aRefundTheServerNeverRecordedIsAskedForAgain() throws Exception {
         // Bergen.
         String rider = People.rider(accounts, "bgo-rider");
