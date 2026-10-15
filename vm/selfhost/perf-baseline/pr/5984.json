@@ -127,6 +127,28 @@
     }
    }
   },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.749,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.999,
+     "reason": "Hello RAM is bimodal on every runner: one run's rounds read about 1.0 to 1.2, another's about 0.75 to 0.85. On this CPU (AMD family 26 model 2) runs 38688282220 (rounds 1.00 0.81 1.31 0.75 0.83, median 0.83) and 38758240099 (1.02 0.99 1.03 1.17 0.85, median 1.02) are the two modes. The baseline is the median of all ten rounds, 0.999, and the memory tolerance is 0.35, as hello's RAM on the other Windows runners already has; it covers 0.65 to 1.35. Timing and its tolerance are kept.",
+     "runs": 2,
+     "time": 1.41,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-x64@intel64-family-6-model-207-genuineintel": {
    "hello": {
     "all": {
