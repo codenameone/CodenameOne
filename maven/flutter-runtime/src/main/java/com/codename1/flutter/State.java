@@ -55,6 +55,17 @@ public abstract class State<T extends StatefulWidget> {
      */
     public void setState(Funcs.VoidFunc0 fn) {
         FlutterUI.assertEdt();
+        if (defunct) {
+            // Flutter rejects setState after dispose (a FlutterError in debug, a null
+            // element in release). Running the stale closure -- typically a timer or a
+            // future callback outliving its page -- mutated shared data or registered
+            // resources for a dead state, and hid the bug. Reported, not thrown: the
+            // caller is usually an async callback with nowhere to catch it.
+            FlutterErrorReport.record(new com.codename1.flutter.foundation.FlutterError(
+                    "setState() called after dispose(): " + getClass().getName()
+                    + ". Cancel timers and listeners in dispose(), or check mounted first."));
+            return;
+        }
         if (fn != null) {
             fn.call();
         }
@@ -121,5 +132,9 @@ public abstract class State<T extends StatefulWidget> {
 
     void detach() {
         this.element = null;
+        this.defunct = true;
     }
+
+    /// Set once the state is disposed and detached; see {@link #setState}.
+    private boolean defunct;
 }

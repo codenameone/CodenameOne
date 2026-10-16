@@ -203,10 +203,17 @@ public class PageController implements Listenable {
      */
     void applyMetrics(double pixels, double pageExtent, double viewportDimension,
                       double minExtent, double maxExtent) {
+        applyMetrics(pixels, pageExtent, viewportDimension, minExtent, maxExtent, 0);
+    }
+
+    /// As above for pages that rest {@code pageOffset} past each multiple of the extent:
+    /// Flutter's getPageFromPixels subtracts its initial page offset.
+    void applyMetrics(double pixels, double pageExtent, double viewportDimension,
+                      double minExtent, double maxExtent, double pageOffset) {
         position.applyViewportDimension(viewportDimension);
         position.applyContentDimensions(minExtent, maxExtent);
         position.setPixels(pixels);
-        double p = pageExtent > 0 ? pixels / pageExtent : 0;
+        double p = pageExtent > 0 ? Math.max(0, pixels - pageOffset) / pageExtent : 0;
         if (livePage && p == pageValue) {
             return;
         }

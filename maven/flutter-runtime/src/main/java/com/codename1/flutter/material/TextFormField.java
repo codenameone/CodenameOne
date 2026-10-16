@@ -203,7 +203,7 @@ public class TextFormField extends StatefulWidget {
         @Override
         public Widget build(BuildContext context) {
             final TextFormField w = tf();
-            configure(w.validator, w.onSaved, w.autovalidateMode);
+            configure(w.validator, w.onSaved, w.autovalidateMode, w.enabled);
             buildField(context);
             TextField field = new TextField();
             TextEditingController effective = effectiveController();

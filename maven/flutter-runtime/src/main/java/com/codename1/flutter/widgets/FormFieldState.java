@@ -51,10 +51,22 @@ public class FormFieldState<T> extends State<StatefulWidget> {
     /** The configuration a field widget hands its state on every build. */
     protected final void configure(FormFieldValidator<T> validator, FormFieldSetter<T> onSaved,
             Object autovalidateMode) {
+        configure(validator, onSaved, autovalidateMode, null);
+    }
+
+    /// As above, with the field's {@code enabled} (null meaning enabled, Flutter's default).
+    protected final void configure(FormFieldValidator<T> validator, FormFieldSetter<T> onSaved,
+            Object autovalidateMode, Boolean enabled) {
         this.validator = validator;
         this.onSaved = onSaved;
         this.autovalidateMode = autovalidateMode;
+        this.enabled = enabled == null || enabled.booleanValue();
     }
+
+    /// Flutter's FormField.enabled: a disabled field is not AUTOMATICALLY validated (an
+    /// explicit validate() still runs). It was never carried here, so a disabled field
+    /// with autovalidateMode.always grew an error on every rebuild.
+    private boolean enabled = true;
 
     /** Seeds the value and what {@link #reset} returns to; called once, from initState. */
     protected final void seed(T initial) {
@@ -148,7 +160,8 @@ public class FormFieldState<T> extends State<StatefulWidget> {
             }
         }
         Object mode = autovalidateMode != null ? autovalidateMode : form == null ? null : form.autovalidateMode();
-        if (mode == AutovalidateMode.always || (mode == AutovalidateMode.onUserInteraction && interacted)) {
+        if (enabled && (mode == AutovalidateMode.always
+                || (mode == AutovalidateMode.onUserInteraction && interacted))) {
             runValidator();
         }
     }
@@ -169,7 +182,8 @@ public class FormFieldState<T> extends State<StatefulWidget> {
             return null;
         }
         FormField<T> field = (FormField<T>) w;
-        configure(field.validatorValue(), field.onSavedValue(), field.autovalidateModeValue());
+        configure(field.validatorValue(), field.onSavedValue(), field.autovalidateModeValue(),
+                field.enabledValue());
         buildField(context);
         return field.builderValue() == null ? null : field.builderValue().call(this);
     }

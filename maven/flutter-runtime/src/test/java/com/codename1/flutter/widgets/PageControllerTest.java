@@ -229,6 +229,18 @@ class PageControllerTest {
      * and applies it as the starting page the moment the view's dimensions are
      * known, same as {@code initialPage} itself.
      */
+    /// Flutter allows any positive viewportFraction; above 1 a page is wider than the
+    /// viewport and rests centred (offset by half the overflow). It was clamped to 1.
+    @Test
+    void aViewportFractionAboveOneIsKeptAndPagesRestCentred() {
+        PageController c = new PageController();
+        c.viewportFraction(1.5);
+        mountAndLayout(carousel(c, 3, null, null), 400, 200);
+        assertEquals(0.0, c.page(), 0.0001, "the view opens on page 0");
+        assertEquals(100.0, c.position().pixels(), 0.0001,
+                "page 0 rests centred: (1.5 - 1) * 400 / 2 past the leading edge");
+    }
+
     @Test
     void aReplacementControllerOpensOnItsOwnPendingOrInitialPage() {
         PageController first = new PageController();

@@ -462,6 +462,20 @@ public class Motion {
         startTime = AnimationTime.now();
     }
 
+    /// Clears what a finished run left behind -- the last returned value, the decay
+    /// history and a pinned motion time -- so the same instance can run again from its
+    /// source. start() alone only moves the start time, and isFinished() kept answering
+    /// true for an instance that had already reached its destination.
+    void resetForReuse() {
+        lastReturnedValue = sourceValue;
+        for (int i = 0; i < previousLastReturnedValue.length; i++) {
+            previousLastReturnedValue[i] = -1;
+            previousLastReturnedValueTime[i] = -1;
+        }
+        currentMotionTime = -1;
+        previousCurrentMotionTime = -1;
+    }
+
     /// Returns the current time within the motion relative to start time
     ///
     /// #### Returns

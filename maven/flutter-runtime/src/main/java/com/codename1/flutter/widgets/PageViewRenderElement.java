@@ -174,24 +174,25 @@ public class PageViewRenderElement extends ScrollRenderElement {
             Long pending = attached.takePendingPage();
             long startPage = pending != null ? pending.longValue() : attached.initialPage();
             reportedPage = startPage;
-            if (startPage != 0 || restartOnAttach) {
+            if (startPage != 0 || restartOnAttach || restOffset() > 0) {
                 scrollToPage(startPage, false);
             }
             restartOnAttach = false;
         }
         // Headless there is no pane and therefore no scrolling: the view simply
         // sits on whichever page it opened on.
+        double off = restOffset();
         double pixels = pane == null
-                ? reportedPage * extent
+                ? reportedPage * extent + off
                 : (horizontal() ? pane.getScrollX() : pane.getScrollY());
         double viewportDim = horizontal() ? viewportW : viewportH;
-        attached.applyMetrics(pixels, extent, viewportDim, 0, Math.max(0, maxScroll()));
-        firePageChanged(Math.round(pixels / extent));
+        attached.applyMetrics(pixels, extent, viewportDim, 0, Math.max(0, maxScroll()), off);
+        firePageChanged(Math.round((pixels - off) / extent));
     }
 
     /** The largest legal scroll offset: the last page's resting position. */
     private double maxScroll() {
-        return (pageCount() - 1) * pageExtent();
+        return (pageCount() - 1) * pageExtent() + restOffset();
     }
 
     private int pageCount() {
@@ -225,7 +226,7 @@ public class PageViewRenderElement extends ScrollRenderElement {
         if (!(pane instanceof SnappingPane)) {
             return;
         }
-        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent())));
+        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent() + restOffset())));
         ((SnappingPane) pane).moveTo(target, animate);
     }
 
@@ -242,7 +243,7 @@ public class PageViewRenderElement extends ScrollRenderElement {
             done.complete(null);
             return;
         }
-        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent())));
+        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent() + restOffset())));
         ((SnappingPane) pane).animateTo(target, durationMs, curve, done);
     }
 
@@ -250,7 +251,17 @@ public class PageViewRenderElement extends ScrollRenderElement {
     private double viewportFraction() {
         PageController c = pageView().getController();
         double f = c == null ? 1.0 : c.viewportFraction();
-        return f > 0 && f <= 1 ? f : 1.0;
+        // Any positive fraction, as Flutter's PageController allows: above 1 a page is
+        // wider than the viewport (it used to be clamped to 1).
+        return f > 0 ? f : 1.0;
+    }
+
+    /// Flutter's _initialPageOffset: a page wider than the viewport (fraction above 1)
+    /// rests CENTRED, so every page's resting scroll offset is shifted by half the
+    /// overflow. Zero for a fraction of 1 or less.
+    double restOffset() {
+        double viewportDim = horizontal() ? viewportW : viewportH;
+        return Math.max(0, viewportDim * (viewportFraction() - 1) / 2);
     }
 
     // ------------------------------------------------------------------
@@ -275,13 +286,19 @@ public class PageViewRenderElement extends ScrollRenderElement {
      * @param max      the last page's resting offset
      */
     static int settleTarget(int from, double extent, float velocity, int max) {
-        double page = from / extent;
+        return settleTarget(from, extent, velocity, max, 0);
+    }
+
+    /// As above for pages resting at {@code offset} past each multiple of the extent
+    /// (see restOffset).
+    static int settleTarget(int from, double extent, float velocity, int max, double offset) {
+        double page = (from - offset) / extent;
         if (velocity < -VELOCITY_TOLERANCE_PX_PER_MS) {
             page -= 0.5;
         } else if (velocity > VELOCITY_TOLERANCE_PX_PER_MS) {
             page += 0.5;
         }
-        int target = (int) Math.round(Math.round(page) * extent);
+        int target = (int) Math.round(Math.round(page) * extent + offset);
         return Math.max(0, Math.min(target, max));
     }
 
@@ -395,7 +412,7 @@ public class PageViewRenderElement extends ScrollRenderElement {
             int max = Math.max(0, (horizontal()
                     ? getScrollDimension().getWidth() - getWidth()
                     : getScrollDimension().getHeight() - getHeight()));
-            int target = extent > 0 ? settleTarget(from, extent, velocityPxPerMs, max) : from;
+            int target = extent > 0 ? settleTarget(from, extent, velocityPxPerMs, max, restOffset()) : from;
             if ("true".equals(com.codename1.ui.Display.getInstance()
                     .getProperty("cn1.flutter.debugSettle", "false"))) {
                 com.codename1.flutter.FlutterErrorReport.unimplemented("PageSettle",

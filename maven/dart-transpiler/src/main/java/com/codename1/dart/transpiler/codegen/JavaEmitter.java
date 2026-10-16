@@ -3811,6 +3811,13 @@ public final class JavaEmitter {
                 return new Out(o.code, TypeRef.VOID);
             }
             ctx.importClass("dart.async.Await");
+            if (o.type != null && o.type.is("Future") && o.type.nullable) {
+                // `Future<int>? f = null; await f` is null in Dart; await$ rejects a null
+                // Future with TypeError, so a nullable one goes through awaitAny.
+                TypeRef inner = boxType(o.type.arg(0));
+                String v = "Await.awaitAny(" + o.code + ")";
+                return new Out(isDynamicType(inner) ? v : "((" + javaType(inner, true, ctx) + ") " + v + ")", inner);
+            }
             if (o.type != null && o.type.is("Future")) {
                 return new Out("Await.await$(" + o.code + ")", boxType(o.type.arg(0)));
             }

@@ -757,6 +757,12 @@ public final class CommonTransitions extends Transition {
             if (lazyMotion != null) {
                 return lazyMotion.get(Integer.valueOf(startOffset), Integer.valueOf(dest), Integer.valueOf(speed));
             }
+            // The caller's one Motion is shared by every copy of this transition (copy()
+            // carries it over), and the first run leaves it finished: reset it, or every
+            // later run of the transition completed at once.
+            if (motion != null) {
+                motion.resetForReuse();
+            }
             return motion;
         }
         if (linearMotion) {

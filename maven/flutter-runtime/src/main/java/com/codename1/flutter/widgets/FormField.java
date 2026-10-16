@@ -61,6 +61,7 @@ public class FormField<T> extends StatefulWidget {
     FormFieldSetter<T> onSavedValue() { return onSaved; }
     T initialValueValue() { return initialValue; }
     Object autovalidateModeValue() { return autovalidateMode; }
+    Boolean enabledValue() { return enabled; }
 
     @Override
     public State<? extends StatefulWidget> createState() {

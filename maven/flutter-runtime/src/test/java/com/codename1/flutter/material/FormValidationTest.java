@@ -171,6 +171,21 @@ class FormValidationTest {
         assertEquals(java.util.Arrays.asList("ABC"), changed);
     }
 
+    /// A disabled field is not validated automatically, even with
+    /// AutovalidateMode.always; an explicit validate() still runs its validator.
+    @Test
+    void aDisabledFieldIsNotAutovalidated() {
+        GlobalKey<FormFieldState<String>> k = new GlobalKey<FormFieldState<String>>();
+        TextFormField f = field("", k);
+        f.enabled(Boolean.FALSE);
+        f.autovalidateMode(AutovalidateMode.always);
+        mountForm(new GlobalKey<FormState>(), f);
+        assertNull(k.currentState().errorText(), "no automatic error on a disabled field");
+
+        assertFalse(k.currentState().validate(), "an explicit validate still runs");
+        assertEquals("Required", k.currentState().errorText());
+    }
+
     @Test
     void formOfFindsTheEnclosingState() {
         GlobalKey<FormState> formKey = new GlobalKey<FormState>();

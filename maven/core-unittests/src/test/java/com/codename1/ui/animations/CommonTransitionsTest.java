@@ -142,6 +142,27 @@ public class CommonTransitionsTest extends UITestBase {
         assertFalse(transition.animate());
     }
 
+    /// copy() carries the caller's one Motion into every copy, and the first run leaves
+    /// it finished; start() alone only moves the start time, so every later run of the
+    /// transition completed at once.
+    @Test
+    public void aManualMotionRunsAgainForTheNextCopy() throws Exception {
+        CommonTransitions transition = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 100);
+        Motion manualMotion = Motion.createLinearMotion(0, 10, 10);
+        manualMotion.start();
+        manualMotion.setCurrentMotionTime(20);
+        manualMotion.getValue();
+        assertTrue(manualMotion.isFinished(), "the first run reached its destination");
+        transition.setMotion(manualMotion);
+
+        Method createMotion = CommonTransitions.class.getDeclaredMethod("createMotion", int.class, int.class, int.class);
+        createMotion.setAccessible(true);
+        Motion again = (Motion) createMotion.invoke(transition, 0, 10, 10);
+        again.start();
+        assertFalse(again.isFinished(), "the next run starts from the source again");
+        assertEquals(0, again.getValue());
+    }
+
     @Test
     public void testLazyMotionFactory() throws Exception {
         CommonTransitions transition = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 100);
