@@ -60,6 +60,10 @@ import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
 public class IPhoneBuilder extends Executor {
+    /// The application's own library jars, listed right after its sources are
+    /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
+    private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
+
 
     // macNative.enabled=true switches this iOS build to also emit a native Mac
     // variant of the same app. All Mac-specific code lives in MacNativeBuilder
@@ -2388,6 +2392,9 @@ public class IPhoneBuilder extends Executor {
         // fill classes dir from JAR and proper ports
         try {
             unzip(sourceZip, classesDir, resDir, resDir, buildinRes);
+            // The application's own libraries: listed now, before the port's jars are
+            // unzipped into btres, so native-theme pruning scans only the application's.
+            appLibraryJars = NativeThemes.jarsIn(buildinRes);
         } catch (IOException ex) {
             throw new BuildException("Failed to unzip source Zip file.", ex);
         }
@@ -3526,7 +3533,7 @@ public class IPhoneBuilder extends Executor {
         try {
             boolean keepAllNativeThemes = "true".equals(request.getArg(NativeThemes.KEEP_ALL_HINT, "false"));
             List<String> droppedThemes = NativeThemes.removeUnusedApple(buildinRes,
-                    iosMode, iosThemeGeneration, false, classesDir, keepAllNativeThemes);
+                    iosMode, iosThemeGeneration, false, classesDir, appLibraryJars, keepAllNativeThemes);
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: " + droppedThemes
                         + " (set " + NativeThemes.KEEP_ALL_HINT + "=true to keep every native theme, "

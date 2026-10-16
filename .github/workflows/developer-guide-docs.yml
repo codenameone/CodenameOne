@@ -154,8 +154,11 @@ jobs:
           # Through retry.sh, transient failures only, like the demo install below:
           # this is the step that resolves the most from Central, and a single 502
           # on a plugin dependency (maven-shared-utils) failed the whole guide build.
+          # dart-runtime and flutter-runtime: docs/demos/common depends on the Flutter
+          # runtime at this version, which nothing else selected here pulls in; they are
+          # in the reactor because this job runs on JDK 17 (the flutter-modules profile).
           RETRY_ONLY_MATCHING=transient xvfb-run -a bash scripts/ci/retry.sh mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend,backend-test \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend,backend-test,dart-runtime,flutter-runtime \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

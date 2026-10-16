@@ -86,6 +86,10 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
         for (String a : r.missingAssets) {
             getLog().warn("  asset declared in pubspec.yaml but not found: " + a);
         }
+        for (String a : r.assetCollisions) {
+            getLog().warn("  asset not imported, its path is taken by a lib/ source file: " + a
+                    + " (rename one of them)");
+        }
         if (!r.unresolvedPackages.isEmpty()) {
             // Each one was already warned individually, with the remedy, as it was hit.
             getLog().warn("  " + r.unresolvedPackages.size() + " pub package(s) could not be resolved: "

@@ -81,7 +81,7 @@ final class FlutterPomUpdater {
 
     FlutterPomUpdater(String pom) {
         String p = pom;
-        if (activeOccurrence(p, RUNTIME_ARTIFACT) < 0) {
+        if (!declaresTopLevelRuntime(p)) {
             Matcher commented = COMMENTED_DEPENDENCY.matcher(p);
             if (commented.find()) {
                 // The archetype ships this dependency commented out with
@@ -181,6 +181,23 @@ final class FlutterPomUpdater {
             return settings.substring(0, m.start()) + m.group(1) + FLUTTER_JAVA_LEVEL + settings.substring(m.end());
         }
         return settings;
+    }
+
+    /// Whether the runtime is an active dependency of the PROJECT -- inside its top-level
+    /// `<dependencies>`, not merely mentioned. A `<dependencyManagement>` entry only sets
+    /// defaults and puts nothing on the classpath, and a global search took it for the
+    /// wiring, so the import skipped adding the dependency and transcode-flutter then
+    /// rejected the missing runtime.
+    static boolean declaresTopLevelRuntime(String pom) {
+        int start = topLevelDependenciesInsertionPoint(pom);
+        if (start < 0) {
+            return false;
+        }
+        // A dependency's children never include another <dependencies>, so the first
+        // close after the top-level open is the top-level one's.
+        int end = pom.indexOf("</dependencies>", start);
+        String block = end < 0 ? pom.substring(start) : pom.substring(start, end);
+        return activeOccurrence(block, RUNTIME_ARTIFACT) >= 0;
     }
 
     /// `needle`'s first position outside an XML comment, or -1. Unlike a

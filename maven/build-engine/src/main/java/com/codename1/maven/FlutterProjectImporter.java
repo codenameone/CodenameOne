@@ -116,6 +116,11 @@ public final class FlutterProjectImporter {
         /// neither `.dart_tool/package_config.json` nor the pub cache could
         /// resolve a directory for.
         public final List<String> unresolvedPackages = new ArrayList<String>();
+        /// An asset whose path is also a file copied from `lib/` (`lib/assets/data.dart`
+        /// beside a declared `assets/data.dart`): lib/ is copied flat into the same
+        /// directory, so the two cannot both be there. The source is kept, every time,
+        /// and the asset is not copied.
+        public final List<String> assetCollisions = new ArrayList<String>();
         public String appName;
         public String appVersion;
         public int copiedFiles;
@@ -123,6 +128,9 @@ public final class FlutterProjectImporter {
     }
 
     private final Log log;
+    /// The paths the current import copied from lib/; an asset never overwrites one.
+    private Set<String> sourcePaths;
+    private final List<String> collisions = new ArrayList<String>();
 
     public FlutterProjectImporter(Log log) {
         this.log = log;
@@ -170,6 +178,7 @@ public final class FlutterProjectImporter {
             Map<String, String> previous = readImportRecord(target);
             Map<String, String> imported = new TreeMap<String, String>();
 
+            sourcePaths = null;
             File[] libChildren = libDir.listFiles();
             if (libChildren != null) {
                 for (File child : libChildren) {
@@ -177,6 +186,12 @@ public final class FlutterProjectImporter {
                             imported);
                 }
             }
+            // Everything copied so far came from lib/. An asset landing on one of those
+            // paths silently replaced the source on a first import, and a later import's
+            // kept-local-edit check could keep either -- the result depended on how many
+            // times import had run. The source wins, always, and the clash is reported.
+            sourcePaths = new java.util.HashSet<String>(imported.keySet());
+            collisions.clear();
 
             // A `packages/<name>/...` asset key points into a pub dependency's own
             // checkout, not this project: resolve it the same way `flutter pub get`
@@ -274,6 +289,8 @@ public final class FlutterProjectImporter {
             }
 
             removeStaleImports(target, previous, imported);
+            r.assetCollisions.addAll(collisions);
+            sourcePaths = null;
             writeImportRecord(target, imported);
             writeLibSources(target, libDir);
             writeDeclaredAssetKeys(target, declaredAssetKeys);
@@ -556,6 +573,14 @@ public final class FlutterProjectImporter {
                 }
             }
             return n;
+        }
+        if (sourcePaths != null && sourcePaths.contains(path)) {
+            if (!collisions.contains(path)) {
+                collisions.add(path);
+                log.warn("Not imported: the asset " + path + " has the same path as a file copied from lib/ "
+                        + "(lib/ is copied flat into the same directory); the Dart source was kept");
+            }
+            return 0;
         }
         String recorded = previous.get(path);
         if (recorded != null && dest.isFile() && !recorded.equals(sha256(dest))

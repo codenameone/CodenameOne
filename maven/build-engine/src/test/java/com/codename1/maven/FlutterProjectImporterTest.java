@@ -340,6 +340,32 @@ public class FlutterProjectImporterTest {
         assertFalse(FlutterProjectImporter.hasParentSegment("a/b..c/d"));
     }
 
+    /// lib/assets/data.dart and a declared assets/data.dart map to the same path. The
+    /// asset used to overwrite the source on a first import, and a re-import could keep
+    /// either; the source now wins every time and the clash is reported.
+    @Test
+    public void anAssetNeverOverwritesALibSourceAtTheSamePath() throws Exception {
+        File root = Files.createTempDirectory("flutter-asset-collision").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/data.dart\n    - assets/ok.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "lib/assets/data.dart"), "int source() => 1;\n");
+        write(new File(flutterProject, "assets/data.dart"), "asset bytes\n");
+        write(new File(flutterProject, "assets/ok.png"), "PNG");
+
+        File common = new File(root, "common");
+        for (int run = 0; run < 2; run++) {
+            FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                    .importProject(flutterProject, common, null, null);
+            File flutterDir = new File(common, "src/main/flutter");
+            assertEquals("import " + run, "int source() => 1;\n", read(new File(flutterDir, "assets/data.dart")));
+            assertEquals(java.util.Arrays.asList("assets/data.dart"), r.assetCollisions);
+            assertTrue(new File(flutterDir, "assets/ok.png").isFile());
+        }
+    }
+
     /// lib/ is copied flat, so lib/assets/x.dart shares assets/ with the bundled
     /// assets; the lib-sources record lists exactly the Dart files that came from lib/.
     @Test

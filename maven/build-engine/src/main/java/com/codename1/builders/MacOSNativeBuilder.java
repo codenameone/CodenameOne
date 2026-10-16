@@ -56,6 +56,10 @@ import javax.imageio.ImageIO;
  * so the generation is unit-testable on a machine with no developer tools.</p>
  */
 public class MacOSNativeBuilder extends Executor {
+    /// The application's own library jars, listed right after its sources are
+    /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
+    private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
+
 
     private File resultDir;
     private File appBundle;
@@ -215,6 +219,9 @@ public class MacOSNativeBuilder extends Executor {
 
         try {
             unzip(sourceZip, classesDir, resDir, resDir, buildinRes);
+            // The application's own libraries, listed before any port archive lands in
+            // btres, for native-theme pruning (a library's bytecode stays in its jar).
+            appLibraryJars = NativeThemes.jarsIn(buildinRes);
         } catch (Exception ex) {
             throw new BuildException("Failed to unzip the application sources", ex);
         }
@@ -276,11 +283,11 @@ public class MacOSNativeBuilder extends Executor {
             // are never touched.
             boolean keepAllNativeThemes = "true".equals(request.getArg(NativeThemes.KEEP_ALL_HINT, "false"));
             List<String> droppedThemes = NativeThemes.removeUnusedApple(nativeSources,
-                    hints.getThemeMode(), null, true, classesDir, keepAllNativeThemes);
+                    hints.getThemeMode(), null, true, classesDir, appLibraryJars, keepAllNativeThemes);
             // MacPort.jar carries a copy too (iPhoneTheme.res, from the iOSPort
             // sources it shares), and the port classes are translator input as well.
             droppedThemes.addAll(NativeThemes.removeUnusedApple(portClasses,
-                    hints.getThemeMode(), null, true, classesDir, keepAllNativeThemes));
+                    hints.getThemeMode(), null, true, classesDir, appLibraryJars, keepAllNativeThemes));
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: "
                         + new java.util.LinkedHashSet<String>(droppedThemes)

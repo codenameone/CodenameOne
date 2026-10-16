@@ -206,6 +206,40 @@ public class NativeThemesTest {
         assertTrue("the application's own theme", new File(dir, "theme.res").isFile());
     }
 
+    private File jarWith(String name, String classEntry, byte[] classBytes) throws IOException {
+        File jar = new File(tmp.newFolder(name), name + ".jar");
+        java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(jar));
+        try {
+            z.putNextEntry(new java.util.zip.ZipEntry(classEntry));
+            z.write(classBytes);
+            z.closeEntry();
+        } finally {
+            z.close();
+        }
+        return jar;
+    }
+
+    /// A submitted library's bytecode stays in its jar (routed to the libs directory),
+    /// so a theme mode it sets, or a theme it opens, was invisible to the loose-class
+    /// scan and its theme was deleted.
+    @Test
+    public void aThemeReferenceInsideALibraryJarKeepsTheTheme() throws IOException {
+        File dir = tmp.newFolder("assetsJar");
+        for (String name : NativeThemes.ANDROID_ALL) {
+            Files.write(new File(dir, name + ".res").toPath(), new byte[] {1});
+        }
+        File jar = jarWith("libmode", "com/example/lib/Setup.class", bytesWith("and.themeMode"));
+        assertTrue(NativeThemes.removeUnusedAndroid(dir,
+                NativeThemes.androidThemesFor(null, null, "modern", null, null), tmp.newFolder("cJar"),
+                java.util.Collections.singletonList(jar), false).isEmpty());
+
+        // The framework's own classes inside a jar never count as the application's use.
+        File frameworkJar = jarWith("libimpl", "com/codename1/impl/Port.class", bytesWith("and.themeMode"));
+        assertEquals(Arrays.asList("androidTheme"), NativeThemes.removeUnusedAndroid(dir,
+                NativeThemes.androidThemesFor(null, null, "modern", null, null), tmp.newFolder("cJar2"),
+                java.util.Collections.singletonList(frameworkJar), false));
+    }
+
     @Test
     public void theAndroidKeepAllHintKeepsEveryTheme() throws IOException {
         // A mode chosen through a property name the class scan cannot see (built at run

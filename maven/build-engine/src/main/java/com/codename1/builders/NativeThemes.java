@@ -144,10 +144,16 @@ final class NativeThemes {
     /// {@link #ANDROID_KEEP_ALL_HINT}).
     static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses,
             boolean keepAll) throws IOException {
-        if (keepAll || namesAny(appClasses, ANDROID_MODE_PROPERTIES)) {
+        return removeUnusedAndroid(dir, keep, appClasses, java.util.Collections.<File>emptyList(), keepAll);
+    }
+
+    /// As above, also scanning `appJars` (see the Apple overload).
+    static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses,
+            List<File> appJars, boolean keepAll) throws IOException {
+        if (keepAll || namesAny(appClasses, appJars, ANDROID_MODE_PROPERTIES)) {
             return new ArrayList<String>();
         }
-        return removeUnused(dir, keep, ANDROID_ALL, appClasses);
+        return removeUnused(dir, keep, ANDROID_ALL, appClasses, appJars);
     }
 
     /// The runtime property an application reads to learn which modern theme the
@@ -187,6 +193,13 @@ final class NativeThemes {
     /// @return the names removed, for the build log
     static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
             File appClasses, boolean keepAll) throws IOException {
+        return removeUnusedApple(dir, mode, generation, mac, appClasses, java.util.Collections.<File>emptyList(), keepAll);
+    }
+
+    /// As above, also scanning `appJars`: a submitted library's jar is routed to the libs
+    /// directory, not expanded into `appClasses`, so a theme it opens by name was deleted.
+    static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
+            File appClasses, List<File> appJars, boolean keepAll) throws IOException {
         if (keepAll) {
             return new ArrayList<String>();
         }
@@ -195,10 +208,10 @@ final class NativeThemes {
         if (theme != null) {
             keep.add(theme);
         }
-        if (namesAny(appClasses, new String[] {NATIVE_THEME_RESOURCE_PROPERTY})) {
+        if (namesAny(appClasses, appJars, new String[] {NATIVE_THEME_RESOURCE_PROPERTY})) {
             keep.add(themeFor("modern", generation, false));
         }
-        return removeUnused(dir, keep, ALL, appClasses);
+        return removeUnused(dir, keep, ALL, appClasses, appJars);
     }
 
     /// True for the `custom` theme mode: the application ships the only theme it
@@ -246,18 +259,18 @@ final class NativeThemes {
     static List<String> removeUnused(File dir, String keep, File appClasses) throws IOException {
         Set<String> k = new LinkedHashSet<String>();
         k.add(keep);
-        return removeUnused(dir, k, ALL, appClasses);
+        return removeUnused(dir, k, ALL, appClasses, java.util.Collections.<File>emptyList());
     }
 
     private static List<String> removeUnused(File dir, Set<String> keep, String[] candidates,
-            File appClasses) throws IOException {
+            File appClasses, List<File> appJars) throws IOException {
         List<String> removed = new ArrayList<String>();
         if (dir == null || !dir.isDirectory()) {
             return removed;
         }
         Set<String> referenced = new LinkedHashSet<String>();
         for (String name : candidates) {
-            if (referencesTheme(appClasses, name)) {
+            if (referencesTheme(appClasses, appJars, name)) {
                 referenced.add(name);
             }
         }
@@ -282,18 +295,23 @@ final class NativeThemes {
     /// every theme and every mode property, and so is `com.codename1.annotations`,
     /// whose build-hint declarations name the properties without setting them.
     static boolean namesAny(File classesDir, final String[] needles) throws IOException {
-        return classesDir != null && classesDir.isDirectory()
-                && scan(classesDir, classesDir, new Predicate<String>() {
-                    @Override
-                    public boolean test(String body) {
-                        for (String needle : needles) {
-                            if (body.contains(needle)) {
-                                return true;
-                            }
-                        }
-                        return false;
+        return namesAny(classesDir, java.util.Collections.<File>emptyList(), needles);
+    }
+
+    static boolean namesAny(File classesDir, List<File> jars, final String[] needles) throws IOException {
+        Predicate<String> p = new Predicate<String>() {
+            @Override
+            public boolean test(String body) {
+                for (String needle : needles) {
+                    if (body.contains(needle)) {
+                        return true;
                     }
-                });
+                }
+                return false;
+            }
+        };
+        return (classesDir != null && classesDir.isDirectory() && scan(classesDir, classesDir, p))
+                || scanJars(jars, p);
     }
 
     /// Whether the application names the theme `name`: as "name.res" anywhere (a path such as
@@ -302,15 +320,85 @@ final class NativeThemes {
     /// contains ".res". The JavaScript build's pruning matches the same way
     /// (`JavaScriptBuildHints.scanBytes`).
     static boolean referencesTheme(File classesDir, final String name) throws IOException {
-        return classesDir != null && classesDir.isDirectory()
-                && scan(classesDir, classesDir, new Predicate<String>() {
-                    @Override
-                    public boolean test(String body) {
-                        return body.contains(name + ".res")
-                                || JavaScriptBuildHints.containsConstant(body, name)
-                                || JavaScriptBuildHints.containsConstant(body, "/" + name);
+        return referencesTheme(classesDir, java.util.Collections.<File>emptyList(), name);
+    }
+
+    static boolean referencesTheme(File classesDir, List<File> jars, final String name) throws IOException {
+        Predicate<String> p = new Predicate<String>() {
+            @Override
+            public boolean test(String body) {
+                return body.contains(name + ".res")
+                        || JavaScriptBuildHints.containsConstant(body, name)
+                        || JavaScriptBuildHints.containsConstant(body, "/" + name);
+            }
+        };
+        return (classesDir != null && classesDir.isDirectory() && scan(classesDir, classesDir, p))
+                || scanJars(jars, p);
+    }
+
+    /// The `.jar` files directly or indirectly under `dir`: a builder lists the libs
+    /// directory right after unzipping the APPLICATION, before its own port archives
+    /// land there, so only the application's libraries are scanned.
+    static List<File> jarsIn(File dir) {
+        List<File> out = new ArrayList<File>();
+        collectJars(dir, out);
+        return out;
+    }
+
+    private static void collectJars(File dir, List<File> out) {
+        File[] children = dir == null ? null : dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            if (c.isDirectory()) {
+                collectJars(c, out);
+            } else if (c.getName().endsWith(".jar")) {
+                out.add(c);
+            }
+        }
+    }
+
+    /// The class files inside `jars`, with the same framework exclusions as the
+    /// directory scan.
+    private static boolean scanJars(List<File> jars, Predicate<String> matches) throws IOException {
+        if (jars == null) {
+            return false;
+        }
+        for (File jar : jars) {
+            if (!jar.isFile()) {
+                continue;
+            }
+            java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar);
+            try {
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> en = zip.entries();
+                while (en.hasMoreElements()) {
+                    java.util.zip.ZipEntry e = en.nextElement();
+                    String n = e.getName();
+                    if (e.isDirectory() || !n.endsWith(".class")
+                            || n.startsWith("com/codename1/impl/") || n.startsWith("com/codename1/annotations/")) {
+                        continue;
                     }
-                });
+                    java.io.InputStream in = zip.getInputStream(e);
+                    try {
+                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                        byte[] buf = new byte[8192];
+                        int r;
+                        while ((r = in.read(buf)) > 0) {
+                            bytes.write(buf, 0, r);
+                        }
+                        if (matches.test(new String(bytes.toByteArray(), StandardCharsets.ISO_8859_1))) {
+                            return true;
+                        }
+                    } finally {
+                        in.close();
+                    }
+                }
+            } finally {
+                zip.close();
+            }
+        }
+        return false;
     }
 
     private static boolean scan(File root, File f, Predicate<String> matches) throws IOException {

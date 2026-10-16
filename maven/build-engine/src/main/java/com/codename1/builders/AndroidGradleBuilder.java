@@ -80,6 +80,10 @@ import org.xeustechnologies.jtar.TarEntry;
 import org.xeustechnologies.jtar.TarOutputStream;
 
 public class AndroidGradleBuilder extends Executor {
+    /// The application's own library jars, listed right after its sources are
+    /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
+    private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
+
 
     private static final String GRADLE_8_VERSION = "8.13";
     private static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
@@ -2299,6 +2303,9 @@ public class AndroidGradleBuilder extends Executor {
         try {
             debug("Extracting "+sourceZip);
             unzip(sourceZip, dummyClassesDir, assetsDir, srcDir, libsDir, xmlDir);
+            // The application's own libraries, listed before anything else lands in libs:
+            // native-theme pruning scans them too (a library's bytecode stays in its jar).
+            appLibraryJars = NativeThemes.jarsIn(libsDir);
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
         }
@@ -4465,7 +4472,7 @@ public class AndroidGradleBuilder extends Executor {
                             // application or not at all, and removeUnusedAndroid keeps
                             // every theme for an application that names it.
                             null),
-                    dummyClassesDir,
+                    dummyClassesDir, appLibraryJars,
                     "true".equals(request.getArg(NativeThemes.ANDROID_KEEP_ALL_HINT, "false")));
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: " + droppedThemes

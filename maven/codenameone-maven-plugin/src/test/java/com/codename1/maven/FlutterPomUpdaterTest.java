@@ -88,6 +88,29 @@ public class FlutterPomUpdaterTest {
                 FlutterPomUpdater.raiseSettingsJavaLevel("codename1.arg.java.version=21\n"));
     }
 
+    /// A runtime named only in dependencyManagement is not on the classpath: the
+    /// import must still add the real dependency.
+    @Test
+    public void aManagedOnlyRuntimeStillGetsTheRealDependency() {
+        String pom = "<project>\n"
+                + "<dependencyManagement><dependencies>\n"
+                + "    <dependency><groupId>com.codenameone</groupId>"
+                + "<artifactId>codenameone-flutter-runtime</artifactId><version>1</version></dependency>\n"
+                + "</dependencies></dependencyManagement>\n"
+                + "<build><plugins><plugin><groupId>com.codenameone</groupId>"
+                + "<artifactId>codenameone-maven-plugin</artifactId><executions>"
+                + "<execution><goals><goal>transcode-flutter</goal></goals></execution>"
+                + "</executions></plugin></plugins></build>\n"
+                + "<dependencies>\n"
+                + "</dependencies>\n"
+                + "</project>\n";
+        assertFalse(FlutterPomUpdater.declaresTopLevelRuntime(pom));
+        FlutterPomUpdater u = new FlutterPomUpdater(pom);
+        assertTrue(u.manual.isEmpty(), u.manual.toString());
+        assertTrue(u.changed);
+        assertTrue(FlutterPomUpdater.declaresTopLevelRuntime(u.pom), u.pom);
+    }
+
     @Test
     public void wiresALegacyPomWithNeitherAnchorPresent() {
         String legacy = "<project><build><plugins>\n"
