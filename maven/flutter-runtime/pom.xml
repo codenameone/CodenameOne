@@ -91,7 +91,10 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-dart-runtime</artifactId>
-            <version>8.0-SNAPSHOT</version>
+            <!-- Never a literal: the two runtimes are released together, and
+                 frozen-coordinates.py reads any literal com.codenameone version
+                 as a pin the release must find already published. -->
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
