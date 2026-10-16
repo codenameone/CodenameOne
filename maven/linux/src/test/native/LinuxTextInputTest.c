@@ -134,7 +134,30 @@ int main(int argc, char** argv) {
     cn1TextFocus(testWindow, &focus, NULL);
     assert(!POLL(NULL));
     key(4, GDK_KEY_y, 0, GDK_KEY_PRESS); event = expectKind(0, "y"); g_free(event);
-    for (int i = 3; i < 103; i++) {
+    /* SENSITIVE withholds context and requests no spelling/completion, but keeps normal IME purpose/composition. */
+    assert(START(NULL, 3, -1, 0x40000, 1, 1));
+    clearEvents();
+    g_object_get(cn1TextInput.im, "input-hints", &hints, "input-purpose", &purpose, NULL);
+    assert(purpose == GTK_INPUT_PURPOSE_FREE_FORM);
+    assert((hints & GTK_INPUT_HINT_NO_SPELLCHECK) && !(hints & GTK_INPUT_HINT_SPELLCHECK));
+    assert(!(hints & GTK_INPUT_HINT_WORD_COMPLETION));
+    UPDATE(NULL, 3, 0, "private identifier", 3, 0, 0, 1, 1);
+    assert(!cn1TextSurrounding(cn1TextInput.im, NULL));
+    key(-1, GDK_KEY_dead_acute, 0, GDK_KEY_PRESS);
+    key(-1, GDK_KEY_e, 0, GDK_KEY_PRESS);
+    composed = 0;
+    while ((event = POLL(NULL))) {
+        int id, seq, kind, value, mods, consumed = 0;
+        assert(sscanf(event, "%d;%d;%d;%d;%d;%n", &id, &seq, &kind, &value, &mods, &consumed) == 5);
+        if (kind == 0 && strcmp(event + consumed, "é") == 0) { composed++; }
+        g_free(event);
+    }
+    assert(composed == 1);
+    assert(START(NULL, 4, -1, 1 | 0x40000 | 0x80000, 1, 1));
+    g_object_get(cn1TextInput.im, "input-hints", &hints, "input-purpose", &purpose, NULL);
+    assert(purpose == GTK_INPUT_PURPOSE_EMAIL);
+    assert(!(hints & GTK_INPUT_HINT_WORD_COMPLETION));
+    for (int i = 5; i < 105; i++) {
         assert(START(NULL, i, -1, 0, 1, 1));
         STOP(NULL, i); STOP(NULL, i);
         assert(!cn1TextInput.im && !cn1TextInput.session);

@@ -175,12 +175,16 @@ static void cn1TextStartOnMain(void* data) {
     if (request->capitalize) {
         hints |= GTK_INPUT_HINT_UPPERCASE_SENTENCES;
     }
-    if (request->constraint & (0x10000 | 0x40000)) {
-        hints = GTK_INPUT_HINT_NO_SPELLCHECK;
-        purpose = GTK_INPUT_PURPOSE_PASSWORD;
-    }
     if (request->constraint & 0x80000) {
         hints = GTK_INPUT_HINT_NO_SPELLCHECK;
+    }
+    if (request->constraint & (0x10000 | 0x40000)) {
+        hints = GTK_INPUT_HINT_NO_SPELLCHECK;
+        /* GTK 3 has no PRIVATE hint. Do not request spelling/completion or
+         * supply surrounding text; retain the ordinary IME purpose. */
+    }
+    if (request->constraint & 0x10000) {
+        purpose = GTK_INPUT_PURPOSE_PASSWORD;
     }
     input->session = request->session;
     input->slot = request->slot;
