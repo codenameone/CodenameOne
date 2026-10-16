@@ -160,6 +160,57 @@ class NamedRouteTest {
         assertTrue(state.canPop(), "the original page is still beneath it");
     }
 
+    /// The removed route's future completes after the replacement is in place: a callback
+    /// that pushes at once lands ABOVE the replacement, as in Flutter. It used to push
+    /// first, and the replacement went on top of it.
+    @Test
+    void aPushFromTheReplacedRoutesCallbackLandsAboveTheReplacement() {
+        Navigator.installRouteTable(null, settings -> {
+            MaterialPageRoute r = route();
+            r.settings(settings);
+            return r;
+        }, null);
+        NavigatorState state = Navigator.of(null, null);
+        dart.async.Future<Object> first = state.pushNamed("/first", null);
+        first.then((dart.runtime.Funcs.VoidFunc1<Object>) v -> state.pushNamed("/from-callback", null));
+
+        state.pushReplacementNamed("/replacement", null, null);
+
+        assertEquals(2, Navigator.stackSize());
+        assertEquals("/replacement", Navigator.routeNameAt(0));
+        assertEquals("/from-callback", Navigator.routeNameAt(1));
+    }
+
+    static final class Capture extends com.codename1.flutter.StatelessWidget {
+        com.codename1.flutter.BuildContext context;
+
+        @Override
+        public com.codename1.flutter.Widget build(com.codename1.flutter.BuildContext context) {
+            this.context = context;
+            return new ProbeBox(1, 1);
+        }
+    }
+
+    /// Navigator.of(context, rootNavigator: true) below a nested app binds to the ROOT
+    /// app's navigator, so its named routes resolve there; the flag was ignored.
+    @Test
+    void rootNavigatorTrueBindsToTheOutermostApp() {
+        Capture leaf = new Capture();
+        com.codename1.flutter.material.MaterialApp inner = new com.codename1.flutter.material.MaterialApp();
+        inner.home(leaf);
+        com.codename1.flutter.material.MaterialApp outer = new com.codename1.flutter.material.MaterialApp();
+        outer.home(inner);
+        com.codename1.flutter.FlutterUI.mount(outer, new com.codename1.flutter.rendering.RenderHost(),
+                new com.codename1.flutter.BuildOwner());
+
+        assertSame(leaf.context, Navigator.boundContextForTest(Navigator.of(leaf.context, Boolean.FALSE)),
+                "the nearest navigator acts for the caller");
+        com.codename1.flutter.BuildContext root = Navigator.boundContextForTest(Navigator.of(leaf.context, Boolean.TRUE));
+        assertTrue(root != leaf.context, "the root one does not");
+        assertTrue(((com.codename1.flutter.Element) root).widget() instanceof Navigator.RootScope,
+                "it is the root app's navigator position");
+    }
+
     @Test
     void pushReplacementSwapsTheTopRoute() {
         Navigator.installRouteTable(null, settings -> route(), null);

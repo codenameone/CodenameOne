@@ -70,6 +70,71 @@ public class MethodChannelTest {
         assertEquals("hello world", Await.await$(f));
     }
 
+    /// A channel carrying calls BOTH ways has a handler on each side. One shared map let
+    /// the second registration replace the first, so one direction reached the wrong side.
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void bothSidesHandlersCoexistOnOneChannel() {
+        String channel = "test/channel/" + System.nanoTime();
+        com.codename1.flutter.platform.MethodChannel java = new com.codename1.flutter.platform.MethodChannel(channel);
+        java.setMethodCallHandler(new com.codename1.flutter.platform.MethodChannel.MethodCallHandler() {
+            @Override
+            public void onMethodCall(com.codename1.flutter.platform.MethodCall call,
+                    com.codename1.flutter.platform.MethodChannel.Result result) {
+                result.success("from java");
+            }
+        });
+        MethodChannel dart = new MethodChannel(channel);
+        dart.setMethodCallHandler(new Funcs.Func1<com.codename1.flutter.platform.MethodCall, Object>() {
+            @Override
+            public Object call(com.codename1.flutter.platform.MethodCall call) {
+                return "from dart";
+            }
+        });
+
+        assertEquals("from java", Await.await$(dart.invokeMethod("ask", null)), "Dart's call reaches Java");
+        final dart.async.Completer<Object> answer = new dart.async.Completer<Object>();
+        java.invokeMethod("ask", null, new com.codename1.flutter.platform.MethodChannel.Result() {
+            @Override
+            public void success(Object result) {
+                answer.complete(result);
+            }
+
+            @Override
+            public void error(String code, String message, Object details) {
+                answer.complete("error " + code);
+            }
+
+            @Override
+            public void notImplemented() {
+                answer.complete("not implemented");
+            }
+        });
+        assertEquals("from dart", Await.await$(answer.future()), "and Java's call reaches Dart");
+    }
+
+    /// A Java byte[] reaches Dart as a Uint8List, as Flutter's standard codec delivers it.
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void aByteArrayResultArrivesAsUint8List() {
+        String channel = "test/channel/" + System.nanoTime();
+        new com.codename1.flutter.platform.MethodChannel(channel).setMethodCallHandler(
+                new com.codename1.flutter.platform.MethodChannel.MethodCallHandler() {
+                    @Override
+                    public void onMethodCall(com.codename1.flutter.platform.MethodCall call,
+                            com.codename1.flutter.platform.MethodChannel.Result result) {
+                        java.util.List<Object> l = new java.util.ArrayList<Object>();
+                        l.add(new byte[] {1, 2, 3});
+                        result.success("one".equals(call.method()) ? (Object) new byte[] {7, 8} : l);
+                    }
+                });
+        MethodChannel dart = new MethodChannel(channel);
+        Object one = Await.await$(dart.invokeMethod("one", null));
+        assertTrue(one instanceof dart.typed_data.Uint8List, "got " + (one == null ? null : one.getClass()));
+        Object nested = ((java.util.List<?>) Await.await$(dart.invokeMethod("list", null))).get(0);
+        assertTrue(nested instanceof dart.typed_data.Uint8List, "nested in a list too");
+    }
+
     /// Java values reach Dart in Dart's types: an Integer (what ported Kotlin
     /// `Int` code answers with) as a Long, a java.util.List as a DartList with
     /// its elements converted too. See FlutterChannelRegistry.toDart.
@@ -315,8 +380,8 @@ public class MethodChannelTest {
                         return "v";
                     }
                 });
-        assertTrue(com.codename1.flutter.FlutterChannelRegistry.methodCallHandler(channel) != null);
+        assertTrue(com.codename1.flutter.FlutterChannelRegistry.dartMethodCallHandler(channel) != null);
         new MethodChannel(channel).setMethodCallHandler(null);
-        assertNull(com.codename1.flutter.FlutterChannelRegistry.methodCallHandler(channel));
+        assertNull(com.codename1.flutter.FlutterChannelRegistry.dartMethodCallHandler(channel));
     }
 }

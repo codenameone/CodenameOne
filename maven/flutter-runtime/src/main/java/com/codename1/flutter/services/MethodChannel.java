@@ -86,7 +86,7 @@ public final class MethodChannel {
             @Override
             public void call() {
                 com.codename1.flutter.platform.MethodChannel.MethodCallHandler h =
-                        FlutterChannelRegistry.methodCallHandler(name);
+                        FlutterChannelRegistry.platformMethodCallHandler(name);
                 if (h == null) {
                     completer.completeError(missingPlugin(method));
                     return;
@@ -170,10 +170,10 @@ public final class MethodChannel {
      */
     public void setMethodCallHandler(final Funcs.Func1<MethodCall, Object> handler) {
         if (handler == null) {
-            FlutterChannelRegistry.setMethodCallHandler(name, null);
+            FlutterChannelRegistry.setDartMethodCallHandler(name, null);
             return;
         }
-        FlutterChannelRegistry.setMethodCallHandler(name,
+        FlutterChannelRegistry.setDartMethodCallHandler(name,
                 new com.codename1.flutter.platform.MethodChannel.MethodCallHandler() {
                     @Override
                     public void onMethodCall(MethodCall call,

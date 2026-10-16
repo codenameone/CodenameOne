@@ -104,6 +104,10 @@ class NavigatorOrderingTest {
     @Test
     void aDialogIsGoneBeforeItsResultIsDelivered() {
         Navigator.push(null, page(null));
+        // A repaint already queued when the dialog shows: Dialog.showPacked flushes the EDT,
+        // which paints, and CI's test order happened to leave one where the local run did
+        // not. Queued here so the paint path always runs.
+        Navigator.formAt(0).repaint();
         final List<Integer> openAtCallback = new ArrayList<Integer>();
         final List<Boolean> showingAtCallback = new ArrayList<Boolean>();
         dart.async.Future<Object> result = Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));

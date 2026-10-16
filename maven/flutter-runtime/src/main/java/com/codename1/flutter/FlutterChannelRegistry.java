@@ -58,23 +58,49 @@ public final class FlutterChannelRegistry {
     private FlutterChannelRegistry() {
     }
 
-    private static final Map<String, MethodChannel.MethodCallHandler> METHOD_HANDLERS =
+    /// Two directories, not one: each side of a channel registers the handler for calls
+    /// coming FROM the other side, and a channel that carries calls both ways has both. A
+    /// single map let the second registration replace the first, so one direction reached
+    /// the wrong side and the other handler became unreachable (the documented battery
+    /// example, once both its handlers were installed).
+    ///
+    /// Handlers the PLATFORM (Java) side registered: what a Dart-side invokeMethod calls.
+    private static final Map<String, MethodChannel.MethodCallHandler> PLATFORM_HANDLERS =
             new HashMap<String, MethodChannel.MethodCallHandler>();
+    /// Handlers the DART side registered: what a platform-side invokeMethod calls.
+    private static final Map<String, MethodChannel.MethodCallHandler> DART_HANDLERS =
+            new HashMap<String, MethodChannel.MethodCallHandler>();
+
     private static final Map<String, EventChannel.StreamHandler> STREAM_HANDLERS =
             new HashMap<String, EventChannel.StreamHandler>();
 
-    /** Registers (or, with {@code handler == null}, clears) the method handler for {@code channel}. */
-    public static void setMethodCallHandler(String channel, MethodChannel.MethodCallHandler handler) {
-        if (handler == null) {
-            METHOD_HANDLERS.remove(channel);
-        } else {
-            METHOD_HANDLERS.put(channel, handler);
-        }
+    /** The Java side's handler for {@code channel} (null clears it). */
+    public static void setPlatformMethodCallHandler(String channel, MethodChannel.MethodCallHandler handler) {
+        put(PLATFORM_HANDLERS, channel, handler);
     }
 
-    /** The method handler registered for {@code channel}, or {@code null} if none. */
-    public static MethodChannel.MethodCallHandler methodCallHandler(String channel) {
-        return METHOD_HANDLERS.get(channel);
+    /** What a Dart-side call on {@code channel} reaches, or {@code null}. */
+    public static MethodChannel.MethodCallHandler platformMethodCallHandler(String channel) {
+        return PLATFORM_HANDLERS.get(channel);
+    }
+
+    /** The Dart side's handler for {@code channel} (null clears it). */
+    public static void setDartMethodCallHandler(String channel, MethodChannel.MethodCallHandler handler) {
+        put(DART_HANDLERS, channel, handler);
+    }
+
+    /** What a platform-side call on {@code channel} reaches, or {@code null}. */
+    public static MethodChannel.MethodCallHandler dartMethodCallHandler(String channel) {
+        return DART_HANDLERS.get(channel);
+    }
+
+    private static void put(Map<String, MethodChannel.MethodCallHandler> map, String channel,
+                            MethodChannel.MethodCallHandler handler) {
+        if (handler == null) {
+            map.remove(channel);
+        } else {
+            map.put(channel, handler);
+        }
     }
 
     /** Registers (or, with {@code handler == null}, clears) the stream handler for {@code channel}. */
@@ -103,6 +129,11 @@ public final class FlutterChannelRegistry {
     /// value, including `null`, `String`, `Boolean` and the Dart types themselves,
     /// passes through unchanged.
     public static Object toDart(Object value) {
+        if (value instanceof byte[]) {
+            // Flutter's standard codec hands a byte buffer to Dart as a Uint8List; a raw
+            // Java array failed the moment Dart code cast it or gave it to MemoryImage.
+            return dart.typed_data.Uint8List.fromBytes((byte[]) value);
+        }
         if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
             return Long.valueOf(((Number) value).longValue());
         }

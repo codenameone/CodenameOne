@@ -232,9 +232,20 @@ public class Navigator extends StatelessWidget {
         if (Dialogs.popTopDialog(result)) {
             return;
         }
+        RouteEntry e = popPage();
+        if (e != null) {
+            e.popped.complete(result);
+        }
+    }
+
+    /// Removes the top page and starts the way back, WITHOUT completing its future --
+    /// the caller completes it once whatever else the operation does is in place (pop at
+    /// once; pushReplacementNamed only after the replacement is pushed). Null when only
+    /// the base route is left.
+    private static RouteEntry popPage() {
         if (stack.isEmpty()) {
             // the base runApp route: never popped
-            return;
+            return null;
         }
         RouteEntry e = stack.remove(stack.size() - 1);
         // The future completes LAST, once the way back is committed: a callback on it that
@@ -265,7 +276,7 @@ public class Navigator extends StatelessWidget {
         } else if (e.rootElement != null) {
             FlutterUI.unmountTree(e.rootElement);
         }
-        e.popped.complete(result);
+        return e;
     }
 
     /// The form a pop is on its way back to, for as long as that is still in
@@ -275,6 +286,11 @@ public class Navigator extends StatelessWidget {
     /// Test hooks: the form of stack entry {@code i}, and the form the top entry returns to.
     static Form formAt(int i) {
         return stack.get(i).form;
+    }
+
+    static String routeNameAt(int i) {
+        Route<?> r = stack.get(i).route;
+        return r == null || r.settings() == null ? null : r.settings().name();
     }
 
     static Form previousFormOfTop() {
@@ -524,7 +540,11 @@ public class Navigator extends StatelessWidget {
         // goes on the stack above the base (canPop stays true) -- only with NOTHING
         // poppable is the replacement the new implicit base.
         boolean replacingImplicitBase = !poppable();
-        pop(context, result);
+        // The removed route's future completes only once the replacement is pushed: a
+        // callback on it that pushes at once (await Navigator.push(...); push(...)) used
+        // to push FIRST, and the replacement then landed above it -- the reverse of
+        // Flutter's order, with the callback's route stranded under it.
+        RouteEntry removed = Dialogs.popTopDialog(result) ? null : popPage();
         com.codename1.flutter.FlutterErrorReport.route(name);
         dart.async.Future<Object> pushed = push(context, route);
         if (replacingImplicitBase) {
@@ -542,6 +562,9 @@ public class Navigator extends StatelessWidget {
                 baseEntry.popped.complete(result);
             }
             baseEntry = e;
+        }
+        if (removed != null && !removed.popped.isCompleted()) {
+            removed.popped.complete(result);
         }
         return pushed;
     }
@@ -682,7 +705,19 @@ public class Navigator extends StatelessWidget {
         if (context == null) {
             return STATE;
         }
+        // rootNavigator: true asks for the OUTERMOST navigator, whatever nested app the
+        // caller sits in: bound to the root app's navigator position, so a named push
+        // resolves that app's table and inherits its scope. It was ignored, and an inner
+        // app's '/settings' opened where the root's was asked for.
+        if (Boolean.TRUE.equals(rootNavigator) && rootScopeContext != null && rootScopeContext.isMounted()) {
+            return new BoundState(rootScopeContext);
+        }
         return new BoundState(context);
+    }
+
+    /// Test hook: the context a NavigatorState from {@link #of} pushes on behalf of.
+    static BuildContext boundContextForTest(NavigatorState state) {
+        return state instanceof BoundState ? ((BoundState) state).context : null;
     }
 
     /** The element a push should inherit from, or null when unknown. Public so a dialog,

@@ -122,6 +122,7 @@ public final class RasterDisplay extends CodenameOneImplementation {
     private final Object font = new Object();
 
     private static CodenameOneImplementation previousImpl;
+    private static Object previousGraphics;
     private static Object previousEdt;
 
     /// Installs a fresh raster implementation as the Display's, on the calling thread
@@ -138,6 +139,16 @@ public final class RasterDisplay extends CodenameOneImplementation {
             previousImpl = (CodenameOneImplementation) implField.get(null);
             implField.set(null, impl);
             Display d = Display.getInstance();
+            // Display.init wraps the implementation's native graphics in a Graphics; a
+            // Form.show or Dialog.showPacked paints through it on the EDT flush, and
+            // without one that paint NPEd (only when a repaint happened to be queued).
+            Field graphicsField = Display.class.getDeclaredField("codenameOneGraphics");
+            graphicsField.setAccessible(true);
+            java.lang.reflect.Constructor<com.codename1.ui.Graphics> gc =
+                    com.codename1.ui.Graphics.class.getDeclaredConstructor(Object.class);
+            gc.setAccessible(true);
+            previousGraphics = graphicsField.get(d);
+            graphicsField.set(d, gc.newInstance(impl.getNativeGraphics()));
             Field running = Display.class.getDeclaredField("codenameOneRunning");
             running.setAccessible(true);
             running.setBoolean(d, true);
@@ -176,6 +187,9 @@ public final class RasterDisplay extends CodenameOneImplementation {
             Field running = Display.class.getDeclaredField("codenameOneRunning");
             running.setAccessible(true);
             running.setBoolean(d, false);
+            Field graphicsField = Display.class.getDeclaredField("codenameOneGraphics");
+            graphicsField.setAccessible(true);
+            graphicsField.set(d, previousGraphics);
             Field edt = Display.class.getDeclaredField("edt");
             edt.setAccessible(true);
             edt.set(d, previousEdt);

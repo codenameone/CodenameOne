@@ -58,7 +58,7 @@ public final class MethodChannel {
 
     /** Registers the handler that answers calls the Dart side makes with {@code invokeMethod}. */
     public void setMethodCallHandler(MethodCallHandler handler) {
-        FlutterChannelRegistry.setMethodCallHandler(name, handler);
+        FlutterChannelRegistry.setPlatformMethodCallHandler(name, handler);
     }
 
     /** Calls the handler the Dart side registered with {@code setMethodCallHandler}, ignoring any reply. */
@@ -81,7 +81,7 @@ public final class MethodChannel {
         new dart.async.Timer(Duration.zero, new Funcs.VoidFunc0() {
             @Override
             public void call() {
-                MethodCallHandler h = FlutterChannelRegistry.methodCallHandler(name);
+                MethodCallHandler h = FlutterChannelRegistry.dartMethodCallHandler(name);
                 Result r = callback != null ? callback : NO_OP_RESULT;
                 if (h == null) {
                     r.notImplemented();

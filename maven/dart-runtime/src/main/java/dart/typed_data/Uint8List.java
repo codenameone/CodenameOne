@@ -46,6 +46,12 @@ public final class Uint8List {
         this.bytes = bytes;
     }
 
+    /// A Uint8List holding a copy of {@code bytes}: how a Java byte buffer crosses into
+    /// Dart (a platform channel's binary result, as Flutter's codec delivers it).
+    public static Uint8List fromBytes(byte[] bytes) {
+        return new Uint8List(bytes == null ? new byte[0] : bytes.clone());
+    }
+
     /** {@code Uint8List.fromList(source)} with a source typed only dynamic. */
     public static Uint8List fromList(Object source) {
         if (!(source instanceof List)) {
