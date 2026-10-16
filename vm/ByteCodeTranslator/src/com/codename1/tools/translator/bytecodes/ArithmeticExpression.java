@@ -679,10 +679,17 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                 }
 
                 case Opcodes.DDIV:
-                case Opcodes.IDIV:
-                case Opcodes.LDIV:
                 case Opcodes.FDIV: {
                     return "("+subExpression.getExpressionAsString().trim() + " / " + subExpression2.getExpressionAsString().trim()+")";
+                }
+
+                // Integer division goes through the cn1_globals.h helpers: a raw C
+                // division by 0, or of MIN_VALUE by -1, raises SIGFPE on x86.
+                case Opcodes.IDIV: {
+                    return "cn1IntDiv(" + subExpression.getExpressionAsString().trim() + ", " + subExpression2.getExpressionAsString().trim() + ")";
+                }
+                case Opcodes.LDIV: {
+                    return "cn1LongDiv(" + subExpression.getExpressionAsString().trim() + ", " + subExpression2.getExpressionAsString().trim() + ")";
                 }
 
                 case Opcodes.FREM:
@@ -695,7 +702,8 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                     if (subExpression2.getExpressionAsString() == null || "null".equals(subExpression2.getExpressionAsString())) {
                         throw new RuntimeException("2nd param of REM is null.  Should never happen.  Expression is "+subExpression2+" with last instruction "+subExpression2.lastInstruction);
                     }
-                    return "("+subExpression.getExpressionAsString().trim() + " % "+subExpression2.getExpressionAsString().trim()+")";
+                    String rem = opcode == Opcodes.LREM ? "cn1LongRem(" : "cn1IntRem(";
+                    return rem + subExpression.getExpressionAsString().trim() + ", " + subExpression2.getExpressionAsString().trim() + ")";
                 }
 
                 case Opcodes.FNEG:

@@ -147,6 +147,8 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(generatedCode.contains("BC_ISHR_EXPR"), "Shift right should translate to BC_ISHR_EXPR");
         assertTrue(generatedCode.contains("BC_IUSHR_EXPR"), "Unsigned shift right should translate to BC_IUSHR_EXPR");
         assertTrue(generatedCode.contains("fmod"), "Remainder should translate to fmod for floats/doubles");
+        assertTrue(generatedCode.contains("cn1IntDiv(") && generatedCode.contains("cn1LongRem("),
+                "Integer division should route through the cn1_globals.h helpers");
         assertTrue(generatedCode.contains("allocArray"), "New array should translate to allocArray");
 
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
@@ -167,6 +169,10 @@ class BytecodeInstructionIntegrationTest {
         Path executable = buildDir.resolve("CustomBytecodeApp");
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
         assertTrue(output.contains("RESULT="), "Compiled program should print the expected arithmetic result");
+        // 9000 + a zero bitmask: every division edge case answered as expected, and
+        // the process got this far rather than dying of SIGFPE on x86.
+        assertTrue(Arrays.asList(output.split("\\R")).contains("RESULT=9000"),
+                "Integer division by 0 and of MIN_VALUE by -1 should not trap: " + output);
     }
 
     private String invokeLdcLocalVarsAppSource() {
@@ -804,6 +810,39 @@ class BytecodeInstructionIntegrationTest {
                 "        d = -d;\n" +
                 "        return (int)(ires + lres + irem + lrem + frem + drem + b + c + s + f2 + d2 + l2 + i2 + f3 + d3 + i3 + l3 + d4 + i4 + l4 + f4);\n" +
                 "    }\n" +
+                // Integer division edge cases. A raw C division by 0, or of MIN_VALUE
+                // by -1, raises SIGFPE on x86 and kills the process; the cn1_globals.h
+                // helpers answer what arm64 hardware answers instead. The divisors
+                // live in heap fields so clang cannot constant-fold them away, and
+                // the id() calls force the stack form beside the expression form.
+                // Returns a bitmask of the checks that failed.
+                "    private int zeroDivisor;\n" +
+                "    private int minusOneDivisor;\n" +
+                "    private static int id(int v) { return v; }\n" +
+                "    private static long idL(long v) { return v; }\n" +
+                "    private int divisionEdges() {\n" +
+                "        int zero = zeroDivisor;\n" +
+                "        int minusOne = minusOneDivisor;\n" +
+                "        long lzero = zero;\n" +
+                "        long lminusOne = minusOne;\n" +
+                "        int min = Integer.MIN_VALUE;\n" +
+                "        long lmin = Long.MIN_VALUE;\n" +
+                "        int failed = 0;\n" +
+                "        if (min / minusOne != min) failed |= 1;\n" +
+                "        if (min % minusOne != 0) failed |= 2;\n" +
+                "        if (7 / zero != 0) failed |= 4;\n" +
+                "        if (7 % zero != 7) failed |= 8;\n" +
+                "        if (lmin / lminusOne != lmin) failed |= 16;\n" +
+                "        if (lmin % lminusOne != 0) failed |= 32;\n" +
+                "        if (7L / lzero != 0) failed |= 64;\n" +
+                "        if (7L % lzero != 7) failed |= 128;\n" +
+                "        if (id(min) / id(minusOne) != min) failed |= 256;\n" +
+                "        if (id(7) % id(zero) != 7) failed |= 512;\n" +
+                "        if (idL(lmin) / idL(lminusOne) != lmin) failed |= 1024;\n" +
+                "        if (idL(7L) % idL(lzero) != 7) failed |= 2048;\n" +
+                "        if (id(-7) / id(2) != -3 || id(-7) % id(2) != -1) failed |= 4096;\n" +
+                "        return failed;\n" +
+                "    }\n" +
                 // New primitive arrays
                 "    private int primitiveArrays(int val) {\n" +
                 "        boolean[] b = new boolean[1]; b[0] = true;\n" +
@@ -871,6 +910,8 @@ class BytecodeInstructionIntegrationTest {
                 "        int fieldCalls = app.useFieldsAndMethods(5);\n" +
                 "        int arithmetic = app.arithmeticOps(1, 1L, 1.0f, 1.0);\n" +
                 "        int primitives = app.primitiveArrays(5);\n" +
+                "        app.minusOneDivisor = -1;\n" +
+                "        report(9000 + app.divisionEdges());\n" +
                 "        report(first);\n" +
                 "        report(second);\n" +
                 "        report(switched);\n" +
