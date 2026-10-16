@@ -2281,7 +2281,7 @@ public class EditorView extends Component implements TextInputClient, com.codena
             System.arraycopy(line, 0, points, at, line.length);
             at += line.length;
         }
-        return new com.codename1.ui.TextInputGeometry(points, getSelectionStart(), getSelectionEnd(),
+        return new com.codename1.ui.TextInputGeometry(points, anchor < 0 ? caret : anchor, caret,
                 selectionRects(getSelectionStart(), getSelectionEnd(), first, last), getCaretRect());
     }
 

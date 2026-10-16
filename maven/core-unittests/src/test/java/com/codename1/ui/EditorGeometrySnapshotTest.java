@@ -210,4 +210,33 @@ class EditorGeometrySnapshotTest extends UITestBase {
         assertArrayEquals(new int[]{100, 9000}, range);
     }
 
+    @FormTest
+    void providerWithoutVisibleCaretPointsRetainsSelectionFocus() {
+        class ScrolledEditor extends EditorView {
+            final CountingFont font = new CountingFont();
+            ScrolledEditor() { super(null, false); }
+            @Override protected Font getEditorFont() { return font; }
+            void hideVisibleShortLines() {
+                scrollByPixels(-500, -200);
+                assertTrue(getHorizontalScroll() >= 500);
+                assertTrue(getVerticalScroll() >= 200);
+            }
+        }
+        ScrolledEditor editor = new ScrolledEditor();
+        editor.setWidth(200);
+        editor.setHeight(80);
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 2000; i++) { text.append('x'); }
+        for (int i = 0; i < 100; i++) { text.append("\nabc"); }
+        editor.setText(text.toString());
+        for (int[] selection : new int[][]{{2004, 2001}, {2001, 2004}, {2002, 2002}}) {
+            editor.setSelectionRange(selection[0], selection[1]);
+            editor.hideVisibleShortLines();
+            TextInputGeometry geometry = TextInputGeometry.capture(editor);
+            assertEquals(selection[1], geometry.offsetAtPoint(0, 0));
+            assertEquals(selection[1], geometry.offsetAtPoint(150, 60));
+            assertArrayEquals(editor.getCaretRect(), geometry.rectForOffset(0));
+        }
+    }
+
 }
