@@ -928,6 +928,7 @@ public class TextFieldRenderElement extends RenderElement {
      * tests can drive the flow without a component.
      */
     public void userEdited(String newText) {
+        newText = applyInputFormatters(newText);
         // Enforced here too, not only through the native field's max size: text can
         // arrive by paste or a platform editor that ignores it, and the value handed
         // on must never exceed the limit. It used to reach the controller and
@@ -959,6 +960,51 @@ public class TextFieldRenderElement extends RenderElement {
         if (f != null) {
             f.call(newText);
         }
+    }
+
+    /// The text before the edit now arriving, for the formatters' oldValue.
+    private String lastEditedText = "";
+
+    /// Runs the field's inputFormatters over a user edit, in order (Flutter's
+    /// formatEditUpdate chain), and shows the result when it differs from what was typed.
+    private String applyInputFormatters(String newText) {
+        Object fs = textField().getInputFormatters();
+        String before = lastEditedText;
+        lastEditedText = newText == null ? "" : newText;
+        if (newText == null || !(fs instanceof Iterable)) {
+            return newText;
+        }
+        rebindController();
+        String oldText = boundController != null ? boundController.rawValue() : before;
+        com.codename1.flutter.TextEditingValue oldValue = editingValue(oldText == null ? "" : oldText);
+        com.codename1.flutter.TextEditingValue value = editingValue(newText);
+        for (Object f : (Iterable<?>) fs) {
+            if (f instanceof com.codename1.flutter.services.TextInputFormatter) {
+                com.codename1.flutter.TextEditingValue r =
+                        ((com.codename1.flutter.services.TextInputFormatter) f).formatEditUpdate(oldValue, value);
+                if (r != null) {
+                    value = r;
+                }
+            }
+        }
+        String formatted = value.text() == null ? "" : value.text();
+        if (!formatted.equals(newText) && field != null && !applying) {
+            applying = true;
+            try {
+                field.setText(formatted);
+            } finally {
+                applying = false;
+            }
+        }
+        lastEditedText = formatted;
+        return formatted;
+    }
+
+    private static com.codename1.flutter.TextEditingValue editingValue(String text) {
+        com.codename1.flutter.TextEditingValue v = new com.codename1.flutter.TextEditingValue();
+        v.text(text);
+        v.selection(com.codename1.flutter.TextSelection.collapsed(text.length()));
+        return v;
     }
 
     /**

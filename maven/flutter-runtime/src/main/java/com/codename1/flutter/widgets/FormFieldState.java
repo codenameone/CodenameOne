@@ -66,6 +66,11 @@ public class FormFieldState<T> extends State<StatefulWidget> {
         return value;
     }
 
+    /// What {@link #reset} returns to: the value seeded at initState.
+    protected final T initialValue() {
+        return initialValue;
+    }
+
     public boolean hasError() {
         return errorText != null;
     }

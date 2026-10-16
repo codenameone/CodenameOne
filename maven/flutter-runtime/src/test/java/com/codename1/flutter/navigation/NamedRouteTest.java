@@ -144,6 +144,22 @@ class NamedRouteTest {
         assertEquals(1, Navigator.stackSize());
     }
 
+    /// A dialog over the implicit base page is what the replacement's pop removes, so
+    /// the replacement goes on the stack ABOVE the base and stays poppable. Deciding by
+    /// the route stack alone (empty) promoted it to the new non-poppable base.
+    @Test
+    void replacingADialogOverTheBasePageKeepsTheBaseBeneath() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        com.codename1.flutter.material.Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));
+        NavigatorState state = Navigator.of(null, null);
+
+        state.pushReplacementNamed("/next", null, null);
+
+        assertEquals(0, com.codename1.flutter.material.Dialogs.openDialogCount(), "the dialog was replaced");
+        assertEquals(1, Navigator.stackSize(), "the replacement is a poppable route");
+        assertTrue(state.canPop(), "the original page is still beneath it");
+    }
+
     @Test
     void pushReplacementSwapsTheTopRoute() {
         Navigator.installRouteTable(null, settings -> route(), null);

@@ -130,6 +130,47 @@ class FormValidationTest {
         assertNull(k.currentState().errorText());
     }
 
+    /// Flutter seeds a controller-backed field's initial value from controller.text, so
+    /// reset restores it; it used to blank the field.
+    @Test
+    void resetRestoresAnExternalControllersTextAtCreation() {
+        GlobalKey<FormState> formKey = new GlobalKey<FormState>();
+        TextEditingController ctl = new TextEditingController();
+        ctl.setText("start");
+        TextFormField f = new TextFormField();
+        f.controller(ctl);
+        mountForm(formKey, f);
+
+        ctl.setText("edited");
+        formKey.currentState().reset();
+        assertEquals("start", ctl.text());
+    }
+
+    /// inputFormatters were stored and never applied: the gallery's phone-number
+    /// formatter never ran and the raw edit reached the controller and onChanged.
+    @Test
+    void inputFormattersReshapeAUserEdit() {
+        GlobalKey<FormFieldState<String>> k = new GlobalKey<FormFieldState<String>>();
+        final List<String> changed = new ArrayList<String>();
+        TextFormField f = field("", k);
+        f.onChanged(changed::add);
+        f.inputFormatters(DartList.of((Object) new com.codename1.flutter.services.TextInputFormatter() {
+            @Override
+            public com.codename1.flutter.TextEditingValue formatEditUpdate(
+                    com.codename1.flutter.TextEditingValue oldValue, com.codename1.flutter.TextEditingValue newValue) {
+                return newValue.copyWith(newValue.text().toUpperCase(java.util.Locale.ROOT), null, null);
+            }
+        }));
+        mountForm(new GlobalKey<FormState>(), f);
+
+        TextFieldRenderElement field = (TextFieldRenderElement) RenderElement.findRenderElement(
+                (Element) k.currentContext());
+        field.userEdited("abc");
+
+        assertEquals("ABC", ((TextField) field.widget()).getController().text());
+        assertEquals(java.util.Arrays.asList("ABC"), changed);
+    }
+
     @Test
     void formOfFindsTheEnclosingState() {
         GlobalKey<FormState> formKey = new GlobalKey<FormState>();

@@ -82,9 +82,11 @@ public final class DartIdentitySet<E> extends DartSet<E> {
         inner.clear();
     }
 
+    /// Checked like every DartSet's: the backing map's own iterator notices a change
+    /// only in next(), so removing the last element mid-loop ended it quietly.
     @Override
     public Iterator<E> iterator() {
-        return inner.keySet().iterator();
+        return checkedIterator(inner.keySet().iterator());
     }
 
     /// Keeps {@code toSet}/{@code union}/{@code intersection}/{@code difference}/

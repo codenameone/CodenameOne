@@ -867,6 +867,16 @@ public class DartCoreSemanticsTest {
             }
         });
 
+        // Set.identity() has its own storage; its iterator must be checked the same way.
+        final DartIdentitySet<Object> ids = new DartIdentitySet<Object>();
+        final Object only = new Object();
+        ids.add(only);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object x : ids) {
+                ids.remove(only);
+            }
+        });
+
         final DartLongMap lm = new DartLongMap();
         lm.putLong(1, 10);
         lm.putLong(2, 20);

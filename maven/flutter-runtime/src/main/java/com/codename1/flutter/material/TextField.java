@@ -114,6 +114,18 @@ public class TextField extends Widget {
      * neither the limit nor the {@code 0/14} the reference counts out under
      * it.</p>
      */
+    private Object inputFormatters;
+
+    /// Flutter's {@code inputFormatters}: each {@code TextInputFormatter} reshapes a
+    /// user edit, in order, before the field, controller and onChanged see it.
+    public void inputFormatters(Object v) {
+        this.inputFormatters = v;
+    }
+
+    public Object getInputFormatters() {
+        return inputFormatters;
+    }
+
     public void maxLength(long v) {
         this.maxLength = v;
     }

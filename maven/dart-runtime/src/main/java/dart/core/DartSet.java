@@ -120,7 +120,13 @@ public class DartSet<E> extends LinkedHashSet<E> {
     /// Java bulk removals.
     @Override
     public java.util.Iterator<E> iterator() {
-        final java.util.Iterator<E> it = super.iterator();
+        return checkedIterator(super.iterator());
+    }
+
+    /// The Dart iterator over {@code it}: what {@link #iterator} answers, and what a
+    /// subclass with its own storage (DartIdentitySet) wraps its storage's iterator in,
+    /// so a change made through the set is reported on the next step there too.
+    protected final java.util.Iterator<E> checkedIterator(final java.util.Iterator<E> it) {
         return new java.util.Iterator<E>() {
             int expected = structure;
 

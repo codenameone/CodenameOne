@@ -496,7 +496,10 @@ public class Navigator extends StatelessWidget {
         // very route pushReplacement was supposed to have removed. Flutter semantics: after
         // pushReplacement on the only route, the replacement itself becomes the new
         // (non-poppable) base.
-        boolean replacingImplicitBase = stack.isEmpty();
+        // A dialog over the base page is what pop() then removes, so the replacement
+        // goes on the stack above the base (canPop stays true) -- only with NOTHING
+        // poppable is the replacement the new implicit base.
+        boolean replacingImplicitBase = !poppable();
         pop(context, result);
         com.codename1.flutter.FlutterErrorReport.route(name);
         dart.async.Future<Object> pushed = push(context, route);

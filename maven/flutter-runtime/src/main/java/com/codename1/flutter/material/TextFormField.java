@@ -136,7 +136,9 @@ public class TextFormField extends StatefulWidget {
         public void reset() {
             TextEditingController c = effectiveController();
             if (c != null) {
-                String initial = tf().controller != null ? null : tf().initialValue;
+                // The value seeded at initState: the external controller's text then, or
+                // initialValue. An external controller used to be blanked.
+                String initial = initialValue();
                 c.setText(initial == null ? "" : initial);
             }
             super.reset();
@@ -145,7 +147,9 @@ public class TextFormField extends StatefulWidget {
         @Override
         public void initState() {
             TextFormField w = tf();
-            seed(w.initialValue);
+            // Flutter's FormField initial value is controller.text when a controller is
+            // given, so reset() restores what the field held when it was created.
+            seed(w.controller != null ? w.controller.text() : w.initialValue);
             if (w.controller == null) {
                 localController = new TextEditingController();
                 if (w.initialValue != null) {
@@ -247,6 +251,11 @@ public class TextFormField extends StatefulWidget {
             }
             if (w.keyboardType != null) {
                 field.keyboardType(w.keyboardType);
+            }
+            // Stored and never forwarded, so the gallery's phone-number formatter never
+            // ran and raw input reached the application.
+            if (w.inputFormatters != null) {
+                field.inputFormatters(w.inputFormatters);
             }
             return field;
         }

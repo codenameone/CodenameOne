@@ -62,6 +62,37 @@ public class StreamTest {
         b.cancel();
     }
 
+    /// Dart treats delivering the final done event as cancelling the subscription, so
+    /// onCancel runs when the PRODUCER ends the stream too -- at once for a running
+    /// listener, and only once a paused one drains (or discards) its queued done.
+    @Test
+    public void closingAListenedStreamRunsOnCancelOnceTheLastListenerIsDone() {
+        final int[] cancels = {0};
+        StreamController<String> c = new StreamController<String>();
+        c.onCancel((Funcs.VoidFunc0) () -> cancels[0]++);
+        StreamSubscription<String> sub = c.stream().listen(v -> { });
+        c.close();
+        assertEquals(1, cancels[0], "the done event ends the subscription");
+        sub.cancel();
+        assertEquals(1, cancels[0], "and a later cancel does not run it again");
+
+        final int[] pausedCancels = {0};
+        StreamController<String> p = new StreamController<String>();
+        p.onCancel((Funcs.VoidFunc0) () -> pausedCancels[0]++);
+        StreamSubscription<String> paused = p.stream().listen(v -> { });
+        paused.pause();
+        p.close();
+        assertEquals(0, pausedCancels[0], "the paused listener has not had its done yet");
+        paused.resume();
+        assertEquals(1, pausedCancels[0]);
+
+        final int[] never = {0};
+        StreamController<String> unheard = new StreamController<String>();
+        unheard.onCancel((Funcs.VoidFunc0) () -> never[0]++);
+        unheard.close();
+        assertEquals(0, never[0], "never listened: nothing to cancel");
+    }
+
     @Test
     public void everyLiveListenerReceivesEveryEvent() {
         StreamController<String> c = new StreamController<String>();

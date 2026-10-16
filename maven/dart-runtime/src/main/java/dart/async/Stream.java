@@ -145,11 +145,18 @@ public class Stream<T> {
     private static final class PendingClose {
         final Completer<Object> completer = new Completer<Object>();
         int remaining;
+        /// Run when the last listener has had its done event (or discarded it).
+        Runnable whenAllDone;
 
         void resolve() {
             remaining--;
             if (remaining <= 0) {
                 completer.complete();
+                if (whenAllDone != null) {
+                    Runnable r = whenAllDone;
+                    whenAllDone = null;
+                    r.run();
+                }
             }
         }
     }
@@ -300,10 +307,12 @@ public class Stream<T> {
         List<Sub> snapshot = new ArrayList<Sub>(subs);
         subs.clear();
         PendingClose pendingClose = new PendingClose();
+        boolean hadListeners = false;
         for (Sub s : snapshot) {
             if (s.cancelled) {
                 continue;
             }
+            hadListeners = true;
             if (s.pauseCount > 0) {
                 queue(s, QueuedEvent.DONE, null);
                 s.pendingClose = pendingClose;
@@ -312,8 +321,24 @@ public class Stream<T> {
                 deliverVoid(s.onDone);
             }
         }
+        // Dart counts delivering the final done event as cancelling the subscription, so
+        // the source's cancel hook (StreamController.onCancel, an event channel's
+        // StreamHandler.onCancel) runs once the last listener has its done -- now, or when
+        // a paused one drains or discards it. It used to be skipped whenever the PRODUCER
+        // ended the stream, leaving a platform event source running.
+        Runnable cancelHook = hadListeners ? new Runnable() {
+            @Override
+            public void run() {
+                onNoListeners();
+            }
+        } : null;
         if (pendingClose.remaining == 0) {
             pendingClose.completer.complete();
+            if (cancelHook != null) {
+                cancelHook.run();
+            }
+        } else {
+            pendingClose.whenAllDone = cancelHook;
         }
         return pendingClose.completer.future();
     }
