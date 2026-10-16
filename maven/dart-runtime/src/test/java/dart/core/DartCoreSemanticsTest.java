@@ -754,18 +754,97 @@ public class DartCoreSemanticsTest {
         assertEquals(1, l.take(5).length());
     }
 
+    /// Dart's iterators check on every moveNext. Java's check only in next(), so a body
+    /// that cleared or shrank the collection after the last-but-one element ended the
+    /// loop quietly: hasNext() answered false from the live size.
+    @Test
+    public void shrinkingACollectionWhileIteratingItThrowsFromHasNext() {
+        final DartList<Object> l = new DartList<Object>();
+        l.add("a");
+        l.add("b");
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object x : l) {
+                l.clear();
+            }
+        });
+        // Replacing an element is not a length change, so Dart does not report it.
+        DartList<Object> r = new DartList<Object>();
+        r.add("a");
+        r.add("b");
+        int seen = 0;
+        for (Object x : r) {
+            r.set(0, "z");
+            seen++;
+        }
+        assertEquals(2, seen);
+
+        final DartSet<Object> set = new DartSet<Object>();
+        set.add("a");
+        set.add("b");
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object x : set) {
+                set.clear();
+            }
+        });
+
+        final DartMap<Object, Object> m = new DartMap<Object, Object>();
+        m.put("a", 1);
+        m.put("b", 2);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object k : m.keys()) {
+                m.clear();
+            }
+        });
+        m.put("a", 1);
+        m.put("b", 2);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object v : m.valuesIterable()) {
+                m.remove("b");
+            }
+        });
+        m.put("b", 2);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (MapEntry<Object, Object> e : m.entries()) {
+                m.remove("a");
+            }
+        });
+
+        final DartLongMap lm = new DartLongMap();
+        lm.putLong(1, 10);
+        lm.putLong(2, 20);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Long k : lm.keySet()) {
+                lm.clear();
+            }
+        });
+        lm.putLong(1, 10);
+        lm.putLong(2, 20);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Long v : lm.values()) {
+                lm.clear();
+            }
+        });
+        lm.putLong(1, 10);
+        lm.putLong(2, 20);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (java.util.Map.Entry<Long, Long> e : lm.entrySet()) {
+                lm.clear();
+            }
+        });
+    }
+
     @Test
     public void aListModifiedWhileIteratedFailsInsteadOfLooping() {
         DartList<Object> l = new DartList<Object>();
         l.add("a");
         l.add("b");
-        assertThrows(java.util.ConcurrentModificationException.class, () -> {
+        assertThrows(ConcurrentModificationError.class, () -> {
             for (Object x : l) {
                 l.add(x);
             }
         });
         DartLongList longs = DartLongList.ofLongs(1, 2);
-        assertThrows(java.util.ConcurrentModificationException.class, () -> {
+        assertThrows(ConcurrentModificationError.class, () -> {
             for (Long x : longs) {
                 longs.addLong(x);
             }

@@ -276,6 +276,56 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         impl.add(index, element);
     }
 
+    /**
+     * Dart's ListIterator: the length is checked on every step, hasNext() included, as
+     * moveNext does. AbstractList's iterator checks modCount in next() only, so a loop
+     * body that cleared or shrank the list past the cursor ended the loop quietly, and
+     * what it did throw was Java's exception, which no {@code on
+     * ConcurrentModificationError} clause catches. Like Dart, only a LENGTH change is
+     * reported; replacing an element is not a concurrent modification.
+     */
+    @Override
+    public java.util.Iterator<E> iterator() {
+        return new java.util.Iterator<E>() {
+            int length = size();
+            int i;
+            int last = -1;
+
+            @Override
+            public boolean hasNext() {
+                checkLength();
+                return i < length;
+            }
+
+            @Override
+            public E next() {
+                checkLength();
+                if (i >= length) {
+                    throw new java.util.NoSuchElementException();
+                }
+                last = i;
+                return get(i++);
+            }
+
+            @Override
+            public void remove() {
+                if (last < 0) {
+                    throw new IllegalStateException();
+                }
+                DartList.this.remove(last);
+                i = last;
+                last = -1;
+                length--;
+            }
+
+            private void checkLength() {
+                if (size() != length) {
+                    throw new ConcurrentModificationError("list length changed from " + length + " to " + size());
+                }
+            }
+        };
+    }
+
     @Override
     public E remove(int index) {
         checkGrowable("removeAt");

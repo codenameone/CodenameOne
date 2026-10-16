@@ -392,7 +392,9 @@ external bool debugCheckHasDirectionality(BuildContext context);
 // --- l10n : MaterialLocalizations ------------------------------------------
 
 @JavaName('com.codename1.flutter.l10n.LocalizationsDelegate')
-class LocalizationsDelegate<T> {}
+class LocalizationsDelegate<T> {
+  external bool shouldReload(LocalizationsDelegate<T> old);
+}
 
 @JavaName('com.codename1.flutter.l10n.MaterialLocalizations')
 abstract class MaterialLocalizations {

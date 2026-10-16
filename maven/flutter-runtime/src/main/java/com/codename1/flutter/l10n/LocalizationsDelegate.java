@@ -43,4 +43,16 @@ public class LocalizationsDelegate<T> {
     public dart.async.Future<T> load(com.codename1.flutter.Locale locale) {
         return null;
     }
+
+    /**
+     * Flutter's {@code shouldReload(old)}: whether a rebuilt app's delegate must load
+     * its resources again although it is of the same type as {@code old}. Flutter
+     * declares it abstract; the opaque runtime delegates never reload. A transpiled
+     * delegate that narrows the parameter (gen-l10n's
+     * {@code shouldReload(_AppLocalizationsDelegate old)}) reaches this signature
+     * through the bridge the transpiler emits for covariant overrides.
+     */
+    public boolean shouldReload(LocalizationsDelegate<T> old) {
+        return false;
+    }
 }

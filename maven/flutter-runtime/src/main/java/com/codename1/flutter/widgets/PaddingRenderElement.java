@@ -50,6 +50,9 @@ public class PaddingRenderElement extends SingleChildRenderElement {
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         EdgeInsets lp = ((Padding) widget()).getPadding();
+        if (lp != null) {
+            lp = lp.resolve(Directionality.of(this));
+        }
         EdgeInsets px = lp == null
                 ? EdgeInsets.all(0)
                 : EdgeInsets.only(Dp.px(lp.left()), Dp.px(lp.top()), Dp.px(lp.right()), Dp.px(lp.bottom()));

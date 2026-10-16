@@ -112,28 +112,43 @@ public class DartSet<E> extends LinkedHashSet<E> {
         }
     }
 
-    /// Only a frozen set pays for the wrapper; its remove() is refused, which covers
-    /// removeWhere, retainWhere and the inherited Java bulk removals.
+    /// Checks {@link #structure} on every step, hasNext() included, as Dart's moveNext
+    /// does: Java's iterator checks only in next(), so a loop body that cleared the set
+    /// ended the loop quietly, and when it did notice it threw Java's exception, which
+    /// no {@code on ConcurrentModificationError} clause catches. A frozen set's
+    /// remove() is refused, which covers removeWhere, retainWhere and the inherited
+    /// Java bulk removals.
     @Override
     public java.util.Iterator<E> iterator() {
         final java.util.Iterator<E> it = super.iterator();
-        if (!readOnly) {
-            return it;
-        }
         return new java.util.Iterator<E>() {
+            int expected = structure;
+
             @Override
             public boolean hasNext() {
+                check();
                 return it.hasNext();
             }
 
             @Override
             public E next() {
+                check();
                 return it.next();
             }
 
             @Override
             public void remove() {
                 checkWritable();
+                // Removal through the iterator is the one sanctioned change.
+                it.remove();
+                structure++;
+                expected = structure;
+            }
+
+            private void check() {
+                if (structure != expected) {
+                    throw new ConcurrentModificationError("set modified during iteration");
+                }
             }
         };
     }

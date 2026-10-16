@@ -1,0 +1,4 @@
+dog keeper greets dog
+dog keeper feeds dog
+true
+false

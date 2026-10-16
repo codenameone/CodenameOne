@@ -57,8 +57,10 @@ public class LocalizationsScope extends SingleChildWidget implements InheritedVa
      * Whether {@code old} published the same resources -- Flutter's test in
      * Localizations.didUpdateWidget: the same locale, and as many delegates of the same
      * types. (A delegate list is usually a new list on every build, so it is not
-     * compared by identity.)
+     * compared by identity.) A same-typed new delegate whose {@code shouldReload(old)}
+     * answers true forces the reload too.
      */
+    @SuppressWarnings("unchecked")
     boolean sameResourcesAs(LocalizationsScope old) {
         if (old.locale == null ? locale != null : !old.locale.equals(locale)) {
             return false;
@@ -75,6 +77,13 @@ public class LocalizationsScope extends SingleChildWidget implements InheritedVa
             Object x = a.next();
             Object y = b.next();
             if (x == null ? y != null : y == null || x.getClass() != y.getClass()) {
+                return false;
+            }
+            // Same type is not the whole test: Flutter also asks the NEW delegate
+            // whether its configuration changed (didUpdateWidget's shouldReload).
+            if (y instanceof com.codename1.flutter.l10n.LocalizationsDelegate
+                    && ((com.codename1.flutter.l10n.LocalizationsDelegate<Object>) y)
+                            .shouldReload((com.codename1.flutter.l10n.LocalizationsDelegate<Object>) x)) {
                 return false;
             }
         }

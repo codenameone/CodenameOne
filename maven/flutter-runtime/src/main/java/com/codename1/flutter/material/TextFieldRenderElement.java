@@ -761,6 +761,7 @@ public class TextFieldRenderElement extends RenderElement {
         // 80% of the reference's height.
         com.codename1.flutter.EdgeInsets pad = insetsOf(resolvePadding(d, themed));
         if (pad != null) {
+            pad = pad.resolve(com.codename1.flutter.widgets.Directionality.of(this));
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
             all.setPadding((int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.top())),
                     (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.bottom())),

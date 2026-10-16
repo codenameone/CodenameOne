@@ -153,7 +153,7 @@ public class CardRenderElement extends SingleChildRenderElement {
 
     @Override
     protected Size performLayout(BoxConstraints constraints) {
-        EdgeInsets lp = marginLp();
+        EdgeInsets lp = marginLp().resolve(com.codename1.flutter.widgets.Directionality.of(this));
         marginPx = EdgeInsets.only(Dp.px(lp.left()), Dp.px(lp.top()), Dp.px(lp.right()), Dp.px(lp.bottom()));
         RenderElement child = renderChild();
         if (child == null) {

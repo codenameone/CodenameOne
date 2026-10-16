@@ -64,6 +64,20 @@ class OverlayLifecycleTest {
     // ------------------------------------------------------------------
 
     @Test
+    void aNewEntryIsNotMountedUntilInserted() {
+        OverlayState state = new OverlayState();
+        OverlayEntry entry = new OverlayEntry();
+        // The common guard `if (!entry.mounted) overlay.insert(entry)` skipped the
+        // first insertion when a detached entry already reported mounted.
+        assertFalse(entry.mounted(), "a detached entry is not in any overlay");
+        if (!entry.mounted()) {
+            state.insert(entry, null, null);
+        }
+        assertTrue(state.entries().contains(entry));
+        assertTrue(entry.mounted());
+    }
+
+    @Test
     void reInsertingARemovedEntryComesBackMounted() {
         OverlayState state = new OverlayState();
         OverlayEntry entry = new OverlayEntry();

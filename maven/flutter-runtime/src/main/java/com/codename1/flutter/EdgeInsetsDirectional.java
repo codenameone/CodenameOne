@@ -28,10 +28,10 @@ package com.codename1.flutter;
  * {@code left}/{@code right}) — Flutter's {@code EdgeInsetsDirectional}.
  *
  * <p>It extends {@link EdgeInsets} so it remains assignable to the
- * {@code EdgeInsets}-typed padding parameters the widget stubs declare. Under
- * the default left-to-right text direction {@code start} maps to {@code left}
- * and {@code end} to {@code right}; full bidi resolution is deferred to the
- * render layer.</p>
+ * {@code EdgeInsets}-typed padding parameters the widget stubs declare. Read
+ * directly, {@code start} is {@code left} and {@code end} is {@code right} (LTR);
+ * layouts call {@link #resolve(TextDirection)} with the ambient
+ * {@code Directionality}, which swaps them under RTL.</p>
  */
 public final class EdgeInsetsDirectional extends EdgeInsets {
 
@@ -61,6 +61,14 @@ public final class EdgeInsetsDirectional extends EdgeInsets {
 
     public static EdgeInsetsDirectional fromSTEB(double start, double top, double end, double bottom) {
         return new EdgeInsetsDirectional(start, top, end, bottom);
+    }
+
+    @Override
+    public EdgeInsets resolve(TextDirection direction) {
+        if (direction == TextDirection.rtl) {
+            return EdgeInsets.only(end, top(), start, bottom());
+        }
+        return this;
     }
 
     public double start() {

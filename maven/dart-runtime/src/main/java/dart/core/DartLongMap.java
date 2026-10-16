@@ -505,7 +505,9 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
         return new Iterator<Long>() {
             final int v = version;
             int e = nextLive(0);
-            public boolean hasNext() { return e < entryCount; }
+            // Checked here too, like Dart's moveNext: after a callback cleared or shrank
+            // the map, a next()-only check let hasNext() end the loop silently.
+            public boolean hasNext() { checkVersion(v); return e < entryCount; }
             public Long next() {
                 checkVersion(v);
                 if (e >= entryCount) { throw new NoSuchElementException(); }
@@ -518,7 +520,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
         return new Iterator<Long>() {
             final int ver = version;
             int e = nextLive(0);
-            public boolean hasNext() { return e < entryCount; }
+            public boolean hasNext() { checkVersion(ver); return e < entryCount; }
             public Long next() {
                 checkVersion(ver);
                 if (e >= entryCount) { throw new NoSuchElementException(); }
@@ -546,6 +548,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
                     final int v = version;
                     int e = nextLive(0);
                     public boolean hasNext() {
+                        checkVersion(v);
                         return e < entryCount;
                     }
                     public Map.Entry<Long, Long> next() {

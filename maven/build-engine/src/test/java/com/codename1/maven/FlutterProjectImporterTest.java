@@ -311,6 +311,35 @@ public class FlutterProjectImporterTest {
         assertFalse(settings, settings.contains("ios.bundleVersion"));
     }
 
+    /// `..` is rejected as a path SEGMENT only: `assets/logo..png` and
+    /// `images/v1..2/icon.png` are ordinary names and must be copied, while a key
+    /// that climbs out of the project still is not.
+    @Test
+    public void assetNamesContainingTwoDotsAreCopied() throws Exception {
+        File root = Files.createTempDirectory("flutter-double-dot-assets").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo..png\n    - images/v1..2/icon.png\n"
+                + "    - ../outside.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "assets/logo..png"), "PNG1");
+        write(new File(flutterProject, "images/v1..2/icon.png"), "PNG2");
+        write(new File(root, "outside.png"), "OUT");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File flutterDir = new File(common, "src/main/flutter");
+        assertTrue(new File(flutterDir, "assets/logo..png").isFile());
+        assertTrue(new File(flutterDir, "images/v1..2/icon.png").isFile());
+        assertFalse(new File(common, "src/main/outside.png").exists());
+        assertTrue(FlutterProjectImporter.hasParentSegment("a/../b"));
+        assertTrue(FlutterProjectImporter.hasParentSegment("..\\b"));
+        assertFalse(FlutterProjectImporter.hasParentSegment("a/b..c/d"));
+    }
+
     /// lib/ is copied flat and pubspec.yaml is not copied, so the transpiler
     /// learns the project's package name -- which `package:<name>/x.dart`
     /// imports of its own files use -- only from this record.

@@ -58,6 +58,15 @@ public class EdgeInsets extends EdgeInsetsGeometry {
         return new EdgeInsets(left, top, right, bottom);
     }
 
+    /**
+     * Flutter's {@code EdgeInsetsGeometry.resolve}: the absolute insets for a text
+     * direction. Absolute insets are already resolved; {@link EdgeInsetsDirectional}
+     * swaps start and end under RTL. Every layout that reads left/right resolves first.
+     */
+    public EdgeInsets resolve(TextDirection direction) {
+        return this;
+    }
+
     public double left() {
         return left;
     }

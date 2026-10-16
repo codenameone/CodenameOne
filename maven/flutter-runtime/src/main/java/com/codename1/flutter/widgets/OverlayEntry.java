@@ -38,7 +38,8 @@ public class OverlayEntry {
     private Funcs.Func1<BuildContext, Widget> builder;
     private Boolean opaque;
     private Boolean maintainState;
-    private boolean mounted = true;
+    /** False until attach(): a detached entry is in no overlay. */
+    private boolean mounted;
 
     public OverlayEntry() {
     }

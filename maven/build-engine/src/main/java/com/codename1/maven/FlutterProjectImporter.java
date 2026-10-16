@@ -195,7 +195,7 @@ public final class FlutterProjectImporter {
             assetKeys.addAll(pubspec.fontAssets);
             for (String key : assetKeys) {
                 String clean = key.endsWith("/") ? key.substring(0, key.length() - 1) : key;
-                if (clean.length() == 0 || clean.contains("..")) {
+                if (clean.length() == 0 || hasParentSegment(clean)) {
                     continue;
                 }
                 File assetSrc = new File(source, clean.replace('/', File.separatorChar));
@@ -630,6 +630,18 @@ public final class FlutterProjectImporter {
         return n;
     }
 
+    /// Whether `path` climbs out of its root: a `..` SEGMENT. A substring test also
+    /// rejected `assets/logo..png` and `images/v1..2/icon.png`, valid names that were
+    /// then neither copied nor reported missing.
+    static boolean hasParentSegment(String path) {
+        for (String segment : path.split("[/\\\\]")) {
+            if (segment.equals("..")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Removes what an earlier import copied and this one did not -- a Dart
     /// file or asset renamed or removed upstream -- so it does not stay
     /// behind to be transpiled or packaged. Only a file listed in the earlier
@@ -640,7 +652,7 @@ public final class FlutterProjectImporter {
             throws IOException {
         for (Map.Entry<String, String> e : previous.entrySet()) {
             String path = e.getKey();
-            if (imported.containsKey(path) || path.contains("..")) {
+            if (imported.containsKey(path) || hasParentSegment(path)) {
                 continue;
             }
             File f = new File(target, path.replace('/', File.separatorChar));

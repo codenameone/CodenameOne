@@ -925,6 +925,9 @@ public final class JavaEmitter {
             mm.body = m.body;
             mm.exprBody = m.exprBody;
             body.append(emitMethodLike(mm, ctx, c.isAbstract));
+            if (m.isOverride && !mm.isOverride && !c.isMixin) {
+                body.append(emitCovariantBridge(c, m, mm, ctx));
+            }
         }
 
         // mixin applications: implement each mixin interface and synthesize
@@ -1642,6 +1645,133 @@ public final class JavaEmitter {
     }
 
     /** A same-name, same-arity, identical-param-type method anywhere on a stub class's chain. */
+    /**
+     * Dart lets an override narrow a parameter ({@code covariant}, or implicitly on a
+     * generated delegate's {@code shouldReload(_AppLocalizationsDelegate old)} and an
+     * inherited widget's {@code updateShouldNotify(PageStatus old)}); Java does not, so
+     * the narrowed method is only an OVERLOAD, and the runtime -- which calls the base
+     * signature -- reached the base's default instead of the app's code. This emits the
+     * override Java can see: the base's erased signature, casting each argument to the
+     * narrowed type and delegating. Empty when no wider base method exists, when a
+     * primitive or optional parameter is involved, or when the erasures coincide (the
+     * narrowed method then already overrides, or would clash).
+     */
+    private String emitCovariantBridge(ClassDecl c, MethodDecl m, Method mm, Ctx ctx) {
+        if (m.isStatic || m.isGetter || m.isSetter || m.name.startsWith("$")
+                || "hashCode".equals(m.name) || "compareTo".equals(m.name)) {
+            return "";
+        }
+        for (Param p : m.params) {
+            if (p.named || p.defaultValue != null) {
+                return "";
+            }
+        }
+        Object[] found = widerBaseMethod(c, m);
+        if (found == null) {
+            return "";
+        }
+        MethodDecl sm = (MethodDecl) found[0];
+        List<String> ownerTypeParams = (List<String>) found[1];
+        StringBuilder sig = new StringBuilder();
+        StringBuilder call = new StringBuilder();
+        boolean differs = false;
+        for (int i = 0; i < m.params.size(); i++) {
+            TypeRef wide = sm.params.get(i).type == null ? TypeRef.DYNAMIC : sm.params.get(i).type;
+            TypeRef narrow = m.params.get(i).type == null ? TypeRef.DYNAMIC : m.params.get(i).type;
+            String wideJava = ownerTypeParams.contains(wide.name) || sm.typeParams.contains(wide.name)
+                    ? "Object" : javaType(TypeRef.of(wide.name), false, ctx);
+            String narrowJava = javaType(narrow, false, ctx);
+            if (isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
+                return "";
+            }
+            String narrowErased = narrowJava.indexOf('<') >= 0
+                    ? narrowJava.substring(0, narrowJava.indexOf('<')) : narrowJava;
+            if (!narrowErased.equals(wideJava)) {
+                differs = true;
+            }
+            if (i > 0) {
+                sig.append(", ");
+                call.append(", ");
+            }
+            sig.append(wideJava).append(" $b").append(i);
+            call.append("((").append(narrowJava).append(") $b").append(i).append(')');
+        }
+        if (!differs) {
+            return "";
+        }
+        TypeRef rt = mm.returnType == null || mm.returnType.is("var") ? TypeRef.DYNAMIC : mm.returnType;
+        String rjt = javaType(rt, false, ctx);
+        StringBuilder sb = new StringBuilder();
+        sb.append("    @Override\n    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public ")
+                .append(rjt).append(' ').append(m.name).append('(').append(sig).append(") {\n        ")
+                .append("void".equals(rjt) ? "" : "return ").append(m.name).append('(').append(call)
+                .append(");\n    }\n\n");
+        return sb.toString();
+    }
+
+    private static boolean isJavaPrimitive(String t) {
+        return "long".equals(t) || "double".equals(t) || "boolean".equals(t) || "int".equals(t)
+                || "float".equals(t) || "char".equals(t) || "short".equals(t) || "byte".equals(t);
+    }
+
+    /**
+     * The nearest base method -- program superclass chain first, then the stub chain,
+     * mixins and interfaces -- with {@code m}'s name and arity but not its parameter
+     * types, with the type parameters of the class declaring it; null when none.
+     */
+    private Object[] widerBaseMethod(ClassDecl c, MethodDecl m) {
+        ClassDecl p = c;
+        while (p != null && p.superclass != null) {
+            ClassDecl sp = program.classes.get(p.superclass.name);
+            if (sp == null) {
+                Object[] s = widerStubMethod(p.superclass.name, m);
+                if (s != null) {
+                    return s;
+                }
+                break;
+            }
+            MethodDecl sm = sp.method(m.name);
+            if (sm != null && !sm.isGetter && !sm.isSetter && !sm.isStatic) {
+                if (sm.params.size() == m.params.size() && !sameParamTypes(sm.params, m.params)) {
+                    return new Object[] {sm, sp.typeParams};
+                }
+                return null;
+            }
+            p = sp;
+        }
+        for (ClassDecl q = c; q != null; q = q.superclass == null ? null : program.classes.get(q.superclass.name)) {
+            for (TypeRef t : q.mixins) {
+                Object[] s = widerStubMethod(t.name, m);
+                if (s != null) {
+                    return s;
+                }
+            }
+            for (TypeRef t : q.interfaces) {
+                Object[] s = widerStubMethod(t.name, m);
+                if (s != null) {
+                    return s;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Object[] widerStubMethod(String stubClassName, MethodDecl m) {
+        Ast.ClassDecl sc = stubs.classes.get(stubClassName);
+        while (sc != null) {
+            for (Ast.MethodDecl sm : sc.methods) {
+                if (!sm.isGetter && !sm.isSetter && !sm.isStatic && sm.name.equals(m.name)) {
+                    if (sm.params.size() == m.params.size() && !sameParamTypes(sm.params, m.params)) {
+                        return new Object[] {sm, sc.typeParams};
+                    }
+                    return null;
+                }
+            }
+            sc = sc.superclass != null ? stubs.classes.get(sc.superclass.name) : null;
+        }
+        return null;
+    }
+
     private boolean stubSigMatches(String stubClassName, MethodDecl m) {
         Ast.ClassDecl sc = stubs.classes.get(stubClassName);
         while (sc != null) {

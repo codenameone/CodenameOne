@@ -28,6 +28,7 @@ import com.codename1.flutter.AlignmentDirectional;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.RenderElement;
 import com.codename1.flutter.SingleChildRenderElement;
+import com.codename1.flutter.TextDirection;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.rendering.BoxConstraints;
 import com.codename1.flutter.rendering.Dp;
@@ -86,8 +87,9 @@ public class ContainerRenderElement extends SingleChildRenderElement {
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         Container w = container();
-        marginPx = toPx(resolveInsets(w.getMargin()));
-        EdgeInsets paddingPx = toPx(resolveInsets(w.getPadding()));
+        TextDirection dir = Directionality.of(this);
+        marginPx = toPx(resolveInsets(w.getMargin()).resolve(dir));
+        EdgeInsets paddingPx = toPx(resolveInsets(w.getPadding()).resolve(dir));
 
         BoxConstraints box = constraints.deflate(marginPx);
         if (w.getConstraints() != null) {

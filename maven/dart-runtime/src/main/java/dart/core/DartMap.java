@@ -295,14 +295,14 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     /// {@code map.keys.contains(b)} answered true for a distinct, merely equal {@code b}
     /// that {@code containsKey(b)} answered false for.
     public DartIterable<K> keys() {
-        return new DartIterable<K>(keySet(), this::containsKey);
+        return new DartIterable<K>(checked(keySet()), this::containsKey);
     }
 
     /// Delegates to {@link #containsValue} for the same reason {@link #keys} delegates
     /// to {@link #containsKey}: a subclass may give the two a different meaning, and a
     /// view that scanned its own elements instead would silently disagree with it.
     public DartIterable<V> valuesIterable() {
-        return new DartIterable<V>(values(), this::containsValue);
+        return new DartIterable<V>(checked(values()), this::containsValue);
     }
 
     public V putIfAbsentDart(K key, Funcs.Func0<V> ifAbsent) {
@@ -356,7 +356,41 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
      * front, so a retained view went stale.
      */
     public DartIterable<MapEntry<K, V>> entries() {
-        return entriesOf(this);
+        return DartIterable.wrap(checked(entriesOf(this)));
+    }
+
+    /// A view of {@code source} whose iterator checks {@link #structure} on every step,
+    /// hasNext() included, as Dart's moveNext does. Java's iterator checks only in
+    /// next(), so a loop body that cleared or shrank the map ended the loop quietly
+    /// where Dart throws -- and threw Java's exception, which no
+    /// {@code on ConcurrentModificationError} clause catches, when it did notice.
+    private <T> Iterable<T> checked(final Iterable<T> source) {
+        return new Iterable<T>() {
+            @Override
+            public java.util.Iterator<T> iterator() {
+                final java.util.Iterator<T> it = source.iterator();
+                final int s = structure;
+                return new java.util.Iterator<T>() {
+                    @Override
+                    public boolean hasNext() {
+                        checkStructure(s);
+                        return it.hasNext();
+                    }
+
+                    @Override
+                    public T next() {
+                        checkStructure(s);
+                        return it.next();
+                    }
+                };
+            }
+        };
+    }
+
+    private void checkStructure(int expected) {
+        if (structure != expected) {
+            throw new ConcurrentModificationError("map modified during iteration");
+        }
     }
 
     /** A live MapEntry view over any Java map's entries. */
