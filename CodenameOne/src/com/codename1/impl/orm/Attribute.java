@@ -35,6 +35,10 @@ public final class Attribute {
     public static final int BLOB = 4;
     public static final int BOOLEAN = 5;
     public static final int TIMESTAMP = 6;
+    /// [#temporal] of a `@Temporal(TemporalType.DATE)` field.
+    public static final int TEMPORAL_DATE = 1;
+    /// [#temporal] of a `@Temporal(TemporalType.TIMESTAMP)` field.
+    public static final int TEMPORAL_TIMESTAMP = 2;
     public final String field;
     public final String column;
     public final String declaredType;
@@ -43,12 +47,21 @@ public final class Attribute {
     public final boolean generated;
     public final boolean nullable;
     public final boolean version;
+    /// Zero, or the native column a `@Temporal` field is stored in. The value
+    /// itself is TEXT storage through TemporalConverter; this picks the DDL type
+    /// and what an existing column may be.
+    public final int temporal;
     public Attribute(
             String field, String column, int kind, boolean id, boolean generated, boolean nullable, boolean version) {
         this(field, column, kind, id, generated, nullable, version, null);
     }
     public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
             boolean version, String declaredType) {
+        this(field, column, kind, id, generated, nullable, version, declaredType, 0);
+    }
+    public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
+            boolean version, String declaredType, int temporal) {
+        this.temporal = temporal;
         this.declaredType = declaredType;
         this.field = field;
         this.column = column;

@@ -470,6 +470,24 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
                 if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot declare converters");
             }
+            AnnotationValues temporal=f.getAnnotation("Lcom/codename1/annotations/db/Temporal;");
+            if(temporal!=null) {
+                // A native date or timestamp column, opted into per field. It is
+                // a built-in converter to UTC ISO text -- the form every engine
+                // accepts for those columns -- so writes, loads and query
+                // parameters all take the path a @Convert field already takes.
+                Object value=temporal.get("value");
+                boolean day=value instanceof String[] && "DATE".equals(((String[])value)[1]);
+                if(conversion!=null) ctx.error(cls,"@Temporal cannot be combined with @Convert: "+pf.fieldName);
+                else if(!"Ljava/util/Date;".equals(f.getDescriptor())) ctx.error(cls,"@Temporal requires a java.util.Date field: "+pf.fieldName);
+                else if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot be @Temporal: "+pf.fieldName);
+                else {
+                    pf.converter="com.codename1.impl.orm.TemporalConverter."+(day?"Day":"Timestamp");
+                    pf.domainType="java.util.Date";
+                    pf.kind=PropertyTypeKind.scalar("java.lang.String");
+                    pf.temporal=day?1:2;
+                }
+            }
             AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())
                 pf.kind = PropertyTypeKind.enumType(pf.kind.binaryName);
@@ -748,7 +766,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             List<String> physical=new ArrayList<String>();
             for(PersistedField key:entity.idFields) physical.add(relation.ownerColumn+(entity.idFields.size()==1?"":"_"+key.columnName));
             if(relation.element) {
-                physical.add(relation.targetColumn);physical.add(relation.orderColumn);if(relation.mapKey.length()>0) physical.add(relation.mapKey);
+                physical.add(relation.targetColumn);if(relation.orderColumn.length()>0) physical.add(relation.orderColumn);if(relation.mapKey.length()>0) physical.add(relation.mapKey);
             } else {
                 EntityClass target=accepted.get(relation.target);
                 if(target!=null) for(PersistedField key:target.idFields) physical.add(relation.targetColumn+(target.idFields.size()==1?"":"_"+key.columnName));
@@ -1165,7 +1183,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(relation.element) {
             AnnotationValues keyColumn=field.getAnnotation(prefix+"MapKeyColumn;");
             if(map) { relation.mapKey=keyColumn==null?"map_key":keyColumn.getStringOrDefault("name","map_key");if(relation.mapKey.length()==0) relation.mapKey="map_key"; }
-            if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
+            Object position=annotation.get("positionColumn");
+            if(position instanceof String) {
+                if(orderColumn!=null) ctx.error("Choose OrderColumn or ElementCollection.positionColumn: "+relation.field);
+                relation.orderColumn=(String)position;
+                if(relation.orderColumn.length()==0 && !"Ljava/util/Set;".equals(field.getDescriptor()))
+                    ctx.error("Only a Set element collection can omit its position column: "+relation.field);
+            } else if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
             if(relation.orderBy.length()>0 || mapKey!=null) ctx.error("Scalar elements use OrderColumn/MapKeyColumn: "+relation.field);
         }
         if(map && relation.mapKey.length()==0) ctx.error("Map relationships require @MapKey(name=...): "+relation.field);
@@ -1424,7 +1448,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append("\", \"").append(escape(f.columnName)).append("\", ").append(kind)
               .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
               .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
-              .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"").append(")")
+              .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"")
+              .append(f.temporal==0?"":", "+f.temporal).append(")")
               .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
         }
         sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
@@ -3042,6 +3067,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String fieldName;
         String embeddedParent;
         String converter,domainType,declaringType;
+        /// Attribute.TEMPORAL_DATE or TEMPORAL_TIMESTAMP for a @Temporal field, else 0.
+        int temporal;
         boolean discriminator,primitive;
         String javaType;
         String columnName;

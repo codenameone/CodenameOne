@@ -2479,7 +2479,34 @@ public final class Backend {
             if (create) {
                 manager.createTables();
             }
+            if (config.getBoolean(Config.ORM_VALIDATE_SCHEMA, true)) {
+                validateSchema(manager);
+            }
             return manager;
+        }
+
+        /// Refuses to start on a schema the mappings cannot use. Before the
+        /// first request rather than at it: a missing column or a native
+        /// TIMESTAMP behind a plain Date field otherwise fails one request at a
+        /// time, and only the requests that touch it. Nullability differences
+        /// are logged and tolerated -- a schema stricter than its mapping is a
+        /// legitimate design.
+        private void validateSchema(EntityManager manager) throws IOException {
+            if (com.codename1.impl.orm.Models.snapshot().isEmpty()) {
+                // Hand-written definitions only: there is no mapping to compare.
+                return;
+            }
+            com.codename1.orm.session.SchemaReport report = manager.schemaReport();
+            if (report.isCompatible()) {
+                return;
+            }
+            if (report.getIssues(com.codename1.orm.session.SchemaReport.Kind.UNSUPPORTED).isEmpty()
+                    && report.getIssues(com.codename1.orm.session.SchemaReport.Kind.MIGRATION_REQUIRED).isEmpty()) {
+                System.err.println("cn1: " + report);
+                return;
+            }
+            throw new IOException("The database schema does not match the entity mappings. "
+                    + "Set " + Config.ORM_VALIDATE_SCHEMA + "=false to start anyway.\n" + report);
         }
 
         /// One line saying what came up and where its data is.

@@ -153,6 +153,11 @@ public final class Config {
     /// schema without being asked, and production wants its migrations run by
     /// whatever runs migrations.
     public static final String ORM_CREATE_TABLES = "cn1.orm.createTables";
+    /// Whether start-up checks the entity mappings against the existing schema,
+    /// after migrations and table creation, and refuses to serve when a table or
+    /// column is missing or a mapping is unsupported. On unless set; see
+    /// [com.codename1.orm.session.SchemaReport].
+    public static final String ORM_VALIDATE_SCHEMA = "cn1.orm.validateSchema";
 
     /// Whether pending migrations run at start-up. Defaults to true when the build found
     /// migrations or a library registered some, which is the only time there is anything to

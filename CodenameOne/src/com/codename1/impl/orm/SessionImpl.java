@@ -27,6 +27,7 @@ import com.codename1.orm.session.LazyInitializationException;
 import com.codename1.orm.session.LockMode;
 import com.codename1.orm.session.OptimisticLockException;
 import com.codename1.orm.session.PersistenceException;
+import com.codename1.orm.session.SchemaReport;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -1100,7 +1101,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             for (Relationship relation : model.relationships()) {
                 if (relation.many && relation.mappedBy.length() == 0) {
-                    int suffix = relation.element ? (relation.mapKey.length() > 0 ? 1020 : 4)
+                    int suffix = relation.element ? (relation.mapKey.length() > 0 || keyedByValue(relation) ? 1020 : 4)
                             : relation.orderColumn.length() > 0 ? 4
                             : keyWidth(model(relation.target), model(relation.target).idIndexes());
                     checkKeyWidth(relation.joinTable, primary + suffix);
@@ -1134,6 +1135,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (attr.declaredType != null) {
             return attr.declaredType;
         }
+        if (attr.temporal != 0) {
+            return temporalType(attr.temporal);
+        }
         if (!keyColumn(model, index)) {
             return sql.columnType(attr.kind);
         }
@@ -1141,6 +1145,28 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int end = declaration.indexOf(" PRIMARY KEY");
         return end < 0 ? sql.columnType(attr.kind) : declaration.substring(0, end).replace(" NOT NULL", "");
     }
+    /// The native column of a @Temporal field. DATETIME rather than TIMESTAMP on
+    /// MySQL: its TIMESTAMP ends in 2038 and, unless explicit_defaults_for_timestamp
+    /// is on, gives the first such column an ON UPDATE CURRENT_TIMESTAMP that
+    /// would overwrite the value on every update. Millisecond precision, which
+    /// is what a Date holds; SQLite stores the text whatever the type says.
+    private String temporalType(int temporal) {
+        if (temporal == Attribute.TEMPORAL_DATE) {
+            return "DATE";
+        }
+        String dialect = sql.dialect();
+        return "postgresql".equals(dialect) ? "TIMESTAMP(3)" : "mysql".equals(dialect) ? "DATETIME(3)" : "TIMESTAMP";
+    }
+
+    /// Whether an existing column can hold what the mapping stores. A @Temporal
+    /// field on SQLite also accepts a TEXT column: SQLite has no date type, and
+    /// schemas written for it commonly declare their dates as TEXT.
+    private boolean storageCompatible(Attribute attr, String found, String expected) {
+        int family = typeFamily(found);
+        return family == typeFamily(expected)
+                || attr.temporal != 0 && "sqlite".equals(sql.dialect()) && family == 2;
+    }
+
     private boolean keyColumn(EntityModel model, int index) {
         Attribute attr = model.attributes()[index];
         if (attr.id) {
@@ -1226,12 +1252,29 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// Read-only validation of mapped columns, nullability, storage types, and primary keys.
     @Override
     public void validateSchema() {
+        SchemaReport report = schemaReport();
+        if (!report.isCompatible()) {
+            throw new PersistenceException("Schema validation failed:\n" + report);
+        }
+    }
+
+    /// A missing table or column is a migration: the mapping is right and the
+    /// schema is behind it. Nullability is reported apart, since a schema may be
+    /// stricter than its mapping on purpose. A storage-type or key mismatch is not -- the
+    /// existing column holds something this mapping would misread or refuse to
+    /// write, so the MAPPING has to change. An existing native TIMESTAMP column
+    /// against a plain Date field is the case that matters: converting it to
+    /// epoch milliseconds would be a silent rewrite of the data, so it is
+    /// reported for the developer to map with @Temporal instead.
+    @Override
+    public SchemaReport schemaReport() {
         check();
-        List<String> errors = new ArrayList<String>();
+        List<SchemaReport.Issue> errors = new ArrayList<SchemaReport.Issue>();
         for (EntityModel model : models.values()) {
             List<Object[]> columns = describe(model.table());
             if (columns.isEmpty()) {
-                errors.add("Missing table " + model.table());
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, model.table(), null,
+                        "Missing table " + model.table()));
                 continue;
             }
             Attribute[] attrs = model.attributes();
@@ -1244,21 +1287,27 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         break;
                     }
                 }
+                String name = model.table() + "." + attr.column;
                 if (found == null) {
-                    errors.add("Missing column " + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, model.table(),
+                            attr.column, "Missing column " + name));
                     continue;
                 }
                 boolean primary = ((Number) found[3]).intValue() != 0;
                 boolean required = ((Number) found[2]).intValue() != 0 || primary;
                 if (primary != attr.id) {
-                    errors.add("Primary key mismatch on " + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Primary key mismatch on " + name));
                 }
                 if (attr.nullable == required) {
-                    errors.add((required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ")
-                            + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
+                            attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
-                if (typeFamily((String) found[1]) != typeFamily(columnType(model, i))) {
-                    errors.add("Storage type mismatch on " + model.table() + "." + attr.column);
+                String expected = columnType(model, i);
+                if (!storageCompatible(attr, (String) found[1], expected)) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Storage type mismatch on " + name + ": the column is " + found[1]
+                            + ", the mapping stores " + expected));
                 }
             }
             for (Object[] column : columns) {
@@ -1270,7 +1319,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         }
                     }
                     if (!mapped) {
-                        errors.add("Unmapped primary key column " + model.table() + "." + column[0]);
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(),
+                                (String) column[0], "Unmapped primary key column " + model.table() + "." + column[0]));
                     }
                 }
             }
@@ -1280,14 +1330,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (relation.many && relation.mappedBy.length() == 0) {
                     List<Object[]> columns = describe(relation.joinTable);
                     if (columns.isEmpty()) {
-                        errors.add("Missing collection table " + relation.joinTable);
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, relation.joinTable,
+                                null, "Missing collection table " + relation.joinTable));
                         continue;
                     }
                     List<Attribute> expected = new ArrayList<Attribute>();
                     collectionKeys(expected, joinColumns(relation.joinColumn, owner), owner, true);
                     if (relation.element) {
+                        boolean keyed = keyedByValue(relation);
                         expected.add(new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
-                                false, false, true, false));
+                                keyed, false, !keyed, false));
                         if (relation.mapKey.length() > 0) {
                             expected.add(new Attribute("", relation.mapKey, Attribute.TEXT, true, false, false, false));
                         }
@@ -1304,9 +1356,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             }
         }
-        if (!errors.isEmpty()) {
-            throw new PersistenceException("Schema validation failed: " + errors);
-        }
+        return new SchemaReport(errors);
     }
     private void collectionKeys(List<Attribute> expected, String[] names, EntityModel model, boolean primary) {
         int[] ids = model.idIndexes();
@@ -1316,7 +1366,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private void validateCollectionColumns(String table, List<Attribute> expected, List<Object[]> columns,
-            List<String> errors) {
+            List<SchemaReport.Issue> errors) {
         for (Attribute attr : expected) {
             Object[] found = null;
             for (Object[] column : columns) {
@@ -1327,20 +1377,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             String name = table + "." + attr.column;
             if (found == null) {
-                errors.add("Missing collection column " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, table, attr.column,
+                        "Missing collection column " + name));
                 continue;
             }
             boolean primary = ((Number) found[3]).intValue() != 0;
             boolean required = ((Number) found[2]).intValue() != 0 || primary;
             if (attr.id != primary) {
-                errors.add("Primary key mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Primary key mismatch on collection " + name));
             }
             if (attr.nullable == required) {
-                errors.add("Nullability mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, attr.column,
+                        "Nullability mismatch on collection " + name));
             }
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
             if (typeFamily((String) found[1]) != typeFamily(type)) {
-                errors.add("Storage type mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Storage type mismatch on collection " + name + ": the column is " + found[1]
+                        + ", the mapping stores " + type));
             }
         }
         for (Object[] column : columns) {
@@ -1352,7 +1407,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 }
                 if (!mapped) {
-                    errors.add("Unmapped primary key column " + table + "." + column[0]);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, (String) column[0],
+                            "Unmapped primary key column " + table + "." + column[0]));
                 }
             }
         }
@@ -1824,25 +1880,40 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new PersistenceException("Wrong element type: " + relation.field);
         }
     }
+    /// An element Set declared with no position column: its table is keyed by
+    /// the owner and the value, as JPA providers lay one out.
+    private static boolean keyedByValue(Relationship relation) {
+        return relation.element && relation.orderColumn.length() == 0 && relation.mapKey.length() == 0;
+    }
     private void createElementTable(EntityModel owner, Relationship relation, List<ForeignKey> foreignKeys) {
         String[] columns = joinColumns(relation.joinColumn, owner);
         StringBuilder definition = new StringBuilder("CREATE TABLE ").append(q(relation.joinTable)).append(" (");
         appendJoinDefinition(definition, columns, owner);
-        definition.append(", ")
-                .append(q(relation.orderColumn))
-                .append(" INTEGER NOT NULL, ")
-                .append(q(relation.inverseJoinColumn))
-                .append(' ')
-                .append(sql.columnType(Elements.kind(relation.target)));
-        if (relation.mapKey.length() > 0) {
-            String type = sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
-            definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");
+        if (keyedByValue(relation)) {
+            // The key type, not the plain one: a value that is part of the key
+            // needs a bounded type on MySQL, which cannot index TEXT.
+            String type = sql.assignedKeyColumn(Elements.kind(relation.target))
+                    .replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
+            definition.append(", ").append(q(relation.inverseJoinColumn)).append(' ').append(type)
+                    .append(" NOT NULL, PRIMARY KEY (").append(quoted(columns)).append(", ")
+                    .append(q(relation.inverseJoinColumn)).append(')');
+        } else {
+            definition.append(", ")
+                    .append(q(relation.orderColumn))
+                    .append(" INTEGER NOT NULL, ")
+                    .append(q(relation.inverseJoinColumn))
+                    .append(' ')
+                    .append(sql.columnType(Elements.kind(relation.target)));
+            if (relation.mapKey.length() > 0) {
+                String type = sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
+                definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");
+            }
+            definition.append(", PRIMARY KEY (")
+                    .append(quoted(columns))
+                    .append(", ")
+                    .append(q(relation.mapKey.length() > 0 ? relation.mapKey : relation.orderColumn))
+                    .append(')');
         }
-        definition.append(", PRIMARY KEY (")
-                .append(quoted(columns))
-                .append(", ")
-                .append(q(relation.mapKey.length() > 0 ? relation.mapKey : relation.orderColumn))
-                .append(')');
         ForeignKey key = new ForeignKey(relation.joinTable, columns, owner.table(), keyColumns(owner));
         if ("sqlite".equals(sql.dialect())) {
             definition.append(", ").append(foreignDeclaration(key));
@@ -1858,7 +1929,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                           : new int[] {Elements.kind(relation.target)};
         List<Object[]> rows = read("SELECT " + selection + " FROM " + q(relation.joinTable) + " WHERE " +
                                            matches(joinColumns(relation.joinColumn, owner), null) + " ORDER BY " +
-                                           q(relation.orderColumn),
+                                           q(keyedByValue(relation) ? relation.inverseJoinColumn : relation.orderColumn),
                 owner.keyValues(owner.identifier(entity)), kinds);
         List values = new ArrayList();
         Map mapping = new LinkedHashMap();
@@ -1880,6 +1951,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String[] ownerColumns = joinColumns(relation.joinColumn, entry.model);
         Object[] owner = entry.model.keyValues(entry.model.identifier(entry.entity));
         write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null), owner);
+        if (keyedByValue(relation)) {
+            for (Object row : rows) {
+                Object value = ((ElementRow) row).value;
+                if (value == null) {
+                    throw new PersistenceException("A Set without a position column cannot hold null: "
+                            + relation.field);
+                }
+                if (value instanceof String && characterCount((String) value) > 255) {
+                    throw new PersistenceException("Element value exceeds the portable key limit of 255 characters: "
+                            + relation.field);
+                }
+                Object[] args = concat(owner, new Object[] {value});
+                write("INSERT INTO " + q(relation.joinTable) + " (" + quoted(ownerColumns) + ", "
+                        + q(relation.inverseJoinColumn) + ") VALUES (" + placeholders(args.length) + ")", args);
+            }
+            entry.collections[index] = rows;
+            return;
+        }
         for (int i = 0; i < rows.size(); i++) {
             ElementRow row = (ElementRow) rows.get(i);
             boolean map = relation.mapKey.length() > 0;
