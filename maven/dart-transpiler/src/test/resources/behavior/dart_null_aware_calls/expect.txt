@@ -1,0 +1,12 @@
+CALL box:x
+CALL null
+STATEMENT survived
+CHAIN box:y
+CHAIN null
+CHAIN null
+MIXED 7
+MIXED null
+SIDE_EFFECTS 1
+DEFAULTED fallback
+DEFAULTED box:x
+CALLBACKS 1

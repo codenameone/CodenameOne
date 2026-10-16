@@ -595,6 +595,9 @@ final class JavascriptReachability {
         seedRuntimeDispatched("java_util_HashMap", "removeImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
         seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
+        // Static, like valueOfHeap below, so it is enqueued rather than seeded as a
+        // dispatch: the translator emits HashMap.areEqualKeys as a call to it.
+        enqueueResolved("java_util_HashMap", "areEqualKeysImpl", "(Ljava/lang/Object;Ljava/lang/Object;)Z", true);
         seedRuntimeDispatched("java_util_HashSet", "cn1AddImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashSet", "cn1ContainsImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashSet", "cn1RemoveImpl", "(Ljava/lang/Object;)Z");

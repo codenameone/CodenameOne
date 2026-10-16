@@ -111,6 +111,87 @@ void CN1MacRefreshScaleValue(void) {
     }
 }
 
+/// The content size the main window will open at, in points, published once on
+/// the main thread before the application's main runs. 0 until then.
+///
+/// The window is created at the default 1024x685, but AppKit fits a window to the
+/// screen's visible frame when it is shown -- and on a small display, the menu bar
+/// and the Dock leave less than that. The GitHub macOS runner opens it at 1024x642.
+/// The size query answered 685 until the window existed and screenSizeChanged then
+/// said 642, so every launch there built and laid the tree out twice and settled
+/// 14MB heavier. Fitting the size up front, and building the window at it, makes
+/// the first answer the final one.
+static int cn1MacExpectedContentWidth = 0;
+static int cn1MacExpectedContentHeight = 0;
+
+static NSWindowStyleMask cn1MacMainWindowStyle(void) {
+    return NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+            | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+}
+
+/// Main thread only; see cn1MacExpectedContentWidth.
+void CN1MacPublishExpectedContentSize(void) {
+    if (![NSThread isMainThread]) {
+        return;
+    }
+    CGFloat w = CN1_MAC_DEFAULT_WIDTH;
+    CGFloat h = CN1_MAC_DEFAULT_HEIGHT;
+    // The size the window will be given, not the size it is built with. Two things
+    // override the default after construction: macos.fixedWindowSize (the
+    // CN1FixedWindow* keys, applied by setFixedContentSize) and the frame AppKit
+    // restores from setFrameAutosaveName -- the size the user, or the previous
+    // launch, left it at. The benchmark runner hit the second one: the first launch
+    // fitted correctly, and every later launch restored the saved frame and laid the
+    // tree out twice again.
+    NSNumber *fixedW = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowWidth"];
+    NSNumber *fixedH = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowHeight"];
+    if (fixedW != nil && fixedH != nil && fixedW.doubleValue > 0 && fixedH.doubleValue > 0) {
+        w = fixedW.doubleValue;
+        h = fixedH.doubleValue;
+    } else {
+        NSString *saved = [[NSUserDefaults standardUserDefaults]
+                stringForKey:@"NSWindow Frame CN1MainWindow"];
+        NSArray<NSString *> *parts = [saved componentsSeparatedByCharactersInSet:
+                [NSCharacterSet whitespaceCharacterSet]];
+        if (parts.count >= 4) {
+            NSRect savedFrame = NSMakeRect(parts[0].doubleValue, parts[1].doubleValue,
+                    parts[2].doubleValue, parts[3].doubleValue);
+            NSRect savedContent = [NSWindow contentRectForFrameRect:savedFrame
+                                                          styleMask:cn1MacMainWindowStyle()];
+            if (savedContent.size.width > 0 && savedContent.size.height > 0) {
+                w = savedContent.size.width;
+                h = savedContent.size.height;
+            }
+        }
+    }
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count > 0) {
+        NSRect visible = [[screens objectAtIndex:0] visibleFrame];
+        NSRect content = NSMakeRect(0, 0, w, h);
+        NSRect frame = [NSWindow frameRectForContentRect:content styleMask:cn1MacMainWindowStyle()];
+        CGFloat chromeW = frame.size.width - content.size.width;
+        CGFloat chromeH = frame.size.height - content.size.height;
+        if (visible.size.width - chromeW < w) {
+            w = floor(visible.size.width - chromeW);
+        }
+        if (visible.size.height - chromeH < h) {
+            h = floor(visible.size.height - chromeH);
+        }
+    }
+    __atomic_store_n(&cn1MacExpectedContentWidth, (int)w, __ATOMIC_RELEASE);
+    __atomic_store_n(&cn1MacExpectedContentHeight, (int)h, __ATOMIC_RELEASE);
+}
+
+static CGFloat cn1MacContentWidthPoints(void) {
+    int w = __atomic_load_n(&cn1MacExpectedContentWidth, __ATOMIC_ACQUIRE);
+    return w > 0 ? w : CN1_MAC_DEFAULT_WIDTH;
+}
+
+static CGFloat cn1MacContentHeightPoints(void) {
+    int h = __atomic_load_n(&cn1MacExpectedContentHeight, __ATOMIC_ACQUIRE);
+    return h > 0 ? h : CN1_MAC_DEFAULT_HEIGHT;
+}
+
 @implementation CN1MacHost {
     NSWindow *_window;
     METALView *_renderingView;
@@ -170,17 +251,27 @@ void CN1MacRefreshScaleValue(void) {
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, CN1_MAC_DEFAULT_WIDTH, CN1_MAC_DEFAULT_HEIGHT);
-    NSWindowStyleMask style = NSWindowStyleMaskTitled
-            | NSWindowStyleMaskClosable
-            | NSWindowStyleMaskMiniaturizable
-            | NSWindowStyleMaskResizable;
+    cn1StartupPhase("buildWindow.enter");
+    NSRect frame = NSMakeRect(0, 0, cn1MacContentWidthPoints(), cn1MacContentHeightPoints());
+    NSWindowStyleMask style = cn1MacMainWindowStyle();
     // CN1MacWindow, not NSWindow: a modal dialog usually blocks THIS window, and
     // blocking it has to include refusing key focus. See CN1AppKitWindows.h.
     _window = [[CN1MacWindow alloc] initWithContentRect:frame
                                               styleMask:style
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
+    // Published HERE, the instant builtWindow stops being nil, rather than from
+    // the block CN1MacInstallAppDelegate queues for later. In between,
+    // macMonitorForMainWindow found a built window with nothing published and
+    // marshalled onto this thread to ask it -- which, at start-up, is busy
+    // finishing this very build and then launching the application. Measured on
+    // the benchmark runner: the event dispatch thread sat 60-70ms in that hop,
+    // inside UIManager's constructor, on the launches where its first
+    // convertToPixels landed after the window existed. The window has no screen
+    // yet, so this publishes the primary one -- the same answer the hop gave --
+    // and the republish below corrects it once the window is placed.
+    extern void CN1MacPublishMainWindowScreen(void);
+    CN1MacPublishMainWindowScreen();
     ((CN1MacWindow *)_window).cn1AcceptsKey = YES;
     // Remembers where the user left it between launches. One line, and its
     // absence is the kind of thing that makes an app feel unfinished.
@@ -260,6 +351,27 @@ void CN1MacRefreshScaleValue(void) {
     // this process in front. Without this the app launches, runs and draws --
     // behind whatever the user was already looking at.
     [NSApp activateIgnoringOtherApps:YES];
+    // On screen now, so the real screen rather than the primary stand-in.
+    CN1MacPublishMainWindowScreen();
+    cn1StartupPhase("buildWindow.exit");
+}
+
+/// The scale to answer with before the window exists.
+///
+/// The default size is in POINTS -- it is the content rectangle the window is
+/// built with -- and Codename One lays out in device pixels. Answering it
+/// unscaled told a Retina launch its screen was 1024x685 until the window
+/// arrived and screenSizeChanged said 2048x1370, so the first layout of every
+/// launch was done at half size and then thrown away: the whole tree was built,
+/// laid out and rebuilt inside the first frame. The primary screen's scale is
+/// already published before the application's main runs (see
+/// CN1MacPublishPrimaryScale), so the answer can be in pixels without touching
+/// AppKit off the main thread. 0 from the reader means "not safe to guess" -- a
+/// mixed-scale desktop -- and then this stays at 1, as it always did.
+static CGFloat cn1MacDefaultScale(void) {
+    extern int cn1MacPublishedScaleTimes100(void);
+    int s100 = cn1MacPublishedScaleTimes100();
+    return s100 > 0 ? s100 / 100.0 : 1.0;
 }
 
 /// Answering a size query must not WAIT for the window either.
@@ -275,7 +387,7 @@ void CN1MacRefreshScaleValue(void) {
 - (int)displayWidth {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)CN1_MAC_DEFAULT_WIDTH;
+        return (int)(cn1MacContentWidthPoints() * cn1MacDefaultScale());
     }
     // Device pixels, not points: Codename One lays out in pixels and a Retina
     // display has two of them per point.
@@ -285,7 +397,7 @@ void CN1MacRefreshScaleValue(void) {
 - (int)displayHeight {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)CN1_MAC_DEFAULT_HEIGHT;
+        return (int)(cn1MacContentHeightPoints() * cn1MacDefaultScale());
     }
     return (int)(v.bounds.size.height * CN1AppKitBackingScale(v));
 }

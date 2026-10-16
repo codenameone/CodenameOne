@@ -709,6 +709,20 @@ final class BuildHintsIos {
                 .doc("Set to true to enable iOS multitasking and split-screen support. This only works if "
                         + "`ios.xcode_verson=9.2`."));
 
+        h.add(new Hint("ios.nativeThemes.keepAll")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("true/false (defaults to `false`). The iOS and native macOS builds ship only "
+                        + "the one native theme the build's own theme mode/generation will install, "
+                        + "plus any theme the application's own classes name as a string "
+                        + "(`\"Name.res\"`, or the bare name passed to `Resources.openLayered`). Set "
+                        + "to `true` for an application that opens a native theme by a name it "
+                        + "computes or reads from configuration, which no build-time scan can see -- "
+                        + "the JavaScript build's equivalent escape hatch is "
+                        + "`javascript.pruneThemes=false`."));
+
         h.add(new Hint("ios.nativeVerify")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

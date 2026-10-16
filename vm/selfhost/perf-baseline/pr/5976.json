@@ -47,15 +47,15 @@
     "all": {
      "from": {
       "memory": 0.118,
-      "time": 1.235,
+      "time": 1.534,
       "tolerance": {
        "time": 0.2
       }
      },
      "memory": 0.118,
-     "reason": "macOS arm64 recursion RAM is bimodal per round (~0.118x or ~0.037x) on master too; run 38726563387 had 2 of 3 rounds low",
+     "reason": "macOS arm64 recursion RAM is bimodal per round (~0.118x or ~0.037x) on master too; run 38726563387 had 2 of 3 rounds low. On top of pr/5883.json's time",
      "runs": 6,
-     "time": 1.235,
+     "time": 1.534,
      "tolerance": {
       "memory": 1.0,
       "time": 0.2

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="424" viewBox="0 0 720 424" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="16" y="26" font-size="17" font-weight="bold" fill="#202124">Installed size (lower is better)</text>
+<rect x="16" y="38" width="12" height="12" fill="#1a73e8"/>
+<text x="34" y="49" font-size="12" fill="#202124">Codename One</text>
+<rect x="136" y="38" width="12" height="12" fill="#9aa0a6"/>
+<text x="154" y="49" font-size="12" fill="#202124">Flutter</text>
+<text x="86" y="86" font-size="13" text-anchor="end" fill="#202124">Android</text>
+<rect x="96" y="64" width="257.7" height="16" fill="#1a73e8"/>
+<text x="359.7" y="76" font-size="11" fill="#5f6368">78.2 MB</text>
+<rect x="96" y="84" width="315.7" height="16" fill="#9aa0a6"/>
+<text x="417.7" y="96" font-size="11" fill="#5f6368">95.8 MB</text>
+<text x="712" y="86" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.23x smaller</text>
+<text x="86" y="140" font-size="13" text-anchor="end" fill="#202124">Linux</text>
+<rect x="96" y="118" width="363.5" height="16" fill="#1a73e8"/>
+<text x="465.5" y="130" font-size="11" fill="#5f6368">110.3 MB</text>
+<rect x="96" y="138" width="474.0" height="16" fill="#9aa0a6"/>
+<text x="576.0" y="150" font-size="11" fill="#5f6368">143.8 MB</text>
+<text x="712" y="140" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.30x smaller</text>
+<text x="86" y="194" font-size="13" text-anchor="end" fill="#202124">Windows</text>
+<rect x="96" y="172" width="352.5" height="16" fill="#1a73e8"/>
+<text x="454.5" y="184" font-size="11" fill="#5f6368">106.9 MB</text>
+<rect x="96" y="192" width="399.3" height="16" fill="#9aa0a6"/>
+<text x="501.3" y="204" font-size="11" fill="#5f6368">121.1 MB</text>
+<text x="712" y="194" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.13x smaller</text>
+<text x="86" y="248" font-size="13" text-anchor="end" fill="#202124">macOS</text>
+<rect x="96" y="226" width="403.4" height="16" fill="#1a73e8"/>
+<text x="505.4" y="238" font-size="11" fill="#5f6368">122.4 MB</text>
+<rect x="96" y="246" width="459.4" height="16" fill="#9aa0a6"/>
+<text x="561.4" y="258" font-size="11" fill="#5f6368">139.4 MB</text>
+<text x="712" y="248" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.14x smaller</text>
+<text x="86" y="302" font-size="13" text-anchor="end" fill="#202124">iOS</text>
+<rect x="96" y="280" width="353.7" height="16" fill="#1a73e8"/>
+<text x="455.7" y="292" font-size="11" fill="#5f6368">107.3 MB</text>
+<rect x="96" y="300" width="364.2" height="16" fill="#9aa0a6"/>
+<text x="466.2" y="312" font-size="11" fill="#5f6368">110.5 MB</text>
+<text x="712" y="302" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.03x smaller</text>
+<text x="86" y="356" font-size="13" text-anchor="end" fill="#202124">Web</text>
+<rect x="96" y="334" width="340.5" height="16" fill="#1a73e8"/>
+<text x="442.5" y="346" font-size="11" fill="#5f6368">103.3 MB</text>
+<rect x="96" y="354" width="403.8" height="16" fill="#9aa0a6"/>
+<text x="505.8" y="366" font-size="11" fill="#5f6368">122.5 MB</text>
+<text x="712" y="356" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.19x smaller</text>
+<text x="16" y="412" font-size="11" fill="#5f6368">Same Flutter Gallery source on both sides; Codename One builds it from the Dart.</text>
+</svg>

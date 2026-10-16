@@ -97,6 +97,10 @@ public class CustomInvoke extends Instruction {
         return desc + "." + name;
     }
 
+    public String getOwner() {
+        return owner;
+    }
+
     public String getSignature() { return(desc); }
     
     @Override

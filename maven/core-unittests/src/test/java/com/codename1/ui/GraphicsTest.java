@@ -1,7 +1,31 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.geom.Shape;
@@ -165,6 +189,31 @@ class GraphicsTest extends UITestBase {
         assertEquals(0, implementation.getClipY(nativeGraphics));
         assertEquals(10, implementation.getClipWidth(nativeGraphics));
         assertEquals(5, implementation.getClipHeight(nativeGraphics));
+    }
+
+    @Test
+    void testDrawImageRegionRoundedFallbackPreservesNonRectangularClip() throws Exception {
+        // isRoundedImageDrawSupported() is false by default in the test
+        // implementation, so drawImageRegionRounded always takes its square
+        // "clip to the destination" fallback. A nonrectangular clip (an
+        // L-shaped path, the kind a caller sets up for a rounded-corner
+        // paint) must survive that fallback unchanged.
+        GeneralPath clipShape = new GeneralPath();
+        clipShape.moveTo(0, 0);
+        clipShape.lineTo(20, 0);
+        clipShape.lineTo(20, 20);
+        clipShape.lineTo(10, 20);
+        clipShape.lineTo(10, 10);
+        clipShape.lineTo(0, 10);
+        clipShape.closePath();
+        graphics.setClip(clipShape);
+        assertSame(clipShape, implementation.getClipShapeState(nativeGraphics));
+
+        Image img = Image.createImage(8, 8);
+        graphics.drawImageRegionRounded(img, 0, 0, 8, 8, 2, 2, 10, 10, 4f);
+
+        assertSame(clipShape, implementation.getClipShapeState(nativeGraphics),
+                "fallback must restore the exact clip (pushClip/popClip), not just its bounding rectangle");
     }
 
     @Test

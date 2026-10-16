@@ -173,6 +173,12 @@ public class GcUncooperativeThreadApp {
                 head = new Node(head, chunk * 31L + i);
             }
             checksum += head.b;
+            // Read next and a: DeadFieldElimination (#5903) deletes instance fields nothing
+            // reads, and with both write-only Node was a leaf, not the reference-carrying
+            // object the comment on it promises the mark worklist.
+            if (head.next != null) {
+                checksum += head.next.a;
+            }
             // Keep the retained set churning so marking has real work every cycle.
             liveSet[chunk % LIVE_SET] = new Node(null, chunk);
             long dt = System.currentTimeMillis() - t0;

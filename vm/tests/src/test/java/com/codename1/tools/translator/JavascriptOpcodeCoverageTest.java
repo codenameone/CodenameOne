@@ -153,8 +153,15 @@ class JavascriptOpcodeCoverageTest {
                         || translatedApp.contains("_dw2(")
                         || translatedApp.contains("_dw3(")
                         || translatedApp.contains("_dw4(")
-                        || translatedApp.contains("_dwN("),
-                "Virtual/interface dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw* helper family");
+                        || translatedApp.contains("_dwN(")
+                        || translatedApp.contains("_dn0(")
+                        || translatedApp.contains("(_nn(")
+                        || translatedApp.contains("_dn1(")
+                        || translatedApp.contains("_dn2(")
+                        || translatedApp.contains("_dn3(")
+                        || translatedApp.contains("_dn4(")
+                        || translatedApp.contains("_dnN("),
+                "Virtual/interface dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw*/_dn* helper family");
         assertTrue(runtime.contains("const classDef = target.__classDef;")
                         && runtime.contains("classDef && classDef.methods ? classDef.methods[mid]"),
                 "Runtime virtual dispatch helper should use an exact-class method-table fast path");

@@ -1,0 +1,8 @@
+caught1: Reading static variable 'a' during its initialization
+caught2: Reading static variable 'a' during its initialization
+i=56 counter=10
+caught: LateInitializationError: Field 'j' has been assigned during initialization.
+j=99 c2=1
+first read: Bad state: boom
+14
+flakyAttempts=2

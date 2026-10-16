@@ -1,0 +1,9 @@
+dart-invoke-success: echo:hello
+dart-invoke-error: E_FAIL it failed the detail
+dart-invoke-missing: No implementation found for method x
+java-invoke-sync: sync:v1
+java-invoke-error: java.lang.RuntimeException: E_DART:dart handler failed
+java-invoke-missing: java.lang.RuntimeException: notImplemented
+java-invoke-async: async:v2
+events: [tick1, tick2]
+cancelCount: 1

@@ -1,5 +1,10 @@
 name: Performance baselines
 
+# Two gates keep their baselines this way, with one set of rules
+# (vm/selfhost/perf_baseline.py): the ParparVM performance gate in
+# vm/selfhost/perf-baseline/, and the Flutter benchmark's regression gate in
+# scripts/flutter-bench/baseline/ (scripts/flutter-bench/flutter_baseline.py).
+#
 # The ParparVM performance gate's baselines live in vm/selfhost/perf-baseline/:
 # base/ holds the consolidated rows, and each pull request that changes a baseline
 # writes only its own pr/<number>.json, so baseline changes stay in the pull
@@ -49,20 +54,34 @@ jobs:
         working-directory: vm/selfhost
         run: python3 -m unittest test_perf_gate
 
+      - name: The Flutter benchmark gate's unit tests
+        working-directory: scripts/flutter-bench
+        run: python3 -m unittest test_flutter_baseline
+
       - name: Check the baselines
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ -n "${BASE_SHA}" ]; then
-            # checkout uses the synthetic merge, which can target a newer master
-            # than event.pull_request.base.sha. Compare against its actual base
-            # parent so master's nightly folds are not attributed to this PR.
-            MERGE_BASE_SHA="$(git rev-parse HEAD^1)"
-            python3 vm/selfhost/perf_baseline.py check --base "${MERGE_BASE_SHA}" --pr "${PR_NUMBER}"
-          else
-            python3 vm/selfhost/perf_baseline.py check
+          # A pull_request run checks out GitHub's merge of the pull request into
+          # the CURRENT base branch, while base.sha can be an older base commit.
+          # Diffed from that, every base/ row the nightly fold wrote since was
+          # charged to this pull request. The merge commit's first parent is the
+          # base branch it was merged into, so HEAD^1...HEAD is exactly the
+          # pull request's own change.
+          if git rev-parse -q --verify HEAD^2 >/dev/null; then
+            BASE_SHA=$(git rev-parse HEAD^1)
           fi
+          # Both, even when the first fails, so one comment shows every problem.
+          status=0
+          if [ -n "${BASE_SHA}" ]; then
+            python3 vm/selfhost/perf_baseline.py check --base "${BASE_SHA}" --pr "${PR_NUMBER}" || status=1
+            python3 scripts/flutter-bench/flutter_baseline.py check --base "${BASE_SHA}" --pr "${PR_NUMBER}" || status=1
+          else
+            python3 vm/selfhost/perf_baseline.py check || status=1
+            python3 scripts/flutter-bench/flutter_baseline.py check || status=1
+          fi
+          exit $status
 
   fold:
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
@@ -91,14 +110,15 @@ jobs:
             git fetch --quiet origin master
             git reset --quiet --hard origin/master
             python3 vm/selfhost/perf_baseline.py fold
-            git add -A vm/selfhost/perf-baseline
+            python3 scripts/flutter-bench/flutter_baseline.py fold
+            git add -A vm/selfhost/perf-baseline scripts/flutter-bench/baseline
             if git diff --staged --quiet; then
               echo "No overlays to fold."
               echo "folded=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             git diff --staged --stat
-            git commit --quiet -m "ci: fold merged performance baselines into perf-baseline/base"
+            git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/"
             if git push origin HEAD:master; then
               echo "folded=true" >> "$GITHUB_OUTPUT"
               exit 0

@@ -80,6 +80,13 @@ import org.xeustechnologies.jtar.TarEntry;
 import org.xeustechnologies.jtar.TarOutputStream;
 
 public class AndroidGradleBuilder extends Executor {
+    /// The application's own library jars, listed right after its sources are
+    /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
+    private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
+    /// The application's own .res files, listed at the same moment, for the same pruning
+    /// (a theme's @OverlayThemes names another theme only there).
+    private java.util.List<java.io.File> appResourceFiles = new java.util.ArrayList<java.io.File>();
+
 
     private static final String GRADLE_8_VERSION = "8.13";
     private static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
@@ -2299,6 +2306,10 @@ public class AndroidGradleBuilder extends Executor {
         try {
             debug("Extracting "+sourceZip);
             unzip(sourceZip, dummyClassesDir, assetsDir, srcDir, libsDir, xmlDir);
+            // The application's own libraries, listed before anything else lands in libs:
+            // native-theme pruning scans them too (a library's bytecode stays in its jar).
+            appLibraryJars = NativeThemes.jarsIn(libsDir);
+            appResourceFiles = NativeThemes.resFilesIn(assetsDir);
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
         }
@@ -4448,6 +4459,33 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
         }
 
+        // Only the native themes installNativeTheme() can load are shipped. The port
+        // carries three -- the pre-Holo androidTheme alone is half a megabyte -- and
+        // the mode that picks one comes from the build hints the stub copies into
+        // Display properties. android_holo_light always stays: hasNativeTheme()
+        // probes for it. Placed after the port unzip, which overwrites any same-named
+        // file, so only the port's own copies can be removed.
+        try {
+            List<String> droppedThemes = NativeThemes.removeUnusedAndroid(assetsDir,
+                    NativeThemes.androidThemesFor(request.getArg("and.themeMode", null),
+                            request.getArg("cn1.androidTheme", null),
+                            request.getArg("nativeTheme", null),
+                            request.getArg("cn1.nativeTheme", null),
+                            // and.hololight is a run-time Display property only: no
+                            // build hint carries it into the stub, so it is set by the
+                            // application or not at all, and removeUnusedAndroid keeps
+                            // every theme for an application that names it.
+                            null),
+                    dummyClassesDir, appLibraryJars, appResourceFiles,
+                    "true".equals(request.getArg(NativeThemes.ANDROID_KEEP_ALL_HINT, "false")));
+            if (!droppedThemes.isEmpty()) {
+                log("Native themes not used by this build, not shipped: " + droppedThemes
+                        + " (set " + NativeThemes.ANDROID_KEEP_ALL_HINT + "=true to keep every native theme)");
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to remove the unused native themes", ex);
+        }
+
         // Health background-listener bindings: generated rather than
         // resolved reflectively, so each listener is reached through a
         // direct constructor call that shrinking and obfuscation follow.
@@ -5685,18 +5723,16 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         File manifestFile = new File(projectDir + "/src/main", "AndroidManifest.xml");
-        float version = 1.0f;
-        int intVersion = 1;
-        try {
-            version = Float.parseFloat(request.getVersion());
-            String vcOverride = request.getArg("android.versionCode", null);
-            if (vcOverride != null && vcOverride.length() > 0) {
-                intVersion = Integer.parseInt(vcOverride);
-            } else {
-                intVersion = Math.round(100 * version);
-            }
-        } catch (Throwable thrown) {
-        }
+        int intVersion = computeVersionCode(request);
+        // android:versionName (below, at the "versionName" build.gradle line) wants the
+        // raw version string, independent of the android.versionCode override that
+        // intVersion may have taken -- unchanged from before computeVersionCode was
+        // extracted. It used to be re-derived from a Float.parseFloat of the SAME
+        // string that just failed to parse as one above (silently narrowing a
+        // 3-segment semver such as "1.2.3" -- which the Flutter importer now writes
+        // from pubspec.yaml -- down to the hardcoded default of "1.0"); see
+        // gradleVersionName for why it is now the original string instead.
+        String version = gradleVersionName(request);
 
         String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n"
                 + "<service android:name=\"com.codename1.location.BackgroundLocationHandler\" android:exported=\"false\" />\n"
@@ -9721,6 +9757,78 @@ public class AndroidGradleBuilder extends Executor {
                 + "artifact beside the phone one.");
     }
 
+
+    /**
+     * The phone APK's {@code android:versionCode}: the {@code android.versionCode}
+     * build hint (BuildHintsAndroid) when set, otherwise {@code Math.round(100 *
+     * Float.parseFloat(request.getVersion()))}, or {@code 1} when neither parses.
+     *
+     * <p>The override and the version-derived default used to share one
+     * {@code try}/{@code catch (Throwable)}: {@code request.getVersion()} failing
+     * {@link Float#parseFloat} -- any 3-segment semver such as {@code "1.0.0"}, or a
+     * Flutter {@code pubspec.yaml}'s {@code "marketing+buildNumber"} after the build
+     * number is stripped -- threw on the FIRST statement, before the override was
+     * even read. A developer-supplied {@code android.versionCode} was therefore
+     * silently discarded too, and {@code intVersion} fell back to the hardcoded
+     * default of 1 regardless of what the override said. Reading the override first,
+     * independent of whether the project's version string is float-parseable, fixes
+     * that: the two failure modes no longer share a catch block.</p>
+     */
+    static int computeVersionCode(BuildRequest request) {
+        String vcOverride = request.getArg("android.versionCode", null);
+        if (vcOverride != null && vcOverride.length() > 0) {
+            try {
+                return Integer.parseInt(vcOverride);
+            } catch (NumberFormatException invalidOverride) {
+                // Not a whole number: fall through to the version-derived default.
+            }
+        }
+        try {
+            return Math.round(100 * Float.parseFloat(request.getVersion()));
+        } catch (Throwable notAFloat) {
+            return 1;
+        }
+    }
+
+    /**
+     * The Gradle build.gradle {@code versionName}: {@code request.getVersion()}, kept
+     * as the original string instead of being re-derived through
+     * {@code Float.parseFloat}, the way this method's caller (and
+     * {@link #computeVersionCode}'s own {@code versionCode} integer) still are.
+     * {@code android:versionName} in AndroidManifest.xml already writes
+     * {@code request.getVersion()} straight through; narrowing it only here, for the
+     * SAME build, meant the manifest and build.gradle disagreed about the app's own
+     * version whenever the version was not float-parseable -- any 3-segment semver
+     * such as {@code "1.2.3"}, which the Flutter importer now writes from
+     * pubspec.yaml's marketing half, became {@code "1.0"} in build.gradle while the
+     * manifest still said {@code "1.2.3"}.
+     *
+     * <p>The value is written into a Gradle/Groovy double-quoted string literal
+     * ({@code versionName "..."}), so it is validated rather than trusted: a quote
+     * would close the literal early, and a backslash or an actual newline would
+     * either change what the literal means or fail to parse as one at all (Groovy's
+     * single-line string does not accept a literal newline). None of those belong in
+     * a version string, so they are refused rather than silently rewritten.</p>
+     *
+     * @return {@code request.getVersion()} unmodified, or {@code "1.0"} when it is
+     * null or empty, matching the previous float-parse fallback for that case
+     * @throws BuildException if the version contains a {@code "}, a {@code \} or a
+     * newline/carriage return, which cannot be written into the literal
+     */
+    static String gradleVersionName(BuildRequest request) throws BuildException {
+        String v = request.getVersion();
+        if (v == null || v.length() == 0) {
+            return "1.0";
+        }
+        if (v.indexOf('"') >= 0 || v.indexOf('\\') >= 0
+                || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) {
+            throw new BuildException("codename1.version is \"" + v
+                    + "\", which cannot be written into the Gradle build file's "
+                    + "versionName string literal (it contains a quote, a backslash "
+                    + "or a newline). Use a plain version string such as \"1.2.3\".");
+        }
+        return v;
+    }
 
     /**
      * The Wear artifact's version code, which must outrank the phone's.

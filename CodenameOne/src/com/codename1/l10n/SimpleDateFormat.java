@@ -117,10 +117,19 @@ public class SimpleDateFormat extends DateFormat {
     private String pattern;
     /// The parsed pattern
     private List<String> patternTokens;
+    /// The zone fields are formatted in; null means the device's default zone.
+    private TimeZone timeZone;
 
     /// Construct a SimpleDateFormat with no pattern.
     public SimpleDateFormat() {
         super();
+        // Captured now rather than left null: java.text.SimpleDateFormat fixes the
+        // default zone at construction too, via the Calendar its own constructor
+        // builds. Leaving this null and re-reading TimeZone.getDefault() from
+        // getTimeZone() on every call made format/parse/equals/hashCode drift if
+        // the device default changed later -- including mid-format, since format()
+        // itself calls getTimeZone() once per invocation.
+        this.timeZone = TimeZone.getDefault();
     }
 
     /// Construct a SimpleDateFormat with a given pattern.
@@ -131,6 +140,9 @@ public class SimpleDateFormat extends DateFormat {
     public SimpleDateFormat(String pattern) {
         super();
         this.pattern = pattern;
+        // See the no-arg constructor for why this is captured here instead of
+        // left for getTimeZone() to resolve live.
+        this.timeZone = TimeZone.getDefault();
     }
 
     /// #### Returns
@@ -220,7 +232,25 @@ public class SimpleDateFormat extends DateFormat {
         return super.equals(o) &&
                 (dateFormatSymbols == null ? that.dateFormatSymbols == null : dateFormatSymbols.equals(that.dateFormatSymbols)) &&
                 (pattern == null ? that.pattern == null : pattern.equals(that.pattern)) &&
-                (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens));
+                (patternTokens == null ? that.patternTokens == null : patternTokens.equals(that.patternTokens)) &&
+                // The zone decides the fields an instant formats to, so it is part of the value.
+                // Compared as the effective zone: no zone means the device's.
+                sameZone(getTimeZone(), that.getTimeZone());
+    }
+
+    /// Two zones format alike when they share the ID, the raw offset and whether they observe
+    /// daylight time. A custom zone can reuse a standard ID with other rules, so the ID alone is
+    /// not enough. The transition dates themselves are not compared: neither device runtime
+    /// offers `TimeZone.hasSameRules`, and `hashCode` hashes the ID, which equal zones share.
+    ///
+    /// Nor can an application construct two zones that agree on all three and differ in their
+    /// transition dates: Codename One has no public `SimpleTimeZone` (Ports/CLDC11 has none,
+    /// and vm/JavaAPI's is package-private), so every zone comes from `TimeZone.getTimeZone(id)`
+    /// or `getDefault()`, and one ID resolves to one set of rules.
+    private static boolean sameZone(TimeZone a, TimeZone b) {
+        return a.getID().equals(b.getID())
+                && a.getRawOffset() == b.getRawOffset()
+                && a.useDaylightTime() == b.useDaylightTime();
     }
 
     /// {@inheritDoc}
@@ -228,6 +258,7 @@ public class SimpleDateFormat extends DateFormat {
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (pattern != null ? pattern.hashCode() : 0);
+        result = 31 * result + getTimeZone().getID().hashCode();
         return result;
     }
 
@@ -240,7 +271,39 @@ public class SimpleDateFormat extends DateFormat {
     public Object clone() {
         SimpleDateFormat sdf = new SimpleDateFormat(pattern);
         sdf.setDateFormatSymbols(dateFormatSymbols);
+        // Shared, not copied: Codename One's TimeZone (Ports/CLDC11 and vm/JavaAPI) has
+        // no instance mutators -- no setRawOffset or setID, only the static
+        // setDefault -- so neither formatter can change the zone under the other.
+        // (Object.clone() would answer null on ParparVM in any case.)
+        sdf.timeZone = timeZone;
         return sdf;
+    }
+
+    /// Sets the time zone the date's fields are formatted in, as `java.text.DateFormat`
+    /// does. Without one the device's default zone is used.
+    ///
+    /// A formatter fixed to the device zone cannot print an instant's fields in any other:
+    /// a UTC time had to be moved onto a local one first, and inside a daylight-saving gap
+    /// that local time does not exist, so its hour came out shifted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zone`: the zone, or null for the device's default
+    public void setTimeZone(TimeZone zone) {
+        // null still means "the device's default", but that default is captured
+        // right now rather than re-read live on every later getTimeZone()/format()/
+        // parse() call -- see the constructors for why a live read is unstable.
+        this.timeZone = zone != null ? zone : TimeZone.getDefault();
+    }
+
+    /// The zone set with `setTimeZone`, or the zone captured at construction when
+    /// none was set.
+    ///
+    /// #### Returns
+    ///
+    /// the zone fields are formatted in
+    public TimeZone getTimeZone() {
+        return timeZone;
     }
 
     /*
@@ -272,8 +335,8 @@ public class SimpleDateFormat extends DateFormat {
         if (pattern == null) {
             return super.format(source, toAppendTo);
         }
-        // format based on local timezone
-        Calendar calendar = Calendar.getInstance(TimeZone.getDefault());
+        // format in the configured zone, the device's by default
+        Calendar calendar = Calendar.getInstance(getTimeZone());
         calendar.setTime(source);
         List<String> pattern = getPatternTokens();
         for (String token : pattern) {
@@ -561,7 +624,9 @@ public class SimpleDateFormat extends DateFormat {
             }
         }
 
-        TimeZone localTimezone = Calendar.getInstance().getTimeZone();
+        // Text without a zone of its own is read in the formatter's zone, the one
+        // setTimeZone configured, so parse round-trips what format wrote.
+        TimeZone localTimezone = getTimeZone();
         calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone
         calendar.setTimeZone(localTimezone);
         if (pmMinutes != 0) {
@@ -669,7 +734,7 @@ public class SimpleDateFormat extends DateFormat {
     ///
     /// - `source`
     int getLocalDSTOffset(Calendar source) {
-        TimeZone localTimezone = Calendar.getInstance().getTimeZone();
+        TimeZone localTimezone = getTimeZone();
         int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;
         return getOffsetInMinutes(source, localTimezone) - rawOffset;
     }

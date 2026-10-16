@@ -1,0 +1,6 @@
+async throw returned a future
+caught through the future
+caught after await
+false
+true
+2

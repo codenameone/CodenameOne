@@ -1,0 +1,67 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.flutter.cupertino;
+
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Widget;
+
+import dart.runtime.Funcs;
+
+/**
+ * A single tab's navigation root — Flutter's {@code CupertinoTabView}. Runs
+ * its {@code builder} to produce the tab content (the per-tab navigator stack
+ * is not modeled this pass).
+ */
+public class CupertinoTabView extends StatelessWidget {
+
+    private Funcs.Func1<BuildContext, Widget> builder;
+
+    public void builder(Funcs.Func1<BuildContext, Widget> v) {
+        this.builder = v;
+    }
+
+    public void restorationScopeId(String v) {
+    }
+
+    public void defaultTitle(String v) {
+    }
+
+    public void routes(Object v) {
+    }
+
+    public void onGenerateRoute(Object v) {
+    }
+
+    public void onUnknownRoute(Object v) {
+    }
+
+    public void navigatorObservers(Object v) {
+    }
+
+    @Override
+    public Widget build(BuildContext context) {
+        return builder == null ? null : builder.call(context);
+    }
+}

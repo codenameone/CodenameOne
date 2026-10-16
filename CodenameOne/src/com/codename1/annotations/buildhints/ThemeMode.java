@@ -73,6 +73,14 @@ public enum ThemeMode {
     LEGACY,
 
     /// The theme the application ships, rather than a platform one.
+    ///
+    /// No native theme is packaged and none is installed, on every port: the
+    /// application's own theme is the only one it loads. Pair it with
+    /// `includeNativeBool: false` in the theme's CSS `#Constants`, which stops the
+    /// theme from asking for a native base in the first place. The hint is what
+    /// keeps the platform theme files out of the application, and what stops the
+    /// Linux and Windows ports from installing theirs at start-up whatever the
+    /// theme says.
     @HintValue("custom")
     CUSTOM;
 }

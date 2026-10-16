@@ -93,6 +93,27 @@ public class GraceAudit {
                 checksum += 3;
             }
         }
+        // READ EVERY FIELD THE HAZARD STORES THROUGH. DeadFieldElimination (#5903) deletes an
+        // instance field nothing reads, and Node's fields were write-only: the translated Node
+        // had no fields at all, so a fresh node no longer held the only reference to its
+        // child, the grace pass had nothing to rescue, and run-gc-verify.sh's nograce
+        // self-test -- which re-injects exactly the missing grace pass -- caught nothing on
+        // any tree since. Filler's are read for the same reason: they are what makes it a
+        // page-sized filler rather than an empty object.
+        for (int i = 0; i < 256; i++) {
+            Object o = keep[i];
+            if (o instanceof Node) {
+                Node k = (Node) o;
+                checksum += (k.a != null ? 5 : 0) + (k.b == k ? 7 : 0) + (k.c != null ? 11 : 0);
+            }
+        }
+        for (int i = 0; i < 16; i++) {
+            Object o = tmp[i];
+            if (o instanceof Filler) {
+                Filler f = (Filler) o;
+                checksum += f.a + f.b + f.c + f.d + f.e + f.f + f.g + f.h + f.i2 + f.j + f.k + f.l;
+            }
+        }
         System.out.println("GRACE_AUDIT_DRIVER_DONE checksum=" + checksum);
     }
 }

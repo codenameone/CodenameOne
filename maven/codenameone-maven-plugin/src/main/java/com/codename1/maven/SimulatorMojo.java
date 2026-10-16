@@ -217,6 +217,30 @@ private static final String GROUP_ID="com.codenameone";
     
    
     
+    /**
+     * Hands every {@code cn1.*} system property to the simulator.
+     *
+     * <p>The simulator runs in a JVM of its own, so {@code mvn cn1:run -Dcn1.something=x}
+     * sets the property on Maven and nowhere the application can see it -- which looks
+     * exactly like the property being ignored. Only {@code ffmpeg.dir} was forwarded, one
+     * key at a time, so anything else needed a code change to become settable at all.</p>
+     *
+     * <p>Scoped to the {@code cn1.} prefix rather than passing the whole environment:
+     * Maven's own properties (its repository, its offline flag, the JDK's) mean something
+     * different inside a forked JVM, and a few of them would change how it behaves.</p>
+     */
+    private void forwardCn1Properties(Java java) {
+        Properties props = System.getProperties();
+        for (String name : props.stringPropertyNames()) {
+            if (name.startsWith("cn1.")) {
+                Variable v = new Variable();
+                v.setKey(name);
+                v.setValue(props.getProperty(name));
+                java.addSysproperty(v);
+            }
+        }
+    }
+
     private Path prepareClasspath(Java java) {
         Log log = getLog();
         log.debug("Preparing classpath for Simulator");
@@ -227,6 +251,7 @@ private static final String GROUP_ID="com.codenameone";
             v.setValue(System.getProperty("ffmpeg.dir"));
             java.addSysproperty(v);
         }
+        forwardCn1Properties(java);
         copyKotlinIncrementalCompileOutputToOutputDir();
         for (Artifact artifact : project.getArtifacts()) {
             

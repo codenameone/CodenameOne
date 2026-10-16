@@ -48,6 +48,12 @@
 -(void)setCornerRadius:(float)r {
     cornerRadius = r;
 }
+-(void)setRegionX:(float)u y:(float)v w:(float)du h:(float)dv {
+    regionX = u;
+    regionY = v;
+    regionW = du;
+    regionH = dv;
+}
 
 #if TARGET_OS_WATCH
 -(void)execute {
@@ -60,7 +66,10 @@
 #else
 -(void)execute {
 #ifdef CN1_USE_METAL
-    if (cornerRadius > 0.0f) {
+    if (regionW > 0.0f && regionH > 0.0f) {
+        CN1MetalDrawImageRegionRounded([img getMTLTexture], alpha, x, y, width, height, cornerRadius,
+                                       regionX, regionY, regionW, regionH);
+    } else if (cornerRadius > 0.0f) {
         CN1MetalDrawImageRounded([img getMTLTexture], alpha, x, y, width, height, cornerRadius);
     } else {
         CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);

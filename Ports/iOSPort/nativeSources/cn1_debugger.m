@@ -714,8 +714,17 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
             memcpy(argsCopy, s->invokeArgs, sizeof(argsCopy));
             // Re-activate the thread while running the thunk so any
             // allocations / GC interaction it triggers proceed normally;
-            // we'll re-park before going back to wait.
-            tsd->threadActive = JAVA_TRUE;
+            // we'll re-park before going back to wait. Through the GC's
+            // resume handshake, never a bare store: this thread is parked, so
+            // the collector may be holding it, and running Java while it is held
+            // is running under a stop-the-world cycle that believes it stopped.
+            do {
+                while (tsd->threadBlockedByGC) {
+                    pthread_mutex_unlock(&s->mu);
+                    usleep(1000);
+                    pthread_mutex_lock(&s->mu);
+                }
+            } while (!cn1GcTryResumeActive(tsd));
             pthread_mutex_unlock(&s->mu);
             cn1_invoke_result r;
             r.type = 'V';
@@ -743,13 +752,15 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
         }
         pthread_cond_wait(&s->cv, &s->mu);
     }
-    // GC may have parked us; wait for it to finish before resuming.
-    while (tsd->threadBlockedByGC) {
-        pthread_mutex_unlock(&s->mu);
-        usleep(1000);
-        pthread_mutex_lock(&s->mu);
-    }
-    tsd->threadActive = JAVA_TRUE;
+    // GC may have parked us; wait for it to finish before resuming, and go
+    // active through its handshake (cn1GcTryResumeActive in cn1_globals.h).
+    do {
+        while (tsd->threadBlockedByGC) {
+            pthread_mutex_unlock(&s->mu);
+            usleep(1000);
+            pthread_mutex_lock(&s->mu);
+        }
+    } while (!cn1GcTryResumeActive(tsd));
     s->tsd = NULL;
     pthread_mutex_unlock(&s->mu);
 }

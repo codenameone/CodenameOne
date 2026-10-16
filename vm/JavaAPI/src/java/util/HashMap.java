@@ -660,6 +660,20 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     native static boolean areEqualKeys(Object key1, Object key2);
 
+    // The JavaScript port's areEqualKeys: the translator emits that native as a call
+    // to this twin (JavascriptNativeRegistry.TRANSLATED_DELEGATES), so it is a plain
+    // function wherever equals is. The C targets keep their native. Nothing in
+    // bytecode calls it, so it is a runtime delegate target as well.
+    static boolean areEqualKeysImpl(Object key1, Object key2) {
+        if (key1 == key2) {
+            return true;
+        }
+        if (key1 == null || key2 == null) {
+            return false;
+        }
+        return key1.equals(key2);
+    }
+
     // ------------------------------------------------------------------
     // Iteration over the compact layout. Order comes from cn1FirstIndex /
     // cn1NextIndex, which LinkedHashMap overrides with its links.

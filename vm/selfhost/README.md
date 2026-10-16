@@ -199,6 +199,13 @@ layout, with `perf_baseline.py import-legacy --pr N --reason "..." --ref origin/
 It reads the branch's copy and the copy at its merge base, so only the branch's own edits
 are imported.
 
+`perf_baseline.py` is parameterised by a `Layout`, and the Flutter benchmark's regression
+gate is its second one (`scripts/flutter-bench/flutter_baseline.py`, rows in
+`scripts/flutter-bench/baseline/`): the overlay rules, the fold, the pull request check
+and the calibrator's arithmetic (`calibration_context`, `plan_calibration`) are shared,
+not copied. A change to them is tested by both `test_perf_gate` and
+`scripts/flutter-bench/test_flutter_baseline`.
+
 The Port Status page's ParparVM vs JDK 25 table is rendered from these same rows
 (`perf_baseline.py summary`, run by `scripts/website/build.sh`).
 

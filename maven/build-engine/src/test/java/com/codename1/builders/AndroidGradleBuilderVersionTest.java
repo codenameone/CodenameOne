@@ -310,4 +310,97 @@ class AndroidGradleBuilderVersionTest {
                 + "com.codename1.impl.CodenameOneImplementation.getPushCallback(), this)"));
         assertFalse(legacyReplay.contains("PushClient.dispatch"));
     }
+
+    @Test
+    void versionCodeOverrideWinsEvenWhenTheProjectVersionIsNotAFloat() {
+        // The override and the version-derived default used to share one
+        // try/catch(Throwable): Float.parseFloat("1.0.0") throws on the FIRST
+        // statement, before android.versionCode was even read, so the override
+        // was silently discarded and intVersion fell back to the hardcoded
+        // default of 1 regardless of what the developer asked for.
+        BuildRequest threeSegment = new BuildRequest();
+        threeSegment.setVersion("1.0.0");
+        threeSegment.putArgument("android.versionCode", "42");
+        assertEquals(42, AndroidGradleBuilder.computeVersionCode(threeSegment),
+                "an explicit android.versionCode must be honoured even when codename1.version "
+                        + "is not Float.parseFloat-compatible");
+
+        // Same failure mode from a Flutter import: pubspec's "marketing+build"
+        // convention left codename1.version with a '+' after splitting at the
+        // marketing part was skipped, but the marketing part itself can still be
+        // a 3-segment semver.
+        BuildRequest fromFlutterImport = new BuildRequest();
+        fromFlutterImport.setVersion("2.10.2");
+        fromFlutterImport.putArgument("android.versionCode", "021002");
+        assertEquals(21002, AndroidGradleBuilder.computeVersionCode(fromFlutterImport));
+
+        // No override: falls back to the version-derived default, unchanged.
+        BuildRequest noOverride = new BuildRequest();
+        noOverride.setVersion("1.5");
+        assertEquals(150, AndroidGradleBuilder.computeVersionCode(noOverride));
+
+        // Neither a usable override nor a float-parseable version: the
+        // long-standing default of 1, not an exception.
+        BuildRequest neither = new BuildRequest();
+        neither.setVersion("1.0.0");
+        assertEquals(1, AndroidGradleBuilder.computeVersionCode(neither));
+
+        // An override that is not itself a whole number falls back to the
+        // version-derived default rather than propagating.
+        BuildRequest malformedOverride = new BuildRequest();
+        malformedOverride.setVersion("1.5");
+        malformedOverride.putArgument("android.versionCode", "not-a-number");
+        assertEquals(150, AndroidGradleBuilder.computeVersionCode(malformedOverride));
+    }
+
+    @Test
+    void gradleVersionNameKeepsTheOriginalStringInsteadOfNarrowingThroughAFloat() throws Exception {
+        // build.gradle's versionName used to be re-derived from Float.parseFloat of
+        // the SAME string computeVersionCode already falls back to 1 for: any
+        // 3-segment semver such as "1.2.3" -- which the Flutter importer now writes
+        // from pubspec.yaml's marketing half -- silently became "1.0" there, while
+        // AndroidManifest.xml's android:versionName (request.getVersion() directly)
+        // still said "1.2.3". gradleVersionName must answer the same "1.2.3" instead.
+        BuildRequest threeSegment = new BuildRequest();
+        threeSegment.setVersion("1.2.3");
+        assertEquals("1.2.3", AndroidGradleBuilder.gradleVersionName(threeSegment));
+
+        // A float-parseable version is also kept exactly as given, not reformatted.
+        BuildRequest simple = new BuildRequest();
+        simple.setVersion("1.5");
+        assertEquals("1.5", AndroidGradleBuilder.gradleVersionName(simple));
+
+        // A pre-release/build-metadata suffix is still just a string to Gradle.
+        BuildRequest suffixed = new BuildRequest();
+        suffixed.setVersion("2.10.2-beta.1");
+        assertEquals("2.10.2-beta.1", AndroidGradleBuilder.gradleVersionName(suffixed));
+
+        // Null or empty falls back to the same "1.0" default the old float parse
+        // produced for those cases (Float.parseFloat(null/"") also landed on 1.0f).
+        BuildRequest unset = new BuildRequest();
+        assertEquals("1.0", AndroidGradleBuilder.gradleVersionName(unset));
+        BuildRequest empty = new BuildRequest();
+        empty.setVersion("");
+        assertEquals("1.0", AndroidGradleBuilder.gradleVersionName(empty));
+    }
+
+    @Test
+    void gradleVersionNameRefusesWhatWouldBreakOutOfTheGradleStringLiteral() {
+        // The value is written as versionName "<value>" straight into build.gradle:
+        // a quote would close the literal early, and a backslash or a real newline
+        // would either change what the literal means or fail to parse as one at all.
+        BuildRequest quoted = new BuildRequest();
+        quoted.setVersion("1.0\" + rootProject.ext.evil + \"");
+        BuildException quoteEx = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.gradleVersionName(quoted));
+        assertTrue(quoteEx.getMessage().contains("codename1.version"), quoteEx.getMessage());
+
+        BuildRequest backslashed = new BuildRequest();
+        backslashed.setVersion("1.0\\n2.0");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.gradleVersionName(backslashed));
+
+        BuildRequest newlined = new BuildRequest();
+        newlined.setVersion("1.0\n2.0");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.gradleVersionName(newlined));
+    }
 }

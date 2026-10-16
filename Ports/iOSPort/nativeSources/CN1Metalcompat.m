@@ -877,8 +877,32 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
  */
 void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
                               int width, int height, float cornerRadius) {
+    CN1MetalDrawImageRegionRounded(texture, alpha, x, y, width, height, cornerRadius,
+                                   0.0f, 0.0f, 1.0f, 1.0f);
+}
+
+/**
+ * CN1MetalDrawImageRounded for PART of the texture: the region (u0, v0, du, dv), in
+ * the normalised coordinates of the drawn picture (0,0 top left, 1,1 bottom right),
+ * is stretched over the destination and the DESTINATION's corners are rounded.
+ *
+ * <p>This is what lets a picture scaled to overflow its box -- BoxFit.cover, the
+ * gallery's cards -- be drawn rounded without a copy. Drawing the whole picture
+ * rounded puts the corners outside the box, where the box's clip cuts them off and
+ * the card shows square; so the caller used to read the pixels back, cut the corners
+ * into them and upload a second image, holding every such picture twice in memory
+ * and twice on the GPU. Showing only the region inside the box, rounded, is the
+ * same picture with no second copy.</p>
+ */
+void CN1MetalDrawImageRegionRounded(id<MTLTexture> texture, int alpha, int x, int y,
+                                    int width, int height, float cornerRadius,
+                                    float u0, float v0, float du, float dv) {
     if (texture == nil || width <= 0 || height <= 0) return;
-    if (cornerRadius <= 0.0f) {
+    if (du <= 0.0f || dv <= 0.0f) {
+        u0 = 0.0f; v0 = 0.0f; du = 1.0f; dv = 1.0f;
+    }
+    BOOL whole = u0 == 0.0f && v0 == 0.0f && du == 1.0f && dv == 1.0f;
+    if (cornerRadius <= 0.0f && whole) {
         CN1MetalDrawImage(texture, alpha, x, y, width, height);
         return;
     }
@@ -905,8 +929,13 @@ void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
     uploadMatricesIfChanged(1);
     [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
     [activeEncoder setFragmentBytes:&tint length:sizeof(tint) atIndex:0];
-    simd_float4 params = (simd_float4){ (float)width, (float)height, cornerRadius, 0.0f };
+    // A zero radius is valid here: the rounded pipeline at r = 0 is a plain
+    // textured draw of the region, which CN1MetalDrawImage cannot do.
+    simd_float4 params = (simd_float4){ (float)width, (float)height,
+                                        cornerRadius > 0.0f ? cornerRadius : 0.0f, 0.0f };
     [activeEncoder setFragmentBytes:&params length:sizeof(params) atIndex:1];
+    simd_float4 region = (simd_float4){ u0, v0, du, dv };
+    [activeEncoder setFragmentBytes:&region length:sizeof(region) atIndex:2];
     [activeEncoder setFragmentTexture:texture atIndex:0];
     [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }

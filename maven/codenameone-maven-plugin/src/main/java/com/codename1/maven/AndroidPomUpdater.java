@@ -74,6 +74,14 @@ final class AndroidPomUpdater {
     AndroidPomUpdater(String pom, boolean kotlin) {
         String p = pom;
         if (p.indexOf("<artifactId>codenameone-android-compat</artifactId>") < 0) {
+            // Unlike FlutterPomUpdater, this never does a bare
+            // indexOf("<dependencies>") to splice a dependency into whichever
+            // <dependencies> element happens to come first in the file (which
+            // can be <dependencyManagement>'s own, nested one -- the bug
+            // FlutterPomUpdater had). The whole PROFILE block, including its
+            // own self-contained <dependencies>, is inserted as one unit
+            // right before </profiles>, so there is no "which <dependencies>"
+            // question to get wrong here.
             int profiles = p.lastIndexOf("</profiles>");
             if (profiles < 0) {
                 manual.add("the codenameone-android-compat dependency (scope provided), e.g. as this profile:\n" + PROFILE);

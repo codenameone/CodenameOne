@@ -680,38 +680,47 @@ XCODE_BUILD_CMD=(
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
 )
-# One xcconfig carries every per-SDK architecture override this build needs. It
-# has to be an xcconfig rather than command-line settings, because xcodebuild does
-# NOT honour per-SDK conditionals in command-line settings --
-# "ARCHS[sdk=iphonesimulator*]=x" parses as ARCHS with the literal value
-# "iphonesimulator*]=x", every target then warns "None of the architectures in
-# ARCHS are valid", and the build silently compiles NOTHING while still copying
-# resources. An xcconfig is where the conditional syntax is actually evaluated.
+# Every simulator build gets an xcconfig, even when ARCHS is not forced, because of
+# the watch app a companion project embeds. Its simulator ARCHS is $(ARCHS_STANDARD)
+# with ONLY_ACTIVE_ARCH, which reads as "follow the host" -- but the run destination
+# is an iPhone, so the watch target, built for a different platform, has no active
+# arch and compiles every standard one. On an arm64 runner that is an x86_64 watch
+# slice nothing can run: a full second ParparVM translation, a third of this step's
+# compile (measured: 3206 x86_64 units beside 3206 arm64 ones). Excluding every
+# simulator arch but BUILD_ARCH keeps the watch on the slice the app itself uses.
+# EXCLUDED_ARCHS rather than ARCHS, because the watch target sets ARCHS itself and
+# a target setting outranks an xcconfig; nothing sets its EXCLUDED_ARCHS.
+# run-ios-native-tests.sh writes the same line: it reuses this derived data, and a
+# watch whose settings differ is rebuilt from scratch.
+case "$BUILD_ARCH" in
+  x86_64) WATCH_SIM_EXCLUDED_ARCHS="arm64" ;;
+  *) WATCH_SIM_EXCLUDED_ARCHS="x86_64" ;;
+esac
 ARCH_XCCONFIG="$(mktemp -t cn1-ios-archs).xcconfig"
-# Always: the watch app this scheme embeds is built for ONE simulator slice, not
-# two. With an iPhone destination the watch platform has no active architecture,
-# so the app was compiled for arm64 and x86_64 -- two thirds of this build's
-# compile units, for a copy nothing here installs or launches. The lines, the
-# measurements and how the override was checked are in scripts/lib/xcode.sh.
-cn1_watch_simulator_arch_xcconfig > "$ARCH_XCCONFIG"
+printf 'EXCLUDED_ARCHS[sdk=watchsimulator*] = %s\n' "$WATCH_SIM_EXCLUDED_ARCHS" > "$ARCH_XCCONFIG"
 XCODE_BUILD_CMD+=(-xcconfig "$ARCH_XCCONFIG")
 if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ] || [ "$FORCE_SIMULATOR_ARCH" = "true" ]; then
   ri_log "Forcing simulator ARCHS=$BUILD_ARCH"
   # The override has to be scoped to the simulator SDK: unscoped, it is forced on
   # every target including the watch app a companion project embeds, whose device
   # ABI is arm64_32. That matters most for the Rosetta case, where
-  # SIMULATOR_EXCLUDED_ARCHS excludes arm64 outright. The [sdk=iphonesimulator*]
-  # condition is what keeps it off the watch target: -xcconfig outranks
-  # target-level settings (see scripts/lib/xcode.sh), so the condition, not the
-  # precedence, is why the watch target's ARCHS[sdk=watchos*]=arm64_32 stands.
+  # SIMULATOR_EXCLUDED_ARCHS excludes arm64 outright.
+  #
+  # It must go through an xcconfig rather than a command-line override, because
+  # xcodebuild does NOT honour per-SDK conditionals in command-line settings --
+  # "ARCHS[sdk=iphonesimulator*]=x" parses as ARCHS with the literal value
+  # "iphonesimulator*]=x", every target then warns "None of the architectures in
+  # ARCHS are valid", and the build silently compiles NOTHING while still copying
+  # resources. An xcconfig is where the conditional syntax is actually evaluated,
+  # and it sits below target-level settings, so the watch target's own
+  # ARCHS[sdk=watchos*]=arm64_32 still wins where it applies.
   {
     printf 'ARCHS[sdk=iphonesimulator*] = %s\n' "$BUILD_ARCH"
     printf 'EXCLUDED_ARCHS[sdk=iphonesimulator*] = %s\n' "$SIMULATOR_EXCLUDED_ARCHS"
   } >> "$ARCH_XCCONFIG"
   XCODE_BUILD_CMD+=("ONLY_ACTIVE_ARCH=YES")
 fi
-ri_log "Architecture xcconfig -> $ARCH_XCCONFIG"
-sed 's/^/[run-ios-ui-tests]   /' "$ARCH_XCCONFIG"
+ri_log "Simulator arch xcconfig -> $ARCH_XCCONFIG: $(tr '\n' ';' < "$ARCH_XCCONFIG")"
 # Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the
 # scalar baseline is unvectorized, so the SIMD benchmark overstates the speedup;
 # -O2 lets the compiler auto-vectorize scalar, making the SIMD-vs-scalar
@@ -727,12 +736,10 @@ ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
 # census measures what restoring each would cost before any of them is changed in
 # the template.
 #
-# These must be command-line overrides rather than a configuration's base xcconfig:
-# Xcode's precedence is command line > target > project > base xcconfig, so a base
-# xcconfig saying YES loses to the project-level NO and would measure nothing at
-# all -- a gate that reads nothing and reports success. (The -xcconfig file above
-# is a different thing and outranks all of these; these five carry no per-SDK
-# condition, so they have no reason to move into it.)
+# These must be command-line overrides rather than an xcconfig: Xcode's precedence
+# is command line > target > project > xcconfig, so an xcconfig saying YES loses to
+# the project-level NO and would measure nothing at all -- a gate that reads
+# nothing and reports success.
 if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
   ri_log "Warning census: re-enabling the warnings the template disables"
   XCODE_BUILD_CMD+=(

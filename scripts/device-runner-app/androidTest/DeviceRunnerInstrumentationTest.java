@@ -25,8 +25,11 @@ package com.codenameone.examples.hellocodenameone;
 import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
+
+import com.codename1.impl.android.AndroidImplementation;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -38,6 +41,7 @@ import org.junit.runner.RunWith;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -67,6 +71,29 @@ public class DeviceRunnerInstrumentationTest {
     /// per-test budget so the runner's one retry re-announces rather than
     /// races this.
     private static final long BACK_ANSWER_TIMEOUT_MS = 45_000L;
+
+    /// The port preloads the Java types Chromium passes to its navigation
+    /// callbacks, so ART's CheckJNI cannot suspend mid-check on the first page
+    /// load in a debuggable app (see
+    /// AndroidImplementation.preloadWebViewJniArgumentTypes). It looks them up by
+    /// name and ignores a miss, so a rename on Chromium's side would silently
+    /// reopen that crash; this fails instead.
+    @Test
+    public void webViewJniArgumentTypesResolve() {
+        final List<String>[] missing = new List[1];
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
+            @Override
+            public void run() {
+                missing[0] = AndroidImplementation.preloadWebViewJniArgumentTypes();
+            }
+        });
+        if (Build.VERSION.SDK_INT >= 28) {
+            assertNotNull("WebView.getWebViewClassLoader() was not reachable", missing[0]);
+        }
+        if (missing[0] != null) {
+            assertTrue("WebView JNI argument types not found: " + missing[0], missing[0].isEmpty());
+        }
+    }
 
     @Test
     public void launchMainActivityAndWaitForDeviceRunner() throws Exception {

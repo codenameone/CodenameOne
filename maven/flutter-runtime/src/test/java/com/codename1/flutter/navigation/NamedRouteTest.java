@@ -1,0 +1,333 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.flutter.navigation;
+
+import com.codename1.flutter.cupertino.CupertinoPageRoute;
+import com.codename1.flutter.testsupport.ProbeBox;
+
+import dart.runtime.Funcs;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Named-route resolution: the {@code routes} map first, then
+ * {@code onGenerateRoute}, then {@code onUnknownRoute} — Flutter's order.
+ * Headless, so no Forms are created and route builders never run; only the
+ * resolution and stack bookkeeping are exercised.
+ */
+class NamedRouteTest {
+
+    @BeforeEach
+    void reset() {
+        Navigator.reset();
+        Navigator.resetRouteTable();
+    }
+
+    @AfterEach
+    void clear() {
+        Navigator.reset();
+        Navigator.resetRouteTable();
+    }
+
+    private static MaterialPageRoute route() {
+        MaterialPageRoute r = new MaterialPageRoute();
+        r.builder((context) -> new ProbeBox(10, 10));
+        return r;
+    }
+
+    @Test
+    void routesMapWins() {
+        Map<Object, Object> routes = new HashMap<Object, Object>();
+        routes.put("/a", (Funcs.Func1<Object, Object>) context -> new ProbeBox(1, 1));
+        Navigator.installRouteTable(routes, settings -> route(), null);
+
+        Route r = Navigator.resolveRoute("/a", null);
+        assertNotNull(r);
+        assertNotNull(((MaterialPageRoute) r).getBuilder(),
+                "a routes-map entry becomes a MaterialPageRoute around that builder");
+        assertEquals("/a", r.settings().name());
+    }
+
+    @Test
+    void onGenerateRouteHandlesWhatTheMapDoesNot() {
+        MaterialPageRoute generated = route();
+        Navigator.installRouteTable(new HashMap<Object, Object>(), settings -> generated, null);
+        assertSame(generated, Navigator.resolveRoute("/demo/app-bar", null));
+    }
+
+    @Test
+    void onUnknownRouteIsTheLastResort() {
+        MaterialPageRoute fallback = route();
+        Navigator.installRouteTable(null, settings -> null, settings -> fallback);
+        assertSame(fallback, Navigator.resolveRoute("/nope", null));
+    }
+
+    @Test
+    void argumentsAndNameReachTheFactory() {
+        final String[] seenName = new String[1];
+        final Object[] seenArgs = new Object[1];
+        Object args = new Object();
+        Navigator.installRouteTable(null, settings -> {
+            seenName[0] = settings.name();
+            seenArgs[0] = settings.arguments();
+            return route();
+        }, null);
+
+        Navigator.resolveRoute("/demo/banner", args);
+        assertEquals("/demo/banner", seenName[0]);
+        assertSame(args, seenArgs[0]);
+    }
+
+    @Test
+    void unresolvableNameIsReportedNotThrown() {
+        Navigator.installRouteTable(null, settings -> null, null);
+        assertNull(Navigator.resolveRoute("/missing", null));
+        assertFalse(Navigator.pushNamed(null, "/missing", null));
+        assertEquals(0, Navigator.stackSize(), "a dead link must not push anything");
+    }
+
+    @Test
+    void pushNamedGrowsTheStack() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        assertTrue(Navigator.pushNamed(null, "/demo/app-bar", null));
+        assertEquals(1, Navigator.stackSize());
+    }
+
+    @Test
+    void navigatorStateRoutesNamedPushesToTheStack() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+
+        state.pushNamed("/demo/a", null);
+        assertEquals(1, Navigator.stackSize());
+        // Opaque, as in Flutter, and unique per push: RestorableRouteFuture claims the
+        // pushed route's result with it, so it cannot simply be the route name.
+        String id = state.restorablePushNamed("/demo/b", null);
+        assertTrue(id != null && !id.isEmpty(), "a pushed route has a restoration id");
+        assertEquals(2, Navigator.stackSize());
+        assertTrue(state.canPop());
+
+        state.pop(null);
+        assertEquals(1, Navigator.stackSize());
+    }
+
+    /// A dialog over the implicit base page is what the replacement's pop removes, so
+    /// the replacement goes on the stack ABOVE the base and stays poppable. Deciding by
+    /// the route stack alone (empty) promoted it to the new non-poppable base.
+    @Test
+    void replacingADialogOverTheBasePageKeepsTheBaseBeneath() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        com.codename1.flutter.material.Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));
+        NavigatorState state = Navigator.of(null, null);
+
+        state.pushReplacementNamed("/next", null, null);
+
+        assertEquals(0, com.codename1.flutter.material.Dialogs.openDialogCount(), "the dialog was replaced");
+        assertEquals(1, Navigator.stackSize(), "the replacement is a poppable route");
+        assertTrue(state.canPop(), "the original page is still beneath it");
+    }
+
+    /// The removed route's future completes after the replacement is in place: a callback
+    /// that pushes at once lands ABOVE the replacement, as in Flutter. It used to push
+    /// first, and the replacement went on top of it.
+    @Test
+    void aPushFromTheReplacedRoutesCallbackLandsAboveTheReplacement() {
+        Navigator.installRouteTable(null, settings -> {
+            MaterialPageRoute r = route();
+            r.settings(settings);
+            return r;
+        }, null);
+        NavigatorState state = Navigator.of(null, null);
+        dart.async.Future<Object> first = state.pushNamed("/first", null);
+        first.then((dart.runtime.Funcs.VoidFunc1<Object>) v -> state.pushNamed("/from-callback", null));
+
+        state.pushReplacementNamed("/replacement", null, null);
+
+        assertEquals(2, Navigator.stackSize());
+        assertEquals("/replacement", Navigator.routeNameAt(0));
+        assertEquals("/from-callback", Navigator.routeNameAt(1));
+    }
+
+    static final class Capture extends com.codename1.flutter.StatelessWidget {
+        com.codename1.flutter.BuildContext context;
+
+        @Override
+        public com.codename1.flutter.Widget build(com.codename1.flutter.BuildContext context) {
+            this.context = context;
+            return new ProbeBox(1, 1);
+        }
+    }
+
+    /// Navigator.of(context, rootNavigator: true) below a nested app binds to the ROOT
+    /// app's navigator, so its named routes resolve there; the flag was ignored.
+    @Test
+    void rootNavigatorTrueBindsToTheOutermostApp() {
+        Capture leaf = new Capture();
+        com.codename1.flutter.material.MaterialApp inner = new com.codename1.flutter.material.MaterialApp();
+        inner.home(leaf);
+        com.codename1.flutter.material.MaterialApp outer = new com.codename1.flutter.material.MaterialApp();
+        outer.home(inner);
+        com.codename1.flutter.FlutterUI.mount(outer, new com.codename1.flutter.rendering.RenderHost(),
+                new com.codename1.flutter.BuildOwner());
+
+        assertSame(leaf.context, Navigator.boundContextForTest(Navigator.of(leaf.context, Boolean.FALSE)),
+                "the nearest navigator acts for the caller");
+        com.codename1.flutter.BuildContext root = Navigator.boundContextForTest(Navigator.of(leaf.context, Boolean.TRUE));
+        assertTrue(root != leaf.context, "the root one does not");
+        assertTrue(((com.codename1.flutter.Element) root).widget() instanceof Navigator.RootScope,
+                "it is the root app's navigator position");
+    }
+
+    @Test
+    void pushReplacementSwapsTheTopRoute() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        state.pushNamed("/b", null);
+        assertEquals(2, Navigator.stackSize());
+
+        state.pushReplacementNamed("/c", null, null);
+        assertEquals(2, Navigator.stackSize(), "one popped, one pushed");
+    }
+
+    @Test
+    void pushReplacementFromTheInitialRouteBecomesTheNewNonPoppableBase() {
+        // The implicit base route (nothing pushed yet) is never on the stack, so a
+        // pushReplacementNamed here finds pop() a no-op. Before the fix, push() still
+        // recorded the (unpopped) base as the replacement's previousForm and left the
+        // replacement on the stack, so canPop() wrongly answered true and popping it
+        // would have resurrected the removed base route -- Flutter's own rule is that
+        // replacing the only route makes the replacement itself the new, non-poppable
+        // base.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        assertEquals(0, Navigator.stackSize());
+        assertFalse(state.canPop());
+
+        state.pushReplacementNamed("/a", null, null);
+
+        assertEquals(0, Navigator.stackSize(),
+                "the replacement becomes the new implicit base, not a poppable entry");
+        assertFalse(state.canPop(), "nothing below the replacement to pop back to");
+
+        // A pop here must stay a no-op -- never resurrect anything.
+        state.pop(null);
+        assertEquals(0, Navigator.stackSize());
+    }
+
+    @Test
+    void secondPushReplacementOfTheImplicitBaseCompletesTheFirstsFuture() {
+        // Reported bug: replacing the implicit base route installs the replacement as
+        // the new non-poppable base (see the test above) but used to just discard the
+        // RouteEntry that tracked it -- so a LATER pushReplacementNamed, which replaces
+        // THAT base in turn, had nothing left to find and complete. A caller awaiting
+        // the first pushReplacementNamed's future hung forever: nothing -- not a pop,
+        // not a second replace -- ever completed it.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+
+        dart.async.Future<Object> first = state.pushReplacementNamed("/a", null, null);
+        assertEquals(0, Navigator.stackSize());
+        assertNull(first.getNow(), "not replaced yet -- must still be pending");
+
+        state.pushReplacementNamed("/b", null, "second result");
+
+        assertEquals(0, Navigator.stackSize(), "the second replacement also becomes the base");
+        assertEquals("second result", first.getNow(),
+                "replacing the implicit base must complete the route it replaced's own "
+                        + "future with the supplied result, as Flutter's contract says, "
+                        + "exactly as popping a stacked route would");
+    }
+
+    @Test
+    void pushReplacementOfAPushedRouteStaysPoppableToWhatWasBelowIt() {
+        // Contrast case: replacing a route that is NOT the implicit base must keep the
+        // normal (poppable) behavior -- only the implicit-base case is special-cased.
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        assertTrue(state.canPop());
+
+        state.pushReplacementNamed("/b", null, null);
+
+        assertEquals(1, Navigator.stackSize());
+        assertTrue(state.canPop(), "the base route is still below the replacement");
+    }
+
+    @Test
+    void pushReplacementNamedAcceptsACupertinoPageRouteFromOnGenerateRoute() {
+        // onGenerateRoute can hand back ANY Route, not only a MaterialPageRoute built
+        // from the routes map -- the replace path's old instanceof MaterialPageRoute
+        // gate rejected a CupertinoPageRoute here exactly like pushAny once rejected one
+        // from a plain Navigator.push.
+        Navigator.installRouteTable(null, settings -> {
+            CupertinoPageRoute<Object> r = new CupertinoPageRoute<Object>();
+            r.builder((context) -> new ProbeBox(10, 10));
+            return r;
+        }, null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        assertEquals(1, Navigator.stackSize());
+
+        state.pushReplacementNamed("/b", null, null);
+
+        assertEquals(1, Navigator.stackSize(), "the CupertinoPageRoute replacement must not be rejected");
+    }
+
+    @Test
+    void aReplacementThatCannotBeBuiltLeavesTheCurrentRoute() {
+        // Only "/known" resolves; anything else has no route.
+        Navigator.installRouteTable(null, settings -> "/unknown".equals(settings.name()) ? null : route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        state.pushNamed("/b", null);
+        state.pushReplacementNamed("/unknown", null, null);
+        assertEquals(2, Navigator.stackSize(),
+                "the page stays: popping first sent the user back when the replacement failed");
+    }
+
+    @Test
+    void popUntilUnwindsToTheAcceptedRoute() {
+        Navigator.installRouteTable(null, settings -> route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        state.pushNamed("/b", null);
+        state.pushNamed("/c", null);
+
+        state.popUntil(r -> Boolean.FALSE);
+        assertEquals(0, Navigator.stackSize(), "an always-false predicate unwinds to the base route");
+    }
+}

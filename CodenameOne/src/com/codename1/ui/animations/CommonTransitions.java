@@ -757,6 +757,12 @@ public final class CommonTransitions extends Transition {
             if (lazyMotion != null) {
                 return lazyMotion.get(Integer.valueOf(startOffset), Integer.valueOf(dest), Integer.valueOf(speed));
             }
+            // The caller's one Motion is shared by every copy of this transition (copy()
+            // carries it over), and the first run leaves it finished: reset it, or every
+            // later run of the transition completed at once.
+            if (motion != null) {
+                motion.resetForReuse();
+            }
             return motion;
         }
         if (linearMotion) {
@@ -1439,6 +1445,15 @@ public final class CommonTransitions extends Transition {
                 break;
         }
         retVal.linearMotion = linearMotion;
+        // A motion the caller supplied has to survive the copy. Display copies a
+        // transition before running it, so everything set through setMotion() -- which is
+        // public API, documented as the way to give a transition "a more appropriate
+        // physical feel" -- was dropped on the way to the screen and the default ease ran
+        // instead. Silently: the transition still played, just not the one that was asked
+        // for.
+        retVal.motionSetManually = motionSetManually;
+        retVal.motion = motion;
+        retVal.lazyMotion = lazyMotion;
         return retVal;
     }
 
