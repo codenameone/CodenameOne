@@ -22,7 +22,47 @@
     }
    }
   },
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.626,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.519,
+     "reason": "Linux x64 EPYC 7763 translator time 0.49x on run 38943915665 (rounds 0.48-0.54); this PR's earlier runs on that model measured 0.51x and 0.55x against the 0.63x row",
+     "runs": 3,
+     "time": 0.508,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "macos-arm64": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.34,
+      "time": 0.957,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.925,
+     "reason": "First run after merging master with the Flutter runtime (ff8f935c20): hello RAM fell on macOS arm64 (1.17-1.47x before, 0.92x now) and on Windows arm64 d49 (1.28x to 0.77x) in the same run, so the move comes from master's changes, not this PR's",
+     "runs": 1,
+     "time": 0.957,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
    "mathTranscendental": {
     "all": {
      "from": {
@@ -53,12 +93,11 @@
       }
      },
      "memory": 0.118,
-     "reason": "macOS arm64 recursion RAM is bimodal per round (~0.118x or ~0.037x) on master too; run 38726563387 had 2 of 3 rounds low. On top of pr/5883.json's time",
-     "runs": 6,
-     "time": 1.534,
+     "reason": "macOS arm64 recursion time is ~1.22x on every M1 (Virtual) run held, master's and this PR's alike (1.18-1.28 run medians); pr/5883.json's 1.534x came from one run",
+     "runs": 14,
+     "time": 1.235,
      "tolerance": {
-      "memory": 1.0,
-      "time": 0.2
+      "memory": 1.0
      }
     }
    },
@@ -75,6 +114,38 @@
      "tolerance": {
       "memory": 0.35
      }
+    }
+   }
+  },
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.277,
+      "time": 1.107,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 0.773,
+     "reason": "First run after merging master with the Flutter runtime (ff8f935c20): hello RAM fell on macOS arm64 (1.17-1.47x before, 0.92x now) and on Windows arm64 d49 (1.28x to 0.77x) in the same run, so the move comes from master's changes, not this PR's",
+     "runs": 1,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.43,
+      "time": 0.838
+     },
+     "memory": 0.503,
+     "reason": "Windows arm64 d49 translator RAM 0.50x (rounds 0.48-0.55) is the 0.513x the row held before pr/5883.json moved it to 0.43x from one run",
+     "runs": 1,
+     "time": 0.838
     }
    }
   }
