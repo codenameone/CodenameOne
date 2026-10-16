@@ -116,6 +116,34 @@ class TileQueueTest extends UITestBase {
     }
 
     @FormTest
+    void anAncestorThatFailedIsNotAskedForAgainByItsOtherPieces() {
+        // Level 16 over a source whose deepest level is 14: a level-14 tile
+        // is sixteen pieces of the map, and the view shows only some of them.
+        HoldingSource source = new HoldingSource(14);
+        VectorMapEngine engine = engine(source, 16);
+        engine.setViewport(200, 200);
+        engine.hasRenderedVisibleTiles();
+        while (!source.held.isEmpty()) {
+            source.failAll();
+            flushSerialCalls();
+        }
+        List failedOnce = new ArrayList(source.requests);
+        assertFalse(failedOnce.isEmpty(), "the ancestors were asked for");
+
+        // A short pan brings other pieces of the same ancestors into view.
+        // Theirs is the failure the ancestor already had, and its back-off.
+        engine.setCenter(new LatLng(SAN_FRANCISCO.getLatitude(),
+                SAN_FRANCISCO.getLongitude() + 0.004));
+        engine.hasRenderedVisibleTiles();
+        flushSerialCalls();
+        List later = source.requests.subList(failedOnce.size(), source.requests.size());
+        for (Object request : later) {
+            assertFalse(failedOnce.contains(request),
+                    request + " failed a moment ago and was asked for again");
+        }
+    }
+
+    @FormTest
     void aTileThatFailedIsAskedForAgainAfterAWhile() throws Exception {
         HoldingSource source = new HoldingSource(14);
         VectorMapEngine engine = engine(source, 14);

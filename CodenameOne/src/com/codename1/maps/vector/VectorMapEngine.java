@@ -1049,6 +1049,15 @@ public final class VectorMapEngine {
         }
         List waiters = (List) parentWaiters.get(parentKey);
         boolean underway = waiters != null || pending.containsKey(parentKey);
+        if (!underway && failedForNow(parentKey)) {
+            // The ancestor failed and is waiting out its back-off. Each piece
+            // of it has a key of its own, so without this every sibling the
+            // view reaches would ask the source for the same tile again --
+            // once per piece within a single paint when the source refuses at
+            // once -- and the back-off would hold for none of them.
+            finishFailed(key, requestGeneration);
+            return;
+        }
         if (waiters == null) {
             waiters = new ArrayList();
             parentWaiters.put(parentKey, waiters);
@@ -1103,9 +1112,13 @@ public final class VectorMapEngine {
             return;
         }
         if (tile == null) {
+            // Under the ancestor's own key, which every later piece of it
+            // consults before asking again; see requestOverzoomTile.
+            markFailed(parentKey);
             failAll(waiters, requestGeneration);
             return;
         }
+        failed.remove(parentKey);
         decodedParents.put(parentKey, tile);
         for (Object w : waiters) {
             queuePiece(tile, parentZ, (int[]) w, requestGeneration);
