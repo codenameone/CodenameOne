@@ -487,6 +487,11 @@ components:
   # 0 was then a widget on the native side only, which the gate fails. macos-aqua's Separator
   # therefore carries that 2pt as padding (out of its margin), so both sides are measured.
   #
+  # The row says so with platforms: macos. Without it the Windows and GNOME jobs still compare
+  # the tile, the gate files the both-empty geometry as "nothing to measure" -- and a baseline
+  # refresh writes the score anyway, a near-perfect number about a tile nobody looked at. The
+  # Fluent and Adwaita native keys stay so the reference apps keep capturing those goldens.
+  #
   # The Separator component is still themed by all three desktop themes and is asserted by
   # DesktopNativeThemeContentTest on every platform.
 
@@ -507,6 +512,7 @@ components:
     native_mac: appkit_box_separator
     native_gnome: gtk_separator
     states: normal
+    platforms: macos
 
   - id: DesktopGroupBox
     cn1_uiid: GroupBox

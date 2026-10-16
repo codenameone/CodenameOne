@@ -569,13 +569,21 @@ ListRendererFocus {
  * The rule sits 2pt INSIDE the separator, not at its edge. AppKit's separator NSBox draws its
  * 1px line centred in its own frame, and the macOS golden measures it at the frame's third pixel
  * row: the box carries 2pt of air above the line (and, centred, below it) as part of the view.
- * Those 2pt are padding here and come out of the margin, so the space a layout gives the rule
- * is the same 1.1mm either side it always was and a real screen paints the same pixels. What
- * changes is where the rule sits within the component's own bounds, which is what the fidelity
- * tile compares: with padding 0 the rule was our separator's top row, which the geometry mask's
- * 2px edge trim discards, so the gate saw AppKit's line and no line of ours.
+ * With padding 0 our rule was the separator's top row, which the fidelity geometry mask's 2px
+ * edge trim discards, so the gate saw AppKit's line and no line of ours.
+ *
+ * That air is padding here and comes out of the 1.1mm margin, so the space a layout gives the
+ * rule does not change. The split is NOT the obvious 2pt-of-1.1mm (0.53mm + 0.57mm): margin and
+ * padding are converted to pixels separately, each rounded on its own, and two rounded halves do
+ * not add up to the rounded whole. 0.53 + 0.57 grew each side by a pixel at 72, 120, 168, 216 and
+ * 264 dpi -- a 1x Mac among them. 0.42mm + 0.64mm gives exactly the pixels 1.1mm did at every
+ * density from 72 to 288 dpi in 24 dpi steps: a Mac at 1x and 2x, the 96 dpi fidelity runner,
+ * and Windows, Linux and the browser from 100% to 300% scaling. Above 300%, or at a density
+ * between those steps, a side can differ by one pixel. No split avoids that everywhere -- two
+ * independently rounded fields cannot track one -- so this one is exact where desktops run.
+ * The padding is 2px at 1x and 96 dpi and 4px on a 2x Mac: AppKit's 2pt.
  */
-Separator { color: #dcdcdc; background-color: transparent; margin: 0.57mm 0 0.57mm 0; padding: 0.53mm 0 0.53mm 0; }
+Separator { color: #dcdcdc; background-color: transparent; margin: 0.42mm 0 0.42mm 0; padding: 0.64mm 0 0.64mm 0; }
 GroupBox { background-color: transparent; border: 0.26mm solid #c6c6c8; border-radius: 1.59mm; padding: 1.1mm; margin: 1.1mm 0 1.1mm 0; }
 GroupBoxTitle { color: #7f7f7f; background-color: transparent; padding: 0 0 1.1mm 0; margin: 0; }
 Link { color: #007aff; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
@@ -821,7 +829,7 @@ RightSideCommand.hover { color: var(--text-color, #000000); background-color: #e
     DesktopHorizontalScrollThumb { background-color: #5a5a5e; cn1-background-type: cn1-pill-border; padding: 0; margin: 1.06mm 0 1.06mm 0; }
     DesktopHorizontalScrollThumb.selected { background-color: #8e8e93; cn1-background-type: cn1-pill-border; padding: 0; margin: 1.06mm 0 1.06mm 0; }
     DesktopHorizontalScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-pill-border; padding: 0; margin: 1.06mm 0 1.06mm 0; }
-    Separator { color: #48484a; background-color: transparent; margin: 0.57mm 0 0.57mm 0; padding: 0.53mm 0 0.53mm 0; }
+    Separator { color: #48484a; background-color: transparent; margin: 0.42mm 0 0.42mm 0; padding: 0.64mm 0 0.64mm 0; }
     GroupBox { background-color: transparent; border: 0.26mm solid #545456; border-radius: 1.59mm; padding: 1.1mm; margin: 1.1mm 0 1.1mm 0; }
     GroupBoxTitle { color: #98989d; background-color: transparent; padding: 0 0 1.1mm 0; margin: 0; }
     Link { color: #007aff; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
