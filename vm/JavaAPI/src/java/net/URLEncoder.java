@@ -128,6 +128,10 @@ public class URLEncoder {
                 out.append('%').append(HEX[v >> 4]).append(HEX[v & 0xf]);
             }
         }
+        // As in URLDecoder: a string that needs no escape is returned without
+        // `enc` being looked at, so an encoding this runtime lacks is reported
+        // only once a character needs it. This is not the JDK; the runtime has
+        // UTF-8 and ISO-8859-1, which are what a URL is encoded with.
         return out == null ? s : out.toString();
     }
 

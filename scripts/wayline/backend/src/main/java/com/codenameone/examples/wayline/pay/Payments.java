@@ -601,9 +601,13 @@ public class Payments {
             throw new ResponseStatusException(400, "That is not an amount for a tip");
         }
         // Not for a driver who has closed the account: the tip would be
-        // credited to a name nobody can sign in as or cash out. A tip and a
-        // closure at the same moment can still cross; the closure then sees
-        // the balance and is refused.
+        // credited to a name nobody can sign in as or cash out. A closure can
+        // still land while this tip's charge is at the processor, since the
+        // balance counts a tip only once its charge is recorded; the driver
+        // would have to close in that second or two, just after cashing out.
+        // Holding closures until every tip in flight settles would need a
+        // state of its own, and one that never settles would hold the
+        // account open for good.
         String driver = ride.getDriver();
         if (driver == null || driver.length() == 0 || profiles.findById(driver) == null) {
             throw new ResponseStatusException(409, "That driver can no longer be tipped");

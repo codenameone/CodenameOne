@@ -505,17 +505,17 @@ public class BackendPackageMojo extends AbstractMojo {
     /// sources and has to read them the same way.
     static String sourceEncodingOf(MavenProject project) {
         Plugin compiler = compilerPlugin(project);
-        if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
-            Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
-            if (encoding != null && encoding.getValue() != null) {
-                String declared = encoding.getValue().trim();
-                // A configuration that is still a property reference is one Maven
-                // would have interpolated; an uninterpolated ${...} names no
-                // charset, so fall through rather than hand javac a literal.
-                if (declared.length() > 0 && declared.indexOf("${") < 0) {
-                    return declared;
-                }
-            }
+        // The execution that compiles these sources first -- the one
+        // compilerExecutionConfiguration picks for every other compiler option
+        // -- and only then the plugin-level value. Read the other way, a module
+        // that declares its encoding on the execution was recompiled here with
+        // the plugin's, or with UTF-8.
+        String declared = encodingIn(compilerExecutionConfiguration(compiler, "compile"));
+        if (declared == null && compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
+            declared = encodingIn((Xpp3Dom) compiler.getConfiguration());
+        }
+        if (declared != null) {
+            return declared;
         }
         String property = project.getProperties() == null ? null
                 : project.getProperties().getProperty("project.build.sourceEncoding");
@@ -523,6 +523,18 @@ public class BackendPackageMojo extends AbstractMojo {
             return property.trim();
         }
         return "UTF-8";
+    }
+
+    private static String encodingIn(Xpp3Dom configuration) {
+        Xpp3Dom encoding = configuration == null ? null : configuration.getChild("encoding");
+        if (encoding == null || encoding.getValue() == null) {
+            return null;
+        }
+        String declared = encoding.getValue().trim();
+        // A configuration that is still a property reference is one Maven
+        // would have interpolated; an uninterpolated ${...} names no
+        // charset, so fall through rather than hand javac a literal.
+        return declared.length() > 0 && declared.indexOf("${") < 0 ? declared : null;
     }
 
     private File resolve(String groupId, String artifactId, String version, String classifier)
