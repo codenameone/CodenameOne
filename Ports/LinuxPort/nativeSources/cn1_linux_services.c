@@ -210,7 +210,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetText___R_java_lang_
     JAVA_OBJECT result;
     r.text = NULL;
     cn1LinuxRunOnMainAndWait(cn1ClipGetTextOnMain, &r);
-    result = r.text ? newStringFromCString(threadStateData, r.text) : JAVA_NULL;
+    result = r.text ? newStringFromUtf8Len(threadStateData, r.text, (int) strlen(r.text)) : JAVA_NULL;
     if (r.text) {
         g_free(r.text);
     }
