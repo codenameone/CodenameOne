@@ -31,7 +31,8 @@ extern "C" {
 
 /// Builds the application's menu bar.
 ///
-/// Called from the generated `main` before the run loop starts, because an app
+/// Called from the generated `main` before the run loop starts -- after the main
+/// window and its first frame, which is all the user is waiting for -- because an app
 /// with no menu bar has no Quit item, and an app with no Quit item does not pass
 /// App Store review and cannot be closed from the keyboard.
 ///
@@ -41,8 +42,13 @@ extern "C" {
 /// XIBs.
 void CN1MacInstallMainMenu(void);
 
-/// Installs the NSApplicationDelegate. Called from the generated main alongside
-/// the menu bar, before [NSApp run].
+/// Lets the menu bar be built, and applies any commands the application
+/// published before it could be. Main thread only; idempotent. See
+/// CN1MacHostSetMenuCommands for why commands are held back until this runs.
+void CN1MacReleaseStartupMenu(void);
+
+/// Installs the NSApplicationDelegate. Called from the generated main before
+/// [NSApp run], ahead of the window and the menu bar.
 void CN1MacInstallAppDelegate(void);
 
 #ifdef __cplusplus

@@ -720,6 +720,50 @@ final class JavascriptMethodGenerator {
      * calls that implementation directly, so a signature-wide "suspending"
      * would put ``yield*`` in front of a plain function.
      */
+    /// A virtual call site's direct target, as {function id, "1" if it suspends}, or null.
+    ///
+    /// monomorphicDispatch only devirtualizes a signature declared ONCE in the whole
+    /// program, which almost nothing is: Integer.intValue() shares its signature with
+    /// every Number, HashMap.get(Object) with every Map. Every such call went through
+    /// cn1_ivResolve -- a methods-map probe per call -- even where the receiver's type
+    /// leaves one possible body: a final class, or a cone in which RTA sees one
+    /// instantiated implementation. This asks the suspension analysis's own dispatch
+    /// model for that body (DispatchModel.directTarget), so the direct call and the
+    /// site's classification come from one answer. The m: entry stays: only
+    /// monomorphicDispatch prunes it, and the bridge can still dispatch through it.
+    /// Kill switch: -Dparparvm.js.sitedevirt.off.
+    private static String[] siteDirectTarget(Invoke invoke, String receiver) {
+        if (invoke == null || System.getProperty("parparvm.js.sitedevirt.off") != null) {
+            return null;
+        }
+        JavascriptSuspensionAnalysis.DispatchModel model = JavascriptSuspensionAnalysis.exportedDispatchModel;
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (model == null || idx == null) {
+            return null;
+        }
+        BytecodeMethod m = null;
+        String exactOwner = exactLocalType(receiver);
+        if (exactOwner != null) {
+            m = model.exactTarget(exactOwner, invoke.getName(), invoke.getDesc());
+            // The site was classified from the declared type's cone, which holds this
+            // body; a generator body at a site classified synchronous would need a drive.
+            if (m != null && m.isJavascriptSuspending() && !isInvokeSuspending(invoke)) {
+                m = null;
+            }
+        }
+        if (m == null) {
+            m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        }
+        if (m == null) {
+            return null;
+        }
+        ByteCodeClass c = idx.get(m.getClsName());
+        if (c == null || isJsoBridgeType(c, idx)) {
+            return null;
+        }
+        return new String[]{jsMethodIdentifier(c, m), m.isJavascriptSuspending() ? "1" : "0"};
+    }
+
     private static boolean isDevirtualizedInvokeSuspending(String dispatchId, boolean signatureAnswer) {
         java.util.Map<String, Boolean> known = monomorphicSuspending;
         if (known == null) {
@@ -1113,7 +1157,9 @@ final class JavascriptMethodGenerator {
             String nativeId = jsMethodIdentifier(cls, method);
             NATIVE_METHOD_IDENTIFIERS.add(nativeId);
             NATIVE_METHOD_IDENTIFIERS.add(nativeId + "__impl");
-            appendNativeStubIfNeeded(methodsOut, cls, method);
+            if (!appendTranslatedDelegate(methodsOut, cls, method)) {
+                appendNativeStubIfNeeded(methodsOut, cls, method);
+            }
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
                 String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(method.getMethodName(), method.getSignature());
@@ -1486,9 +1532,7 @@ final class JavascriptMethodGenerator {
             return ((Boolean) value).booleanValue() ? "1" : "0";
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            return "_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")";
+            return javascriptLongLiteral((Long) value);
         }
         if (value instanceof Number) {
             return value.toString();
@@ -1637,6 +1681,10 @@ final class JavascriptMethodGenerator {
             s = rx(s, 
                     dvPattern.replace("yield\\* _dv", "_dw"),
                     dvReplacement.replace("yield* _dv", "_dw"));
+            // _dn is _dw without the generator drive; same argument shape.
+            s = rx(s,
+                    dvPattern.replace("yield\\* _dv", "_dn"),
+                    dvReplacement.replace("yield* _dv", "_dn"));
         }
         return s;
     }
@@ -2950,6 +2998,8 @@ final class JavascriptMethodGenerator {
     private static void appendMethodImpl(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
+        currentLoopNewSites = loopNewSites(instructions, labelToIndex);
+        currentExactLocals = exactLocals(method, instructions);
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
@@ -4798,11 +4848,17 @@ final class JavascriptMethodGenerator {
             case Opcodes.ICONST_5:
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getOpcode() - Opcodes.ICONST_0))).append(";\n");
                 return true;
+            // A long in the safe range is a plain number, so 0L and 1L are the literals
+            // rather than the runtime's _L0/_L1 constants. Reading a top-level const is a
+            // context-slot load V8 does not fold here: an accumulator seeded from one
+            // (`long s = 0; for (...) s += a[i];`) is typed as any number and every
+            // _Ladd in the loop keeps its type tests -- 2.5x slower in node on
+            // arraySequential's reduction than the same loop seeded with 0.
             case Opcodes.LCONST_0:
-                out.append("  ").append(ctx.push("_L0")).append(";\n");
+                out.append("  ").append(ctx.push("0")).append(";\n");
                 return true;
             case Opcodes.LCONST_1:
-                out.append("  ").append(ctx.push("_L1")).append(";\n");
+                out.append("  ").append(ctx.push("1")).append(";\n");
                 return true;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -5109,6 +5165,24 @@ final class JavascriptMethodGenerator {
             case Opcodes.SALOAD: {
                 String idx = ctx.pop();
                 String arr = ctx.pop();
+                java.util.Set<Instruction> hotArraySites = currentLoopNewSites;
+                if (hotArraySites != null && hotArraySites.contains(instruction)
+                        && isPureOperand(arr) && isPureOperand(idx)) {
+                    // The bounds test as a statement and the load as a plain element read.
+                    // Through _A the load is one site shared by every array access in the
+                    // program -- int, double and reference arrays alike -- so its feedback
+                    // is megamorphic in any real application. The failing case still goes
+                    // through _A, which throws exactly what it always did (a null array is
+                    // a NullPointerException, a bad index ArrayIndexOutOfBoundsException).
+                    // A statement rather than `ok ? a[i] : _A(a, i)`: the conditional merges
+                    // an unboxed element with _A's tagged result and boxes every load. In
+                    // headless Chrome on an 8M-element int reduction: shared _A 98ms, the
+                    // conditional 212ms, this form 38ms, a bare `a[i]` 27ms.
+                    out.append("  if(").append(arr).append("==null||").append(idx).append(">>>0>=")
+                            .append(arr).append(".length)_A(").append(arr).append(",").append(idx).append(");\n");
+                    out.append("  ").append(ctx.push(arr + "[" + idx + "]")).append(";\n");
+                    return true;
+                }
                 out.append("  ").append(ctx.push("_A(" + arr + ", " + idx + ")")).append(";\n");
                 return true;
             }
@@ -5123,6 +5197,17 @@ final class JavascriptMethodGenerator {
                 String value = ctx.pop();
                 String idx = ctx.pop();
                 String arr = ctx.pop();
+                java.util.Set<Instruction> hotArraySites = currentLoopNewSites;
+                if (hotArraySites != null && hotArraySites.contains(instruction)
+                        && isPureOperand(arr) && isPureOperand(idx)) {
+                    // As for the loads above, inside loops only. The value is evaluated once on either branch,
+                    // after the array and index, as Java evaluates it.
+                    out.append("  if(").append(arr).append("==null||").append(idx).append(">>>0>=")
+                            .append(arr).append(".length)_T(").append(arr).append(",").append(idx).append(",")
+                            .append(value).append(");else ").append(arr).append("[").append(idx).append("]=")
+                            .append(value).append(";\n");
+                    return true;
+                }
                 out.append("  _T(").append(arr).append(", ").append(idx).append(", ").append(value).append(");\n");
                 return true;
             }
@@ -5205,13 +5290,22 @@ final class JavascriptMethodGenerator {
     private static boolean appendStraightLineLdcInstruction(StringBuilder out, Ldc instruction, StraightLineContext ctx) {
         Object value = instruction.getValue();
         if (value instanceof String) {
-            out.append("  ").append(ctx.push("_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
+            String literal = "_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")";
+            java.util.Set<Instruction> loopSites = currentLoopNewSites;
+            if (loopSites != null && loopSites.contains(instruction)) {
+                // A literal read in a loop keeps its String in a slot of its own. _L looks
+                // the text up in the literal table on every read -- a dictionary lookup
+                // over every literal in the program (4,675 in the transpiled gallery),
+                // repeated per iteration. Outside loops the lookup runs once and the
+                // slot's ~20 bytes would not pay for themselves.
+                String slot = "_Lc[" + literalCacheSlot((String) value) + "]";
+                literal = "(" + slot + "||(" + slot + "=" + literal + "))";
+            }
+            out.append("  ").append(ctx.push(literal)).append(";\n");
             return true;
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            out.append("  ").append(ctx.push("_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")")).append(";\n");
+            out.append("  ").append(ctx.push(javascriptLongLiteral((Long) value))).append(";\n");
             return true;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
@@ -5285,7 +5379,7 @@ final class JavascriptMethodGenerator {
                 // suspending <clinit> runs on the trampoline; ``_O``'s own
                 // call then finds the class initialized and returns. (#5774)
                 appendStraightLineEnsureClassInitialized(out, ctx, typeName);
-                out.append("  ").append(ctx.push("_O(\"" + typeName + "\")")).append(";\n");
+                out.append("  ").append(ctx.push(newObjectExpression(typeName, instruction))).append(";\n");
                 return true;
             case Opcodes.ANEWARRAY: {
                 String size = ctx.pop();
@@ -5524,9 +5618,41 @@ final class JavascriptMethodGenerator {
                     // A devirtualized site follows its TARGET, not the signature.
                     boolean devSuspending = monoImpl != null
                             ? isDevirtualizedInvokeSuspending(dispatchId, suspending) : suspending;
-                    String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+                    if (monoImpl == null) {
+                        String[] direct = siteDirectTarget(invoke, target);
+                        if (direct != null) {
+                            monoImpl = direct[0];
+                            devSuspending = "1".equals(direct[1]);
+                        }
+                    }
+                    // A generator target at a site classified synchronous (see
+                    // JavascriptSuspensionAnalysis.isDrivenSignature) is driven.
+                    boolean devDriven = monoImpl != null && devSuspending && !suspending;
+                    if (devDriven) {
+                        devSuspending = false;
+                    }
+                    // _dn: a direct call to a synchronous body needs no generator
+                    // drive (see _dn0 in parparvm_runtime.js).
+                    String devBase = monoImpl != null ? (devDriven ? "_dw" : devSuspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
+                    if ("_dn".equals(devBase) && argsArePure(argValues)) {
+                        // A direct call V8 can see at the site: `impl(_nn(t), ...)`. Through
+                        // _dn* the body is a parameter of a helper every direct call in the
+                        // program shares, so the inner call's feedback is megamorphic, the
+                        // body is not inlined, and the receiver escapes into it -- a `new`
+                        // whose fields are read through getters is allocated for real. On
+                        // valueEscape's shape that is 7ms against 107ms in node. The null
+                        // check moves ahead of the arguments, which is only unobservable
+                        // when they are pure (locals and constants), so only then.
+                        callExpr.append("(").append(monoImpl).append("(_nn(").append(target).append(")");
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            callExpr.append(", ").append(argValues[ai]);
+                        }
+                        callExpr.append("))");
+                        out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+                        return true;
+                    }
                     callExpr.append(devSuspending ? "(yield* " : "(").append(devBase)
                             .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
                             .append("(").append(target).append(", ").append(devSecond);
@@ -5546,12 +5672,12 @@ final class JavascriptMethodGenerator {
                     out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
                 } else {
                     out.append("  {\n");
-                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
+                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending, invoke);
                     out.append("    ").append(ctx.push("__result")).append(";\n");
                     out.append("  }\n");
                 }
             } else {
-                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending);
+                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending, invoke);
             }
             return true;
         }
@@ -6006,6 +6132,52 @@ final class JavascriptMethodGenerator {
 
     private static String jsStaticMethodBodyIdentifier(String owner, String name, String desc) {
         return JavascriptNameUtil.methodIdentifier(owner, name, desc) + "__impl";
+    }
+
+/// Emits a native the JavaScript target implements by calling its pure-Java twin
+/// (JavascriptNativeRegistry.TRANSLATED_DELEGATES), and answers whether it did. The
+/// native is a plain function exactly when the twin is: the suspension analysis
+/// records the call as an edge, so a suspending twin always makes the native
+/// suspending. The reverse cannot be emitted -- a synchronous body cannot yield*
+/// into a generator -- and would mean the analysis and the emitter disagree, so it
+/// fails the translation rather than producing a native that returns a generator.
+private static boolean appendTranslatedDelegate(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+        String twinName = JavascriptNativeRegistry.translatedDelegateTwin(cls.getClsName(), method);
+        if (twinName == null) {
+            return false;
+        }
+        BytecodeMethod twin = null;
+        for (BytecodeMethod candidate : cls.getMethods()) {
+            if (!candidate.isEliminated() && !candidate.isNative()
+                    && twinName.equals(candidate.getMethodName())
+                    && method.getSignature().equals(candidate.getSignature())
+                    && method.isStatic() == candidate.isStatic()) {
+                twin = candidate;
+                break;
+            }
+        }
+        if (twin == null) {
+            throw new IllegalStateException("JavaScript delegate twin " + cls.getClsName() + "." + twinName
+                    + method.getSignature() + " of native " + method.getMethodName() + " is missing");
+        }
+        boolean suspending = method.isJavascriptSuspending();
+        boolean twinSuspending = twin.isJavascriptSuspending();
+        if (twinSuspending && !suspending) {
+            throw new IllegalStateException("native " + cls.getClsName() + "." + method.getMethodName()
+                    + " was classified synchronous but its twin " + twinName + " suspends");
+        }
+        String twinFn = twin.isStatic() && !shouldEmitStaticWrapper(twin)
+                ? jsMethodBodyIdentifier(cls, twin) : jsMethodIdentifier(cls, twin);
+        out.append(suspending ? "function* " : "function ").append(jsMethodIdentifier(cls, method)).append("(");
+        appendMethodParameters(out, method);
+        out.append("){\n");
+        if (twin.isStatic() && !shouldEmitStaticWrapper(twin) && classNeedsInitialization(cls.getClsName())) {
+            out.append(classInitGuard(cls.getClsName(), suspending, "  "));
+        }
+        out.append("  return ").append(twinSuspending ? "yield* " : "").append(twinFn).append("(");
+        appendMethodParameters(out, method);
+        out.append(");\n}\n");
+        return true;
     }
 
 private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
@@ -6815,10 +6987,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_0:
-                out.append("        stack.p(_L0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_1:
-                out.append("        stack.p(_L1); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(1); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -7138,10 +7310,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return;
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            out.append("        stack.p(_Llit(").append((int) lv).append(", ").append((int) (lv >>> 32))
-                    .append(")); pc = ").append(index + 1).append("; break;\n");
+            out.append("        stack.p(").append(javascriptLongLiteral((Long) value))
+                    .append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
@@ -7171,7 +7341,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 // See the straight-line NEW case: ``_O`` only ever drives a
                 // clinit synchronously, so the guard goes first. (#5774)
                 appendInterpreterEnsureClassInitialized(out, typeName, false);
-                out.append("        stack.p(_O(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(").append(newObjectExpression(typeName, instruction)).append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ANEWARRAY:
                 out.append("        stack.p(_j(stack.q(), \"").append(typeName)
@@ -7462,10 +7632,21 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // one emitted through the interpreter rather than structured --
             // could still ``yield*`` a plain function or drive a generator
             // synchronously at precisely the sites this map exists for.
+            boolean siteSusp = susp;
             if (monoImpl != null) {
                 susp = isDevirtualizedInvokeSuspending(dispatchId, susp);
+            } else {
+                String[] direct = siteDirectTarget(invoke, null);
+                if (direct != null) {
+                    monoImpl = direct[0];
+                    susp = "1".equals(direct[1]);
+                }
             }
-            String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
+            boolean driven = monoImpl != null && susp && !siteSusp;
+            if (driven) {
+                susp = false;
+            }
+            String iv = monoImpl != null ? (driven ? "_dw" : susp ? "_dv" : "_dn") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
@@ -7706,6 +7887,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
             int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
             boolean suspending) {
+        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack,
+                argExpressions, suspending, null);
+    }
+
+    private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
+            boolean suspending, Invoke invoke) {
         // Monomorphic devirtualization: a dispatch id with exactly one
         // concrete impl resolves to that body for any receiver, so call
         // it directly through the ``_dv*`` / ``_dw*`` family (impl
@@ -7717,10 +7905,21 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String monoImpl = mono == null ? null : mono.get(methodId);
         // Devirtualized: follow the TARGET's suspending-ness, not the
         // signature's -- see isDevirtualizedInvokeSuspending.
+        boolean siteSuspending = suspending;
         if (monoImpl != null) {
             suspending = isDevirtualizedInvokeSuspending(methodId, suspending);
+        } else {
+            String[] direct = siteDirectTarget(invoke, targetExpr);
+            if (direct != null) {
+                monoImpl = direct[0];
+                suspending = "1".equals(direct[1]);
+            }
         }
-        String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+        boolean driven = monoImpl != null && suspending && !siteSuspending;
+        if (driven) {
+            suspending = false;
+        }
+        String base = monoImpl != null ? (driven ? "_dw" : suspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
         // The second helper argument: bareword impl fn for devirt, else
         // the quoted dispatch-id string.
         String secondArg = monoImpl != null ? monoImpl : ("\"" + methodId + "\"");
@@ -7737,6 +7936,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 helper = base + "N";
                 variadic = true;
                 break;
+        }
+        if ("_dn".equals(base) && !argsFromStack && argsArePure(argExpressions == null ? new String[0] : argExpressions)) {
+            // The site-visible direct call, as in the straight-line invoke: see the
+            // comment there.
+            out.append(indent);
+            if (hasReturn) {
+                out.append("let __result = ");
+            }
+            out.append(monoImpl).append("(_nn(").append(targetExpr).append(")");
+            for (int i = 0; i < argCount; i++) {
+                out.append(", ").append(argExpressions[i]);
+            }
+            out.append(");\n");
+            return;
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
@@ -11155,4 +11368,373 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         depthHolder[0]++;
         return true;
     }
+    /// The JavaScript expression for a long constant, in the runtime's canonical form
+    /// (see the long section of parparvm_runtime.js): a plain number literal when the
+    /// value is a safe integer, which is what the runtime's own helpers return for it,
+    /// and an _Llit(lowInt, highInt) record otherwise. Emitting _Llit for every
+    /// constant cost a call per evaluation, inside loops included. A negative number
+    /// is parenthesized so it cannot merge with an operator it is spliced after.
+    static String javascriptLongLiteral(long value) {
+        final long maxSafe = 9007199254740991L;
+        if (value >= -maxSafe && value <= maxSafe) {
+            return value < 0 ? "(" + value + ")" : Long.toString(value);
+        }
+        return "_Llit(" + ((int) value) + ", " + ((int) (value >>> 32)) + ")";
+    }
+
+    /// Classes a translated ``new`` allocates through a per-class allocation function
+    /// (see newObjectExpression), in first-use order; appendAllocationFunctions emits them.
+    static final java.util.LinkedHashSet<String> ALLOCATION_FUNCTION_CLASSES = new java.util.LinkedHashSet<String>();
+
+    /// Field property names written as bare object-literal keys by the allocation
+    /// functions. JavascriptBundleWriter.minifyGeneratedIdentifiers renames whole tokens,
+    /// so one of these that happened to spell a generated function name (a field
+    /// ``done`` beside a method ``void done()``) would be renamed with it; it excludes them.
+    static final java.util.Set<String> ALLOCATION_FUNCTION_KEYS = new java.util.HashSet<String>();
+
+    static void resetAllocationFunctions() {
+        ALLOCATION_FUNCTION_CLASSES.clear();
+        ALLOCATION_FUNCTION_KEYS.clear();
+    }
+
+    /// The expression a translated ``new typeName`` allocates with.
+    ///
+    /// jvm.newObject builds an object by walking a cached field list and assigning each
+    /// default through a computed key. V8 cannot see through that: the allocation is a
+    /// call it will not inline and the stores are keyed, so every ``new`` in a loop
+    /// allocates for real. Measured in node on the valueEscape shape (allocate, read two
+    /// fields, drop), 8M iterations: 220-250ms through the generic path, 14ms for a
+    /// function returning a literal with the field names as literal keys -- V8 inlines it
+    /// and removes the allocation, as it does for dart2js's own output -- and ~80ms with
+    /// the same keys computed.
+    ///
+    /// So a class gets its own allocation function returning exactly that literal. Not
+    /// for a Throwable, whose construction has to capture the stack (jvm.newObject does);
+    /// not for an abstract class or an interface, which bytecode cannot instantiate; not
+    /// when any class on the chain is unknown here, since the field list would be
+    /// incomplete; and not under -Dparparvm.js.manglefields=1, which renames field names
+    /// only where they appear as quoted strings. The class-initialization guard the NEW
+    /// site already emits (appendStraightLineEnsureClassInitialized) is what runs a
+    /// static initializer; newObject's own check only mattered for a class without one.
+    static String newObjectExpression(String typeName, Instruction site) {
+        java.util.Set<Instruction> loopSites = currentLoopNewSites;
+        boolean hot = BOXED_TYPES.contains(typeName) || (loopSites != null && loopSites.contains(site));
+        if (!hot || !allocationFunctionEligible(typeName)) {
+            return "_O(\"" + typeName + "\")";
+        }
+        ALLOCATION_FUNCTION_CLASSES.add(typeName);
+        return allocationFunctionName(typeName) + "()";
+    }
+
+    /// The NEW, array load and array store instructions of the method being emitted that sit
+    /// inside a loop -- between a
+    /// backward branch and its target -- or null. Only those get an allocation function.
+    /// The function's win is V8 removing, or at least cheaply building, an allocation it
+    /// sees many times; a ``new`` that runs once per call -- a listener, a UI component, a
+    /// lambda -- gains nothing from it, and on the transpiled Flutter gallery giving every
+    /// ``new`` one cost ~1MB of executable code (2,979 functions). An allocation reached
+    /// from a loop only through a call (Integer.valueOf's ``new Integer``) is not
+    /// covered; that is the price of keeping the bundle size.
+    private static java.util.Set<Instruction> currentLoopNewSites;
+
+    /// True when evaluating every argument can neither throw nor have an effect -- local
+    /// reads and literals -- so a null check may run before them without changing what
+    /// a program can observe.
+    private static boolean argsArePure(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (!StraightLineContext.isDeferrable(args[i]) && !isStackSlotName(args[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A local, a stack slot or a literal: re-reading it costs nothing and cannot throw.
+    private static boolean isPureOperand(String expr) {
+        return StraightLineContext.isDeferrable(expr) || isStackSlotName(expr);
+    }
+
+    private static boolean isStackSlotName(String expr) {
+        if (expr == null || expr.length() < 2 || expr.charAt(0) != 's') {
+            return false;
+        }
+        for (int i = 1; i < expr.length(); i++) {
+            if (!Character.isDigit(expr.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final Map<String, Integer> LITERAL_CACHE_SLOTS = new HashMap<String, Integer>();
+
+    /// The `_Lc` index of a string literal read inside a loop: one slot per distinct text.
+    private static synchronized int literalCacheSlot(String text) {
+        Integer slot = LITERAL_CACHE_SLOTS.get(text);
+        if (slot == null) {
+            slot = Integer.valueOf(LITERAL_CACHE_SLOTS.size());
+            LITERAL_CACHE_SLOTS.put(text, slot);
+        }
+        return slot.intValue();
+    }
+
+    /// Local slots of the method being emitted whose class is known exactly, or null.
+    private static Map<Integer, String> currentExactLocals;
+
+    /// The slots every store to which is ``new X(...)`` -- an ASTORE right after the
+    /// ``X.<init>`` call -- mapped to X; parameters, whose first value comes from the
+    /// caller, never qualify. A virtual call on such a local reaches X's own body however
+    /// many overrides the declared type has elsewhere in the program: a ``new HashMap()``
+    /// in an application that also has a LinkedHashMap. CHA answers that site with a
+    /// lookup by name on every call; this answers it with a direct call.
+    ///
+    /// The ASTORE must follow the ``<init>`` with nothing between them but line and
+    /// variable metadata. A label would mean another path reaches the store, and the value
+    /// that path brings is unknown.
+    private static Map<Integer, String> exactLocals(BytecodeMethod method, List<Instruction> instructions) {
+        if (System.getProperty("parparvm.js.exactlocals.off") != null) {
+            return null;
+        }
+        int firstLocal = method.isStatic() ? 0 : 1;
+        for (ByteCodeMethodArg arg : method.getArguments()) {
+            char q = arg.getQualifier();
+            firstLocal += (q == 'l' || q == 'd') ? 2 : 1;
+        }
+        Map<Integer, String> exact = null;
+        java.util.Set<Integer> rejected = null;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp)) {
+                continue;
+            }
+            int op = ins.getOpcode();
+            if (op < Opcodes.ISTORE || op > Opcodes.ASTORE) {
+                continue;
+            }
+            Integer slot = Integer.valueOf(((VarOp) ins).getIndex());
+            String type = null;
+            if (op == Opcodes.ASTORE && slot.intValue() >= firstLocal) {
+                int p = i - 1;
+                while (p >= 0 && (instructions.get(p) instanceof LineNumber
+                        || instructions.get(p) instanceof LocalVariable)) {
+                    p--;
+                }
+                if (p >= 0 && instructions.get(p) instanceof Invoke) {
+                    Invoke init = (Invoke) instructions.get(p);
+                    if (init.getOpcode() == Opcodes.INVOKESPECIAL && "<init>".equals(init.getName())) {
+                        type = init.getOwner();
+                    }
+                }
+            }
+            if (rejected != null && rejected.contains(slot)) {
+                continue;
+            }
+            String known = exact == null ? null : exact.get(slot);
+            if (type == null || (known != null && !known.equals(type))) {
+                if (rejected == null) {
+                    rejected = new HashSet<Integer>();
+                }
+                rejected.add(slot);
+                if (exact != null) {
+                    exact.remove(slot);
+                }
+                continue;
+            }
+            if (exact == null) {
+                exact = new HashMap<Integer, String>();
+            }
+            exact.put(slot, type);
+        }
+        return exact == null || exact.isEmpty() ? null : exact;
+    }
+
+    /// The exact class of a receiver expression that is a plain local read, or null.
+    private static String exactLocalType(String receiver) {
+        Map<Integer, String> exact = currentExactLocals;
+        if (exact == null || receiver == null || receiver.length() < 2 || receiver.charAt(0) != 'l') {
+            return null;
+        }
+        int slot = 0;
+        for (int i = 1; i < receiver.length(); i++) {
+            char c = receiver.charAt(i);
+            if (c < '0' || c > '9' || i > 6) {
+                return null;
+            }
+            slot = slot * 10 + (c - '0');
+        }
+        return exact.get(Integer.valueOf(slot));
+    }
+
+    /// The boxed types. Their instances are allocated in their own valueOf factories, never
+    /// in the loop that autoboxes, so the in-loop rule never sees them -- yet boxing is the
+    /// commonest allocation a loop does (hashMapChurn spent 21% of its time building
+    /// Integers through jvm.newObject). Eight one-field classes, so the cost is a few hundred
+    /// bytes in any bundle.
+    private static final java.util.Set<String> BOXED_TYPES = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "java_lang_Integer", "java_lang_Long", "java_lang_Double", "java_lang_Float",
+            "java_lang_Short", "java_lang_Character", "java_lang_Byte", "java_lang_Boolean"));
+
+    private static java.util.Set<Instruction> loopNewSites(List<Instruction> instructions,
+            Map<Label, Integer> labelToIndex) {
+        java.util.Set<Instruction> out = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Instruction, Boolean>());
+        if (instructions == null) {
+            return out;
+        }
+        boolean[] inLoop = null;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            java.util.List<Label> targets = new java.util.ArrayList<Label>(2);
+            if (in instanceof Jump) {
+                targets.add(((Jump) in).getLabel());
+            } else if (in instanceof com.codename1.tools.translator.bytecodes.CustomJump) {
+                targets.add(((com.codename1.tools.translator.bytecodes.CustomJump) in).getLabel());
+            } else if (in instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) in;
+                targets.add(sw.getDefaultLabel());
+                if (sw.getLabels() != null) {
+                    targets.addAll(java.util.Arrays.asList(sw.getLabels()));
+                }
+            }
+            for (Label target : targets) {
+                Integer t = target == null ? null : labelToIndex.get(target);
+                if (t != null && t.intValue() <= i) {
+                    if (inLoop == null) {
+                        inLoop = new boolean[instructions.size()];
+                    }
+                    for (int k = t.intValue(); k <= i; k++) {
+                        inLoop[k] = true;
+                    }
+                }
+            }
+        }
+        if (inLoop == null) {
+            return out;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (!inLoop[i]) {
+                continue;
+            }
+            int op = in.getOpcode();
+            // NEW for allocation functions; the array loads and stores for the inline
+            // bounds test (appendStraightLine's xALOAD / xASTORE), which costs ~30 bytes a
+            // site and so is spent only where it repeats.
+            if ((in instanceof TypeInstruction && op == Opcodes.NEW)
+                    || (in instanceof Ldc && ((Ldc) in).getValue() instanceof String)
+                    || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
+                    || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)) {
+                out.add(in);
+            }
+        }
+        return out;
+    }
+
+    static String allocationFunctionName(String className) {
+        return "cn1_" + className + "___NEW__";
+    }
+
+    private static boolean allocationFunctionEligible(String typeName) {
+        if ("1".equals(System.getProperty("parparvm.js.manglefields"))
+                || System.getProperty("parparvm.js.allocfn.off") != null) {
+            return false;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (idx == null) {
+            return false;
+        }
+        ByteCodeClass cls = idx.get(typeName);
+        if (cls == null || cls.isIsAbstract() || cls.isIsInterface()) {
+            return false;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Set<String> refs = referencedInstanceFields;
+        int fields = 0;
+        for (ByteCodeClass c = cls; c != null; ) {
+            if (!seen.add(c.getClsName()) || "java_lang_Throwable".equals(c.getClsName())) {
+                return false;
+            }
+            for (ByteCodeField field : c.getFields()) {
+                if (!field.isStaticField()
+                        && (refs == null || refs.contains(c.getClsName() + "\0" + field.getFieldName()))) {
+                    fields++;
+                }
+            }
+            if (fields > ALLOCATION_FUNCTION_MAX_FIELDS) {
+                return false;
+            }
+            String base = c.getBaseClass();
+            if (base == null) {
+                return true;
+            }
+            c = idx.get(JavascriptNameUtil.sanitizeClassName(base));
+            if (c == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The widest class that gets an allocation function. A literal lists every
+    /// inherited field, so its size grows with the class hierarchy, and the win it buys
+    /// -- V8 removing an allocation that never escapes -- is for small value objects in
+    /// loops, not a UI component with sixty inherited fields, whose construction is
+    /// dominated by its constructor anyway. On the transpiled Flutter gallery, 63 classes
+    /// with 64 or more fields were a third of the functions' 1.8MB; nothing measured here
+    /// allocates a class wider than eight.
+    static final int ALLOCATION_FUNCTION_MAX_FIELDS = 16;
+
+    /// Emits the allocation function of every class newObjectExpression handed out. Runs
+    /// after every class has been generated, and its output goes after every class
+    /// registration, so each function can capture its classDef once at load. The identity
+    /// comes from the runtime's cn1Ids counter, not jvm.nextIdentity: see the note on
+    /// cn1Ids in parparvm_runtime.js.
+    ///
+    /// The property order is newObject's -- __class, __classDef, __id, __monitor, then the
+    /// instance fields base class first, each class's in declaration order, filtered by the
+    /// same field-level RTA the class's ``f:`` list uses -- so an object built by either
+    /// path has the same shape. Keys are bare identifiers, each after a comma AND a space:
+    /// the bundle writer's string hoisting rewrites a ``,KEY:`` with no space into a
+    /// computed ``,[alias]:`` key, which is the slow case measured above.
+    static void appendAllocationFunctions(StringBuilder out) {
+        if (ALLOCATION_FUNCTION_CLASSES.isEmpty()) {
+            return;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        int ordinal = 0;
+        for (String className : ALLOCATION_FUNCTION_CLASSES) {
+            java.util.List<ByteCodeClass> chain = new java.util.ArrayList<ByteCodeClass>();
+            for (ByteCodeClass c = idx.get(className); c != null; ) {
+                chain.add(0, c);
+                String base = c.getBaseClass();
+                c = base == null ? null : idx.get(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            // Numbered, not named after the class: the name is written twice per class,
+            // and a fully qualified one is ~60 bytes the minifier never touches (it only
+            // renames cn1_ tokens). $Ad is a prefix nothing else emits.
+            String defVar = "$Ad" + Integer.toString(ordinal++, 36);
+            out.append("const ").append(defVar).append(" = _Od(\"").append(className).append("\");\n");
+            out.append("function ").append(allocationFunctionName(className)).append("(){\n");
+            out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar)
+                    .append(", __id: cn1Ids.n++, __monitor: null");
+            java.util.Set<String> refs = referencedInstanceFields;
+            for (ByteCodeClass c : chain) {
+                for (ByteCodeField field : c.getFields()) {
+                    if (field.isStaticField()) {
+                        continue;
+                    }
+                    if (refs != null && !refs.contains(c.getClsName() + "\0" + field.getFieldName())) {
+                        continue;
+                    }
+                    String prop = JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName());
+                    ALLOCATION_FUNCTION_KEYS.add(prop);
+                    String desc = field.getRuntimeDescriptor();
+                    boolean primitive = desc != null && !desc.isEmpty() && isPrimitiveDescriptor(desc);
+                    out.append(", ").append(prop).append(": ").append(primitive ? "0" : "null");
+                }
+            }
+            out.append("};\n}\n");
+        }
+    }
+
 }

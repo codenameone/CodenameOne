@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-flutter-runtime</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-flutter-runtime</name>
+    <description>
+        Java implementation of the Flutter widget framework on top of
+        Codename One components: Widget/State/Element reconciliation, the
+        Flutter box-constraint layout engine, the material widget catalog and
+        the ThemeData-to-UIManager theme overlay. Transpiled Dart widget code
+        (from the codenameone-dart-transpiler) runs against this API. Ships
+        Dart signature stubs under META-INF/dart which the transpiler reads
+        to resolve this API from Dart source.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- source/target are set explicitly, not just release: the parent's
+                         pluginManagement pins an explicit <source>1.8</source>, and an
+                         inherited explicit value beats this module's maven.compiler.*
+                         properties, so release alone leaves javac on -source 8. -->
+                    <source>17</source>
+                    <target>17</target>
+                    <release>17</release>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>java17-fork</id>
+            <activation>
+                <property>
+                    <name>env.JAVA17_HOME</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <!-- source/target are set explicitly, not just release: the parent's
+                         pluginManagement pins an explicit <source>1.8</source>, and an
+                         inherited explicit value beats this module's maven.compiler.*
+                         properties, so release alone leaves javac on -source 8. -->
+                    <source>17</source>
+                    <target>17</target>
+                    <release>17</release>
+                            <fork>true</fork>
+                            <executable>${env.JAVA17_HOME}/bin/javac</executable>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <jvm>${env.JAVA17_HOME}/bin/java</jvm>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-dart-runtime</artifactId>
+            <version>8.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

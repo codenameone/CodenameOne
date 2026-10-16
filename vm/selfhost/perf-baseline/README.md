@@ -9,3 +9,7 @@ ParparVM / JDK 25 ratios that `vm/selfhost/perf-gate.py` holds every platform bu
   `calibrate-perf-baseline.py --pr <number>`. It is folded into `base/` after the merge.
 
 The format and the rules for combining overlays are in `../perf_baseline.py`.
+
+The same rules, run with a second layout, keep the Flutter benchmark's regression
+baselines in `scripts/flutter-bench/baseline/` (`scripts/flutter-bench/flutter_baseline.py`);
+the nightly fold and the pull request check cover both.

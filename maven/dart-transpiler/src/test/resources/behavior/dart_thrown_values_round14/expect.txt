@@ -1,0 +1,14 @@
+true 7
+[boom] true
+only the catch-all caught boom
+Error: true
+Exception: true
+Token 7
+catchError got [async boom] true
+0
+await rethrew the same token: true
+int map refused the change
+map refused the change
+unmodifiable list refused a store
+pathSegments is read-only
+true

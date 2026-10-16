@@ -1,0 +1,20 @@
+10
+widgets has many (8)
+nothing
+gear x2
+1
+{z: 1, a: 2}
+3
+2
+0.5
+3.0
+true
+[2, 4, 6, 8]
+2
+HELLO WORLD
+[hello, world]
+true
+world
+5
+1
+2

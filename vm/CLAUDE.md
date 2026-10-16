@@ -269,6 +269,36 @@ alternates phases for the verifier and gauntlet. Each of these was measured to b
   interval, halve below 1%, host memory / 8 at most): 3x fewer minors on objectAllocation.
   One minor is not enough to grow on -- a single OS-descheduled minor stepped a steady
   workload's heap up a third late in the run.
+- **Going active again is a handshake, not a store.** Every resume site was
+  `wait while threadBlockedByGC; threadActive = TRUE`. A thread preempted between the
+  two let the collector raise the block, read `threadActive` as FALSE and hold the thread
+  as parked while it ran Java -- allocating into pages the cycle had retired as pre-cycle
+  and storing young objects into old ones the minor never traced. Widening the window by
+  300us under `CN1_GC_HYBRID_FORCE=1` reproduced it in 20 of 20 runs of a targeted driver
+  (11 of 12 on master), always as a FREED slot, and 0 of 20 with the handshake. Every
+  resume goes through `cn1GcTryResumeActive` (raise, seq_cst fence,
+  re-read the block, step back down if raised) and the collector fences
+  (`CN1_GC_BLOCK_FENCE`) between raising the block and reading `threadActive`. A new
+  resume site that stores `threadActive = JAVA_TRUE` directly reopens it.
+  Verifier builds check the invariant itself rather than its damage: a thread the cycle
+  took as parked must not have resumed by the time it is released
+  (`cn1GcVerifyHeldThreadsStayedHeld`, "HELD THREAD RAN"). The escape only becomes a
+  dangling reference in a narrow interleaving -- every run on one host, never on a CI
+  runner -- so a negative control that waited for the damage depended on the machine.
+- **A "recycled slot" holding a fresh object is usually the verifier racing the
+  allocator, not the collector.** The verifier walks the heap after the mutators are
+  released. A slot is published as `header; dmb ishst; bumpIndex = bi + 1`, and nothing
+  orders that bump store before the mutator's next store, the one that puts the object in
+  a field, so an arm64 core can show the reference before the bump that covers it. Linux
+  arm64 CI reported that twice as an `Object[]` at the current epoch holding a fresh
+  `Filler` "above the bump cursor"; it never reproduced on Apple silicon (0 in 67,000
+  verify passes, and a 2.3-billion-read litmus of the same store pattern saw no
+  reordering). The collector itself never rejects a precise field on `bumpIndex`, so the
+  verifier is what changed: `cn1GcVerifyPublishedLate` accepts such a slot only among
+  the page's newest slots, holding a fresh object of a registered class, and only once
+  the bump really covers it. It does not ask whether the page is still owned: the owner
+  can fill and retire it in between, which a fault run caught. `LATEPUBLISH seen=` in the summary
+  counts them; `CN1_GC_FAULT=stalebump` reproduces the stale view on any host.
 
 A test whose evidence names one collector's mechanism goes vacuous when the hybrid takes
 its workload. Fix the EVIDENCE, never pin the collector: `GcOverflowSpiralIntegrationTest`
@@ -548,13 +578,14 @@ every value read in the Java class through `cn1Value`, the debugger's
 `cn1_debugger_tagged_value` switch, and `BoxEdge` cases. `ByteCodeClass` already force-retains
 all six wrapper classes from dead-code elimination.
 
-**And FOUR JavaScript files, not one.** The JS port has no immediates, so `valueOf` binds
-straight through to `valueOfHeap` -- which is static and reached only from
-`parparvm_runtime.js`, so bytecode-only reachability never sees the edge and the cull deletes
-it. All four are needed: `parparvm_runtime.js` (the `bindNative`),
-`JavascriptNativeRegistry.RUNTIME_IMPLEMENTED` (the native), and both
-`JavascriptReachability.enqueueResolved` and
-`JavascriptNativeRegistry.RUNTIME_DELEGATE_TARGETS` (the heap twin). Missing the last two
+**And THREE JavaScript registrations, not one.** The JS port has no immediates, so `valueOf`
+is a call straight through to `valueOfHeap`. The translator emits that call itself, from
+`JavascriptNativeRegistry.TRANSLATED_DELEGATES` (the native -> twin pair), so the native is
+a plain function wherever the twin is one; a `bindNative` for it in `parparvm_runtime.js`
+would replace that function with a generator and must NOT be added. `valueOfHeap` is
+static and nothing in bytecode calls it, so bytecode-only reachability never sees the edge
+and the cull deletes it -- hence the other two: `JavascriptReachability.enqueueResolved` and
+`JavascriptNativeRegistry.RUNTIME_DELEGATE_TARGETS` (the heap twin). Missing those two
 does not produce a recognisable error -- the fixture returns a wrong value, and
 `JavascriptRuntimeSemanticsTest`'s coverage assertion is one of the few in that class that
 does not print `rawMessage`/`errorMessage`. `JavascriptNativeAuditTest` is inert and catches
@@ -816,6 +847,15 @@ survived until the data contradicted it:
   **bistable** -- once pacing engages, throughput drops two orders of magnitude, and
   whether a run falls in is timing-sensitive. Single runs there measure the coin. If that
   regime is what you want, count how many of N runs complete; do not time one.
+
+**A weak referent on its thread's current allocation page is not cleared until that
+page retires**, and the memory is not freed either: the clear follows the sweep, and no
+sweep touches an owned page. 64 unreachable `int[8]` referents stayed set through 20
+concurrent cycles and cleared the moment the page was filled, or under any stop-the-world
+cycle that held the thread -- on master and before #5940 too. Bounded (one page per size
+class per thread) and not avoidable in a concurrent cycle; see `cn1GcSweepReclaimsObj`. A
+test that asserts clearing must retire the page or use a referent off the page heap
+(`RefPolicy`'s 32KB payloads are legacy-heap, so its counts are unaffected).
 
 **What is still not measured.** Nothing here separates ranking by RECENCY from "trims at
 all" -- there is no random-eviction arm at a matched rate, so the LRU claim is unproven,

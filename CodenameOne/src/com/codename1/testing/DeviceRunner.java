@@ -107,6 +107,8 @@ public abstract class DeviceRunner {
     @SuppressWarnings("BanClassForName")
     public void runTest(String testClassName) {
         try {
+            // ParparVM's ReachabilityCull (FOR_NAME_SITES) keeps only UnitTest
+            // implementations for this forName.
             final UnitTest t = (UnitTest) Class.forName(testClassName).newInstance();
             try {
                 TestReporting.getInstance().startingTestCase(t.getClass().getName());

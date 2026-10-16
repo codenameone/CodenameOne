@@ -320,6 +320,8 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 5.1.1;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				COMPRESS_PNG_FILES = NO;
+				STRIP_PNG_TEXT = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = "$(ARCHS_STANDARD)";
 				LIBRARY_SEARCH_PATHS = (
@@ -376,7 +378,7 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = c99;
 				GCC_OPTIMIZATION_LEVEL = 3;
-				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf";
+				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -mllvm -inline-threshold=50";
 				LLVM_LTO = YES_THIN;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -386,6 +388,8 @@
 				GCC_WARN_UNUSED_VARIABLE = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 5.1.1;
 				SDKROOT = iphoneos;
+				COMPRESS_PNG_FILES = NO;
+				STRIP_PNG_TEXT = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 				VALID_ARCHS = "$(ARCHS_STANDARD)";
@@ -416,8 +420,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				GCC_OPTIMIZATION_LEVEL = 3;
-				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf";
+				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -mllvm -inline-threshold=50";
 				LLVM_LTO = YES_THIN;
+				OTHER_LDFLAGS = "$(inherited) -Wl,-mllvm,-inline-threshold=50";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "template-src/template-Prefix.pch";
 				INFOPLIST_FILE = "template-src/template-Info.plist";

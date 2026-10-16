@@ -53,8 +53,11 @@ public @interface Build {
     /// override that sets `ios.themeMode` and `and.themeMode` together when those
     /// aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` =
     /// iOS 7 flat + Holo Light, `custom` disables the framework native theme
-    /// entirely. The legacy alias `cn1.nativeTheme` is still accepted.
+    /// entirely: no platform theme is packaged or installed on any port, desktop
+    /// included, for an application whose own theme sets `includeNativeBool: false`.
+    /// The legacy alias `cn1.nativeTheme` is still accepted.
     ///
+    /// `native` and `custom` are the two values that reach the desktop too.
     /// `native` is `modern` plus the desktop: it additionally selects the host's
     /// own desktop theme -- Fluent, Aqua or Adwaita -- the way
     /// `desktop.themeMode = auto` does. `modern` stops short of the desktop on

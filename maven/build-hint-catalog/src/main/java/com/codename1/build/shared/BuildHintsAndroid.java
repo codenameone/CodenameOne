@@ -44,6 +44,18 @@ final class BuildHintsAndroid {
     }
 
     static void register(List<Hint> h) {
+        h.add(new Hint("android.nativeThemes.keepAll")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .doc("true/false (defaults to `false`). The Android build ships only the native "
+                        + "themes the build's theme mode can install (plus `android_holo_light`), unless "
+                        + "the application's classes name `and.themeMode` or another theme-mode property. "
+                        + "Set to `true` for an application that picks the mode through a property name "
+                        + "it computes or reads from configuration, which no build-time scan can see; "
+                        + "the iOS equivalent is `ios.nativeThemes.keepAll`."));
+
         h.add(new Hint("android.call.video")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)

@@ -212,6 +212,17 @@ if [ -f "$PODFILE_LOCK" ] && grep -q "GoogleMLKit/" "$PODFILE_LOCK"; then
   )
   ri_log "Google ML Kit detected; selecting its supported x86_64 simulator slice"
 fi
+# The same watch-simulator pin run-ios-ui-tests.sh applies (see the comment there): the
+# embedded watch app otherwise compiles an x86_64 slice nothing on an arm64 runner can
+# run, and when this step shares the UI step's derived data a different setting would
+# also rebuild the watch objects that step already produced.
+WATCH_SIM_EXCLUDED_ARCHS="x86_64"
+if [ "$(uname -m 2>/dev/null)" = "x86_64" ] || [ ${#SIMULATOR_ARCH_ARGS[@]} -gt 0 ]; then
+  WATCH_SIM_EXCLUDED_ARCHS="arm64"
+fi
+ARCH_XCCONFIG="$(mktemp -t cn1-ios-archs).xcconfig"
+printf 'EXCLUDED_ARCHS[sdk=watchsimulator*] = %s\n' "$WATCH_SIM_EXCLUDED_ARCHS" > "$ARCH_XCCONFIG"
+DERIVED_ARGS+=(-xcconfig "$ARCH_XCCONFIG")
 ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
 set +e
 xcodebuild \

@@ -129,6 +129,26 @@ class ExecutorArchiveExtractionTest {
                 "javase.lib.tar");
     }
 
+    /**
+     * Dart API declarations a runtime jar carries for the transpiler are build-time
+     * metadata: the application jar merges every dependency, and they used to be
+     * copied into every installed bundle.
+     */
+    @Test
+    void doesNotShipTheTranspilersDartDeclarations() throws Exception {
+        File root = temporaryDirectory.resolve("dart-metadata").toFile();
+        unzipSpecialEntry(root, "META-INF/dart/flutter_material.dart");
+        java.util.List<String> written = new java.util.ArrayList<>();
+        java.nio.file.Files.walk(root.toPath()).filter(java.nio.file.Files::isRegularFile)
+                .forEach(p -> written.add(root.toPath().relativize(p).toString()));
+        assertTrue(written.isEmpty(), "nothing should be extracted, got: " + written);
+
+        File other = temporaryDirectory.resolve("dart-neighbour").toFile();
+        File resources = unzipSpecialEntry(other, "gallery.res");
+        assertTrue(new File(resources, "gallery.res").isFile(),
+                "an ordinary resource must still be extracted");
+    }
+
     private static byte[] zipEntry(String name, String contents)
             throws IOException {
         byte[] payload = contents.getBytes(StandardCharsets.UTF_8);

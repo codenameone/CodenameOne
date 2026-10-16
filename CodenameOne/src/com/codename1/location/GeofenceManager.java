@@ -259,6 +259,8 @@ public final class GeofenceManager implements Iterable<Geofence> {
             String className = (String) Storage.getInstance().readObject(LISTENER_CLASS_KEY);
             if (className != null) {
                 try {
+                    // ParparVM's ReachabilityCull (FOR_NAME_SITES) keeps only
+                    // GeofenceListener implementations for this forName.
                     listenerClass = (Class) Class.forName(className);
                 } catch (Throwable t) {
                     Log.e(t);

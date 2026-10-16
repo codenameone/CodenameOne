@@ -85,6 +85,91 @@ def error_log(log):
     return log.with_name(log.name + '.err')
 
 
+def allow_core_dump():
+    """preexec_fn for a measured run: raise the core-size soft limit to the hard one.
+
+    The limit a runner starts a step with is usually 0, and the kernel writes no core
+    under it however core_pattern is set. Only the limit changes; where a core lands
+    is the system's core_pattern, which the Linux job points at /tmp/cn1-cores."""
+    try:
+        import resource
+        hard = resource.getrlimit(resource.RLIMIT_CORE)[1]
+        resource.setrlimit(resource.RLIMIT_CORE, (hard, hard))
+    except (ImportError, ValueError, OSError):
+        pass
+
+
+def crashed(log, returncode=0):
+    """The signal a run died of, or None: from the return code when the wrapper passed
+    the signal on (BSD time re-raises it), else from GNU time's report, which says
+    "Command terminated by signal N" and exits normally."""
+    if returncode < 0:
+        return -returncode
+    try:
+        text = error_log(log).read_text(errors='replace')
+    except OSError:
+        return None
+    m = re.search(r'(?:Command terminated by signal|signal:?)\s+(\d+)', text)
+    return int(m.group(1)) if m else None
+
+
+GDB_COMMANDS = ['-batch', '-nx', '-ex', 'set pagination off',
+                # ParparVM stops threads with signals during a collection; under gdb those
+                # are routine, and stopping on each would end the run in the wrong place.
+                '-ex', 'handle SIGUSR1 SIGUSR2 SIGPIPE nostop noprint pass']
+
+
+def native_backtrace(command, env, log, started, timeout):
+    """After a crash, the native stacks of every thread, beside the run's log.
+
+    A self-hosted translator that dies of a signal prints nothing of its own: the
+    clean target installs no fault handler, so the log just stops. An arm64 hello
+    round died that way twice and was located only by which progress line came last.
+    From the core when the kernel wrote one -- the crashed process itself, so an
+    intermittent fault is caught the time it happens -- and otherwise by running
+    the same command once more under gdb, which shows the fault only if it recurs
+    and says so when it does not. Needs gdb on PATH; does nothing without it.
+    Returns the file written, or None."""
+    gdb = shutil.which('gdb')
+    if gdb is None or platform.system() != 'Linux':
+        return None
+    out = log.with_name(log.name + '.gdb')
+    core = None
+    try:
+        pattern = Path('/proc/sys/kernel/core_pattern').read_text().strip()
+    except OSError:
+        pattern = ''
+    if pattern.startswith('/'):
+        cores = [c for c in Path(pattern).parent.glob('core*')
+                 if c.is_file() and c.stat().st_mtime >= started - 1]
+        if cores:
+            core = max(cores, key=lambda c: c.stat().st_mtime)
+    if core is not None:
+        args = [gdb] + GDB_COMMANDS + ['-ex', 'info registers', '-ex', 'bt full 40',
+                                       '-ex', 'thread apply all bt 60', command[0], str(core)]
+        header = 'core %s of %s\n' % (core, ' '.join(command))
+    else:
+        args = [gdb] + GDB_COMMANDS + ['-ex', 'run', '-ex', 'info registers', '-ex', 'bt full 40',
+                                       '-ex', 'thread apply all bt 60', '--args'] + list(command)
+        header = ('no core was written (core_pattern %r); the command again under gdb -- '
+                  'if it exits normally the fault did not recur:\n%s\n' % (pattern, ' '.join(command)))
+    try:
+        with out.open('w') as f:
+            f.write(header)
+            f.flush()
+            subprocess.run(args, env=env, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        with out.open('a') as f:
+            f.write('\ngdb did not finish: %s\n' % e)
+    if core is not None:
+        # Hundreds of MB each; the stacks are what is kept.
+        try:
+            core.unlink()
+        except OSError:
+            pass
+    return out
+
+
 def run_windows(command, env, log, timeout):
     """Windows has no /usr/bin/time. The peak working set and CPU times are read off the
     process handle after exit -- still open, because Popen keeps it until the object is
@@ -145,7 +230,7 @@ def run(command, env, log, system, timeout=300):
     start = time.monotonic()
     with log.open('w') as output, error_log(log).open('w') as errors:
         result = subprocess.Popen(wrapper + command, env=env, stdout=output, stderr=errors,
-                                  start_new_session=True)
+                                  start_new_session=True, preexec_fn=allow_core_dump)
         timed_out = threading.Event()
 
         def expire():
@@ -178,9 +263,12 @@ def run(command, env, log, system, timeout=300):
             raise
         finally:
             watchdog.cancel()
-    if result.returncode:
-        raise RuntimeError('Process exited with %s: %s (stderr: %s)'
-                           % (result.returncode, log, error_log(log)))
+    signo = crashed(log, result.returncode)
+    if result.returncode or signo is not None:
+        trace = native_backtrace(command, env, log, time.time() - elapsed, timeout) if signo else None
+        raise RuntimeError('Process exited with %s%s: %s (stderr: %s%s)'
+                           % (result.returncode, ' (signal %d)' % signo if signo else '', log,
+                              error_log(log), ', native stacks: %s' % trace if trace else ''))
     usage = parse_usage(error_log(log).read_text(errors='replace'), system)
     usage['elapsed_seconds'] = elapsed
     return usage

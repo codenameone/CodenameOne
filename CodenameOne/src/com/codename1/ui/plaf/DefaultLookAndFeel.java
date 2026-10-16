@@ -72,6 +72,28 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] rButtonImages = null;
     private Image[] chkBoxImagesFocus = null;
     private Image[] rButtonImagesFocus = null;
+
+    // The five groups above are built on first use rather than in refreshTheme; see
+    // refreshTheme. Each flag says its group still has to be built from the current
+    // theme, and a setter clears its own group's, so an image an application set
+    // itself is never overwritten by a late build.
+    //
+    // Each one starts true, not at the boolean default. refreshTheme() is what
+    // normally arms them, but the very first LookAndFeel a UIManager constructs
+    // never has refreshTheme() called on it -- the constructor calls
+    // resetThemeProps() directly, which never touches these -- so a caller that
+    // asks for a combo/check/radio image before anything else happens to call
+    // setThemeProps/addThemeProps/zoomFonts first saw `pending` at its Java
+    // default of false, which this code reads as "nothing to build," and the
+    // image was null forever: ensureXxx() short-circuits on `!pending` and
+    // refreshTheme() is the only thing that ever sets it back to true. The same
+    // trap caught a freshly built UIManager.createInstance() instance, which
+    // never gets a refreshTheme() call unless the caller makes one.
+    private boolean comboImagePending = true;
+    private boolean chkBoxImagesPending = true;
+    private boolean chkBoxImagesFocusPending = true;
+    private boolean rButtonImagesPending = true;
+    private boolean rButtonImagesFocusPending = true;
     private boolean tickWhenFocused = true;
     private char passwordChar = '\u25CF';
     //used for the pull to refresh feature
@@ -193,6 +215,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `disabledUnchecked`: same as unchecked for the disabled state
     public void setCheckBoxImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+        chkBoxImagesPending = false;
         if (checkedX == null || uncheckedX == null) {
             chkBoxImages = null;
         } else {
@@ -218,6 +241,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `disabledUnchecked`: same as unchecked for the disabled state
     public void setCheckBoxFocusImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+        chkBoxImagesFocusPending = false;
         if (checkedX == null || uncheckedX == null) {
             chkBoxImagesFocus = null;
         } else {
@@ -237,6 +261,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `picker`: picker image
     public void setComboBoxImage(Image picker) {
+        comboImagePending = false;
         comboImage = picker;
     }
 
@@ -248,6 +273,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `unselected`: the image to draw in order to represent an unselected radio button
     public void setRadioButtonImages(Image selected, Image unselected) {
+        rButtonImagesPending = false;
         if (selected == null || unselected == null) {
             rButtonImages = null;
         } else {
@@ -267,6 +293,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `disabledUnselected`: same as unselected for the disabled state
     public void setRadioButtonImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
+        rButtonImagesPending = false;
         if (selected == null || unselected == null) {
             rButtonImages = null;
         } else {
@@ -292,6 +319,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// - `disabledUnselected`: same as unselected for the disabled state
     public void setRadioButtonFocusImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
+        rButtonImagesFocusPending = false;
         if (selected == null || unselected == null) {
             rButtonImagesFocus = null;
         } else {
@@ -320,6 +348,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// images representing the radio button or null for using the default drawing
     public Image[] getRadioButtonImages() {
+        ensureRadioButtonImages();
         return rButtonImages;
     }
 
@@ -329,6 +358,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// images representing the radio button or null for using the default drawing
     public Image[] getRadioButtonFocusImages() {
+        ensureRadioButtonFocusImages();
         return rButtonImagesFocus;
     }
 
@@ -338,6 +368,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// images representing the check box or null for using the default drawing
     public Image[] getCheckBoxImages() {
+        ensureCheckBoxImages();
         return chkBoxImages;
     }
 
@@ -347,6 +378,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     ///
     /// images representing the check box or null for using the default drawing
     public Image[] getCheckBoxFocusImages() {
+        ensureCheckBoxFocusImages();
         return chkBoxImagesFocus;
     }
 
@@ -363,6 +395,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public void drawCheckBox(Graphics g, Button cb) {
+        ensureCheckBoxImages();
+        ensureCheckBoxFocusImages();
         if (chkBoxImages != null) {
             Image x;
             if (chkBoxImagesFocus != null && chkBoxImagesFocus[0] != null && cb.hasFocus() && Display.getInstance().shouldRenderSelection(cb)) {
@@ -631,6 +665,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public void drawRadioButton(Graphics g, Button rb) {
+        ensureRadioButtonImages();
+        ensureRadioButtonFocusImages();
         if (rButtonImages != null) {
             Image x;
             if (rButtonImagesFocus != null && rButtonImagesFocus[0] != null && rb.hasFocus() && Display.getInstance().shouldRenderSelection(rb)) {
@@ -681,6 +717,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public void drawComboBox(Graphics g, List cb) {
+        ensureComboBoxImage();
         int border = 2;
         Style style = cb.getStyle();
         int leftPadding = style.getPaddingLeft(cb.isRTL());
@@ -987,6 +1024,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public Dimension getCheckBoxPreferredSize(Button cb) {
+        ensureCheckBoxImages();
         if (cb.isToggle()) {
             return getButtonPreferredSize(cb);
         }
@@ -1204,6 +1242,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public Dimension getRadioButtonPreferredSize(Button rb) {
+        ensureRadioButtonImages();
         if (rb.isToggle()) {
             return getButtonPreferredSize(rb);
         }
@@ -1813,6 +1852,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public Dimension getComboBoxPreferredSize(List cb) {
+        ensureComboBoxImage();
         Dimension d = getListPreferredSize(cb);
         Image comboBoxImage = ((ComboBox) cb).getComboBoxImage() != null ? ((ComboBox) cb).getComboBoxImage() : comboImage;
         if (comboBoxImage != null) {
@@ -2625,8 +2665,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         chkBoxImagesFocus = null;
         rButtonImagesFocus = null;
         super.refreshTheme(b);
-        UIManager m = getUIManager();
-        Image combo = m.getThemeImageConstant("comboImage");
+        // Built on first use, not here. Every theme install ends in this method, and
+        // building these meant loading the Material icon font and rendering eight
+        // glyph images for check boxes, radio buttons and the combo box arrow -- on
+        // the transpiled Flutter gallery about a third of its whole theme install,
+        // for controls most screens never show. What is built is unchanged: the same
+        // code, reading the same theme, the first time anything asks for it.
+        comboImagePending = true;
+        chkBoxImagesPending = true;
+        chkBoxImagesFocusPending = true;
+        rButtonImagesPending = true;
+        rButtonImagesFocusPending = true;
+    }
+
+    private void ensureComboBoxImage() {
+        if (!comboImagePending) {
+            return;
+        }
+        comboImagePending = false;
+        Image combo = getUIManager().getThemeImageConstant("comboImage");
         if (combo != null) {
             setComboBoxImage(combo);
         } else {
@@ -2636,10 +2693,34 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 setComboBoxImage(combo);
             }
         }
-        updateCheckBoxConstants(m, false, "");
-        updateCheckBoxConstants(m, true, "Focus");
-        updateRadioButtonConstants(m, false, "");
-        updateRadioButtonConstants(m, true, "Focus");
+    }
+
+    private void ensureCheckBoxImages() {
+        if (chkBoxImagesPending) {
+            chkBoxImagesPending = false;
+            updateCheckBoxConstants(getUIManager(), false, "");
+        }
+    }
+
+    private void ensureCheckBoxFocusImages() {
+        if (chkBoxImagesFocusPending) {
+            chkBoxImagesFocusPending = false;
+            updateCheckBoxConstants(getUIManager(), true, "Focus");
+        }
+    }
+
+    private void ensureRadioButtonImages() {
+        if (rButtonImagesPending) {
+            rButtonImagesPending = false;
+            updateRadioButtonConstants(getUIManager(), false, "");
+        }
+    }
+
+    private void ensureRadioButtonFocusImages() {
+        if (rButtonImagesFocusPending) {
+            rButtonImagesFocusPending = false;
+            updateRadioButtonConstants(getUIManager(), true, "Focus");
+        }
     }
 
     /// Builds a check-box / radio glyph. When sizeMM is non-null it sizes the box

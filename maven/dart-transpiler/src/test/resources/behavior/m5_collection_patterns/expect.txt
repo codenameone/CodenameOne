@@ -1,0 +1,6 @@
+big 10
+small 3
+other
+{2, 3}
+{1: a, 2: b, 3: c}
+1a2b3c
