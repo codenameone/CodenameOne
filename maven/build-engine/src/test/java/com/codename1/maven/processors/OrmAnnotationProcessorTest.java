@@ -128,8 +128,10 @@ public class OrmAnnotationProcessorTest {
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         // A mapped superclass in ANOTHER package, so its fields are out of reach of
         // the generated model even when package-private or protected.
-        sources.put("hiddenbase.Audited","package hiddenbase; import com.codename1.annotations.db.*; @MappedSuperclass public abstract class Audited { private long created; protected String createdBy; long revision; "
-            + "public long created() { return created; } public void created(long v) { created=v; } public String createdBy() { return createdBy; } public void createdBy(String v) { createdBy=v; } public long revision() { return revision; } public void revision(long v) { revision=v; } }");
+        sources.put("hiddenbase.Audited","package hiddenbase; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public abstract class Audited { private long created; protected String createdBy; long revision; "
+            + "public long created() { return created; } public void created(long v) { created=v; } public String createdBy() { return createdBy; } public void createdBy(String v) { createdBy=v; } public long revision() { return revision; } public void revision(long v) { revision=v; } "
+            // Package-private callback in another package: reached through a woven accessor, virtually.
+            + "@DbTransient private int loads; @PostLoad void loaded() { loads++; } public int loads() { return loads; } }");
         sources.put("hidden.Place","package hidden; import com.codename1.annotations.db.*; @Embeddable public class Place { private String city; private int zip; public Place() {} "
             + "public String city() { return city; } public void city(String v) { city=v; } public int zip() { return zip; } public void zip(int v) { zip=v; } }");
         sources.put("hidden.Rider","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hidden_rider\") public class Rider extends hiddenbase.Audited { "
@@ -137,22 +139,27 @@ public class OrmAnnotationProcessorTest {
             + "private transient String cached=\"c\"; private final String constant=\"k\"; private static int counter; "
             + "public Rider() {} public long id() { return id; } public String name() { return name; } public void name(String v) { name=v; } public int score() { return score; } public void score(int v) { score=v; } "
             + "public Boolean active() { return active; } public void active(Boolean v) { active=v; } public Place home() { return home; } public void home(Place v) { home=v; } "
-            + "public String cached() { return cached; } public void cached(String v) { cached=v; } public String constant() { return constant; } }");
+            + "public String cached() { return cached; } public void cached(String v) { cached=v; } public String constant() { return constant; } "
+            // Private and protected callbacks on the entity itself.
+            + "@DbTransient private int updates; @PrePersist private void defaults() { if(name==null) name=\"anon\"; } @PreUpdate protected void touched() { updates++; } public int updates() { return updates; } }");
         sources.put("hidden.Riders","package hidden; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Rider.class,key=Long.class) public interface Riders extends CrudRepository<Rider,Long> { "
             + "List<Rider> findByNameOrderByScoreDesc(String name); long countByScoreGreaterThan(int score); }");
         sources.put("hidden.Check","package hidden; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
             + "Riders repo=Repositories.create(Riders.class,s); s.createTables(); s.beginTransaction(); "
             + "Rider a=new Rider(); a.name(\"ann\"); a.score(7); a.active(Boolean.TRUE); a.created(1234L); a.createdBy(\"ops\"); a.revision(3); a.cached(\"changed\"); Place p=new Place(); p.city(\"Haifa\"); p.zip(31000); a.home(p); repo.insert(a); "
-            + "Rider b=new Rider(); b.name(\"ann\"); b.score(2); repo.insert(b); s.commitTransaction(); "
+            + "Rider b=new Rider(); b.name(\"ann\"); b.score(2); repo.insert(b); Rider c=new Rider(); repo.insert(c); s.commitTransaction(); "
+            + "if(!\"anon\".equals(c.name())) throw new AssertionError(\"private @PrePersist \"+c.name()); "
             + "if(a.id()==0 || b.id()==0) throw new AssertionError(\"generated id written through the accessor\"); "
             + "s.clear(); Rider back=repo.findById(a.id()); "
             + "if(back==a) throw new AssertionError(\"expected a fresh instance\"); "
+            + "if(back.loads()!=1) throw new AssertionError(\"package-private inherited @PostLoad \"+back.loads()); "
             + "if(!\"ann\".equals(back.name()) || back.score()!=7 || !Boolean.TRUE.equals(back.active())) throw new AssertionError(\"own fields \"+back.name()+\" \"+back.score()+\" \"+back.active()); "
             + "if(back.created()!=1234L || !\"ops\".equals(back.createdBy()) || back.revision()!=3) throw new AssertionError(\"inherited fields\"); "
             + "if(back.home()==null || !\"Haifa\".equals(back.home().city()) || back.home().zip()!=31000) throw new AssertionError(\"embedded fields\"); "
             + "if(!\"c\".equals(back.cached()) || !\"k\".equals(back.constant())) throw new AssertionError(\"transient and final fields must not be stored\"); "
             + "java.util.List<Rider> named=repo.findByNameOrderByScoreDesc(\"ann\"); if(named.size()!=2 || named.get(0).score()!=7 || repo.countByScoreGreaterThan(5)!=1) throw new AssertionError(\"derived queries\"); "
-            + "s.beginTransaction(); back.score(9); s.commitTransaction(); s.clear(); if(repo.findById(a.id()).score()!=9) throw new AssertionError(\"update\"); }}");
+            + "s.beginTransaction(); back.score(9); s.commitTransaction(); if(back.updates()!=1) throw new AssertionError(\"protected @PreUpdate \"+back.updates()); "
+            + "s.clear(); if(repo.findById(a.id()).score()!=9) throw new AssertionError(\"update\"); }}");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         // The accessors are woven into the class that declares each field, and the
@@ -161,9 +168,12 @@ public class OrmAnnotationProcessorTest {
         assertTrue(riderMethods.toString(),riderMethods.contains("__cn1OrmGet_name") && riderMethods.contains("__cn1OrmSet_home"));
         assertFalse(riderMethods.toString(),riderMethods.contains("__cn1OrmGet_cached") || riderMethods.contains("__cn1OrmGet_constant"));
         assertTrue(methodNames(new File(classes,"hiddenbase/Audited.class")).contains("__cn1OrmSet_created"));
+        assertTrue(riderMethods.toString(),riderMethods.contains("__cn1OrmCall_defaults") && riderMethods.contains("__cn1OrmCall_touched"));
+        assertTrue(methodNames(new File(classes,"hiddenbase/Audited.class")).contains("__cn1OrmCall_loaded"));
         assertTrue(methodNames(new File(classes,"hidden/Place.class")).contains("__cn1OrmGet_zip"));
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
         assertTrue(java.lang.reflect.Modifier.isPrivate(loader.loadClass("hidden.Rider").getDeclaredField("name").getModifiers()));
+        assertTrue(java.lang.reflect.Modifier.isPrivate(loader.loadClass("hidden.Rider").getDeclaredMethod("defaults").getModifiers()));
         loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
         com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
         com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));

@@ -420,11 +420,19 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
 
         String[] events={"PrePersist","PostPersist","PreUpdate","PostUpdate","PreRemove","PostRemove","PostLoad"};
-        for (MethodInfo method : persistentMethods(cls,ctx)) for (int event=0;event<events.length;event++) {
+        Map<MethodInfo,String> methodOwners=new java.util.IdentityHashMap<MethodInfo,String>();
+        for (MethodInfo method : persistentMethods(cls,ctx,methodOwners)) for (int event=0;event<events.length;event++) {
             if (method.getAnnotations().containsKey("Lcom/codename1/annotations/db/"+events[event]+";")) {
-                if (!method.isPublic() || !"()V".equals(method.getDescriptor()) || method.isStatic()) {
-                    ctx.error(cls,"Lifecycle callback must be a public non-static void method with no parameters: "+method.getName());
-                } else ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
+                if (!"()V".equals(method.getDescriptor()) || method.isStatic() || method.isAbstract()) {
+                    ctx.error(cls,"Lifecycle callback must be a non-static, non-abstract void method with no parameters: "+method.getName());
+                } else {
+                    // Any access, like a persistent field: a non-public callback
+                    // is called through a static accessor OrmEnhancer weaves into
+                    // its declaring class, so the generated model never needs
+                    // reflection to reach it.
+                    if (!method.isPublic()) hideCallback(ec,methodOwners.get(method),method);
+                    ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
+                }
             }
         }
 
@@ -977,13 +985,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(tooLongForAnEngine(name) || previous!=null) ctx.error("Invalid or duplicate index name: "+name);
     }
 
-    private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx) {
+    /// The callback candidates of an entity, inherited first; `owners` receives
+    /// the internal name of the class that declares each one.
+    private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx,Map<MethodInfo,String> owners) {
         List<MethodInfo> result=new ArrayList<MethodInfo>();
         String parent=cls.getSuperInternalName();
         if(parent!=null && !"java/lang/Object".equals(parent)) {
             AnnotatedClass base=findType(parent.replace('/','.'),ctx);
             if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/db/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
-                result.addAll(persistentMethods(base,ctx));
+                result.addAll(persistentMethods(base,ctx,owners));
         }
         Set<String> events=new LinkedHashSet<String>();
         for(MethodInfo method:cls.getMethods()) {
@@ -993,6 +1003,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     if(!events.add(annotation)) ctx.error(cls,"Duplicate lifecycle callback: "+annotation);
             }
             result.add(method);
+            owners.put(method,cls.getInternalName());
         }
         return result;
     }
@@ -1110,6 +1121,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// EntityClass#hiddenFields.
     private static void hide(EntityClass entity,AnnotatedClass declaring,FieldInfo field) {
         hide(entity,declaring.getInternalName(),field);
+    }
+
+    /// Records a non-public lifecycle callback for the accessor weaving; see
+    /// EntityClass#hiddenCallbacks.
+    private static void hideCallback(EntityClass entity,String declaringInternal,MethodInfo method) {
+        for(String[] existing:entity.hiddenCallbacks) {
+            if(existing[0].equals(declaringInternal) && existing[1].equals(method.getName())) return;
+        }
+        entity.hiddenCallbacks.add(new String[] {declaringInternal,method.getName(),
+                method.isPrivate()?"private":"virtual"});
     }
 
     private static void hide(EntityClass entity,String declaringInternal,FieldInfo field) {
@@ -3009,6 +3030,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         /// fields made public, and OrmEnhancer then routes each access through a
         /// static accessor it weaves into the declaring class.
         final List<String[]> hiddenFields = new ArrayList<String[]>();
+        /// Every non-public lifecycle callback, as {declaring class internal
+        /// name, method name, "private" or "virtual"}. Exposed to the generated
+        /// source the same way as #hiddenFields; the accessor OrmEnhancer weaves
+        /// calls a private method directly and any other one virtually, so an
+        /// override still runs.
+        final List<String[]> hiddenCallbacks = new ArrayList<String[]>();
     }
 
     static final class PersistedField {
