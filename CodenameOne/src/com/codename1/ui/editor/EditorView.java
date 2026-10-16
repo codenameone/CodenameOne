@@ -1059,6 +1059,16 @@ public class EditorView extends Component implements TextInputClient, com.codena
         return doc.getLineStart(target) + Math.min(col, lineLen);
     }
 
+    private int caretPage(boolean down) {
+        int line = doc.lineOfOffset(caret);
+        Font font = getEditorFont();
+        int x = lineContentOffsetX(line) + measureColumnX(line, doc.getLineText(line),
+                caret - doc.getLineStart(line), font);
+        int target = lineAtContentY(lineTopContent(line) + (down ? 1 : -1) * Math.max(1, contentHeight()));
+        return doc.getLineStart(target) + columnAtX(target, doc.getLineText(target),
+                x - lineContentOffsetX(target), font);
+    }
+
     private void lineHome(boolean extend) {
         moveCaret(doc.getLineStart(doc.lineOfOffset(caret)), extend);
     }
@@ -1763,12 +1773,82 @@ public class EditorView extends Component implements TextInputClient, com.codena
         return previous;
     }
 
+    private boolean wordCharacterAt(int offset) {
+        int cp = wordCodePointAt(offset);
+        while (WordCharacters.isMark(cp)) {
+            if (offset == 0) {
+                return false;
+            }
+            offset = previousWordOffset(offset);
+            cp = wordCodePointAt(offset);
+        }
+        return WordCharacters.contains(cp);
+    }
+
+    private int visualWord(boolean right) {
+        int line = doc.lineOfOffset(caret);
+        int start = doc.getLineStart(line);
+        String text = doc.getLineText(line);
+        Font font = getEditorFont();
+        int x = measureColumnX(line, text, caret - start, font);
+        int best = caret;
+        int distance = Integer.MAX_VALUE;
+        // Examine word edges in rendered order, so mixed-direction runs retain
+        // spatial left/right semantics instead of reversing the whole paragraph.
+        int[][] runs = bidiRuns(text, font);
+        for (int[] run : runs) {
+            int p = run[0];
+            while (p < run[1]) {
+                if (!wordCharacterAt(start + p)) {
+                    p += Character.charCount(wordCodePointAt(start + p));
+                    continue;
+                }
+                int lo = p;
+                do {
+                    p += Character.charCount(wordCodePointAt(start + p));
+                } while (p < run[1] && wordCharacterAt(start + p));
+                boolean rtl = (run[2] & 1) != 0;
+                int edge = right == rtl ? lo : p;
+                int[] segments = lineVisualSegments(line, text, lo, p, font);
+                int edgeX = right ? Integer.MIN_VALUE : Integer.MAX_VALUE;
+                for (int i = 0; i < segments.length; i += 2) {
+                    edgeX = right ? Math.max(edgeX, segments[i] + segments[i + 1])
+                            : Math.min(edgeX, segments[i]);
+                }
+                int delta = right ? edgeX - x : x - edgeX;
+                if (delta > 0 && delta < distance) {
+                    distance = delta;
+                    best = start + edge;
+                }
+            }
+        }
+        if (best != caret) {
+            return best;
+        }
+        // A line can end in punctuation or contain no word characters at all.
+        if (runs.length > 0) {
+            int[] edgeRun = runs[right ? runs.length - 1 : 0];
+            boolean rtl = (edgeRun[2] & 1) != 0;
+            int edge = start + edgeRun[right == rtl ? 0 : 1];
+            if (edge != caret) {
+                return edge;
+            }
+        }
+        // At the visual line edge continue in the paragraph's reading order.
+        boolean forward = right != isRTL();
+        int adjacent = line + (forward ? 1 : -1);
+        if (adjacent >= 0 && adjacent < doc.getLineCount()) {
+            return forward ? doc.getLineStart(adjacent) : doc.getLineEnd(adjacent);
+        }
+        return caret;
+    }
+
     private int wordLeft() {
         int p = caret;
-        while (p > 0 && !WordCharacters.contains(wordCodePointAt(previousWordOffset(p)))) {
+        while (p > 0 && !wordCharacterAt(previousWordOffset(p))) {
             p = previousWordOffset(p);
         }
-        while (p > 0 && WordCharacters.contains(wordCodePointAt(previousWordOffset(p)))) {
+        while (p > 0 && wordCharacterAt(previousWordOffset(p))) {
             p = previousWordOffset(p);
         }
         return p;
@@ -1777,10 +1857,10 @@ public class EditorView extends Component implements TextInputClient, com.codena
     private int wordRight() {
         int p = caret;
         int n = doc.length();
-        while (p < n && !WordCharacters.contains(wordCodePointAt(p))) {
+        while (p < n && !wordCharacterAt(p)) {
             p += Character.charCount(wordCodePointAt(p));
         }
-        while (p < n && WordCharacters.contains(wordCodePointAt(p))) {
+        while (p < n && wordCharacterAt(p)) {
             p += Character.charCount(wordCodePointAt(p));
         }
         return p;
@@ -1789,10 +1869,10 @@ public class EditorView extends Component implements TextInputClient, com.codena
     private void selectWordAt(int offset) {
         int s = offset;
         int e = offset;
-        while (s > 0 && WordCharacters.contains(wordCodePointAt(previousWordOffset(s)))) {
+        while (s > 0 && wordCharacterAt(previousWordOffset(s))) {
             s = previousWordOffset(s);
         }
-        while (e < doc.length() && WordCharacters.contains(wordCodePointAt(e))) {
+        while (e < doc.length() && wordCharacterAt(e)) {
             e += Character.charCount(wordCodePointAt(e));
         }
         anchor = s;
@@ -1990,6 +2070,12 @@ public class EditorView extends Component implements TextInputClient, com.codena
         boolean lineJump = (modifiers & MOD_CTRL) != 0;
         boolean word = (modifiers & MOD_ALT) != 0;
         switch (command) {
+            case KEY_WORD_LEFT:
+                moveCaret(visualWord(false), extend);
+                break;
+            case KEY_WORD_RIGHT:
+                moveCaret(visualWord(true), extend);
+                break;
             case KEY_LEFT:
                 if (lineJump) {
                     lineHome(extend);
@@ -2033,10 +2119,10 @@ public class EditorView extends Component implements TextInputClient, com.codena
                 }
                 break;
             case KEY_PAGE_UP:
-                moveCaret(caretVertical(-Math.max(1, contentHeight() / getLineHeight())), extend);
+                moveCaret(caretPage(false), extend);
                 break;
             case KEY_PAGE_DOWN:
-                moveCaret(caretVertical(Math.max(1, contentHeight() / getLineHeight())), extend);
+                moveCaret(caretPage(true), extend);
                 break;
             case KEY_SCROLL_PAGE_UP:
                 scrollByPixels(0, Math.max(1, contentHeight()));

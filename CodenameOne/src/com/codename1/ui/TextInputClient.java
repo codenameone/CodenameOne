@@ -77,11 +77,14 @@ public interface TextInputClient {
     int KEY_TAB = 18;
 
     /// Key command: scroll up one viewport without moving the caret or selection.
-    /// @since 8.0
     int KEY_SCROLL_PAGE_UP = 19;
     /// Key command: scroll down one viewport without moving the caret or selection.
-    /// @since 8.0
     int KEY_SCROLL_PAGE_DOWN = 20;
+
+    /// Key command: move to the next word boundary spatially to the left, including in RTL text.
+    int KEY_WORD_LEFT = 21;
+    /// Key command: move to the next word boundary spatially to the right, including in RTL text.
+    int KEY_WORD_RIGHT = 22;
 
     /// Modifier bit: shift held (used to extend a selection).
     int MOD_SHIFT = 1;

@@ -88,13 +88,11 @@ public final class TextInputState {
     }
 
     /// Returns the UTF-16 anchor offset, which may be greater than the focus.
-    /// @since 8.0
     public int getSelectionAnchor() {
         return selectionAnchor;
     }
 
     /// Returns the UTF-16 focus offset (the moving end of a selection).
-    /// @since 8.0
     public int getSelectionFocus() {
         return selectionFocus;
     }

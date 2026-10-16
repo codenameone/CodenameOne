@@ -270,4 +270,93 @@ class EditorViewInputTest extends UITestBase {
         v.onKeyCommand(TextInputClient.KEY_PAGE_DOWN, 0);
         assertTrue(v.getEditingState().getSelectionFocus() > 0);
     }
+    @FormTest
+    void variationSelectorsFollowTheirBaseDuringWordDeletion() {
+        for (String symbol : new String[]{"\u2764\uFE0F", "\u2600\uFE0E", "\uD83D\uDE00\uDB40\uDD00"}) {
+            EditorView v = show(symbol);
+            v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+            assertEquals("", v.getText());
+            v.performUndo();
+            assertEquals(symbol, v.getText());
+            v.setSelectionRange(0, 0);
+            v.onKeyCommand(TextInputClient.KEY_DELETE, TextInputClient.MOD_ALT);
+            assertEquals("", v.getText());
+        }
+        EditorView v = show("a\u0301 b\u0301");
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        assertEquals("a\u0301 ", v.getText());
+    }
+
+    @FormTest
+    void spatialWordCommandsRespectRtlAndMixedRuns() {
+        for (EditorView v : new EditorView[]{new EditorView(new NoopHost(), true), new RichView(new NoopHost())}) {
+            Form form = new Form("bidi", new BorderLayout());
+            form.add(BorderLayout.CENTER, v);
+            form.show();
+            flushSerialCalls();
+            v.setText("אבג דהו");
+            if (v instanceof RichView) {
+                v.setSelectionRange(0, 3);
+                ((RichView) v).toggleBold();
+            }
+            v.setRTL(true);
+            v.setSelectionRange(0, 0);
+            v.onKeyCommand(TextInputClient.KEY_WORD_LEFT, TextInputClient.MOD_SHIFT);
+            assertEquals(0, v.getEditingState().getSelectionAnchor());
+            assertEquals(3, v.getEditingState().getSelectionFocus());
+            v.onKeyCommand(TextInputClient.KEY_WORD_RIGHT, 0);
+            assertEquals(0, v.getEditingState().getSelectionFocus());
+            v.setSelectionRange(2, 2);
+            v.onKeyCommand(TextInputClient.KEY_LEFT, TextInputClient.MOD_ALT);
+            assertEquals(0, v.getEditingState().getSelectionFocus(), "logical backward still decreases offsets");
+            v.setText("abc אבג xyz");
+            if (v instanceof RichView) {
+                v.setSelectionRange(0, 3);
+                ((RichView) v).toggleBold();
+            }
+            v.setRTL(false);
+            v.setSelectionRange(5, 5);
+            v.onKeyCommand(TextInputClient.KEY_WORD_LEFT, 0);
+            assertEquals(7, v.getEditingState().getSelectionFocus(), "spatial left within the RTL run");
+            v.setSelectionRange(5, 5);
+            v.onKeyCommand(TextInputClient.KEY_WORD_RIGHT, 0);
+            assertEquals(4, v.getEditingState().getSelectionFocus(), "spatial right within the RTL run");
+            v.setSelectionRange(1, 1);
+            v.onKeyCommand(TextInputClient.KEY_WORD_RIGHT, 0);
+            assertEquals(3, v.getEditingState().getSelectionFocus());
+            v.setText("abc !!!");
+            v.setSelectionRange(3, 3);
+            v.onKeyCommand(TextInputClient.KEY_WORD_RIGHT, 0);
+            assertEquals(7, v.getEditingState().getSelectionFocus());
+            v.setText("\u2764\uFE0F");
+            v.setSelectionRange(0, 0);
+            v.onKeyCommand(TextInputClient.KEY_WORD_RIGHT, 0);
+            assertEquals(2, v.getEditingState().getSelectionFocus());
+            v.onKeyCommand(TextInputClient.KEY_WORD_LEFT, 0);
+            assertEquals(0, v.getEditingState().getSelectionFocus());
+        }
+    }
+
+    @FormTest
+    void pageCommandsUseActualLineHeightsAndVisualColumn() {
+        EditorView v = new EditorView(new NoopHost(), true) {
+            @Override protected boolean uniformLineHeight() { return false; }
+            @Override protected int lineHeightAt(int line) { return line == 1 ? 160 : 20; }
+        };
+        Form f = new Form("page", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.getAllStyles().setPadding(0, 0, 0, 0);
+        v.setHeight(100);
+        v.setText("abc\nabc\nabc\nabc\nabc\nabc\nabc\nabc");
+        v.setSelectionRange(1, 1);
+        v.onKeyCommand(TextInputClient.KEY_PAGE_DOWN, TextInputClient.MOD_SHIFT);
+        assertEquals(1, v.getEditingState().getSelectionAnchor());
+        assertEquals(5, v.getEditingState().getSelectionFocus(), "one page lands in the tall second line");
+        v.setSelectionRange(13, 13);
+        v.onKeyCommand(TextInputClient.KEY_PAGE_UP, 0);
+        assertEquals(5, v.getEditingState().getSelectionFocus(), "up also uses cumulative line pixels");
+    }
+
 }

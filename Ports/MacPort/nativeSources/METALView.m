@@ -2215,9 +2215,13 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             command = 5; modifiers |= 4;
         } else if ([name isEqualToString:@"moveToEndOfParagraph:"]) {
             command = 6; modifiers |= 4;
-        } else if ([name isEqualToString:@"moveWordLeft:"] || [name isEqualToString:@"moveWordBackward:"]) {
+        } else if ([name isEqualToString:@"moveWordLeft:"]) {
+            command = 21; // KEY_WORD_LEFT: spatial direction
+        } else if ([name isEqualToString:@"moveWordRight:"]) {
+            command = 22; // KEY_WORD_RIGHT: spatial direction
+        } else if ([name isEqualToString:@"moveWordBackward:"]) {
             command = 1; modifiers |= 4; // KEY_LEFT, MOD_ALT
-        } else if ([name isEqualToString:@"moveWordRight:"] || [name isEqualToString:@"moveWordForward:"]) {
+        } else if ([name isEqualToString:@"moveWordForward:"]) {
             command = 2; modifiers |= 4; // KEY_RIGHT, MOD_ALT
         } else if ([name isEqualToString:@"moveUp:"]) {
             command = 3;
