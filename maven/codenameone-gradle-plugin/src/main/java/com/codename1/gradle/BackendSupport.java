@@ -68,6 +68,21 @@ final class BackendSupport {
     /// The directory it stages into, under the backend's build directory.
     static final String WEB_APP_DIRECTORY = "webapp";
 
+    /// Where the web app is staged: `cn1.backend.webapp.output`, relative to
+    /// the project, or `build/webapp`. The staging task writes it and the run
+    /// and package tasks read it, so all three take it from here -- a custom
+    /// output staged by one and looked for at the default by the others was
+    /// never served or packaged.
+    ///
+    /// The project directory is looked up here, outside the lambda: a lambda
+    /// that held the Project could not be stored in the configuration cache.
+    static Provider<org.gradle.api.file.Directory> webAppDirectory(Project project) {
+        final org.gradle.api.file.Directory projectDirectory = project.getLayout().getProjectDirectory();
+        return project.getProviders().gradleProperty("cn1.backend.webapp.output")
+                .map(projectDirectory::dir)
+                .orElse(project.getLayout().getBuildDirectory().dir(WEB_APP_DIRECTORY));
+    }
+
     private BackendSupport() {
     }
 
@@ -135,7 +150,7 @@ final class BackendSupport {
             t.getWorkingDirectory().set(layout.projectDir());
             // What backendWebApp staged, when it has; never a dependency, so a
             // restart does not pay for a browser build.
-            t.getWebAppDirectory().set(project.getLayout().getBuildDirectory().dir(WEB_APP_DIRECTORY));
+            t.getWebAppDirectory().set(webAppDirectory(project));
             t.mustRunAfter(WEB_APP_TASK);
         });
         registerWebApp(project, layout);
@@ -167,9 +182,6 @@ final class BackendSupport {
         final Project root = project.getRootProject();
         final boolean hasApp = hostsApplication(project != root,
                 project != root ? ProjectSupport.kind(root) : null);
-        // Looked up here: a lambda that held the Project could not be stored in
-        // the configuration cache.
-        final org.gradle.api.file.Directory projectDirectory = project.getLayout().getProjectDirectory();
         project.getTasks().register(WEB_APP_TASK, BackendWebAppTask.class, t -> {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Builds the app for the browser and stages it for this backend to serve");
@@ -183,9 +195,7 @@ final class BackendSupport {
             t.getOutputs().upToDateWhen(task -> false);
             t.getBundle().set(bundle);
             t.getWorkingDirectory().set(layout.projectDir());
-            t.getOutputDirectory().set(project.getProviders().gradleProperty("cn1.backend.webapp.output")
-                    .map(projectDirectory::dir)
-                    .orElse(project.getLayout().getBuildDirectory().dir(WEB_APP_DIRECTORY)));
+            t.getOutputDirectory().set(webAppDirectory(project));
             // Staging replaces the directory with whatever the bundle holds now.
             t.getOutputs().upToDateWhen(x -> false);
             if (hasApp) {

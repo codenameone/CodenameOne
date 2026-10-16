@@ -75,8 +75,7 @@ final class BackendPackageSupport {
             // The application backendWebApp staged ships beside the binary. Not
             // an input: the binary does not change with it, and a new browser
             // build should not cost a native link.
-            t.getWebAppDirectory().set(project.getLayout().getBuildDirectory()
-                    .dir(BackendSupport.WEB_APP_DIRECTORY));
+            t.getWebAppDirectory().set(BackendSupport.webAppDirectory(project));
             t.mustRunAfter(BackendSupport.WEB_APP_TASK);
             t.getOutputs().upToDateWhen(task -> {
                 PackageTask p = (PackageTask) task;

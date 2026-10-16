@@ -42,9 +42,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @BackendTest
 class DrivingApplicationTest {
     /// The smallest things the server takes for a picture: the first bytes of a
-    /// PNG and of a JPEG, in base64.
+    /// PNG and of a JPEG, as far as the header that gives their size (one
+    /// pixel), in base64.
     private static final String PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
-    private static final String JPEG = "/9j/4AAQSkZJRgABAQAAAQABAAA=";
+    private static final String JPEG = "/9j/4AAQSkZJRgABAQAAAQABAAD/wAARCAABAAEDASIAAhEBAxEB";
     private static final String[] KINDS = {"photo_id", "licence", "selfie", "vehicle_registration",
         "insurance"};
     private static final String FORM = "{\"legalName\":\"Ada Applicant\","
@@ -132,6 +133,15 @@ class DrivingApplicationTest {
         mvc.perform(People.asRider(Trips.body(post("/api/driving/application/documents"),
                         picture("photo_id", huge.toString())), who))
                 .andExpect(status().isPayloadTooLarge());
+        // A few bytes that say 100000 pixels wide: refused before an admin's
+        // app tries to decode them.
+        mvc.perform(People.asRider(Trips.body(post("/api/driving/application/documents"),
+                        picture("photo_id", "iVBORw0KGgoAAAANSUhEUgABhqAAAAAB")), who))
+                .andExpect(status().isPayloadTooLarge());
+        // A JPEG that never says its size is no picture.
+        mvc.perform(People.asRider(Trips.body(post("/api/driving/application/documents"),
+                        picture("photo_id", "/9j/4AAQSkZJRgABAQAAAQABAAA=")), who))
+                .andExpect(status().isBadRequest());
 
         for (int iter = 0; iter < 4; iter++) {
             upload(who, KINDS[iter]);

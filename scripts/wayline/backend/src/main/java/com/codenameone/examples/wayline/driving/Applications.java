@@ -81,6 +81,9 @@ public class Applications {
     /// well below this before sending it; the cap is for whoever does not.
     static final int MAX_DOCUMENT_BYTES = 1572864;
 
+    /// The most pixels a document may have on a side, read from its header.
+    static final int MAX_DOCUMENT_SIDE = 4096;
+
     private static final String[] KIND_NAMES = {"a photo of your ID", "a photo of your licence",
         "a selfie", "the vehicle's registration", "proof of insurance"};
 
@@ -232,6 +235,17 @@ public class Applications {
             type = "image/png";
         } else {
             throw new ResponseStatusException(400, "Send a JPEG or a PNG picture");
+        }
+        // The size the picture says it has, before anyone decodes it. A few
+        // kilobytes can declare a picture of millions of pixels, and an admin's
+        // app decoding that runs out of memory: the app sends at most 1280 on
+        // a side, so anything far past that is refused.
+        int[] size = "image/png".equals(type) ? pngSize(bytes) : jpegSize(bytes);
+        if (size == null || size[0] <= 0 || size[1] <= 0) {
+            throw new ResponseStatusException(400, "Send a JPEG or a PNG picture");
+        }
+        if (size[0] > MAX_DOCUMENT_SIDE || size[1] > MAX_DOCUMENT_SIDE) {
+            throw new ResponseStatusException(413, "That picture is too large");
         }
         // Held before it is read. The check below says the application may
         // still be changed, and the picture is stored after it: without the
@@ -587,5 +601,60 @@ public class Applications {
                 row.getProduct(), row.isWheelchair(), row.isPets(), listed,
                 row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
                 row.getReviewedBy());
+    }
+
+    /// Width and height from a PNG's header chunk, or null without one.
+    static int[] pngSize(byte[] bytes) {
+        if (bytes.length < 24 || bytes[12] != 'I' || bytes[13] != 'H' || bytes[14] != 'D'
+                || bytes[15] != 'R') {
+            return null;
+        }
+        return new int[] {int32(bytes, 16), int32(bytes, 20)};
+    }
+
+    /// Width and height from a JPEG's frame header, or null when the scan
+    /// starts, or the bytes run out, before one.
+    static int[] jpegSize(byte[] bytes) {
+        int at = 2;
+        while (at + 3 < bytes.length) {
+            if ((bytes[at] & 0xff) != 0xff) {
+                return null;
+            }
+            int marker = bytes[at + 1] & 0xff;
+            if (marker == 0xff) {
+                // Fill before a marker.
+                at++;
+                continue;
+            }
+            if (marker == 0x01 || (marker >= 0xd0 && marker <= 0xd8)) {
+                // Markers that carry no length.
+                at += 2;
+                continue;
+            }
+            if (marker == 0xda || marker == 0xd9) {
+                return null;
+            }
+            int length = ((bytes[at + 2] & 0xff) << 8) | (bytes[at + 3] & 0xff);
+            boolean frame = marker >= 0xc0 && marker <= 0xcf && marker != 0xc4
+                    && marker != 0xc8 && marker != 0xcc;
+            if (frame) {
+                if (at + 8 >= bytes.length) {
+                    return null;
+                }
+                int height = ((bytes[at + 5] & 0xff) << 8) | (bytes[at + 6] & 0xff);
+                int width = ((bytes[at + 7] & 0xff) << 8) | (bytes[at + 8] & 0xff);
+                return new int[] {width, height};
+            }
+            if (length < 2) {
+                return null;
+            }
+            at += 2 + length;
+        }
+        return null;
+    }
+
+    private static int int32(byte[] bytes, int at) {
+        return ((bytes[at] & 0xff) << 24) | ((bytes[at + 1] & 0xff) << 16)
+                | ((bytes[at + 2] & 0xff) << 8) | (bytes[at + 3] & 0xff);
     }
 }
