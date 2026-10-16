@@ -631,7 +631,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);
         String rootPom = getText(entries, "pom.xml");
-        assertContains(rootPom, "<cn1.plugin.version>7.0.278</cn1.plugin.version>",
+        assertContains(rootPom, "<cn1.plugin.version>" + version + "</cn1.plugin.version>",
                 label + "the root pom should name the plugin the download was generated against");
         assertCodenameOneRepository(rootPom, label);
         assertNotNull(entries.get("mvnw"), label + "missing mvnw");

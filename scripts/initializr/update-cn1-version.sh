@@ -62,12 +62,19 @@ replace_file() {
   perl -0pi -e "$expr" "$file"
 }
 
+# What a version written out literally looks like. Not [^<]+: in Java source that
+# also matches an expression, so the bump rewrote the matrix test's
+# "<cn1.plugin.version>" + version + "</cn1.plugin.version>" into a literal and
+# broke the check of a download generated at another version. Likewise it keeps a
+# ${property} reference in a pom from being flattened.
+VERSION_LITERAL='[0-9][0-9A-Za-z.-]*'
+
 ROOT_INITIALIZR_DIR="$ROOT_DIR/scripts/initializr"
 GENERATOR_MODEL="$ROOT_DIR/scripts/initializr/common/src/main/java/com/codename1/initializr/model/GeneratorModel.java"
 MATRIX_TEST="$ROOT_DIR/scripts/initializr/common/src/test/java/com/codename1/initializr/model/GeneratorModelMatrixTest.java"
 while IFS= read -r pom; do
-  replace_file "$pom" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
-  replace_file "$pom" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
+  replace_file "$pom" "s|<cn1\\.plugin\\.version>$VERSION_LITERAL</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
+  replace_file "$pom" "s|<cn1\\.version>$VERSION_LITERAL</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 done < <(find "$ROOT_INITIALIZR_DIR" -name pom.xml -type f)
 
 # The cn1-local-workspace profile (scripts/initializr/pom.xml) is built against the
@@ -100,8 +107,8 @@ else
 fi
 replace_file "$GENERATOR_MODEL" "s#static final boolean GRADLE_PLUGIN_PUBLISHED = (?:true|false);#static final boolean GRADLE_PLUGIN_PUBLISHED = $GRADLE_PUBLISHED;#g;"
 echo "Gradle plugin published at $VERSION: $GRADLE_PUBLISHED"
-replace_file "$MATRIX_TEST" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
-replace_file "$MATRIX_TEST" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
+replace_file "$MATRIX_TEST" "s|<cn1\\.plugin\\.version>$VERSION_LITERAL</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
+replace_file "$MATRIX_TEST" "s|<cn1\\.version>$VERSION_LITERAL</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 
 
 echo "Updated Initializr Codename One versions to $VERSION"

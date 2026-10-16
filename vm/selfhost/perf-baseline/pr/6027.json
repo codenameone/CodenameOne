@@ -5,11 +5,11 @@
    "hello": {
     "all": {
      "from": {
-      "memory": 0.868,
+      "memory": 1.014,
       "time": 0.931
      },
-     "memory": 0.868,
-     "reason": "Recalibrate Linux ARM64 Neoverse-N2 hello translation time from five matching-CPU five-round reports (runs 38848075973, 38861108588, 38848287858, 38876165702, 38878637047), including two independent master controls. Median of run medians is 1.021x versus the older 0.931x baseline; measured medians span 1.013-1.078x. Keep the 15% time tolerance and 0.868x memory baseline. This is a baseline calibration, not an editor startup measurement. Evidence and artifact hashes: evidence/pr-6027-linux.md.",
+     "memory": 1.014,
+     "reason": "Recalibrate Linux ARM64 Neoverse-N2 hello translation time from five matching-CPU five-round reports (runs 38848075973, 38861108588, 38848287858, 38876165702, 38878637047), including two independent master controls. Median of run medians is 1.021x versus the older 0.931x baseline; measured medians span 1.013-1.078x. Keep the 15% time tolerance. Chained on pr/5984.json, which merged first and moved this row's memory from 0.868x to 1.014x while keeping time: the two changes moved different dimensions of the same row without seeing each other, so this rebaseline now starts from 5984's result and keeps its memory. This is a baseline calibration, not an editor startup measurement. Evidence and artifact hashes: evidence/pr-6027-linux.md.",
      "runs": 5,
      "time": 1.021
     }
