@@ -359,4 +359,51 @@ class EditorViewInputTest extends UITestBase {
         assertEquals(5, v.getEditingState().getSelectionFocus(), "up also uses cumulative line pixels");
     }
 
+    @FormTest
+    void cancelCompositionRestoresSelectionStylesAndRedoWithoutAnUndoEntry() {
+        RichView v = new RichView(new NoopHost());
+        Form f = new Form("cancel", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.setText("abc def");
+        v.setSelectionRange(0, 3);
+        v.toggleBold();
+        v.setSelectionRange(7, 7);
+        v.commitText("!");
+        v.performUndo();
+        v.setSelectionRange(3, 0);
+        v.setComposingText(KANA, KANA.length());
+        v.setComposingText("", 0);
+        v.cancelComposing();
+        assertEquals("abc def", v.getText());
+        assertEquals(0, v.getSelectionStart());
+        assertEquals(3, v.getSelectionEnd());
+        assertEquals(3, v.getEditingState().getSelectionAnchor());
+        assertEquals(0, v.getEditingState().getSelectionFocus());
+        assertTrue(v.getInlineStyles().styleAt(0).isBold());
+        assertFalse(v.getInlineStyles().styleAt(4).isBold());
+        assertEquals(-1, v.getEditingState().getComposingStart());
+        v.performRedo();
+        assertEquals("abc def!", v.getText(), "cancellation must preserve redo");
+        v.performUndo();
+        v.performUndo();
+        assertEquals("abc def", v.getText());
+        assertFalse(v.getInlineStyles().styleAt(0).isBold(), "no cancellation undo entry precedes bold");
+    }
+
+    @FormTest
+    void cancelWithoutCompositionDoesNotChangeTextAndCommittedTextSurvivesEnd() {
+        EditorView v = show("original");
+        v.cancelComposing();
+        assertEquals("original", v.getText());
+        v.setSelectionRange(0, 8);
+        v.setComposingText(KANA, 0);
+        v.commitText(KANJI);
+        v.cancelComposing();
+        assertEquals(KANJI, v.getText());
+        v.performUndo();
+        assertEquals("original", v.getText());
+    }
+
 }

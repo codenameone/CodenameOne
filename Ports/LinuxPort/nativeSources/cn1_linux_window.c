@@ -415,6 +415,10 @@ void cn1LinuxOverlayRemove(int slot, GtkWidget* w) {
 
 /* The top-level GtkWindow (NULL in headless mode); used as the transient parent
  * for modal dialogs (file chooser, print) and the WebKit/edit hosts. */
+GtkWidget* cn1LinuxTextCanvas(int slot) {
+    return slot == CN1_MAIN_WINDOW_SLOT ? cn1DrawingArea : cn1LinuxDesktopDrawingArea(slot);
+}
+
 GtkWidget* cn1LinuxWindowWidget(void) {
     return cn1Window;
 }
@@ -714,6 +718,16 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
         if (focus != 0 && focus != cn1DrawingArea && focus != cn1TitleCanvas) {
             return FALSE;
         }
+    }
+    /* Our handler consumes unhandled canvas keys below, so GTK's default
+     * handler never gets to activate menu accelerators. Resolve them here,
+     * after native peers have had their normal focus-based dispatch. */
+    if (e->type == GDK_KEY_PRESS && cn1Window != NULL
+            && gtk_window_activate_key(GTK_WINDOW(cn1Window), e)) {
+        return TRUE;
+    }
+    if (cn1LinuxTextInputFilter(CN1_MAIN_WINDOW_SLOT, e)) {
+        return TRUE;
     }
     /* Map the GDK keyval to a Codename One key code: printable Unicode passes
      * through gdk_keyval_to_unicode; the navigation keys map to the CN1 game-key

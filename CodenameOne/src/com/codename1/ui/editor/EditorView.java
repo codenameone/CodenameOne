@@ -46,7 +46,7 @@ import com.codename1.ui.TopLevelContainer;
 /// This class provides the shared editing behavior. Feature layers (syntax highlighting, the gutter,
 /// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
 /// document/measurement hooks.
-public class EditorView extends Component implements TextInputClient, com.codename1.ui.TextInputGeometry.Provider {
+public class EditorView extends Component implements TextInputClient, TextInputClient.CompositionCancellation, com.codename1.ui.TextInputGeometry.Provider {
     private EditorHost host;
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
@@ -60,6 +60,8 @@ public class EditorView extends Component implements TextInputClient, com.codena
     // pre-composition snapshot so the finalized composition forms a single undo unit
     private String composingBaseRemoved;
     private Object composingBeforeState;
+    private int composingBeforeCaret;
+    private int composingBeforeAnchor;
     private boolean editable = true;
 
     private int scrollY;
@@ -1994,6 +1996,8 @@ public class EditorView extends Component implements TextInputClient, com.codena
             // commitText / finishComposing; intermediate compose updates are never recorded
             composingBaseRemoved = doc.substring(start, end);
             composingBeforeState = captureDocumentState();
+            composingBeforeCaret = caret;
+            composingBeforeAnchor = anchor;
         }
         String removed = doc.substring(start, end);
         doc.delete(start, end);
@@ -2016,6 +2020,25 @@ public class EditorView extends Component implements TextInputClient, com.codena
             pushInputState();
             repaint();
         }
+    }
+
+    @Override
+    public void cancelComposing() {
+        if (composingStart < 0) {
+            return;
+        }
+        Object before = composingBeforeState;
+        int oldCaret = composingBeforeCaret;
+        int oldAnchor = composingBeforeAnchor;
+        replaceRange(composingStart, composingEnd,
+                composingBaseRemoved == null ? "" : composingBaseRemoved, false);
+        restoreDocumentState(before);
+        caret = doc.clamp(oldCaret);
+        anchor = oldAnchor < 0 ? -1 : doc.clamp(oldAnchor);
+        invalidateLayout();
+        scrollCaretVisible();
+        pushInputState();
+        repaint();
     }
 
     @Override
