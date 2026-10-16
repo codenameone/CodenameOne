@@ -91,6 +91,22 @@ final class TimeArithmetic {
     }
 
     /// `unit` as a `ChronoUnit`, or the JDK's refusal of a unit it cannot add.
+    /// The length in nanoseconds of a unit to truncate a time to. Any unit
+    /// will do, a custom one included, as long as its duration divides a
+    /// standard day: that is the JDK's rule, and the reason it reads the
+    /// duration rather than requiring a [ChronoUnit].
+    static long truncationNanos(TemporalUnit unit) {
+        java.time.Duration length = unit.getDuration();
+        if (length.getSeconds() > SECONDS_PER_DAY) {
+            throw new UnsupportedTemporalTypeException("Unit is too large to be used for truncation");
+        }
+        long dur = length.toNanos();
+        if (dur <= 0 || NANOS_PER_DAY % dur != 0) {
+            throw new UnsupportedTemporalTypeException("Unit must divide into a standard day without remainder");
+        }
+        return dur;
+    }
+
     static ChronoUnit chrono(TemporalUnit unit) {
         if (unit instanceof ChronoUnit) {
             return (ChronoUnit) unit;

@@ -66,6 +66,15 @@ public class ZoneId {
                 throw new DateTimeException("Invalid ID for region-based ZoneId, invalid format: " + zoneId);
             }
         }
+        // A well-formed region ID is accepted without checking it names a
+        // real region, where the JDK throws ZoneRulesException. That is
+        // deliberate: a device has no zone database to check against -- the
+        // rules come from the OS one lookup at a time, through TimeZone, and
+        // TimeZone.getAvailableIDs() answers only GMT and the default zone --
+        // so validating would mean a new native on every port for an error
+        // case. Its rules are whatever java.util.TimeZone.getTimeZone gives
+        // the same ID, which -- on the JDK as here -- does not throw for an
+        // unknown one either.
         return new ZoneId(zoneId, null);
     }
 

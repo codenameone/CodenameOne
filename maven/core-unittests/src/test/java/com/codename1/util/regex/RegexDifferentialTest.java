@@ -263,6 +263,17 @@ class RegexDifferentialTest {
         return false;
     }
 
+    /// Whether this JDK predates JDK-8264160 (fixed in 19), under which `\b`
+    /// took any Unicode letter or digit as a word character rather than the
+    /// ASCII ones `\w` matches. The shim follows the current JDK, so on an
+    /// older one the comparison for boundaries is skipped.
+    private static final boolean JDK_UNICODE_WORD_BOUNDARY = java.util.regex.Pattern
+            .compile("\\b").matcher(String.valueOf((char) 0xe9)).find();
+
+    private static boolean namesAWordBoundary(String regex) {
+        return regex.contains("\\b") || regex.contains("\\B");
+    }
+
     private static int compare(int flags) {
         int compared = 0;
         StringBuilder failures = new StringBuilder();
@@ -270,6 +281,10 @@ class RegexDifferentialTest {
         for (String regex : PATTERNS) {
             if (JDK_CASE_CLASSES_IGNORE_CASE_FLAG && (flags & java.util.regex.Pattern.CASE_INSENSITIVE) != 0
                     && (flags & java.util.regex.Pattern.LITERAL) == 0 && namesACaseClass(regex)) {
+                continue;
+            }
+            if (JDK_UNICODE_WORD_BOUNDARY && (flags & java.util.regex.Pattern.LITERAL) == 0
+                    && namesAWordBoundary(regex)) {
                 continue;
             }
             boolean reported = false;

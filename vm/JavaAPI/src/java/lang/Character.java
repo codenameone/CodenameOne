@@ -1704,15 +1704,61 @@ public final class Character implements Comparable<Character>{
     }
 
     /// The value of a digit, or of a Latin letter read as a digit of base
-    /// 36, or -1.
+    /// 36, or of a numeric symbol this runtime knows (superscripts,
+    /// subscripts, Roman numerals, circled numbers); -2 for a vulgar fraction,
+    /// which has a value but not an integral one; otherwise -1.
     public static int getNumericValue(char ch) {
-        return digit(ch, MAX_RADIX);
+        return getNumericValue((int) ch);
     }
 
     /// The value of a digit, or of a Latin letter read as a digit of base
-    /// 36, or -1.
+    /// 36, or of a numeric symbol this runtime knows (superscripts,
+    /// subscripts, Roman numerals, circled numbers); -2 for a vulgar fraction,
+    /// which has a value but not an integral one; otherwise -1.
     public static int getNumericValue(int codePoint) {
-        return digit(codePoint, MAX_RADIX);
+        int value = digit(codePoint, MAX_RADIX);
+        return value >= 0 || codePoint < 0xb2 ? value : numericSymbolValue(codePoint);
+    }
+
+    /// Ranges of numeric symbols as {first, last, value of first}; each code
+    /// point after the first is worth one more. A first value of -2 marks a
+    /// range of fractions, all of them -2.
+    private static final int[] NUMERIC_RANGES = {
+        0x00b2, 0x00b3, 2,
+        0x00b9, 0x00b9, 1,
+        0x00bc, 0x00be, -2,
+        0x2070, 0x2070, 0,
+        0x2074, 0x2079, 4,
+        0x2080, 0x2089, 0,
+        0x2150, 0x215e, -2,
+        0x215f, 0x215f, 1,
+        0x2160, 0x216b, 1,
+        0x2170, 0x217b, 1,
+        0x2460, 0x2473, 1,
+        0x2474, 0x2487, 1,
+        0x2488, 0x249b, 1,
+        0x24ea, 0x24ea, 0,
+        0x24eb, 0x24f4, 11,
+        0x24f5, 0x24fe, 1,
+        0x24ff, 0x24ff, 0,
+        0x2776, 0x277f, 1,
+        0x2780, 0x2789, 1,
+        0x278a, 0x2793, 1
+    };
+
+    private static int numericSymbolValue(int codePoint) {
+        for (int i = 0; i < NUMERIC_RANGES.length; i += 3) {
+            if (codePoint >= NUMERIC_RANGES[i] && codePoint <= NUMERIC_RANGES[i + 1]) {
+                int first = NUMERIC_RANGES[i + 2];
+                return first == -2 ? -2 : first + codePoint - NUMERIC_RANGES[i];
+            }
+        }
+        // The Roman numerals past twelve: L, C, D and M, upper and lower case.
+        if (codePoint >= 0x216c && codePoint <= 0x216f || codePoint >= 0x217c && codePoint <= 0x217f) {
+            int k = (codePoint - 0x216c) % 16;
+            return k == 0 ? 50 : k == 1 ? 100 : k == 2 ? 500 : 1000;
+        }
+        return -1;
     }
 
     /// Whether the code point is alphabetic. This runtime answers as for

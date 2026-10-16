@@ -214,18 +214,10 @@ public final class LocalTime implements Temporal, Comparable<LocalTime> {
     /// This time with everything smaller than `unit` set to zero. The unit
     /// has to divide a day.
     public LocalTime truncatedTo(TemporalUnit unit) {
-        ChronoUnit u = TimeArithmetic.chrono(unit);
-        if (u == ChronoUnit.NANOS) {
+        if (unit == ChronoUnit.NANOS) {
             return this;
         }
-        if (u == ChronoUnit.DAYS) {
-            return MIDNIGHT;
-        }
-        if (u.compareTo(ChronoUnit.DAYS) > 0) {
-            throw new java.time.temporal.UnsupportedTemporalTypeException(
-                    "Unit is too large to be used for truncation");
-        }
-        long dur = TimeArithmetic.seconds(u) * NANOS_PER_SECOND + TimeArithmetic.nanos(u);
+        long dur = TimeArithmetic.truncationNanos(unit);
         long nod = toNanoOfDay();
         return ofNanoOfDay((nod / dur) * dur);
     }

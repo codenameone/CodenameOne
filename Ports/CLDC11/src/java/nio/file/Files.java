@@ -479,6 +479,11 @@ public final class Files {
             throw new NoSuchFileException(dir.toString());
         }
         if (!f.mkdir()) {
+            // mkdir is the atomic claim: a caller that lost the race for the
+            // name is told so, as createFile tells it.
+            if (f.exists()) {
+                throw new FileAlreadyExistsException(dir.toString());
+            }
             throw new IOException("Could not create the directory " + dir);
         }
         return dir;
@@ -512,7 +517,13 @@ public final class Files {
         while (true) {
             Path candidate = parent.resolve(p + n + suffix);
             if (!file(candidate).exists()) {
-                return directory ? createDirectory(candidate) : createFile(candidate);
+                // Another caller can claim the same name between the check and
+                // the create; the create is exclusive, so the loser moves on.
+                try {
+                    return directory ? createDirectory(candidate) : createFile(candidate);
+                } catch (FileAlreadyExistsException e) {
+                    // Taken meanwhile: try the next name.
+                }
             }
             n++;
         }

@@ -234,15 +234,10 @@ public final class Instant implements Temporal, Comparable<Instant> {
     /// This moment with everything smaller than `unit` dropped. The unit has
     /// to divide a day.
     public Instant truncatedTo(TemporalUnit unit) {
-        ChronoUnit u = TimeArithmetic.chrono(unit);
-        if (u == ChronoUnit.NANOS) {
+        if (unit == ChronoUnit.NANOS) {
             return this;
         }
-        if (u.compareTo(ChronoUnit.DAYS) > 0) {
-            throw new java.time.temporal.UnsupportedTemporalTypeException(
-                    "Unit is too large to be used for truncation");
-        }
-        long dur = TimeArithmetic.seconds(u) * TimeArithmetic.NANOS_PER_SECOND + TimeArithmetic.nanos(u);
+        long dur = TimeArithmetic.truncationNanos(unit);
         long nod = (epochSecond % TimeArithmetic.SECONDS_PER_DAY) * TimeArithmetic.NANOS_PER_SECOND + nano;
         long result = TimeArithmetic.floorDiv(nod, dur) * dur;
         return plusNanos(result - nod);

@@ -90,6 +90,9 @@ public final class Pattern {
     public static final int CANON_EQ = 0x80;
     public static final int UNICODE_CHARACTER_CLASS = 0x100;
 
+    private static final int ALL_FLAGS = UNIX_LINES | CASE_INSENSITIVE | COMMENTS | MULTILINE | LITERAL
+            | DOTALL | UNICODE_CASE | CANON_EQ | UNICODE_CHARACTER_CLASS;
+
     private final String regex;
     private final int flags;
     final Node root;
@@ -100,6 +103,11 @@ public final class Pattern {
     private Pattern(String regex, int flags) {
         if (regex == null) {
             throw new NullPointerException();
+        }
+        // As in the JDK: a bit no flag constant names is a caller's mistake,
+        // not something to ignore.
+        if ((flags & ~ALL_FLAGS) != 0) {
+            throw new IllegalArgumentException("Unknown flag 0x" + Integer.toHexString(flags & ~ALL_FLAGS));
         }
         if ((flags & CANON_EQ) != 0) {
             throw new UnsupportedOperationException("Pattern.CANON_EQ is not supported by the Codename One runtime");
@@ -333,8 +341,13 @@ public final class Pattern {
         return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
     }
 
+    /// A word character for `\b` and `\B`: the ASCII `[a-zA-Z0-9_]` that
+    /// `\w` matches. The JDK has defined the boundary this way since 19
+    /// (JDK-8264160); before, it took any Unicode letter or digit, so `\b`
+    /// fell inside a word `\w+` could not match. The Unicode reading comes
+    /// only with `UNICODE_CHARACTER_CLASS`, which this runtime refuses.
     static boolean wordChar(char c) {
-        return c == '_' || isLetterOrDigit(c);
+        return c == '_' || asciiLetter(c) || c >= '0' && c <= '9';
     }
 
     static boolean isLetterOrDigit(char c) {

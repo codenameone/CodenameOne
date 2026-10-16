@@ -262,6 +262,17 @@ public class LangMembersApp {
                 InputStreamReader r = new InputStreamReader(new ByteArrayInputStream(new byte[] {(byte) 0xc3, (byte) 0xa9, 0x41}), StandardCharsets.UTF_8);
                 return r.read() + "/" + r.read() + "/" + r.read();
             }
+            case 121: {
+                // Superscripts, fractions, Roman numerals and circled numbers.
+                int[] ranges = {0xa0, 0xbf, 0x2070, 0x208f, 0x2150, 0x217f, 0x2460, 0x249b, 0x24ea, 0x24ff, 0x2776, 0x2793};
+                StringBuilder sb = new StringBuilder();
+                for (int r = 0; r < ranges.length; r += 2) {
+                    for (int c = ranges[r]; c <= ranges[r + 1]; c++) {
+                        sb.append(Character.getNumericValue(c)).append(',').append(Character.getNumericValue((char) c)).append(' ');
+                    }
+                }
+                return sb.toString();
+            }
             default: return null;
         }
     }

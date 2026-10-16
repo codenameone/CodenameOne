@@ -30,9 +30,12 @@ import java.lang.ref.WeakReference;
 /// manager's cached constraints, say -- without ever removing it.
 ///
 /// Keys are held through the device's `WeakReference` and compared with
-/// `equals`, as the JDK's are. Entries whose key is gone are dropped the next
-/// time the map is used; there is no reference queue on a device, so nothing
-/// is dropped in between, and [#size()] counts only the entries still alive.
+/// `equals`, as the JDK's are. Entries whose key is gone are dropped by the
+/// next change to the map, by [#size()], and by reads too, in a sweep that
+/// runs once per roughly as many reads as the map has keys -- so a cache that
+/// is only ever read still lets go of its values, at an amortized constant
+/// cost per read. There is no reference queue on a device, so nothing is
+/// dropped in between, and [#size()] counts only the entries still alive.
 ///
 /// [#entrySet()], [#keySet()] and [#values()] are snapshots taken when they
 /// are called: removing through them, or through their iterators, does not
@@ -49,6 +52,9 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> {
 
     /// The entries by their key's hash code.
     private final HashMap<Integer, List<Cell<V>>> buckets = new HashMap<Integer, List<Cell<V>>>();
+
+    /// Reads since the last sweep; see the class description.
+    private int readsSinceExpunge;
 
     private static final class Cell<V> {
         @SuppressWarnings("rawtypes")
@@ -103,8 +109,16 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> {
         return null;
     }
 
+    /// Sweeps from a read once enough reads have passed to pay for it.
+    private void expungeFromRead() {
+        if (++readsSinceExpunge > buckets.size() + 16) {
+            expunge();
+        }
+    }
+
     /// Drops every entry whose key has been collected.
     private void expunge() {
+        readsSinceExpunge = 0;
         Iterator<List<Cell<V>>> all = buckets.values().iterator();
         while (all.hasNext()) {
             List<Cell<V>> bucket = all.next();
@@ -136,11 +150,13 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> {
 
     @Override
     public boolean containsKey(Object key) {
+        expungeFromRead();
         return find(mask(key)) != null;
     }
 
     @Override
     public V get(Object key) {
+        expungeFromRead();
         Cell<V> c = find(mask(key));
         return c == null ? null : c.value;
     }
