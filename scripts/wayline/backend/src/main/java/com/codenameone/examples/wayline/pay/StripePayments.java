@@ -97,6 +97,11 @@ public class StripePayments implements PaymentProvider {
         // places an address should not be, and it covers the name too: the
         // processor refuses a key it has seen with other fields, and a rider
         // who renamed themselves between two attempts must not be refused.
+        // The price is one orphan in a case that takes two mishaps: the
+        // answer to the first attempt is lost, and the rider renames
+        // themselves before trying again. The second customer is the one
+        // kept; the first holds no card and no money, and is left at the
+        // processor rather than looked up by address on every first card.
         String key = "customer-" + Ids.sha256(username + "\n" + displayName);
         Map made = ask("POST", "/v1/customers", form("email", username, "name", displayName,
                 "metadata[wayline_user]", username), key);
