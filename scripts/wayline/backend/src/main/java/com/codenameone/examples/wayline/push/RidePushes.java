@@ -114,10 +114,18 @@ public class RidePushes {
     static final class Outgoing {
         final List<PushTarget> to;
         final PushNotification message;
+        /// The ride whose Live Activity this ends, forgotten once the push
+        /// service takes it; null for every other message.
+        final String ends;
 
         Outgoing(List<PushTarget> to, PushNotification message) {
+            this(to, message, null);
+        }
+
+        Outgoing(List<PushTarget> to, PushNotification message, String ends) {
             this.to = to;
             this.message = message;
+            this.ends = ends;
         }
     }
 
@@ -128,13 +136,6 @@ public class RidePushes {
     public void rideChanged(String id, RideState state, String rider, String driver) {
         try {
             send(compose(id, state, rider, driver));
-            // Forgotten only once the provider took the end. If it threw, the
-            // row stays marked ended and endLeftBehind sends the end again: the
-            // ride's transition is committed and is never retried, so nothing
-            // else would, and the lock screen would keep showing the ride.
-            if (!state.isActive()) {
-                forget(id);
-            }
         } catch (IOException | RuntimeException err) {
             System.err.println("[push] nothing was sent for ride " + id + " (" + state + "): "
                     + err);
@@ -158,7 +159,6 @@ public class RidePushes {
             String id = left.get(iter).getRideId();
             try {
                 send(ending(id));
-                forget(id);
             } catch (IOException err) {
                 failed = failed == null ? err : failed;
             } catch (RuntimeException err) {
@@ -202,7 +202,7 @@ public class RidePushes {
         Profile who = driver == null || driver.length() == 0 ? null : profiles.findById(driver);
         String name = who == null ? "Your driver" : who.getDisplayName();
         out.add(new Outgoing(devices.targetsOf(ride.getRider()), quiet(id, ride.getState())
-                .surface(endOf(activity.getActivityId(), ride.getState(), name, who)).build()));
+                .surface(endOf(activity.getActivityId(), ride.getState(), name, who)).build(), id));
         return out;
     }
 
@@ -262,11 +262,23 @@ public class RidePushes {
     }
     // end::wayline-push-activity[]
 
+    /// Hands each message to the sender. The end of a Live Activity forgets
+    /// it only once the push service has taken the message, which the sender
+    /// says later, on its own thread. Until then the row stays marked ended,
+    /// so a refusal, an outage or a server stopped first leaves it for
+    /// [#endLeftBehind]: the ride's transition is committed and never retried,
+    /// so nothing else would end the activity on the lock screen.
     private void send(List<Outgoing> outgoing) {
         for (Outgoing each : outgoing) {
-            if (!each.to.isEmpty()) {
-                sender.send(each.to, each.message);
+            final String ends = each.ends;
+            if (each.to.isEmpty()) {
+                // No phone left to tell: nothing will ever take it.
+                if (ends != null) {
+                    forget(ends);
+                }
+                continue;
             }
+            sender.send(each.to, each.message, ends == null ? null : () -> forget(ends));
         }
     }
 
@@ -376,12 +388,13 @@ public class RidePushes {
             if (surface != null) {
                 toRider.surface(surface);
             }
-            out.add(new Outgoing(devices.targetsOf(rider), toRider.build()));
+            out.add(new Outgoing(devices.targetsOf(rider), toRider.build(),
+                    surface != null && !state.isActive() ? id : null));
         } else if (surface != null) {
             // Nothing to say to the rider, but their lock screen still has to
             // let go of the ride.
             out.add(new Outgoing(devices.targetsOf(rider), quiet(id, state).surface(surface)
-                    .build()));
+                    .build(), state.isActive() ? null : id));
         }
         if (toDriver != null) {
             out.add(new Outgoing(devices.targetsOf(driver), toDriver.build()));

@@ -413,6 +413,34 @@ class PushTest {
         assertEquals(before + 1, sent.sentTo("rey-rider-phone").size());
     }
 
+    /// A send that returned is not a send the service took: the real sender
+    /// hands the message to another thread and learns later, and only then is
+    /// the activity forgotten.
+    @Test
+    void anEndTheServiceNeverConfirmedIsKept() throws Exception {
+        String rider = People.rider(accounts, "push-tll-rider");
+        String driver = People.driver(accounts, "push-tll-driver");
+        register(rider, "apns", "tll-rider-phone");
+        Trips.online(mvc, driver, 59.4370, 24.7536);
+        String id = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(59.4371, 24.7535, 59.4400, 24.7700)), rider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + id + "/activity"),
+                "{\"activityId\":\"act-tll\"}"), rider)).andExpect(status().isOk());
+
+        sent.leaveUnconfirmed(1);
+        mvc.perform(People.asRider(post("/api/rides/" + id + "/cancel"), rider))
+                .andExpect(status().isOk());
+        assertEquals("live-end", surface(last(sent.sentTo("tll-rider-phone"))).get("operation"));
+        assertEquals(1L, activities(id), "sent, but never confirmed");
+
+        db.execute("UPDATE ride_activity SET ended_at = ? WHERE ride_id = ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 120000L), id});
+        pushes.endLeftBehind();
+        assertEquals(0L, activities(id));
+    }
+
     /// An end still undelivered when iOS would have ended the activity itself
     /// is dropped, not sent.
     @Test

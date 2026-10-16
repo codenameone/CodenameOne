@@ -203,6 +203,13 @@ final class BackendPackageSupport {
     /// not only index.html: a browser build may change a script or a style
     /// and leave the page as it was, and the staged app is not a task input
     /// that Gradle would compare on its own.
+    ///
+    /// With nothing staged there is nothing to do, even when a `webapp` from
+    /// an earlier package is still beside the binary. That directory is not
+    /// removed: it sits beside a binary written outside the build directory,
+    /// where nothing records whether this plugin made it or somebody put it
+    /// there, and deleting a directory of somebody's files is worse than
+    /// leaving one. A deployment that stops serving its web app removes it.
     static boolean webAppIsBeside(File staged, File binary) {
         File beside = webAppBeside(staged, binary);
         if (beside == null || beside.getAbsoluteFile().equals(staged.getAbsoluteFile())) {

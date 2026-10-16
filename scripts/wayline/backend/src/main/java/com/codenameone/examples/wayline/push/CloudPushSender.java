@@ -46,23 +46,34 @@ public class CloudPushSender implements PushSender {
     }
 
     @Override
-    public void send(List<PushTarget> targets, final PushNotification message) {
+    public void send(List<PushTarget> targets, final PushNotification message,
+            final Runnable delivered) {
         if (targets == null || targets.isEmpty()) {
             return;
         }
         final List<PushTarget> to = new ArrayList<PushTarget>(targets);
-        Tasks.platform(() -> deliver(to, message));
+        Tasks.platform(() -> deliver(to, message, delivered));
     }
 
-    private void deliver(List<PushTarget> to, PushNotification message) {
+    private void deliver(List<PushTarget> to, PushNotification message, Runnable delivered) {
+        boolean accepted = false;
         try {
             PushResult result = push.send(message, to);
-            if (!result.isAccepted()) {
+            accepted = result.isAccepted();
+            if (!accepted) {
                 System.err.println("[push] the push service refused a notification: "
                         + result.getStatus() + " " + result.getError());
             }
         } catch (IOException | RuntimeException err) {
             System.err.println("[push] a notification was not sent: " + err);
+        }
+        if (accepted && delivered != null) {
+            try {
+                delivered.run();
+            } catch (RuntimeException err) {
+                System.err.println("[push] a notification was sent, and what follows it failed: "
+                        + err);
+            }
         }
     }
 }

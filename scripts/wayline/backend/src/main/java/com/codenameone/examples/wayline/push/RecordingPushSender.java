@@ -33,6 +33,7 @@ import java.util.Map;
 public class RecordingPushSender implements PushSender {
     private final List<Sent> sent = new ArrayList<Sent>();
     private int refusals;
+    private int unconfirmed;
 
     /// One notification as one device was sent it.
     public static final class Sent {
@@ -62,17 +63,29 @@ public class RecordingPushSender implements PushSender {
     }
 
     @Override
-    public synchronized void send(List<PushTarget> targets, PushNotification message) {
+    public void send(List<PushTarget> targets, PushNotification message, Runnable delivered) {
+        // Outside the lock: what follows a delivery writes to the database.
+        if (record(targets, message) && delivered != null) {
+            delivered.run();
+        }
+    }
+
+    /// Records a send, and answers whether the push service would confirm it.
+    private synchronized boolean record(List<PushTarget> targets, PushNotification message) {
         if (refusals > 0) {
             refusals--;
             throw new IllegalStateException("The push provider is unavailable");
         }
-        if (targets == null) {
-            return;
+        if (targets != null) {
+            for (PushTarget target : targets) {
+                sent.add(new Sent(target.getProvider(), target.getToken(), message.toMap()));
+            }
         }
-        for (PushTarget target : targets) {
-            sent.add(new Sent(target.getProvider(), target.getToken(), message.toMap()));
+        if (unconfirmed > 0) {
+            unconfirmed--;
+            return false;
         }
+        return true;
     }
 
     /// What the device with `token` was sent, oldest first.
@@ -94,6 +107,13 @@ public class RecordingPushSender implements PushSender {
     public synchronized void clear() {
         sent.clear();
         refusals = 0;
+        unconfirmed = 0;
+    }
+
+    /// Makes the next `count` sends go out and never be confirmed, as a
+    /// service that refuses them later, on its own thread, does.
+    public synchronized void leaveUnconfirmed(int count) {
+        unconfirmed = count;
     }
 
     /// Makes the next `count` sends throw, as a provider that is down does.

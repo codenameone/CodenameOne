@@ -39,6 +39,12 @@ class RunnableWrapper implements Runnable {
     /// under `THREADPOOL_LOCK` only.
     private static int retirements = 0;
 
+    /// For a pool thread, the `#retirements` count it was created under. Taken when the
+    /// thread is made, under the lock, and not when it first runs: a thread made just
+    /// before a retirement but scheduled after it would otherwise read the new count, take
+    /// itself for the next generation and wait for work forever.
+    private int generation;
+
     private boolean done = false;
     private Runnable internal;
     private int type;
@@ -65,7 +71,9 @@ class RunnableWrapper implements Runnable {
         synchronized (THREADPOOL_LOCK) {
             if (availableThreads == 0 && threadCount < maxThreadCount) {
                 threadCount++;
-                Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
+                RunnableWrapper worker = new RunnableWrapper(null, 4);
+                worker.generation = retirements;
+                Thread poolThread = Display.getInstance().startThread(worker, "invokeAndBlock" + threadCount);
                 poolThread.start();
             }
             threadPool.add(r);
@@ -161,10 +169,8 @@ class RunnableWrapper implements Runnable {
                     Display.getInstance().mainEDTLoop();
                     break;
                 case 4:
-                    int startedUnder;
-                    synchronized (THREADPOOL_LOCK) {
-                        startedUnder = retirements;
-                    }
+                    // Written before the thread was started, so it is seen here.
+                    int startedUnder = generation;
                     while (!Display.getInstance().codenameOneExited) {
                         Runnable r = null;
                         synchronized (THREADPOOL_LOCK) {

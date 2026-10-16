@@ -39,7 +39,7 @@ public class MisconfiguredPushSender implements PushSender {
     }
 
     @Override
-    public void send(List<PushTarget> targets, PushNotification message) {
+    public void send(List<PushTarget> targets, PushNotification message, Runnable delivered) {
         if (targets != null && !targets.isEmpty()) {
             System.err.println("[config] a push notification was not sent: " + problem);
         }

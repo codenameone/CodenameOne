@@ -33,6 +33,10 @@ import java.util.List;
 public interface PushSender {
     /// Sends `message` to every one of `targets`. Returns at once; the sending
     /// itself may happen later, on another thread.
-    void send(List<PushTarget> targets, PushNotification message);
+    ///
+    /// @param delivered run once the push service has taken the message, on
+    ///     whatever thread learnt it; never when it was refused or could not be
+    ///     sent. Null when nobody needs to know.
+    void send(List<PushTarget> targets, PushNotification message, Runnable delivered);
 }
 // end::wayline-push-sender[]

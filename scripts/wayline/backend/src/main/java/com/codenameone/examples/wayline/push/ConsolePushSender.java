@@ -29,11 +29,15 @@ import java.util.List;
 /// out on a development profile alone.
 public class ConsolePushSender implements PushSender {
     @Override
-    public void send(List<PushTarget> targets, PushNotification message) {
+    public void send(List<PushTarget> targets, PushNotification message, Runnable delivered) {
         if (targets == null || targets.isEmpty()) {
             return;
         }
         System.out.println("[push] to " + targets.size() + " device(s): "
                 + message.toJson());
+        // Printed is as delivered as this sender gets.
+        if (delivered != null) {
+            delivered.run();
+        }
     }
 }
