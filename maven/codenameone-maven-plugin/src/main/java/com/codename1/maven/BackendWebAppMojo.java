@@ -40,6 +40,7 @@ import org.apache.maven.shared.invoker.InvocationResult;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -201,6 +202,18 @@ public class BackendWebAppMojo extends AbstractMojo {
         request.setGoals(Collections.singletonList("package"));
         request.setProperties(props);
         request.setBatchMode(true);
+        // The profiles asked for with -P, and those turned off with -P !id:
+        // a separate invocation inherits neither, and the application's
+        // profiles can carry the dependencies its browser build needs.
+        if (session != null && session.getRequest() != null) {
+            List<String> profiles = new ArrayList<String>(session.getRequest().getActiveProfiles());
+            for (String off : session.getRequest().getInactiveProfiles()) {
+                profiles.add("!" + off);
+            }
+            if (!profiles.isEmpty()) {
+                request.setProfiles(profiles);
+            }
+        }
         // A build asked to be quiet means all of it: the browser build logs a
         // line per translated class. Its last lines are kept, because a failure
         // with nothing above it says nothing.

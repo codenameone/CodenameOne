@@ -217,6 +217,11 @@ public class DemoRides {
                     payment.setCurrency(fares.currency());
                     payment.setStatus(Payments.PAID);
                     payment.setProviderRef(cash ? Payments.CASH : "sim_ch_ride-" + id);
+                    if (tip > 0L) {
+                        // A tip counts as paid -- in the driver's earnings,
+                        // and for a refund -- once its charge has a reference.
+                        payment.setTipRef("sim_ch_tip-" + id);
+                    }
                     payment.setCreatedAt(ended);
                     paid.insert(payment);
                     lastSeen[driverIndex] = Math.max(lastSeen[driverIndex], ended);

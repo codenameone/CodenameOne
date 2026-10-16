@@ -123,6 +123,12 @@ public class DemoAccounts {
         }
         // The fortnight is written once, with the accounts it is shared among,
         // and not again when a server with a database that persists restarts.
+        // The marker is an account made before the rides, so a start-up that
+        // failed between the two leaves a development database with the
+        // accounts and no fortnight. That is demonstration data on a
+        // developer's machine, where the answer is to drop the database and
+        // start again; a marker written with the rides would be one more
+        // table for the sample to carry.
         boolean first = !accounts.exists(COMFORT_DRIVER);
         // The tests sign in as the first three and expect to find them as new
         // accounts are: no rides behind them, no card saved, cash by default.
