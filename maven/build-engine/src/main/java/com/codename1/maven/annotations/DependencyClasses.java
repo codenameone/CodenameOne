@@ -29,9 +29,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -82,6 +84,12 @@ public final class DependencyClasses {
             return out;
         }
         File own = canonical(ownOutput);
+        // Every class name met so far, wanted or not. A definition the JVM
+        // would load first shadows a later one even when it is the later one
+        // that carries the annotation -- two versions of a dependency on one
+        // classpath -- so a name is claimed before the annotation test, and
+        // code is never generated from an annotation the loaded class lacks.
+        Set<String> defined = new HashSet<String>();
         for (String element : compileClasspath) {
             File file = new File(element);
             if (file.isDirectory()) {
@@ -91,9 +99,9 @@ public final class DependencyClasses {
                 if (new File(file, CORE_MARKER).isFile() || new File(file, BACKEND_MARKER).isFile()) {
                     continue;
                 }
-                scanDirectory(file, file, needles, out);
+                scanDirectory(file, file, needles, defined, out);
             } else if (file.isFile()) {
-                scanArchive(file, needles, out);
+                scanArchive(file, needles, defined, out);
             }
         }
         return out;
@@ -208,7 +216,7 @@ public final class DependencyClasses {
     }
 
     private static void scanDirectory(File root, File dir, List<byte[]> needles,
-            Map<String, AnnotatedClass> out) throws ProcessingException {
+            Set<String> defined, Map<String, AnnotatedClass> out) throws ProcessingException {
         File[] children = dir.listFiles();
         if (children == null) {
             return;
@@ -216,12 +224,13 @@ public final class DependencyClasses {
         java.util.Arrays.sort(children);
         for (File child : children) {
             if (child.isDirectory()) {
-                scanDirectory(root, child, needles, out);
+                scanDirectory(root, child, needles, defined, out);
                 continue;
             }
             String entryName = root.toPath().relativize(child.toPath()).toString()
                     .replace(File.separatorChar, '/');
-            if (!entryName.endsWith(".class") || skipped(entryName)) {
+            if (!entryName.endsWith(".class") || skipped(entryName)
+                    || !defined.add(entryName)) {
                 continue;
             }
             byte[] bytes;
@@ -241,7 +250,7 @@ public final class DependencyClasses {
     }
 
     private static void scanArchive(File archive, List<byte[]> needles,
-            Map<String, AnnotatedClass> out) throws ProcessingException {
+            Set<String> defined, Map<String, AnnotatedClass> out) throws ProcessingException {
         ZipFile zip;
         try {
             zip = new ZipFile(archive);
@@ -261,7 +270,8 @@ public final class DependencyClasses {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 if (entry.isDirectory() || !name.endsWith(".class") || skipped(name)
-                        || (runtime && name.startsWith("com/codename1/"))) {
+                        || (runtime && name.startsWith("com/codename1/"))
+                        || !defined.add(name)) {
                     continue;
                 }
                 byte[] bytes;

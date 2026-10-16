@@ -375,6 +375,56 @@ class PushTest {
                 "{\"activityId\":\"act-osl\"}"), oslo)).andExpect(status().isConflict());
     }
 
+    /// An end the push provider refused is not lost with the activity: the
+    /// ride's transition is never retried, so the sweep sends it again.
+    @Test
+    void anEndTheProviderRefusedIsSentAgain() throws Exception {
+        String rider = People.rider(accounts, "push-rey-rider");
+        String driver = People.driver(accounts, "push-rey-driver");
+        register(rider, "apns", "rey-rider-phone");
+        Trips.online(mvc, driver, 64.1466, -21.9426);
+        String id = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
+                People.ride(64.1467, -21.9425, 64.1500, -21.9000)), rider)).get("id");
+        mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), driver))
+                .andExpect(status().isOk());
+        mvc.perform(People.asRider(body(post("/api/rides/" + id + "/activity"),
+                "{\"activityId\":\"act-rey\"}"), rider)).andExpect(status().isOk());
+
+        sent.refuse(1);
+        mvc.perform(People.asDriver(post("/api/driver/rides/" + id + "/cancel"), driver))
+                .andExpect(status().isOk());
+        assertEquals(1L, activities(id), "the refused end keeps its activity");
+        int before = sent.sentTo("rey-rider-phone").size();
+
+        // Not while the call that ended the ride may still be sending it...
+        pushes.endLeftBehind();
+        assertEquals(before, sent.sentTo("rey-rider-phone").size());
+        // ...and once that is past, once.
+        db.execute("UPDATE ride_activity SET ended_at = ? WHERE ride_id = ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 120000L), id});
+        pushes.endLeftBehind();
+        List<RecordingPushSender.Sent> toRider = sent.sentTo("rey-rider-phone");
+        assertEquals(before + 1, toRider.size());
+        Map command = surface(last(toRider));
+        assertEquals("live-end", command.get("operation"));
+        assertEquals("act-rey", command.get("id"));
+        assertEquals(0L, activities(id));
+        pushes.endLeftBehind();
+        assertEquals(before + 1, sent.sentTo("rey-rider-phone").size());
+    }
+
+    /// An end still undelivered when iOS would have ended the activity itself
+    /// is dropped, not sent.
+    @Test
+    void anEndTooOldToBeOnScreenIsDropped() throws Exception {
+        db.execute("INSERT INTO ride_activity (ride_id, username, activity_id, sent_at, ended_at) "
+                + "VALUES ('old-ride', 'push-old-rider', 'act-old', 0, 1)", new Object[0]);
+        int before = sent.all().size();
+        pushes.endLeftBehind();
+        assertEquals(0L, activities("old-ride"));
+        assertEquals(before, sent.all().size());
+    }
+
     @Test
     void aTokenTakenFromAnotherAccountStillRespectsTheCap() throws Exception {
         String full = People.rider(accounts, "push-cap-full");

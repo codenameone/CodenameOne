@@ -129,6 +129,24 @@ public class DependencyClassesTest {
                 found.get("com/example/Marked").isInterface());
     }
 
+    /// A class is shadowed by an earlier definition of its name even when only
+    /// the later one carries the annotation: the JVM loads the earlier one, so
+    /// nothing is generated from the annotation it lacks.
+    @Test
+    public void anUnannotatedEarlierDefinitionShadowsAnAnnotatedLaterOne() throws Exception {
+        File older = tmp.newFolder("older");
+        File newer = tmp.newFolder("newer");
+        compile(older, "com.example.Marked", "public class Marked {}");
+        compile(newer, "com.example.Marked", "@Deprecated public class Marked {}");
+        File jar = jar(newer, "com/example/Marked.class");
+
+        assertTrue(DependencyClasses.scan(Arrays.asList(older.getPath(), jar.getPath()), null,
+                java.util.Collections.singleton("Ljava/lang/Deprecated;")).isEmpty());
+        assertEquals(java.util.Collections.singleton("com/example/Marked"),
+                DependencyClasses.scan(Arrays.asList(jar.getPath(), older.getPath()), null,
+                        java.util.Collections.singleton("Ljava/lang/Deprecated;")).keySet());
+    }
+
     /// The runtimes are thousands of classes and none of them the application's.
     @Test
     public void scanSkipsARuntime() throws Exception {

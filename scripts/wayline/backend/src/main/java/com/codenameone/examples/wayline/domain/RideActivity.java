@@ -40,6 +40,11 @@ public class RideActivity {
     @Column(nullable = false)
     private long sentAt;
 
+    /// When its ride ended, 0 while the ride lasts. An ended activity is kept
+    /// until the phone has been told to end it.
+    @Column(nullable = false)
+    private long endedAt;
+
     public RideActivity() {
     }
 
@@ -73,5 +78,13 @@ public class RideActivity {
 
     public void setSentAt(long sentAt) {
         this.sentAt = sentAt;
+    }
+
+    public long getEndedAt() {
+        return endedAt;
+    }
+
+    public void setEndedAt(long endedAt) {
+        this.endedAt = endedAt;
     }
 }

@@ -32,6 +32,7 @@ import java.util.Map;
 /// development one.
 public class RecordingPushSender implements PushSender {
     private final List<Sent> sent = new ArrayList<Sent>();
+    private int refusals;
 
     /// One notification as one device was sent it.
     public static final class Sent {
@@ -62,6 +63,10 @@ public class RecordingPushSender implements PushSender {
 
     @Override
     public synchronized void send(List<PushTarget> targets, PushNotification message) {
+        if (refusals > 0) {
+            refusals--;
+            throw new IllegalStateException("The push provider is unavailable");
+        }
         if (targets == null) {
             return;
         }
@@ -88,5 +93,11 @@ public class RecordingPushSender implements PushSender {
 
     public synchronized void clear() {
         sent.clear();
+        refusals = 0;
+    }
+
+    /// Makes the next `count` sends throw, as a provider that is down does.
+    public synchronized void refuse(int count) {
+        refusals = count;
     }
 }

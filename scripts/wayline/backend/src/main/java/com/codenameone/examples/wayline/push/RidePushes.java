@@ -20,10 +20,12 @@ package com.codenameone.examples.wayline.push;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
+import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.wayline.Text;
 import com.codenameone.examples.wayline.api.RideActivityKeys;
 import com.codenameone.examples.wayline.api.RideActivityDto;
@@ -68,6 +70,15 @@ import java.util.Map;
 public class RidePushes {
     private static final String RIDER = "rider";
     private static final String DRIVER = "driver";
+
+    /// How long an end the phone was not told of is tried again. iOS ends a
+    /// Live Activity on its own within twelve hours, so past that there is
+    /// nothing left on the lock screen to end.
+    private static final long END_RETRY_MILLIS = 12L * 60 * 60 * 1000;
+
+    /// How old an end has to be before the sweep sends it again: the call
+    /// that ended the ride is still sending it until then.
+    private static final long END_GRACE_MILLIS = 60000L;
 
     private final PushSender sender;
     private final PushDevices devices;
@@ -117,12 +128,83 @@ public class RidePushes {
     public void rideChanged(String id, RideState state, String rider, String driver) {
         try {
             send(compose(id, state, rider, driver));
+            // Forgotten only once the provider took the end. If it threw, the
+            // row stays marked ended and endLeftBehind sends the end again: the
+            // ride's transition is committed and is never retried, so nothing
+            // else would, and the lock screen would keep showing the ride.
+            if (!state.isActive()) {
+                forget(id);
+            }
         } catch (IOException | RuntimeException err) {
             System.err.println("[push] nothing was sent for ride " + id + " (" + state + "): "
                     + err);
         }
     }
     // end::wayline-push-ride-changed[]
+
+    /// Sends again the ends of Live Activities the push provider did not take
+    /// when their ride ended, and forgets those too old to be on screen.
+    ///
+    /// Not a transaction itself, as `Rides.settleLeftBehind` is not: the
+    /// provider is called with none open, and what went wrong with the first
+    /// end that failed again is reported once the rest have been tried.
+    @Scheduled(fixedDelay = 60000, initialDelay = 50000, lock = "wayline-activity-ends")
+    public void endLeftBehind() throws IOException {
+        long now = System.currentTimeMillis();
+        dropEndedBefore(now - END_RETRY_MILLIS);
+        List<RideActivity> left = leftBehind(now - END_GRACE_MILLIS);
+        Exception failed = null;
+        for (int iter = 0; iter < left.size(); iter++) {
+            String id = left.get(iter).getRideId();
+            try {
+                send(ending(id));
+                forget(id);
+            } catch (IOException err) {
+                failed = failed == null ? err : failed;
+            } catch (RuntimeException err) {
+                failed = failed == null ? err : failed;
+            }
+        }
+        if (failed instanceof IOException) {
+            throw (IOException) failed;
+        }
+        if (failed instanceof RuntimeException) {
+            throw (RuntimeException) failed;
+        }
+    }
+
+    @Transactional
+    private void dropEndedBefore(long before) {
+        activities.dropEndedBefore(before);
+    }
+
+    @Transactional(readOnly = true)
+    private List<RideActivity> leftBehind(long before) {
+        return activities.leftBehind(before, new PageRequest(0, 50));
+    }
+
+    @Transactional
+    private void forget(String id) {
+        activities.deleteByRideId(id);
+    }
+
+    /// The end of the Live Activity of ride `id`, sent quietly: the rider
+    /// was told of the ride's end, or chose not to be, when it happened.
+    @Transactional(readOnly = true)
+    private List<Outgoing> ending(String id) throws IOException {
+        List<Outgoing> out = new ArrayList<Outgoing>();
+        RideActivity activity = activities.findById(id);
+        Ride ride = rides.findById(id);
+        if (activity == null || ride == null) {
+            return out;
+        }
+        String driver = ride.getDriver();
+        Profile who = driver == null || driver.length() == 0 ? null : profiles.findById(driver);
+        String name = who == null ? "Your driver" : who.getDisplayName();
+        out.add(new Outgoing(devices.targetsOf(ride.getRider()), quiet(id, ride.getState())
+                .surface(endOf(activity.getActivityId(), ride.getState(), name, who)).build()));
+        return out;
+    }
 
     /// Moves the rider's Live Activity on as the car moves: its minutes to
     /// the pickup or the destination. At most once every
@@ -184,7 +266,8 @@ public class RidePushes {
     }
 
     /// What to send about a change, read and decided in one transaction. A
-    /// ride that has ended also forgets its Live Activity here.
+    /// ride that has ended marks its Live Activity ended here; [#rideChanged]
+    /// forgets it once the end has been sent.
     @Transactional
     private List<Outgoing> compose(String id, RideState state, String rider, String driver)
             throws IOException {
@@ -246,12 +329,12 @@ public class RidePushes {
             case COMPLETED:
                 toRider = message(id, state, RIDER, "You've arrived",
                         "Thanks for riding with Wayline. Your receipt is in the app.");
-                surface = end(activityId, state(state, name, who, 0), false);
+                surface = endOf(activityId, state, name, who);
                 break;
             case CANCELLED_BY_DRIVER:
                 toRider = message(id, state, RIDER, "Your driver canceled",
                         "Sorry about that. Request again to find another driver.");
-                surface = end(activityId, null, true);
+                surface = endOf(activityId, state, name, who);
                 break;
             case CANCELLED_BY_ADMIN:
                 toRider = message(id, state, RIDER, "Your ride was canceled",
@@ -259,13 +342,13 @@ public class RidePushes {
                 toDriver = driver == null || driver.length() == 0 ? null
                         : message(id, state, DRIVER, "Ride canceled",
                         "Wayline support canceled this ride.");
-                surface = end(activityId, null, true);
+                surface = endOf(activityId, state, name, who);
                 break;
             case CANCELLED_BY_RIDER:
                 toDriver = driver == null || driver.length() == 0 ? null
                         : message(id, state, DRIVER, "Ride canceled",
                         "The rider canceled. You're available for new requests.");
-                surface = end(activityId, null, true);
+                surface = endOf(activityId, state, name, who);
                 break;
             case NO_DRIVERS:
                 toRider = message(id, state, RIDER, "No drivers available",
@@ -276,7 +359,7 @@ public class RidePushes {
         }
         // end::wayline-push-messages[]
         if (!state.isActive() && activity != null) {
-            activities.deleteByRideId(id);
+            activities.markEnded(id, System.currentTimeMillis());
         }
         if (toRider != null && !wants(rider, RideState.COMPLETED == state)) {
             toRider = null;
@@ -376,6 +459,16 @@ public class RidePushes {
     private static Map<String, Object> end(String activityId, Map<String, Object> state,
             boolean dismiss) {
         return activityId == null ? null : PushNotification.liveEnd(activityId, state, dismiss);
+    }
+
+    /// The end of a Live Activity whose ride ended in `state`: a completed
+    /// ride stays on the lock screen a while showing its arrival, a cancelled
+    /// one goes at once.
+    private static Map<String, Object> endOf(String activityId, RideState state, String name,
+            Profile who) {
+        return RideState.COMPLETED == state
+                ? end(activityId, state(state, name, who, 0), false)
+                : end(activityId, null, true);
     }
 
     /// The Live Activity's state, in the keys the app laid it out with.

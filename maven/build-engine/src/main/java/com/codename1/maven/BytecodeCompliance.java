@@ -339,6 +339,16 @@ public class BytecodeCompliance {
         projectAndDependencyIndex.putAll(buildClassIndex(siblingClassRoots));
 
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
+        // A shared module's classes are checked as they are, never through
+        // applyInvocationRewrites, so a call the rewrites would redirect in an
+        // application class (String.replaceAll, the wrappers' static hashCode)
+        // is reported here instead. That is deliberate. The same classes are
+        // translated for the server too, against vm/JavaAPI, which has none of
+        // those methods and gets no rewrites (checkBackend applies none, and
+        // the server runtime has no JdkApiRewriteHelper). A rewritten client
+        // overlay would only move the failure into the native backend build,
+        // far from the line that caused it; a shared module keeps to what both
+        // runtimes define.
         for (File root : checkedDependencyRoots) {
             if (root != null && root.isDirectory()) {
                 violations.addAll(scanProjectClasses(root, allowedIndex, projectAndDependencyIndex));
