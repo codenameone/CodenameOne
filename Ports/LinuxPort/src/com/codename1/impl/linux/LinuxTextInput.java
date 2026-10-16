@@ -42,12 +42,14 @@ final class LinuxTextInput {
         final Component owner;
         int sequence;
         FocusListener focusListener;
+        final Composition composition;
 
         Binding(int id, TextInputClient client, TextInputConfig config, Component owner) {
             this.id = id;
             this.client = client;
             this.config = config;
             this.owner = owner;
+            this.composition = new Composition(client);
         }
     }
 
@@ -116,6 +118,7 @@ final class LinuxTextInput {
             binding.owner.removeFocusListener(binding.focusListener);
         }
         stopNative(binding.id);
+        binding.composition.cancel();
         binding.client.inputFocusLost();
     }
 
@@ -159,13 +162,13 @@ final class LinuxTextInput {
         String text = event.substring(start);
         switch (fields[2]) {
             case 0:
-                client.commitText(text);
+                binding.composition.commit(text);
                 break;
             case 1:
-                client.setComposingText(text, moveCodePoints(text, 0, fields[3]));
+                binding.composition.preedit(text, fields[3]);
                 break;
             case 2:
-                client.finishComposing();
+                binding.composition.cancel();
                 break;
             case 3:
                 client.onKeyCommand(fields[3], fields[4]);
@@ -192,6 +195,52 @@ final class LinuxTextInput {
         }
         if (current == binding) {
             update(binding, client.getEditingState());
+        }
+    }
+
+    /** Owns rollback state until an explicit GTK commit, independently of signal ordering. */
+    static final class Composition {
+        private final TextInputClient client;
+        private TextInputState before;
+        private String selected;
+
+        Composition(TextInputClient client) {
+            this.client = client;
+        }
+
+        void preedit(String text, int cursor) {
+            if (before == null) {
+                if (text.length() == 0) {
+                    return;
+                }
+                before = client.getEditingState();
+                selected = client.getTextRange(Math.min(before.getSelectionStart(), before.getSelectionEnd()),
+                        Math.max(before.getSelectionStart(), before.getSelectionEnd()));
+            }
+            client.setComposingText(text, moveCodePoints(text, 0, cursor));
+        }
+
+        void commit(String text) {
+            client.commitText(text);
+            before = null;
+            selected = null;
+        }
+
+        void cancel() {
+            if (before == null) {
+                return;
+            }
+            TextInputState original = before;
+            String replacement = selected;
+            before = null;
+            selected = null;
+            if (client instanceof TextInputClient.CompositionCancellation) {
+                ((TextInputClient.CompositionCancellation) client).cancelComposing();
+            } else {
+                client.setComposingText(replacement, replacement.length());
+                client.finishComposing();
+                client.setSelectionRange(original.getSelectionStart(), original.getSelectionEnd());
+            }
         }
     }
 

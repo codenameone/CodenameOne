@@ -32,7 +32,7 @@ extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT text);
 extern JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* text, int length);
 
 typedef struct {
-    int session, sequence, slot, focused, surroundingValid, caretBytes, sensitive;
+    int session, sequence, slot, focused, surroundingValid, caretBytes, sensitive, preediting;
     GtkIMContext* im;
     GtkWidget *window, *canvas;
     char* surrounding;
@@ -57,6 +57,7 @@ static void cn1TextQueue(int kind, int value, int modifiers, const char* text) {
 
 static void cn1TextCommit(GtkIMContext* im, const gchar* text, gpointer unused) {
     (void) im; (void) unused;
+    cn1TextInput.preediting = 0;
     cn1TextQueue(0, 0, 0, text);
 }
 
@@ -66,6 +67,9 @@ static void cn1TextPreedit(GtkIMContext* im, gpointer unused) {
     gint cursor = 0;
     (void) unused;
     gtk_im_context_get_preedit_string(im, &text, &attributes, &cursor);
+    if (text && *text) {
+        cn1TextInput.preediting = 1;
+    }
     cn1TextQueue(1, cursor, 0, text);
     g_free(text);
     if (attributes) {
@@ -75,6 +79,9 @@ static void cn1TextPreedit(GtkIMContext* im, gpointer unused) {
 
 static void cn1TextPreeditEnd(GtkIMContext* im, gpointer unused) {
     (void) im; (void) unused;
+    cn1TextInput.preediting = 0;
+    /* End without a commit means cancellation; Java restores its saved selection.
+     * A following commit still replaces that restored selection normally. */
     cn1TextQueue(2, 0, 0, NULL);
 }
 
@@ -112,6 +119,10 @@ static gboolean cn1TextFocus(GtkWidget* widget, GdkEventFocus* event, gpointer u
         gtk_im_context_focus_in(cn1TextInput.im);
     } else {
         cn1TextInput.focused = 0;
+        gtk_im_context_reset(cn1TextInput.im);
+        if (cn1TextInput.preediting) {
+            cn1TextPreeditEnd(cn1TextInput.im, NULL);
+        }
         gtk_im_context_focus_out(cn1TextInput.im);
     }
     return FALSE;
@@ -152,7 +163,8 @@ static void cn1TextStartOnMain(void* data) {
             ? cn1LinuxWindowWidget() : cn1LinuxDesktopWidget(request->slot);
     GtkWidget* canvas = cn1LinuxTextCanvas(request->slot);
     GtkInputPurpose purpose = GTK_INPUT_PURPOSE_FREE_FORM;
-    GtkInputHints hints = request->correct ? GTK_INPUT_HINT_SPELLCHECK : GTK_INPUT_HINT_NO_SPELLCHECK;
+    GtkInputHints hints = request->correct
+            ? GTK_INPUT_HINT_SPELLCHECK | GTK_INPUT_HINT_WORD_COMPLETION : GTK_INPUT_HINT_NO_SPELLCHECK;
     cn1TextClear();
     if (!window || !canvas) {
         return;
@@ -186,7 +198,7 @@ static void cn1TextStartOnMain(void* data) {
          * supply surrounding text; retain the ordinary IME purpose. */
     }
     if (request->constraint & 0x10000) {
-        purpose = GTK_INPUT_PURPOSE_PASSWORD;
+        purpose = (request->constraint & 0xffff) == 2 ? GTK_INPUT_PURPOSE_PIN : GTK_INPUT_PURPOSE_PASSWORD;
         hints = GTK_INPUT_HINT_NO_SPELLCHECK;
     }
     input->session = request->session;

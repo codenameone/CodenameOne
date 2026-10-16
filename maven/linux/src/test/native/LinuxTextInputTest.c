@@ -116,6 +116,31 @@ int main(int argc, char** argv) {
         g_free(event);
     }
     assert(composed == 1 && preedit > 0);
+    /* Actual GTK cancellation must end the preedit without a commit. */
+    for (int mode = 0; mode < 2; mode++) {
+        key(-1, GDK_KEY_Multi_key, 0, GDK_KEY_PRESS);
+        key(-1, GDK_KEY_apostrophe, 0, GDK_KEY_PRESS);
+        assert(cn1TextInput.preediting);
+        clearEvents();
+        if (mode == 0) {
+            key(-1, GDK_KEY_Escape, 0, GDK_KEY_PRESS);
+        } else {
+            memset(&focus, 0, sizeof(focus));
+            cn1TextFocus(testWindow, &focus, NULL);
+            focus.in = TRUE;
+            cn1TextFocus(testWindow, &focus, NULL);
+        }
+        int ended = 0;
+        while ((event = POLL(NULL))) {
+            int id, seq, kind;
+            assert(sscanf(event, "%d;%d;%d;", &id, &seq, &kind) == 3);
+            if (kind == 0) { fprintf(stderr, "cancel mode %d event: %s\n", mode, event); }
+            assert(kind != 0);
+            if (kind == 2) { ended++; }
+            g_free(event);
+        }
+        assert(ended > 0 && !cn1TextInput.preediting);
+    }
     assert(START(NULL, 2, 4, 0x10000 | 0x80000, 1, 1));
     GtkInputHints hints;
     GtkInputPurpose purpose;
@@ -177,12 +202,25 @@ int main(int argc, char** argv) {
     assert(START(NULL, 13, -1, 0x100000, 1, 1));
     g_object_get(cn1TextInput.im, "input-hints", &hints, NULL);
     assert((hints & capsMask) == GTK_INPUT_HINT_UPPERCASE_WORDS);
-    for (int i = 14; i < 114; i++) {
+    assert(START(NULL, 14, -1, 0, 1, 0));
+    g_object_get(cn1TextInput.im, "input-hints", &hints, NULL);
+    assert((hints & GTK_INPUT_HINT_SPELLCHECK) && (hints & GTK_INPUT_HINT_WORD_COMPLETION));
+    assert(!(hints & GTK_INPUT_HINT_NO_SPELLCHECK));
+    const int privateConstraints[] = {0, 0x80000, 0x40000, 0x10000, 2 | 0x10000};
+    for (int i = 0; i < 5; i++) {
+        assert(START(NULL, 15 + i, -1, privateConstraints[i], i != 0, 1));
+        g_object_get(cn1TextInput.im, "input-hints", &hints, "input-purpose", &purpose, NULL);
+        assert(hints & GTK_INPUT_HINT_NO_SPELLCHECK);
+        assert(!(hints & (GTK_INPUT_HINT_SPELLCHECK | GTK_INPUT_HINT_WORD_COMPLETION)));
+        if (i == 3) { assert(purpose == GTK_INPUT_PURPOSE_PASSWORD); }
+        if (i == 4) { assert(purpose == GTK_INPUT_PURPOSE_PIN); }
+    }
+    for (int i = 20; i < 120; i++) {
         assert(START(NULL, i, -1, 0, 1, 1));
         STOP(NULL, i); STOP(NULL, i);
         assert(!cn1TextInput.im && !cn1TextInput.session);
     }
     clearEvents(); gtk_widget_destroy(testWindow);
-    puts("PASS: real GTK commit/dead-key composition, UTF-16 caret, stale-state rejection, delete-surrounding, navigation/shortcuts, owner-window routing, privacy/capitalization hints, focus loss, 100 session replacements/stops");
+    puts("PASS: real GTK commit/dead-key composition, UTF-16 caret, stale-state rejection, delete-surrounding, navigation/shortcuts, owner-window routing, privacy/completion/PIN/capitalization hints, composition cancellation, focus loss, 100 session replacements/stops");
     return 0;
 }
