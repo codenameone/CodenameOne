@@ -96,11 +96,11 @@ clipboard, and undo shortcuts are delivered as semantic commands. Native `TextFi
 editing takes over the input session when one of those fields starts native editing. A dialog's
 initially focused editor can bind before its native window is shown. Temporary native window focus
 loss cancels an unfinished composition and pauses input without discarding the component's session;
-returning to that window resumes it. A GTK preedit ending without a commit restores the original
+returning to that window resumes it. A GTK text composition ending without a commit restores the original
 selection instead of finalizing a deletion. Pure editors implement
 `TextInputClient.CompositionCancellation` to restore rich attributes and undo state as well as text.
 Custom clients can implement the same optional contract; the fallback restores text and selection
-through their existing composition methods. Explicit commits work whether GTK ends the preedit before
+through their existing composition methods. Explicit commits work whether GTK ends the composition before
 or after the commit callback.
 
 Linux queues native input onto the EDT with a session identifier and edit sequence. Callbacks from a
