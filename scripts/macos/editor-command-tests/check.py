@@ -22,11 +22,20 @@ with tempfile.TemporaryDirectory(prefix="cn1-editor-command-") as directory:
         "- (void)resetDeferredEditsIfNeeded", "- (BOOL)deferNativeEdit:",
         "- (int)beginEditorCommand", "- (void)completeEditorCommand:"]))
     (tmp / "echo.h").write_text(method(session,
-        "JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___"))
+        "JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___")
+        + method(session, "void CN1MacTextInputNotifySelection(")
+        + method(view, "static NSUInteger cn1ActiveEdge("))
     (tmp / "view.h").write_text("".join(method(view, signature) for signature in [
         "- (BOOL)cn1DeferNativeEdit:", "- (void)cn1SendEditorKeyCommand:(int)command modifiers:",
         "- (void)cn1SendEditorKeyCommand:(int)command {", "- (NSInteger)cn1ReplaceRange:",
-        "- (NSRange)cn1EffectiveRange:", "- (void)insertText:", "- (void)cut:", "- (void)paste:"]))
+        "- (NSRange)cn1EffectiveRange:", "- (void)insertText:", "- (void)cut:", "- (void)paste:",
+        "- (NSUInteger)cn1LineStart:", "- (NSUInteger)cn1LineEnd:",
+        "- (NSUInteger)cn1AfterLineBreak:", "- (NSUInteger)cn1BeforeLineBreak:",
+        "- (NSUInteger)cn1VerticalTarget:", "- (NSUInteger)cn1SelectionAnchor:",
+        "- (void)cn1RememberAnchor:", "- (NSUInteger)cn1IndexBefore:",
+        "- (NSUInteger)cn1IndexAfter:", "- (NSRange)cn1Extend:",
+        "- (void)cn1ForgetAnchor", "- (void)cn1SetSelection:",
+        "- (void)doCommandBySelector:", "- (void)selectAll:"]))
     executable = tmp / "contract"
     subprocess.run(["xcrun", "clang", "-fno-objc-arc", "-Wall", "-Wextra", "-Werror",
         "-Wno-unused-parameter", "-framework", "AppKit", "-I", str(tmp),

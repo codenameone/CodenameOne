@@ -106,6 +106,9 @@ line heights and visual columns for rich content. Fallback geometry snapshots sa
 selection focus, including backward selections. Word navigation classifies Unicode letters, decimal
 digits and underscore consistently across ports. Combining marks inherit their base character's
 classification, so emoji variation selectors stay attached during word deletion. It keeps surrogate pairs intact. It doesn't perform dictionary segmentation. Boundary word deletions are no-ops.
+Character movement remains on the native composed-character path so accents, emoji variation
+selectors and ZWJ sequences stay intact. Unmodified character movement collapses a selection to its
+ordered edge. Select All explicitly creates a forward selection before later shift-arrow commands.
 These callbacks don't change the legacy `TextArea` editing path.
 
 All offsets in this contract are UTF-16 indices, matching Java `String`, Android `Editable`, and Apple
