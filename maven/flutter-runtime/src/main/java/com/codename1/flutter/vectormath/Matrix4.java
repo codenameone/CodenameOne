@@ -162,14 +162,27 @@ public class Matrix4 {
         m[col * 4 + row] = value;
     }
 
-    /** vector_math's {@code setRotationZ(radians)}. */
+    /**
+     * vector_math's {@code setRotationZ(radians)}: the whole upper 3x3 becomes the
+     * rotation and the perspective row is cleared; only the translation column is
+     * kept. Setting just the four sine/cosine entries left a reused matrix's scale,
+     * skew or perspective in place.
+     */
     public void setRotationZ(double radians) {
         double c = Math.cos(radians);
         double s = Math.sin(radians);
         m[0] = c;
         m[1] = s;
+        m[2] = 0.0;
+        m[3] = 0.0;
         m[4] = -s;
         m[5] = c;
+        m[6] = 0.0;
+        m[7] = 0.0;
+        m[8] = 0.0;
+        m[9] = 0.0;
+        m[10] = 1.0;
+        m[11] = 0.0;
     }
 
     // vector_math's translate(x, [y, z]) — arity overloads for the transpiler.

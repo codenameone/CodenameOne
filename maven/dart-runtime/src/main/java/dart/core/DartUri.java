@@ -94,13 +94,14 @@ public final class DartUri {
                 }
             }
             int at = t.lastIndexOf('@', authEnd - 1);
+            out.append("//");
+            int hostStart = pos + 2;
             if (at >= pos + 2) {
-                out.append("//");
                 component(t, pos + 2, at, USERINFO, out);
-                out.append(t.substring(at, authEnd));
-            } else {
-                out.append(t.substring(pos, authEnd));
+                out.append('@');
+                hostStart = at + 1;
             }
+            hostAndPort(t, hostStart, authEnd, out);
             pos = authEnd;
         }
         int hash = t.indexOf('#', pos);
@@ -119,6 +120,56 @@ public final class DartUri {
             component(t, hash + 1, t.length(), FRAGMENT, out);
         }
         return out.toString();
+    }
+
+    /**
+     * The host and port of an authority, the host normalized as Dart's registered-name
+     * normalization does: an escape of an unreserved character is decoded, the hex of
+     * any other escape upper-cased, and ASCII letters lower-cased -- so
+     * https://%65XAMPLE.com is https://example.com. The authority used to be copied
+     * verbatim, and equivalent spellings compared unequal. An IP literal ([...]) and
+     * the port are kept as written.
+     */
+    private static void hostAndPort(String t, int from, int to, StringBuilder out) {
+        if (from < to && t.charAt(from) == '[') {
+            out.append(t, from, to);
+            return;
+        }
+        int pc = t.lastIndexOf(':', to - 1);
+        int hostEnd = pc >= from ? pc : to;
+        for (int i = from; i < hostEnd; i++) {
+            char c = t.charAt(i);
+            if (c == '%' && i + 2 < hostEnd && hexValue(t.charAt(i + 1)) >= 0 && hexValue(t.charAt(i + 2)) >= 0) {
+                int v = hexValue(t.charAt(i + 1)) * 16 + hexValue(t.charAt(i + 2));
+                if (isUnreserved(v)) {
+                    out.append(v >= 'A' && v <= 'Z' ? (char) (v + 32) : (char) v);
+                } else {
+                    percent(v, out);
+                }
+                i += 2;
+            } else if (c >= 'A' && c <= 'Z') {
+                out.append((char) (c + 32));
+            } else {
+                out.append(c);
+            }
+        }
+        out.append(t, hostEnd, to);
+    }
+
+    /// ASCII lower case for a registered name, leaving each escape's hex as written:
+    /// normalize() already upper-cased it, which is Dart's form (a%2Fb.com).
+    private static String lowerRegName(String h) {
+        StringBuilder b = new StringBuilder(h.length());
+        for (int i = 0; i < h.length(); i++) {
+            char c = h.charAt(i);
+            if (c == '%' && i + 2 < h.length()) {
+                b.append(c).append(h.charAt(i + 1)).append(h.charAt(i + 2));
+                i += 2;
+            } else {
+                b.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+            }
+        }
+        return b.toString();
     }
 
     private static void component(String t, int from, int to, int kind, StringBuilder out) {
@@ -436,7 +487,7 @@ public final class DartUri {
             // https://EXAMPLE.COM/ and https://example.com/ have the same host --
             // host allowlists, route matches and host-keyed caches depend on it.
             if (!literal) {
-                host = asciiLower(host);
+                host = lowerRegName(host);
             }
         }
         path = s;

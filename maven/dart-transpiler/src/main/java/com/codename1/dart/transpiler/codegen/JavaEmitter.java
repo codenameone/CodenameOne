@@ -393,6 +393,18 @@ public final class JavaEmitter {
                 .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
         sb.append(body);
+        // Dart's Enum.toString is "Mode.only" -- what print and string interpolation
+        // show -- where Java's is the bare constant name; .name is still name().
+        boolean ownToString = false;
+        for (MethodDecl m : e.methods) {
+            if ("toString".equals(m.name) && m.params.isEmpty() && !m.isStatic) {
+                ownToString = true;
+            }
+        }
+        if (!ownToString) {
+            sb.append("\n    @Override\n    public String toString() {\n        return \"")
+                    .append(e.name).append(".\" + name();\n    }\n");
+        }
         sb.append("}\n");
         return new GeneratedFile(enumJava + ".java", sb.toString());
     }

@@ -103,8 +103,10 @@ public final class Program {
                     return e;
                 }
             }
-            for (String uri : fromLibrary.imports) {
-                Ast.Library target = resolveImportedLibrary(fromLibrary, uri);
+            for (Ast.Directive d : fromLibrary.importDirectives) {
+                // A combinator decides visibility: `import 'a.dart' hide Foo` makes a's
+                // Foo invisible here, whatever order the imports come in.
+                Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.EnumDecl e : byName) {
                         if (e.ownerLibrary == target) {
@@ -263,8 +265,10 @@ public final class Program {
             //    an unqualified name against the file's imports, so `Backdrop` in main.dart
             //    (which imports pages/backdrop.dart) must be that Backdrop, never an unrelated
             //    same-name class in a study file main.dart never imports.
-            for (String uri : fromLibrary.imports) {
-                Ast.Library target = resolveImportedLibrary(fromLibrary, uri);
+            for (Ast.Directive d : fromLibrary.importDirectives) {
+                // Honour show/hide: `import 'a.dart' hide Foo; import 'b.dart' show Foo;`
+                // is b's Foo even though a.dart comes first.
+                Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.ClassDecl c : byName) {
                         if (c.ownerLibrary == target) {
@@ -295,15 +299,15 @@ public final class Program {
      * library itself, then a plainly-imported library, then the last registration.
      */
     public Ast.Library resolveTopLevelVarOwner(String name, Ast.Library from, String prefix) {
-        return resolveOwner(topLevelVarOwnersByName.get(name), topLevelVarOwners.get(name), from, prefix);
+        return resolveOwner(name, topLevelVarOwnersByName.get(name), topLevelVarOwners.get(name), from, prefix);
     }
 
     /** Same as {@link #resolveTopLevelVarOwner} for top-level functions / getters. */
     public Ast.Library resolveFunctionOwner(String name, Ast.Library from, String prefix) {
-        return resolveOwner(functionOwnersByName.get(name), functionOwners.get(name), from, prefix);
+        return resolveOwner(name, functionOwnersByName.get(name), functionOwners.get(name), from, prefix);
     }
 
-    private Ast.Library resolveOwner(List<Ast.Library> owners, Ast.Library fallback,
+    private Ast.Library resolveOwner(String name, List<Ast.Library> owners, Ast.Library fallback,
                                      Ast.Library from, String prefix) {
         if (owners == null || owners.isEmpty()) {
             return fallback;
@@ -323,8 +327,10 @@ public final class Program {
                 return from;
             }
             for (Ast.Library o : owners) {
-                for (String uri : from.imports) {
-                    if (o == resolveImportedLibrary(from, uri)) {
+                for (Ast.Directive d : from.importDirectives) {
+                    // An import that hides the name (or shows others only) does not
+                    // provide it, whichever comes first.
+                    if (d.admits(name) && o == resolveImportedLibrary(from, d.uri)) {
                         return o;
                     }
                 }

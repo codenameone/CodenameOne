@@ -176,6 +176,22 @@ public class DartCoreSemanticsTest {
 
     // --- Uri query components decode '+' as a space; path segments do not -----
 
+    /// Dart normalizes a registered-name host: unreserved escapes decoded, other
+    /// escapes' hex upper-cased, ASCII lower-cased. The authority was copied verbatim,
+    /// so equivalent spellings had different hosts and compared unequal.
+    @Test
+    public void aUriHostIsNormalizedLikeDarts() {
+        DartUri u = DartUri.parse("https://%65XAMPLE.com:8080/p");
+        assertEquals("example.com", u.host());
+        assertEquals("https://example.com:8080/p", u.toString());
+        assertEquals(DartUri.parse("https://example.com:8080/p"), u);
+        assertEquals("a%2Fb.com", DartUri.parse("http://A%2fB.com/").host(), "escape hex upper-case");
+        assertEquals("http://user:PW@example.com/", DartUri.parse("http://user:PW@EXAMPLE.com/").toString(),
+                "user info is not lower-cased");
+        assertEquals("file:///a/b", DartUri.parse("file:///a/b").toString());
+        assertEquals("http://[::1]:8080/", DartUri.parse("http://[::1]:8080/").toString());
+    }
+
     @Test
     public void plusInAQueryIsASpace() {
         DartUri u = DartUri.parse("https://example.com/search?q=hello+world&x=a%2Bb");
