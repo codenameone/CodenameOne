@@ -100,7 +100,7 @@ final class LinuxTextInput {
         if (rect == null || rect.length < 4) {
             rect = new int[] {0, 0, 1, 1};
         }
-        updateNative(binding.id, binding.sequence, state.getText(), state.getSelectionEnd(),
+        updateNative(binding.id, binding.sequence, state.getText(), state.getSelectionFocus(),
                 rect[0], rect[1], Math.max(1, rect[2]), Math.max(1, rect[3]));
     }
 
@@ -239,7 +239,7 @@ final class LinuxTextInput {
             } else {
                 client.setComposingText(replacement, replacement.length());
                 client.finishComposing();
-                client.setSelectionRange(original.getSelectionStart(), original.getSelectionEnd());
+                client.setSelectionRange(original.getSelectionAnchor(), original.getSelectionFocus());
             }
         }
     }
@@ -248,7 +248,7 @@ final class LinuxTextInput {
         if (offset > 0 || count < 0 || (long) offset + count < 0) {
             return null;
         }
-        int caret = Math.max(0, Math.min(state.getText().length(), state.getSelectionEnd()));
+        int caret = Math.max(0, Math.min(state.getText().length(), state.getSelectionFocus()));
         int from = moveCodePoints(state.getText(), caret, offset);
         int to = moveCodePoints(state.getText(), caret, offset + count);
         return new int[] {caret - from, to - caret};

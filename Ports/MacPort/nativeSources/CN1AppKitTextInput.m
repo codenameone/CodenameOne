@@ -69,8 +69,14 @@ void CN1MacTextInputNotifySelection(NSRange sel) {
     if (!session.pureEditor) {
         return;
     }
+    NSUInteger anchor = session.selectionAnchor;
+    if (anchor != sel.location && anchor != NSMaxRange(sel)) {
+        anchor = sel.location;
+    }
+    NSUInteger focus = anchor == sel.location ? NSMaxRange(sel) : sel.location;
+    session.selectionAnchor = anchor;
     com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(
-            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)sel.location, (JAVA_INT)NSMaxRange(sel),
+            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)anchor, (JAVA_INT)focus,
             (JAVA_INT)[session nextEditSeq]);
 }
 
@@ -216,8 +222,9 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     // changed, so clamp rather than trust it -- an out of range NSRange is a
     // crash, not a wrong caret.
     selStart = MIN(MAX(selStart, 0), len);
-    selEnd = MIN(MAX(selEnd, selStart), len);
-    self.selectedRange = NSMakeRange(selStart, selEnd - selStart);
+    selEnd = MIN(MAX(selEnd, 0), len);
+    self.selectionAnchor = selStart;
+    self.selectedRange = NSMakeRange(MIN(selStart, selEnd), MAX(selStart, selEnd) - MIN(selStart, selEnd));
     self.markedRange = NSMakeRange(NSNotFound, 0);
     self.multiline = multiline;
     _active = YES;
@@ -411,8 +418,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
         }
         NSInteger len = (NSInteger)session.text.length;
         NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
-        NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
-        session.selectedRange = NSMakeRange(start, end - start);
+        NSInteger end = MIN(MAX((NSInteger)selEnd, 0), len);
+        session.selectionAnchor = start;
+        session.selectedRange = NSMakeRange(MIN(start, end), MAX(start, end) - MIN(start, end));
         com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
         [session completeEditorCommand:(int)seq];
     });

@@ -56,6 +56,13 @@ class LinuxTextInputTest {
     }
 
     @Test
+    void surroundingDeletionUsesFocusOfBackwardSelection() {
+        TextInputState state = new TextInputState("A\ud83d\ude00B", 3, 1);
+        assertArrayEquals(new int[] {0, 2}, LinuxTextInput.surroundingDeletion(state, 0, 1));
+        assertArrayEquals(new int[] {1, 0}, LinuxTextInput.surroundingDeletion(state, -1, 1));
+    }
+
+    @Test
     void absentOrStaleHandlesCannotInvokeNativeStateChanges() {
         LinuxTextInput input = new LinuxTextInput();
         input.stop(null);

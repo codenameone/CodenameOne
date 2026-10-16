@@ -89,6 +89,28 @@ autocorrection and automatic capitalization. The immutable
 https://www.codenameone.com/javadoc/com/codename1/ui/TextInputState.html[`TextInputState`] returns the
 authoritative text, selection, and composing range to the port after each edit.
 
+`TextInputState.getSelectionStart()` and `getSelectionEnd()` return an ordered range for existing
+input bridges. `getSelectionAnchor()` and `getSelectionFocus()` retain direction: a backward
+selection has an anchor greater than its focus. The Apple bridge uses those directional getters;
+UIKit normalizes its native range, while macOS retains the anchor alongside AppKit's ordered range.
+
+On macOS, pure editors receive word movement and deletion, visual line and paragraph boundaries,
+document boundaries, and page movement through `onKeyCommand(...)`. AppKit interprets the key event first. Paragraph boundary commands use `MOD_ALT` with `KEY_HOME` or `KEY_END`.
+Paragraph selection uses `MOD_ALT` with `KEY_UP` or `KEY_DOWN` and retains `MOD_SHIFT`. The editor owns
+its visual line layout; the port waits for its updated state before replaying later native edits.
+Logical word commands carry `MOD_ALT`; spatial AppKit word-left/right commands use `KEY_WORD_LEFT` and
+`KEY_WORD_RIGHT` and follow the rendered directional runs. Document Home/End commands carry `MOD_CTRL`, and selection commands
+also carry `MOD_SHIFT`. `KEY_SCROLL_PAGE_UP` and `KEY_SCROLL_PAGE_DOWN` scroll the viewport without changing the caret or
+selection; they're distinct from caret-moving `KEY_PAGE_UP` and `KEY_PAGE_DOWN`, which use cumulative
+line heights and visual columns for rich content. Fallback geometry snapshots sample around the active
+selection focus, including backward selections. Word navigation classifies Unicode letters, decimal
+digits and underscore consistently across ports. Combining marks inherit their base character's
+classification, so emoji variation selectors stay attached during word deletion. It keeps surrogate pairs intact. It doesn't perform dictionary segmentation. Boundary word deletions are no-ops.
+Character movement remains on the native composed-character path so accents, emoji variation
+selectors and ZWJ sequences stay intact. Unmodified character movement collapses a selection to its
+ordered edge. Select All explicitly creates a forward selection before later shift-arrow commands.
+These callbacks don't change the legacy `TextArea` editing path.
+
 The native Linux port binds this contract to GTK's
 https://docs.gtk.org/gtk3/class.IMContext.html[`GtkIMContext`]. The document stays in the lightweight
 canvas while GTK handles composed text and input-method candidate UI. Navigation, deletion,

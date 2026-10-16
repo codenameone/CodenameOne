@@ -69,7 +69,7 @@ public final class TextInputGeometry {
             return ((Provider) client).getGeometrySnapshot();
         }
         TextInputState state = client.getEditingState();
-        int caret = state.getSelectionEnd();
+        int caret = state.getSelectionFocus();
         int first = caret;
         int last = caret;
         if (client instanceof Component) {
@@ -100,8 +100,8 @@ public final class TextInputGeometry {
                 points[n++] = rect[j];
             }
         }
-        return new TextInputGeometry(points, state.getSelectionStart(), caret,
-            client.selectionRects(state.getSelectionStart(), caret), client.getCaretRect());
+        return new TextInputGeometry(points, state.getSelectionAnchor(), caret,
+            client.selectionRects(state.getSelectionStart(), state.getSelectionEnd()), client.getCaretRect());
     }
 
     /// Returns the last captured caret rectangle for an offset, or the active caret offscreen.

@@ -2116,6 +2116,11 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 /// in each case. Forgotten whenever the selection stops matching what was
 /// recorded, which is how an ordinary click or an insertion starts a fresh one.
 - (NSUInteger)cn1SelectionAnchor:(NSRange)sel {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (session.pureEditor && (session.selectionAnchor == sel.location
+            || session.selectionAnchor == NSMaxRange(sel))) {
+        return session.selectionAnchor;
+    }
     if (selectionAnchorValid
             && (selectionAnchor == sel.location || selectionAnchor == NSMaxRange(sel))) {
         return selectionAnchor;
@@ -2126,6 +2131,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)cn1RememberAnchor:(NSUInteger)anchor {
+    [CN1MacTextInputSession sharedSession].selectionAnchor = anchor;
     selectionAnchor = anchor;
     selectionAnchorValid = YES;
 }
@@ -2185,6 +2191,66 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     }
     NSRange sel = session.selectedRange;
     NSUInteger len = session.text.length;
+
+    if (session.pureEditor) {
+        // TextInputClient owns visual lines and the direction of its selection.
+        // AppKit still interprets the event first, so input methods get first refusal.
+        int command = 0;
+        int modifiers = 0;
+        NSString *name = NSStringFromSelector(selector);
+        NSString *suffix = @"AndModifySelection:";
+        if ([name hasSuffix:suffix]) {
+            modifiers |= 1; // TextInputClient.MOD_SHIFT
+            name = [[name substringToIndex:name.length - suffix.length] stringByAppendingString:@":"];
+        }
+        // Character commands retain the composed-character native path below.
+        if ([name isEqualToString:@"moveParagraphBackward:"]) {
+            command = 3; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveParagraphForward:"]) {
+            command = 4; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveToBeginningOfParagraph:"]) {
+            command = 5; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveToEndOfParagraph:"]) {
+            command = 6; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveWordLeft:"]) {
+            command = 21; // KEY_WORD_LEFT: spatial direction
+        } else if ([name isEqualToString:@"moveWordRight:"]) {
+            command = 22; // KEY_WORD_RIGHT: spatial direction
+        } else if ([name isEqualToString:@"moveWordBackward:"]) {
+            command = 1; modifiers |= 4; // KEY_LEFT, MOD_ALT
+        } else if ([name isEqualToString:@"moveWordForward:"]) {
+            command = 2; modifiers |= 4; // KEY_RIGHT, MOD_ALT
+        } else if ([name isEqualToString:@"moveUp:"]) {
+            command = 3;
+        } else if ([name isEqualToString:@"moveDown:"]) {
+            command = 4;
+        } else if ([name isEqualToString:@"moveToBeginningOfLine:"] || [name isEqualToString:@"moveToLeftEndOfLine:"]) {
+            command = 5;
+        } else if ([name isEqualToString:@"moveToEndOfLine:"] || [name isEqualToString:@"moveToRightEndOfLine:"]) {
+            command = 6;
+        } else if ([name isEqualToString:@"moveToBeginningOfDocument:"]) {
+            command = 5; modifiers |= 2; // KEY_HOME, MOD_CTRL
+        } else if ([name isEqualToString:@"moveToEndOfDocument:"]) {
+            command = 6; modifiers |= 2; // KEY_END, MOD_CTRL
+        } else if ([name isEqualToString:@"pageUp:"]) {
+            command = 7;
+        } else if ([name isEqualToString:@"pageDown:"]) {
+            command = 8;
+        } else if ([name isEqualToString:@"scrollPageUp:"]) {
+            command = 19; // KEY_SCROLL_PAGE_UP: viewport only
+        } else if ([name isEqualToString:@"scrollPageDown:"]) {
+            command = 20; // KEY_SCROLL_PAGE_DOWN: viewport only
+        } else if ([name isEqualToString:@"deleteWordBackward:"]) {
+            command = 9; modifiers |= 4;
+        } else if ([name isEqualToString:@"deleteWordForward:"]) {
+            command = 10; modifiers |= 4;
+        }
+        if (command != 0) {
+            [self cn1SendEditorKeyCommand:command modifiers:modifiers];
+            [self cn1ForgetAnchor];
+            return;
+        }
+    }
 
     if (selector == @selector(insertNewline:)) {
         if (session.multiline) {
@@ -2256,14 +2322,14 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     // pressing an arrow twice from offset 5 gave [4,5) and then 4 rather than
     // [3,5). A plain arrow genuinely ends the selection gesture and still
     // forgets; an extending one must not.
-    if (selector == @selector(moveLeft:)) {
+    if (selector == @selector(moveLeft:) || selector == @selector(moveBackward:)) {
         NSUInteger at = sel.length > 0 ? sel.location
             : [self cn1IndexBefore:sel.location inText:session.text];
         [self cn1SetSelection:NSMakeRange(at, 0)];
         [self cn1ForgetAnchor];
         return;
     }
-    if (selector == @selector(moveRight:)) {
+    if (selector == @selector(moveRight:) || selector == @selector(moveForward:)) {
         NSUInteger at = sel.length > 0 ? NSMaxRange(sel)
             : [self cn1IndexAfter:sel.location inText:session.text];
         [self cn1SetSelection:NSMakeRange(at, 0)];
@@ -2375,6 +2441,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     if (selector == @selector(selectAll:)) {
+        [self cn1RememberAnchor:0];
         [self cn1SetSelection:NSMakeRange(0, len)];
         return;
     }
@@ -2725,6 +2792,7 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
     // Edit menu land here directly rather than through doCommandBySelector, so
     // assigning the shadow alone left the Java editor with no selection to
     // render -- and a following Cut or Copy then acted on nothing.
+    [self cn1RememberAnchor:0];
     [self cn1SetSelection:NSMakeRange(0, session.text.length)];
 }
 
