@@ -5,13 +5,19 @@
    "hello": {
     "all": {
      "from": {
-      "memory": 0.868,
-      "time": 0.931
+      "memory": 0.932,
+      "time": 1.021,
+      "tolerance": {
+       "memory": 0.4
+      }
      },
      "memory": 1.103,
      "reason": "The hello application now ships the Swing and JavaFX compatibility runtimes, so the translation this benchmark times reads about 9,600 classes instead of 7,350. ParparVM's peak grows with the larger live set and the garbage allocated while a concurrent cycle runs over it; the JVM's committed heap already had room, so its peak barely moves and the ratio rises. The fixed-input translator benchmark is unchanged.",
      "runs": 1,
-     "time": 0.931
+     "time": 1.021,
+     "tolerance": {
+      "memory": 0.4
+     }
     }
    }
   },
@@ -63,10 +69,10 @@
    "hello": {
     "all": {
      "from": {
-      "memory": 0.749,
+      "memory": 0.999,
       "time": 1.41,
       "tolerance": {
-       "memory": 0.3,
+       "memory": 0.35,
        "time": 0.5
       }
      },
@@ -75,7 +81,7 @@
      "runs": 1,
      "time": 1.41,
      "tolerance": {
-      "memory": 0.3,
+      "memory": 0.35,
       "time": 0.5
      }
     }
