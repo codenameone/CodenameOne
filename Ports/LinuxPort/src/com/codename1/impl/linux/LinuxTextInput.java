@@ -187,12 +187,6 @@ final class LinuxTextInput {
             case 6:
                 stop(binding);
                 return;
-            case 7:
-                client.inputFocusLost();
-                return;
-            case 8:
-                client.inputFocusGained();
-                break;
             default:
                 return;
         }

@@ -105,14 +105,14 @@ static gboolean cn1TextFocus(GtkWidget* widget, GdkEventFocus* event, gpointer u
     if (!cn1TextInput.im) {
         return FALSE;
     }
+    /* A deactivated window retains its focused component. Only component
+     * focus loss or destruction ends the Java input session. */
     if (event->in) {
         cn1TextInput.focused = 1;
         gtk_im_context_focus_in(cn1TextInput.im);
-        cn1TextQueue(8, 0, 0, NULL);
     } else {
         cn1TextInput.focused = 0;
         gtk_im_context_focus_out(cn1TextInput.im);
-        cn1TextQueue(7, 0, 0, NULL);
     }
     return FALSE;
 }

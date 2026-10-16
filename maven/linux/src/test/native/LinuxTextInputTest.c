@@ -128,11 +128,11 @@ int main(int argc, char** argv) {
     key(4, GDK_KEY_x, 0, GDK_KEY_PRESS); event = expectKind(0, "x"); g_free(event);
     memset(&focus, 0, sizeof(focus)); focus.in = FALSE;
     cn1TextFocus(testWindow, &focus, NULL);
-    event = expectKind(7, ""); g_free(event);
+    assert(!POLL(NULL)); /* Window deactivation does not end the client session. */
     key(4, GDK_KEY_x, 0, GDK_KEY_PRESS); assert(!POLL(NULL));
     focus.in = TRUE;
     cn1TextFocus(testWindow, &focus, NULL);
-    event = expectKind(8, ""); g_free(event);
+    assert(!POLL(NULL));
     key(4, GDK_KEY_y, 0, GDK_KEY_PRESS); event = expectKind(0, "y"); g_free(event);
     for (int i = 3; i < 103; i++) {
         assert(START(NULL, i, -1, 0, 1, 1));
