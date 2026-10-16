@@ -425,6 +425,17 @@ public class CSSThemeCompilerTest extends UITestBase {
 
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile("#Constants{ missingImage: nothing.png; }", new MutableResource(), "Theme"));
+
+        // Through a custom property declared after the constants block, quoted or not.
+        MutableResource viaVar = new MutableResource();
+        viaVar.setImage("spinner.png", spinner);
+        new CSSThemeCompiler().compile("#Constants{ infiniteImage: var(--spinner); quotedImage: var(--q); }"
+                + ":root{ --spinner: spinner.png; --q: \"spinner.png\"; }", viaVar, "Theme");
+        assertTrue(viaVar.getTheme("Theme").get("@infiniteImage") == spinner);
+        assertTrue(viaVar.getTheme("Theme").get("@quotedImage") == spinner);
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ goneImage: var(--x); } :root{ --x: nothing.png; }",
+                        new MutableResource(), "Theme"));
     }
 
     @Test

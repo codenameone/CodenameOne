@@ -114,11 +114,17 @@ public class CSSThemeCompiler {
         compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
-        // A constant written as var(--x) is only a color once x is resolved.
+        // A constant written as var(--x) is only an image or a color once x is resolved.
         for (String key : varConstants) {
             Object value = theme.get(key);
-            if (value instanceof String && isColorLiteral((String) value)) {
-                theme.put(key, normalizeHexColor((String) value));
+            if (!(value instanceof String)) {
+                continue;
+            }
+            String resolved = unquote((String) value);
+            if (key.endsWith("Image")) {
+                theme.put(key, imageConstant(resources, key.substring(1), resolved));
+            } else if (isColorLiteral(resolved)) {
+                theme.put(key, normalizeHexColor(resolved));
             }
         }
         resources.setTheme(themeName, theme);
@@ -240,15 +246,8 @@ public class CSSThemeCompiler {
             }
             String raw = declaration.value.trim();
             String value = unquote(raw);
-            if (name.endsWith("Image")) {
-                // UIManager.getThemeImageConstant casts the constant to Image, and on iOS that
-                // cast is unchecked: a String left here would be read as an Image and crash
-                // natively. The build-time compiler fails the build on a missing image too.
-                Image image = resources.getImage(value);
-                if (image == null) {
-                    throw new CSSSyntaxException("Constant " + name + " names no image in the resource: " + value);
-                }
-                theme.put("@" + name, image);
+            if (name.endsWith("Image") && value.indexOf("var(--") < 0) {
+                theme.put("@" + name, imageConstant(resources, name, value));
                 continue;
             }
             if (raw.equals(value)) {
@@ -262,6 +261,17 @@ public class CSSThemeCompiler {
             }
             theme.put("@" + name, value);
         }
+    }
+
+    /// UIManager.getThemeImageConstant casts an image constant to Image, and on iOS that cast is
+    /// unchecked: a String left in its place would be read as an Image and crash natively. The
+    /// build-time compiler fails the build on a missing image too.
+    private static Image imageConstant(MutableResource resources, String name, String imageName) {
+        Image image = resources.getImage(imageName);
+        if (image == null) {
+            throw new CSSSyntaxException("Constant " + name + " names no image in the resource: " + imageName);
+        }
+        return image;
     }
 
     private boolean isColorLiteral(String value) {
