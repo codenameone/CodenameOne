@@ -107,6 +107,11 @@ public final class Account {
 
     private static void fetch(final Runnable done) {
         final String owner = Session.owner();
+        // An answer from a session that has since ended still runs `done`.
+        // Signing out and in while the account loads is rare, and the worst
+        // of it is the home screen shown a moment before its settings, which
+        // the new session's own load applies when it ends. The data itself is
+        // only taken for the account signed in now, which is checked below.
         final Runnable thenProfile = () -> {
             if (profileLoaded || !signedInAs(owner)) {
                 done.run();
@@ -249,13 +254,13 @@ public final class Account {
             final int send = ++preferencesSends;
             Api.account().savePreferences(sent, Net.to(saved -> {
                 if (send == preferencesSends) {
-                    Preferences.delete(UNSENT_PREFERENCES);
+                    sentFor(UNSENT_PREFERENCES, owner);
                 }
             }, (status, message) -> {
                 if (refused(status)) {
                     // Refused: sent again, it would be refused again.
                     if (send == preferencesSends) {
-                        Preferences.delete(UNSENT_PREFERENCES);
+                        sentFor(UNSENT_PREFERENCES, owner);
                     }
                 } else if (signedInAs(owner)) {
                     preferencesChanged = true;
@@ -270,7 +275,7 @@ public final class Account {
             final int send = ++profileSends;
             Api.account().saveProfile(wanted, Net.to(user -> {
                 if (send == profileSends) {
-                    Preferences.delete(UNSENT_PROFILE);
+                    sentFor(UNSENT_PROFILE, owner);
                 }
                 // Signing out sends what is waiting and does not wait for the
                 // answer. If somebody else has signed in by the time it comes,
@@ -282,7 +287,7 @@ public final class Account {
             }, (status, message) -> {
                 if (refused(status)) {
                     if (send == profileSends) {
-                        Preferences.delete(UNSENT_PROFILE);
+                        sentFor(UNSENT_PROFILE, owner);
                     }
                 } else if (signedInAs(owner)) {
                     profileChanged = true;
@@ -304,6 +309,16 @@ public final class Account {
     /// Whether `key` marks a change that `owner`'s account has not taken.
     private static boolean isUnsent(String key, String owner) {
         return owner != null && owner.equals(Preferences.get(key, ""));
+    }
+
+    /// The server has what `owner` left unsent under `key`. The mark is one
+    /// key for every account, so an answer that comes after somebody else
+    /// signed in leaves theirs alone: it may be a change of their own that
+    /// never went through, and cleared it would be lost to the server's copy.
+    private static void sentFor(String key, String owner) {
+        if (isUnsent(key, owner)) {
+            Preferences.delete(key);
+        }
     }
 
     /// Whether the account signed in now is `owner` ([Session#owner()]): an

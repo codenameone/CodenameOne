@@ -195,9 +195,11 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     int rate(@Param("id") String id, @Param("rider") String rider, @Param("stars") int stars);
 
     /// Completed rides whose payment has been pending since before `before`
-    /// and no longer than since `after`, newest first.
+    /// and no longer than since `after`, oldest first: the sweep takes one
+    /// page at a time, and a backlog read newest first would keep the oldest
+    /// behind the new arrivals until they aged out of the window unsettled.
     @Query("select r from Ride r where r.state = 'COMPLETED' and r.paymentStatus = 'PENDING' "
-            + "and r.updatedAt < :before and r.updatedAt > :after order by r.updatedAt desc")
+            + "and r.updatedAt < :before and r.updatedAt > :after order by r.updatedAt asc")
     List<Ride> unsettled(@Param("after") long after, @Param("before") long before,
             PageRequest page);
 

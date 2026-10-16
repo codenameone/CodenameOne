@@ -190,7 +190,12 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
                 }
             }
         };
-        // One of these ends every request, whichever way it ends.
+        // One of these ends every request, whichever way it ends. Nothing
+        // here outlives the request: the XHR is made in the worker
+        // (XMLHttpRequest.create in port.js), so the listener becomes a plain
+        // closure on it through port.js's EventListener converter and is
+        // collected with it. Only a listener handed to an object on the main
+        // thread is given a lasting entry in the runtime's workerCallbacks.
         XHREvents events = (XHREvents) req;
         events.addEventListener("load", ended);
         events.addEventListener("error", ended);
