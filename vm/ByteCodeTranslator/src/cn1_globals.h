@@ -1082,17 +1082,57 @@ static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
     SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 
-#define BC_IDIV() SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i
+/* Java integer division and remainder. A raw C / or % is undefined for a zero
+ * divisor and for MIN_VALUE / -1 (the quotient does not fit), and -fwrapv only
+ * covers + - *. arm64's sdiv happens to answer both without trapping, but x86's
+ * idiv raises SIGFPE and kills the process -- native Windows/Linux, an x86 server
+ * running the backend, or anything that divides by a value a caller controls.
+ *
+ * No ArithmeticException is thrown: these answer what arm64 hardware already
+ * answers, so iOS devices see no change and every target agrees:
+ *   x / 0 == 0, x % 0 == x, MIN / -1 == MIN, MIN % -1 == 0.
+ * The one unsigned compare is true only for a divisor of 0 or -1, so the common
+ * path costs a single well-predicted branch, and it folds away entirely when the
+ * divisor is a constant. */
+static inline JAVA_INT cn1IntDiv(JAVA_INT a, JAVA_INT b) {
+    if((uint32_t)b + 1u <= 1u) {
+        return b == 0 ? 0 : (JAVA_INT)(0u - (uint32_t)a);
+    }
+    return a / b;
+}
 
-#define BC_LDIV() SP--; SP[-1].data.l = SP[-1].data.l / (*SP).data.l
+static inline JAVA_INT cn1IntRem(JAVA_INT a, JAVA_INT b) {
+    if((uint32_t)b + 1u <= 1u) {
+        return b == 0 ? a : 0;
+    }
+    return a % b;
+}
+
+static inline JAVA_LONG cn1LongDiv(JAVA_LONG a, JAVA_LONG b) {
+    if((uint64_t)b + 1u <= 1u) {
+        return b == 0 ? 0 : (JAVA_LONG)(0u - (uint64_t)a);
+    }
+    return a / b;
+}
+
+static inline JAVA_LONG cn1LongRem(JAVA_LONG a, JAVA_LONG b) {
+    if((uint64_t)b + 1u <= 1u) {
+        return b == 0 ? a : 0;
+    }
+    return a % b;
+}
+
+#define BC_IDIV() SP--; SP[-1].data.i = cn1IntDiv(SP[-1].data.i, (*SP).data.i)
+
+#define BC_LDIV() SP--; SP[-1].data.l = cn1LongDiv(SP[-1].data.l, (*SP).data.l)
 
 #define BC_FDIV() SP--; SP[-1].data.f = SP[-1].data.f / (*SP).data.f
 
 #define BC_DDIV() SP--; SP[-1].data.d = SP[-1].data.d / (*SP).data.d
 
-#define BC_IREM() SP--; SP[-1].data.i = SP[-1].data.i % (*SP).data.i
+#define BC_IREM() SP--; SP[-1].data.i = cn1IntRem(SP[-1].data.i, (*SP).data.i)
 
-#define BC_LREM() SP--; SP[-1].data.l = SP[-1].data.l % (*SP).data.l
+#define BC_LREM() SP--; SP[-1].data.l = cn1LongRem(SP[-1].data.l, (*SP).data.l)
 
 #define BC_FREM() SP--; SP[-1].data.f = fmod(SP[-1].data.f, (*SP).data.f)
 

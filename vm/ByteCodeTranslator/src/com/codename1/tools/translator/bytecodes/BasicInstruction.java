@@ -502,11 +502,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
                 
             case Opcodes.IDIV:
-                b.append("    SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i; /* IDIV */\n");
+                b.append("    SP--; SP[-1].data.i = cn1IntDiv(SP[-1].data.i, (*SP).data.i); /* IDIV */\n");
                 break;
                 
             case Opcodes.LDIV:
-                b.append("    SP--; SP[-1].data.l = SP[-1].data.l / (*SP).data.l; /* LDIV */\n");
+                b.append("    SP--; SP[-1].data.l = cn1LongDiv(SP[-1].data.l, (*SP).data.l); /* LDIV */\n");
                 break;
                 
             case Opcodes.FDIV:
@@ -518,11 +518,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
                 
             case Opcodes.IREM:
-                b.append("    SP--; SP[-1].data.i = SP[-1].data.i % (*SP).data.i; /* IREM */\n");
+                b.append("    SP--; SP[-1].data.i = cn1IntRem(SP[-1].data.i, (*SP).data.i); /* IREM */\n");
                 break;
                 
             case Opcodes.LREM:
-                b.append("    SP--; SP[-1].data.l = SP[-1].data.l % (*SP).data.l; /* LREM */\n");
+                b.append("    SP--; SP[-1].data.l = cn1LongRem(SP[-1].data.l, (*SP).data.l); /* LREM */\n");
                 break;
                 
             case Opcodes.FREM:
