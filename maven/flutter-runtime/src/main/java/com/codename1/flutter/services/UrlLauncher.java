@@ -27,6 +27,7 @@ import com.codename1.ui.Display;
 
 import dart.async.Future;
 import dart.core.DartUri;
+import dart.runtime.Funcs;
 
 /**
  * The top-level functions of the {@code url_launcher} package new_gallery calls
@@ -55,18 +56,42 @@ public final class UrlLauncher {
 
     /** {@code url_launcher}'s {@code launchUrlString(urlString)}. */
     public static Future<Boolean> launchUrlString(String urlString, Object mode, Object webOnlyWindowName) {
-        boolean ok = false;
-        if (urlString != null) {
-            try {
-                if (Display.isInitialized()) {
-                    Display.getInstance().execute(urlString);
-                    ok = true;
-                }
-            } catch (Throwable t) {
-                ok = false;
-            }
+        if (urlString == null || !Display.isInitialized()) {
+            return Future.value(false);
         }
-        return Future.value(ok);
+        final Display d = Display.getInstance();
+        return Future.value(launch(urlString, new Funcs.Func1<String, Boolean>() {
+            @Override
+            public Boolean call(String u) {
+                return d.canExecute(u);
+            }
+        }, new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String u) {
+                d.execute(u);
+            }
+        }));
+    }
+
+    /**
+     * {@code launchUrl} answers true only when the URL was handed off. Display.execute
+     * returns nothing and a port may decline a URL silently (an unhandled custom
+     * scheme), so the port's own answer to canExecute decides first: FALSE means
+     * nothing would open and the caller's fallback must run. A null answer is the
+     * port saying it cannot tell, and the launch is attempted; an exception is a
+     * failed launch.
+     */
+    static boolean launch(String url, Funcs.Func1<String, Boolean> canExecute, Funcs.VoidFunc1<String> execute) {
+        try {
+            Boolean can = canExecute.call(url);
+            if (can != null && !can.booleanValue()) {
+                return false;
+            }
+            execute.call(url);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** {@code url_launcher}'s {@code canLaunchUrlString(urlString)}. */

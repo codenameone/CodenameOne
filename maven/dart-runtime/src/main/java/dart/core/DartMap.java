@@ -428,6 +428,9 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
             Map.Entry<K, V> e = it.next();
             if (Boolean.TRUE.equals(test.call(e.getKey(), e.getValue()))) {
                 it.remove();
+                // The JDK iterator's removal bypasses remove(), so it is counted here:
+                // a keys/values/entries loop around this call must see the change.
+                structure++;
             }
         }
     }

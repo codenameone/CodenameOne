@@ -809,6 +809,16 @@ public class DartCoreSemanticsTest {
             }
         });
 
+        // removeWhere removes through the JDK iterator, bypassing remove(): it must still
+        // count as a change for a keys loop around it.
+        final DartMap<Object, Object> rw = new DartMap<Object, Object>();
+        rw.put("a", 1);
+        assertThrows(ConcurrentModificationError.class, () -> {
+            for (Object k : rw.keys()) {
+                rw.removeWhere((key, value) -> Boolean.TRUE);
+            }
+        });
+
         final DartLongMap lm = new DartLongMap();
         lm.putLong(1, 10);
         lm.putLong(2, 20);

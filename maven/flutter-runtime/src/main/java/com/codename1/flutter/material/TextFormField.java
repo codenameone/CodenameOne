@@ -102,7 +102,7 @@ public class TextFormField extends StatefulWidget {
     public void buildCounter(Object v) { }
 
     @Override
-    public State<TextFormField> createState() {
+    public State<? extends StatefulWidget> createState() {
         return new TextFormFieldState();
     }
 
@@ -114,14 +114,38 @@ public class TextFormField extends StatefulWidget {
      * because {@link #build} keeps handing the SAME controller instance to the
      * {@link TextField} it builds, every time.
      */
-    private static final class TextFormFieldState extends State<TextFormField> {
+    private static final class TextFormFieldState
+            extends com.codename1.flutter.widgets.FormFieldState<String> {
 
         /** The controller this state owns, or null while an external one is in use. */
         private TextEditingController localController;
 
+        private TextFormField tf() {
+            return (TextFormField) widget();
+        }
+
+        /** The field's value is whatever its controller holds, as in Flutter. */
+        @Override
+        public String value() {
+            TextEditingController c = effectiveController();
+            return c == null ? null : c.text();
+        }
+
+        /** Flutter's TextFormField.reset: the controller goes back to the initial text. */
+        @Override
+        public void reset() {
+            TextEditingController c = effectiveController();
+            if (c != null) {
+                String initial = tf().controller != null ? null : tf().initialValue;
+                c.setText(initial == null ? "" : initial);
+            }
+            super.reset();
+        }
+
         @Override
         public void initState() {
-            TextFormField w = widget();
+            TextFormField w = tf();
+            seed(w.initialValue);
             if (w.controller == null) {
                 localController = new TextEditingController();
                 if (w.initialValue != null) {
@@ -131,8 +155,9 @@ public class TextFormField extends StatefulWidget {
         }
 
         @Override
-        public void didUpdateWidget(TextFormField oldWidget) {
-            TextFormField w = widget();
+        public void didUpdateWidget(com.codename1.flutter.StatefulWidget oldWidgetAny) {
+            TextFormField oldWidget = (TextFormField) oldWidgetAny;
+            TextFormField w = tf();
             if (w.controller == oldWidget.controller) {
                 // Same controller identity (both null, or the same external instance):
                 // initialValue is consulted only once, at initState -- a later change
@@ -159,6 +184,7 @@ public class TextFormField extends StatefulWidget {
 
         @Override
         public void dispose() {
+            super.dispose();
             if (localController != null) {
                 localController.dispose();
                 localController = null;
@@ -166,28 +192,45 @@ public class TextFormField extends StatefulWidget {
         }
 
         private TextEditingController effectiveController() {
-            TextFormField w = widget();
+            TextFormField w = tf();
             return w.controller != null ? w.controller : localController;
         }
 
         @Override
         public Widget build(BuildContext context) {
-            TextFormField w = widget();
+            final TextFormField w = tf();
+            configure(w.validator, w.onSaved, w.autovalidateMode);
+            buildField(context);
             TextField field = new TextField();
             TextEditingController effective = effectiveController();
             if (effective != null) {
                 field.controller(effective);
             }
-            if (w.decoration != null) {
-                field.decoration(w.decoration);
+            // A failed validation shows in the decoration, where Material draws it.
+            InputDecoration deco = w.decoration;
+            if (errorText() != null) {
+                deco = (deco == null ? new InputDecoration() : deco).withErrorText(errorText());
             }
+            if (deco != null) {
+                field.decoration(deco);
+            }
+            field.reservesSupportLine(w.validator != null);
             field.obscureText(w.obscureText);
             if (w.enabled != null) {
                 field.enabled(w.enabled);
             }
-            if (w.onChanged != null) {
-                field.onChanged(w.onChanged);
-            }
+            // Flutter's TextFormField: onChanged reports to the field (didChange, so
+            // the form's onChanged and onUserInteraction autovalidation see it), then
+            // to the app's own callback.
+            field.onChanged(new Funcs.VoidFunc1<String>() {
+                @Override
+                public void call(String v) {
+                    didChange(v);
+                    if (w.onChanged != null) {
+                        w.onChanged.call(v);
+                    }
+                }
+            });
             // maxLength, maxLines and minLines were accepted here and dropped on the
             // way to the field, so a form field could not count its characters or
             // grow past one line however it was configured. The text-field demo is

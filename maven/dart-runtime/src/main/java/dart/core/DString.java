@@ -303,6 +303,24 @@ public final class DString {
         return s.startsWith(pattern, (int) index);
     }
 
+    /**
+     * {@code startsWith} with any Dart {@code Pattern}: a {@link RegExp} matches as a
+     * prefix at {@code index} (Dart's {@code matchAsPrefix}). A regex search is
+     * leftmost-first, so a match starting at {@code index}, if any exists, is the
+     * first one found from there.
+     */
+    public static boolean startsWith(String s, Object pattern, long index) {
+        if (pattern instanceof String) {
+            return startsWith(s, (String) pattern, index);
+        }
+        RangeError.checkValueInInterval(index, 0, s.length(), "index");
+        if (pattern instanceof RegExp) {
+            java.util.Iterator<RegExpMatch> it = ((RegExp) pattern).allMatches(s, (int) index).iterator();
+            return it.hasNext() && it.next().start() == index;
+        }
+        throw new ArgumentError("startsWith: unsupported pattern " + pattern);
+    }
+
     public static boolean contains(String s, String other) {
         return s.contains(other);
     }

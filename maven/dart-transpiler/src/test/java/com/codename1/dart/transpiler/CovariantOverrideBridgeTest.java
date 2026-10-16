@@ -83,6 +83,24 @@ public class CovariantOverrideBridgeTest {
                 + "return shouldReload(((AppDelegate) $b0)); }"), java);
     }
 
+    /**
+     * The gallery's {@code _RestorableCheckedValues extends RestorableProperty<Set<X>>}
+     * overrides {@code initWithValue(T)} as {@code initWithValue(Set<X>)}: Java's generic
+     * substitution already makes that an override, and a bridge taking Object failed the
+     * build with "two methods with the same erasure".
+     */
+    @Test
+    public void aTypeVariableParameterGetsNoBridge() {
+        String java = generated("import 'package:flutter/widgets.dart';\n"
+                + "class Box<T> { void put(T v) {} }\n"
+                + "class Names extends Box<Set<String>> {\n"
+                + "  @override\n"
+                + "  void put(Set<String> v) {}\n"
+                + "}\n"
+                + "void main() { Names().put(<String>{}); }\n");
+        assertFalse(java.contains("$b0"), java);
+    }
+
     @Test
     public void anOverrideWithTheBaseSignatureGetsNoBridge() {
         String java = generated("class A { int f(Object o) => 1; }\n"

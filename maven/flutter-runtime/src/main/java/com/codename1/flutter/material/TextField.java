@@ -118,6 +118,18 @@ public class TextField extends Widget {
         this.maxLength = v;
     }
 
+    /// Set by TextFormField when the field has a validator: the supporting line is
+    /// built (hidden while empty) so a later validation error has somewhere to appear.
+    private boolean reservesSupportLine;
+
+    void reservesSupportLine(boolean v) {
+        this.reservesSupportLine = v;
+    }
+
+    boolean isReservingSupportLine() {
+        return reservesSupportLine;
+    }
+
     public Long getMaxLength() {
         return maxLength;
     }

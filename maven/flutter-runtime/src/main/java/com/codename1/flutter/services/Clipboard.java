@@ -42,8 +42,13 @@ public abstract class Clipboard {
         return Future.value((Object) null);
     }
 
+    /**
+     * Completes with null when there is nothing to paste, as Flutter's does: callers
+     * guard {@code data == null} before {@code data!.text}, and a ClipboardData with a
+     * null text slipped past that guard.
+     */
     public static Future<Object> getData(String format) {
         Object contents = Display.isInitialized() ? Display.getInstance().getPasteDataFromClipboard() : null;
-        return Future.value((Object) new ClipboardData(contents == null ? null : contents.toString()));
+        return Future.value(contents == null ? null : (Object) new ClipboardData(contents.toString()));
     }
 }

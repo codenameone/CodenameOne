@@ -24,7 +24,8 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.Widget;
 
 import dart.runtime.Funcs;
@@ -32,13 +33,12 @@ import dart.runtime.Funcs;
 /**
  * A single form field wired to {@link Form} validation/save — Flutter's
  * {@code FormField<T>}. Application fields supply a {@code builder} that renders
- * the input from the current {@link FormFieldState}. This pass builds the field
- * from a fresh state; registration with the enclosing form lands with the form
- * renderer.
+ * the input from the current {@link FormFieldState}, which keeps the value across
+ * rebuilds and registers with the enclosing {@link Form}.
  *
  * @param <T> the field's value type
  */
-public class FormField<T> extends StatelessWidget {
+public class FormField<T> extends StatefulWidget {
 
     private Funcs.Func1<FormFieldState<T>, Widget> builder;
     private FormFieldValidator<T> validator;
@@ -56,15 +56,14 @@ public class FormField<T> extends StatelessWidget {
     public void autovalidateMode(Object v) { this.autovalidateMode = v; }
     public void restorationId(String v) { this.restorationId = v; }
 
+    Funcs.Func1<FormFieldState<T>, Widget> builderValue() { return builder; }
+    FormFieldValidator<T> validatorValue() { return validator; }
+    FormFieldSetter<T> onSavedValue() { return onSaved; }
+    T initialValueValue() { return initialValue; }
+    Object autovalidateModeValue() { return autovalidateMode; }
+
     @Override
-    public Widget build(BuildContext context) {
-        if (builder == null) {
-            return null;
-        }
-        FormFieldState<T> state = new FormFieldState<T>();
-        if (initialValue != null) {
-            state.didChange(initialValue);
-        }
-        return builder.call(state);
+    public State<? extends StatefulWidget> createState() {
+        return new FormFieldState<T>();
     }
 }

@@ -403,11 +403,21 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     /**
-     * Dart's {@code Iterable.whereType&lt;T&gt;()} — the transpiler threads the
-     * requested type as a trailing {@code Class} witness.
+     * Dart's {@code Iterable.whereType&lt;T&gt;()} for a non-nullable {@code T} -- the
+     * transpiler threads the requested type as a trailing {@code Class} witness. Null
+     * is not a T, so it is dropped.
+     */
+    public <T> DartIterable<T> whereType(Class<T> type) {
+        return whereType(type, false);
+    }
+
+    /**
+     * {@code whereType<T?>()}: {@code nullable} keeps null elements, which a nullable
+     * type (and {@code dynamic}, the witness {@code null}) admits. {@code Class.isInstance}
+     * answers false for null, so the one-argument form silently dropped them.
      */
     @SuppressWarnings("unchecked")
-    public <T> DartIterable<T> whereType(Class<T> type) {
+    public <T> DartIterable<T> whereType(Class<T> type, boolean nullable) {
         Iterable<E> src = this;
         return new DartIterable<>(() -> new Iterator<T>() {
             private final Iterator<E> it = src.iterator();
@@ -417,7 +427,7 @@ public class DartIterable<E> implements Iterable<E> {
             private void advance() {
                 while (!ready && it.hasNext()) {
                     E c = it.next();
-                    if (type == null ? c != null : type.isInstance(c)) {
+                    if (c == null ? nullable || type == null : type == null || type.isInstance(c)) {
                         next = (T) c;
                         ready = true;
                     }

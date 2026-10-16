@@ -790,6 +790,10 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().whereType(type);
     }
 
+    public <T> DartIterable<T> whereType(Class<T> type, boolean nullable) {
+        return asIterable().whereType(type, nullable);
+    }
+
     public DartIterable<E> followedBy(Iterable<E> other) {
         return asIterable().followedBy(other);
     }

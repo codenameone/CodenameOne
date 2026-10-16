@@ -1653,8 +1653,8 @@ public final class JavaEmitter {
      * signature -- reached the base's default instead of the app's code. This emits the
      * override Java can see: the base's erased signature, casting each argument to the
      * narrowed type and delegating. Empty when no wider base method exists, when a
-     * primitive or optional parameter is involved, or when the erasures coincide (the
-     * narrowed method then already overrides, or would clash).
+     * primitive, optional or type-variable parameter is involved, or when the erasures
+     * coincide (the narrowed method then already overrides, or would clash).
      */
     private String emitCovariantBridge(ClassDecl c, MethodDecl m, Method mm, Ctx ctx) {
         if (m.isStatic || m.isGetter || m.isSetter || m.name.startsWith("$")
@@ -1678,8 +1678,14 @@ public final class JavaEmitter {
         for (int i = 0; i < m.params.size(); i++) {
             TypeRef wide = sm.params.get(i).type == null ? TypeRef.DYNAMIC : sm.params.get(i).type;
             TypeRef narrow = m.params.get(i).type == null ? TypeRef.DYNAMIC : m.params.get(i).type;
-            String wideJava = ownerTypeParams.contains(wide.name) || sm.typeParams.contains(wide.name)
-                    ? "Object" : javaType(TypeRef.of(wide.name), false, ctx);
+            if (ownerTypeParams.contains(wide.name) || sm.typeParams.contains(wide.name)) {
+                // A type-variable parameter (RestorableProperty<T>.initWithValue(T)): Java's
+                // own generic substitution already makes initWithValue(Set<X>) in a
+                // RestorableProperty<Set<X>> an override, and a bridge taking Object
+                // would clash with it (same erasure).
+                return "";
+            }
+            String wideJava = javaType(TypeRef.of(wide.name), false, ctx);
             String narrowJava = javaType(narrow, false, ctx);
             if (isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
                 return "";
@@ -1701,8 +1707,20 @@ public final class JavaEmitter {
         }
         TypeRef rt = mm.returnType == null || mm.returnType.is("var") ? TypeRef.DYNAMIC : mm.returnType;
         String rjt = javaType(rt, false, ctx);
+        TypeRef brt = sm.returnType == null || sm.returnType.is("var") ? TypeRef.DYNAMIC : sm.returnType;
+        String baseRjt = ownerTypeParams.contains(brt.name) || sm.typeParams.contains(brt.name)
+                ? "Object" : javaType(brt, false, ctx);
+        if ((isJavaPrimitive(rjt) || isJavaPrimitive(baseRjt) || "void".equals(rjt) || "void".equals(baseRjt))
+                && !rjt.equals(baseRjt)) {
+            // An override must return the base's primitive exactly; a covariant object
+            // return is fine, a boolean against Object is not.
+            return "";
+        }
+        // No @Override: the bridge's parameter types come from the Dart stub's names, and
+        // should that mapping ever miss the Java signature the bridge is a harmless
+        // overload -- exactly the state before it -- instead of a compile error.
         StringBuilder sb = new StringBuilder();
-        sb.append("    @Override\n    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public ")
+        sb.append("    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public ")
                 .append(rjt).append(' ').append(m.name).append('(').append(sig).append(") {\n        ")
                 .append("void".equals(rjt) ? "" : "return ").append(m.name).append('(').append(call)
                 .append(");\n    }\n\n");
@@ -8035,12 +8053,19 @@ public final class JavaEmitter {
                 // Dart's whitespace set, not Java's <= U+0020.
                 return new Out("DString.trim(" + target.code + ")", TypeRef.STRING);
             }
-            if (n.equals("startsWith") && pos.size() > 1) {
-                // startsWith(pattern, index): the index was dropped, so
-                // 'abc'.startsWith('b', 1) answered false.
-                return new Out("DString.startsWith(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ", "
-                        + emitExpr(pos.get(1), TypeRef.INT, ctx).code + ")", TypeRef.BOOL);
+            if (n.equals("startsWith")) {
+                // A RegExp (any non-String Pattern) has no Java String.startsWith: it goes
+                // through the runtime's prefix match. startsWith(pattern, index): the index
+                // was once dropped, so 'abc'.startsWith('b', 1) answered false.
+                Out pat = emitExpr(pos.get(0), null, ctx);
+                boolean plain = pat.type != null && pat.type.is("String");
+                if (plain && pos.size() == 1) {
+                    return new Out(target.code + ".startsWith(" + pat.code + ")", TypeRef.BOOL);
+                }
+                ctx.importClass("dart.core.DString");
+                String idx = pos.size() > 1 ? emitExpr(pos.get(1), TypeRef.INT, ctx).code : "0L";
+                return new Out("DString.startsWith(" + target.code + ", " + (plain ? "" : "(Object) ")
+                        + pat.code + ", " + idx + ")", TypeRef.BOOL);
             }
             if (n.equals("startsWith") || n.equals("endsWith")) {
                 return new Out(target.code + "." + n + "("
@@ -8208,8 +8233,9 @@ public final class JavaEmitter {
                 // explicit <T> -- so the runtime's whereType(Class<T>) takes it as a
                 // trailing type witness (a class literal for a user class, the boxed
                 // class for a type the emitter maps to a Java primitive). No explicit
-                // <T> (whereType<dynamic>()) passes a null witness, which the runtime
-                // treats the same way Dart does: every non-null element passes.
+                // <T> passes a null witness: dynamic, which keeps every element, null
+                // included, as Dart does. A nullable T? (and dynamic/Object? spelled out)
+                // also admits null, so it says so: Class.isInstance(null) is false.
                 //
                 // An ENCLOSING generic method's <T> (only<T>(xs) => xs.whereType<T>()) is
                 // neither: it is a real, specific type at the call site, but this emitter
@@ -8222,7 +8248,8 @@ public final class JavaEmitter {
                             TypeRef.of("Iterable", TypeRef.DYNAMIC), true);
                 }
                 String token = sub != null ? javaType(sub, true, ctx) + ".class" : "null";
-                return new Out(target.code + ".whereType(" + token + ")",
+                boolean admitsNull = sub == null || sub.nullable || sub.is("dynamic") || sub.is("var");
+                return new Out(target.code + ".whereType(" + token + (admitsNull ? ", true" : "") + ")",
                         TypeRef.of("Iterable", sub != null ? sub : TypeRef.DYNAMIC));
             }
             if (n.equals("forEach")) {

@@ -112,6 +112,32 @@ public class InputDecoration {
         this.floatingLabelBehavior = v;
     }
 
+    public String getErrorText() {
+        return errorText;
+    }
+
+    /** A copy carrying {@code error}: how a form field shows its failed validation. */
+    public InputDecoration withErrorText(String error) {
+        InputDecoration d = new InputDecoration();
+        d.labelText = labelText;
+        d.hintText = hintText;
+        d.helperText = helperText;
+        d.errorText = error;
+        d.prefixText = prefixText;
+        d.suffixText = suffixText;
+        d.icon = icon;
+        d.prefixIcon = prefixIcon;
+        d.suffixIcon = suffixIcon;
+        d.filled = filled;
+        d.fillColor = fillColor;
+        d.border = border;
+        d.labelStyle = labelStyle;
+        d.hintStyle = hintStyle;
+        d.contentPadding = contentPadding;
+        d.floatingLabelBehavior = floatingLabelBehavior;
+        return d;
+    }
+
     public String getLabelText() {
         return labelText;
     }

@@ -113,7 +113,15 @@ public class TextEditingController {
      * component when mounted and notifies listeners.
      */
     public void setText(String v) {
-        this.value = v == null ? "" : v;
+        String next = v == null ? "" : v;
+        if (next.equals(value)) {
+            // Flutter's ValueNotifier does not notify for an equal value, and
+            // `addListener(() => c.text = c.text)` recursed until the stack overflowed.
+            // value tracks every user edit (valueFromComponent), so equal means the
+            // fields already show it.
+            return;
+        }
+        this.value = next;
         pushToFields(null);
         notifyListeners();
     }

@@ -24,17 +24,18 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.Element;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.Widget;
 
 /**
- * Groups form fields that validate/save together — Flutter's {@code Form}. A
- * {@link com.codename1.flutter.GlobalKey}{@code <FormState>} attached to the
- * form gives access to the {@link FormState} that drives
- * validate/save/reset across the fields. Structural pass-through for this
- * milestone: the {@code child} renders unchanged.
+ * Groups form fields that validate/save together -- Flutter's {@code Form}. A
+ * {@link com.codename1.flutter.GlobalKey}{@code <FormState>} attached to the form,
+ * or {@link #of} below it, gives the live {@link FormState} that drives
+ * validate/save/reset across the fields registered under it. The {@code child}
+ * renders unchanged.
  */
-public class Form extends Widget implements HasChild {
+public class Form extends StatefulWidget implements HasChild {
 
     private Widget child;
     private Object onChanged;
@@ -72,18 +73,26 @@ public class Form extends Widget implements HasChild {
         return child;
     }
 
-    /** Flutter's {@code Form.of} — the nearest enclosing {@link FormState}. */
-    public static FormState of(BuildContext context) {
-        return null;
+    Object onChangedCallback() {
+        return onChanged;
     }
 
-    /** Flutter's {@code Form.maybeOf}. */
+    Object autovalidateModeValue() {
+        return autovalidateMode;
+    }
+
+    /** Flutter's {@code Form.of}: the nearest enclosing {@link FormState}. */
+    public static FormState of(BuildContext context) {
+        return maybeOf(context);
+    }
+
+    /** Flutter's {@code Form.maybeOf}: the nearest enclosing {@link FormState}, or null. */
     public static FormState maybeOf(BuildContext context) {
-        return null;
+        return context == null ? null : context.findAncestorStateOfType(FormState.class);
     }
 
     @Override
-    public Element createElement() {
-        return new PassThroughRenderElement(this);
+    public State<Form> createState() {
+        return new FormState();
     }
 }

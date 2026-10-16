@@ -157,6 +157,7 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
                     @Override
                     public void remove() {
                         it.remove();
+                        structuralChange();
                     }
                 };
             }
@@ -205,6 +206,7 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
                     @Override
                     public void remove() {
                         it.remove();
+                        structuralChange();
                     }
                 };
             }

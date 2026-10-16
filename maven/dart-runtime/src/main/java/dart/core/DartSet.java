@@ -560,6 +560,10 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return asIterable().whereType(type);
     }
 
+    public <T> DartIterable<T> whereType(Class<T> type, boolean nullable) {
+        return asIterable().whereType(type, nullable);
+    }
+
     @Override
     public String toString() {
         if (!DartRuntime.beginFormat(this)) {

@@ -410,6 +410,7 @@ public class TextFieldRenderElement extends RenderElement {
             if (counterLabel != null) {
                 counterLabel.setText(counterText());
             }
+            syncSupportText();
             rebindController();
             if (boundController != null) {
                 // rawValue, not text(): text() reads the bound component first,
@@ -1190,9 +1191,12 @@ public class TextFieldRenderElement extends RenderElement {
      */
     private Component withHelper(com.codename1.ui.TextField tf, Component field) {
         InputDecoration d = textField().getDecoration();
-        String help = d == null ? null : d.getHelperText();
+        // Material puts a failed validation where the helper text goes, in the error colour.
+        String error = d == null ? null : d.getErrorText();
+        String help = error != null ? error : d == null ? null : d.getHelperText();
         Long max = textField().getMaxLength();
-        if ((help == null || help.length() == 0) && max == null) {
+        boolean reserve = textField().isReservingSupportLine();
+        if ((help == null || help.length() == 0) && max == null && !reserve) {
             return field;
         }
         com.codename1.ui.Container stack = new com.codename1.ui.Container(
@@ -1210,8 +1214,11 @@ public class TextFieldRenderElement extends RenderElement {
         line.getAllStyles().setPadding(
                 (int) Math.round(com.codename1.flutter.rendering.Dp.px(4)), 0, 0, 0);
         line.getAllStyles().setMargin(0, 0, 0, 0);
-        if (help != null && help.length() > 0) {
+        if ((help != null && help.length() > 0) || reserve) {
             helperLabel = supportLabel(help);
+            if (error != null) {
+                applyErrorColor(helperLabel);
+            }
             // CENTER, not WEST: a WEST cell takes its preferred width and the
             // sentence was cut off mid-word ("...just a demc").
             line.add(com.codename1.ui.layouts.BorderLayout.CENTER, helperLabel);
@@ -1222,7 +1229,46 @@ public class TextFieldRenderElement extends RenderElement {
         }
         stack.add(line);
         supportLine = stack;
+        supportRow = line;
+        // Reserved for a validator but empty: takes no room until an error arrives.
+        line.setHidden((help == null || help.length() == 0) && max == null);
         return stack;
+    }
+
+    /// The supporting line follows the decoration on every update: a form field's
+    /// validation error appears (and clears) after the field was first built.
+    private void syncSupportText() {
+        if (helperLabel == null) {
+            return;
+        }
+        InputDecoration d = textField().getDecoration();
+        String error = d == null ? null : d.getErrorText();
+        String help = error != null ? error : d == null ? null : d.getHelperText();
+        String text = help == null ? "" : help;
+        if (!text.equals(helperLabel.getText())) {
+            helperLabel.setText(text);
+        }
+        applyOne(helperLabel.getAllStyles(), supportStyle(), backdropRgb());
+        if (error != null) {
+            applyErrorColor(helperLabel);
+        }
+        if (supportRow != null) {
+            supportRow.setHidden(text.length() == 0 && counterLabel == null);
+        }
+    }
+
+    private com.codename1.ui.Container supportRow;
+
+    private void applyErrorColor(com.codename1.ui.Label l) {
+        try {
+            ThemeData t = Theme.of(this);
+            ColorScheme cs = t == null ? null : t.colorScheme();
+            if (cs != null && cs.error() != null) {
+                l.getAllStyles().setFgColor((int) (cs.error().value() & 0xffffff));
+            }
+        } catch (Throwable noTheme) {
+            // unthemed: the supporting colour stays
+        }
     }
 
     private com.codename1.ui.Label supportLabel(String text) {

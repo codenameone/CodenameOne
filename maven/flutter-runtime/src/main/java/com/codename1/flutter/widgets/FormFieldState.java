@@ -23,18 +23,44 @@
  */
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.material.AutovalidateMode;
+
 /**
- * The state of a single {@link FormField} — Flutter's {@code FormFieldState<T>}.
- * Reached through a {@code GlobalKey<FormFieldState<T>>().currentState}; the
- * text-field demo reads/writes {@link #value()} and drives
- * didChange/validate/save/reset.
+ * The state of a single form field -- Flutter's {@code FormFieldState<T>}, reached
+ * through a {@code GlobalKey<FormFieldState<T>>().currentState}. It registers with
+ * the enclosing {@link Form} when it builds, so the form's validate/save/reset reach
+ * this field's validator, {@code onSaved} and initial value.
  *
  * @param <T> the field's value type
  */
-public class FormFieldState<T> {
+public class FormFieldState<T> extends State<StatefulWidget> {
 
     private T value;
+    private T initialValue;
     private String errorText;
+    private boolean interacted;
+    private FormFieldValidator<T> validator;
+    private FormFieldSetter<T> onSaved;
+    private Object autovalidateMode;
+    private FormState form;
+
+    /** The configuration a field widget hands its state on every build. */
+    protected final void configure(FormFieldValidator<T> validator, FormFieldSetter<T> onSaved,
+            Object autovalidateMode) {
+        this.validator = validator;
+        this.onSaved = onSaved;
+        this.autovalidateMode = autovalidateMode;
+    }
+
+    /** Seeds the value and what {@link #reset} returns to; called once, from initState. */
+    protected final void seed(T initial) {
+        this.initialValue = initial;
+        this.value = initial;
+    }
 
     public T value() {
         return value;
@@ -44,27 +70,111 @@ public class FormFieldState<T> {
         return errorText != null;
     }
 
+    /** Whether the current value passes the validator, without showing an error. */
     public boolean isValid() {
-        return errorText == null;
+        return validator == null || validator.call(value()) == null;
     }
 
     public String errorText() {
         return errorText;
     }
 
-    public void didChange(T value) {
-        this.value = value;
+    public void didChange(final T v) {
+        setState(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                value = v;
+                interacted = true;
+            }
+        });
+        if (form != null) {
+            form.fieldDidChange();
+        }
     }
 
     public boolean validate() {
-        return errorText == null;
+        setState(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                runValidator();
+            }
+        });
+        return !hasError();
+    }
+
+    private void runValidator() {
+        errorText = validator == null ? null : validator.call(value());
     }
 
     public void save() {
+        if (onSaved != null) {
+            onSaved.call(value());
+        }
     }
 
     public void reset() {
-        this.value = null;
-        this.errorText = null;
+        setState(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                value = initialValue;
+                interacted = false;
+                errorText = null;
+            }
+        });
+        if (form != null) {
+            form.fieldDidChange();
+        }
+    }
+
+    /**
+     * Registers with the nearest {@link Form} (Flutter does it in build too, so a
+     * field moved under another form follows it) and applies autovalidation: the
+     * field's own mode, else the form's.
+     */
+    protected final void buildField(BuildContext context) {
+        FormState f = Form.maybeOf(context);
+        if (f != form) {
+            if (form != null) {
+                form.unregister(this);
+            }
+            form = f;
+            if (f != null) {
+                f.register(this);
+            }
+        }
+        Object mode = autovalidateMode != null ? autovalidateMode : form == null ? null : form.autovalidateMode();
+        if (mode == AutovalidateMode.always || (mode == AutovalidateMode.onUserInteraction && interacted)) {
+            runValidator();
+        }
+    }
+
+    @Override
+    public void dispose() {
+        if (form != null) {
+            form.unregister(this);
+            form = null;
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Widget build(BuildContext context) {
+        StatefulWidget w = widget();
+        if (!(w instanceof FormField)) {
+            return null;
+        }
+        FormField<T> field = (FormField<T>) w;
+        configure(field.validatorValue(), field.onSavedValue(), field.autovalidateModeValue());
+        buildField(context);
+        return field.builderValue() == null ? null : field.builderValue().call(this);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void initState() {
+        StatefulWidget w = widget();
+        if (w instanceof FormField) {
+            seed(((FormField<T>) w).initialValueValue());
+        }
     }
 }
