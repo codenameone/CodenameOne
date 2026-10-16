@@ -135,8 +135,11 @@ public class Drivers {
         // reports would both find none and both insert one under the same
         // name. They take turns on the profile instead, the order blocking an
         // account takes them in, and the second then finds the first's row.
-        if (drivers.hold(driver) == 0) {
-            profiles.hold(driver);
+        // No profile either means the account was closed meanwhile, after its
+        // clean-up deleted the state row; inserting one now would leave it
+        // behind for good.
+        if (drivers.hold(driver) == 0 && profiles.hold(driver) == 0) {
+            throw new ResponseStatusException(404, "No such account");
         }
         // The role lets a driver into this part of the API; the approval is
         // what lets them take rides. They are granted together, but they are

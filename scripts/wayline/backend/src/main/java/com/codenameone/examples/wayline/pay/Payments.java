@@ -252,6 +252,14 @@ public class Payments {
         }
         // Counted again with the account held: several requests sent together
         // all pass the count made before the processor was asked.
+        //
+        // The session a refusal here leaves at the processor is not cleaned
+        // up, on purpose. Its address is never answered, so nobody can open
+        // it; a card entered there anyway could not be saved, because saving
+        // claims this row and there is none; and the processor expires an
+        // unfinished session by itself. Only the requests already past the
+        // first count when the limit was reached can leave one, so a loop
+        // of them still makes no more than a handful.
         refuseTooManySetups(username);
         PaymentSetup row = new PaymentSetup();
         row.setId(id);

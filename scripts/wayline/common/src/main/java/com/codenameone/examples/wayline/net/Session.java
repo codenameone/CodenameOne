@@ -215,7 +215,16 @@ public final class Session {
     /// Signs in with an e-mail address and password.
     public static void signIn(String email, String password, final Runnable done,
             final Net.Failed failed) {
+        // The server can be changed while the sign-in is under way, and
+        // start() then puts a new authorizer in place. Tokens the old server
+        // issued are dropped rather than installed in the new one, which would
+        // send them -- the refresh token too -- to a server that never issued
+        // them. Each start() makes a new authorizer, so it names the session.
+        final OidcRequestAuthorizer asked = authorizer;
         authenticate(email, password, tokens -> {
+            if (asked != authorizer) {
+                return;
+            }
             authorizer.setTokens(tokens);
             store.save(storeKey(base), tokens);
             refreshUser(done, failed);

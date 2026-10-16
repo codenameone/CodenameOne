@@ -230,8 +230,13 @@ public class Earnings {
         // find none and both insert one under the same name, and one would
         // fail; behind the profile's hold the second finds the first's row
         // and updates it. The payout account itself cannot be held: until
-        // this inserts it there is no row.
-        profiles.hold(driver);
+        // this inserts it there is no row. With no profile to hold the account
+        // was closed meanwhile and its clean-up has run: a row inserted now
+        // would keep the closed account's bank details with nobody able to
+        // remove them.
+        if (profiles.hold(driver) == 0) {
+            throw new ResponseStatusException(404, "No such account");
+        }
         PayoutAccount row = accounts.findById(driver);
         boolean added = row == null;
         if (added) {

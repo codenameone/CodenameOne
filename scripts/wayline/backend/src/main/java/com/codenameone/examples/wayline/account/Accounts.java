@@ -485,9 +485,14 @@ public class Accounts {
     }
 
     /// Makes the rest of the caller's transaction take its turn with any other
-    /// that holds the same account. See [ProfileRepository#hold].
+    /// that holds the same account. See [ProfileRepository#hold]. Answers 404
+    /// when the account is gone: it was closed while the request was under
+    /// way, its clean-up has run, and a row the caller went on to insert would
+    /// never be deleted.
     public void hold(String username) {
-        profiles.hold(username);
+        if (profiles.hold(username) == 0) {
+            throw new ResponseStatusException(404, "No such account");
+        }
     }
 
     @Transactional(rollbackFor = IOException.class)
