@@ -132,3 +132,6 @@ fasthttp
 Adwaita
 Podman
 retrolambda
+
+# Ride-hailing sample application.
+\bWayline\b
