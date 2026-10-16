@@ -796,6 +796,15 @@ public class DartCoreSemanticsTest {
         assertEquals(Long.valueOf(5), sk.next());
     }
 
+    /// The minimum duration has no positive counterpart, so negating first overflowed and
+    /// printed negative components; Dart prints -2562047788:00:54.775808.
+    @Test
+    public void theMinimumDurationPrintsLikeDarts() {
+        assertEquals("-2562047788:00:54.775808", Duration.ofMicroseconds(Long.MIN_VALUE).toString());
+        assertEquals("-1:02:03.000004", Duration.ofMicroseconds(-(3723000004L)).toString());
+        assertEquals("1:02:03.000004", Duration.ofMicroseconds(3723000004L).toString());
+    }
+
     /// An explicit null generator means the same as none: the indices.
     @Test
     public void iterableGenerateWithANullGeneratorYieldsTheIndices() {

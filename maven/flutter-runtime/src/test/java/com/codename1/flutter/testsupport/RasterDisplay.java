@@ -130,6 +130,9 @@ public final class RasterDisplay extends CodenameOneImplementation {
         try {
             RasterDisplay impl = new RasterDisplay();
             impl.initImpl(null);
+            // Display hands its mutex over at init; installed by reflection here, so a
+            // Form.show (painting, repaint bookkeeping) has a lock to take.
+            impl.setDisplayLock(new Object());
             Field implField = Display.class.getDeclaredField("impl");
             implField.setAccessible(true);
             previousImpl = (CodenameOneImplementation) implField.get(null);

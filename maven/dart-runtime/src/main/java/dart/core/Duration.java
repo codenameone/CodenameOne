@@ -174,16 +174,15 @@ public final class Duration implements Comparable<Duration> {
 
     @Override
     public String toString() {
-        long us = micros;
-        String sign = "";
-        if (us < 0) {
-            sign = "-";
-            us = -us;
-        }
-        long hours = us / microsecondsPerHour;
-        long minutes = (us % microsecondsPerHour) / microsecondsPerMinute;
-        long seconds = (us % microsecondsPerMinute) / microsecondsPerSecond;
-        long microsRem = us % microsecondsPerSecond;
+        // Split before taking magnitudes: -micros overflows for the minimum duration
+        // (Long.MIN_VALUE has no positive counterpart) and left every component negative.
+        // The quotient and the remainder of a negative value each fit once negated.
+        String sign = micros < 0 ? "-" : "";
+        long hours = Math.abs(micros / microsecondsPerHour);
+        long rem = Math.abs(micros % microsecondsPerHour);
+        long minutes = rem / microsecondsPerMinute;
+        long seconds = (rem % microsecondsPerMinute) / microsecondsPerSecond;
+        long microsRem = rem % microsecondsPerSecond;
         return sign + hours + ":" + pad2(minutes) + ":" + pad2(seconds) + "." + pad6(microsRem);
     }
 

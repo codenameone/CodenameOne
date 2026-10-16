@@ -126,6 +126,21 @@ class RestorationReviewTest {
         assertNull(page.future.route());
     }
 
+    /// A presentation that pushed nothing (an unresolved route name) has no route to
+    /// complete it, so it must not leave the future "present" for good.
+    @Test
+    void aFailedPresentationStaysInactive() {
+        Navigator.installRouteTable(new java.util.HashMap<Object, Object>(), null, null);
+        Page page = new Page();
+        page.future.onPresent((NavigatorState nav, Object args) -> nav.restorablePushNamed("/nowhere", args));
+        FlutterUI.mount(page, new RenderHost(), new BuildOwner());
+
+        page.future.present(null);
+
+        assertTrue(!page.future.isPresent(), "nothing was shown, so nothing is present");
+        assertNull(page.future.route());
+    }
+
     @Test
     void restorableDateTimeIsARestorableValue() {
         DateTime d = new DateTime(2024, 3, 1, 0, 0, 0, 0, 0);

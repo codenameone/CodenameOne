@@ -70,18 +70,23 @@ public class RestorableRouteFuture<T> extends RestorableProperty<Object> {
     public void present(Object arguments) {
         NavigatorState nav = Navigator.of(ownerContext(), Boolean.FALSE);
         String id = onPresent == null ? null : onPresent.call(nav, arguments);
+        dart.async.Future<Object> result = Navigator.claimRestorableResult(id);
+        if (result == null) {
+            // Nothing was pushed (an unresolved name, or onPresent pushed nothing
+            // restorable): there is no route whose pop could ever complete this, so it
+            // stays NOT present -- marking it present left isPresent() true for good and
+            // a caller guarding on it could never present again.
+            return;
+        }
         this.route = id;
         this.present = true;
         notifyListeners();
-        dart.async.Future<Object> result = Navigator.claimRestorableResult(id);
-        if (result != null) {
-            result.then(new Funcs.VoidFunc1<Object>() {
-                @Override
-                public void call(Object value) {
-                    complete(value);
-                }
-            });
-        }
+        result.then(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object value) {
+                complete(value);
+            }
+        });
     }
 
     public boolean isPresent() {

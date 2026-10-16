@@ -166,7 +166,18 @@ public class Navigator extends StatelessWidget {
             // back from any of them returned to it rather than to the page beneath.
             e.previousForm = returningTo != null
                     ? returningTo : Display.getInstance().getCurrent();
-            RenderHost host = FlutterUI.mountInNewForm(new RouteWidget(route), pushingElement(context));
+            // On the stack BEFORE its page builds: the first build is synchronous, and an
+            // in-canvas AppBar's automaticallyImplyLeading asks canPop() during it -- with
+            // the route not yet registered the first pushed page answered false and drew
+            // no back button. Rolled back if the page fails to mount.
+            stack.add(e);
+            RenderHost host;
+            try {
+                host = FlutterUI.mountInNewForm(new RouteWidget(route), pushingElement(context));
+            } catch (RuntimeException | Error mountFailed) {
+                stack.remove(e);
+                throw mountFailed;
+            }
             e.form = host.form();
             e.rootElement = host.rootElement();
             Toolbar tb = e.form.getToolbar();
@@ -185,7 +196,6 @@ public class Navigator extends StatelessWidget {
             // carries two bars and the Flutter canvas shrinks by the toolbar inset.
             // FlutterUI.mountInNewForm does that for every Form it builds, this one
             // included, so there is nothing to do here.
-            stack.add(e);
             // Without this the Form replaces the screen outright and the page is fully
             // painted on the first frame after the tap. Flutter always animates a route in.
             RouteTransitions.apply(e.form, route);
@@ -227,7 +237,11 @@ public class Navigator extends StatelessWidget {
             return;
         }
         RouteEntry e = stack.remove(stack.size() - 1);
-        e.popped.complete(result);
+        // The future completes LAST, once the way back is committed: a callback on it that
+        // pushes at once (await Navigator.push(...) then push again) must see returningTo
+        // and the return transition already under way. Completing first made that push
+        // record the page being popped as its previous form, and the outer pop then showed
+        // the older form over the new page.
         if (e.previousForm != null) {
             // The way out mirrors the way in. showBack() plays the transition of the form
             // being RETURNED TO, in reverse -- and that form carries whatever animation
@@ -251,11 +265,21 @@ public class Navigator extends StatelessWidget {
         } else if (e.rootElement != null) {
             FlutterUI.unmountTree(e.rootElement);
         }
+        e.popped.complete(result);
     }
 
     /// The form a pop is on its way back to, for as long as that is still in
     /// flight. Null at rest.
     private static Form returningTo;
+
+    /// Test hooks: the form of stack entry {@code i}, and the form the top entry returns to.
+    static Form formAt(int i) {
+        return stack.get(i).form;
+    }
+
+    static Form previousFormOfTop() {
+        return stack.isEmpty() ? null : stack.get(stack.size() - 1).previousForm;
+    }
 
     /// Unmounts {@code tree} the first time {@code form} finishes being shown.
     private static void unmountWhenShown(Form form, final Element tree) {
