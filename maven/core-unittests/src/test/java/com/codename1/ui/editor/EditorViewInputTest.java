@@ -147,4 +147,38 @@ class EditorViewInputTest extends UITestBase {
         f.commitText("cd");
         assertEquals("abcd", f.getText());
     }
+    @FormTest
+    void semanticDocumentCommandsPreserveSelectionDirection() {
+        EditorView v = show("one\ntwo\nthree");
+        v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_CTRL | TextInputClient.MOD_SHIFT);
+        TextInputState state = v.getEditingState();
+        assertEquals(13, state.getSelectionStart());
+        assertEquals(0, state.getSelectionEnd());
+        v.commitText("replacement");
+        assertEquals("replacement", v.getText());
+        v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_CTRL);
+        assertEquals(0, v.getEditingState().getSelectionEnd());
+        v.onKeyCommand(TextInputClient.KEY_END, TextInputClient.MOD_CTRL);
+        assertEquals(11, v.getEditingState().getSelectionEnd());
+    }
+
+    @FormTest
+    void wordDeletionRespectsSelectionUndoAndReadOnly() {
+        EditorView v = show("one two three");
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        assertEquals("one two ", v.getText());
+        v.onKeyCommand(TextInputClient.KEY_UNDO, 0);
+        assertEquals("one two three", v.getText());
+        v.setSelectionRange(0, 0);
+        v.onKeyCommand(TextInputClient.KEY_DELETE, TextInputClient.MOD_ALT);
+        assertEquals(" two three", v.getText());
+        v.setSelectionRange(4, 1);
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        assertEquals("  three", v.getText());
+        v.setEditableState(false);
+        v.onKeyCommand(TextInputClient.KEY_DELETE, TextInputClient.MOD_ALT);
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        assertEquals("  three", v.getText());
+    }
+
 }

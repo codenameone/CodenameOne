@@ -2116,6 +2116,11 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 /// in each case. Forgotten whenever the selection stops matching what was
 /// recorded, which is how an ordinary click or an insertion starts a fresh one.
 - (NSUInteger)cn1SelectionAnchor:(NSRange)sel {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (session.pureEditor && (session.selectionAnchor == sel.location
+            || session.selectionAnchor == NSMaxRange(sel))) {
+        return session.selectionAnchor;
+    }
     if (selectionAnchorValid
             && (selectionAnchor == sel.location || selectionAnchor == NSMaxRange(sel))) {
         return selectionAnchor;
@@ -2126,6 +2131,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)cn1RememberAnchor:(NSUInteger)anchor {
+    [CN1MacTextInputSession sharedSession].selectionAnchor = anchor;
     selectionAnchor = anchor;
     selectionAnchorValid = YES;
 }
@@ -2185,6 +2191,49 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     }
     NSRange sel = session.selectedRange;
     NSUInteger len = session.text.length;
+
+    if (session.pureEditor) {
+        // TextInputClient owns visual lines and the direction of its selection.
+        // AppKit still interprets the event first, so input methods get first refusal.
+        int command = 0;
+        int modifiers = 0;
+        NSString *name = NSStringFromSelector(selector);
+        NSString *suffix = @"AndModifySelection:";
+        if ([name hasSuffix:suffix]) {
+            modifiers |= 1; // TextInputClient.MOD_SHIFT
+            name = [[name substringToIndex:name.length - suffix.length] stringByAppendingString:@":"];
+        }
+        if ([name isEqualToString:@"moveWordLeft:"] || [name isEqualToString:@"moveWordBackward:"]) {
+            command = 1; modifiers |= 4; // KEY_LEFT, MOD_ALT
+        } else if ([name isEqualToString:@"moveWordRight:"] || [name isEqualToString:@"moveWordForward:"]) {
+            command = 2; modifiers |= 4; // KEY_RIGHT, MOD_ALT
+        } else if ([name isEqualToString:@"moveUp:"]) {
+            command = 3;
+        } else if ([name isEqualToString:@"moveDown:"]) {
+            command = 4;
+        } else if ([name isEqualToString:@"moveToBeginningOfLine:"] || [name isEqualToString:@"moveToLeftEndOfLine:"]) {
+            command = 5;
+        } else if ([name isEqualToString:@"moveToEndOfLine:"] || [name isEqualToString:@"moveToRightEndOfLine:"]) {
+            command = 6;
+        } else if ([name isEqualToString:@"moveToBeginningOfDocument:"]) {
+            command = 5; modifiers |= 2; // KEY_HOME, MOD_CTRL
+        } else if ([name isEqualToString:@"moveToEndOfDocument:"]) {
+            command = 6; modifiers |= 2; // KEY_END, MOD_CTRL
+        } else if ([name isEqualToString:@"pageUp:"] || [name isEqualToString:@"scrollPageUp:"]) {
+            command = 7;
+        } else if ([name isEqualToString:@"pageDown:"] || [name isEqualToString:@"scrollPageDown:"]) {
+            command = 8;
+        } else if ([name isEqualToString:@"deleteWordBackward:"]) {
+            command = 9; modifiers |= 4;
+        } else if ([name isEqualToString:@"deleteWordForward:"]) {
+            command = 10; modifiers |= 4;
+        }
+        if (command != 0) {
+            [self cn1SendEditorKeyCommand:command modifiers:modifiers];
+            [self cn1ForgetAnchor];
+            return;
+        }
+    }
 
     if (selector == @selector(insertNewline:)) {
         if (session.multiline) {

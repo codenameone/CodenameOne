@@ -1987,10 +1987,18 @@ public class EditorView extends Component implements TextInputClient, com.codena
                 moveCaret(lineJump ? doc.length() : caretVertical(1), extend);
                 break;
             case KEY_HOME:
-                lineHome(extend);
+                if (lineJump) {
+                    moveCaret(0, extend);
+                } else {
+                    lineHome(extend);
+                }
                 break;
             case KEY_END:
-                lineEndKey(extend);
+                if (lineJump) {
+                    moveCaret(doc.length(), extend);
+                } else {
+                    lineEndKey(extend);
+                }
                 break;
             case KEY_PAGE_UP:
                 moveCaret(caretVertical(-Math.max(1, contentHeight() / getLineHeight())), extend);
@@ -1999,10 +2007,18 @@ public class EditorView extends Component implements TextInputClient, com.codena
                 moveCaret(caretVertical(Math.max(1, contentHeight() / getLineHeight())), extend);
                 break;
             case KEY_BACKSPACE:
-                deleteBackward();
+                if (word && !hasSelection() && editable) {
+                    replaceRange(wordLeft(), caret, "", true);
+                } else {
+                    deleteBackward();
+                }
                 break;
             case KEY_DELETE:
-                deleteForward();
+                if (word && !hasSelection() && editable) {
+                    replaceRange(caret, wordRight(), "", true);
+                } else {
+                    deleteForward();
+                }
                 break;
             case KEY_COPY:
                 copySelection();
@@ -2067,7 +2083,7 @@ public class EditorView extends Component implements TextInputClient, com.codena
 
     @Override
     public TextInputState getEditingState() {
-        return new TextInputState(doc.getText(), getSelectionStart(), getSelectionEnd(), composingStart, composingEnd);
+        return new TextInputState(doc.getText(), anchor < 0 ? caret : anchor, caret, composingStart, composingEnd);
     }
 
     /// Measures all insertion positions with one bulk request per directional run. Subclasses
