@@ -500,6 +500,7 @@ public final class Pattern {
         static final int DIGIT = 8;
         static final int WHITESPACE = 16;
         static final int LETTER_OR_DIGIT = 32;
+        static final int TITLE = 64;
 
         private char[] ranges = new char[8];
         private int count;
@@ -568,7 +569,8 @@ public final class Pattern {
                     || (kinds & LOWER) != 0 && Character.isLowerCase(c)
                     || (kinds & DIGIT) != 0 && Character.isDigit(c)
                     || (kinds & WHITESPACE) != 0 && Character.isWhitespace(c)
-                    || (kinds & LETTER_OR_DIGIT) != 0 && isLetterOrDigit(c);
+                    || (kinds & LETTER_OR_DIGIT) != 0 && isLetterOrDigit(c)
+                    || (kinds & TITLE) != 0 && Character.isTitleCase(c);
         }
 
         boolean has(char c) {
@@ -1686,11 +1688,15 @@ public final class Pattern {
                 throw error("Illegal character family");
             }
             CharSet s = new CharSet(0);
+            // Under CASE_INSENSITIVE the case classes match either case, as
+            // they have on the JDK since 16 (JDK-8214245): the ASCII ones become
+            // the ASCII letters, the Unicode ones any cased letter.
+            boolean anyCase = has(CASE_INSENSITIVE);
             if ("Lower".equals(name)) {
-                return s.add('a', 'z');
+                return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('a', 'z');
             }
             if ("Upper".equals(name)) {
-                return s.add('A', 'Z');
+                return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('A', 'Z');
             }
             if ("ASCII".equals(name)) {
                 return s.add(0, 0x7f);
@@ -1727,11 +1733,11 @@ public final class Pattern {
             }
             if ("javaLowerCase".equals(name) || "Ll".equals(name) || "IsLl".equals(name)
                     || "IsLowercase".equals(name)) {
-                return s.kind(CharSet.LOWER);
+                return anyCase ? s.kind(CharSet.LOWER | CharSet.UPPER | CharSet.TITLE) : s.kind(CharSet.LOWER);
             }
             if ("javaUpperCase".equals(name) || "Lu".equals(name) || "IsLu".equals(name)
                     || "IsUppercase".equals(name)) {
-                return s.kind(CharSet.UPPER);
+                return anyCase ? s.kind(CharSet.LOWER | CharSet.UPPER | CharSet.TITLE) : s.kind(CharSet.UPPER);
             }
             if ("javaWhitespace".equals(name) || "IsWhite_Space".equals(name) || "IsWhiteSpace".equals(name)) {
                 return s.kind(CharSet.WHITESPACE);

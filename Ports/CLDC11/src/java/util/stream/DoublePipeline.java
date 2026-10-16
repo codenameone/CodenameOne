@@ -245,8 +245,12 @@ final class DoublePipeline implements DoubleStream {
     public void forEach(DoubleConsumer action) {
         Objects.requireNonNull(action);
         Iterator<Double> it = boxed.iterator();
-        while (it.hasNext()) {
-            action.accept(it.next().doubleValue());
+        try {
+            while (it.hasNext()) {
+                action.accept(it.next().doubleValue());
+            }
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
     }
 
@@ -259,14 +263,18 @@ final class DoublePipeline implements DoubleStream {
     public double[] toArray() {
         List<Double> all = new ArrayList<Double>();
         Iterator<Double> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.add(it.next());
+        try {
+            while (it.hasNext()) {
+                all.add(it.next());
+            }
+            double[] out = new double[all.size()];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = all.get(i).doubleValue();
+            }
+            return out;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        double[] out = new double[all.size()];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = all.get(i).doubleValue();
-        }
-        return out;
     }
 
     @Override
@@ -274,24 +282,32 @@ final class DoublePipeline implements DoubleStream {
         Objects.requireNonNull(op);
         double result = identity;
         Iterator<Double> it = boxed.iterator();
-        while (it.hasNext()) {
-            result = op.applyAsDouble(result, it.next().doubleValue());
+        try {
+            while (it.hasNext()) {
+                result = op.applyAsDouble(result, it.next().doubleValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
     public OptionalDouble reduce(DoubleBinaryOperator op) {
         Objects.requireNonNull(op);
         Iterator<Double> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalDouble.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalDouble.empty();
+            }
+            double result = it.next().doubleValue();
+            while (it.hasNext()) {
+                result = op.applyAsDouble(result, it.next().doubleValue());
+            }
+            return OptionalDouble.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        double result = it.next().doubleValue();
-        while (it.hasNext()) {
-            result = op.applyAsDouble(result, it.next().doubleValue());
-        }
-        return OptionalDouble.of(result);
     }
 
     @Override
@@ -301,10 +317,14 @@ final class DoublePipeline implements DoubleStream {
         Objects.requireNonNull(combiner);
         R result = supplier.get();
         Iterator<Double> it = boxed.iterator();
-        while (it.hasNext()) {
-            accumulator.accept(result, it.next().doubleValue());
+        try {
+            while (it.hasNext()) {
+                accumulator.accept(result, it.next().doubleValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
@@ -316,15 +336,19 @@ final class DoublePipeline implements DoubleStream {
     /// `Math.max` choose, which is what the JDK's reduction uses.
     private OptionalDouble extreme(boolean max) {
         Iterator<Double> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalDouble.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalDouble.empty();
+            }
+            double result = it.next().doubleValue();
+            while (it.hasNext()) {
+                double v = it.next().doubleValue();
+                result = max ? Math.max(result, v) : Math.min(result, v);
+            }
+            return OptionalDouble.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        double result = it.next().doubleValue();
-        while (it.hasNext()) {
-            double v = it.next().doubleValue();
-            result = max ? Math.max(result, v) : Math.min(result, v);
-        }
-        return OptionalDouble.of(result);
     }
 
     @Override
@@ -352,10 +376,14 @@ final class DoublePipeline implements DoubleStream {
     public DoubleSummaryStatistics summaryStatistics() {
         DoubleSummaryStatistics all = new DoubleSummaryStatistics();
         Iterator<Double> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.accept(it.next().doubleValue());
+        try {
+            while (it.hasNext()) {
+                all.accept(it.next().doubleValue());
+            }
+            return all;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return all;
     }
 
     @Override

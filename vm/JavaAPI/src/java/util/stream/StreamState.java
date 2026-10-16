@@ -166,6 +166,12 @@ final class StreamState {
     /// Throws `t` unchanged, checked or not: the erased cast is to
     /// `Throwable`, so nothing is checked at run time.
     @SuppressWarnings("unchecked")
+    /// Throws `failure` as it is, checked or not.
+    static RuntimeException unchecked(Throwable failure) {
+        StreamState.<RuntimeException>rethrow(failure);
+        return null;
+    }
+
     private static <E extends Throwable> void rethrow(Throwable t) throws E {
         throw (E) t;
     }

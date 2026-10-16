@@ -505,6 +505,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     /// Fails this future with a [TimeoutException] if it is not complete
     /// when the time has passed.
     public CompletableFuture<T> orTimeout(long timeout, TimeUnit unit) {
+        // The unit is required even when there is nothing left to time.
+        if (unit == null) {
+            throw new NullPointerException();
+        }
         if (!isDone()) {
             later(unit.toMillis(timeout), new Runnable() {
                 @Override
@@ -517,6 +521,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     public CompletableFuture<T> completeOnTimeout(final T value, long timeout, TimeUnit unit) {
+        // The unit is required even when there is nothing left to time.
+        if (unit == null) {
+            throw new NullPointerException();
+        }
         if (!isDone()) {
             later(unit.toMillis(timeout), new Runnable() {
                 @Override

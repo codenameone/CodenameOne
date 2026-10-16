@@ -280,8 +280,12 @@ final class LongPipeline implements LongStream {
     public void forEach(LongConsumer action) {
         Objects.requireNonNull(action);
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            action.accept(it.next().longValue());
+        try {
+            while (it.hasNext()) {
+                action.accept(it.next().longValue());
+            }
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
     }
 
@@ -294,14 +298,18 @@ final class LongPipeline implements LongStream {
     public long[] toArray() {
         List<Long> all = new ArrayList<Long>();
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.add(it.next());
+        try {
+            while (it.hasNext()) {
+                all.add(it.next());
+            }
+            long[] out = new long[all.size()];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = all.get(i).longValue();
+            }
+            return out;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        long[] out = new long[all.size()];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = all.get(i).longValue();
-        }
-        return out;
     }
 
     @Override
@@ -309,24 +317,32 @@ final class LongPipeline implements LongStream {
         Objects.requireNonNull(op);
         long result = identity;
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            result = op.applyAsLong(result, it.next().longValue());
+        try {
+            while (it.hasNext()) {
+                result = op.applyAsLong(result, it.next().longValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
     public OptionalLong reduce(LongBinaryOperator op) {
         Objects.requireNonNull(op);
         Iterator<Long> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalLong.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalLong.empty();
+            }
+            long result = it.next().longValue();
+            while (it.hasNext()) {
+                result = op.applyAsLong(result, it.next().longValue());
+            }
+            return OptionalLong.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        long result = it.next().longValue();
-        while (it.hasNext()) {
-            result = op.applyAsLong(result, it.next().longValue());
-        }
-        return OptionalLong.of(result);
     }
 
     @Override
@@ -336,35 +352,47 @@ final class LongPipeline implements LongStream {
         Objects.requireNonNull(combiner);
         R result = supplier.get();
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            accumulator.accept(result, it.next().longValue());
+        try {
+            while (it.hasNext()) {
+                accumulator.accept(result, it.next().longValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
     public long sum() {
         long total = 0;
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            total += it.next().longValue();
+        try {
+            while (it.hasNext()) {
+                total += it.next().longValue();
+            }
+            return total;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return total;
     }
 
     /// The smallest (`max` false) or largest value, as `Math.min` and
     /// `Math.max` choose, which is what the JDK's reduction uses.
     private OptionalLong extreme(boolean max) {
         Iterator<Long> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalLong.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalLong.empty();
+            }
+            long result = it.next().longValue();
+            while (it.hasNext()) {
+                long v = it.next().longValue();
+                result = max ? Math.max(result, v) : Math.min(result, v);
+            }
+            return OptionalLong.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        long result = it.next().longValue();
-        while (it.hasNext()) {
-            long v = it.next().longValue();
-            result = max ? Math.max(result, v) : Math.min(result, v);
-        }
-        return OptionalLong.of(result);
     }
 
     @Override
@@ -392,10 +420,14 @@ final class LongPipeline implements LongStream {
     public LongSummaryStatistics summaryStatistics() {
         LongSummaryStatistics all = new LongSummaryStatistics();
         Iterator<Long> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.accept(it.next().longValue());
+        try {
+            while (it.hasNext()) {
+                all.accept(it.next().longValue());
+            }
+            return all;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return all;
     }
 
     @Override

@@ -283,6 +283,12 @@ public final class Files {
         if (exists && !none && !append && !has(options, StandardOpenOption.TRUNCATE_EXISTING)) {
             tail = readAllBytes(path);
         }
+        // CREATE_NEW claims the path with the exclusive create before opening
+        // it: the check above alone lets two callers both pass and the later
+        // open erase what the first one wrote.
+        if (has(options, StandardOpenOption.CREATE_NEW) && !f.createNewFile()) {
+            throw new FileAlreadyExistsException(path.toString());
+        }
         OutputStream out = new FileOutputStream(f, append);
         return tail == null || tail.length == 0 ? out : new Overwrite(out, tail);
     }
@@ -455,7 +461,11 @@ public final class Files {
         if (parent != null && !parent.isDirectory()) {
             throw new NoSuchFileException(path.toString());
         }
-        new FileOutputStream(f, false).close();
+        // Claimed with the exclusive create, so of two callers racing for
+        // the path exactly one succeeds and nothing is truncated.
+        if (!f.createNewFile()) {
+            throw new FileAlreadyExistsException(path.toString());
+        }
         return path;
     }
 

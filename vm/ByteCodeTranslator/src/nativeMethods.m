@@ -4914,11 +4914,36 @@ typedef struct {
     int result;
 } cn1_timezone_offset_ctx;
 
+/* Past the last transition a zone repeats its recurring rule forever, and
+ * the Gregorian calendar repeats every 400 years (146097 days, a whole
+ * number of weeks), so a far-future instant has the offset of its
+ * counterpart in 2400-2799. The JDK answers that, and so does macOS's libc,
+ * but glibc answers standard time for distant years: the year 81190086
+ * resolved to EST in July. Folding first makes every libc answer the same. */
+#define CN1_TZ_FOLD_FROM_YEAR 2400
+#define CN1_TZ_FOLD_CYCLE_SECONDS (146097LL * 86400LL)
+#define CN1_TZ_FOLD_FROM_SECONDS 13569465600LL /* 2400-01-01T00:00Z */
+
+static int cn1_fold_timezone_year(int year) {
+    if (year >= CN1_TZ_FOLD_FROM_YEAR + 400) {
+        return CN1_TZ_FOLD_FROM_YEAR + (year - CN1_TZ_FOLD_FROM_YEAR) % 400;
+    }
+    return year;
+}
+
+static long long cn1_fold_timezone_seconds(long long seconds) {
+    if (seconds >= CN1_TZ_FOLD_FROM_SECONDS + CN1_TZ_FOLD_CYCLE_SECONDS) {
+        return CN1_TZ_FOLD_FROM_SECONDS
+                + (seconds - CN1_TZ_FOLD_FROM_SECONDS) % CN1_TZ_FOLD_CYCLE_SECONDS;
+    }
+    return seconds;
+}
+
 static void cn1_compute_timezone_offset(void* data) {
     cn1_timezone_offset_ctx* ctx = (cn1_timezone_offset_ctx*)data;
     struct tm utc;
     memset(&utc, 0, sizeof(utc));
-    utc.tm_year = ctx->year - 1900;
+    utc.tm_year = cn1_fold_timezone_year(ctx->year) - 1900;
     utc.tm_mon = ctx->month - 1;
     utc.tm_mday = ctx->day;
     utc.tm_hour = ctx->millis / 3600000;
@@ -4942,7 +4967,7 @@ typedef struct {
 
 static void cn1_compute_timezone_dst(void* data) {
     cn1_timezone_dst_ctx* ctx = (cn1_timezone_dst_ctx*)data;
-    time_t epoch = (time_t)(ctx->millis / 1000LL);
+    time_t epoch = (time_t)cn1_fold_timezone_seconds(ctx->millis / 1000LL);
     struct tm resolved;
     localtime_r(&epoch, &resolved);
     ctx->result = resolved.tm_isdst > 0 ? JAVA_TRUE : JAVA_FALSE;

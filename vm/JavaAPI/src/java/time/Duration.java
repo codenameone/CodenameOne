@@ -217,18 +217,18 @@ public final class Duration implements TemporalAmount, Comparable<Duration> {
                 throw invalidDuration(value);
             }
             if (unit == 'D' && !time && !foundDays && fractionStart < 0) {
-                seconds += amount * 86400L;
+                seconds = parsedSum(value, seconds, amount, 86400L);
                 foundDays = true;
             } else if (unit == 'H' && time && lastTimeUnit < 1 && fractionStart < 0) {
-                seconds += amount * 3600L;
+                seconds = parsedSum(value, seconds, amount, 3600L);
                 lastTimeUnit = 1;
                 foundTime = true;
             } else if (unit == 'M' && time && lastTimeUnit < 2 && fractionStart < 0) {
-                seconds += amount * 60L;
+                seconds = parsedSum(value, seconds, amount, 60L);
                 lastTimeUnit = 2;
                 foundTime = true;
             } else if (unit == 'S' && time && lastTimeUnit < 3) {
-                seconds += amount;
+                seconds = parsedSum(value, seconds, amount, 1L);
                 lastTimeUnit = 3;
                 foundTime = true;
                 if (fractionStart >= 0) {
@@ -252,7 +252,22 @@ public final class Duration implements TemporalAmount, Comparable<Duration> {
         if (!found || (time && !foundTime)) {
             throw invalidDuration(value);
         }
-        return ofSeconds(overallSign * seconds, overallSign * (long) nanos);
+        try {
+            return ofSeconds(TimeArithmetic.multiplyExact(overallSign, seconds), overallSign * (long) nanos);
+        } catch (ArithmeticException e) {
+            throw invalidDuration(value);
+        }
+    }
+
+    /// `seconds` plus `amount` units of `unitSeconds` each. A field too large
+    /// for a duration is refused as the JDK refuses it, rather than wrapping
+    /// around to an unrelated one.
+    private static long parsedSum(String value, long seconds, long amount, long unitSeconds) {
+        try {
+            return TimeArithmetic.addExact(seconds, TimeArithmetic.multiplyExact(amount, unitSeconds));
+        } catch (ArithmeticException e) {
+            throw invalidDuration(value);
+        }
     }
 
     private static DateTimeParseException invalidDuration(String value) {

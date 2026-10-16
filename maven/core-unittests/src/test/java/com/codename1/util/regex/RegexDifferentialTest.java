@@ -244,11 +244,34 @@ class RegexDifferentialTest {
         return sb.toString();
     }
 
+    /// Whether this JDK predates JDK-8214245 (fixed in 16), under which the
+    /// case classes ignored CASE_INSENSITIVE. The shim follows the current
+    /// JDK, so on an older one the comparison for them is skipped.
+    private static final boolean JDK_CASE_CLASSES_IGNORE_CASE_FLAG = !java.util.regex.Pattern
+            .compile("\\p{Lu}", java.util.regex.Pattern.CASE_INSENSITIVE).matcher("a").matches();
+
+    private static final String[] CASE_CLASSES = {
+        "Lower}", "Upper}", "Lu}", "Ll}", "javaLowerCase}", "javaUpperCase}", "IsLowercase}", "IsUppercase}"
+    };
+
+    private static boolean namesACaseClass(String regex) {
+        for (String c : CASE_CLASSES) {
+            if (regex.contains("{" + c) || regex.contains("{Is" + c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static int compare(int flags) {
         int compared = 0;
         StringBuilder failures = new StringBuilder();
         int failed = 0;
         for (String regex : PATTERNS) {
+            if (JDK_CASE_CLASSES_IGNORE_CASE_FLAG && (flags & java.util.regex.Pattern.CASE_INSENSITIVE) != 0
+                    && (flags & java.util.regex.Pattern.LITERAL) == 0 && namesACaseClass(regex)) {
+                continue;
+            }
             boolean reported = false;
             for (String input : INPUTS) {
                 String expected = jdk(regex, flags, input);

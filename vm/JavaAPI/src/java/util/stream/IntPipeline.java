@@ -288,8 +288,12 @@ final class IntPipeline implements IntStream {
     public void forEach(IntConsumer action) {
         Objects.requireNonNull(action);
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            action.accept(it.next().intValue());
+        try {
+            while (it.hasNext()) {
+                action.accept(it.next().intValue());
+            }
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
     }
 
@@ -302,14 +306,18 @@ final class IntPipeline implements IntStream {
     public int[] toArray() {
         List<Integer> all = new ArrayList<Integer>();
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.add(it.next());
+        try {
+            while (it.hasNext()) {
+                all.add(it.next());
+            }
+            int[] out = new int[all.size()];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = all.get(i).intValue();
+            }
+            return out;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        int[] out = new int[all.size()];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = all.get(i).intValue();
-        }
-        return out;
     }
 
     @Override
@@ -317,24 +325,32 @@ final class IntPipeline implements IntStream {
         Objects.requireNonNull(op);
         int result = identity;
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            result = op.applyAsInt(result, it.next().intValue());
+        try {
+            while (it.hasNext()) {
+                result = op.applyAsInt(result, it.next().intValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
     public OptionalInt reduce(IntBinaryOperator op) {
         Objects.requireNonNull(op);
         Iterator<Integer> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalInt.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalInt.empty();
+            }
+            int result = it.next().intValue();
+            while (it.hasNext()) {
+                result = op.applyAsInt(result, it.next().intValue());
+            }
+            return OptionalInt.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        int result = it.next().intValue();
-        while (it.hasNext()) {
-            result = op.applyAsInt(result, it.next().intValue());
-        }
-        return OptionalInt.of(result);
     }
 
     @Override
@@ -344,35 +360,47 @@ final class IntPipeline implements IntStream {
         Objects.requireNonNull(combiner);
         R result = supplier.get();
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            accumulator.accept(result, it.next().intValue());
+        try {
+            while (it.hasNext()) {
+                accumulator.accept(result, it.next().intValue());
+            }
+            return result;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return result;
     }
 
     @Override
     public int sum() {
         int total = 0;
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            total += it.next().intValue();
+        try {
+            while (it.hasNext()) {
+                total += it.next().intValue();
+            }
+            return total;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return total;
     }
 
     /// The smallest (`max` false) or largest value, as `Math.min` and
     /// `Math.max` choose, which is what the JDK's reduction uses.
     private OptionalInt extreme(boolean max) {
         Iterator<Integer> it = boxed.iterator();
-        if (!it.hasNext()) {
-            return OptionalInt.empty();
+        try {
+            if (!it.hasNext()) {
+                return OptionalInt.empty();
+            }
+            int result = it.next().intValue();
+            while (it.hasNext()) {
+                int v = it.next().intValue();
+                result = max ? Math.max(result, v) : Math.min(result, v);
+            }
+            return OptionalInt.of(result);
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        int result = it.next().intValue();
-        while (it.hasNext()) {
-            int v = it.next().intValue();
-            result = max ? Math.max(result, v) : Math.min(result, v);
-        }
-        return OptionalInt.of(result);
     }
 
     @Override
@@ -400,10 +428,14 @@ final class IntPipeline implements IntStream {
     public IntSummaryStatistics summaryStatistics() {
         IntSummaryStatistics all = new IntSummaryStatistics();
         Iterator<Integer> it = boxed.iterator();
-        while (it.hasNext()) {
-            all.accept(it.next().intValue());
+        try {
+            while (it.hasNext()) {
+                all.accept(it.next().intValue());
+            }
+            return all;
+        } catch (Throwable e) {
+            throw ObjPipeline.fail(boxed, e);
         }
-        return all;
     }
 
     @Override

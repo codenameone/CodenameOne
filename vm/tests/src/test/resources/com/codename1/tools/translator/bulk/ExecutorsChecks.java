@@ -71,6 +71,15 @@ public final class ExecutorsChecks {
         pool.awaitTermination(20, TimeUnit.SECONDS);
     }
 
+    /// Waits up to 30 seconds for `runs` to reach `target`.
+    private static boolean waitForRuns(AtomicInteger runs, int target) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 30000;
+        while (runs.get() < target && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        return runs.get() >= target;
+    }
+
     private static Callable<String> answering(String value, AtomicBoolean ran) {
         return () -> {
             ran.set(true);
@@ -827,16 +836,18 @@ public final class ExecutorsChecks {
         Bulk.check("Executors.aVeryShortFixedDelayKeepsRepeating", () -> {
             // A fixed delay shorter than the time a run takes to wind up must
             // not end the repetition: the next run is armed once this one is over.
+            // The evidence is that runs keep coming after a first batch, not how
+            // many fit in a time: every run is two thread hand-offs, and a loaded
+            // two-core CI runner managed fewer than 300 in 30 seconds.
             ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
             try {
                 final AtomicInteger runs = new AtomicInteger();
                 ScheduledFuture<?> spaced = pool.scheduleWithFixedDelay(runs::incrementAndGet, 0, 1,
                         TimeUnit.MILLISECONDS);
-                long deadline = System.currentTimeMillis() + 30000;
-                while (runs.get() < 300 && System.currentTimeMillis() < deadline) {
-                    Thread.sleep(10);
-                }
-                Bulk.p("atLeast300", runs.get() >= 300);
+                boolean first = waitForRuns(runs, 20);
+                int seen = runs.get();
+                boolean more = waitForRuns(runs, seen + 20);
+                Bulk.p("keepsRepeating", first && more);
                 Bulk.p("isDone", spaced.isDone());
                 spaced.cancel(false);
             } finally {

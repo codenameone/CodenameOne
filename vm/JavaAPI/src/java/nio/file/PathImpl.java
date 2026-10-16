@@ -428,8 +428,14 @@ final class PathImpl implements Path {
         while (at + 1 < storage.length() && storage.charAt(at) == '/' && storage.charAt(at + 1) == '/') {
             at++;
         }
+        String uriPath = storage.substring(at);
+        // A directory's URI ends in '/', as the JDK's does, so that resolving
+        // a name against it lands inside the directory rather than beside it.
+        if (!uriPath.endsWith("/") && toFile().isDirectory()) {
+            uriPath = uriPath + "/";
+        }
         try {
-            return new URI("file", null, storage.substring(at), null, null);
+            return new URI("file", null, uriPath, null, null);
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException(e.getMessage());
         }

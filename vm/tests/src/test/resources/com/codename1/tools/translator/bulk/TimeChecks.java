@@ -534,7 +534,8 @@ public final class TimeChecks {
         }
         same("units", () -> ChronoUnit.values().length);
         for (final String text : new String[] {"PT0S", "PT1.5S", "P2DT3H4M", "PT-0.5S", "-PT6H3M", "PT25H", "nonsense",
-            "P1Y"}) {
+            "P1Y", "P106751991167301D", "PT2562047788015216H", "PT153722867280912931M",
+            "PT9223372036854775807S", "-PT9223372036854775808S", "P106751991167300DT24H"}) {
             same("parse " + text, () -> Duration.parse(text));
         }
         end(1500);

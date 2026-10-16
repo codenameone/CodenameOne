@@ -1647,7 +1647,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
                 }
                 out.append(line);
             } else if (n < 0) {
-                int drop = Math.min(-n, line.indexOfNonWhitespace());
+                // -n overflows for Integer.MIN_VALUE; negate as a long.
+                int drop = (int) Math.min(-(long) n, (long) line.indexOfNonWhitespace());
                 out.append(line, drop, line.length());
             } else {
                 out.append(line);

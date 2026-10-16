@@ -144,6 +144,16 @@ final class ObjPipeline<T> implements Stream<T> {
     }
 
     /// The iterator of this stage, which the caller now owns.
+    /// Rethrows `failure` from a terminal operation of a primitive stream
+    /// over `stream`, first closing what its pipeline still holds open -- the
+    /// inner stream of a `flatMap` -- as this class's own terminals do.
+    static RuntimeException fail(Stream<?> stream, Throwable failure) {
+        if (stream instanceof ObjPipeline) {
+            return ((ObjPipeline<?>) stream).state.fail(failure);
+        }
+        return StreamState.unchecked(failure);
+    }
+
     private Iterator<T> take() {
         // Closing any stage closes the pipeline, so a stage made before an
         // earlier one was closed is refused as well as the closed one.
