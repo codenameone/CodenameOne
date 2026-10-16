@@ -244,6 +244,13 @@ public class PhoneVerification {
         }
     }
 
+    /// An unkeyed digest, kept so on purpose. Somebody who can read the
+    /// `phone_code` table could try every code within the five minutes one
+    /// lasts, but somebody who can read the database already owns what a
+    /// phone check guards: it proves a number, and grants nothing on its own.
+    /// A keyed digest under a server secret is a hardening step for a
+    /// production deployment, listed in the implementor's guide among what the
+    /// sample leaves out.
     private static String hash(String username, String code) throws IOException {
         return Ids.sha256(username + ":" + code);
     }

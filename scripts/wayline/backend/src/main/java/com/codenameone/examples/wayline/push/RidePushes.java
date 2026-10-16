@@ -241,6 +241,11 @@ public class RidePushes {
         if (rides.holdWhile(rideId, rider, MEETING) == 0) {
             throw new ResponseStatusException(409, "That ride has no driver on the way");
         }
+        // One activity per ride, the last one attached. A rider following
+        // their own ride on two phones at once is not a case the sample
+        // serves: the earlier phone's activity stops moving and the system
+        // removes it. A row per device is listed in the implementor's guide
+        // among what a product adds.
         RideActivity row = activities.findById(rideId);
         if (row == null) {
             row = new RideActivity();

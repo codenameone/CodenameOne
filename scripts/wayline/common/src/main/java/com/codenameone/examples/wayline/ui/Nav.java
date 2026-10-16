@@ -209,6 +209,10 @@ public final class Nav {
             Telemetry.signedOut(reason);
             Session.signOut(WelcomeForm::show);
         };
+        // The ride's Live Activity is left to the system. Signing out does not
+        // end the ride, which goes on for the rider who signed out, and the
+        // system removes an activity on its own within hours. Ending it here
+        // would hide a ride that is still happening.
         if (forgetDevice) {
             Notifications.signingOut(out);
         } else {

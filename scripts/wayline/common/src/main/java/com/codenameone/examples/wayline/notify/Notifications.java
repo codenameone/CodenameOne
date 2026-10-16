@@ -83,6 +83,13 @@ public final class Notifications {
             then.run();
             return;
         }
+        // A failure is not kept for retrying. The row it would remove names
+        // this phone's token, and the next sign-in on the phone takes that row
+        // over for whoever signs in, as the server keeps a phone on the
+        // account that signed in on it last. What is lost to an outage is
+        // the window until then, on the phone of the account that signed out
+        // -- noted in the implementor's guide among the hardening a
+        // production deployment adds, not worth a durable queue in a sample.
         Api.account().unregisterPush(device, Net.to(gone -> then.run(),
                 (status, message) -> then.run()));
     }

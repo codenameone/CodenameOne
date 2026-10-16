@@ -712,9 +712,15 @@ These are things the sample doesn't have, and a ride-sharing product needs:
 
 * Real payments, payouts to drivers, and tax. See <<wayline-billing>>.
 * An account with a text-message provider. See <<wayline-sms>>.
-* Push notifications. The switches in the settings are stored and nothing
-  sends a notification. A rider with the app closed isn't told the driver
-  arrived.
+* A keyed digest for phone codes. `PhoneVerification` stores a plain SHA-256
+  of the account and the code. Somebody who can read the `phone_code` table
+  can try all million codes within the five minutes a code lasts. Use an HMAC
+  under a server secret that isn't kept in the database.
+* Sturdier push cleanup. A sign-out that can't reach the server leaves the
+  phone registered to that account until somebody signs in on it again. A
+  rider who signs out during a ride keeps its Live Activity until the system
+  removes it. One Live Activity is kept per ride, so a rider following a ride
+  on two devices sees the second one updated, and the first one not.
 * Position reports while the driver's app is in the background.
 * A cancellation fee, scheduled rides, shared rides and promotions.
 * A check that the rider asking for a woman driver is one. `Matcher` filters
