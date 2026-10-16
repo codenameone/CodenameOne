@@ -82,7 +82,10 @@ class TextFieldDecorationUpdateTest {
         TextField limited = new TextField();
         limited.maxLength(10);
         TextFieldRenderElement e = mount(limited);
-        assertEquals(10 * 16, e.nativeMaxSizeForTest(), "the finite cap applied on mount");
+        // No native cap even with a limit: the native one counts UTF-16 units and cut a
+        // valid grapheme (a letter with many combining marks) short before the
+        // grapheme-aware limit in userEdited ran.
+        assertEquals(Integer.MAX_VALUE, e.nativeMaxSizeForTest(), "no code-unit cap with maxLength set");
 
         // A rebuild that drops the limit entirely (maxLength left unset == null,
         // Flutter's "no limit"). The native cap must come back UP, not stay pinned

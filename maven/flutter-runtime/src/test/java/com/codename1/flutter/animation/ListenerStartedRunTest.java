@@ -86,4 +86,14 @@ class ListenerStartedRunTest {
         assertEquals(0.0, c.value(), 1e-9);
         assertEquals(AnimationStatus.dismissed, statuses.get(statuses.size() - 1));
     }
+
+    /// A counted repeat completes headless: every leg collapses synchronously, and the
+    /// future used to stay pending after the first.
+    @Test
+    void aCountedRepeatCompletesHeadless() {
+        AnimationController c = new AnimationController();
+        c.duration(Duration.of(0, 0, 0, 0, 100, 0));
+        assertEquals(true, completes(c.repeat(null, null, Boolean.TRUE, null, Integer.valueOf(3))));
+        assertEquals(true, completes(c.repeat(null, null, Boolean.TRUE, null, Integer.valueOf(2))));
+    }
 }

@@ -126,9 +126,11 @@ final class FlutterBoxStyle {
         if (!(decoration instanceof BoxDecoration)) {
             return 0;
         }
-        Object br = ((BoxDecoration) decoration).getBorderRadius();
-        if (br instanceof com.codename1.flutter.BorderRadius) {
-            com.codename1.flutter.Radius r = ((com.codename1.flutter.BorderRadius) br).topLeft();
+        // A directional radius counts too (resolved LTR: this reads one uniform corner).
+        com.codename1.flutter.BorderRadius b =
+                com.codename1.flutter.BorderRadius.of(((BoxDecoration) decoration).getBorderRadius(), null);
+        if (b != null) {
+            com.codename1.flutter.Radius r = b.topLeft();
             return r == null ? 0 : r.x();
         }
         return 0;

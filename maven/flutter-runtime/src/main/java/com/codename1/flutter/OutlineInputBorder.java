@@ -53,8 +53,9 @@ public class OutlineInputBorder extends InputBorder {
     }
 
     public BorderRadius borderRadius() {
-        if (borderRadius instanceof BorderRadius) {
-            return (BorderRadius) borderRadius;
+        BorderRadius resolved = BorderRadius.of(borderRadius, null);
+        if (resolved != null) {
+            return resolved;
         }
         // Material's default, rather than null.
         //

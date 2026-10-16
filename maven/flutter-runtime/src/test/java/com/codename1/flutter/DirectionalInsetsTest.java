@@ -94,4 +94,26 @@ class DirectionalInsetsTest {
         assertEquals(4, rtl.bottom());
         assertEquals(1, d.resolve(TextDirection.ltr).left());
     }
+
+    /// Two directional insets add to a directional one (Flutter's EdgeInsetsGeometry.add);
+    /// the inherited absolute add turned start into left, which stayed left under RTL.
+    @Test
+    void addingDirectionalInsetsStaysDirectional() {
+        EdgeInsets sum = EdgeInsetsDirectional.only(10, 0, 0, 0).add(EdgeInsetsDirectional.only(5, 1, 2, 0));
+        assertTrue(sum instanceof EdgeInsetsDirectional);
+        EdgeInsets rtl = sum.resolve(TextDirection.rtl);
+        assertEquals(15, rtl.right());
+        assertEquals(2, rtl.left());
+        assertEquals(1, rtl.top());
+    }
+
+    /// A BorderRadiusDirectional resolves against the direction; ClipRRect and the
+    /// uniform-radius readers treated it as no radius at all and drew square corners.
+    @Test
+    void aDirectionalBorderRadiusResolves() {
+        BorderRadiusDirectional d = BorderRadiusDirectional.only(Radius.circular(8), null, null, null);
+        assertEquals(8, BorderRadius.of(d, TextDirection.ltr).topLeft().x());
+        assertEquals(8, BorderRadius.of(d, TextDirection.rtl).topRight().x());
+        assertEquals(8, BorderRadius.of(d, null).topLeft().x(), "null direction reads LTR");
+    }
 }

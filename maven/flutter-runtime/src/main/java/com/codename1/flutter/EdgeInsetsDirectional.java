@@ -71,6 +71,22 @@ public final class EdgeInsetsDirectional extends EdgeInsets {
         return this;
     }
 
+    /**
+     * Flutter's EdgeInsetsGeometry.add: two directional insets add to a DIRECTIONAL one,
+     * start to start. The inherited EdgeInsets.add read the argument as absolute (this
+     * class extends it) and returned left/right, which then stayed on the left under RTL.
+     * Adding absolute insets still yields absolute ones (start read as left), the LTR
+     * reading the rest of this class uses.
+     */
+    @Override
+    public EdgeInsets add(EdgeInsetsGeometry other) {
+        if (other instanceof EdgeInsetsDirectional) {
+            EdgeInsetsDirectional o = (EdgeInsetsDirectional) other;
+            return new EdgeInsetsDirectional(start + o.start, top() + o.top(), end + o.end, bottom() + o.bottom());
+        }
+        return super.add(other);
+    }
+
     public double start() {
         return start;
     }

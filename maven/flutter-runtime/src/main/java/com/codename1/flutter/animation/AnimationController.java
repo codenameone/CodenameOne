@@ -585,7 +585,10 @@ public class AnimationController extends Animation<Double> {
             repeatLegsDone++;
             boolean exhausted = repeatCount != NO_COUNT && repeatLegsDone >= repeatCount;
             if (!exhausted) {
-                if (Display.isInitialized()) {
+                // A COUNTED repeat runs its remaining legs headless too: each beginRun
+                // collapses synchronously there, so the recursion is the count deep and the
+                // future completes. Stopping after the first leg left it pending forever.
+                if (Display.isInitialized() || repeatCount != NO_COUNT) {
                     // Mid-repeat: only the direction flips (when reversing) -- it never
                     // snaps to completed/dismissed between legs. Flutter's
                     // _RepeatingSimulation only ever calls directionSetter (forward/
@@ -602,10 +605,10 @@ public class AnimationController extends Animation<Double> {
                     }
                     return;
                 }
-                // Headless, no count (or not yet reached): there is no frame clock to
-                // drive a further leg, and Flutter's repeat() never completes on its
-                // own without a count -- the run simply sits at this leg's end, exactly
-                // as a canceled run would, until stop() settles it.
+                // Headless with no count: there is no frame clock to drive a further leg,
+                // and Flutter's repeat() never completes on its own without a count -- the
+                // run simply sits at this leg's end, exactly as a canceled run would, until
+                // stop() settles it.
                 return;
             }
             // count exhausted: falls through to the same completion as any other run,

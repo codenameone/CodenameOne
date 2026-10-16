@@ -70,8 +70,9 @@ public class ClipRRectRenderElement extends ClipRectRenderElement {
         if (!(w instanceof ClipRRect)) {
             return null;
         }
-        Object r = ((ClipRRect) w).getBorderRadius();
-        return r instanceof BorderRadius ? (BorderRadius) r : null;
+        // A BorderRadiusDirectional is resolved against the ambient direction, as Flutter's
+        // ClipRRect does; it used to read as "no radius" and clip square corners.
+        return BorderRadius.of(((ClipRRect) w).getBorderRadius(), Directionality.of(this));
     }
 
     private static double px(Radius r) {

@@ -119,6 +119,27 @@ class NavigatorStackTest {
         assertEquals(0, Navigator.stackSize());
     }
 
+    /// A dialog is the top route: popUntil evaluates and pops it before the page
+    /// beneath. With a dialog over the base page alone it used to do nothing.
+    @Test
+    void popUntilDismissesAnOpenDialogFirst() {
+        Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));
+        Navigator.of(null, null).popUntil(route -> route.settings() != null
+                && "/".equals(route.settings().name()));
+        assertEquals(0, Dialogs.openDialogCount(), "the dialog over the base page was dismissed");
+
+        Navigator.push(null, route());
+        Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));
+        final java.util.List<Boolean> sawDialog = new java.util.ArrayList<Boolean>();
+        Navigator.of(null, null).popUntil(r -> {
+            sawDialog.add(r instanceof DialogRoute);
+            return !(r instanceof DialogRoute);
+        });
+        assertEquals(java.util.Arrays.asList(true, false), sawDialog, "the dialog is judged first");
+        assertEquals(0, Dialogs.openDialogCount());
+        assertEquals(1, Navigator.stackSize(), "the page the predicate accepted stays");
+    }
+
     @Test
     void stackedDialogsPopInLifoOrder() {
         Dialogs.showDialog(null, (context) -> new ProbeBox(1, 1));

@@ -176,6 +176,15 @@ public class DartCoreSemanticsTest {
 
     // --- Uri query components decode '+' as a space; path segments do not -----
 
+    /// Dart's splitQueryString ignores a component whose '=' is at index zero.
+    @Test
+    public void aQueryComponentWithAnEmptyKeyIsIgnored() {
+        DartMap<String, String> q = DartUri.parse("https://x/?=admin&role=user").queryParameters();
+        assertEquals(1, q.size());
+        assertEquals("user", q.get("role"));
+        assertFalse(q.containsKey(""));
+    }
+
     /// Dart normalizes a registered-name host: unreserved escapes decoded, other
     /// escapes' hex upper-cased, ASCII lower-cased. The authority was copied verbatim,
     /// so equivalent spellings had different hosts and compared unequal.

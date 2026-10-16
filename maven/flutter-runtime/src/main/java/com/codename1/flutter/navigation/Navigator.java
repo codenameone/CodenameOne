@@ -641,8 +641,14 @@ public class Navigator extends StatelessWidget {
         public void popUntil(Funcs.Func1<Route<Object>, Boolean> predicate) {
             // Pop down to the first route the predicate accepts. With the base
             // runApp route off the stack, an always-false predicate unwinds to it.
-            while (!stack.isEmpty()) {
-                Route<Object> top = (Route<Object>) stack.get(stack.size() - 1).route;
+            // An open dialog is the top route (Flutter's showDialog pushes a DialogRoute),
+            // so it is evaluated -- and popped -- before the page beneath it. Looking at the
+            // page stack alone left a dialog over the base page untouched, and with pages
+            // pushed it judged the page while its dialog stayed open.
+            while (Dialogs.openDialogCount() > 0 || !stack.isEmpty()) {
+                Route<Object> top = Dialogs.openDialogCount() > 0
+                        ? new DialogRoute<Object>()
+                        : (Route<Object>) stack.get(stack.size() - 1).route;
                 Boolean stop;
                 try {
                     stop = predicate == null ? null : predicate.call(top);

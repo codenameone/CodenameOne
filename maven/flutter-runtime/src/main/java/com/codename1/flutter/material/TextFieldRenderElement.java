@@ -366,20 +366,14 @@ public class TextFieldRenderElement extends RenderElement {
             // maxLength is a limit, not only a counter: Flutter stops the edit.
             // Zero is a real limit (no characters at all); only null and Flutter's
             // negative noMaxLength mean "unlimited".
-            if (w.getMaxLength() != null && w.getMaxLength().longValue() >= 0) {
-                // The native cap counts UTF-16 units, and maxLength counts characters: a
-                // single emoji can be eleven units. It is therefore only a generous upper
-                // bound; userEdited enforces the real limit on character boundaries.
-                tf.setMaxSize((int) Math.min(Integer.MAX_VALUE, w.getMaxLength().longValue() * 16));
-            } else {
-                // null or negative (Flutter's noMaxLength, -1) both mean UNLIMITED. Without
-                // this, a field whose maxLength was never set kept TextArea's constructor
-                // default of 124 -- not Flutter's unlimited -- and a rebuild from a finite
-                // limit down to unlimited kept the OLD finite cap forever, since nothing
-                // ever asked setMaxSize() to raise it back. There is no "unlimited" sentinel
-                // on TextArea; the cap is just an int, so the largest one stands in for it.
-                tf.setMaxSize(Integer.MAX_VALUE);
-            }
+            // No native cap at all, whatever maxLength says. The native limit counts UTF-16
+            // units, and maxLength counts grapheme clusters: any multiple of the limit still
+            // cut a valid grapheme short (one letter with twenty combining marks under
+            // maxLength: 1). userEdited enforces the real limit, on cluster boundaries, after
+            // the formatters -- as Flutter's length formatter runs after the supplied ones.
+            // There is no "unlimited" sentinel on TextArea; the largest int stands in for it,
+            // which also lifts TextArea's constructor default of 124.
+            tf.setMaxSize(Integer.MAX_VALUE);
             // maxLines was stored and never read, so the demo's "Life story"
             // field -- which asks for three lines -- came up one line tall and
             // every line the user typed scrolled the one before it out of view.

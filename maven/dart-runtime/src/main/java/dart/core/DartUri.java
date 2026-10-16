@@ -822,7 +822,12 @@ public final class DartUri {
                     continue;
                 }
                 int eq = pair.indexOf('=');
-                if (eq >= 0) {
+                if (eq == 0) {
+                    // Dart's splitQueryString ignores a component with an empty key
+                    // ("?=admin"); it used to appear here as a parameter named "".
+                    continue;
+                }
+                if (eq > 0) {
                     out.put(decodeQueryComponent(pair.substring(0, eq)),
                             decodeQueryComponent(pair.substring(eq + 1)));
                 } else {

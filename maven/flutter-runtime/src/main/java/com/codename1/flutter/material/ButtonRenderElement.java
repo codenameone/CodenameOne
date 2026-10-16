@@ -767,11 +767,12 @@ public class ButtonRenderElement extends RenderElement {
         } else if (shape instanceof com.codename1.flutter.BeveledRectangleBorder) {
             radius = ((com.codename1.flutter.BeveledRectangleBorder) shape).getBorderRadius();
         }
-        if (!(radius instanceof com.codename1.flutter.BorderRadius)) {
+        // A directional radius counts too (resolved LTR: this reads one uniform corner).
+        com.codename1.flutter.BorderRadius b = com.codename1.flutter.BorderRadius.of(radius, null);
+        if (b == null) {
             return 0;
         }
-        com.codename1.flutter.Radius tl =
-                ((com.codename1.flutter.BorderRadius) radius).topLeft();
+        com.codename1.flutter.Radius tl = b.topLeft();
         return tl == null ? 0 : tl.x();
     }
 

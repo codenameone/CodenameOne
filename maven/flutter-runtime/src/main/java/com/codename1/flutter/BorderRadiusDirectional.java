@@ -66,6 +66,14 @@ public final class BorderRadiusDirectional extends BorderRadiusGeometry {
         return new BorderRadiusDirectional(start, end, start, end);
     }
 
+    /// Flutter's BorderRadiusDirectional.resolve: start is left under LTR, right under RTL.
+    public BorderRadius resolve(TextDirection direction) {
+        if (direction == TextDirection.rtl) {
+            return BorderRadius.only(topEnd(), topStart(), bottomEnd(), bottomStart());
+        }
+        return BorderRadius.only(topStart(), topEnd(), bottomStart(), bottomEnd());
+    }
+
     public Radius topStart() {
         return topStart;
     }

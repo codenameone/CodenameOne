@@ -51,6 +51,20 @@ public final class BorderRadius extends BorderRadiusGeometry {
         return all(Radius.circular(radius));
     }
 
+    /// Any BorderRadiusGeometry as absolute radii for {@code direction} (null meaning
+    /// LTR): a BorderRadiusDirectional is resolved, not treated as absent. Null when
+    /// {@code geometry} is neither kind.
+    public static BorderRadius of(Object geometry, TextDirection direction) {
+        if (geometry instanceof BorderRadius) {
+            return (BorderRadius) geometry;
+        }
+        if (geometry instanceof BorderRadiusDirectional) {
+            return ((BorderRadiusDirectional) geometry).resolve(
+                    direction == null ? TextDirection.ltr : direction);
+        }
+        return null;
+    }
+
     public static BorderRadius only(Radius topLeft, Radius topRight,
                                     Radius bottomLeft, Radius bottomRight) {
         return new BorderRadius(topLeft, topRight, bottomLeft, bottomRight);
