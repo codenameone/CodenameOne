@@ -150,10 +150,17 @@ final class NativeThemes {
     /// As above, also scanning `appJars` (see the Apple overload).
     static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses,
             List<File> appJars, boolean keepAll) throws IOException {
+        return removeUnusedAndroid(dir, keep, appClasses, appJars, java.util.Collections.<File>emptyList(), keepAll);
+    }
+
+    /// As above, also scanning the application's own resource files (see the Apple
+    /// overload: an `@OverlayThemes` reference lives only there).
+    static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses,
+            List<File> appJars, List<File> appResources, boolean keepAll) throws IOException {
         if (keepAll || namesAny(appClasses, appJars, ANDROID_MODE_PROPERTIES)) {
             return new ArrayList<String>();
         }
-        return removeUnused(dir, keep, ANDROID_ALL, appClasses, appJars);
+        return removeUnused(dir, keep, ANDROID_ALL, appClasses, appJars, appResources);
     }
 
     /// The runtime property an application reads to learn which modern theme the
@@ -200,6 +207,14 @@ final class NativeThemes {
     /// directory, not expanded into `appClasses`, so a theme it opens by name was deleted.
     static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
             File appClasses, List<File> appJars, boolean keepAll) throws IOException {
+        return removeUnusedApple(dir, mode, generation, mac, appClasses, appJars, java.util.Collections.<File>emptyList(), keepAll);
+    }
+
+    /// As above, also scanning the application's own resource files: a theme can name
+    /// another in its `@OverlayThemes` property (UIManager.buildThemeImpl opens each),
+    /// a reference no class or jar holds, and pruning then deleted the overlay.
+    static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
+            File appClasses, List<File> appJars, List<File> appResources, boolean keepAll) throws IOException {
         if (keepAll) {
             return new ArrayList<String>();
         }
@@ -211,7 +226,7 @@ final class NativeThemes {
         if (namesAny(appClasses, appJars, new String[] {NATIVE_THEME_RESOURCE_PROPERTY})) {
             keep.add(themeFor("modern", generation, false));
         }
-        return removeUnused(dir, keep, ALL, appClasses, appJars);
+        return removeUnused(dir, keep, ALL, appClasses, appJars, appResources);
     }
 
     /// True for the `custom` theme mode: the application ships the only theme it
@@ -259,18 +274,18 @@ final class NativeThemes {
     static List<String> removeUnused(File dir, String keep, File appClasses) throws IOException {
         Set<String> k = new LinkedHashSet<String>();
         k.add(keep);
-        return removeUnused(dir, k, ALL, appClasses, java.util.Collections.<File>emptyList());
+        return removeUnused(dir, k, ALL, appClasses, java.util.Collections.<File>emptyList(), java.util.Collections.<File>emptyList());
     }
 
     private static List<String> removeUnused(File dir, Set<String> keep, String[] candidates,
-            File appClasses, List<File> appJars) throws IOException {
+            File appClasses, List<File> appJars, List<File> appResources) throws IOException {
         List<String> removed = new ArrayList<String>();
         if (dir == null || !dir.isDirectory()) {
             return removed;
         }
         Set<String> referenced = new LinkedHashSet<String>();
         for (String name : candidates) {
-            if (referencesTheme(appClasses, appJars, name)) {
+            if (referencesTheme(appClasses, appJars, name) || resourcesName(appResources, name)) {
                 referenced.add(name);
             }
         }
@@ -334,6 +349,46 @@ final class NativeThemes {
         };
         return (classesDir != null && classesDir.isDirectory() && scan(classesDir, classesDir, p))
                 || scanJars(jars, p);
+    }
+
+    /// The `.res` files under `dir`, listed right after the APPLICATION is unzipped (as
+    /// {@link #jarsIn} is), so a port theme copied in later is never among them.
+    static List<File> resFilesIn(File dir) {
+        List<File> out = new ArrayList<File>();
+        collectByExtension(dir, ".res", out);
+        return out;
+    }
+
+    private static void collectByExtension(File dir, String ext, List<File> out) {
+        File[] children = dir == null ? null : dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            if (c.isDirectory()) {
+                collectByExtension(c, ext, out);
+            } else if (c.getName().endsWith(ext)) {
+                out.add(c);
+            }
+        }
+    }
+
+    /// Whether any of `resources` names the theme `name` (an `@OverlayThemes` value is
+    /// stored as a plain string). A theme's own file is never its own reference.
+    static boolean resourcesName(List<File> resources, String name) throws IOException {
+        if (resources == null) {
+            return false;
+        }
+        for (File f : resources) {
+            if (!f.isFile() || f.getName().equals(name + ".res")) {
+                continue;
+            }
+            String body = new String(Files.readAllBytes(f.toPath()), StandardCharsets.ISO_8859_1);
+            if (body.contains(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The `.jar` files directly or indirectly under `dir`: a builder lists the libs

@@ -90,20 +90,51 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
             // Integral and inside the long range, tested with a cast: Math.rint is not
             // in ParparVM's JavaAPI, and calling it broke every native build.
             if (d >= -9.223372036854775808E18 && d < 9.223372036854775808E18 && (double) (long) d == d) {
-                Long asInt = Long.valueOf((long) d);
-                return d == 0 ? new Object[] {asInt, Double.valueOf(-d)} : new Object[] {asInt};
+                java.util.List<Object> twins = integralForms((long) d, null);
+                if (d == 0) {
+                    twins.add(Double.valueOf(-d));
+                }
+                return twins.toArray();
             }
             return NO_TWINS;
         }
-        if (key instanceof Long || key instanceof Integer) {
+        if (key instanceof Long || key instanceof Integer || key instanceof Short || key instanceof Byte) {
+            // Every integral wrapper of the same value too, not just the double: a key that
+            // arrived through Java interop or Map.from as an Integer, Short or Byte was never
+            // found by the Long a transpiled Dart int is, and could be stored twice.
             long l = ((Number) key).longValue();
+            java.util.List<Object> twins = integralForms(l, key.getClass());
             double d = (double) l;
             if ((long) d == l && d < 9.223372036854775808E18) {
-                return l == 0 ? new Object[] {Double.valueOf(0.0), Double.valueOf(-0.0)}
-                        : new Object[] {Double.valueOf(d)};
+                if (l == 0) {
+                    twins.add(Double.valueOf(0.0));
+                    twins.add(Double.valueOf(-0.0));
+                } else {
+                    twins.add(Double.valueOf(d));
+                }
             }
+            return twins.toArray();
         }
         return NO_TWINS;
+    }
+
+    /// The Long, Integer, Short and Byte boxes of {@code l} that can hold it, except the
+    /// wrapper class {@code except} (the key's own).
+    private static java.util.List<Object> integralForms(long l, Class<?> except) {
+        java.util.List<Object> out = new java.util.ArrayList<Object>(4);
+        if (except != Long.class) {
+            out.add(Long.valueOf(l));
+        }
+        if (except != Integer.class && l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE) {
+            out.add(Integer.valueOf((int) l));
+        }
+        if (except != Short.class && l >= Short.MIN_VALUE && l <= Short.MAX_VALUE) {
+            out.add(Short.valueOf((short) l));
+        }
+        if (except != Byte.class && l >= Byte.MIN_VALUE && l <= Byte.MAX_VALUE) {
+            out.add(Byte.valueOf((byte) l));
+        }
+        return out;
     }
 
     static final Object[] NO_TWINS = new Object[0];

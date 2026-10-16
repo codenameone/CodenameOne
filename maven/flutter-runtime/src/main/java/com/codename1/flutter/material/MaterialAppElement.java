@@ -129,7 +129,29 @@ public class MaterialAppElement extends StatelessElement {
             listenedForm = null;
             sizeListener = null;
         }
+        // The theme lives in the process-global UIManager, so a NESTED app (a route that
+        // builds its own MaterialApp) left its theme installed when popped: the outer page
+        // kept its existing styles, but every later rebuild or new component read the
+        // departed app's colours and type. Hand the theme back to the enclosing app,
+        // refreshing its form, as its own mount did.
+        MaterialAppElement outer = enclosingApp();
         super.unmount();
+        // Not while the enclosing app is itself being torn down (a whole-tree unmount
+        // reaches the nested app first): there is nothing left to restyle.
+        if (outer != null && outer.isMounted()) {
+            outer.installEffectiveTheme(outer.app().effectiveTheme(), outer.host());
+        }
+    }
+
+    /// The nearest MaterialApp above this one -- across the route boundary, which
+    /// {@link Element#ancestor()} walks -- or null for the outermost app.
+    MaterialAppElement enclosingApp() {
+        for (com.codename1.flutter.Element e = ancestor(); e != null; e = e.ancestor()) {
+            if (e instanceof MaterialAppElement) {
+                return (MaterialAppElement) e;
+            }
+        }
+        return null;
     }
 
     /**
@@ -178,7 +200,11 @@ public class MaterialAppElement extends StatelessElement {
         }
     }
 
+    /// The theme the most recent install put into the global UIManager (test hook).
+    static ThemeData lastInstalledTheme;
+
     private void installEffectiveTheme(ThemeData eff, RenderHost h) {
+        lastInstalledTheme = eff;
         installedProps = ThemeDataAdapter.themeProps(eff);
         ThemeDataAdapter.install(eff);
         Form f = h == null ? null : h.form();

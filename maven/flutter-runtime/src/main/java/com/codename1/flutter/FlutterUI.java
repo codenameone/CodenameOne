@@ -99,15 +99,19 @@ public final class FlutterUI {
      * freed-but-unreturned pages alone were 21MB against 0.1MB for the same
      * app built with another toolchain.</p>
      *
-     * <p>Deferred, so the collection lands after the frame rather than inside
-     * it, and it runs on the collector's thread either way.</p>
+     * <p>Deferred, so the collection lands after the frame rather than inside it,
+     * and REQUESTED FROM A BACKGROUND THREAD: on ParparVM the collector runs on its
+     * own thread anyway, but on the JVM (simulator) and ART an explicit collection
+     * blocks the calling thread, and calling it from the EDT stalled every Flutter
+     * application just after its first frame and again as the user began to
+     * interact.</p>
      */
     private static void collectStartupGarbage(final Form form) {
         try {
             com.codename1.ui.CN.callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    System.gc();
+                    collectOffTheEdt();
                 }
             });
             // And once more a moment later. Start-up garbage clears in two
@@ -118,7 +122,7 @@ public final class FlutterUI {
                 com.codename1.ui.util.UITimer.timer(1200, false, form, new Runnable() {
                     @Override
                     public void run() {
-                        System.gc();
+                        collectOffTheEdt();
                     }
                 });
             }
@@ -126,6 +130,20 @@ public final class FlutterUI {
             // headless, or a port with no collector to ask
         }
     }
+
+    /// One explicit collection, asked for on a short-lived background thread so the EDT
+    /// never waits for it.
+    static void collectOffTheEdt() {
+        com.codename1.ui.CN.startThread(gcAction, "flutter-startup-gc").start();
+    }
+
+    /// What collectOffTheEdt runs; a test swaps it to see which thread runs it.
+    static Runnable gcAction = new Runnable() {
+        @Override
+        public void run() {
+            System.gc();
+        }
+    };
 
     /**
      * Isolates what creating one Codename One component actually costs.

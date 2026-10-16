@@ -240,6 +240,22 @@ public class NativeThemesTest {
                 java.util.Collections.singletonList(frameworkJar), false));
     }
 
+    /// A theme's @OverlayThemes names another theme in the application's .res only:
+    /// no class or jar holds that reference, and pruning deleted the overlay.
+    @Test
+    public void aThemeNamedByAnOverlayInTheAppsResourcesIsKept() throws IOException {
+        File dir = tmp.newFolder("btresOverlay");
+        for (String name : NativeThemes.ALL) {
+            Files.write(new File(dir, name + ".res").toPath(), new byte[] {1});
+        }
+        File appRes = new File(tmp.newFolder("appres"), "theme.res");
+        Files.write(appRes.toPath(), bytesWith("@OverlayThemes" + "iOSModernTheme"));
+        List<String> removed = NativeThemes.removeUnusedApple(dir, "ios7", null, false, tmp.newFolder("cOv"),
+                java.util.Collections.<File>emptyList(), java.util.Collections.singletonList(appRes), false);
+        assertFalse(removed.toString(), removed.contains("iOSModernTheme"));
+        assertTrue(new File(dir, "iOSModernTheme.res").isFile());
+    }
+
     @Test
     public void theAndroidKeepAllHintKeepsEveryTheme() throws IOException {
         // A mode chosen through a property name the class scan cannot see (built at run

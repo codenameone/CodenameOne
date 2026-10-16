@@ -83,6 +83,9 @@ public class AndroidGradleBuilder extends Executor {
     /// The application's own library jars, listed right after its sources are
     /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
     private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
+    /// The application's own .res files, listed at the same moment, for the same pruning
+    /// (a theme's @OverlayThemes names another theme only there).
+    private java.util.List<java.io.File> appResourceFiles = new java.util.ArrayList<java.io.File>();
 
 
     private static final String GRADLE_8_VERSION = "8.13";
@@ -2306,6 +2309,7 @@ public class AndroidGradleBuilder extends Executor {
             // The application's own libraries, listed before anything else lands in libs:
             // native-theme pruning scans them too (a library's bytecode stays in its jar).
             appLibraryJars = NativeThemes.jarsIn(libsDir);
+            appResourceFiles = NativeThemes.resFilesIn(assetsDir);
         } catch (Exception ex) {
             throw new BuildException("Failed to extract source zip "+sourceZip, ex);
         }
@@ -4472,7 +4476,7 @@ public class AndroidGradleBuilder extends Executor {
                             // application or not at all, and removeUnusedAndroid keeps
                             // every theme for an application that names it.
                             null),
-                    dummyClassesDir, appLibraryJars,
+                    dummyClassesDir, appLibraryJars, appResourceFiles,
                     "true".equals(request.getArg(NativeThemes.ANDROID_KEEP_ALL_HINT, "false")));
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: " + droppedThemes

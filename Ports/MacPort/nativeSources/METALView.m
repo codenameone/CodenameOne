@@ -649,6 +649,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     os_unfair_lock_lock(&cn1PresentLock);
     self.screenTexture = newScreen;
     cn1ScreenVolatile = NO;
+    // A new texture is a new frame sequence: a command buffer from before the rebuild
+    // can complete after it, and its frameSeq must not match, or its handler marks THIS
+    // texture volatile while its clear or first resized frame is still using it.
+    ++cn1ScreenFrameSeq;
     os_unfair_lock_unlock(&cn1PresentLock);
 #ifndef CN1_USE_ARC
     [newScreen release];
@@ -1199,6 +1203,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     os_unfair_lock_lock(&cn1PresentLock);
     self.screenTexture = nil;
     cn1ScreenVolatile = NO;
+    ++cn1ScreenFrameSeq;   // see setupFramebuffer: no older frame may claim what comes next
     os_unfair_lock_unlock(&cn1PresentLock);
     self.stencilTexture = nil;
     os_unfair_lock_lock(&cn1PresentLock);

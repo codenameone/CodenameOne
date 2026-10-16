@@ -176,6 +176,20 @@ public class DartCoreSemanticsTest {
 
     // --- Uri query components decode '+' as a space; path segments do not -----
 
+    /// A key that arrived as an Integer, Short or Byte (Java interop, Map.from) is the
+    /// same Dart int as the Long transpiled code looks it up with.
+    @Test
+    public void integralWrapperKeysAreOneDartInt() {
+        DartMap<Object, String> m = new DartMap<Object, String>();
+        m.put(Integer.valueOf(1), "a");
+        assertEquals("a", m.get(Long.valueOf(1)));
+        m.put(Long.valueOf(1), "b");
+        assertEquals(1, m.size(), "one entry, not two");
+        assertEquals("b", m.get(Short.valueOf((short) 1)));
+        assertEquals("b", m.get(Double.valueOf(1.0)));
+        assertTrue(m.containsKey(Byte.valueOf((byte) 1)));
+    }
+
     /// Dart's splitQueryString ignores a component whose '=' is at index zero.
     @Test
     public void aQueryComponentWithAnEmptyKeyIsIgnored() {
