@@ -2757,6 +2757,24 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        long handle = LinuxNative.socketListenLoopback(port);
+        return handle == 0 ? null : new LinuxSocket(handle);
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        if (loopbackOnly) {
+            LinuxNative.socketStopListening(port);
+        }
+    }
+
+    @Override
     public Object connectSocket(String host, int port, int connectTimeout) {
         LinuxSocket socket = new LinuxSocket(host, port, connectTimeout);
         return socket.isConnected() ? socket : null;
@@ -2769,7 +2787,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void disconnectSocket(Object socket) {
-        ((LinuxSocket) socket).close();
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).close();
+        }
     }
 
     @Override
@@ -2779,27 +2799,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public int getSocketAvailableInput(Object socket) {
-        return ((LinuxSocket) socket).available();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).available() : 0;
     }
 
     @Override
     public byte[] readFromSocketStream(Object socket) {
-        return ((LinuxSocket) socket).readChunk();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).readChunk() : null;
     }
 
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
-        ((LinuxSocket) socket).write(data, 0, data.length);
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).write(data, 0, data.length);
+        }
     }
 
     @Override
     public String getSocketErrorMessage(Object socket) {
-        return ((LinuxSocket) socket).getErrorMessage();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorMessage() : null;
     }
 
     @Override
     public int getSocketErrorCode(Object socket) {
-        return ((LinuxSocket) socket).getErrorCode();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorCode() : -1;
     }
 
     /* ---------------------------------------------------------- websocket */
