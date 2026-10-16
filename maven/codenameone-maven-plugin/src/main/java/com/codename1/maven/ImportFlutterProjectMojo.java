@@ -122,5 +122,20 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
             }
             getLog().info("Wired the Flutter runtime into " + pomFile);
         }
+        File settings = new File(common, "codenameone_settings.properties");
+        if (settings.isFile()) {
+            try {
+                String s = new String(java.nio.file.Files.readAllBytes(settings.toPath()), "UTF-8");
+                String raised = FlutterPomUpdater.raiseSettingsJavaLevel(s);
+                if (!raised.equals(s)) {
+                    java.nio.file.Files.write(settings.toPath(), raised.getBytes("UTF-8"));
+                    getLog().info("Raised codename1.arg.java.version to " + FlutterPomUpdater.FLUTTER_JAVA_LEVEL
+                            + " in " + settings + ": the transpiled Flutter sources are Java "
+                            + FlutterPomUpdater.FLUTTER_JAVA_LEVEL);
+                }
+            } catch (java.io.IOException e) {
+                throw new MojoExecutionException("Cannot update " + settings, e);
+            }
+        }
     }
 }

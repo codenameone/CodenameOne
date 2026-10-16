@@ -4465,9 +4465,11 @@ public class AndroidGradleBuilder extends Executor {
                             // application or not at all, and removeUnusedAndroid keeps
                             // every theme for an application that names it.
                             null),
-                    dummyClassesDir);
+                    dummyClassesDir,
+                    "true".equals(request.getArg(NativeThemes.ANDROID_KEEP_ALL_HINT, "false")));
             if (!droppedThemes.isEmpty()) {
-                log("Native themes not used by this build, not shipped: " + droppedThemes);
+                log("Native themes not used by this build, not shipped: " + droppedThemes
+                        + " (set " + NativeThemes.ANDROID_KEEP_ALL_HINT + "=true to keep every native theme)");
             }
         } catch (IOException ex) {
             throw new BuildException("Failed to remove the unused native themes", ex);

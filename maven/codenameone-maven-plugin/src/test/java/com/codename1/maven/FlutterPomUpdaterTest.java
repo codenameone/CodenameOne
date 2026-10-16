@@ -60,6 +60,34 @@ public class FlutterPomUpdaterTest {
         assertEquals(u.pom, again.pom);
     }
 
+    /// A project generated for Java 8 compiles at -source 8, and the transpiled
+    /// Flutter sources are Java 17 (records): the import raises the level.
+    @Test
+    public void raisesAJava8CompilerLevelTo17() {
+        String pom = "<project><build><plugins>\n"
+                + "    <plugin>\n"
+                + "        <artifactId>maven-compiler-plugin</artifactId>\n"
+                + "        <configuration>\n"
+                + "            <source>1.8</source>\n"
+                + "            <target>8</target>\n"
+                + "        </configuration>\n"
+                + "    </plugin>\n"
+                + "    <plugin><artifactId>other</artifactId><configuration><source>5</source></configuration></plugin>\n"
+                + "</plugins></build></project>\n";
+        String raised = FlutterPomUpdater.raiseCompilerLevel(pom);
+        assertTrue(raised.contains("<source>17</source>"), raised);
+        assertTrue(raised.contains("<target>17</target>"), raised);
+        assertTrue(raised.contains("<source>5</source>"), "another plugin's configuration is not touched");
+        assertEquals(raised, FlutterPomUpdater.raiseCompilerLevel(raised), "17 stays 17");
+        String prop = pom.replace("<source>1.8</source>", "<source>${javaVersion}</source>");
+        assertTrue(FlutterPomUpdater.raiseCompilerLevel(prop).contains("<source>${javaVersion}</source>"));
+
+        assertEquals("a=1\ncodename1.arg.java.version=17\n",
+                FlutterPomUpdater.raiseSettingsJavaLevel("a=1\ncodename1.arg.java.version=8\n"));
+        assertEquals("codename1.arg.java.version=21\n",
+                FlutterPomUpdater.raiseSettingsJavaLevel("codename1.arg.java.version=21\n"));
+    }
+
     @Test
     public void wiresALegacyPomWithNeitherAnchorPresent() {
         String legacy = "<project><build><plugins>\n"

@@ -207,6 +207,23 @@ public class NativeThemesTest {
     }
 
     @Test
+    public void theAndroidKeepAllHintKeepsEveryTheme() throws IOException {
+        // A mode chosen through a property name the class scan cannot see (built at run
+        // time, read from configuration) needs the escape hatch iOS already has.
+        File dir = tmp.newFolder("assetsKeep");
+        for (String name : NativeThemes.ANDROID_ALL) {
+            Files.write(new File(dir, name + ".res").toPath(), new byte[] {1});
+        }
+        assertTrue(NativeThemes.removeUnusedAndroid(dir,
+                NativeThemes.androidThemesFor(null, null, "modern", null, null), tmp.newFolder("cKeep"),
+                true).isEmpty());
+        for (String name : NativeThemes.ANDROID_ALL) {
+            assertTrue(name, new File(dir, name + ".res").isFile());
+        }
+        assertEquals("android.nativeThemes.keepAll", NativeThemes.ANDROID_KEEP_ALL_HINT);
+    }
+
+    @Test
     public void anAndroidAppThatSetsTheModeItselfKeepsEveryTheme() throws IOException {
         File dir = tmp.newFolder("assets2");
         for (String name : NativeThemes.ANDROID_ALL) {

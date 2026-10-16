@@ -137,7 +137,14 @@ final class NativeThemes {
     /// run time and every theme stays.
     static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses)
             throws IOException {
-        if (namesAny(appClasses, ANDROID_MODE_PROPERTIES)) {
+        return removeUnusedAndroid(dir, keep, appClasses, false);
+    }
+
+    /// As above, but nothing at all is removed when `keepAll` is set (see
+    /// {@link #ANDROID_KEEP_ALL_HINT}).
+    static List<String> removeUnusedAndroid(File dir, Set<String> keep, File appClasses,
+            boolean keepAll) throws IOException {
+        if (keepAll || namesAny(appClasses, ANDROID_MODE_PROPERTIES)) {
             return new ArrayList<String>();
         }
         return removeUnused(dir, keep, ANDROID_ALL, appClasses);
@@ -164,6 +171,12 @@ final class NativeThemes {
     /// (native macOS) -- so one hint covers both the way `ios.teamId` and the
     /// other shared `ios.*` hints already do.
     static final String KEEP_ALL_HINT = "ios.nativeThemes.keepAll";
+
+    /// The Android counterpart of {@link #KEEP_ALL_HINT}: an application that sets
+    /// the theme mode from a property name it builds or reads at run time -- not
+    /// the literal `and.themeMode` the class scan looks for -- still loads a theme
+    /// pruning would have deleted, and silently fell back to Holo Light.
+    static final String ANDROID_KEEP_ALL_HINT = "android.nativeThemes.keepAll";
 
     /// Removes the Apple native themes this build does not need from `dir`: every
     /// one except the theme the stub's mode will install, a theme the application

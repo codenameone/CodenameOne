@@ -127,7 +127,60 @@ final class FlutterPomUpdater {
                 changed = true;
             }
         }
+        String raised = raiseCompilerLevel(p);
+        if (!raised.equals(p)) {
+            p = raised;
+            changed = true;
+        }
         this.pom = p;
+    }
+
+    /// The Java level the transpiler's output needs: it emits Java 17 source
+    /// (records for Dart records, among others), and the archetype generates a
+    /// Flutter-capable project at 17 for exactly that reason.
+    static final int FLUTTER_JAVA_LEVEL = 17;
+
+    private static final Pattern COMPILER_LEVEL = Pattern.compile(
+            "<(source|target|release)>\\s*(?:1\\.)?(\\d+)\\s*</\\1>");
+
+    /// Raises the maven-compiler-plugin's literal source/target/release below
+    /// {@link #FLUTTER_JAVA_LEVEL} to it. A project generated for Java 8 kept
+    /// `-source 8` after the import and then failed to compile the generated
+    /// sources, although the JDK running Maven passed the transcode goal's own
+    /// check. A level given as a property (`${...}`) is left as it is.
+    static String raiseCompilerLevel(String pom) {
+        int plugin = pom.indexOf("<artifactId>maven-compiler-plugin</artifactId>");
+        if (plugin < 0) {
+            return pom;
+        }
+        int end = pom.indexOf("</plugin>", plugin);
+        if (end < 0) {
+            return pom;
+        }
+        String block = pom.substring(plugin, end);
+        Matcher m = COMPILER_LEVEL.matcher(block);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            int level = Integer.parseInt(m.group(2));
+            String rep = level < FLUTTER_JAVA_LEVEL
+                    ? "<" + m.group(1) + ">" + FLUTTER_JAVA_LEVEL + "</" + m.group(1) + ">"
+                    : m.group(0);
+            m.appendReplacement(out, Matcher.quoteReplacement(rep));
+        }
+        m.appendTail(out);
+        return pom.substring(0, plugin) + out + pom.substring(end);
+    }
+
+    /// `codename1.arg.java.version` -- the level the build server compiles at --
+    /// raised the same way in a `codenameone_settings.properties` text; the same
+    /// text when it is already at or above it, or absent.
+    static String raiseSettingsJavaLevel(String settings) {
+        Matcher m = Pattern.compile("(?m)^(codename1\\.arg\\.java\\.version\\s*=\\s*)(?:1\\.)?(\\d+)[ \\t]*$")
+                .matcher(settings);
+        if (m.find() && Integer.parseInt(m.group(2)) < FLUTTER_JAVA_LEVEL) {
+            return settings.substring(0, m.start()) + m.group(1) + FLUTTER_JAVA_LEVEL + settings.substring(m.end());
+        }
+        return settings;
     }
 
     /// `needle`'s first position outside an XML comment, or -1. Unlike a

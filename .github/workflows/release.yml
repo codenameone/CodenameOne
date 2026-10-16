@@ -366,6 +366,9 @@ jobs:
       # Without this pass a project that declares codenameone-flutter-runtime at a
       # released version -- as the archetype documentation says to -- cannot
       # resolve it. The transpiler itself builds on JDK 8 and ships with the core.
+      # This runs on JDK 17, so the profile IS active and -pl finds both modules:
+      # "Set up JDK 17 for the editors" above switched the job's JAVA_HOME under the
+      # same condition as this step, and nothing switches back to 8 in between.
       - name: Build and stage the Flutter runtimes
         id: deploy_flutter
         continue-on-error: true
