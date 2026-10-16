@@ -181,4 +181,23 @@ class EditorViewInputTest extends UITestBase {
         assertEquals("  three", v.getText());
     }
 
+    @FormTest
+    void paragraphCommandsKeepSelectionAndAdvanceAtBoundaries() {
+        EditorView v = show("one\ntwo\nthree");
+        v.setSelectionRange(5, 5);
+        v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_ALT);
+        assertEquals(4, v.getEditingState().getSelectionEnd());
+        v.onKeyCommand(TextInputClient.KEY_UP, TextInputClient.MOD_ALT | TextInputClient.MOD_SHIFT);
+        assertEquals(4, v.getEditingState().getSelectionStart());
+        assertEquals(0, v.getEditingState().getSelectionEnd());
+        v.setSelectionRange(5, 5);
+        v.onKeyCommand(TextInputClient.KEY_END, TextInputClient.MOD_ALT);
+        assertEquals(7, v.getEditingState().getSelectionEnd());
+        v.onKeyCommand(TextInputClient.KEY_DOWN, TextInputClient.MOD_ALT | TextInputClient.MOD_SHIFT);
+        assertEquals(7, v.getEditingState().getSelectionStart());
+        assertEquals(13, v.getEditingState().getSelectionEnd());
+        v.onKeyCommand(TextInputClient.KEY_DOWN, TextInputClient.MOD_ALT);
+        assertEquals(13, v.getEditingState().getSelectionEnd());
+    }
+
 }

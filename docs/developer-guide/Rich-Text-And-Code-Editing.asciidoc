@@ -94,8 +94,9 @@ a backward selection can have a larger start offset than end offset. The macOS b
 direction alongside the ordered range required by AppKit, so extending a selection and typing
 into it preserve the same range in Java and native code.
 
-On macOS, pure editors receive word movement and deletion, visual line boundaries, document boundaries,
-and page movement through `onKeyCommand(...)`. AppKit interprets the key event first. The editor owns
+On macOS, pure editors receive word movement and deletion, visual line and paragraph boundaries,
+document boundaries, and page movement through `onKeyCommand(...)`. AppKit interprets the key event first. Paragraph boundary commands use `MOD_ALT` with `KEY_HOME` or `KEY_END`.
+Paragraph selection uses `MOD_ALT` with `KEY_UP` or `KEY_DOWN` and retains `MOD_SHIFT`. The editor owns
 its visual line layout; the port waits for its updated state before replaying later native edits.
 Word commands carry `MOD_ALT`, document Home/End commands carry `MOD_CTRL`, and selection commands
 also carry `MOD_SHIFT`. These callbacks don't change the legacy `TextArea` editing path.

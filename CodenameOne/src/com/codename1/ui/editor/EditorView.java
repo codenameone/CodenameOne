@@ -1953,6 +1953,20 @@ public class EditorView extends Component implements TextInputClient, com.codena
         replaceRange(s, e, "", true);
     }
 
+    private int paragraphBoundary(boolean forward, boolean advance) {
+        int line = doc.lineOfOffset(caret);
+        if (forward) {
+            if (advance && caret == doc.getLineEnd(line) && line + 1 < doc.getLineCount()) {
+                line++;
+            }
+            return doc.getLineEnd(line);
+        }
+        if (advance && caret == doc.getLineStart(line) && line > 0) {
+            line--;
+        }
+        return doc.getLineStart(line);
+    }
+
     @Override
     public void onKeyCommand(int command, int modifiers) {
         boolean extend = (modifiers & MOD_SHIFT) != 0;
@@ -1981,14 +1995,16 @@ public class EditorView extends Component implements TextInputClient, com.codena
                 }
                 break;
             case KEY_UP:
-                moveCaret(lineJump ? 0 : caretVertical(-1), extend);
+                moveCaret(lineJump ? 0 : word ? paragraphBoundary(false, true) : caretVertical(-1), extend);
                 break;
             case KEY_DOWN:
-                moveCaret(lineJump ? doc.length() : caretVertical(1), extend);
+                moveCaret(lineJump ? doc.length() : word ? paragraphBoundary(true, true) : caretVertical(1), extend);
                 break;
             case KEY_HOME:
                 if (lineJump) {
                     moveCaret(0, extend);
+                } else if (word) {
+                    moveCaret(paragraphBoundary(false, false), extend);
                 } else {
                     lineHome(extend);
                 }
@@ -1996,6 +2012,8 @@ public class EditorView extends Component implements TextInputClient, com.codena
             case KEY_END:
                 if (lineJump) {
                     moveCaret(doc.length(), extend);
+                } else if (word) {
+                    moveCaret(paragraphBoundary(true, false), extend);
                 } else {
                     lineEndKey(extend);
                 }

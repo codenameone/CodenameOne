@@ -2203,7 +2203,19 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             modifiers |= 1; // TextInputClient.MOD_SHIFT
             name = [[name substringToIndex:name.length - suffix.length] stringByAppendingString:@":"];
         }
-        if ([name isEqualToString:@"moveWordLeft:"] || [name isEqualToString:@"moveWordBackward:"]) {
+        if ([name isEqualToString:@"moveBackward:"]) {
+            command = 1;
+        } else if ([name isEqualToString:@"moveForward:"]) {
+            command = 2;
+        } else if ([name isEqualToString:@"moveParagraphBackward:"]) {
+            command = 3; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveParagraphForward:"]) {
+            command = 4; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveToBeginningOfParagraph:"]) {
+            command = 5; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveToEndOfParagraph:"]) {
+            command = 6; modifiers |= 4;
+        } else if ([name isEqualToString:@"moveWordLeft:"] || [name isEqualToString:@"moveWordBackward:"]) {
             command = 1; modifiers |= 4; // KEY_LEFT, MOD_ALT
         } else if ([name isEqualToString:@"moveWordRight:"] || [name isEqualToString:@"moveWordForward:"]) {
             command = 2; modifiers |= 4; // KEY_RIGHT, MOD_ALT
