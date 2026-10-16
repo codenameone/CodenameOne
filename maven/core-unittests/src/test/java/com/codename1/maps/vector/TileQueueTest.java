@@ -160,6 +160,36 @@ class TileQueueTest extends UITestBase {
         assertTrue(imagesDrawn(drawing) > 0, "the level above stands in for it");
     }
 
+    @FormTest
+    void overzoomedTilesTheViewLeftBehindAreNotDrawnWhenTheirAncestorArrives() throws Exception {
+        // Level 16 over a source whose deepest level is 14: every tile in view
+        // is a piece of a level-14 tile that is fetched once.
+        HoldingSource source = new HoldingSource(14);
+        VectorMapEngine engine = engine(source, 16);
+        engine.setViewport(200, 200);
+        engine.hasRenderedVisibleTiles();
+        String sfTile = tileAt(SAN_FRANCISCO, 16);
+        int sent = source.held.size();
+        assertTrue(sent > 0, "the ancestors were asked for");
+
+        // The view moves on while those fetches are at the source, and then
+        // they arrive.
+        engine.setCenter(LONDON);
+        engine.hasRenderedVisibleTiles();
+        for (int i = 0; i < sent; i++) {
+            source.answerOne();
+        }
+        long deadline = System.currentTimeMillis() + 1500;
+        while (System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        java.lang.reflect.Field field = VectorMapEngine.class.getDeclaredField("rendered");
+        field.setAccessible(true);
+        TileCache rendered = (TileCache) field.get(engine);
+        assertTrue(rendered.get(sfTile) == null, "a tile no longer in view was drawn");
+    }
+
     // However the port in use draws an image at a size.
     private static int imagesDrawn(TestCodenameOneImplementation drawing) {
         int drawn = 0;

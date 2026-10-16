@@ -637,18 +637,29 @@ public class Payments {
     public ReceiptDto refund(String rideId, String reason) throws IOException {
         Ride ride = claimRefund(rideId);
         Payment payment = payment(rideId);
+        String why = cut(reason == null ? "" : reason.trim(), 255);
         PaymentProvider.Refund fare;
         PaymentProvider.Refund tip = null;
         try {
             fare = provider.refund(payment.getProviderRef(), payment.getAmountCents());
-            if (payment.getTipRef().length() > 0) {
-                tip = provider.refund(payment.getTipRef(), ride.getTipCents());
-            }
         } catch (IOException failed) {
             releaseRefund(rideId);
             throw unavailable("refund", failed);
         }
-        keepRefund(rideId, fare, tip, cut(reason == null ? "" : reason.trim(), 255));
+        if (payment.getTipRef().length() > 0) {
+            try {
+                tip = provider.refund(payment.getTipRef(), ride.getTipCents());
+            } catch (IOException failed) {
+                // The fare is back with the rider already. Paid again, the
+                // ride would show that money as paid and its driver could cash
+                // it out; so the fare's refund is kept and the payment marked
+                // failed, which is what it is until a person with the
+                // processor's records settles the tip -- see settleRefunds.
+                keepPartialRefund(rideId, fare, why);
+                throw unavailable("tip refund", failed);
+            }
+        }
+        keepRefund(rideId, fare, tip, why);
         live.rideChanged(rideId, ride.getState(), ride.getRider(), ride.getDriver(), "");
         return receipt("", true, rideId);
     }
@@ -848,6 +859,19 @@ public class Payments {
         payment.setTipRefundRef(tip == null ? "" : cut(tip.reference, 64));
         payment.setRefundReason(reason);
         payment.setRefundedAt(pending ? 0L : System.currentTimeMillis());
+    }
+
+    /// Records a refund of the fare whose tip could not be refunded: the ride
+    /// and its payment are [#REFUND_FAILED], with the fare's refund kept.
+    @Transactional
+    private void keepPartialRefund(String rideId, PaymentProvider.Refund fare, String reason) {
+        rides.paymentStatus(rideId, REFUND_FAILED);
+        Payment payment = payments.findById(rideId);
+        payment.setStatus(REFUND_FAILED);
+        payment.setRefundRef(cut(fare.reference, 64));
+        payment.setTipRefundRef("");
+        payment.setRefundReason(reason);
+        payment.setRefundedAt(0L);
     }
 
     // -------------------------------------------------------------- receipts

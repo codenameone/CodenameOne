@@ -25,6 +25,7 @@ package com.codenameone.examples.wayline.ride;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
+import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
 import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverApplication;
 import com.codenameone.examples.wayline.domain.DriverState;
@@ -227,8 +228,16 @@ public class Matcher {
     }
 
     /// Whether the account of this name exists and has not been blocked.
+    ///
+    /// Read once: an account closed between asking whether it exists and
+    /// loading it would otherwise throw, and turn a rider's request into a
+    /// server error over a driver who is simply no longer there.
     boolean enabled(String username) {
-        return users.userExists(username) && users.loadUserByUsername(username).isEnabled();
+        try {
+            return users.loadUserByUsername(username).isEnabled();
+        } catch (UsernameNotFoundException gone) {
+            return false;
+        }
     }
 
     /// The nearest free driver fit for a ride who has not already passed on it,

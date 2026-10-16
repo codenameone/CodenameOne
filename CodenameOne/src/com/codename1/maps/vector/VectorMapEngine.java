@@ -688,11 +688,13 @@ public final class VectorMapEngine {
             // wants it yet.
             if (overzoomed) {
                 int depth = z - source.getMaxZoom();
-                stillWanted(TileUtil.key(source.getMaxZoom(), x >> depth, y >> depth));
+                String parentKey = TileUtil.key(source.getMaxZoom(), x >> depth, y >> depth);
+                stillWanted(parentKey);
                 Piece waiting = (Piece) waitingPieces.get(key);
                 if (waiting != null) {
                     waiting.pass = pass;
                 }
+                stillWaiting(parentKey, z, x, y);
             } else {
                 stillWanted(key);
             }
@@ -710,7 +712,7 @@ public final class VectorMapEngine {
             // An overzoom fetch of this very tile is in flight (the user zoomed
             // back out): join it as its depth-0 piece instead of fetching again.
             pending.put(key, Integer.valueOf(generation));
-            loading.add(new int[]{z, x, y});
+            loading.add(new int[]{z, x, y, pass});
             stillWanted(key);
             return;
         }
@@ -1036,7 +1038,9 @@ public final class VectorMapEngine {
         final String parentKey = TileUtil.key(parentZ, px, py);
         final int requestGeneration = generation;
         pending.put(key, Integer.valueOf(requestGeneration));
-        final int[] address = new int[]{z, x, y};
+        // The last element is the last pass that asked for the tile; see
+        // stillWaiting.
+        final int[] address = new int[]{z, x, y, pass};
         final VectorTile parent = (VectorTile) decodedParents.get(parentKey);
         if (parent != null) {
             // Rasterizing is EDT work, but not work for the middle of a paint.
@@ -1138,7 +1142,33 @@ public final class VectorMapEngine {
         return true;
     }
 
+    // A tile waiting on an ancestor whose fetch is already at the source is in
+    // neither the queue nor the pieces endPass looks at, so a pass that no
+    // longer shows it cannot drop it. Its address records the last pass that
+    // asked for it instead, and is refreshed here each time one does.
+    private void stillWaiting(String parentKey, int z, int x, int y) {
+        List waiters = (List) parentWaiters.get(parentKey);
+        if (waiters == null) {
+            return;
+        }
+        for (Object w : waiters) {
+            int[] a = (int[]) w;
+            if (a[0] == z && a[1] == x && a[2] == y) {
+                a[3] = pass;
+            }
+        }
+    }
+
     private void queuePiece(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
+        if (address[3] != pass) {
+            // Its ancestor arrived after the view moved on: the last pass did
+            // not ask for it, and drawing it would spend the event thread on
+            // a tile nobody sees and push ones in view out of the cache. It
+            // goes back to being absent, as endPass leaves the tiles it drops.
+            removePendingIfMatches(TileUtil.key(address[0], address[1], address[2]),
+                    requestGeneration);
+            return;
+        }
         Piece piece = new Piece();
         piece.parent = parent;
         piece.parentZ = parentZ;

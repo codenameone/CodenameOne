@@ -143,6 +143,10 @@ public class PhoneVerification {
     /// and another may be asked for at once.
     @Transactional
     void discard(String username, String codeHash) throws IOException {
+        // The hold store() takes, before the row is read: a resend storing its
+        // code meanwhile commits first, and this then finds that code and
+        // leaves it, where read before the wait it would overwrite or delete it.
+        accounts.hold(username);
         PhoneCode pending = codes.findById(username);
         if (pending == null || !codeHash.equals(pending.getCodeHash())) {
             return;
