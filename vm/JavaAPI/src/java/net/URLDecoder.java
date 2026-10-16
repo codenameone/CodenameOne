@@ -128,6 +128,12 @@ public class URLDecoder {
             }
             out.append(new String(bytes, 0, count, enc));
         }
+        // A string with no escapes comes back as it is without `enc` being
+        // looked at, so an encoding this runtime lacks is reported only once
+        // an escape needs it. The JDK would refuse it at once. This is not the
+        // JDK: the runtime has UTF-8 and ISO-8859-1, which are what a URL is
+        // decoded with, and a check for the others on every call would be
+        // paid by every caller for a mistake none of them makes.
         return out == null ? s : out.toString();
     }
 }

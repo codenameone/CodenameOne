@@ -65,9 +65,49 @@ public class HTML5LocationManager extends LocationManager {
     private long lastFixTime;
     private int watchId = -1;
     private boolean watching;
-    /// Counts the watches started, so an answer to one that has been cleared
-    /// since is not taken for an answer to the current one.
-    private int watchGeneration;
+
+    // Two callbacks for the life of the manager, not one per request. A
+    // callback handed to the page is given an entry in the runtime's table of
+    // worker callbacks that nothing ever removes, so a new one per request or
+    // per watch would be kept for good, with everything it holds.
+    //
+    // The one-shot answers are therefore shared: whoever is waiting takes
+    // the next answer to arrive, which is as current as the one asked for.
+    // Each answer bumps answerCount; a request waits for a count above the
+    // one it started at.
+    private final Object answerLock = new Object();
+    private int answerCount;
+    private Answer latestAnswer;
+    private final GeoCallback oneShot = new GeoCallback() {
+        @Override
+        public void onAnswer(MessageEvent answer) {
+            Answer parsed = parse(answer == null ? null : answer.getDataAsString());
+            synchronized (answerLock) {
+                latestAnswer = parsed;
+                answerCount++;
+                answerLock.notifyAll();
+            }
+        }
+    };
+    // An answer from a watch already cleared that arrives after another has
+    // started is still a position, and is delivered; one that arrives while
+    // nothing watches is dropped.
+    private final GeoCallback watcher = new GeoCallback() {
+        @Override
+        public void onAnswer(MessageEvent answer) {
+            final Answer parsed = parse(answer == null ? null : answer.getDataAsString());
+            // On the event thread: the listener is the application's, and
+            // so is everything it touches.
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (watching) {
+                        deliver(parsed);
+                    }
+                }
+            });
+        }
+    };
 
     public HTML5LocationManager(){
 
@@ -163,33 +203,30 @@ public class HTML5LocationManager extends LocationManager {
         if (recent != null && System.currentTimeMillis() - lastFixTime <= FRESH_MILLIS) {
             return recent;
         }
-        final Answer[] result = new Answer[1];
-        window().cn1GeoRequest(new GeoCallback() {
-            @Override
-            public void onAnswer(MessageEvent answer) {
-                Answer parsed = parse(answer == null ? null : answer.getDataAsString());
-                synchronized (result) {
-                    result[0] = parsed;
-                    result.notifyAll();
-                }
-            }
-        }, false, REQUEST_TIMEOUT, 0, false);
+        int asked;
+        synchronized (answerLock) {
+            asked = answerCount;
+        }
+        window().cn1GeoRequest(oneShot, false, REQUEST_TIMEOUT, 0, false);
 
         long deadline = System.currentTimeMillis() + REQUEST_TIMEOUT + REQUEST_GRACE;
-        synchronized (result) {
-            while (result[0] == null) {
+        Answer answer = null;
+        synchronized (answerLock) {
+            while (answerCount == asked) {
                 long left = deadline - System.currentTimeMillis();
                 if (left <= 0) {
                     break;
                 }
                 try {
-                    result.wait(left);
+                    answerLock.wait(left);
                 } catch (InterruptedException ie) {
                     throw new IOException("Interrupted while waiting for location", ie);
                 }
             }
+            if (answerCount != asked) {
+                answer = latestAnswer;
+            }
         }
-        Answer answer = result[0];
         if (answer == null) {
             // The permission prompt is still open, most likely.
             throw new IOException("The browser did not answer the location request");
@@ -212,26 +249,10 @@ public class HTML5LocationManager extends LocationManager {
             return;
         }
         watching = true;
-        final int generation = ++watchGeneration;
         LocationRequest request = getRequest();
         boolean precise = request != null
                 && request.getPriority() == LocationRequest.PRIORITY_HIGH_ACCUARCY;
-        watchId = window().cn1GeoRequest(new GeoCallback() {
-            @Override
-            public void onAnswer(MessageEvent answer) {
-                final Answer parsed = parse(answer == null ? null : answer.getDataAsString());
-                // On the event thread: the listener is the application's, and
-                // so is everything it touches.
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (generation == watchGeneration && watching) {
-                            deliver(parsed);
-                        }
-                    }
-                });
-            }
-        }, true, 0, 0, precise);
+        watchId = window().cn1GeoRequest(watcher, true, 0, 0, precise);
     }
 
     private void deliver(Answer answer) {
@@ -264,7 +285,6 @@ public class HTML5LocationManager extends LocationManager {
     protected void clearListener() {
         if (watching) {
             watching = false;
-            watchGeneration++;
             window().cn1GeoClear(watchId);
             watchId = -1;
         }
