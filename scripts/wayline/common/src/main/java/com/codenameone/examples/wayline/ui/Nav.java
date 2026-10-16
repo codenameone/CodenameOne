@@ -66,6 +66,13 @@ public final class Nav {
     private Nav() {
     }
 
+    /// Whether `form` is still the home screen, for an answer that arrives
+    /// after the user has gone to another mode or signed out and should then
+    /// change nothing.
+    public static boolean isHome(Form form) {
+        return form != null && form == homeForm;
+    }
+
     /// The first screen: wherever the stored session leads.
     public static void launch() {
         Session.onSignedOut(() -> {
@@ -125,7 +132,7 @@ public final class Nav {
         if (!DRIVER.equals(mode)) {
             // Out of the driver's side of the app is off line as far as the
             // phone is concerned: nothing goes on reporting where it is.
-            Shift.end();
+            Shift.leave();
         }
         Home home = ADMIN.equals(mode) ? new AdminForm()
                 : !DRIVER.equals(mode) ? new RiderForm()
@@ -199,7 +206,7 @@ public final class Nav {
 
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
-        Shift.end();
+        Shift.leave();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";
@@ -238,7 +245,7 @@ public final class Nav {
         // a live refresh token and this phone's push registration, and go on
         // notifying it about that account's rides.
         Account.flush();
-        Shift.end();
+        Shift.leave();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";

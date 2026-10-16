@@ -367,6 +367,13 @@ public final class Session {
     public static void signOut(final Runnable done) {
         OidcTokens tokens = authorizer.getTokens();
         if (tokens != null && tokens.getRefreshToken() != null) {
+            // Sent and not waited for. Signing out is something the user does
+            // to this phone, and it is done here whether or not the server
+            // answers: the tokens are gone from the device either way. A
+            // revocation that is lost leaves a refresh token only someone who
+            // already copied it off the phone could use, and it expires on
+            // its own; holding the sign-out until the network allows would
+            // trap the user signed in on a phone with no connection.
             client.revoke(tokens.getRefreshToken());
         }
         user = null;

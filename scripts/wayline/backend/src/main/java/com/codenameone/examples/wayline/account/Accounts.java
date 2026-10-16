@@ -35,6 +35,7 @@ import com.codenameone.examples.wayline.api.RegisterDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.domain.ClosedAccount;
 import com.codenameone.examples.wayline.domain.Profile;
+import com.codenameone.examples.wayline.driver.Earnings;
 import com.codenameone.examples.wayline.driving.Applications;
 import com.codenameone.examples.wayline.live.LiveHub;
 import com.codenameone.examples.wayline.pay.Payments;
@@ -71,11 +72,13 @@ public class Accounts {
     private final LiveHub live;
     private final ClosedAccountRepository closed;
     private final Grants grants;
+    private final Earnings earnings;
 
     public Accounts(ProfileRepository profiles, AccountCleanup cleanup,
             JdbcUserDetailsManager users, PasswordEncoder encoder, Applications applications,
             Moderation moderation, Payments payments, LiveHub live,
-            ClosedAccountRepository closed, Grants grants) {
+            ClosedAccountRepository closed, Grants grants, Earnings earnings) {
+        this.earnings = earnings;
         this.closed = closed;
         this.grants = grants;
         this.profiles = profiles;
@@ -442,6 +445,14 @@ public class Accounts {
         }
         if (cleanup.hasRideUnderWay(username)) {
             throw new ResponseStatusException(409, "Finish your ride before closing the account");
+        }
+        // Money this driver is owed. The rides and the payout ledger outlive
+        // the account, but the sign-in and the payout account do not, and
+        // the name is retired: once closed, nobody could cash it out. So the
+        // driver cashes out first. No ride is under way, so nothing can add
+        // to the balance between this check and the commit.
+        if (earnings.balance(username) > 0L) {
+            throw new ResponseStatusException(409, "Cash out your earnings before closing the account");
         }
         payments.forget(username);
         applications.forget(username);

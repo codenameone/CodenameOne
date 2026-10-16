@@ -250,8 +250,9 @@ public class Earnings {
 
     /// Everything earned less everything paid out.
     ///
-    /// The dashboard's totals count the same rides as [#earned].
-    private long balance(String driver) {
+    /// The dashboard's totals count the same rides as [#earned]. Closing an
+    /// account asks it too, and is refused while it is above zero.
+    public long balance(String driver) {
         return earned(driver) - Rows.number(payouts.paidOut(driver));
     }
 

@@ -134,6 +134,12 @@ public class DriverForm extends LiveChannel.Adapter implements Nav.Home {
         display();
         // Picks up where the driver left off: still online, perhaps mid-ride.
         Api.driver().me(Net.to(me -> {
+            // Too late: the user has left for another mode or signed out, and
+            // Shift was ended then. Starting it again here would report a
+            // driver with no driver's screen.
+            if (!Nav.isHome(form)) {
+                return;
+            }
             online = me.online();
             shift();
             showing = "";

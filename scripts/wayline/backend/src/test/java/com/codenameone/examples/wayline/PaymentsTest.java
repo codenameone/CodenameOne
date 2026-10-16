@@ -299,6 +299,12 @@ class PaymentsTest {
         mvc.perform(People.asDriver(get("/api/driver/earnings"), driver))
                 .andExpect(jsonPath("$.totalCents").value((int) (earned - 300L)));
 
+        // Nor can an account that is owed money be closed: nobody could cash
+        // it out afterwards.
+        mvc.perform(People.asDriver(Trips.body(post("/api/account/delete"),
+                        "{\"password\":\"" + People.PASSWORD + "\"}"), driver))
+                .andExpect(status().isConflict());
+
         // Cashing out needs somewhere to send it, and empties the balance.
         mvc.perform(People.asDriver(get("/api/driver/payouts"), driver))
                 .andExpect(jsonPath("$.length()").value(0));

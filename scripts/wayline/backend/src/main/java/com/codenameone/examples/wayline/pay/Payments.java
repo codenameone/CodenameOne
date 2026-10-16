@@ -471,6 +471,12 @@ public class Payments {
     /// held, which nothing else in this class does.
     @Transactional(rollbackFor = IOException.class)
     public void forget(String username) throws IOException {
+        // Only charges still being retried hold a closure up. One left
+        // pending past the retry window has already been handed to a person
+        // to settle against the processor's own records, which keep the
+        // charge and the card used after the customer is deleted here.
+        // Counting it would refuse the closure for good over something the
+        // rider can do nothing about.
         if (awaitsCharge(username, null, retriedSince())) {
             throw new ResponseStatusException(409,
                     "A ride is still being paid for. Try again in a few minutes");

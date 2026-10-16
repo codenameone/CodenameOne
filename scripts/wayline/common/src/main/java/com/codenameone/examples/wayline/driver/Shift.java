@@ -105,6 +105,21 @@ public final class Shift {
         }
     }
 
+    /// Leaving the driver's side of the app, with the session still there:
+    /// the server is told this driver is off line before the phone stops
+    /// reporting. Otherwise it would go on offering rides to a phone that is
+    /// no longer listening until the reports went stale, a minute, and each
+    /// rider would wait out an offer nobody sees. One request, not waited
+    /// for; if it is lost the minute is the fallback.
+    public static void leave() {
+        if (on) {
+            LatLng where = Locator.here();
+            Api.driver().status(new DriverStatusDto(false, where.getLatitude(),
+                    where.getLongitude(), Locator.heading()), Net.to(me -> { }, QUIET));
+        }
+        end();
+    }
+
     public static boolean isOn() {
         return on;
     }
