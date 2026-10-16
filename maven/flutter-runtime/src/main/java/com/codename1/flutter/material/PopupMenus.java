@@ -97,7 +97,7 @@ public final class PopupMenus {
             return;
         }
         dismiss();
-        com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(new BorderLayout());
+        com.codename1.ui.Dialog d = newMenuDialog();
         d.setDisposeWhenPointerOutOfBounds(true);
         Container c = FlutterUI.wrap(menu);
         d.add(BorderLayout.CENTER, c);
@@ -158,6 +158,33 @@ public final class PopupMenus {
         }
     }
 
+    /**
+     * The menu's dialog. Codename One disposes it ITSELF when the user taps outside
+     * (setDisposeWhenPointerOutOfBounds), a path that never reached {@link #dismiss}:
+     * the menu's tree stayed mounted and referenced, {@link #isOpen} stayed true and an
+     * anchored menu's page tint was not restored. Every way the dialog closes now goes
+     * through dismiss, as Dialogs.present does for its dialogs.
+     */
+    static com.codename1.ui.Dialog newMenuDialog() {
+        return new com.codename1.ui.Dialog(new BorderLayout()) {
+            @Override
+            public void dispose() {
+                super.dispose();
+                if (openMenu == this) {
+                    // Disposed from outside: clear the state; dismiss must not dispose again.
+                    openMenu = null;
+                    dismiss();
+                }
+            }
+        };
+    }
+
+    /** Test hook: makes {@code d} the open menu, as show() does once it is built. */
+    static void adoptOpenMenu(com.codename1.ui.Dialog d, Element root) {
+        openMenu = d;
+        openRoot = root;
+    }
+
     /** Closes the open menu, if any. */
     public static void dismiss() {
         restoreTint();
@@ -165,9 +192,10 @@ public final class PopupMenus {
             FlutterUI.unmountTree(openRoot);
             openRoot = null;
         }
-        if (openMenu != null) {
-            openMenu.dispose();
-            openMenu = null;
+        com.codename1.ui.Dialog m = openMenu;
+        openMenu = null;
+        if (m != null) {
+            m.dispose();
         }
     }
 

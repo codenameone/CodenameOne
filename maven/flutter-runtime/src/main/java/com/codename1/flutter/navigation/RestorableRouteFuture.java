@@ -46,6 +46,7 @@ public class RestorableRouteFuture<T> extends RestorableProperty<Object> {
     private Funcs.Func2<NavigatorState, Object, String> onPresent;
     private Funcs.VoidFunc1<T> onComplete;
     private boolean present;
+    private String route;
 
     public RestorableRouteFuture() {
     }
@@ -60,18 +61,36 @@ public class RestorableRouteFuture<T> extends RestorableProperty<Object> {
         this.onComplete = callback;
     }
 
-    /** Imperatively present the route. Optional argument is forwarded to onPresent. */
+    /**
+     * Presents the route: {@code onPresent} pushes it on the navigator of the State
+     * that registered this property (Flutter's default navigatorFinder), and the
+     * route's result, when it pops, goes to {@code onComplete}. This used to set a
+     * flag only, so the route or dialog never opened.
+     */
     public void present(Object arguments) {
+        NavigatorState nav = Navigator.of(ownerContext(), Boolean.FALSE);
+        String id = onPresent == null ? null : onPresent.call(nav, arguments);
+        this.route = id;
         this.present = true;
         notifyListeners();
+        dart.async.Future<Object> result = Navigator.claimRestorableResult(id);
+        if (result != null) {
+            result.then(new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object value) {
+                    complete(value);
+                }
+            });
+        }
     }
 
     public boolean isPresent() {
         return present;
     }
 
+    /** The restoration id of the presented route while it is showing, else null. */
     public String route() {
-        return null;
+        return present ? route : null;
     }
 
     // ------------------------------------------------------------------
@@ -82,6 +101,7 @@ public class RestorableRouteFuture<T> extends RestorableProperty<Object> {
     @SuppressWarnings("unchecked")
     void complete(Object result) {
         this.present = false;
+        this.route = null;
         if (onComplete != null) {
             onComplete.call((T) result);
         }

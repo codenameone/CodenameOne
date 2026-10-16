@@ -133,8 +133,10 @@ class NamedRouteTest {
 
         state.pushNamed("/demo/a", null);
         assertEquals(1, Navigator.stackSize());
-        assertEquals("/demo/b", state.restorablePushNamed("/demo/b", null),
-                "the restoration id is informational — the route name itself");
+        // Opaque, as in Flutter, and unique per push: RestorableRouteFuture claims the
+        // pushed route's result with it, so it cannot simply be the route name.
+        String id = state.restorablePushNamed("/demo/b", null);
+        assertTrue(id != null && !id.isEmpty(), "a pushed route has a restoration id");
         assertEquals(2, Navigator.stackSize());
         assertTrue(state.canPop());
 

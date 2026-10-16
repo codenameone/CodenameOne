@@ -566,7 +566,20 @@ public class AnimationController extends Animation<Double> {
     private void finishRun(int gen) {
         currentValue = runTargetValue;
         running = false;
+        dart.async.Completer<Object> finishing = runCompleter;
         notifyListeners();
+        if (generation != gen) {
+            // A value listener started another run as this one landed -- reverse() the
+            // moment forward() reaches its target. That run now owns the status and its
+            // own future; deriving this run's ending from it completed the NEW future at
+            // once and reported the wrong terminal status. This run did finish, so its
+            // own future completes, as Flutter's ticker stops (canceled: false) before
+            // notifying; a canceling stop() inside the listener already took it.
+            if (finishing != null && finishing != runCompleter) {
+                finishing.complete(null);
+            }
+            return;
+        }
 
         if (repeating) {
             repeatLegsDone++;

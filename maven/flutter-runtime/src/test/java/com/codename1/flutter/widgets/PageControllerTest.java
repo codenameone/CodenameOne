@@ -230,6 +230,30 @@ class PageControllerTest {
      * known, same as {@code initialPage} itself.
      */
     @Test
+    void aReplacementControllerOpensOnItsOwnPendingOrInitialPage() {
+        PageController first = new PageController();
+        com.codename1.flutter.Element root = FlutterUI.mount(carousel(first, 6, null, null),
+                host = new RenderHost(), owner = new BuildOwner());
+        RenderElement r = host.rootRenderElement();
+        r.layout(BoxConstraints.tight(500, 200));
+        assertEquals(0.0, first.page(), 0.0001);
+
+        // A controller that cached a jump before it had a view: Flutter applies it as
+        // the starting page. Swapped in, it used to inherit the old pane offset instead.
+        PageController pending = new PageController();
+        pending.jumpToPage(4);
+        root.update(carousel(pending, 6, null, null));
+        r.layout(BoxConstraints.tight(500, 200));
+        assertEquals(4.0, pending.page(), 0.0001, "the pending jump must be consumed");
+
+        PageController initial = new PageController();
+        initial.initialPage(2);
+        root.update(carousel(initial, 6, null, null));
+        r.layout(BoxConstraints.tight(500, 200));
+        assertEquals(2.0, initial.page(), 0.0001, "and a fresh one opens on its initialPage");
+    }
+
+    @Test
     void anAnimateToPageBeforeAttachmentOpensOnThatPageInstead() {
         PageController c = new PageController();
         c.animateToPage(3, null, null);

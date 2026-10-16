@@ -68,7 +68,7 @@ public interface RestorationMixin {
      */
     default void registerForRestoration(RestorableProperty<?> property, String restorationId) {
         if (property != null) {
-            property.markRegistered();
+            property.markRegistered(this);
         }
     }
 

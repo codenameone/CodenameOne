@@ -26,37 +26,31 @@ package com.codename1.flutter;
 import dart.core.DateTime;
 
 /**
- * A restorable {@code DateTime} — Flutter's {@code RestorableDateTime} (a
- * {@code RestorableValue<DateTime>}). The value is held as a
- * {@link dart.core.DateTime} so callers can read date components (e.g.
+ * A restorable {@code DateTime} -- Flutter's {@code RestorableDateTime}, a
+ * {@link RestorableValue}{@code <DateTime>} as the Dart stub declares, so it can be
+ * passed wherever a {@code RestorableValue<DateTime>} is expected. The value is held
+ * as a {@link dart.core.DateTime} so callers can read date components (e.g.
  * {@code value.millisecondsSinceEpoch}). Restoration is not persisted.
  */
-public class RestorableDateTime extends RestorableProperty<DateTime> {
+public class RestorableDateTime extends RestorableValue<DateTime> {
 
-    private DateTime current;
+    private final DateTime defaultValue;
 
     public RestorableDateTime(DateTime defaultValue) {
-        this.current = defaultValue;
+        this.defaultValue = defaultValue;
     }
 
-    public DateTime value() {
-        return current;
-    }
-
+    /** Notifies only for a different instant, as before. */
+    @Override
     public void value(DateTime v) {
+        DateTime current = value();
         if (current == null ? v != null : !current.equals(v)) {
-            current = v;
-            notifyListeners();
+            super.value(v);
         }
     }
 
     @Override
     public DateTime createDefaultValue() {
-        return current;
-    }
-
-    @Override
-    public void initWithValue(DateTime value) {
-        this.current = value;
+        return defaultValue;
     }
 }

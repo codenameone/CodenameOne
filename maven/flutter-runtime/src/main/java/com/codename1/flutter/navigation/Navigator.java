@@ -577,9 +577,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public String restorablePushNamed(String routeName, Object arguments) {
-            Navigator.pushNamed(null, routeName, arguments);
-            // restoration is not persisted; the id is informational
-            return routeName == null ? "" : routeName;
+            return trackRestorable(pushNamedForResult(null, routeName, arguments));
         }
 
         @Override
@@ -766,8 +764,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public String restorablePushNamed(String routeName, Object arguments) {
-            Navigator.pushNamed(context, routeName, arguments);
-            return routeName == null ? "" : routeName;
+            return trackRestorable(pushNamedForResult(context, routeName, arguments));
         }
 
         @Override
@@ -818,9 +815,37 @@ public class Navigator extends StatelessWidget {
             dart.runtime.Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
         Object route = routeBuilder != null ? routeBuilder.call(context, arguments) : null;
         if (route instanceof Route) {
-            push(context, (Route) route);
+            return trackRestorable(push(context, (Route) route));
         }
         return "";
+    }
+
+    /// Pushed routes' result futures by restoration id, until claimed or completed --
+    /// how a RestorableRouteFuture learns when the route it presented is popped.
+    private static final java.util.Map<String, dart.async.Future<Object>> RESTORABLE_RESULTS =
+            new java.util.HashMap<String, dart.async.Future<Object>>();
+    private static int restorableIds;
+
+    /// The id a restorable push answers: opaque, as in Flutter, and unique, so the
+    /// presenter can claim the route's result with it. "" when nothing was pushed.
+    private static String trackRestorable(dart.async.Future<Object> result) {
+        if (result == null) {
+            return "";
+        }
+        final String id = "cn1-restorable-" + (++restorableIds);
+        RESTORABLE_RESULTS.put(id, result);
+        result.then(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object value) {
+                RESTORABLE_RESULTS.remove(id);
+            }
+        });
+        return id;
+    }
+
+    /// The result future of the restorable push that answered {@code id}, or null.
+    static dart.async.Future<Object> claimRestorableResult(String id) {
+        return id == null ? null : RESTORABLE_RESULTS.remove(id);
     }
 
     /**

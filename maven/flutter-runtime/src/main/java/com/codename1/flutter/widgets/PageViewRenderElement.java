@@ -84,6 +84,9 @@ public class PageViewRenderElement extends ScrollRenderElement {
     private PageController attached;
     private long reportedPage;
     private boolean initialScrollApplied;
+    /// A replacement controller must move the pane even to page 0: the pane may sit
+    /// wherever the previous controller left it.
+    private boolean restartOnAttach;
 
     @Override
     protected void viewport(double width, double height) {
@@ -122,12 +125,18 @@ public class PageViewRenderElement extends ScrollRenderElement {
         if (c == attached) {
             return;
         }
+        boolean replacing = attached != null || initialScrollApplied;
         if (attached != null) {
             attached.detach(this);
         }
         attached = c;
         if (attached != null) {
             attached.attach(this);
+            // A replacement controller starts like a first one: its own initialPage, or
+            // a jump/animate it cached before it had a view. Leaving the startup applied
+            // published the old pane offset to it and dropped both.
+            initialScrollApplied = false;
+            restartOnAttach = replacing;
             // Seed the reported page so settling on the page we STARTED on is not
             // announced as a change - Flutter fires onPageChanged on transitions,
             // never for the initial page.
@@ -165,9 +174,10 @@ public class PageViewRenderElement extends ScrollRenderElement {
             Long pending = attached.takePendingPage();
             long startPage = pending != null ? pending.longValue() : attached.initialPage();
             reportedPage = startPage;
-            if (startPage != 0) {
+            if (startPage != 0 || restartOnAttach) {
                 scrollToPage(startPage, false);
             }
+            restartOnAttach = false;
         }
         // Headless there is no pane and therefore no scrolling: the view simply
         // sits on whichever page it opened on.

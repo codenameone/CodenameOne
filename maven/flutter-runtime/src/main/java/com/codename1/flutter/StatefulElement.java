@@ -51,6 +51,13 @@ public class StatefulElement extends ComposedElement {
     @Override
     protected void firstBuild() {
         state.initState();
+        // RestorationMixin promises restoreState after initState and before the first
+        // build -- where a state registers its restorable properties. Nothing called it,
+        // so isRegistered() stayed false and that set-up never ran. No bucket is ever
+        // restored here, so it is always the initial restore with no old bucket.
+        if (state instanceof RestorationMixin) {
+            ((RestorationMixin) state).restoreState(null, true);
+        }
         // Flutter runs didChangeDependencies right after initState and before the first
         // build; widgets that create controllers there (e.g. a PageController sized from
         // MediaQuery) rely on it having run before build reads them.

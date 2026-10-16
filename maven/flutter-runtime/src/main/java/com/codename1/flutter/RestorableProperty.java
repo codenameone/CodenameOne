@@ -100,6 +100,22 @@ public class RestorableProperty<T> {
         this.registered = true;
     }
 
+    /// The State that registered this property, so a property that acts on the tree
+    /// (RestorableRouteFuture finding its Navigator) has a context; null until then.
+    private State<?> owner;
+
+    void markRegistered(Object state) {
+        markRegistered();
+        if (state instanceof State) {
+            this.owner = (State<?>) state;
+        }
+    }
+
+    /// The registering State's context, or null when unregistered or unmounted.
+    protected BuildContext ownerContext() {
+        return owner == null ? null : owner.context();
+    }
+
     void markUnregistered() {
         this.registered = false;
     }
