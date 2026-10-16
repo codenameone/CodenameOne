@@ -64,9 +64,20 @@ public final class AppConfig {
         String url = System.getProperty("wayline.server.url");
         if (url == null || url.length() == 0) {
             String origin = pageOrigin();
-            url = Preferences.get(SERVER_KEY, origin == null ? DEFAULT_SERVER : origin);
+            // In a browser it is always the page's own server: see
+            // serverSwitchable(). An address saved before that is ignored.
+            url = origin != null ? origin : Preferences.get(SERVER_KEY, DEFAULT_SERVER);
         }
         return clean(url);
+    }
+
+    /// Whether the app may be pointed at another server. Not in a browser:
+    /// there the authorization code is sent back to the page's own server
+    /// ([#redirectUri]), and another server has not registered that address
+    /// as one of its own, so every sign-in after a switch would be refused.
+    /// The hosted app is the server's own, and talks to that server.
+    public static boolean serverSwitchable() {
+        return pageOrigin() == null;
     }
 
     /// The address of the page the app is running in -- `https://host`, with

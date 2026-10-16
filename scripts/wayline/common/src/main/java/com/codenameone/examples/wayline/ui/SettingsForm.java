@@ -28,6 +28,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codenameone.examples.wayline.AppConfig;
 import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.AccountClosureDto;
@@ -199,8 +200,10 @@ public final class SettingsForm {
                         + "Codename One's analytics service under a made-up id for this "
                         + "device. Your name, e-mail, phone number, places and card details "
                         + "are never part of it, and turning it off in Settings stops it.")));
-        about.add(Ui.tap(Ui.row(FontImage.MATERIAL_DNS, "Server address", null, chevron()),
-                "server", e -> ServerForm.show(form)));
+        if (AppConfig.serverSwitchable()) {
+            about.add(Ui.tap(Ui.row(FontImage.MATERIAL_DNS, "Server address", null, chevron()),
+                    "server", e -> ServerForm.show(form)));
+        }
         page.add(about);
 
         page.add(Ui.secondary("Sign out", "signOut", e -> Nav.signOut()));

@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A handler that throws [ResponseStatusException] is answered with the status
 /// and the reason it chose, on the wire and through the in-process dispatch a
@@ -103,6 +104,38 @@ class ResponseStatusExceptionTest {
                     new String(com.codename1.impl.backend.BackendAccess.get().body(taken), "UTF-8"));
             assertEquals(503, backend.dispatch(request("/down")).getStatus());
             assertEquals(200, backend.dispatch(request("/ok")).getStatus());
+        } finally {
+            backend.stop();
+        }
+    }
+
+    /// A chosen status dispatched in process carries the headers the listener
+    /// would put on it -- CORS among them -- so a test sees what a browser sees.
+    @Test
+    void aDispatchedStatusIsDecoratedAsOnTheWire() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, "0");
+        settings.setProperty(Cors.ALLOWED_ORIGINS, "https://app.example");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        throw new ResponseStatusException(409, "taken");
+                    }
+                })
+                .start();
+        try {
+            HashMap headers = new HashMap();
+            headers.put("origin", "https://app.example");
+            HttpServer.Response answer = backend.dispatch(
+                    new HttpServer.Request("GET", "/taken", "HTTP/1.1", headers, null));
+            assertEquals(409, answer.getStatus());
+            StringBuilder sent = new StringBuilder();
+            for (Object pair : com.codename1.impl.backend.BackendAccess.get().headers(answer)) {
+                sent.append(java.util.Arrays.toString((String[]) pair)).append(' ');
+            }
+            assertTrue(sent.indexOf("Access-Control-Allow-Origin, https://app.example") >= 0,
+                    sent.toString());
         } finally {
             backend.stop();
         }

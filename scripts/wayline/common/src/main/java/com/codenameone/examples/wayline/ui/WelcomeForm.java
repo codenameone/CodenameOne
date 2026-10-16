@@ -24,6 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codenameone.examples.wayline.AppConfig;
 
 /// What a signed-out user sees.
 public final class WelcomeForm {
@@ -47,7 +48,9 @@ public final class WelcomeForm {
         actions.setScrollableY(false);
         actions.add(Ui.primary("Sign in", "signIn", e -> SignInForm.show(form)));
         actions.add(Ui.secondary("Create an account", "register", e -> RegisterForm.show(form)));
-        actions.add(Ui.link("Server address", "server", e -> ServerForm.show(form)));
+        if (AppConfig.serverSwitchable()) {
+            actions.add(Ui.link("Server address", "server", e -> ServerForm.show(form)));
+        }
 
         form.add(BorderLayout.CENTER, hero);
         form.add(BorderLayout.SOUTH, actions);

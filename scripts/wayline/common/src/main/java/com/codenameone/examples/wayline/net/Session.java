@@ -191,9 +191,16 @@ public final class Session {
     /// @param unreachable there is one, but the server did not answer
     public static void restore(final Runnable signedIn, final Runnable signedOut,
             final Runnable unreachable) {
+        // Loading the tokens can outlast the session it was asked in -- the
+        // server is changed while it reads -- and then neither answer is this
+        // session's to act on: see [#session].
+        final int asked = session;
         authorizer.load().ready(new SuccessCallback<OidcTokens>() {
             @Override
             public void onSucess(OidcTokens tokens) {
+                if (asked != session) {
+                    return;
+                }
                 if (tokens == null || tokens.getAccessToken() == null) {
                     signedOut.run();
                     return;
@@ -209,7 +216,9 @@ public final class Session {
         }).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
-                signedOut.run();
+                if (asked == session) {
+                    signedOut.run();
+                }
             }
         });
     }
@@ -228,7 +237,11 @@ public final class Session {
             }
             setUser(described);
             done.run();
-        }, failed));
+        }, (status, message) -> {
+            if (asked == session) {
+                failed.failed(status, message);
+            }
+        }));
     }
 
     /// Signs in with an e-mail address and password.

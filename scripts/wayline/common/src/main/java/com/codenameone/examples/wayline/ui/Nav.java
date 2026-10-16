@@ -252,7 +252,9 @@ public final class Nav {
         page.add(Ui.text(Lang.tr("The server at {0} did not answer.", Session.serverUrl()),
                 "WlText"));
         page.add(Ui.primary("Try again", "retry", e -> launch()));
-        page.add(Ui.secondary("Server address", "server", e -> ServerForm.show(form)));
+        if (AppConfig.serverSwitchable()) {
+            page.add(Ui.secondary("Server address", "server", e -> ServerForm.show(form)));
+        }
         form.add(BorderLayout.CENTER, page);
         form.show();
     }

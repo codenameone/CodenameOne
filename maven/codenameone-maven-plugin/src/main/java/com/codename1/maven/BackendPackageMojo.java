@@ -117,6 +117,13 @@ public class BackendPackageMojo extends AbstractMojo {
     private File output;
 
     /**
+     * Where cn1:backend-webapp staged the application: that goal's own
+     * parameter, read here so a non-default directory is the one served.
+     */
+    @Parameter(property = "cn1.backend.webapp.output", defaultValue = "${project.build.directory}/webapp")
+    private File webApp;
+
+    /**
      * A Linux deployment target -- musl-x86_64, musl-arm64, glibc-x86_64,
      * glibc-arm64 -- built in a container. Omitted, it compiles for this machine
      * with the host compiler, which is what a developer wants and what CI checks.
@@ -197,20 +204,21 @@ public class BackendPackageMojo extends AbstractMojo {
      * directory, the way it looks for application.properties, so a deployment is
      * the binary with that directory next to it. The default output is
      * target/&lt;artifactId&gt; and the app is staged in target/webapp, so they are
-     * neighbours already; a binary written anywhere else has the app copied to it.
+     * neighbours already; a binary written anywhere else, or an app staged
+     * anywhere else, has the app copied to the binary's directory.
      * The files are not linked into the binary: it serves them straight from the
      * page cache, which needs them to be files.
      */
     private void webAppBesideTheBinary() throws BuildExecutionException {
-        File staged = new File(project.getBuild().getDirectory(), "webapp");
-        if (!new File(staged, BackendWebApp.INDEX).isFile()) {
+        File staged = webApp;
+        if (staged == null || !new File(staged, BackendWebApp.INDEX).isFile()) {
             return;
         }
-        File beside = staged;
-        if (output != null && output.getAbsoluteFile().getParentFile() != null) {
-            beside = new File(output.getAbsoluteFile().getParentFile(), "webapp");
-            new BackendWebApp(MavenLog.of(getLog())).copy(staged, beside);
-        }
+        File binaryDir = output != null && output.getAbsoluteFile().getParentFile() != null
+                ? output.getAbsoluteFile().getParentFile() : new File(project.getBuild().getDirectory());
+        File beside = new File(binaryDir, "webapp");
+        // A no-op when the app was staged there already, the default.
+        new BackendWebApp(MavenLog.of(getLog())).copy(staged, beside);
         getLog().info("The web app is in " + beside + "; deploy that directory beside the binary");
     }
 

@@ -144,6 +144,35 @@ public class DependencyClassesTest {
                 java.util.Collections.<String>emptySet()).isEmpty());
     }
 
+    /// A shaded jar carries the application's contract beside the runtime it
+    /// was bundled with: the runtime is passed over, the contract is not.
+    @Test
+    public void scanReadsTheApplicationInAnArchiveThatCarriesARuntime() throws Exception {
+        File shaded = tmp.newFolder("shaded");
+        compile(shaded, "com.example.Marked", "@Deprecated public class Marked {}");
+        // compile() only writes com.example, so the runtime's entry is placed by
+        // hand; a marked class there must not be read.
+        compile(shaded, "com.example.Display", "@Deprecated public class Display {}");
+        File jar = new File(tmp.getRoot(), "shaded.jar");
+        ZipOutputStream out = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            out.putNextEntry(new ZipEntry("com/example/Marked.class"));
+            out.write(java.nio.file.Files.readAllBytes(
+                    new File(shaded, "com/example/Marked.class").toPath()));
+            out.closeEntry();
+            out.putNextEntry(new ZipEntry("com/codename1/ui/Display.class"));
+            out.write(java.nio.file.Files.readAllBytes(
+                    new File(shaded, "com/example/Display.class").toPath()));
+            out.closeEntry();
+        } finally {
+            out.close();
+        }
+
+        assertEquals(java.util.Collections.singleton("com/example/Marked"),
+                DependencyClasses.scan(Arrays.asList(jar.getPath()), null,
+                        java.util.Collections.singleton("Ljava/lang/Deprecated;")).keySet());
+    }
+
     @Test
     public void readFindsAnUnannotatedClassInADirectoryOrAnArchive() throws Exception {
         File sibling = tmp.newFolder("sibling");

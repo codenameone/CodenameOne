@@ -88,6 +88,13 @@ public class BackendRunMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.jvmArgs")
     private String jvmArgs;
 
+    /**
+     * Where cn1:backend-webapp staged the application: that goal's own
+     * parameter, read here so a non-default directory is the one served.
+     */
+    @Parameter(property = "cn1.backend.webapp.output", defaultValue = "${project.build.directory}/webapp")
+    private File webApp;
+
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (BackendModules.passOver(project, reactorProjects, getLog(), "backend")) {
             return;
@@ -134,9 +141,8 @@ public class BackendRunMojo extends AbstractMojo {
         // the server is told. Not when the project says where its application is:
         // a system property outranks the module's own files, and answering for it
         // would override a setting somebody wrote down.
-        File webApp = new File(project.getBuild().getDirectory(), "webapp");
         try {
-            if (new File(webApp, BackendWebApp.INDEX).isFile()
+            if (webApp != null && new File(webApp, BackendWebApp.INDEX).isFile()
                     && !BackendWebApp.rootIsConfigured(project.getBasedir(), System.getenv(), jvmArgs)) {
                 command.add("-D" + BackendWebApp.ROOT_PROPERTY + "=" + webApp.getAbsolutePath());
                 getLog().info("Serving the web app staged in " + webApp);

@@ -99,7 +99,8 @@ Any expiry date in the future and any security code work with them.
 
 The welcome screen offers to sign in or to create an account. **Server address**
 is there for a phone on the same network as a development server: `localhost`
-on a phone is the phone, so the app has to be told where the server is.
+on a phone is the phone, so the app has to be told where the server is. The
+app in a browser has no such entry: it always talks to the server that hosts it.
 
 .The welcome screen
 image::img/wayline-welcome.png["The Wayline welcome screen with buttons to sign in, to create an account and to set the server address",scaledwidth=40%]

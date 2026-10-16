@@ -247,10 +247,16 @@ public final class Backend {
         } catch (ResponseStatusException chosen) {
             // The listener turns this into the answer the handler chose, so a
             // test that dispatches here has to see that answer and not the throw.
-            return HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+            response = HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+            chain.decorateFallback(request, response);
+            return response;
         }
         if (response == null) {
             response = HttpServer.Response.text(404, "Not Found");
+            // Decorated as the listener decorates its own answers, CORS and
+            // security headers included: a test that dispatches must see the
+            // headers a client would.
+            chain.decorateFallback(request, response);
         }
         return response;
     }

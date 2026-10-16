@@ -250,14 +250,18 @@ public final class DependencyClasses {
             return;
         }
         try {
-            if (zip.getEntry(CORE_MARKER) != null || zip.getEntry(BACKEND_MARKER) != null) {
-                return;
-            }
+            // The runtime's own classes are never the application's, and the
+            // client and server runtimes are thousands of them: an archive
+            // carrying either is read for everything but those. Not skipped
+            // whole, because a shaded or fat jar can carry the application's
+            // contract beside the runtime it was bundled with.
+            boolean runtime = zip.getEntry(CORE_MARKER) != null || zip.getEntry(BACKEND_MARKER) != null;
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
-                if (entry.isDirectory() || !name.endsWith(".class") || skipped(name)) {
+                if (entry.isDirectory() || !name.endsWith(".class") || skipped(name)
+                        || (runtime && name.startsWith("com/codename1/"))) {
                     continue;
                 }
                 byte[] bytes;
