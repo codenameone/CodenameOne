@@ -33,6 +33,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.MutableResource;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.Map;
 
 /// Compiles a subset of Codename One CSS into theme properties stored in a {@link MutableResource}.
 ///
@@ -96,7 +97,7 @@ public class CSSThemeCompiler {
         // Constants first, wherever their block sits, so a var() in any rule can see them.
         for (Rule rule : rules) {
             if (rule.constants) {
-                compileConstants(rule.declarations, theme);
+                compileConstants(rule.declarations, theme, resources);
             }
         }
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
@@ -105,6 +106,7 @@ public class CSSThemeCompiler {
                 applyRule(theme, resources, rule, fonts);
             }
         }
+        compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
         resources.setTheme(themeName, theme);
@@ -215,7 +217,7 @@ public class CSSThemeCompiler {
         }
     }
 
-    private void compileConstants(Declaration[] declarations, Hashtable theme) {
+    private void compileConstants(Declaration[] declarations, Hashtable theme, MutableResource resources) {
         for (Declaration declaration : declarations) {
             String name = declaration.name;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
@@ -223,8 +225,34 @@ public class CSSThemeCompiler {
             if (name.startsWith("--")) {
                 name = name.substring(2);
             }
-            theme.put("@" + name, unquote(declaration.value));
+            String raw = declaration.value.trim();
+            String value = unquote(raw);
+            if (name.endsWith("Image")) {
+                // UIManager.getThemeImageConstant casts the constant to Image, and on iOS that
+                // cast is unchecked: a String left here would be read as an Image and crash
+                // natively. The build-time compiler fails the build on a missing image too.
+                Image image = resources.getImage(value);
+                if (image == null) {
+                    throw new CSSSyntaxException("Constant " + name + " names no image in the resource: " + value);
+                }
+                theme.put("@" + name, image);
+                continue;
+            }
+            if (raw.equals(value) && isColorLiteral(value)) {
+                // Stored as plain hex, as the build-time compiler stores it: color constants are
+                // read with Integer.parseInt(value, 16), which a leading '#' would break.
+                value = normalizeHexColor(value);
+            }
+            theme.put("@" + name, value);
         }
+    }
+
+    private boolean isColorLiteral(String value) {
+        if (value.regionMatches(true, 0, "rgb(", 0, 4)) {
+            return true;
+        }
+        int len = value.length();
+        return value.startsWith("#") && (len == 4 || len == 7) && isHexColor(value.substring(1));
     }
 
     private static boolean isConstantsSelector(String selector) {
@@ -274,7 +302,7 @@ public class CSSThemeCompiler {
             if (applyThemeConstantProperty(theme, declaration.name, value)) {
                 continue;
             }
-            if (applyFontProperty(theme, fonts, uiid + "." + statePrefix, property, value)) {
+            if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
             }
             if (applySimpleThemeProperty(theme, uiid, statePrefix, property, value)) {
@@ -311,15 +339,17 @@ public class CSSThemeCompiler {
         return true;
     }
 
-    /// Records a `font-family` or `font-size` for one UIID state and rebuilds that state's font
-    /// from everything declared for it so far, so the two may come from different rules.
-    private boolean applyFontProperty(Hashtable theme, Hashtable<String, String[]> fonts, String keyPrefix,
+    /// Records a `font-family` or `font-size` for one UIID state; `compileFonts` builds the fonts
+    /// once every rule has been read, so the two may come from different rules.
+    private boolean applyFontProperty(Hashtable<String, String[]> fonts, String keyPrefix,
                                       String property, String value) {
         int slot;
         if ("font-family".equals(property)) {
             slot = 0;
         } else if ("font-size".equals(property)) {
             slot = 1;
+            // Validated here so the error is reported while the rule is being read.
+            parseFontSize(value);
         } else {
             return false;
         }
@@ -329,14 +359,40 @@ public class CSSThemeCompiler {
             fonts.put(keyPrefix, spec);
         }
         spec[slot] = value;
-        FontSize size = spec[1] == null ? null : parseFontSize(spec[1]);
-        // A font is a live platform object, so it can only be made with a running Display.
-        // Without one -- a tool that only checks that a stylesheet compiles -- the declaration
-        // has still been validated above.
-        if (Display.isInitialized()) {
-            theme.put(keyPrefix + Style.FONT, createFont(spec[0], size));
-        }
         return true;
+    }
+
+    /// Builds the font of every UIID state that declared a font property. A state that sets only
+    /// one of family and size takes the other from the unselected style, since both rules apply
+    /// in that state -- the build-time compiler flattens the base style into each state the
+    /// same way. A dark style falls back to the light style of the same UIID after that.
+    private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
+        // A font is a live platform object, so it can only be made with a running Display.
+        // Without one -- a tool that only checks that a stylesheet compiles -- every
+        // declaration has still been validated as it was read.
+        if (!Display.isInitialized()) {
+            return;
+        }
+        for (Map.Entry<String, String[]> entry : fonts.entrySet()) {
+            String keyPrefix = entry.getKey();
+            String[] spec = entry.getValue();
+            String family = spec[0];
+            String size = spec[1];
+            int dot = keyPrefix.indexOf('.');
+            String uiid = keyPrefix.substring(0, dot);
+            String state = keyPrefix.substring(dot + 1);
+            String[] fallbacks = uiid.startsWith("$Dark")
+                    ? new String[]{uiid + ".", uiid.substring(5) + "." + state, uiid.substring(5) + "."}
+                    : new String[]{uiid + "."};
+            for (String fallback : fallbacks) {
+                String[] other = fonts.get(fallback);
+                if (other != null) {
+                    family = family == null ? other[0] : family;
+                    size = size == null ? other[1] : size;
+                }
+            }
+            theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
+        }
     }
 
     private Font createFont(String familyList, FontSize size) {

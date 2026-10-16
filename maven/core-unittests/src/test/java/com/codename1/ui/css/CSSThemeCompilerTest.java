@@ -263,7 +263,8 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("Hello", theme.get("@customMessage"));
         assertEquals("true", theme.get("@singleQuotedBool"));
         assertEquals("a;b", theme.get("@withSemicolon"));
-        assertEquals("#ff2d95", theme.get("@accentColor"));
+        // Plain hex, as the build-time compiler stores a color constant.
+        assertEquals("ff2d95", theme.get("@accentColor"));
         assertEquals("ff2d95", theme.get("Label.fgColor"));
         // The block is constants only, never a UIID called "#Constants".
         for (Object key : theme.keySet()) {
@@ -278,7 +279,7 @@ public class CSSThemeCompilerTest extends UITestBase {
                 + "@constants{ tint: #102030; quoted: \"x y\"; plain: 12; }"
                 + "@constants{ second: 'two'; }", resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
-        assertEquals("#102030", theme.get("@tint"));
+        assertEquals("102030", theme.get("@tint"));
         assertEquals("x y", theme.get("@quoted"));
         assertEquals("12", theme.get("@plain"));
         assertEquals("two", theme.get("@second"));
@@ -395,6 +396,65 @@ public class CSSThemeCompilerTest extends UITestBase {
         // Family and size declared in two rules for the same UIID still meet.
         Font split = (Font) theme.get("Split.font");
         assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, split.getPixelSize(), 0.001f);
+    }
+
+    @Test
+    public void testColorConstantsAreStoredAsPlainHex() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ infiniteDefaultColor: #f00; rgbColor: rgb(1, 2, 3);"
+                + " quotedHash: \"#abc\"; word: red; }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals(0xff0000, Integer.parseInt((String) theme.get("@infiniteDefaultColor"), 16));
+        assertEquals("010203", theme.get("@rgbColor"));
+        // A quoted value is a string, not a color.
+        assertEquals("#abc", theme.get("@quotedHash"));
+        assertEquals("red", theme.get("@word"));
+    }
+
+    @Test
+    public void testImageConstantsResolveToTheResourceImage() {
+        MutableResource resource = new MutableResource();
+        Image spinner = Image.createImage(4, 4, 0xff00ff00);
+        resource.setImage("spinner.png", spinner);
+        new CSSThemeCompiler().compile("#Constants{ infiniteImage: spinner.png; }", resource, "Theme");
+        assertTrue(resource.getTheme("Theme").get("@infiniteImage") instanceof Image);
+        UIManager.getInstance().addThemeProps(resource.getTheme("Theme"));
+        assertNotNull(UIManager.getInstance().getThemeImageConstant("infiniteImage"));
+
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ missingImage: nothing.png; }", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testStateFontInheritsTheUndeclaredHalfFromTheBase() {
+        MutableResource resource = new MutableResource();
+        // The state rule comes first on purpose: the merge must not depend on rule order.
+        new CSSThemeCompiler().compile("Label:selected{font-size:20px;}"
+                + "Label{font-family:'native:MainBold';font-size:2mm;}"
+                + "Label:pressed{font-family:'native:MainLight';}"
+                + "@media (prefers-color-scheme: dark){ Label:disabled{color:#ffffff;font-size:9px;} }",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font selected = (Font) theme.get("Label.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+        Font pressed = (Font) theme.get("Label.press#font");
+        assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, pressed.getPixelSize(), 0.001f);
+        assertEquals("native:MainLight", fontName(pressed));
+        Font dark = (Font) theme.get("$DarkLabel.dis#font");
+        assertEquals(9f, dark.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(dark));
+    }
+
+    private static String fontName(Font font) {
+        try {
+            java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");
+            id.setAccessible(true);
+            return (String) id.get(font);
+        } catch (ReflectiveOperationException err) {
+            throw new AssertionError(err);
+        }
     }
 
 }

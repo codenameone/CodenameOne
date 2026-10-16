@@ -45,6 +45,8 @@ public class RuntimeCompilerParityTest {
             + "    includeNativeBool: true;\n"
             + "    customMessage: \"Hello\";\n"
             + "    quotedFlagBool: 'false';\n"
+            + "    accentColor: #ff2d95;\n"
+            + "    shortColor: #abc;\n"
             + "}\n"
             + "Label { padding: 1px 2px 3px 4px; margin: 1mm 2mm; }\n"
             + "One { padding: 5px; margin: 0.5mm; }\n"
@@ -64,6 +66,12 @@ public class RuntimeCompilerParityTest {
         Hashtable runtime = compileRuntime(CSS);
         for (String key : new String[]{"@includeNativeBool", "@customMessage", "@quotedFlagBool"}) {
             assertEquals(standard.get(key), runtime.get(key), key);
+        }
+        // Hex case differs between the compilers for every color, not just constants (the
+        // build-time one writes upper case); both are read with Integer.parseInt(value, 16).
+        for (String key : new String[]{"@accentColor", "@shortColor"}) {
+            assertEquals(Integer.valueOf(Integer.parseInt((String) standard.get(key), 16)),
+                    Integer.valueOf(Integer.parseInt((String) runtime.get(key), 16)), key);
         }
         assertEquals("true", runtime.get("@includeNativeBool"), "@includeNativeBool");
         assertEquals("Hello", runtime.get("@customMessage"), "@customMessage");
