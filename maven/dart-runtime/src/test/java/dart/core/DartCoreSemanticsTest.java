@@ -770,6 +770,38 @@ public class DartCoreSemanticsTest {
         assertEquals(1, l.take(5).length());
     }
 
+    /// skip and skipWhile are lazy in Dart: creating an iterator runs nothing, and the
+    /// predicate (or an upstream map) first runs when the iterator is advanced.
+    @Test
+    public void skipAndSkipWhileRunNothingUntilTheIteratorAdvances() {
+        final int[] calls = {0};
+        DartList<Long> xs = DartList.of(1L, 2L, 5L, 1L);
+        java.util.Iterator<Long> it = xs.asIterable().skipWhile(e -> {
+            calls[0]++;
+            return e < 3;
+        }).iterator();
+        assertEquals(0, calls[0], "creating the iterator must not run the predicate");
+        assertTrue(it.hasNext());
+        assertEquals(Long.valueOf(5), it.next());
+        assertEquals(Long.valueOf(1), it.next());
+        assertFalse(it.hasNext());
+        assertEquals(3, calls[0]);
+
+        final int[] mapped = {0};
+        java.util.Iterator<Long> sk = xs.asIterable().map(e -> {
+            mapped[0]++;
+            return e;
+        }).skip(2).iterator();
+        assertEquals(0, mapped[0], "creating a skip iterator must not compute the skipped elements");
+        assertEquals(Long.valueOf(5), sk.next());
+    }
+
+    /// An explicit null generator means the same as none: the indices.
+    @Test
+    public void iterableGenerateWithANullGeneratorYieldsTheIndices() {
+        assertEquals("[0, 1, 2]", DartIterable.<Long>generate(3, null).toList().toString());
+    }
+
     /// Dart's iterators check on every moveNext. Java's check only in next(), so a body
     /// that cleared or shrank the collection after the last-but-one element ended the
     /// loop quietly: hasNext() answered false from the live size.

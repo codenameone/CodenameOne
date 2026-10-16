@@ -7440,7 +7440,16 @@ public final class JavaEmitter {
             bare.col = c.col;
             bare.name = c.name;
             bare.args = c.args;
-            return emitBareCall(bare, ctx);
+            bare.typeArgs = c.typeArgs;
+            // The prefix picks the library: a.Foo() and b.Foo() are different classes
+            // when both libraries declare Foo. Dropping it let import order decide both.
+            String outer = ctx.callPrefix;
+            ctx.callPrefix = ((Ident) c.target).name;
+            try {
+                return emitBareCall(bare, ctx);
+            } finally {
+                ctx.callPrefix = outer;
+            }
         }
         // Static factory methods on the primitive numeric types — `double.parse(s)`,
         // `double.tryParse(s)`, `int.parse(s)`, `int.tryParse(s)`. The type name is not a
@@ -7666,7 +7675,7 @@ public final class JavaEmitter {
         // top-level function (user code)
         FunctionDecl fn = program.functions.get(n);
         if (fn != null) {
-            Library owner = program.resolveFunctionOwner(n, ctx.library(), null);
+            Library owner = program.resolveFunctionOwner(n, ctx.library(), takeCallPrefix(ctx));
             // A private top-level function name can be declared in several libraries (Dart
             // privacy is library-scoped); use the RESOLVED owner's declaration so the parameter
             // list matches (e.g. crane's 2-arg `_customIconTheme` vs shrine's 1-arg one).
@@ -8889,7 +8898,7 @@ public final class JavaEmitter {
         // Resolve against the referencing library's imports (not the flat simple-name map),
         // so a name shared by several files (`Backdrop` in pages/ vs studies/shrine/) binds to
         // the one this library actually imports.
-        ClassDecl pc = program.resolveClass(className, ctx.library());
+        ClassDecl pc = program.resolveClass(className, ctx.library(), takeCallPrefix(ctx));
         // An app class may share a name with a stub type (new_gallery's routes.dart `Path`
         // vs dart:ui `Path`). Prefer the app class only when it is actually visible to the
         // current library (declared or imported); otherwise fall through to the stub.
@@ -10858,6 +10867,13 @@ public final class JavaEmitter {
      * {@code widget.<field>} read from within a State resolves against the wrong sibling.
      * Prefer the declaration in the library that owns the code currently being emitted.
      */
+    /// The pending call prefix, cleared so the call's own arguments resolve unprefixed.
+    private static String takeCallPrefix(Ctx ctx) {
+        String p = ctx.callPrefix;
+        ctx.callPrefix = null;
+        return p;
+    }
+
     private ClassDecl programClass(String name, Ctx ctx) {
         Ast.Library lib = ctx != null && ctx.currentClass != null
                 ? ctx.currentClass.ownerLibrary : null;
@@ -11354,6 +11370,10 @@ public final class JavaEmitter {
     // ==================================================================
 
     private final class Ctx {
+        /// The import prefix of the `prefix.Name(...)` call being lowered to a bare call,
+        /// until the class or function resolution consumes it (see takeCallPrefix).
+        String callPrefix;
+
         final ClassDecl currentClass;
         /** The library whose top-level (lib-class) body is being emitted; set only when currentClass is null. */
         Library currentLibrary;

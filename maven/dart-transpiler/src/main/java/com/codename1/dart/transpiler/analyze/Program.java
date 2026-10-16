@@ -109,7 +109,7 @@ public final class Program {
                 Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.EnumDecl e : byName) {
-                        if (e.ownerLibrary == target) {
+                        if (provides(target, name, e.ownerLibrary)) {
                             return e;
                         }
                     }
@@ -249,6 +249,53 @@ public final class Program {
      * when several libraries share the name (single-package name collision). Falls back to the
      * last-registered declaration ({@link #classes}) when there is no same-library match.
      */
+    /**
+     * Whether importing {@code lib} provides {@code owner}'s declaration of {@code name}:
+     * {@code lib} is {@code owner}, or re-exports it through an {@code export} chain whose
+     * every directive admits the name (a barrel file). Matching the imported library alone
+     * missed a re-exported declaration, and resolution fell back to whichever same-named
+     * declaration was registered last.
+     */
+    public boolean provides(Ast.Library lib, String name, Ast.Library owner) {
+        return provides(lib, name, owner, new HashSet<Ast.Library>());
+    }
+
+    private boolean provides(Ast.Library lib, String name, Ast.Library owner, Set<Ast.Library> seen) {
+        if (lib == null || owner == null || !seen.add(lib)) {
+            return false;
+        }
+        if (lib == owner) {
+            return true;
+        }
+        for (Ast.Directive d : lib.exportDirectives) {
+            if (d.admits(name) && provides(resolveImportedLibrary(lib, d.uri), name, owner, seen)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@link #resolveClass(String, Ast.Library)} for {@code prefix.Name}: the declaration
+     * the prefix's import provides, when it provides one. Lowering {@code a.Foo()} to a bare
+     * {@code Foo()} lost the prefix, so {@code a.Foo()} and {@code b.Foo()} both followed
+     * import order to the same class.
+     */
+    public Ast.ClassDecl resolveClass(String name, Ast.Library fromLibrary, String prefix) {
+        if (prefix != null && fromLibrary != null) {
+            Ast.Library target = resolveImportedLibrary(fromLibrary, fromLibrary.prefixImports.get(prefix));
+            List<Ast.ClassDecl> byName = classesByName.get(name);
+            if (target != null && byName != null) {
+                for (Ast.ClassDecl c : byName) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return c;
+                    }
+                }
+            }
+        }
+        return resolveClass(name, fromLibrary);
+    }
+
     public Ast.ClassDecl resolveClass(String name, Ast.Library fromLibrary) {
         List<Ast.ClassDecl> byName = classesByName.get(name);
         if (byName == null || byName.isEmpty()) {
@@ -271,7 +318,7 @@ public final class Program {
                 Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.ClassDecl c : byName) {
-                        if (c.ownerLibrary == target) {
+                        if (provides(target, name, c.ownerLibrary)) {
                             return c;
                         }
                     }
@@ -318,8 +365,12 @@ public final class Program {
         if (prefix != null && from != null) {
             String uri = from.prefixImports.get(prefix);
             Ast.Library target = resolveImportedLibrary(from, uri);
-            if (target != null && owners.contains(target)) {
-                return target;
+            if (target != null) {
+                for (Ast.Library o : owners) {
+                    if (provides(target, name, o)) {
+                        return o;
+                    }
+                }
             }
         }
         if (from != null) {
@@ -330,7 +381,7 @@ public final class Program {
                 for (Ast.Directive d : from.importDirectives) {
                     // An import that hides the name (or shows others only) does not
                     // provide it, whichever comes first.
-                    if (d.admits(name) && o == resolveImportedLibrary(from, d.uri)) {
+                    if (d.admits(name) && provides(resolveImportedLibrary(from, d.uri), name, o)) {
                         return o;
                     }
                 }

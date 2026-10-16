@@ -266,6 +266,10 @@ public class SimpleDateFormat extends DateFormat {
     public Object clone() {
         SimpleDateFormat sdf = new SimpleDateFormat(pattern);
         sdf.setDateFormatSymbols(dateFormatSymbols);
+        // Shared, not copied: Codename One's TimeZone (Ports/CLDC11 and vm/JavaAPI) has
+        // no instance mutators -- no setRawOffset or setID, only the static
+        // setDefault -- so neither formatter can change the zone under the other.
+        // (Object.clone() would answer null on ParparVM in any case.)
         sdf.timeZone = timeZone;
         return sdf;
     }

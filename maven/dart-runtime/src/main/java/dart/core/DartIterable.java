@@ -92,7 +92,13 @@ public class DartIterable<E> implements Iterable<E> {
      * iterable, not an error: measured on the Dart 3.9 VM, {@code Iterable.generate(-1)}
      * neither throws nor yields anything (only {@code List.generate(-1)} throws).
      */
+    @SuppressWarnings("unchecked")
     public static <E> DartIterable<E> generate(long count, Funcs.Func1<Long, E> generator) {
+        if (generator == null) {
+            // Dart's generator is optional, and an explicit null means the same as
+            // leaving it out: the indices themselves. It used to throw on first use.
+            return generate(count, i -> (E) i);
+        }
         return new DartIterable<>(() -> new Iterator<E>() {
             private long i;
 
@@ -203,12 +209,32 @@ public class DartIterable<E> implements Iterable<E> {
     public DartIterable<E> skip(long count) {
         RangeError.checkNotNegative(count, "count");
         Iterable<E> src = this;
-        return new DartIterable<>(() -> {
-            Iterator<E> it = src.iterator();
-            for (long i = 0; i < count && it.hasNext(); i++) {
-                it.next();
+        // Lazy, as Dart's: nothing is skipped (or computed by an upstream map/where)
+        // until the iterator is first advanced, not when it is created.
+        return new DartIterable<>(() -> new Iterator<E>() {
+            private final Iterator<E> it = src.iterator();
+            private boolean skipped;
+
+            private void skipOnce() {
+                if (!skipped) {
+                    skipped = true;
+                    for (long i = 0; i < count && it.hasNext(); i++) {
+                        it.next();
+                    }
+                }
             }
-            return it;
+
+            @Override
+            public boolean hasNext() {
+                skipOnce();
+                return it.hasNext();
+            }
+
+            @Override
+            public E next() {
+                skipOnce();
+                return it.next();
+            }
         });
     }
 
@@ -545,29 +571,46 @@ public class DartIterable<E> implements Iterable<E> {
 
     public DartIterable<E> skipWhile(Funcs.Func1<E, Boolean> test) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> {
-            Iterator<E> it = src.iterator();
-            java.util.ArrayList<E> buffered = new java.util.ArrayList<>();
-            while (it.hasNext()) {
-                E c = it.next();
-                if (!Boolean.TRUE.equals(test.call(c))) {
-                    buffered.add(c);
-                    break;
+        // Lazy, as Dart's: the predicate first runs when the iterator is advanced,
+        // not when it is created, so an iterator obtained and never used runs nothing.
+        return new DartIterable<>(() -> new Iterator<E>() {
+            private final Iterator<E> it = src.iterator();
+            private boolean skipping = true;
+            private boolean hasHead;
+            private E head;
+
+            private void skipOnce() {
+                if (!skipping) {
+                    return;
+                }
+                skipping = false;
+                while (it.hasNext()) {
+                    E c = it.next();
+                    if (!Boolean.TRUE.equals(test.call(c))) {
+                        head = c;
+                        hasHead = true;
+                        return;
+                    }
                 }
             }
-            Iterator<E> tail = it;
-            Iterator<E> head = buffered.iterator();
-            return new Iterator<E>() {
-                @Override
-                public boolean hasNext() {
-                    return head.hasNext() || tail.hasNext();
-                }
 
-                @Override
-                public E next() {
-                    return head.hasNext() ? head.next() : tail.next();
+            @Override
+            public boolean hasNext() {
+                skipOnce();
+                return hasHead || it.hasNext();
+            }
+
+            @Override
+            public E next() {
+                skipOnce();
+                if (hasHead) {
+                    hasHead = false;
+                    E h = head;
+                    head = null;
+                    return h;
                 }
-            };
+                return it.next();
+            }
         });
     }
 
