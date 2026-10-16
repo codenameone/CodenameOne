@@ -231,6 +231,10 @@ Gradle runs one Codename One build at a time, even when a command line names sev
 | `cn1:backend-package`
 | Builds a backend as a single native binary.
 
+| `backendWebApp`
+| `cn1:backend-webapp`
+| Builds the app for the browser and stages it for the backend to serve at `/`.
+
 | `backendTest`
 | `test -Dcn1.backend.compiledTests=true`
 | Runs a backend's tests as a native binary. The standard `test` task runs them on this JVM.
@@ -354,6 +358,15 @@ Java and Kotlin classes in one project can call each other. Both are checked by 
 include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-backend,indent=0]
 ----
 
+`backendWebApp` builds the app for the browser and stages it in `backend/build/webapp`. `runBackend` then serves the app at `/`, and `backendPackage` leaves it beside the binary, so one address is both the API and the app:
+
+[source,bash]
+----
+include::../demos/gradle/gradle-project-workflow.sh[tag=gradle-backend-webapp,indent=0]
+----
+
+The browser build takes about a minute, so neither task runs it for you: run `backendWebApp` when the app changed. <<backend-hosting-the-app,Hosting the app in the browser>> covers how the server serves it.
+
 A backend-only project has the same bootstrap with the server at the root: `application.properties`, `application-dev.properties` and `src/main/java`. Its tasks are `runBackend`, `backendPackage`, `backendTest`, `cn1Update` and the standard `test`, which runs the backend's tests on this JVM; <<backend-testing>> covers writing them. `backendPackage` writes the binary to `build/<project name>`:
 
 [source,bash]
@@ -388,4 +401,4 @@ These features remain Maven goals, with no Gradle task yet:
 * `cn1:create-game-scene`.
 * The on-device debugging helpers for Android and iOS.
 
-The initializr's Tweet app template isn't available for Gradle projects yet. An application that needs one of these stays on Maven for now.
+An application that needs one of these stays on Maven for now.

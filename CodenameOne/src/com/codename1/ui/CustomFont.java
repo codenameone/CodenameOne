@@ -310,6 +310,22 @@ class CustomFont extends Font {
 
     /// {@inheritDoc}
     @Override
+    public int[] getTextRunPositions(String text, boolean rtl) {
+        int[] positions = new int[text.length() + 1];
+        if (rtl) {
+            for (int i = text.length() - 1; i >= 0; i--) {
+                positions[i] = positions[i + 1] + charWidth(text.charAt(i));
+            }
+        } else {
+            for (int i = 0; i < text.length(); i++) {
+                positions[i + 1] = positions[i] + charWidth(text.charAt(i));
+            }
+        }
+        return positions;
+    }
+
+    /// {@inheritDoc}
+    @Override
     public int charsWidth(char[] ch, int offset, int length) {
         int retVal = 0;
         for (int i = 0; i < length; i++) {

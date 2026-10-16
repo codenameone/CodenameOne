@@ -218,6 +218,46 @@ public class MacImplementation extends IOSImplementation {
         macNative.macTextInputSetOwnerWindow(ownerWindowId(cmp));
     }
 
+    // Keep the native-only callback reachable to ParparVM's dead-code eliminator.
+    private static boolean titleInsetsCallbackLink;
+
+    /// AppKit published changed title metrics after an asynchronous query.
+    public static void macTitleBarInsetsChanged() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.Form form = com.codename1.ui.Display.getInstance().getCurrent();
+                if (form != null) {
+                    form.revalidate();
+                    form.repaint();
+                }
+            }
+        });
+    }
+
+    /// @inheritDoc
+    @Override
+    public int[] getNativeWindowTitleBarInsets(com.codename1.ui.Component toolbar) {
+        if (ownerWindowId(toolbar) != -2) {
+            return null;
+        }
+        if (titleInsetsCallbackLink) {
+            macTitleBarInsetsChanged();
+        }
+        int[] result = new int[5];
+        macNative.macTitleBarInsets(result);
+        return result;
+    }
+
+    /// @inheritDoc
+    @Override
+    public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
+        macNative.macSetTitleBarRegions(ownerWindowId(toolbar), regions);
+    }
+
     /// Which surface the native side should treat as the owner of the next
     /// presentation or editing session.
     ///

@@ -38,6 +38,10 @@ The stdio transport is the standard MCP local transport, exchanging newline deli
 
 The socket transport binds the loopback interface, and it binds the loopback interface of whatever machine the application is running on. In the simulator that's your own, so an agent connects to `127.0.0.1` and there's nothing else to arrange. On a phone the port belongs to the phone, and reaching it needs a forward.
 
+The native Linux port supports the portable socket transport through an IPv4 listener bound to `127.0.0.1`. Stopping the listener wakes a waiting listener, and closing a connection wakes its blocked input/output operations. This capability doesn't enable wildcard-bound server sockets or change the release-build guard. Native Linux builds still require the explicit, controlled-development opt-in described below.
+
+For a Linux application running in a container, run the MCP client in that same container or network namespace. Publishing a container port doesn't make a listener bound to its internal loopback address reachable from the host. A local headless test can use Xvfb; when its launcher runs in Docker, use `--init` so the launcher's readiness signals are delivered normally. Native window-manager behavior still needs a desktop session.
+
 On Android, `adb forward tcp:8765 tcp:8765` maps a port on the development machine onto the same port inside the device, so an agent connects to `127.0.0.1:8765` as before. Remove it with `adb forward --remove tcp:8765` when the session ends. The `cn1:android-on-device-debugging` goal already installs and launches a debuggable build, and its `waitForAttach=false` option is the one to use when the point of the session is the agent rather than a breakpoint, since the application then boots straight into a drivable state instead of blocking for a debugger. On iOS the same setting isn't a convenience but a requirement, because `ios.onDeviceDebug.waitForAttach` defers the callback that boots the application until a debugger attaches -- so a starter in the application's own code never runs, and there is nothing listening on the port to reach.
 
 The native iOS simulator shares the host's network stack, so the application's loopback port is the host's loopback port and no forwarding applies. A physical iPhone doesn't: the port sits on the device's own loopback, reachable only over the USB multiplexing channel, and `iproxy` from libimobiledevice is the usual relay. Codename One ships no goal for it, so an agent-driven session against a real iPhone depends on external tooling in a way the Android one doesn't.
@@ -71,11 +75,23 @@ Treat that call the way you'd treat any other decision to expose a control surfa
 
 === Built-in user interface tools
 
-Every server registers a small set of tools that read and drive the screen through the accessibility tree. An agent calls `ui_snapshot` to get the semantics tree of the current form as JSON, including the identifier, role, label, value, and state of each node, and the identifiers of the actions each node supports.
+Every server registers a small set of tools that read and drive the screen through the accessibility tree. An agent calls `ui_snapshot` to get the semantics tree of the focused top-level container as JSON, including the identifier, role, label, value, and state of each node, and the identifiers of the actions each node supports.
 
 The agent drives the screen with `ui_perform_action`, which performs an action such as `activate` or `setText` on a node from the snapshot. The convenience tools `ui_activate` and `ui_set_text` wrap the common cases, and `ui_find` locates nodes by identifier, by label, or by screen coordinate.
 
-Actions run on the Codename One EDT, so an agent never touches the live component tree directly. Each action returns whether it succeeded together with a fresh snapshot.
+Call `ui_windows` to list the main form and desktop windows, with their `windowId`, `title`,
+`visible`, `focused` and `blocked` fields. The snapshot, find and action tools accept an optional
+`windowId`: omit it to use the focused top-level container, use `0` for the current main form, or
+use a positive ID from `ui_windows` for a visible desktop window. This allows an agent to inspect
+and operate a native Codename One dialog explicitly. Actions against a window blocked by a modal
+dialog are rejected. Operating-system file pickers are outside the Codename One semantics tree.
+
+Actions run on the Codename One EDT, so an agent never touches the live component tree directly.
+A completed action returns `success` and a fresh `snapshot`, with `pending:false`. If an action opens
+a blocking modal dialog, its nested event loop can return a snapshot with `pending:true` and
+`success:null` while the original handler is still running. This keeps the MCP connection available:
+use subsequent calls to inspect and dismiss the dialog, then verify the resulting state. A pending
+response isn't confirmation that the original action completed successfully.
 
 === Publishing application tools
 
@@ -88,7 +104,7 @@ The server merges these tools with the built-in tools when a host lists the avai
 
 === Screenshots and the simulator
 
-The server exposes a screenshot of the current form as an MCP image resource, so a vision capable model can see the screen alongside the semantic tree. The resource is enabled by default and can be disabled per server.
+The server exposes a screenshot of the focused top-level container as an MCP image resource, so a vision capable model can see the screen alongside the semantic tree. The resource is enabled by default and can be disabled per server.
 
 The JavaSE simulator drives the same MCP menu described above, so an application can be exposed and driven from the running simulator during development.
 

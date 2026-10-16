@@ -1,0 +1,39 @@
+{
+ "pr": 6027,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.868,
+      "time": 0.931
+     },
+     "memory": 0.868,
+     "reason": "Recalibrate Linux ARM64 Neoverse-N2 hello translation time from five matching-CPU five-round reports (runs 38848075973, 38861108588, 38848287858, 38876165702, 38878637047), including two independent master controls. Median of run medians is 1.021x versus the older 0.931x baseline; measured medians span 1.013-1.078x. Keep the 15% time tolerance and 0.868x memory baseline. This is a baseline calibration, not an editor startup measurement. Evidence and artifact hashes: evidence/pr-6027-linux.md.",
+     "runs": 5,
+     "time": 1.021
+    }
+   }
+  },
+  "linux-x64@intel-xeon-platinum-8573c": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.517,
+      "time": 0.505,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.44,
+     "reason": "Replace the single-run Linux x64 Xeon Platinum 8573C translator calibration with two matching-CPU five-round reports from independent PRs (38876165702 and 38878637047). Median of run medians: time 0.665x, memory 0.440x; the prior single-run row was 0.505x and 0.517x. Keep the existing 20% time and 15% memory tolerances; no runtime performance change is claimed. Evidence, source provenance and artifact hashes: evidence/pr-6027-linux.md.",
+     "runs": 2,
+     "time": 0.665,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}

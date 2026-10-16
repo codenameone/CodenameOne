@@ -229,6 +229,8 @@ public final class LinuxNative {
     /// Window peers by slot; this is the one the form title goes to in desktop "native"
     /// title-bar mode, where the CN1 title area is suppressed. A no-op when headless.
     public static native void mainWindowSetTitle(String title);
+    public static native void mainWindowTitleBarInsets(int[] result);
+    public static native void mainWindowTitleBarRegions(int[] regions);
 
     public static native void desktopWindowSetTitle(int slot, String title);
 
@@ -659,6 +661,12 @@ public final class LinuxNative {
 
     /* ---------------------------------------------------------- sockets */
 
+    /** Accepts a connection on an IPv4 loopback-only listener; 0 means failure. */
+    public static native long socketListenLoopback(int port);
+
+    /** Cancels the listener and wakes its blocked accept. */
+    public static native void socketStopListening(int port);
+
     /** Connects a TCP socket to host:port (timeoutMillis 0 = blocking). 0 = failure. */
     public static native long socketConnect(String host, int port, int timeoutMillis);
 
@@ -674,7 +682,7 @@ public final class LinuxNative {
     /** Closes and frees the socket peer. */
     public static native void socketClose(long socket);
 
-    /** Last WinSock error code for the socket, or -1. */
+    /** Last POSIX error code for the socket, or -1. */
     public static native int socketErrorCode(long socket);
 
     /** True while the socket peer is open. */

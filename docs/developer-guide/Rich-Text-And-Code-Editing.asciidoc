@@ -89,6 +89,54 @@ autocorrection and automatic capitalization. The immutable
 https://www.codenameone.com/javadoc/com/codename1/ui/TextInputState.html[`TextInputState`] returns the
 authoritative text, selection, and composing range to the port after each edit.
 
+`TextInputState.getSelectionStart()` and `getSelectionEnd()` return an ordered range for existing
+input bridges. `getSelectionAnchor()` and `getSelectionFocus()` retain direction: a backward
+selection has an anchor greater than its focus. The Apple bridge uses those directional getters;
+UIKit normalizes its native range, while macOS retains the anchor alongside AppKit's ordered range.
+
+On macOS, pure editors receive word movement and deletion, visual line and paragraph boundaries,
+document boundaries, and page movement through `onKeyCommand(...)`. AppKit interprets the key event first. Paragraph boundary commands use `MOD_ALT` with `KEY_HOME` or `KEY_END`.
+Paragraph selection uses `MOD_ALT` with `KEY_UP` or `KEY_DOWN` and retains `MOD_SHIFT`. The editor owns
+its visual line layout; the port waits for its updated state before replaying later native edits.
+Logical word commands carry `MOD_ALT`; spatial AppKit word-left/right commands use `KEY_WORD_LEFT` and
+`KEY_WORD_RIGHT` and follow the rendered directional runs. Document Home/End commands carry `MOD_CTRL`, and selection commands
+also carry `MOD_SHIFT`. `KEY_SCROLL_PAGE_UP` and `KEY_SCROLL_PAGE_DOWN` scroll the viewport without changing the caret or
+selection; they're distinct from caret-moving `KEY_PAGE_UP` and `KEY_PAGE_DOWN`, which use cumulative
+line heights and visual columns for rich content. Fallback geometry snapshots sample around the active
+selection focus, including backward selections. Word navigation classifies Unicode letters, decimal
+digits and underscore consistently across ports. Combining marks inherit their base character's
+classification, so emoji variation selectors stay attached during word deletion. It keeps surrogate pairs intact. It doesn't perform dictionary segmentation. Boundary word deletions are no-ops.
+Character movement remains on the native composed-character path so accents, emoji variation
+selectors and ZWJ sequences stay intact. Unmodified character movement collapses a selection to its
+ordered edge. Select All explicitly creates a forward selection before later shift-arrow commands.
+These callbacks don't change the legacy `TextArea` editing path.
+
+The native Linux port binds this contract to GTK's
+https://docs.gtk.org/gtk3/class.IMContext.html[`GtkIMContext`]. The document stays in the lightweight
+canvas while GTK handles composed text and input-method candidate UI. Navigation, deletion,
+clipboard, and undo shortcuts are delivered as semantic commands. Native `TextField`/`TextArea`
+editing takes over the input session when one of those fields starts native editing. A dialog's
+initially focused editor can bind before its native window is shown. Temporary native window focus
+loss cancels an unfinished composition and pauses input without discarding the component's session;
+returning to that window resumes it. A GTK text composition ending without a commit restores the original
+selection instead of finalizing a deletion. Pure editors implement
+`TextInputClient.CompositionCancellation` to restore rich attributes and undo state as well as text.
+Custom clients can implement the same optional contract; the fallback restores text and selection
+through their existing composition methods. Explicit commits work whether GTK ends the composition before
+or after the commit callback.
+
+Linux queues native input onto the EDT with a session identifier and edit sequence. Callbacks from a
+closed session are discarded. The port supplies surrounding text only after Java has acknowledged
+all queued edits; an older state update can't overwrite the latest context. Password and sensitive
+fields don't expose surrounding text to the input method. Autocorrect enables spelling and completion
+hints; password, sensitive and non-predictive fields suppress them. Numeric password fields request
+GTK's PIN purpose. Explicit capitalization constraints take precedence over the boolean fallback.
+GTK's character-based
+composition and deletion offsets are converted to UTF-16. Deletion requests for a disconnected range
+that doesn't touch the caret are declined because `deleteSurroundingText` can't represent them.
+Input-method availability depends on the GTK modules installed on the user's system. Local GTK
+composition tests don't certify every installed input-method engine or a complete language-specific editor.
+
 All offsets in this contract are UTF-16 indices, matching Java `String`, Android `Editable`, and Apple
 string indices. The document canonicalizes CRLF and bare CR line endings to LF before it updates the
 caret, undo history, formatting runs, or platform state. Port authors must deliver composition updates
@@ -331,6 +379,28 @@ text-input contract: `isTextInputSupported()`, `startTextInput(...)`, `updateTex
 composing text, preserve UTF-16 offsets, map native navigation and clipboard actions to
 `TextInputClient.KEY_*`, update native selection state after programmatic edits, and anchor candidate
 UI with the supplied caret geometry.
+
+Some native protocols, including iOS `UITextInput`, request geometry synchronously on the native
+UI thread. That thread must not wait for the Codename One EDT: the EDT may already be waiting for
+native drawing or font measurement. The iOS port captures an immutable `TextInputGeometry` on the
+EDT when starting or updating input and after painting layout or scroll changes, then answers native
+geometry queries from that snapshot. Native selection changes also refresh the snapshot after the
+editor scrolls its caret into view.
+
+Custom editors can implement `TextInputGeometry.Provider` to collect visible caret positions in a
+single layout pass. `getGeometrySnapshot()` runs on the EDT and returns a non-null immutable
+snapshot. Caret records contain a UTF-16 document offset followed by absolute screen pixel
+coordinates `{offset, x, y, width, height}`; selection rectangles use `{x, y, width, height}`.
+Include visible insertion positions in document order, including line endpoints, and supply the
+active caret as the fallback for offsets outside the snapshot. The default capture samples a
+bounded range around the visible area and caret. Editors with expensive per-offset geometry should
+provide their own snapshot to avoid repeating layout work for each character.
+
+The built-in `EditorView`, `CodeView` and `RichView` collect their visible geometry by line and
+font run. `Font.getTextRunPositions(text, rtl)` lets the Apple ports shape each run once with Core
+Text, including styled and directional runs, instead of measuring thousands of prefixes on every
+input update. Other ports have a compatibility fallback. Editor subclasses that change character
+measurement should override `measureLineCaretPositions()` alongside `measureColumnX()`.
 
 A port with a better platform editor can instead supply a native peer and implement the existing
 semantic command/query channel. In both cases application code, change listeners, ready handling, and

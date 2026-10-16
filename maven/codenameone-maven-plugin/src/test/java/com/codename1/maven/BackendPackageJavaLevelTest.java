@@ -226,6 +226,9 @@ class BackendPackageJavaLevelTest {
         assertEquals("17", option(project, new Properties(), "release", false));
         assertEquals("25", option(project, new Properties(), "testRelease", true));
         assertEquals("UTF-16", BackendPackageMojo.sourceEncodingOf(project));
+        // The compile execution's own encoding is what the lifecycle used.
+        compiler.addExecution(execution("default-compile", null, "compile", "encoding", "ISO-8859-1"));
+        assertEquals("ISO-8859-1", BackendPackageMojo.sourceEncodingOf(project));
         Properties cli = new Properties();
         cli.setProperty("backend.java", "25");
         assertEquals("25", option(project, cli, "release", false));

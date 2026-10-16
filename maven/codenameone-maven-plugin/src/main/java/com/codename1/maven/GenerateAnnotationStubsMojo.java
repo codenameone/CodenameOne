@@ -58,8 +58,14 @@ import java.util.ServiceLoader;
 /// If `process-annotations` is not configured the stubs remain as no-ops so the
 /// app still builds — but it sees no registered routes at runtime. This is the
 /// least-surprise default for users experimenting with annotations.
+///
+/// COMPILE resolution, because one kind of stub is generated from the module's
+/// DEPENDENCIES: the server half of a REST contract that lives in a library the
+/// application and its backend share. See
+/// `RestServerAnnotationProcessor.emitStubs`.
 @Mojo(name = "generate-annotation-stubs",
       defaultPhase = LifecyclePhase.GENERATE_SOURCES,
+      requiresDependencyResolution = org.apache.maven.plugins.annotations.ResolutionScope.COMPILE,
       threadSafe = true)
 public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
 
@@ -90,9 +96,22 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
         }
 
         File outputDir = new File(project.getBuild().getOutputDirectory());
+        List<String> classpath;
+        try {
+            classpath = project.getCompileClasspathElements();
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException unresolved) {
+            // Not fatal for the stubs that need no classpath, and said out loud
+            // for the one that does: without it no served contract is generated,
+            // and the class implementing it then fails to compile for a reason
+            // that is nowhere near this message.
+            getLog().warn("cn1: the compile classpath for " + project.getArtifactId()
+                    + " is unresolved, so no shared REST contract can be read from its "
+                    + "dependencies: " + unresolved.getMessage());
+            classpath = java.util.Collections.emptyList();
+        }
         ProcessorContext ctx = new ProcessorContext(outputDir, stubSourceDirectory,
                 /*classIndex*/ java.util.Collections.<String, com.codename1.maven.annotations.AnnotatedClass>emptyMap(),
-                MavenLog.of(getLog()));
+                MavenLog.of(getLog()), null, null, null, null, null, classpath);
 
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
             AnnotationProcessor p = it.next();
@@ -105,7 +124,16 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
             }
         }
 
+        if (ctx.hasErrors()) {
+            StringBuilder sb = new StringBuilder("Codename One stub generation failed:\n");
+            for (ProcessorContext.ProcessingError error : ctx.getErrors()) {
+                sb.append("  - ").append(error).append('\n');
+            }
+            throw new MojoFailureException(sb.toString());
+        }
+
         Map<String, String> stubs = ctx.getEmittedStubSources();
+        removeStubsNoLongerEmitted(stubs);
         for (Map.Entry<String, String> e : stubs.entrySet()) {
             File f = new File(stubSourceDirectory, e.getKey() + ".java");
             File parent = f.getParentFile();
@@ -123,6 +151,43 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
         if (!stubs.isEmpty()) {
             getLog().info("cn1: emitted " + stubs.size() + " annotation stub(s) under "
                     + stubSourceDirectory);
+        }
+    }
+
+    /// Deletes the stubs an earlier run wrote and this one did not, and records
+    /// what this one writes.
+    ///
+    /// The directory is a compile source root, so a stub left in it is compiled
+    /// again: after a contract was removed or renamed, a build without `clean`
+    /// went on compiling against the stub of an API that no longer existed.
+    /// Only this goal's own files are touched -- the list of them is kept
+    /// beside the directory -- because `process-annotations` writes there too.
+    void removeStubsNoLongerEmitted(Map<String, String> stubs) throws MojoExecutionException {
+        File list = new File(stubSourceDirectory.getParentFile(),
+                stubSourceDirectory.getName() + ".stubs");
+        try {
+            if (list.isFile()) {
+                String[] before = new String(java.nio.file.Files.readAllBytes(list.toPath()),
+                        java.nio.charset.StandardCharsets.UTF_8).split("\n");
+                for (String name : before) {
+                    // A name is a class name with slashes, as the processors
+                    // emit it: nothing that leaves the directory is followed.
+                    if (name.length() == 0 || stubs.containsKey(name) || name.indexOf("..") >= 0) {
+                        continue;
+                    }
+                    File stale = new File(stubSourceDirectory, name + ".java");
+                    if (stale.isFile() && !stale.delete()) {
+                        throw new MojoExecutionException("Could not delete the stale stub " + stale);
+                    }
+                }
+            }
+            StringBuilder now = new StringBuilder();
+            for (String name : stubs.keySet()) {
+                now.append(name).append('\n');
+            }
+            writeUtf8(list, now.toString());
+        } catch (IOException e) {
+            throw new MojoExecutionException("Could not keep the list of stubs " + list, e);
         }
     }
 

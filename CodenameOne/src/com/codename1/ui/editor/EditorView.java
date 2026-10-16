@@ -46,7 +46,7 @@ import com.codename1.ui.TopLevelContainer;
 /// This class provides the shared editing behavior. Feature layers (syntax highlighting, the gutter,
 /// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
 /// document/measurement hooks.
-public class EditorView extends Component implements TextInputClient {
+public class EditorView extends Component implements TextInputClient, TextInputClient.CompositionCancellation, com.codename1.ui.TextInputGeometry.Provider {
     private EditorHost host;
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
@@ -60,6 +60,8 @@ public class EditorView extends Component implements TextInputClient {
     // pre-composition snapshot so the finalized composition forms a single undo unit
     private String composingBaseRemoved;
     private Object composingBeforeState;
+    private int composingBeforeCaret;
+    private int composingBeforeAnchor;
     private boolean editable = true;
 
     private int scrollY;
@@ -353,7 +355,14 @@ public class EditorView extends Component implements TextInputClient {
     }
 
     private int contentHeight() {
-        return getHeight() - getStyle().getPaddingTop() - getStyle().getPaddingBottom();
+        int visibleHeight = getHeight();
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null && top.getInvisibleAreaUnderVKB() > 0) {
+            int keyboardTop = top.asContainer().getAbsoluteY() + top.asContainer().getHeight()
+                    - top.getInvisibleAreaUnderVKB();
+            visibleHeight = Math.min(visibleHeight, Math.max(0, keyboardTop - getAbsoluteY()));
+        }
+        return visibleHeight - getStyle().getPaddingTop() - getStyle().getPaddingBottom();
     }
 
     // ---- selection helpers ----
@@ -1052,6 +1061,16 @@ public class EditorView extends Component implements TextInputClient {
         return doc.getLineStart(target) + Math.min(col, lineLen);
     }
 
+    private int caretPage(boolean down) {
+        int line = doc.lineOfOffset(caret);
+        Font font = getEditorFont();
+        int x = lineContentOffsetX(line) + measureColumnX(line, doc.getLineText(line),
+                caret - doc.getLineStart(line), font);
+        int target = lineAtContentY(lineTopContent(line) + (down ? 1 : -1) * Math.max(1, contentHeight()));
+        return doc.getLineStart(target) + columnAtX(target, doc.getLineText(target),
+                x - lineContentOffsetX(target), font);
+    }
+
     private void lineHome(boolean extend) {
         moveCaret(doc.getLineStart(doc.lineOfOffset(caret)), extend);
     }
@@ -1738,17 +1757,101 @@ public class EditorView extends Component implements TextInputClient {
         return false;
     }
 
-    private static boolean isWordChar(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    private int wordCodePointAt(int offset) {
+        char first = doc.charAt(offset);
+        if (Character.isHighSurrogate(first) && offset + 1 < doc.length()
+                && Character.isLowSurrogate(doc.charAt(offset + 1))) {
+            return Character.toCodePoint(first, doc.charAt(offset + 1));
+        }
+        return first;
+    }
+
+    private int previousWordOffset(int offset) {
+        int previous = offset - 1;
+        if (previous > 0 && Character.isLowSurrogate(doc.charAt(previous))
+                && Character.isHighSurrogate(doc.charAt(previous - 1))) {
+            previous--;
+        }
+        return previous;
+    }
+
+    private boolean wordCharacterAt(int offset) {
+        int cp = wordCodePointAt(offset);
+        while (WordCharacters.isMark(cp)) {
+            if (offset == 0) {
+                return false;
+            }
+            offset = previousWordOffset(offset);
+            cp = wordCodePointAt(offset);
+        }
+        return WordCharacters.contains(cp);
+    }
+
+    private int visualWord(boolean right) {
+        int line = doc.lineOfOffset(caret);
+        int start = doc.getLineStart(line);
+        String text = doc.getLineText(line);
+        Font font = getEditorFont();
+        int x = measureColumnX(line, text, caret - start, font);
+        int best = caret;
+        int distance = Integer.MAX_VALUE;
+        // Examine word edges in rendered order, so mixed-direction runs retain
+        // spatial left/right semantics instead of reversing the whole paragraph.
+        int[][] runs = bidiRuns(text, font);
+        for (int[] run : runs) {
+            int p = run[0];
+            while (p < run[1]) {
+                if (!wordCharacterAt(start + p)) {
+                    p += Character.charCount(wordCodePointAt(start + p));
+                    continue;
+                }
+                int lo = p;
+                do {
+                    p += Character.charCount(wordCodePointAt(start + p));
+                } while (p < run[1] && wordCharacterAt(start + p));
+                boolean rtl = (run[2] & 1) != 0;
+                int edge = right == rtl ? lo : p;
+                int[] segments = lineVisualSegments(line, text, lo, p, font);
+                int edgeX = right ? Integer.MIN_VALUE : Integer.MAX_VALUE;
+                for (int i = 0; i < segments.length; i += 2) {
+                    edgeX = right ? Math.max(edgeX, segments[i] + segments[i + 1])
+                            : Math.min(edgeX, segments[i]);
+                }
+                int delta = right ? edgeX - x : x - edgeX;
+                if (delta > 0 && delta < distance) {
+                    distance = delta;
+                    best = start + edge;
+                }
+            }
+        }
+        if (best != caret) {
+            return best;
+        }
+        // A line can end in punctuation or contain no word characters at all.
+        if (runs.length > 0) {
+            int[] edgeRun = runs[right ? runs.length - 1 : 0];
+            boolean rtl = (edgeRun[2] & 1) != 0;
+            int edge = start + edgeRun[right == rtl ? 0 : 1];
+            if (edge != caret) {
+                return edge;
+            }
+        }
+        // At the visual line edge continue in the paragraph's reading order.
+        boolean forward = right != isRTL();
+        int adjacent = line + (forward ? 1 : -1);
+        if (adjacent >= 0 && adjacent < doc.getLineCount()) {
+            return forward ? doc.getLineStart(adjacent) : doc.getLineEnd(adjacent);
+        }
+        return caret;
     }
 
     private int wordLeft() {
         int p = caret;
-        while (p > 0 && !isWordChar(doc.charAt(p - 1))) {
-            p--;
+        while (p > 0 && !wordCharacterAt(previousWordOffset(p))) {
+            p = previousWordOffset(p);
         }
-        while (p > 0 && isWordChar(doc.charAt(p - 1))) {
-            p--;
+        while (p > 0 && wordCharacterAt(previousWordOffset(p))) {
+            p = previousWordOffset(p);
         }
         return p;
     }
@@ -1756,11 +1859,11 @@ public class EditorView extends Component implements TextInputClient {
     private int wordRight() {
         int p = caret;
         int n = doc.length();
-        while (p < n && !isWordChar(doc.charAt(p))) {
-            p++;
+        while (p < n && !wordCharacterAt(p)) {
+            p += Character.charCount(wordCodePointAt(p));
         }
-        while (p < n && isWordChar(doc.charAt(p))) {
-            p++;
+        while (p < n && wordCharacterAt(p)) {
+            p += Character.charCount(wordCodePointAt(p));
         }
         return p;
     }
@@ -1768,11 +1871,11 @@ public class EditorView extends Component implements TextInputClient {
     private void selectWordAt(int offset) {
         int s = offset;
         int e = offset;
-        while (s > 0 && isWordChar(doc.charAt(s - 1))) {
-            s--;
+        while (s > 0 && wordCharacterAt(previousWordOffset(s))) {
+            s = previousWordOffset(s);
         }
-        while (e < doc.length() && isWordChar(doc.charAt(e))) {
-            e++;
+        while (e < doc.length() && wordCharacterAt(e)) {
+            e += Character.charCount(wordCodePointAt(e));
         }
         anchor = s;
         caret = e;
@@ -1893,6 +1996,8 @@ public class EditorView extends Component implements TextInputClient {
             // commitText / finishComposing; intermediate compose updates are never recorded
             composingBaseRemoved = doc.substring(start, end);
             composingBeforeState = captureDocumentState();
+            composingBeforeCaret = caret;
+            composingBeforeAnchor = anchor;
         }
         String removed = doc.substring(start, end);
         doc.delete(start, end);
@@ -1915,6 +2020,25 @@ public class EditorView extends Component implements TextInputClient {
             pushInputState();
             repaint();
         }
+    }
+
+    @Override
+    public void cancelComposing() {
+        if (composingStart < 0) {
+            return;
+        }
+        Object before = composingBeforeState;
+        int oldCaret = composingBeforeCaret;
+        int oldAnchor = composingBeforeAnchor;
+        replaceRange(composingStart, composingEnd,
+                composingBaseRemoved == null ? "" : composingBaseRemoved, false);
+        restoreDocumentState(before);
+        caret = doc.clamp(oldCaret);
+        anchor = oldAnchor < 0 ? -1 : doc.clamp(oldAnchor);
+        invalidateLayout();
+        scrollCaretVisible();
+        pushInputState();
+        repaint();
     }
 
     @Override
@@ -1946,6 +2070,20 @@ public class EditorView extends Component implements TextInputClient {
         replaceRange(s, e, "", true);
     }
 
+    private int paragraphBoundary(boolean forward, boolean advance) {
+        int line = doc.lineOfOffset(caret);
+        if (forward) {
+            if (advance && caret == doc.getLineEnd(line) && line + 1 < doc.getLineCount()) {
+                line++;
+            }
+            return doc.getLineEnd(line);
+        }
+        if (advance && caret == doc.getLineStart(line) && line > 0) {
+            line--;
+        }
+        return doc.getLineStart(line);
+    }
+
     @Override
     public void onKeyCommand(int command, int modifiers) {
         boolean extend = (modifiers & MOD_SHIFT) != 0;
@@ -1955,6 +2093,12 @@ public class EditorView extends Component implements TextInputClient {
         boolean lineJump = (modifiers & MOD_CTRL) != 0;
         boolean word = (modifiers & MOD_ALT) != 0;
         switch (command) {
+            case KEY_WORD_LEFT:
+                moveCaret(visualWord(false), extend);
+                break;
+            case KEY_WORD_RIGHT:
+                moveCaret(visualWord(true), extend);
+                break;
             case KEY_LEFT:
                 if (lineJump) {
                     lineHome(extend);
@@ -1974,28 +2118,60 @@ public class EditorView extends Component implements TextInputClient {
                 }
                 break;
             case KEY_UP:
-                moveCaret(lineJump ? 0 : caretVertical(-1), extend);
+                moveCaret(lineJump ? 0 : word ? paragraphBoundary(false, true) : caretVertical(-1), extend);
                 break;
             case KEY_DOWN:
-                moveCaret(lineJump ? doc.length() : caretVertical(1), extend);
+                moveCaret(lineJump ? doc.length() : word ? paragraphBoundary(true, true) : caretVertical(1), extend);
                 break;
             case KEY_HOME:
-                lineHome(extend);
+                if (lineJump) {
+                    moveCaret(0, extend);
+                } else if (word) {
+                    moveCaret(paragraphBoundary(false, false), extend);
+                } else {
+                    lineHome(extend);
+                }
                 break;
             case KEY_END:
-                lineEndKey(extend);
+                if (lineJump) {
+                    moveCaret(doc.length(), extend);
+                } else if (word) {
+                    moveCaret(paragraphBoundary(true, false), extend);
+                } else {
+                    lineEndKey(extend);
+                }
                 break;
             case KEY_PAGE_UP:
-                moveCaret(caretVertical(-Math.max(1, contentHeight() / getLineHeight())), extend);
+                moveCaret(caretPage(false), extend);
                 break;
             case KEY_PAGE_DOWN:
-                moveCaret(caretVertical(Math.max(1, contentHeight() / getLineHeight())), extend);
+                moveCaret(caretPage(true), extend);
+                break;
+            case KEY_SCROLL_PAGE_UP:
+                scrollByPixels(0, Math.max(1, contentHeight()));
+                break;
+            case KEY_SCROLL_PAGE_DOWN:
+                scrollByPixels(0, -Math.max(1, contentHeight()));
                 break;
             case KEY_BACKSPACE:
-                deleteBackward();
+                if (word && !hasSelection() && editable) {
+                    int start = wordLeft();
+                    if (start != caret) {
+                        replaceRange(start, caret, "", true);
+                    }
+                } else {
+                    deleteBackward();
+                }
                 break;
             case KEY_DELETE:
-                deleteForward();
+                if (word && !hasSelection() && editable) {
+                    int end = wordRight();
+                    if (end != caret) {
+                        replaceRange(caret, end, "", true);
+                    }
+                } else {
+                    deleteForward();
+                }
                 break;
             case KEY_COPY:
                 copySelection();
@@ -2060,7 +2236,76 @@ public class EditorView extends Component implements TextInputClient {
 
     @Override
     public TextInputState getEditingState() {
-        return new TextInputState(doc.getText(), getSelectionStart(), getSelectionEnd(), composingStart, composingEnd);
+        return new TextInputState(doc.getText(), anchor < 0 ? caret : anchor, caret, composingStart, composingEnd);
+    }
+
+    /// Measures all insertion positions with one bulk request per directional run. Subclasses
+    /// with styled runs or inline objects override this alongside measureColumnX().
+    protected int[] measureLineCaretPositions(int line, String text, Font font) {
+        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+            return font.getTextRunPositions(text, false);
+        }
+        int[] positions = new int[text.length() + 1];
+        boolean[] assigned = new boolean[positions.length];
+        for (int[] run : bidiRuns(text, font)) {
+            int[] runPositions = font.getTextRunPositions(text.substring(run[0], run[1]), (run[2] & 1) != 0);
+            for (int i = 0; i < runPositions.length; i++) {
+                int column = run[0] + i;
+                if (!assigned[column]) {
+                    positions[column] = run[3] + runPositions[i];
+                    assigned[column] = true;
+                }
+            }
+        }
+        return positions;
+    }
+
+    @Override
+    public com.codename1.ui.TextInputGeometry getGeometrySnapshot() {
+        Font font = getEditorFont();
+        int first = lineAtContentY(scrollY);
+        int last = Math.min(doc.getLineCount() - 1, lineAtContentY(scrollY + Math.max(0, contentHeight())));
+        java.util.List<int[]> lines = new java.util.ArrayList<int[]>();
+        int size = 0;
+        int left = getAbsoluteX();
+        int right = left + getWidth();
+        for (int line = first; line <= last; line++) {
+            String text = doc.getLineText(line);
+            int[] positions = measureLineCaretPositions(line, text, font);
+            int x = left + getContentLeftInset() + lineContentOffsetX(line) - scrollX;
+            int y = getAbsoluteY() + getStyle().getPaddingTop() + lineTopContent(line) - scrollY;
+            int height = lineHeightAt(line);
+            int start = doc.getLineStart(line);
+            int[] points = new int[positions.length * 5];
+            int count = 0;
+            for (int col = 0; col < positions.length; col++) {
+                int px = x + positions[col];
+                // Keep visible positions and the endpoints of a character crossing either edge.
+                int previous = x + positions[Math.max(0, col - 1)];
+                int next = x + positions[Math.min(positions.length - 1, col + 1)];
+                if (Math.max(px, Math.max(previous, next)) < left
+                        || Math.min(px, Math.min(previous, next)) > right) {
+                    continue;
+                }
+                points[count++] = start + col;
+                points[count++] = px;
+                points[count++] = y;
+                points[count++] = Math.max(1, font.getHeight() / 16);
+                points[count++] = height;
+            }
+            int[] visible = new int[count];
+            System.arraycopy(points, 0, visible, 0, count);
+            lines.add(visible);
+            size += count;
+        }
+        int[] points = new int[size];
+        int at = 0;
+        for (int[] line : lines) {
+            System.arraycopy(line, 0, points, at, line.length);
+            at += line.length;
+        }
+        return new com.codename1.ui.TextInputGeometry(points, anchor < 0 ? caret : anchor, caret,
+                selectionRects(getSelectionStart(), getSelectionEnd(), first, last), getCaretRect());
     }
 
     @Override
@@ -2102,6 +2347,10 @@ public class EditorView extends Component implements TextInputClient {
 
     @Override
     public int[] selectionRects(int start, int end) {
+        return selectionRects(start, end, 0, doc.getLineCount() - 1);
+    }
+
+    private int[] selectionRects(int start, int end, int firstVisibleLine, int lastVisibleLine) {
         start = doc.clamp(start);
         end = doc.clamp(end);
         if (start > end) {
@@ -2113,7 +2362,7 @@ public class EditorView extends Component implements TextInputClient {
         int firstLine = doc.lineOfOffset(start);
         int lastLine = doc.lineOfOffset(end);
         java.util.List<int[]> rects = new java.util.ArrayList<int[]>();
-        for (int ln = firstLine; ln <= lastLine; ln++) {
+        for (int ln = Math.max(firstLine, firstVisibleLine); ln <= Math.min(lastLine, lastVisibleLine); ln++) {
             int ls = doc.getLineStart(ln);
             int le = doc.getLineEnd(ln);
             String text = doc.getLineText(ln);

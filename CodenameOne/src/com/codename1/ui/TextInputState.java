@@ -33,8 +33,8 @@ package com.codename1.ui;
 /// IME composition is active.
 public final class TextInputState {
     private final String text;
-    private final int selectionStart;
-    private final int selectionEnd;
+    private final int selectionAnchor;
+    private final int selectionFocus;
     private final int composingStart;
     private final int composingEnd;
 
@@ -66,8 +66,8 @@ public final class TextInputState {
     /// - `composingEnd`: UTF-16 offset where the marked text ends, or -1 when none
     public TextInputState(String text, int selectionStart, int selectionEnd, int composingStart, int composingEnd) {
         this.text = text == null ? "" : text;
-        this.selectionStart = selectionStart;
-        this.selectionEnd = selectionEnd;
+        this.selectionAnchor = selectionStart;
+        this.selectionFocus = selectionEnd;
         this.composingStart = composingStart;
         this.composingEnd = composingEnd;
     }
@@ -77,14 +77,24 @@ public final class TextInputState {
         return text;
     }
 
-    /// Returns the UTF-16 offset of the selection anchor.
+    /// Returns the lower UTF-16 selection offset, independent of selection direction.
     public int getSelectionStart() {
-        return selectionStart;
+        return Math.min(selectionAnchor, selectionFocus);
     }
 
-    /// Returns the UTF-16 offset of the selection focus.
+    /// Returns the upper UTF-16 selection offset, independent of selection direction.
     public int getSelectionEnd() {
-        return selectionEnd;
+        return Math.max(selectionAnchor, selectionFocus);
+    }
+
+    /// Returns the UTF-16 anchor offset, which may be greater than the focus.
+    public int getSelectionAnchor() {
+        return selectionAnchor;
+    }
+
+    /// Returns the UTF-16 focus offset (the moving end of a selection).
+    public int getSelectionFocus() {
+        return selectionFocus;
     }
 
     /// Returns the UTF-16 offset where the IME marked text begins, or -1 when no composition is active.
@@ -99,7 +109,7 @@ public final class TextInputState {
 
     /// True when the selection is collapsed to a caret.
     public boolean isCaret() {
-        return selectionStart == selectionEnd;
+        return selectionAnchor == selectionFocus;
     }
 
     /// True when an IME composition (marked text) is currently active.

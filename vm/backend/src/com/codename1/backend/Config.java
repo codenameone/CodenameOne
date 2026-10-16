@@ -125,6 +125,20 @@ public final class Config {
     /// The Cache-Control header those files carry.
     public static final String STATIC_CACHE_CONTROL = "cn1.static.cacheControl";
 
+    /// The directory holding the app's web build, which the server answers with
+    /// at [#WEBAPP_PATH] after every route and every static file. Defaults to
+    /// `webapp` in the working directory, and is served only when it holds an
+    /// `index.html`; a directory named here that does not is a start-up error.
+    public static final String WEBAPP_ROOT = "cn1.webapp.root";
+    /// The path the web build is served under. Defaults to /.
+    public static final String WEBAPP_PATH = "cn1.webapp.path";
+    /// The Cache-Control header the web build's files carry. Defaults to
+    /// no-cache: the files keep their names from one build to the next, so a
+    /// browser has to ask whether its copy is still the current one.
+    public static final String WEBAPP_CACHE_CONTROL = "cn1.webapp.cacheControl";
+    /// Set to false to keep the server from looking for a web build at all.
+    public static final String WEBAPP_ENABLED = "cn1.webapp.enabled";
+
     /// The database, as a SQLite path or a PostgreSQL or MySQL URL. Also read from
     /// DATABASE_URL.
     public static final String DATASOURCE_URL = "cn1.datasource.url";

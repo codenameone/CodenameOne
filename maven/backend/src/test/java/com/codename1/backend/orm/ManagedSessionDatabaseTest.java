@@ -120,7 +120,7 @@ class ManagedSessionDatabaseTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",1.5).executeUpdate());
             session.rollbackTransaction();
             for(String mutation:new String[]{"update ManagedSessionTest$Record r set r.counter=sum(r.counter)","update ManagedSessionTest$Record r set r.counter=1 where count(r.id)>0","delete from ManagedSessionTest$Record r where count(r.id)>0"}) assertThrows(IllegalArgumentException.class,()->session.createQuery(mutation));
-            if(!mysql) { session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter) from ManagedSessionTest$Record i)").executeUpdate());assertEquals(0,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.id<0)").executeUpdate());session.commitTransaction(); }
+            if(!mysql) { session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter) from ManagedSessionTest$Record i)").executeUpdate());assertEquals(0,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.id<0)").executeUpdate());session.commitTransaction();session.clear(); }
             assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,"abc"));
             assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,1.5));
             assertEquals(Long.valueOf(0),session.createQuery("select count(NULL) from ManagedSessionTest$Record r",Long.class).first());
@@ -208,9 +208,9 @@ class ManagedSessionDatabaseTest {
             Future<Void> first=workers.submit(increment),second=workers.submit(increment);first.get(10,TimeUnit.SECONDS);second.get(10,TimeUnit.SECONDS);
             session.clear();assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).counter);
             assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).version);
-            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();session.clear();
             assertEquals("updated",session.find(ManagedSessionTest.Record.class,entity.id).name);
-            session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();session.clear();
             assertNull(session.find(ManagedSessionTest.Record.class,entity.id));
             java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> cycleModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();cycleModels.put(Cycle.class.getName(),new CycleModel());
             com.codename1.impl.orm.BackendSqlAccess cycleAccess=new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect());

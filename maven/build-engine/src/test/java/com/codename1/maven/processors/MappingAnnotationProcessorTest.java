@@ -253,6 +253,155 @@ public class MappingAnnotationProcessorTest {
     // Helpers
     // ---------------------------------------------------------------
 
+    /// A `@Mapped` type in a library the application depends on is mapped in the
+    /// application, and a type it refers to -- an enum, which carries no
+    /// annotation and so is in no index -- is still recognised for what it is.
+    @Test
+    public void aDependencyClassIsMappedIntoTheModule() throws Exception {
+        File shared = tmp.newFolder("shared");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.shared.Level",
+                "package com.example.shared;\npublic enum Level { LOW, HIGH }\n");
+        sources.put("com.example.shared.Task",
+                "package com.example.shared;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Mapped\n"
+                        + "public class Task {\n"
+                        + "    public String title;\n"
+                        + "    public Level level;\n"
+                        + "    public Task() {}\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, shared, Arrays.asList(testClassesDir()));
+        File classes = tmp.newFolder("classes");
+
+        ProcessorContext ctx = runOverDependencies(classes, shared);
+
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue(new File(classes, "com/example/shared/TaskCn1Mapper.class").exists());
+        assertTrue(new File(classes, "cn1app/MapperBootstrap.class").exists());
+        assertFalse("a dependency is never written to",
+                new File(shared, "com/example/shared/TaskCn1Mapper.class").exists());
+
+        URL[] urls = {classes.toURI().toURL(), shared.toURI().toURL(),
+                testClassesDir().toURI().toURL()};
+        try (URLClassLoader cl = new URLClassLoader(urls, getClass().getClassLoader())) {
+            Class<?> taskCls = cl.loadClass("com.example.shared.Task");
+            Class<?> mapperCls = cl.loadClass("com.example.shared.TaskCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Map<String, Object> in = new LinkedHashMap<String, Object>();
+            in.put("title", "Ship");
+            in.put("level", "HIGH");
+            Object task = mapperCls.getMethod("fromMap", Map.class).invoke(mapper, in);
+            assertEquals("Ship", taskCls.getField("title").get(task));
+            assertEquals("the enum is read by name, as one of the module's own is",
+                    "HIGH", String.valueOf(taskCls.getField("level").get(task)));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> out = (Map<String, Object>)
+                    mapperCls.getMethod("toMap", taskCls).invoke(mapper, task);
+            assertEquals("HIGH", out.get("level"));
+        }
+    }
+
+    /// The module that owns the type, or one between it and this, mapped it
+    /// already: a second mapper here would define one class twice in the build.
+    @Test
+    public void aDependencyClassAlreadyMappedIsLeftAlone() throws Exception {
+        File shared = tmp.newFolder("shared");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.shared.Task",
+                "package com.example.shared;\n"
+                        + "@com.codename1.annotations.Mapped\n"
+                        + "public class Task {\n"
+                        + "    public String title;\n"
+                        + "    public Task() {}\n"
+                        + "}\n");
+        sources.put("com.example.shared.TaskCn1Mapper",
+                "package com.example.shared;\npublic class TaskCn1Mapper {}\n");
+        JavaSourceCompiler.compile(sources, shared, Arrays.asList(testClassesDir()));
+        File classes = tmp.newFolder("classes");
+
+        ProcessorContext ctx = runOverDependencies(classes, shared);
+
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertFalse(new File(classes, "com/example/shared/TaskCn1Mapper.class").exists());
+    }
+
+    /// Runs the processor the way the driver does for a module that declares
+    /// nothing itself and depends on `shared`.
+    private ProcessorContext runOverDependencies(File classes, File shared) throws Exception {
+        File core = new File(com.codename1.mapping.Mappers.class.getProtectionDomain()
+                .getCodeSource().getLocation().toURI());
+        java.util.List<String> classpath = Arrays.asList(classes.getPath(), shared.getPath(),
+                core.getPath());
+        MappingAnnotationProcessor proc = new MappingAnnotationProcessor();
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(),
+                java.util.Collections.<String, AnnotatedClass>emptyMap(), new SystemStreamLog(),
+                null, null, null, null, null, classpath);
+        assertTrue(proc.acceptsDependencyClasses(ctx));
+        assertFalse("a module without the mapper runtime is not offered them",
+                proc.acceptsDependencyClasses(new ProcessorContext(classes, tmp.newFolder(),
+                        java.util.Collections.<String, AnnotatedClass>emptyMap(),
+                        new SystemStreamLog(), null, null, null, null, null,
+                        Arrays.asList(classes.getPath(), shared.getPath()))));
+        Map<String, AnnotatedClass> dependencies =
+                com.codename1.maven.annotations.DependencyClasses.scan(
+                        classpath, classes, proc.getAnnotationDescriptors());
+        assertTrue(dependencies.containsKey("com/example/shared/Task"));
+        ctx.setDependencyIndex(dependencies);
+        JavaSourceCompiler.setProjectClasspath(Arrays.asList(shared, core));
+        try {
+            proc.start(ctx);
+            for (AnnotatedClass cls : dependencies.values()) {
+                proc.processClass(cls, ctx);
+            }
+            proc.finish(ctx);
+        } finally {
+            JavaSourceCompiler.clearProjectClasspath();
+        }
+        return ctx;
+    }
+
+    /// A JSON parser hands every number over as a `Double`, so the elements of a
+    /// `List<Integer>` have to be converted and not cast. Cast, this threw
+    /// ClassCastException here and, on ParparVM, where a cast is unchecked, left
+    /// a `Double` in the list.
+    @Test
+    public void scalarListElementsAreConvertedFromWhatTheParserProduces() throws Exception {
+        File classes = compileFixture(
+                "com.example.Series",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "import java.util.List;\n"
+                        + "@Mapped public class Series {\n"
+                        + "    public List<Integer> counts;\n"
+                        + "    public List<Long> totals;\n"
+                        + "    public List<Double> rates;\n"
+                        + "    public List<String> names;\n"
+                        + "    public List<Boolean> flags;\n"
+                        + "    public Series() {}\n"
+                        + "}\n");
+        runProcessorOrFail(classes);
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> seriesCls = cl.loadClass("com.example.Series");
+            Class<?> mapperCls = cl.loadClass("com.example.SeriesCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Map<String, Object> json = new LinkedHashMap<String, Object>();
+            json.put("counts", Arrays.<Object>asList(Double.valueOf(3), Long.valueOf(4), "five", null));
+            json.put("totals", Arrays.<Object>asList(Double.valueOf(7)));
+            json.put("rates", Arrays.<Object>asList(Long.valueOf(2), Double.valueOf(0.5)));
+            json.put("names", Arrays.<Object>asList("a", null));
+            json.put("flags", Arrays.<Object>asList(Boolean.TRUE, "yes"));
+            Object restored = mapperCls.getMethod("fromMap", Map.class).invoke(mapper, json);
+            assertEquals(Arrays.asList(Integer.valueOf(3), Integer.valueOf(4), null, null),
+                    seriesCls.getField("counts").get(restored));
+            assertEquals(Arrays.asList(Long.valueOf(7)), seriesCls.getField("totals").get(restored));
+            assertEquals(Arrays.asList(Double.valueOf(2), Double.valueOf(0.5)),
+                    seriesCls.getField("rates").get(restored));
+            assertEquals(Arrays.asList("a", null), seriesCls.getField("names").get(restored));
+            assertEquals(Arrays.asList(Boolean.TRUE, null), seriesCls.getField("flags").get(restored));
+        }
+    }
+
     private File compileFixture(String fqn, String src) throws Exception {
         File classes = tmp.newFolder("classes");
         JavaSourceCompiler.compile(

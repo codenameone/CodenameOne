@@ -660,6 +660,22 @@ public class Font extends CN {
     public void addContrast(byte value) {
     }
 
+    /// Returns visual caret x coordinates for a single directional text run, in pixels.
+    /// The result has one entry per UTF-16 insertion position, including the final endpoint.
+    /// Ports may shape the run once rather than measure every prefix independently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: text containing one directional run
+    /// - `rtl`: true for a right-to-left run
+    ///
+    /// #### Returns
+    ///
+    /// a new array of `text.length() + 1` positions relative to the run's left edge
+    public int[] getTextRunPositions(String text, boolean rtl) {
+        return Display.impl.getTextRunPositions(font, text, rtl);
+    }
+
     /// Return the width of the given characters in this font instance
     ///
     /// #### Parameters

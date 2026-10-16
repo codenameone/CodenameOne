@@ -117,6 +117,9 @@
 /// than being delivered and then discarded further up.
 @property (nonatomic, assign) BOOL cn1InputEnabled;
 
+/// Main-thread-only packed int32 rectangles: title band followed by controls.
+@property (nonatomic, copy) NSData *cn1TitleBarRegions;
+
 /// Keeps the peer input blocker above every peer subview.
 ///
 /// Called when input is toggled and whenever a peer is added: a peer added

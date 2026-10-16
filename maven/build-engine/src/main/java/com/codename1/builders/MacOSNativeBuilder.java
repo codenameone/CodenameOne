@@ -817,6 +817,7 @@ public class MacOSNativeBuilder extends Executor {
                 // makes the uploaded mapping unreachable -- the failure is a
                 // stack trace nobody can retrace, months later.
                 + hardeningRuntimeProperties(request)
+                + desktopTitleBarStubProperty(request)
                 + svgRegistryInstall
                 + "            i.init(this);\n"
                 + createStartInvocation(request, "i")

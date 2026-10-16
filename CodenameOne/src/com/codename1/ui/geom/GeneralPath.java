@@ -591,13 +591,17 @@ public final class GeneralPath implements Shape {
             // awt.20A=First segment should be SEG_MOVETO type
             throw new IndexOutOfBoundsException("First segment must be a moveto"); //$NON-NLS-1$
         }
+        // Both buffers grow by half their size, not by a fixed step. A fixed step
+        // copies the whole path again every ten segments, so building a path of n
+        // segments cost n * n / 20 element copies -- most of the time a vector map
+        // tile took to rasterize, whose fills are paths of thousands of points.
         if (typeSize == types.length) {
-            byte[] tmp = new byte[typeSize + BUFFER_CAPACITY];
+            byte[] tmp = new byte[typeSize + Math.max(BUFFER_CAPACITY, typeSize >> 1)];
             System.arraycopy(types, 0, tmp, 0, typeSize);
             types = tmp;
         }
         if (pointSize + pointCount > points.length) {
-            float[] tmp = new float[pointSize + Math.max(BUFFER_CAPACITY * 2, pointCount)];
+            float[] tmp = new float[pointSize + Math.max(Math.max(BUFFER_CAPACITY * 2, pointCount), pointSize >> 1)];
             System.arraycopy(points, 0, tmp, 0, pointSize);
             points = tmp;
         }

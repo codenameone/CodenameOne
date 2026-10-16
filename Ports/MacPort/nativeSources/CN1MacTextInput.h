@@ -54,6 +54,8 @@ void CN1MacTextInputNotifyEditorAction(void);
 @property (nonatomic, copy) NSString *text;
 
 @property (nonatomic) NSRange selectedRange;
+/// Direction is separate from AppKit's ordered NSRange; Java uses anchor/focus offsets.
+@property (nonatomic) NSUInteger selectionAnchor;
 @property (nonatomic) NSRange markedRange;
 
 /// Whether the session accepts a newline as text rather than as "done".
@@ -116,6 +118,12 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// echo overwrites the newer native text and the next keystroke is applied to
 /// text the user has already moved past.
 - (int)currentEditSeq;
+
+/// Main-thread barrier for commands whose result is computed by the Java editor.
+- (BOOL)deferNativeEdit:(void (^)(void))edit;
+- (int)beginEditorCommand;
+- (void)completeEditorCommand:(int)sequence;
+- (void)resetDeferredEditsIfNeeded;
 
 /// Caret rectangle in Codename One pixels, as last reported by the framework.
 @property (nonatomic) CGRect caretRect;

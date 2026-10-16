@@ -48,6 +48,8 @@ extern void com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(
 extern void com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT action);
 
+extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_INT captureId, JAVA_BOOLEAN accepted);
+
 /// Reports one replacement to the pure editor. No-op for the legacy path, whose
 /// edits travel as a whole-document stringEdit instead.
 void CN1MacTextInputNotifyReplace(NSRange range, NSString *text) {
@@ -67,8 +69,14 @@ void CN1MacTextInputNotifySelection(NSRange sel) {
     if (!session.pureEditor) {
         return;
     }
+    NSUInteger anchor = session.selectionAnchor;
+    if (anchor != sel.location && anchor != NSMaxRange(sel)) {
+        anchor = sel.location;
+    }
+    NSUInteger focus = anchor == sel.location ? NSMaxRange(sel) : sel.location;
+    session.selectionAnchor = anchor;
     com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(
-            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)sel.location, (JAVA_INT)NSMaxRange(sel),
+            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)anchor, (JAVA_INT)focus,
             (JAVA_INT)[session nextEditSeq]);
 }
 
@@ -103,6 +111,9 @@ void CN1MacTextInputNotifyEditorAction(void) {
 
 @implementation CN1MacTextInputSession {
     int editSeq;
+    int pendingEditorCommand;
+    int deferredEditGeneration;
+    NSMutableArray *deferredEdits;
     /// Bumped by every start, so a teardown queued by the previous session can
     /// tell that the singleton has since been rebound to a different editor.
     int sessionGeneration;
@@ -119,6 +130,51 @@ void CN1MacTextInputNotifyEditorAction(void) {
         shared = [[CN1MacTextInputSession alloc] init];
     });
     return shared;
+}
+
+// All queue access is on AppKit's main thread. A replaced/stopped session drops
+// its delayed edits instead of replaying them into another document.
+- (void)resetDeferredEditsIfNeeded {
+    if (!self.active || deferredEditGeneration != sessionGeneration) {
+        pendingEditorCommand = 0;
+        [deferredEdits removeAllObjects];
+        deferredEditGeneration = sessionGeneration;
+    }
+}
+
+- (BOOL)deferNativeEdit:(void (^)(void))edit {
+    [self resetDeferredEditsIfNeeded];
+    if (pendingEditorCommand == 0) {
+        return NO;
+    }
+    if (deferredEdits == nil) { deferredEdits = [[NSMutableArray alloc] init]; }
+    void (^saved)(void) = [edit copy];
+    [deferredEdits addObject:saved];
+#if !__has_feature(objc_arc)
+    [saved release];
+#endif
+    return YES;
+}
+
+- (int)beginEditorCommand {
+    [self resetDeferredEditsIfNeeded];
+    pendingEditorCommand = [self nextEditSeq];
+    return pendingEditorCommand;
+}
+
+- (void)completeEditorCommand:(int)sequence {
+    [self resetDeferredEditsIfNeeded];
+    if (pendingEditorCommand != sequence) { return; }
+    pendingEditorCommand = 0;
+    while (deferredEdits.count > 0 && pendingEditorCommand == 0 && self.active) {
+        void (^edit)(void) = [deferredEdits[0] copy];
+        [deferredEdits removeObjectAtIndex:0];
+        edit();
+#if !__has_feature(objc_arc)
+        [edit release];
+#endif
+        [self resetDeferredEditsIfNeeded];
+    }
 }
 
 - (instancetype)init {
@@ -166,14 +222,16 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     // changed, so clamp rather than trust it -- an out of range NSRange is a
     // crash, not a wrong caret.
     selStart = MIN(MAX(selStart, 0), len);
-    selEnd = MIN(MAX(selEnd, selStart), len);
-    self.selectedRange = NSMakeRange(selStart, selEnd - selStart);
+    selEnd = MIN(MAX(selEnd, 0), len);
+    self.selectionAnchor = selStart;
+    self.selectedRange = NSMakeRange(MIN(selStart, selEnd), MAX(selStart, selEnd) - MIN(selStart, selEnd));
     self.markedRange = NSMakeRange(NSNotFound, 0);
     self.multiline = multiline;
     _active = YES;
     sessionGeneration++;
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self resetDeferredEditsIfNeeded];
         // The window the editing started in, not always the main one. Editing a
         // component in a secondary NSWindow used to make the MAIN host's view
         // first responder, which took key focus away from the window the user
@@ -217,6 +275,7 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     // finish the composition of whichever editor now owns it.
     int teardownGeneration = sessionGeneration;
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self resetDeferredEditsIfNeeded];
         BOOL superseded = sessionGeneration != teardownGeneration;
         if (!superseded) {
             [[NSTextInputContext currentInputContext] discardMarkedText];
@@ -240,11 +299,18 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
 }
 
 - (int)nextEditSeq {
+    if (self.pureEditor) {
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG 0, JAVA_FALSE);
+    }
     return ++editSeq;
 }
 
 - (int)currentEditSeq {
     return editSeq;
+}
+
+- (int)currentSessionGeneration {
+    return sessionGeneration;
 }
 
 - (void)commitFinished:(BOOL)finished {
@@ -272,7 +338,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(
     session.editorBounds = CGRectMake(x, y, w, h);
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType, JAVA_INT captureId) {
     // autoCorrect / autoCapitalize / constraint have no AppKit equivalent for a
     // custom drawn surface: correction and capitalization are a system wide
     // input source behaviour rather than a per field one. They are accepted and
@@ -302,40 +368,62 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_
                                                 selStart:selStart
                                                   selEnd:selEnd
                                                multiline:multiline != 0];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
+    });
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_stopTextInput__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     [[CN1MacTextInputSession sharedSession] stop];
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq, JAVA_INT captureId) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    // The caret geometry is taken from every push, stale or not: it is where the
-    // framework last drew the caret and an input method needs somewhere to put
-    // its candidate window.
-    session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
-    // The TEXT and the selection are not, when the echo is stale. Java echoes
-    // the sequence of the edit it applied, and a push for edit N that arrives
-    // after the user has already typed N+1 would otherwise overwrite the newer
-    // native text -- and the next keystroke would then be applied to a document
-    // the user has moved past, losing or misplacing what they typed. The UIKit
-    // path drops the same echo for the same reason.
-    if (seq != (JAVA_INT)[session currentEditSeq]) {
-        return;
-    }
-    if (session.markedRange.location != NSNotFound) {
-        // Mid composition the input method owns the text. Taking the
-        // framework's copy back here would drop the marked run and make the
-        // composition look like it did nothing.
-        return;
-    }
-    if (text != JAVA_NULL) {
-        session.text = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
-    }
-    NSInteger len = (NSInteger)session.text.length;
-    NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
-    NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
-    session.selectedRange = NSMakeRange(start, end - start);
+    NSString *snapshot = text != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG text) : nil;
+    int generation = [session currentSessionGeneration];
+    // AppKit mutates the shadow on the main thread. Check the generation and
+    // apply the echo on that same queue: checking on the EDT left a window in
+    // which a keystroke could advance the shadow before this older push wrote
+    // it back, even though its sequence check had passed.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!session.active || !session.pureEditor
+                || generation != [session currentSessionGeneration]) {
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
+            return;
+        }
+        // The caret geometry is taken from every push, stale or not: it is where the
+        // framework last drew the caret and an input method needs somewhere to put
+        // its candidate window.
+        session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
+        // The TEXT and the selection are not, when the echo is stale. Java echoes
+        // the sequence of the edit it applied, and a push for edit N that arrives
+        // after the user has already typed N+1 would otherwise overwrite the newer
+        // native text -- and the next keystroke would then be applied to a document
+        // the user has moved past, losing or misplacing what they typed. The UIKit
+        // path drops the same echo for the same reason.
+        if (seq != (JAVA_INT)[session currentEditSeq]) {
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
+            return;
+        }
+        if (session.markedRange.location != NSNotFound) {
+            // Mid composition the input method owns the text. Taking the
+            // framework's copy back here would drop the marked run and make the
+            // composition look like it did nothing.
+            com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_FALSE);
+            return;
+        }
+        if (snapshot != nil) {
+            session.text = snapshot;
+        }
+        NSInteger len = (NSInteger)session.text.length;
+        NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
+        NSInteger end = MIN(MAX((NSInteger)selEnd, 0), len);
+        session.selectionAnchor = start;
+        session.selectedRange = NSMakeRange(MIN(start, end), MAX(start, end) - MIN(start, end));
+        com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG captureId, JAVA_TRUE);
+        [session completeEditorCommand:(int)seq];
+    });
 }
 
 /// Pushes the framework's text into the live session without disturbing the

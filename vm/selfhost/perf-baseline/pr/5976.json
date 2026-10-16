@@ -22,26 +22,6 @@
     }
    }
   },
-  "linux-x64@intel-xeon-platinum-8573c": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.517,
-      "time": 0.505,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.43,
-     "reason": "Recalibrate translator time and RAM on Xeon Platinum 8573C from three complete five-round runs. Run medians, time / RAM: this pull request's run 37974545389 at bb185e0f13, 0.638x / 0.430x; master 37927504399 at d65703afaa, the commit this branch is based on, 0.664x / 0.414x; master 37889241211 at 8e6f2cf05d, 0.521x / 0.465x. Master at the base commit fails the 0.505x / 0.517x row (which came from a single run) the same way this pull request does: time +31.5% there and +26.2% here against a 20% tolerance, RAM -19.9% there and -16.8% here against 15%. This pull request's medians lie between the two master runs on both metrics, and the two master runs differ from each other by more than this pull request differs from either. The shift is therefore present on master at the base commit and is not attributed to this pull request; why two runs of master differ this much was not investigated. No improvement or regression is claimed. The baseline moves to the pooled run medians and the time tolerance widens to the 30% the tool derives from the observed spread; RAM keeps the global tolerance.",
-     "runs": 3,
-     "time": 0.638,
-     "tolerance": {
-      "time": 0.3
-     }
-    }
-   }
-  },
   "macos-arm64": {
    "mathTranscendental": {
     "all": {
@@ -94,88 +74,6 @@
      "time": 0.623,
      "tolerance": {
       "memory": 0.35
-     }
-    }
-   }
-  },
-  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.975,
-      "time": 1.107,
-      "tolerance": {
-       "memory": 0.35
-      }
-     },
-     "memory": 1.256,
-     "reason": "Rebaseline hello RAM on Windows arm64 (Family 8 Model D49) from three complete five-round runs of this pull request: 38041699392 at 6f60a5cc92 (run median 1.147x), 38052037363 at bbeda29aaa (1.256x) and 38096615804 at 1a18fdf9e9 (1.363x, which failed at +39.8% against the 0.975x row's 35% tolerance). Two master controls on the same model passed: 38112530964 at 9911cc8e5d (0.89x) and 38037327137 at 8cc51a3a1 (0.91x). The workload is not the same on the two sides: hello is the screenshot suite, and this pull request adds eight Unity gallery scenes to it, with the Unity runtime and the translated gallery in the binary. ParparVM's peak is 1284-1481 MB in this pull request's runs against 1107-1304 MB on master, about 8% at the median, and that part is attributed to the added scenes; it was not broken down further. The rest of the ratio's movement is the JDK 25 arm, whose peak is either about 1000 MB or 1400-2000 MB for the same suite: the failing run drew the low value in five rounds of five, the previous run in three, master in none and two. The last commit changed no code this benchmark's VM compiles differently, only Unity runtime Java, so the step from 1.256x to 1.363x is read as that draw and not as a change. The baseline moves to the pooled run median with the tolerance the tool derives. Time is unchanged.",
-     "runs": 3,
-     "time": 1.107,
-     "tolerance": {
-      "memory": 0.35
-     }
-    }
-   }
-  },
-  "windows-x64@amd64-family-25-model-17-authenticamd": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.551,
-      "time": 0.777,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.551,
-     "reason": "Recalibrate translator time on AMD64 Family 25 Model 17 from five complete five-round runs. Run medians: this pull request's runs 38052037363 at bbeda29aaa (0.588x, which failed as IMPROVED at -24.4% against the 0.777x row's 20% tolerance), 38020026095 at f0abf10218 (0.756x, passed) and 37974545096 at bb185e0f13 (0.697x, passed), and two master controls, 38016546068 at 6dd059d34b (0.663x) and 37906860757 at 438399d5f1 (0.725x). The 0.777x row came from a single run and all five runs sit below it. Per round, master on this model ranges 0.545-0.749x and the failing run 0.527-0.788x, so master's own rounds reach the failing run's median. Master 438399d5f1 predates d65703afaa, the commit this branch is based on, and 6dd059d34b follows it. In the round timings the ratio moves with the JDK 25 arm rather than with ParparVM: in four of the runs JDK 25 took either 2.95-3.44 s or 4.31-5.20 s for the same workload while ParparVM took 2.27-2.94 s (2.33-2.77 s in the failing run, 2.27-2.94 s in master 38016546068). The failing run drew the slow JDK rounds in four of five, master 38016546068 in two of five, and this pull request's other two runs in one and two of five. The fifth run, master 37906860757, was slower in both arms (JDK 25 3.86-4.13 s with one round at 5.63 s, ParparVM 2.88-3.39 s). That is one run of this branch landing low while two others did not, so no improvement by this pull request is claimed; why the JDK arm has two speeds on this runner was not investigated, and two master runs cannot rule out a small shift inside this spread. The baseline moves to the pooled run median (0.697x) and the time tolerance widens to the 25% the tool derives from the observed spread. RAM is unchanged.",
-     "runs": 5,
-     "time": 0.697,
-     "tolerance": {
-      "time": 0.25
-     }
-    }
-   }
-  },
-  "windows-x64@amd64-family-26-model-2-authenticamd": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.749,
-      "time": 1.41,
-      "tolerance": {
-       "memory": 0.3,
-       "time": 0.5
-      }
-     },
-     "memory": 0.857,
-     "reason": "Rebaseline hello RAM on Windows x64 (AMD64 Family 26 Model 2) from two complete five-round runs of this pull request on that model: 38041699392 at 6f60a5cc92 (run median 0.734x, passed) and 38096615804 at 1a18fdf9e9 (0.979x, which failed at +30.7% against the 0.749x row's 30% tolerance; that row came from two runs). No run of master has landed on this model, so there is no same-model control; master's two recent runs were on Family 25 Model 1 and measured 0.95x and 0.76x, as far apart as these two. hello is the screenshot suite, to which this pull request adds eight Unity gallery scenes, so some of ParparVM's peak is this pull request's own added workload; both of these runs include it, and one passed. Per round the failing run ranges 0.71-1.23x: ParparVM's peak stays at 1155-1380 MB while the JDK 25 arm swings from 1076 to 1785 MB for the same suite, and the rounds above 0.98x are the ones where the JDK arm drew its low value. The commit between the two runs changed no code this benchmark's VM compiles differently. No regression in the VM is claimed and none is ruled out by two runs. The baseline moves to the pooled run median with the tolerance the tool derives. Time is unchanged.",
-     "runs": 2,
-     "time": 1.41,
-     "tolerance": {
-      "memory": 0.3,
-      "time": 0.5
-     }
-    }
-   },
-   "stringBuilding": {
-    "all": {
-     "from": {
-      "memory": 0.175,
-      "time": 1.386,
-      "tolerance": {
-       "memory": 0.35,
-       "time": 0.2
-      }
-     },
-     "memory": 0.267,
-     "reason": "Windows x64 AMD Family 26 Model 2 stringBuilding all-core RAM is 0.267x on master's own runs 38346386877 and 38226452649 and on this PR's run 38519282184; pr/6010.json recorded 0.175x from a single run. The benchmark has no float or array-of-arrays path, so this PR's native changes cannot reach it. Pool the three same-model runs; keep the memory tolerance and time baseline.",
-     "runs": 3,
-     "time": 1.386,
-     "tolerance": {
-      "memory": 0.35,
-      "time": 0.2
      }
     }
    }

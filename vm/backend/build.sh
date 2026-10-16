@@ -60,8 +60,8 @@ TRANSLATOR_STAMP="$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.
 # Rebuild when a TRANSLATOR SOURCE is newer than what was compiled, for the same
 # reason the JavaAPI block below does it -- but here staleness does not merely
 # keep the old behaviour, it fails the build in a place that names nothing. The
-# C runtime sources are copied out of src/ on every run a few lines down, so an
-# old target/classes pairs a NEW cn1_globals.h with the emitter that preceded
+# C runtime sources are staged from src/ on every run a few lines down, so an
+# old translator pairs a NEW cn1_globals.h with the emitter that preceded
 # it. After a merge that renamed the POP2 helper, the generated C still called
 # the previous one and clang reported an undeclared function in a file this
 # script had just written; neither the translator nor target/classes appeared in
@@ -72,13 +72,18 @@ if [ ! -f "$TRANSLATOR_STAMP" ] \
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
 fi
 
-# the C runtime resources the translator emits from its classpath
+# The C runtime resources the translator emits from its classpath.
 # cn1_sqlite3.c is synced too: it carries our build options for the bundled
 # engine, and a stale copy in target/classes silently builds the old ones.
+# Stage privately and put this directory first on this build's classpath.
+# Copying into shared target/classes truncates each destination before writing;
+# a concurrent translator can read an empty header or a partial runtime source.
+RUNTIME_RESOURCES="$WORK/runtime-resources"
+mkdir -p "$RUNTIME_RESOURCES"
 for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h cn1_sqlite3.c \
          cn1_process.h cn1_process_vm.h \
          cn1_virtual_thread.h cn1_virtual_thread.c cn1_virtual_thread_asm.S; do
-    cp "$REPO/vm/ByteCodeTranslator/src/$f" "$TRANSLATOR/$f"
+    cp "$REPO/vm/ByteCodeTranslator/src/$f" "$RUNTIME_RESOURCES/$f"
 done
 
 # Compiled once and shared by every build in this tree, so concurrent builds --
@@ -228,7 +233,7 @@ fi
 # CN1_BACKEND_CHECKED_CASTS=0 turns it off to measure what it costs.
 CAST_OPT="-Dcn1.checkedCasts=true"
 if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
-"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$TRANSLATOR" \
+"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$RUNTIME_RESOURCES:$TRANSLATOR" \
     com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" "$PKG" "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }

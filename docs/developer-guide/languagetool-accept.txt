@@ -808,3 +808,6 @@ Juwal
 Fruitopia
 Kharrat
 Cinemachine
+# -----------------------------------------------------------------------------
+# The sample application the Wayline chapters walk through.
+Wayline

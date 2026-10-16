@@ -27,13 +27,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Thin Java wrapper over a native WinSock TCP socket peer. Holds the native
+ * Thin Java wrapper over a native POSIX TCP socket peer. Holds the native
  * handle and exposes both the raw read/write the Codename One socket SPI needs
  * and blocking {@link InputStream}/{@link OutputStream} adapters the port's
  * WebSocket client runs over.
  */
 public final class LinuxSocket {
-    private long handle;
+    private volatile long handle;
+    private volatile int errorCode = -1;
+
+    /** Takes ownership of an accepted socket token. */
+    LinuxSocket(long acceptedHandle) {
+        handle = acceptedHandle;
+    }
 
     /** Connects to host:port; {@link #isConnected()} reports the outcome. */
     public LinuxSocket(String host, int port, int timeoutMillis) {
@@ -57,6 +63,7 @@ public final class LinuxSocket {
         byte[] buffer = new byte[avail > 0 ? avail : 8192];
         int read = LinuxNative.socketRead(handle, buffer, 0, buffer.length);
         if (read < 0) {
+            close();
             return null;
         }
         if (read == buffer.length) {
@@ -69,21 +76,24 @@ public final class LinuxSocket {
 
     public void write(byte[] data, int offset, int length) {
         if (handle != 0) {
-            LinuxNative.socketWrite(handle, data, offset, length);
+            if (LinuxNative.socketWrite(handle, data, offset, length) < length) {
+                close();
+            }
         }
     }
 
     public int getErrorCode() {
-        return handle == 0 ? -1 : LinuxNative.socketErrorCode(handle);
+        return handle == 0 ? errorCode : LinuxNative.socketErrorCode(handle);
     }
 
     public String getErrorMessage() {
         int code = getErrorCode();
-        return code <= 0 ? null : "WinSock error " + code;
+        return code <= 0 ? null : "Socket error " + code;
     }
 
     public void close() {
         if (handle != 0) {
+            errorCode = LinuxNative.socketErrorCode(handle);
             LinuxNative.socketClose(handle);
             handle = 0;
         }
@@ -99,6 +109,11 @@ public final class LinuxSocket {
 
     /** Blocking input stream backed by socketRead, with a small carry buffer. */
     private final class SocketInput extends InputStream {
+        @Override
+        public void close() {
+            LinuxSocket.this.close();
+        }
+
         private byte[] buffer;
         private int pos;
         private int len;
@@ -135,6 +150,7 @@ public final class LinuxSocket {
             byte[] chunk = new byte[8192];
             int n = LinuxNative.socketRead(handle, chunk, 0, chunk.length);
             if (n < 0) {
+                LinuxSocket.this.close();
                 return false;
             }
             if (n == 0) {
@@ -150,6 +166,11 @@ public final class LinuxSocket {
 
     private final class SocketOutput extends OutputStream {
         @Override
+        public void close() {
+            LinuxSocket.this.close();
+        }
+
+        @Override
         public void write(int b) throws IOException {
             write(new byte[] { (byte) b }, 0, 1);
         }
@@ -159,7 +180,8 @@ public final class LinuxSocket {
             if (handle == 0) {
                 throw new IOException("socket closed");
             }
-            if (LinuxNative.socketWrite(handle, b, off, length) < 0) {
+            if (LinuxNative.socketWrite(handle, b, off, length) < length) {
+                LinuxSocket.this.close();
                 throw new IOException("socket write failed: " + getErrorMessage());
             }
         }

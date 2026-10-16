@@ -822,6 +822,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     private void drainInput() {
+        lowLevelTextInput.drain();
         while (LinuxNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
             int x = eventScratch[1];
@@ -2104,13 +2105,39 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     /**
      * Native input is supported: while a TextField/TextArea is edited it is
-     * overlaid by a real Win32 EDIT control with a native caret, selection,
+     * overlaid by a native GTK text widget with a native caret, selection,
      * keyboard and IME -- so {@code TextArea} routes here instead of the
      * lightweight (CN1-drawn) editor.
      */
     @Override
     public boolean isNativeInputSupported() {
         return true;
+    }
+
+    private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client,
+            com.codename1.ui.TextInputConfig config) {
+        if (editPeer != 0) {
+            commitEdit();
+        }
+        return lowLevelTextInput.start(client, config);
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        lowLevelTextInput.update(handle, state);
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        lowLevelTextInput.stop(handle);
     }
 
     /**
@@ -2127,7 +2154,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * Overlays a native Win32 EDIT control over the field's text area (inside the
+     * Overlays a native GTK text widget over the field's text area (inside the
      * field's padding so its border/background still show), styled to match the
      * field's font and colours, and focuses it. Returns immediately (async); the
      * value is delivered through {@code Display.onEditingComplete} when the user
@@ -2136,6 +2163,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        lowLevelTextInput.stopCurrent();
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
         if (editPeer != 0) {
@@ -2757,6 +2785,24 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        long handle = LinuxNative.socketListenLoopback(port);
+        return handle == 0 ? null : new LinuxSocket(handle);
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        if (loopbackOnly) {
+            LinuxNative.socketStopListening(port);
+        }
+    }
+
+    @Override
     public Object connectSocket(String host, int port, int connectTimeout) {
         LinuxSocket socket = new LinuxSocket(host, port, connectTimeout);
         return socket.isConnected() ? socket : null;
@@ -2769,7 +2815,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void disconnectSocket(Object socket) {
-        ((LinuxSocket) socket).close();
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).close();
+        }
     }
 
     @Override
@@ -2779,27 +2827,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public int getSocketAvailableInput(Object socket) {
-        return ((LinuxSocket) socket).available();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).available() : 0;
     }
 
     @Override
     public byte[] readFromSocketStream(Object socket) {
-        return ((LinuxSocket) socket).readChunk();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).readChunk() : null;
     }
 
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
-        ((LinuxSocket) socket).write(data, 0, data.length);
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).write(data, 0, data.length);
+        }
     }
 
     @Override
     public String getSocketErrorMessage(Object socket) {
-        return ((LinuxSocket) socket).getErrorMessage();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorMessage() : null;
     }
 
     @Override
     public int getSocketErrorCode(Object socket) {
-        return ((LinuxSocket) socket).getErrorCode();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorCode() : -1;
     }
 
     /* ---------------------------------------------------------- websocket */
@@ -3308,6 +3358,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return (LinuxNative.currentModifiers() & 4) != 0;
     }
 
+    @Override
+    public int[] getNativeWindowTitleBarInsets(com.codename1.ui.Component toolbar) {
+        if (!(toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form)
+                || toolbar.getComponentForm() instanceof com.codename1.ui.Dialog) {
+            return null;
+        }
+        int[] result = new int[5];
+        LinuxNative.mainWindowTitleBarInsets(result);
+        return result;
+    }
+
+    @Override
+    public void setNativeWindowTitleBarRegions(com.codename1.ui.Component toolbar, int[] regions) {
+        if (toolbar.getTopLevelContainer() instanceof com.codename1.ui.Form
+                && !(toolbar.getComponentForm() instanceof com.codename1.ui.Dialog)) {
+            LinuxNative.mainWindowTitleBarRegions(regions);
+        }
+    }
+
     // ---- native menu bar ----------------------------------------------------
 
     /// Commands published to the native menu bar, keyed by the id the bar echoes back.
@@ -3357,7 +3426,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// after it was dismissed.
     @Override
     public void refreshNativeTitle() {
-        if (!isNativeTitle()) {
+        if (!isDesktop()) {
             return;
         }
         com.codename1.ui.Form f = getCurrentForm();

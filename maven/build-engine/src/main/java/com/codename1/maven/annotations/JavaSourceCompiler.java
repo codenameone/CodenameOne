@@ -75,6 +75,27 @@ public final class JavaSourceCompiler {
     /// one call every processor makes, rather than in each processor.
     private static final ThreadLocal<List<File>> PROJECT_CLASSPATH = new ThreadLocal<List<File>>();
 
+    /// Directories searched BEFORE everything else, set by [#compileAgainst].
+    private static final ThreadLocal<List<File>> PRIORITY_CLASSPATH = new ThreadLocal<List<File>>();
+
+    /// As [#compile(Map, File, List)], with `priority` ahead of every other
+    /// classpath entry, the output directory included.
+    ///
+    /// For the ORM's generated model: it reads and writes non-public entity
+    /// fields, which javac only accepts against copies of the entity classes
+    /// whose fields were made public. Those copies have to win over the real
+    /// classes, which sit in the output directory and on the project classpath.
+    public static void compileAgainst(List<File> priority, Map<String, String> sources,
+            File outputClassDir, List<File> extraClasspath) throws IOException {
+        List<File> previous = PRIORITY_CLASSPATH.get();
+        PRIORITY_CLASSPATH.set(priority);
+        try {
+            compile(sources, outputClassDir, extraClasspath);
+        } finally {
+            if (previous == null) PRIORITY_CLASSPATH.remove(); else PRIORITY_CLASSPATH.set(previous);
+        }
+    }
+
     /// Makes `classpath` part of every compile on this thread until
     /// [#clearProjectClasspath()].
     public static void setProjectClasspath(List<File> classpath) {
@@ -140,6 +161,7 @@ public final class JavaSourceCompiler {
                     ? surefireCp
                     : System.getProperty("java.class.path", "");
             List<File> cp = new ArrayList<File>();
+            if (PRIORITY_CLASSPATH.get() != null) cp.addAll(PRIORITY_CLASSPATH.get());
             if (existing.length() > 0) {
                 for (String s : existing.split(File.pathSeparator)) {
                     cp.add(new File(s));
@@ -204,6 +226,7 @@ public final class JavaSourceCompiler {
                     "-encoding", "UTF-8", "-d", output.getAbsolutePath()));
             if (level != null) command.addAll(Arrays.asList("-source", level, "-target", level));
             List<File> cp = new ArrayList<File>();
+            if (PRIORITY_CLASSPATH.get() != null) cp.addAll(PRIORITY_CLASSPATH.get());
             cp.add(output);
             if (extraClasspath != null) cp.addAll(extraClasspath);
             if (PROJECT_CLASSPATH.get() != null) cp.addAll(PROJECT_CLASSPATH.get());

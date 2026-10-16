@@ -57,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 class UncaughtExceptionIntegrationTest {
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     void uncaughtExceptionIsFatal(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

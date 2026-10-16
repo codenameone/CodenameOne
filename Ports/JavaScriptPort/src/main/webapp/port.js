@@ -1665,12 +1665,55 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
 // without a DOM. On the worker port they must run on the browser host: leaving
 // the stubs in place returns timer id 0 and silently drops every callback
 // (camera frame delivery was the first assertion test to expose this).
+// A one-shot timer's callback is released once it has fired or been cleared.
+// A function handed to the host gets an entry in jvm.workerCallbacks, and the
+// host a proxy for it, that nothing else removes: one per setTimeout kept a
+// Java handler and all it held for every timer the application ever set --
+// a pinch, a pause in a scroll, a text edit. So each timeout gets a function
+// of its own, which drops its entry when it runs, and the host drops its
+// proxy then too (browser_bridge.js). Timer id -> callback id, for a timeout
+// cleared before it fired.
+const cn1OneShotTimers = Object.create(null);
+
+function cn1ForgetOneShot(timerId) {
+  const callbackId = cn1OneShotTimers[timerId];
+  if (callbackId != null) {
+    delete cn1OneShotTimers[timerId];
+    if (jvm.workerCallbacks) {
+      delete jvm.workerCallbacks[callbackId];
+    }
+  }
+}
+
 function* cn1SetHostTimer(kind, handler, delay) {
   if (typeof jvm.invokeHostNative !== "function") {
     return 0;
   }
   if (!handler || !handler.__class) {
     return 0;
+  }
+  if (kind === "__cn1_timer_set_timeout__") {
+    let timerId = -1;
+    let fired = false;
+    const once = function() {
+      // By its own id as well: a timeout of 0 can fire before the call that
+      // set it has returned here and recorded it.
+      fired = true;
+      cn1ForgetOneShot(timerId);
+      if (jvm.workerCallbacks && typeof once.__cn1WorkerCallbackId === "number") {
+        delete jvm.workerCallbacks[once.__cn1WorkerCallbackId];
+      }
+      try {
+        spawnVirtualCallback(handler, "cn1_s_onTimer", [], "__cn1TimerCallbackPending");
+      } catch (err) {
+        jvm.fail(err);
+      }
+    };
+    timerId = (yield jvm.invokeHostNative(kind, [once, Math.max(0, delay | 0)])) | 0;
+    if (!fired && typeof once.__cn1WorkerCallbackId === "number") {
+      cn1OneShotTimers[timerId] = once.__cn1WorkerCallbackId;
+    }
+    return timerId;
   }
   if (!handler.__cn1NativeTimerCallback) {
     handler.__cn1NativeTimerCallback = function() {
@@ -1698,6 +1741,7 @@ bindNative([
   "cn1_com_codename1_html5_js_browser_Window_clearTimeout_int",
   "cn1_com_codename1_html5_js_browser_Window_clearTimeout___int"
 ], function*(id) {
+  cn1ForgetOneShot(id | 0);
   if (typeof jvm.invokeHostNative === "function") {
     yield jvm.invokeHostNative("__cn1_timer_clear_timeout__", [id | 0]);
   }

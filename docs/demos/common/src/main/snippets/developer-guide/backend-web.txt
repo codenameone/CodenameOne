@@ -1,0 +1,10 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::backend-web-hosting-layout[]
+/srv/myapp/
+  myapp-server            the binary
+  application.properties
+  webapp/
+    index.html
+    ...
+// end::backend-web-hosting-layout[]

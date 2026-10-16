@@ -137,7 +137,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         return (T) value;
     }
-    /// Bulk DML bypasses cascades/callbacks and clears the context after execution.
+    /// Bulk DML bypasses cascades/callbacks. Managed entities stay managed with the
+    /// values they had, as JPA's executeUpdate leaves the persistence context; a
+    /// repository method asks for a clear with `@Modifying(clearAutomatically = true)`.
     @Override
     public int executeUpdate() {
         if (!plan.mutation) {
@@ -149,9 +151,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         Bound bound = arguments();
         session.requireTransaction();
         session.flush();
-        int changed = session.write(bound.sql, bound.args);
-        session.clear();
-        return changed;
+        return session.write(bound.sql, bound.args);
     }
     private static final class Bound {
         final String sql;
