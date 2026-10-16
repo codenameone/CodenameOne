@@ -27,7 +27,8 @@ enum ZipEntryType {
     COMMON,
     COMMON_ARCHIVE,
     TEMPLATE_POM,
-    TEMPLATE_CN1LIB,
     TEMPLATE_CSS,
-    TEMPLATE_SOURCE
+    TEMPLATE_SOURCE,
+    /// A full-stack template's modules, which land where the archive has them.
+    TEMPLATE_MODULES
 }

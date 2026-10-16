@@ -26,17 +26,20 @@ import com.codename1.build.BuildExecutionException;
 import com.codename1.build.ProjectHost;
 import com.codename1.gradle.tasks.Cn1Task;
 import com.codename1.maven.BackendPackager;
+import com.codename1.maven.BackendWebApp;
 import com.codename1.project.ProjectLayout;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
@@ -69,6 +72,15 @@ final class BackendPackageSupport {
             configure(t, project, layout, main, ext, runtime);
             t.setDescription("Builds the backend as a single native binary");
             t.getBinary().set(new File(layout.buildDir(), project.getName()));
+            // The application backendWebApp staged ships beside the binary. Not
+            // an input: the binary does not change with it, and a new browser
+            // build should not cost a native link.
+            t.getWebAppDirectory().set(BackendSupport.webAppDirectory(project));
+            t.mustRunAfter(BackendSupport.WEB_APP_TASK);
+            t.getOutputs().upToDateWhen(task -> {
+                PackageTask p = (PackageTask) task;
+                return webAppIsBeside(p.getWebAppDirectory().get().getAsFile(), p.getBinary().get().getAsFile());
+            });
         });
 
         // The compiled test run: the backend's tests translated with it into one
@@ -174,6 +186,80 @@ final class BackendPackageSupport {
                 .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
     }
 
+    /// Where the web app staged in `staged` belongs for a binary at `binary`:
+    /// the `webapp` directory beside it, or null when nothing is staged.
+    static File webAppBeside(File staged, File binary) {
+        if (staged == null || !new File(staged, BackendWebApp.INDEX).isFile()) {
+            return null;
+        }
+        File parent = binary.getAbsoluteFile().getParentFile();
+        return parent == null ? staged : new File(parent, BackendSupport.WEB_APP_DIRECTORY);
+    }
+
+    /// Whether the binary already has the staged web app beside it, so a
+    /// package whose inputs are unchanged has nothing left to do. A copy keeps
+    /// each file's time, so the copy is current when it holds the same files,
+    /// each the same length and time, and nothing else. Every file is compared,
+    /// not only index.html: a browser build may change a script or a style
+    /// and leave the page as it was, and the staged app is not a task input
+    /// that Gradle would compare on its own.
+    ///
+    /// With nothing staged there is nothing to do, even when a `webapp` from
+    /// an earlier package is still beside the binary. That directory is not
+    /// removed: it sits beside a binary written outside the build directory,
+    /// where nothing records whether this plugin made it or somebody put it
+    /// there, and deleting a directory of somebody's files is worse than
+    /// leaving one. A deployment that stops serving its web app removes it.
+    static boolean webAppIsBeside(File staged, File binary) {
+        File beside = webAppBeside(staged, binary);
+        if (beside == null || beside.getAbsoluteFile().equals(staged.getAbsoluteFile())) {
+            return true;
+        }
+        return sameTree(staged, beside);
+    }
+
+    private static boolean sameTree(File from, File to) {
+        File[] children = from.listFiles();
+        String[] copied = to.list();
+        if (children == null || copied == null || children.length != copied.length) {
+            return false;
+        }
+        for (File child : children) {
+            File other = new File(to, child.getName());
+            if (child.isDirectory()) {
+                if (!other.isDirectory() || !sameTree(child, other)) {
+                    return false;
+                }
+            } else if (!other.isFile() || other.length() != child.length()
+                    || other.lastModified() != child.lastModified()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Puts the web app `backendWebApp` staged beside the binary.
+    ///
+    /// A packaged server looks for its application in `webapp` in its working
+    /// directory, the way it looks for application.properties, so a deployment
+    /// is the binary with that directory next to it. The binary is written to
+    /// the build directory and the app is staged in `webapp` there, so they are
+    /// neighbours already; a binary written anywhere else has the app copied to
+    /// it. The files are not linked into the binary: it serves them straight
+    /// from the page cache, which needs them to be files.
+    ///
+    /// @return the directory to deploy, or null when no web app is staged
+    static File webAppBesideTheBinary(com.codename1.build.Log log, File staged, File binary)
+            throws BuildExecutionException {
+        File beside = webAppBeside(staged, binary);
+        if (beside == null) {
+            return null;
+        }
+        new BackendWebApp(log).copy(staged, beside);
+        log.info("The web app is in " + beside + "; deploy that directory beside the binary");
+        return beside;
+    }
+
     /// See [BackendPackageSupport].
     @DisableCachingByDefault(because = "Runs a native toolchain")
     public abstract static class PackageTask extends Cn1Task {
@@ -251,6 +337,12 @@ final class BackendPackageSupport {
         @OutputFile
         public abstract RegularFileProperty getBinary();
 
+        /// Where `backendWebApp` stages the application's browser build, which
+        /// is deployed beside the binary. Unset for a task whose binary is not
+        /// a server to deploy.
+        @Internal
+        public abstract DirectoryProperty getWebAppDirectory();
+
         /// The source directories the packager compiles: the source set's own, as
         /// the build script configured them, not only the conventional one -- a
         /// directory added in `sourceSets` held controllers the binary then lacked.
@@ -282,6 +374,10 @@ final class BackendPackageSupport {
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
                         .sqlite(getSqlite().get()).checkedCasts(getCheckedCasts().get())
                         .devTools(getDevTools().get()).execute();
+                if (getWebAppDirectory().isPresent()) {
+                    webAppBesideTheBinary(log(), getWebAppDirectory().get().getAsFile(),
+                            getBinary().get().getAsFile());
+                }
             } catch (BuildExecutionException ex) {
                 throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
             }

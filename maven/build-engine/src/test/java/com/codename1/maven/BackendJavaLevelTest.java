@@ -111,6 +111,49 @@ class BackendJavaLevelTest {
         assertEquals(oldJdk, packager.resolveJdk(), "an explicit JDK choice still wins");
     }
 
+    /// A Java 8 application may depend on a contract module compiled at release
+    /// 17. JDK_8_HOME's javac cannot read those class files, so it is passed over
+    /// for the running JDK -- but not for a module descriptor or a multi-release
+    /// entry, which a Java 8 library commonly carries and a Java 8 compile ignores.
+    @Test void aJava17DependencyPassesOverTheLegacyJdk8(@TempDir Path dir) throws Exception {
+        File oldJdk = Files.createDirectories(dir.resolve("legacy/bin")).getParent().toFile();
+        Files.write(new File(oldJdk, "bin/javac").toPath(), new byte[0]);
+        File running = new BackendPackager(TestProjectHost.empty()).resolveJdk();
+
+        Path java8 = Files.createDirectories(dir.resolve("java8/pkg"));
+        Files.write(java8.resolve("Old.class"), header(52));
+        Files.write(java8.getParent().resolve("module-info.class"), header(53));
+        Files.createDirectories(java8.getParent().resolve("META-INF/versions/17"));
+        Files.write(java8.getParent().resolve("META-INF/versions/17/New.class"), header(61));
+        Path jar = dir.resolve("contract.jar");
+        try (java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(
+                Files.newOutputStream(jar))) {
+            out.putNextEntry(new java.util.zip.ZipEntry("module-info.class"));
+            out.write(header(53));
+            out.putNextEntry(new java.util.zip.ZipEntry("api/RideDto.class"));
+            out.write(header(61));
+        }
+
+        TestProjectHost host = TestProjectHost.empty();
+        host.classpath.add(java8.getParent().toString());
+        BackendPackager packager = new BackendPackager(host);
+        packager.jdk(null, oldJdk.toString());
+        packager.javaLevel(null, null, "8");
+        assertEquals(oldJdk, packager.resolveJdk(), "Java 8 dependencies keep JDK_8_HOME");
+
+        host.classpath.add(jar.toString());
+        assertEquals(running, packager.resolveJdk(), "a release 17 dependency needs a newer javac");
+
+        host.classpath.set(1, Files.createDirectories(dir.resolve("classes17/api")).getParent().toString());
+        Files.write(dir.resolve("classes17/api/RideDto.class"), header(61));
+        assertEquals(running, packager.resolveJdk(), "a reactor module's classes directory too");
+    }
+
+    private static byte[] header(int major) {
+        return new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE, 0, 0,
+                (byte) (major >> 8), (byte) major};
+    }
+
     @Test void previewSourcesAndJava8Wiring(@TempDir Path dir) throws Exception {
         File jdk = jdk("25");
         Path source = Files.createDirectories(dir.resolve("src"));

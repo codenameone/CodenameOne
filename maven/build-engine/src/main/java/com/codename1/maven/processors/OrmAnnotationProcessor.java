@@ -409,7 +409,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         Object indexes=entityAnn.get("indexes");
         if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
         String table = entityAnn.getString("table");
-        ec.tableName = (table == null || table.length() == 0) ? ec.simpleName : table;
+        ec.tableName = (table == null || table.length() == 0) ? physical(ec.simpleName) : table;
         if (backend && tooLongForAnEngine(ec.tableName)) {
             ctx.error(cls, "@Entity " + ec.binaryName + " is stored in a table named '"
                     + ec.tableName + "', which is " + utf8Length(ec.tableName) + " bytes. "
@@ -433,16 +433,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (f.isStatic()) continue;
             if (f.getName().startsWith("this$")) continue;
             if (f.getAnnotation(DB_TRANSIENT_DESC) != null) continue;
-            if (!f.isPublic()) {
-                for(String annotation:f.getAnnotations().keySet()) {
-                    if(annotation.equals(ID_DESC) || annotation.equals(COLUMN_DESC) || annotation.equals("Lcom/codename1/annotations/db/Version;")
-                        || annotation.equals("Lcom/codename1/annotations/db/OneToOne;") || annotation.equals("Lcom/codename1/annotations/db/OneToMany;")
-                        || annotation.equals("Lcom/codename1/annotations/db/ManyToOne;") || annotation.equals("Lcom/codename1/annotations/db/ManyToMany;")
-                        || annotation.matches("Lcom/codename1/annotations/db/(ElementCollection|Convert|GeneratedValue|JoinColumn|JoinTable|MapKey|MapKeyColumn|OrderBy|OrderColumn);"))
-                        ctx.error(cls,"Persistent annotated fields currently require public access: "+f.getName());
-                }
-                continue;
-            }
+            // Private, package-private and protected fields are persistent like
+            // public ones. The generated model cannot name them in source, so it
+            // is compiled against public copies of the declaring classes and
+            // OrmEnhancer then routes every access through a static accessor
+            // woven into the declaring class -- straight-line code, so it works
+            // on ParparVM, which has no reflection to fall back on.
+            hide(ec,fieldPath.owner.replace('.','/'),f);
             RelationField relationship = relation(f, ec, ctx);
             if (relationship != null) {
                 if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
@@ -501,7 +498,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 colType = col.getString("type");
                 nullable = col.getBoolOrDefault("nullable", true);
             }
-            pf.columnName = (colName == null || colName.length() == 0) ? pf.fieldName.replace('.', '_') : fieldPath.prefix.replace('.', '_')+colName;
+            pf.columnName = (colName == null || colName.length() == 0) ? physical(pf.fieldName)
+                    : physical(fieldPath.prefix)+colName;
             pf.sqlType = (colType == null || colType.length() == 0) ? defaultSqlType(pf.kind) : colType;
             // The EXPLICIT type, separately: the client flavour needs a type for
             // every column and defaults it to SQLite's, while the backend one
@@ -842,7 +840,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
                 generateBootstrapSource(accepted.values(), repositories, backend, !migrations.isEmpty()));
-        compileGenerated(ctx, sources);
+        java.io.File stubs = null;
+        try {
+            stubs = OrmEnhancer.publicStubs(accepted, ctx);
+            compileGenerated(ctx, sources, stubs);
+        } catch (IOException ioe) {
+            throw new ProcessingException("Could not prepare the entity classes for the generated "
+                    + "dao sources: " + ioe.getMessage(), ioe);
+        } finally {
+            if (stubs != null) {
+                try {
+                    org.apache.commons.io.FileUtils.deleteDirectory(stubs);
+                } catch (IOException ignored) {
+                    // A temporary directory left behind is not worth failing the build over.
+                }
+            }
+        }
         try {
             OrmEnhancer.enhance(accepted, ctx);
         } catch (IOException ioe) {
@@ -859,6 +872,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Compiles generated sources into the module's output directory.
     private static void compileGenerated(ProcessorContext ctx, Map<String, String> sources)
             throws ProcessingException {
+        compileGenerated(ctx, sources, null);
+    }
+
+    /// @param stubs a directory of entity classes with their persistent fields
+    ///     made public, searched before everything else; null when none needed one.
+    private static void compileGenerated(ProcessorContext ctx, Map<String, String> sources,
+            java.io.File stubs) throws ProcessingException {
         try {
             java.util.List<java.io.File> cp = new java.util.ArrayList<java.io.File>();
             cp.add(ctx.getOutputClassDir());
@@ -870,7 +890,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             for (String element : ctx.getCompileClasspath()) {
                 cp.add(new java.io.File(element));
             }
-            JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+            if (stubs != null) {
+                JavaSourceCompiler.compileAgainst(java.util.Collections.singletonList(stubs),
+                        sources, ctx.getOutputClassDir(), cp);
+            } else {
+                JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+            }
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile generated dao sources: "
                     + ioe.getMessage(), ioe);
@@ -985,27 +1010,114 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         for(FieldInfo field:cls.getFields()) {
             String path=prefix+field.getName();
             for(FieldPath inherited:result) {
-                if(inherited.field.isPublic() && !inherited.declaringType.equals(cls.getBinaryName())
+                // Every inherited field in the list is persistent now that access
+                // does not decide it, so hiding any of them is the same conflict:
+                // two fields claiming one attribute name and one column.
+                if(!inherited.declaringType.equals(cls.getBinaryName())
                         && (inherited.path.equals(path) || inherited.path.startsWith(path+"."))) {
                     ctx.error("Hidden inherited persistent field: "+cls.getBinaryName()+"."+path);
                 }
             }
-            if(field.isStatic() || field.getAnnotation(DB_TRANSIENT_DESC)!=null) continue;
+            if(!isPersistentCandidate(field)) continue;
             if(field.getAnnotation("Lcom/codename1/annotations/db/Embedded;")!=null || field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                 if(field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
                     entity.embeddedId=path;
                 }
-                if(!field.isPublic() || field.isFinal()) { ctx.error("Embedded field must be public and writable: "+path);continue; }
+                if(field.isFinal()) { ctx.error("Embedded field must be writable: "+path);continue; }
                 String type=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
                 AnnotatedClass embedded=findType(type,ctx);
                 if(embedded==null || embedded.getClassAnnotation("Lcom/codename1/annotations/db/Embeddable;")==null
                         || !hasPublicNoArgConstructor(embedded)) { ctx.error("Embedded value requires @Embeddable and a public no-arg constructor: "+path);continue; }
                 entity.embedded.put(path,type);
-                for(FieldPath nested:persistentFields(embedded,entity,ctx,path+".",visiting)) result.add(new FieldPath(nested.field,nested.path,nested.prefix,cls.getBinaryName()));
-            } else result.add(new FieldPath(field,path,prefix,cls.getBinaryName()));
+                hide(entity,cls,field);
+                for(FieldPath nested:persistentFields(embedded,entity,ctx,path+".",visiting)) result.add(new FieldPath(nested.field,nested.path,nested.prefix,cls.getBinaryName(),nested.owner));
+            } else result.add(new FieldPath(field,path,prefix,cls.getBinaryName(),cls.getBinaryName()));
         }
         visiting.remove(cls.getBinaryName());return result;
+    }
+
+    /// The table or column name a Java name gets when the developer names none.
+    ///
+    /// On the BACKEND it is Spring Boot's physical naming
+    /// (CamelCaseToUnderscoresNamingStrategy): dots become underscores, an
+    /// underscore goes before an upper case letter that sits between a lower case
+    /// letter or digit and another lower case letter or digit, and the whole is
+    /// lower cased. So `fareCents` is `fare_cents`, `RideEvent` is `ride_event`,
+    /// an embedded `home.zipCode` is `home_zip_code`, and an acronym such as
+    /// `userID` stays one word, `userid`. A server developer expects the schema
+    /// Spring would have made, and an explicit `@Column(name)` or
+    /// `@Entity(table)` still wins.
+    ///
+    /// The CLIENT keeps the Java name, dots made underscores. Applications already
+    /// ship SQLite files whose columns are named after their fields, and
+    /// `CREATE TABLE IF NOT EXISTS` would leave those tables alone while the
+    /// generated SQL went looking for columns they do not have.
+    ///
+    /// There is no switch back to the Java names on the backend. The backend is
+    /// a technology preview that follows Spring Boot, and a mode that kept the
+    /// old names would keep a default that was wrong; a schema made with them
+    /// keeps working by naming its tables and columns with `@Entity(table)` and
+    /// `@Column(name)`.
+    String physical(String name) {
+        String flat=name.replace('.','_');
+        return backend ? snakeCase(flat) : flat;
+    }
+
+    /// Spring's algorithm character for character, Character classes included,
+    /// so that a name gets the column it would get under Spring.
+    static String snakeCase(String name) {
+        StringBuilder out=new StringBuilder(name.length()+8);
+        for(int i=0;i<name.length();i++) {
+            char c=name.charAt(i);
+            if(i>0 && i+1<name.length() && Character.isUpperCase(c)
+                    && lowerOrDigit(name.charAt(i-1)) && lowerOrDigit(name.charAt(i+1)))
+                out.append('_');
+            out.append(c);
+        }
+        return out.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
+
+    /// THE JPA RULE: every field that is not static and not transient is
+    /// persistent, whatever its access. `@DbTransient` and the Java `transient`
+    /// modifier both opt a field out; so does being synthetic, which covers an
+    /// inner class's `this$0` and anything a compiler or this build adds.
+    ///
+    /// A non-public FINAL field that carries no mapping annotation is skipped
+    /// too, rather than refused. It has to be assigned by every constructor,
+    /// including the public no-argument one an entity must have, so it holds a
+    /// constant or a helper -- a Property entity's PropertyIndex is the case in
+    /// this tree -- and never a row's state. A final field that IS annotated,
+    /// or a public one, is still refused as unwritable by the caller.
+    private static boolean isPersistentCandidate(FieldInfo field) {
+        if(field.isStatic() || field.isTransient() || field.isSynthetic()
+                || field.getAnnotation(DB_TRANSIENT_DESC)!=null) return false;
+        if(!field.isPublic() && field.isFinal() && !hasMappingAnnotation(field)) return false;
+        return true;
+    }
+
+    private static boolean hasMappingAnnotation(FieldInfo field) {
+        for(String annotation:field.getAnnotations().keySet()) {
+            if(annotation.startsWith("Lcom/codename1/annotations/db/") || annotation.equals(ID_DESC)
+                    || annotation.equals(COLUMN_DESC)) return true;
+        }
+        return false;
+    }
+
+    /// Records a non-public field for the accessor weaving; see
+    /// EntityClass#hiddenFields.
+    private static void hide(EntityClass entity,AnnotatedClass declaring,FieldInfo field) {
+        hide(entity,declaring.getInternalName(),field);
+    }
+
+    private static void hide(EntityClass entity,String declaringInternal,FieldInfo field) {
+        if(field.isPublic()) return;
+        for(String[] existing:entity.hiddenFields) {
+            if(existing[0].equals(declaringInternal) && existing[1].equals(field.getName())) return;
+        }
+        entity.hiddenFields.add(new String[] {declaringInternal,field.getName(),field.getDescriptor()});
     }
 
     private RelationField relation(FieldInfo field, EntityClass owner, ProcessorContext ctx) {
@@ -1076,14 +1188,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 ctx.error("Relationship collection must use List, Set or Map: "+owner.binaryName+"."+relation.field);
         }
         AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
-        relation.columnName=join==null?relation.field+"_id":join.getStringOrDefault("name",relation.field+"_id");
-        if(relation.columnName.length()==0) relation.columnName=relation.field+"_id";
+        String joinDefault=physical(relation.field)+"_id";
+        relation.columnName=join==null?joinDefault:join.getStringOrDefault("name",joinDefault);
+        if(relation.columnName.length()==0) relation.columnName=joinDefault;
         relation.nullable=annotation.getBoolOrDefault("optional",true) && (join==null || join.getBoolOrDefault("nullable",true));
         AnnotationValues table=field.getAnnotation(prefix+"JoinTable;");
-        relation.table=table==null?owner.tableName+"_"+relation.field:table.getStringOrDefault("name",owner.tableName+"_"+relation.field);
+        String tableDefault=owner.tableName+"_"+physical(relation.field);
+        relation.table=table==null?tableDefault:table.getStringOrDefault("name",tableDefault);
         relation.ownerColumn=table==null?"owner_id":table.getStringOrDefault("joinColumn","owner_id");
         relation.targetColumn=table==null?"target_id":table.getStringOrDefault("inverseJoinColumn","target_id");
-        if(relation.table.length()==0) relation.table=owner.tableName+"_"+relation.field;
+        if(relation.table.length()==0) relation.table=tableDefault;
         if(relation.ownerColumn.length()==0) relation.ownerColumn="owner_id";
         if(relation.targetColumn.length()==0) relation.targetColumn="target_id";
         if(relation.mappedBy.length()>0 && (join!=null || table!=null)) ctx.error("Inverse associations must not declare join columns or tables: "+relation.field);
@@ -2854,7 +2968,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     static final class FieldPath {
         final FieldInfo field;final String path,prefix,declaringType;
-        FieldPath(FieldInfo field,String path,String prefix,String declaringType) { this.field=field;this.path=path;this.prefix=prefix;this.declaringType=declaringType; }
+        /// The class that really declares the field. Differs from declaringType
+        /// inside an embeddable, where declaringType is the class holding the
+        /// embedded value and this is the embeddable itself.
+        final String owner;
+        FieldPath(FieldInfo field,String path,String prefix,String declaringType,String owner) { this.field=field;this.path=path;this.prefix=prefix;this.declaringType=declaringType;this.owner=owner; }
     }
 
     static final class RelationField {
@@ -2885,6 +3003,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         final List<AnnotationValues> indexes=new ArrayList<AnnotationValues>();
         final List<RelationField> relations = new ArrayList<RelationField>();
         final List<PersistedField> fields = new ArrayList<PersistedField>();
+        /// Every non-public field the generated code reads or writes, as
+        /// {declaring class internal name, field name, descriptor}. The
+        /// generated source is compiled against copies of those classes with the
+        /// fields made public, and OrmEnhancer then routes each access through a
+        /// static accessor it weaves into the declaring class.
+        final List<String[]> hiddenFields = new ArrayList<String[]>();
     }
 
     static final class PersistedField {

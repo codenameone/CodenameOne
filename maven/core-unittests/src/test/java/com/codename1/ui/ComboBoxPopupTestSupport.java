@@ -30,10 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// Drives an open `ComboBox` popup from a test.
 ///
 /// The popup is modal: showing it parks the caller until it goes away. The click is
-/// made on the dispatch thread, as a real press is, and everything the test wants to do
-/// to the open popup runs from the popup's show listener, inside the nested event loop
-/// the modal show runs. Whatever the script leaves open is disposed afterwards, so the
-/// show always returns.
+/// made on the dispatch thread, as a real one is, and the modal wait nests the event
+/// loop there; everything the test wants to do to the open popup runs from the popup's
+/// show listener, inside that loop. Whatever the script leaves open is disposed
+/// afterwards, which is what lets the click return.
 final class ComboBoxPopupTestSupport {
 
     private ComboBoxPopupTestSupport() {
@@ -99,19 +99,13 @@ final class ComboBoxPopupTestSupport {
         combo.script = script;
         combo.shown = false;
         combo.failure = null;
-        // On the dispatch thread, never a thread of its own. This used to click from a
-        // background thread while the test thread pumped the EDT, and that is an EDT
-        // violation with a real race in it: the popup list is built with the COMBO'S OWN
-        // renderer (ComboBox.createPopupList), so the background thread was setting the
-        // text of the one shared cell label and measuring it while the EDT was painting
-        // and laying out the combo with that same label. The label's cached width then
-        // belonged to another row's text. Every test font character is 8 px wide, and
-        // ComboBoxPopupWidthTest intermittently failed on CI with a combo of 64 against
-        // a popup of 80 -- the combo had measured its widest row, "Three", as if it read
-        // "One". A modal show from the EDT runs a nested event loop, so the popup still
-        // shows, the script still runs in its show listener, and the show returns once
-        // the script's dispose lands.
-        assertTrue(Display.getInstance().isEdt(), "open() is called from a dispatch-thread test");
+        // On the dispatch thread, which is where a @FormTest body runs. This used to click
+        // from a thread of its own while the test thread pumped the queue, so the popup was
+        // built and measured off the dispatch thread at the same time as that thread laid
+        // the form out. What the popup measured then depended on which side got there
+        // first, and the width test failed now and then in CI (a popup 80 wide against a
+        // 64 wide combo) while it passed every time when run on its own.
+        assertTrue(Display.getInstance().isEdt(), "a popup is opened from the dispatch thread");
         combo.fireClicked();
         DisplayTest.flushEdt();
         assertTrue(combo.shown, "the popup never showed");

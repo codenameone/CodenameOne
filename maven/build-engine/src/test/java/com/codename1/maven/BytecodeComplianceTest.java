@@ -33,6 +33,7 @@ import org.objectweb.asm.Opcodes;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,6 +49,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
+    /// A sibling module checked with the application is compiled by its own
+    /// module, so its classes have to count when deciding whether the last
+    /// check still holds; otherwise a change to it alone skips the check.
+    @Test
+    void siblingClassesCountTowardsTheCheckBeingStale(@TempDir Path dir) throws Exception {
+        TestProjectHost host = TestProjectHost.empty();
+        host.buildDir = dir.resolve("build").toFile();
+        host.outputDir = dir.resolve("build/classes").toFile();
+        File own = new File(host.outputDir, "app/Main.class");
+        own.getParentFile().mkdirs();
+        Files.write(own.toPath(), new byte[] {1});
+        assertTrue(own.setLastModified(1000000000000L));
+        File shared = dir.resolve("shared/target/classes").toFile();
+        File dto = new File(shared, "api/Dto.class");
+        dto.getParentFile().mkdirs();
+        Files.write(dto.toPath(), new byte[] {1});
+        assertTrue(dto.setLastModified(2000000000000L));
+
+        BytecodeCompliance compliance = new BytecodeCompliance(host);
+        assertEquals(1000000000000L, compliance.getCompiledClassesModificationTime());
+        compliance.checkedDependencyRoots(Collections.singletonList(shared));
+        assertEquals(2000000000000L, compliance.getCompiledClassesModificationTime());
+    }
+
     @Test
     void backendAllowsThirdPartyJavaxButProtectsNativeApi(@TempDir Path dir) throws Exception {
         Path output = Files.createDirectories(dir.resolve("output"));
@@ -556,6 +581,108 @@ class BytecodeComplianceTest {
 
         assertTrue(hasChangedSinceLastCheck(mojo),
                 "Expected re-run when the previous check recorded violations, even with nothing newer");
+    }
+
+    /// A module of the same build resolves to its classes DIRECTORY when the
+    /// build stops short of `package`. Left out of the dependencies, every one
+    /// of its classes read as an API the device does not have.
+    @Test
+    void aDependencyThatIsAClassesDirectoryIsScanned(@TempDir Path tempDir) throws Exception {
+        Path shared = tempDir.resolve("shared").resolve("target").resolve("classes");
+        Files.createDirectories(shared);
+        writeApiClass(shared, "shared/Dto", "m", "()V");
+        Path notClasses = tempDir.resolve("notes.txt");
+        Files.write(notClasses, new byte[] {1});
+
+        TestProjectHost host = TestProjectHost.empty();
+        host.artifacts.add(TestProjectHost.artifact("shared", "compile", shared.toFile()));
+        host.artifacts.add(TestProjectHost.artifact("notes", "compile", notClasses.toFile()));
+        host.artifacts.add(TestProjectHost.artifact("gone", "compile",
+                tempDir.resolve("absent").toFile()));
+        BytecodeCompliance mojo = new BytecodeCompliance(host);
+
+        List<?> roots = getDependencyJarsForScanning(mojo);
+        assertEquals(Collections.singletonList(shared.toFile()), roots);
+    }
+
+    @Test
+    void aReferenceIntoADependencyDirectoryIsTheProjectsOwn(@TempDir Path tempDir) throws Exception {
+        Path shared = tempDir.resolve("shared");
+        Files.createDirectories(shared);
+        writeApiClass(shared, "shared/Dto", "m", "()V");
+        TestProjectHost host = complianceHost(tempDir, "shared/Dto");
+        host.artifacts.add(TestProjectHost.artifact("shared", "compile", shared.toFile()));
+
+        new BytecodeCompliance(host).execute();
+
+        String report = new String(Files.readAllBytes(host.buildDir.toPath()
+                .resolve("codenameone").resolve("compliance_check.txt")), "UTF-8");
+        assertTrue(report.contains("Completed compliance check"), report);
+    }
+
+    /// A plain module the application shares with its server is checked by
+    /// nothing when it is built. Its classes ship in the application, so a
+    /// class there that names an API the device lacks is reported here.
+    @Test
+    void aCheckedDependencyRootIsHeldToTheSameApi(@TempDir Path tempDir) throws Exception {
+        Path shared = tempDir.resolve("shared");
+        Files.createDirectories(shared);
+        writeApiClass(shared, "shared/Dto", "m", "()V");
+        writeClass(shared, "shared/Offender", "forbidden/Api", "m", "()V");
+        TestProjectHost host = complianceHost(tempDir, "shared/Dto");
+        host.artifacts.add(TestProjectHost.artifact("shared", "compile", shared.toFile()));
+
+        // As a dependency alone the module is trusted, as a jar always was.
+        new BytecodeCompliance(host).execute();
+
+        TestProjectHost checked = complianceHost(tempDir.resolve("again"), "shared/Dto");
+        checked.artifacts.add(TestProjectHost.artifact("shared", "compile", shared.toFile()));
+        BytecodeCompliance mojo = new BytecodeCompliance(checked).checkedDependencyRoots(
+                java.util.Arrays.asList(shared.toFile(), null, tempDir.resolve("absent").toFile()));
+        com.codename1.build.BuildFailureException refused = org.junit.jupiter.api.Assertions
+                .assertThrows(com.codename1.build.BuildFailureException.class, () -> mojo.execute());
+        assertTrue(refused.getMessage().contains("forbidden/Api")
+                        || refused.getMessage().contains("forbidden.Api"), refused.getMessage());
+        String report = new String(Files.readAllBytes(checked.buildDir.toPath()
+                .resolve("codenameone").resolve("compliance_check.txt")), "UTF-8");
+        assertTrue(report.contains("shared/Offender") || report.contains("shared.Offender"), report);
+    }
+
+    @Test
+    void noCheckedDependencyRootsIsTheDefaultAndNullMeansNone(@TempDir Path tempDir) throws Exception {
+        Path shared = tempDir.resolve("shared");
+        Files.createDirectories(shared);
+        writeApiClass(shared, "shared/Dto", "m", "()V");
+        TestProjectHost host = complianceHost(tempDir, "shared/Dto");
+        host.artifacts.add(TestProjectHost.artifact("shared", "compile", shared.toFile()));
+
+        BytecodeCompliance mojo = new BytecodeCompliance(host);
+        assertTrue(mojo == mojo.checkedDependencyRoots(null));
+        mojo.execute();
+    }
+
+    /// A host whose own output is one class calling `callee.m()`, with a
+    /// runtime that knows `java.lang.Object` and a core that knows nothing more.
+    private TestProjectHost complianceHost(Path dir, String callee) throws Exception {
+        Path output = dir.resolve("target").resolve("classes");
+        Path runtime = dir.resolve("runtime");
+        Path core = dir.resolve("core");
+        Files.createDirectories(output);
+        Files.createDirectories(runtime);
+        Files.createDirectories(core);
+        writeJavaLangObject(runtime);
+        writeClass(output, "app/Caller", callee, "m", "()V");
+
+        TestProjectHost host = TestProjectHost.empty();
+        host.projectDir = dir.toFile();
+        host.buildDir = dir.resolve("target").toFile();
+        host.outputDir = output.toFile();
+        host.sourcesModified = System.currentTimeMillis();
+        host.artifacts.add(new com.codename1.build.BuildArtifact("com.codenameone", "java-runtime",
+                "1.0", null, "jar", "provided", runtime.toFile(), null));
+        host.artifacts.add(new com.codename1.build.BuildArtifact("com.codenameone",
+                "codenameone-core", "1.0", null, "jar", "provided", core.toFile(), null));
+        return host;
     }
 
     private BytecodeCompliance newMojoForSkipCheck(Path tempDir) throws Exception {

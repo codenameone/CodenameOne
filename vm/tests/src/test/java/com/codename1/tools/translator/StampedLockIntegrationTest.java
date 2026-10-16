@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StampedLockIntegrationTest {
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     void verifiesStampedLockBehavior(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

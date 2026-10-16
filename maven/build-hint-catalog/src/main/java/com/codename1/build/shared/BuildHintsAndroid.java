@@ -706,7 +706,12 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.messagingService")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .platform("android"));
+                .platform("android")
+                .doc("The Android push provider. Left unset, a build that uses PushClient picks FCM, "
+                        + "Huawei Push Kit or both from the google-services.json and "
+                        + "agconnect-services.json files present, and fails when neither is. "
+                        + "fcm or huawei forces one provider; none builds without push, for an "
+                        + "app that hasn't got its push configuration yet."));
 
         h.add(new Hint("android.migrateToAndroidX")
                 .group(HintGroup.ANDROID)

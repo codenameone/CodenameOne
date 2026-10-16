@@ -1,0 +1,193 @@
+{
+ "pr": 5984,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.868,
+      "time": 0.931
+     },
+     "memory": 1.014,
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. Run for 3d3119ed9d, five rounds: hello RAM 1.01 against 0.87 on Linux arm64 and 1.22 against 0.77 on Windows x64, the same direction Windows arm64 moved earlier. Timing and tolerances are kept.",
+     "runs": 1,
+     "time": 0.931
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "from": {
+      "memory": 0.262,
+      "time": 1.36,
+      "tolerance": {
+       "memory": 0.3
+      }
+     },
+     "memory": 0.262,
+     "reason": "The same cause as the hello and translator rows: the translator retires fewer objects when their frame ends, so the temporaries string building makes are left to the collector. Linux arm64 rounds 1.57 1.58 1.42 1.57 1.55 (median 1.57) against 1.36; the Intel Windows x64 runner moved the same way in both of its runs (1.63 and 1.58 against 1.42, inside its tolerance). Memory and tolerances are kept.",
+     "runs": 1,
+     "time": 1.567,
+     "tolerance": {
+      "memory": 0.3
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.447,
+      "time": 0.698
+     },
+     "memory": 0.507,
+     "reason": "The same cause as the hello rows: fewer objects are retired when their frame ends, so the translator's own peak RAM rises. Linux arm64 runs for 3d3119ed9d (rounds 0.48 0.49 0.47 0.52 0.53, median 0.49) and c21af4429b (0.51 0.57 0.46 0.52 0.53, median 0.52) against 0.45, one inside the 15% tolerance and one just past it; Windows arm64 moved from 0.45 to 0.51 the same way. Timing and tolerances are kept.",
+     "runs": 2,
+     "time": 0.698
+    }
+   }
+  },
+  "macos-arm64": {
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.814,
+      "time": 1.106,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 1.15,
+     "reason": "The translator retires fewer objects when their frame ends (an object whose only callee is a native method is no longer retired early), so more of objectAllocation's garbage waits for the collector and peak RAM rises, as hello and translator RAM did on the other runners. macOS arm64 run for 7f6b4ee9d7, rounds 1.50 0.87 1.19 0.94 1.15 (median 1.15) against 0.81; time is unchanged at 1.06 to 1.14. The rounds spread widely, so the memory tolerance is 0.35, as the bimodal hello rows on Windows carry.",
+     "runs": 1,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.975,
+      "time": 1.107,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 1.277,
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise. Windows arm64 runs 38210243191 (8ed4eb60a3) and 38293968963 (1dc66ed703), five rounds each: hello RAM 1.32 and 1.24 against 0.97 (Windows x64 moved the same way in the second run, 1.10 against 0.94). Timing and tolerances are kept.",
+     "runs": 2,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.828,
+      "time": 1.375,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 1.092,
+     "reason": "This change tightens the proof that lets the translator retire an object when its frame ends: an object whose only callee is a native method (Thread.start) is no longer retired early, because the root scan then read a live Thread as freed and the sweep finalized it. Fewer objects are retired early, so peak RAM can only rise, and hello is the one workload small enough for that to show. On this CPU the result is bimodal, as on the Intel Windows x64 runner: runs for 3d3119ed9d and 95738c7ece gave medians 1.216 and 1.092, and the run for 8ac2f37307 gave rounds 1.16 0.74 0.81 0.80 0.87 (median 0.81) against the 1.154 recorded from the first two. The baseline is the middle of the three run medians, 1.092, and the memory tolerance is 0.35, as hello's RAM on the Intel Windows x64 and the Windows arm64 runners already has; it covers 0.71 to 1.47. Timing is kept.",
+     "runs": 3,
+     "time": 1.375,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.777,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.551,
+     "reason": "Not a change in the translator: on this runner its self-translation time comes out in two groups, about 0.79 and about 0.58, and a run's median is whichever group three of its five rounds fell in. Runs for 3d3119ed9d (rounds 0.79 0.82 0.79 0.52 0.58, median 0.79) and 95738c7ece (0.66 0.61 0.59 0.56 0.85, median 0.61) are the same code as far as the translator goes. The baseline of 0.78 sat on the upper group, so the lower one read as an improvement past tolerance; taken from both runs it sits between them. Tolerance is kept.",
+     "runs": 2,
+     "time": 0.701,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.749,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.999,
+     "reason": "Hello RAM is bimodal on every runner: one run's rounds read about 1.0 to 1.2, another's about 0.75 to 0.85. On this CPU (AMD family 26 model 2) runs 38688282220 (rounds 1.00 0.81 1.31 0.75 0.83, median 0.83) and 38758240099 (1.02 0.99 1.03 1.17 0.85, median 1.02) are the two modes. The baseline is the median of all ten rounds, 0.999, and the memory tolerance is 0.35, as hello's RAM on the other Windows runners already has; it covers 0.65 to 1.35. Timing and its tolerance are kept.",
+     "runs": 2,
+     "time": 1.41,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.82,
+      "time": 1.069,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.857,
+     "reason": "The translator retires fewer objects when their frame ends, so hello's peak RAM rises, as on the other runners. On this Intel Family 6 Model 207 runner it is bimodal: two runs of this branch gave rounds 1.13 1.11 1.13 0.73 0.98 (median 1.11) and 0.72 0.66 0.71 0.68 1.02 (median 0.71), so no single run's median holds the next one within the 20 percent tolerance. The baseline is the median of all ten rounds, 0.857, and the memory tolerance is 0.35, as hello's RAM on the Windows arm64 runner already has; it covers 0.56 to 1.16. Timing is kept.",
+     "runs": 2,
+     "time": 1.069,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.526,
+      "time": 0.602,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.526,
+     "reason": "The first run of this change on the Intel Family 6 Model 207 Windows x64 runner, which the overlay had no rows for. hello RAM rises for the cause recorded for the other runners: the translator retires fewer objects when their frame ends, so peak RAM is higher (rounds 1.13 1.11 1.13 0.73 0.98, median 1.11 against 0.82; the AMD Windows x64 runner moved from 0.83 to 1.15). translator time rounds 0.76 0.75 0.69 0.58 0.80, median 0.75 against 0.60, with one round at the old baseline; on the AMD runner the same change measured 0.70 against 0.78. Tolerances are kept.",
+     "runs": 1,
+     "time": 0.753,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  }
+ }
+}

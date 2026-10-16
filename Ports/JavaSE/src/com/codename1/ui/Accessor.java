@@ -31,6 +31,15 @@ public class Accessor {
         return g.getGraphics();
     }
     
+    /**
+     * Lets the threads behind {@code invokeAndBlock} end once they are idle.
+     * For a host that is done with a whole generation of Codename One, such
+     * as the test runner after a test.
+     */
+    public static void retireThreadPool() {
+        RunnableWrapper.retireThreadPool();
+    }
+
     public static boolean isScrollDecelerationMotionInProgress(Component cmp) {
         return cmp != null && cmp.isScrollDecelerationMotionInProgress();
     }

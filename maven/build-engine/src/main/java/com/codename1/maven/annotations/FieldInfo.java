@@ -66,6 +66,10 @@ public final class FieldInfo {
     public boolean isStatic() { return (access & Opcodes.ACC_STATIC) != 0; }
     public boolean isFinal() { return (access & Opcodes.ACC_FINAL) != 0; }
     public boolean isPrivate() { return (access & Opcodes.ACC_PRIVATE) != 0; }
+    /// The Java `transient` modifier.
+    public boolean isTransient() { return (access & Opcodes.ACC_TRANSIENT) != 0; }
+    /// A field the compiler made up, such as an inner class's `this$0`.
+    public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }
 
     public Map<String, AnnotationValues> getAnnotations() { return annotations; }
     public AnnotationValues getAnnotation(String descriptor) { return annotations.get(descriptor); }

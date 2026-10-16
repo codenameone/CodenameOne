@@ -151,6 +151,12 @@ and they're injected the same way:
 | The current transaction's persistence session, described under
   <<backend-data>>.
 
+| A `@Repository` interface
+| The generated repository, over that same session. One instance serves every
+  injection point, and like the session it works inside a `@Transactional`
+  method. A bean of the interface's type, when one is declared, is injected
+  instead.
+
 | `HttpServer.Request`
 | The current request. Only a `@Scope("request")` bean can take it.
 

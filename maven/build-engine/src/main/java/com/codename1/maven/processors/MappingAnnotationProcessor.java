@@ -59,7 +59,18 @@ import java.util.TreeMap;
 ///    `JavaSEPort#postInit` loads it via `Class.forName`. Direct symbol
 ///    references survive ParparVM rename and R8 obfuscation; the JavaSE
 ///    classloading path is the legitimate exception (unobfuscated run).
-public final class MappingAnnotationProcessor extends AbstractAnnotationProcessor {
+public final class MappingAnnotationProcessor extends AbstractAnnotationProcessor
+        implements com.codename1.maven.annotations.ProcessesDependencyClasses {
+
+    /// A `@Mapped` type in a library the application shares with its server is
+    /// mapped here, in the application, where the mapper runtime is. Not in a
+    /// module without that runtime: the generated mapper could not link there.
+    @Override
+    public boolean acceptsDependencyClasses(ProcessorContext ctx) {
+        return com.codename1.maven.annotations.DependencyClasses.onClasspath(
+                ctx.getCompileClasspath(), "com/codename1/mapping/Mappers.class");
+    }
+
 
     public static final String MAPPED_DESC = "Lcom/codename1/annotations/Mapped;";
     public static final String JSON_PROPERTY_DESC = "Lcom/codename1/annotations/JsonProperty;";
@@ -98,6 +109,16 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
         if (cls.isSynthetic()) return;
         if (cls.getClassAnnotation(MAPPED_DESC) == null) return;
+        if (ctx.isDependencyClass(cls)
+                && com.codename1.maven.annotations.DependencyClasses.onClasspath(
+                        ctx.getCompileClasspath(), ctx.getOutputClassDir(),
+                        cls.getInternalName() + "Cn1Mapper.class")) {
+            // Already mapped by the module that owns it, or by a module between
+            // that one and this: a platform module sees the application's types
+            // as dependencies too, and generating a second mapper there would
+            // put two definitions of one class into the build.
+            return;
+        }
         boolean isRecord = cls.isRecord();
         if (!isRecord && (cls.isAbstract() || cls.isInterface())) {
             ctx.error(cls, "@Mapped requires a concrete class; "
@@ -858,11 +879,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 } else if (isScalarBinary(f.kind.elementBinaryName)) {
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<").append(f.kind.elementBinaryName).append("> _l = new java.util.ArrayList<").append(f.kind.elementBinaryName).append(">();\n");
-                        sb.append("                    for (Object _e : (java.util.List) _v) { _l.add((").append(f.kind.elementBinaryName).append(") _e); }\n");
+                        sb.append("                    for (Object _e : (java.util.List) _v) { _l.add(").append(scalarElement(f.kind.elementBinaryName, "_e")).append("); }\n");
                         sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
                     } else {
                         sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
-                        sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add((").append(f.kind.elementBinaryName).append(") _e); }\n");
+                        sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add(").append(scalarElement(f.kind.elementBinaryName, "_e")).append("); }\n");
                     }
                 } else if ("java.util.Date".equals(f.kind.elementBinaryName)) {
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
@@ -1192,6 +1213,42 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // Misc
     // ---------------------------------------------------------------
 
+    /// The expression that turns `var`, one element of a parsed JSON array, into
+    /// the boxed scalar `binary` names.
+    ///
+    /// Never a bare cast. A JSON parser hands every number over as a `Double`
+    /// (or a `Long`), whatever the field is declared as, so casting an element
+    /// of a `List<Integer>` throws ClassCastException on a JVM -- and on
+    /// ParparVM, whose casts are unchecked, puts a `Double` in the list for the
+    /// first `intValue()` to read as something it is not. An element of the
+    /// wrong kind altogether becomes null.
+    static String scalarElement(String binary, String var) {
+        String number = "((Number) " + var + ")";
+        String wrapped;
+        if ("java.lang.Integer".equals(binary)) {
+            wrapped = "Integer.valueOf(" + number + ".intValue())";
+        } else if ("java.lang.Long".equals(binary)) {
+            wrapped = "Long.valueOf(" + number + ".longValue())";
+        } else if ("java.lang.Short".equals(binary)) {
+            wrapped = "Short.valueOf(" + number + ".shortValue())";
+        } else if ("java.lang.Byte".equals(binary)) {
+            wrapped = "Byte.valueOf(" + number + ".byteValue())";
+        } else if ("java.lang.Double".equals(binary)) {
+            wrapped = "Double.valueOf(" + number + ".doubleValue())";
+        } else if ("java.lang.Float".equals(binary)) {
+            wrapped = "Float.valueOf(" + number + ".floatValue())";
+        } else if ("java.lang.Boolean".equals(binary)) {
+            return "(" + var + " instanceof Boolean ? (Boolean) " + var + " : null)";
+        } else if ("java.lang.Character".equals(binary)) {
+            return "(" + var + " instanceof Character ? (Character) " + var
+                    + " : " + var + " instanceof String && ((String) " + var + ").length() > 0"
+                    + " ? Character.valueOf(((String) " + var + ").charAt(0)) : null)";
+        } else {
+            return "(" + var + " instanceof String ? (String) " + var + " : null)";
+        }
+        return "(" + var + " instanceof Number ? " + wrapped + " : null)";
+    }
+
     private static boolean isScalarBinary(String binary) {
         return "java.lang.String".equals(binary)
                 || "java.lang.Integer".equals(binary)
@@ -1210,7 +1267,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     private static boolean isEnumType(String binaryName, ProcessorContext ctx) {
         if (binaryName == null || binaryName.length() == 0) return false;
         com.codename1.maven.annotations.AnnotatedClass c =
-                ctx.lookup(binaryName.replace('.', '/'));
+                ctx.lookupWithDependencies(binaryName.replace('.', '/'));
         return c != null && c.isEnum();
     }
 

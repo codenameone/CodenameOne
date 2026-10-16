@@ -35,6 +35,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Point;
@@ -79,6 +80,49 @@ public class MapView extends Container implements MapSurface {
     private long lastTapTime;
     private int lastTapX;
     private int lastTapY;
+
+    // How long a thrown map takes to lose all but a third of its speed, and how
+    // long a zoom takes to close all but a third of the way to where it is
+    // going. Both motions are decays rather than fixed-length tweens, so one
+    // that is added to while it runs -- a second notch of the wheel -- simply
+    // carries on from where it is.
+    private static final double GLIDE_MILLIS = 325;
+    private static final double ZOOM_MILLIS = 90;
+    // The longest step one frame may take. A frame that was held up must not
+    // then throw the map across the gap in one move.
+    private static final int LONGEST_STEP_MILLIS = 100;
+    // The part of a drag its release is judged by.
+    private static final int THROW_WINDOW_MILLIS = 120;
+    // A finger that rested this long before lifting put the map down.
+    private static final int THROW_REST_MILLIS = 80;
+    private static final int SAMPLES = 8;
+
+    private final long[] sampleTime = new long[SAMPLES];
+    private final int[] sampleX = new int[SAMPLES];
+    private final int[] sampleY = new int[SAMPLES];
+    private int sampleCount;
+    // Pixels a millisecond.
+    private double glideX;
+    private double glideY;
+    private boolean gliding;
+    private boolean zooming;
+    private double zoomTarget;
+    private int zoomFocusX;
+    private int zoomFocusY;
+    private long lastStep;
+    private boolean moving;
+    private TopLevelContainer movingOn;
+    private boolean wheelZoom;
+    // Where the pointer was last seen over the map, for a gesture that says
+    // how much to zoom and not where.
+    private int pointerX;
+    private int pointerY;
+    private boolean pointerSeen;
+    private int pinchX;
+    private int pinchY;
+    private boolean pinchPlaced;
+    private int pinchLastX;
+    private int pinchLastY;
 
     /// Creates a map showing the free, keyless OpenFreeMap vector basemap (real
     /// OpenStreetMap data) centered on the equator at a low zoom.
@@ -179,6 +223,7 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void setCameraPosition(CameraPosition position) {
+        settle();
         engine.setCenter(position.getTarget());
         engine.setZoom(position.getZoom());
         repaint();
@@ -188,6 +233,7 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void moveCamera(LatLng target, double zoom) {
+        settle();
         engine.setCenter(target);
         engine.setZoom(zoom);
         repaint();
@@ -203,6 +249,7 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void setZoom(double zoom) {
+        settle();
         engine.setZoom(zoom);
         repaint();
         fireCameraChanged();
@@ -229,6 +276,7 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void setCenter(LatLng center) {
+        settle();
         engine.setCenter(center);
         repaint();
         fireCameraChanged();
@@ -243,6 +291,7 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void fitBounds(MapBounds bounds, int paddingPixels) {
+        settle();
         engine.setViewport(getWidth(), getHeight());
         engine.fitBounds(bounds, paddingPixels);
         repaint();
@@ -628,9 +677,180 @@ public class MapView extends Container implements MapSurface {
     /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
+        // A finger put down on a moving map stops it there.
+        boolean wasMoving = gliding || zooming;
+        settle();
+        if (wasMoving) {
+            fireCameraChanged();
+        }
         lastX = x;
         lastY = y;
         dragDistance = 0;
+        sampleCount = 0;
+        sample(x, y);
+        seen(x, y);
+    }
+
+    /// Whether the wheel zooms the map about the pointer instead of panning it.
+    public boolean isWheelZoom() {
+        return wheelZoom;
+    }
+
+    /// Makes the wheel zoom the map about the pointer, the way a map that fills
+    /// its window is expected to answer, instead of panning it.
+    ///
+    /// Panning is the default because a map is as often one item on a page
+    /// that scrolls: there the wheel belongs to the page, and a map that took
+    /// it to zoom would stop the page under the pointer wherever the two met.
+    /// A wheel at the end of the zoom range is passed on either way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wheelZoom`: true to zoom with the wheel, false to pan with it
+    public void setWheelZoom(boolean wheelZoom) {
+        this.wheelZoom = wheelZoom;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+        if (x.length > 0) {
+            seen(x[0], y[0]);
+        }
+        super.pointerHover(x, y);
+    }
+
+    private void seen(int x, int y) {
+        pointerX = x - getAbsoluteX();
+        pointerY = y - getAbsoluteY();
+        pointerSeen = true;
+    }
+
+    private void sample(int x, int y) {
+        if (sampleCount == SAMPLES) {
+            System.arraycopy(sampleTime, 1, sampleTime, 0, SAMPLES - 1);
+            System.arraycopy(sampleX, 1, sampleX, 0, SAMPLES - 1);
+            System.arraycopy(sampleY, 1, sampleY, 0, SAMPLES - 1);
+            sampleCount--;
+        }
+        sampleTime[sampleCount] = System.currentTimeMillis();
+        sampleX[sampleCount] = x;
+        sampleY[sampleCount] = y;
+        sampleCount++;
+    }
+
+    // ---- Motion that outlasts the gesture --------------------------------
+
+    // Stops the map where it is. Whoever moves the camera next -- a finger, or
+    // the application -- is not to be argued with by a glide still running.
+    private void settle() {
+        gliding = false;
+        zooming = false;
+    }
+
+    // Takes the map off the top level it registered with -- the one remembered,
+    // not the one it is on now, which is none once it has been removed.
+    private void stopAnimating() {
+        if (moving) {
+            moving = false;
+            if (movingOn != null) {
+                movingOn.deregisterAnimated(this);
+                movingOn = null;
+            }
+        }
+    }
+
+    private void move() {
+        lastStep = System.currentTimeMillis();
+        if (!moving) {
+            // The top level, not the form: getComponentForm() is null by design
+            // inside a desktop Window, and a map there would never be animated --
+            // wheel zoom, double-tap zoom and the glide after a fling all did
+            // nothing. Remembered here rather than through Component's
+            // registerForAnimation(), whose single slot Component uses itself.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                top.registerAnimated(this);
+                movingOn = top;
+                moving = true;
+            }
+        }
+        repaint();
+    }
+
+    // Starts, or redirects, a zoom towards `target` that keeps the point under
+    // the given pixel where it is.
+    private void zoomTowards(double target, int focusX, int focusY) {
+        gliding = false;
+        zoomTarget = Math.max(engine.getMinZoom(), Math.min(engine.getMaxZoom(), target));
+        zoomFocusX = focusX;
+        zoomFocusY = focusY;
+        zooming = true;
+        move();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+        boolean other = super.animate();
+        if (!gliding && !zooming) {
+            stopAnimating();
+            return other;
+        }
+        long now = System.currentTimeMillis();
+        long elapsed = Math.min(LONGEST_STEP_MILLIS, now - lastStep);
+        if (elapsed <= 0) {
+            return other;
+        }
+        lastStep = now;
+        if (zooming) {
+            double zoom = engine.getZoom();
+            double left = zoomTarget - zoom;
+            double next = zoomTarget - left * MathUtil.exp(-elapsed / ZOOM_MILLIS);
+            if (Math.abs(zoomTarget - next) < 0.004) {
+                next = zoomTarget;
+                zooming = false;
+            }
+            engine.zoomAround(next, zoomFocusX, zoomFocusY);
+        }
+        if (gliding) {
+            double keep = MathUtil.exp(-elapsed / GLIDE_MILLIS);
+            // The distance covered while the speed fell from what it was to
+            // what it is, not the speed at either end times the time.
+            double reach = GLIDE_MILLIS * (1 - keep);
+            LatLng before = engine.getCenter();
+            engine.panPixels(glideX * reach, glideY * reach);
+            glideX *= keep;
+            glideY *= keep;
+            LatLng after = engine.getCenter();
+            boolean stuck = Double.compare(before.getLatitude(), after.getLatitude()) == 0
+                    && Double.compare(before.getLongitude(), after.getLongitude()) == 0;
+            if (stuck || glideX * glideX + glideY * glideY < slowest() * slowest()) {
+                gliding = false;
+            }
+        }
+        if (!gliding && !zooming) {
+            // The camera has come to rest: this is the end of the gesture that
+            // set it going, which is when the listeners hear of a drag too.
+            fireCameraChanged();
+        }
+        return true;
+    }
+
+    // The speed, in pixels a millisecond, under which a glide is over: about
+    // one logical pixel a frame.
+    private double slowest() {
+        return 0.03 * engine.getPixelRatio();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+        settle();
+        // Not left to animate(): the form stops asking once this is gone from
+        // it, or would go on asking a map it no longer shows.
+        stopAnimating();
+        super.deinitialize();
     }
 
     /// {@inheritDoc}
@@ -643,6 +863,30 @@ public class MapView extends Container implements MapSurface {
         if (ev.getDeltaX() == 0 && ev.getDeltaY() == 0) {
             return false;
         }
+        seen(ev.getX(), ev.getY());
+        if (wheelZoom) {
+            if (ev.getDeltaY() == 0) {
+                return false;
+            }
+            // Two hundred logical pixels of wheel to a zoom level: half a level
+            // for a notch of a mouse wheel, and a trackpad, which reports a few
+            // pixels at a time, zooms as far as the fingers travel.
+            //
+            // Added, not subtracted: a positive deltaY is the wheel turned up
+            // (see WheelEvent; the ports negate the browser's and AWT's sign),
+            // and a wheel turned up zooms in, as it does on every web map.
+            double from = zooming ? zoomTarget : engine.getZoom();
+            double target = from + ev.getDeltaY() / (200 * engine.getPixelRatio());
+            target = Math.max(engine.getMinZoom(), Math.min(engine.getMaxZoom(), target));
+            if (Double.compare(target, from) == 0) {
+                // At the end of the range there is nothing to do with it, and
+                // what cannot move passes the wheel on.
+                return false;
+            }
+            zoomTowards(target, pointerX, pointerY);
+            return true;
+        }
+        settle();
         // Web Mercator stops at its latitude limits, and panPixels clamps the centre back
         // to where it already was. Claiming the wheel for a pan that did not happen traps
         // scrolling on a page that holds a map: what cannot move passes the wheel on, the
@@ -678,6 +922,8 @@ public class MapView extends Container implements MapSurface {
         lastX = x;
         lastY = y;
         dragDistance += Math.abs(dx) + Math.abs(dy);
+        sample(x, y);
+        seen(x, y);
         engine.panPixels(dx, dy);
         repaint();
     }
@@ -696,18 +942,89 @@ public class MapView extends Container implements MapSurface {
             long now = System.currentTimeMillis();
             if (now - lastTapTime < 300 && Math.abs(x - lastTapX) < 30 && Math.abs(y - lastTapY) < 30) {
                 lastTapTime = 0;
-                engine.zoomAround(engine.getZoom() + 1, lx, ly);
-                repaint();
-                fireCameraChanged();
+                // Glided to rather than jumped to: a map that is suddenly a
+                // different map leaves the eye to find its place again. The
+                // listeners hear when it gets there.
+                zoomTowards(engine.getZoom() + 1, lx, ly);
             } else {
                 lastTapTime = now;
                 lastTapX = x;
                 lastTapY = y;
                 handleTap(lx, ly);
             }
-        } else {
+        } else if (!thrown()) {
             fireCameraChanged();
         }
+    }
+
+    // Lets a map that was moving when it was let go carry on, slowing: a drag
+    // that stops dead under a lifting finger is the one thing about a map that
+    // feels like software. The speed is that of the last tenth of a second, so
+    // a drag that ended slowly is not thrown by how it began.
+    private boolean thrown() {
+        if (sampleCount < 2) {
+            return false;
+        }
+        int last = sampleCount - 1;
+        long now = System.currentTimeMillis();
+        if (now - sampleTime[last] > THROW_REST_MILLIS) {
+            return false;
+        }
+        int first = last;
+        while (first > 0 && sampleTime[last] - sampleTime[first - 1] <= THROW_WINDOW_MILLIS) {
+            first--;
+        }
+        long took = sampleTime[last] - sampleTime[first];
+        if (took <= 0) {
+            return false;
+        }
+        double vx = (sampleX[last] - sampleX[first]) / (double) took;
+        double vy = (sampleY[last] - sampleY[first]) / (double) took;
+        // Slower than a sixth of a logical pixel a millisecond is a map being
+        // put down, not thrown.
+        double least = 0.16 * engine.getPixelRatio();
+        if (vx * vx + vy * vy < least * least) {
+            return false;
+        }
+        glideX = vx;
+        glideY = vy;
+        gliding = true;
+        move();
+        return true;
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Remembers where the fingers are, so that the zoom that follows keeps
+    /// the ground between them between them.
+    @Override
+    protected boolean pinch(int[] x, int[] y) {
+        if (x.length > 1) {
+            pinchX = (x[0] + x[1]) / 2 - getAbsoluteX();
+            pinchY = (y[0] + y[1]) / 2 - getAbsoluteY();
+            pinchPlaced = true;
+        }
+        return false;
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// The end of a pinch that leaves no pointer behind: a trackpad's, which
+    /// never presses or releases anything. Without it the map stayed mid-pinch,
+    /// and the next pinch began from the zoom the last one had started at.
+    @Override
+    protected void pinchReleased(int x, int y) {
+        if (!pinching) {
+            return;
+        }
+        pinching = false;
+        // A finger still down carries on as a drag from where it is, and is
+        // neither a tap nor a throw when it lifts.
+        lastX = x;
+        lastY = y;
+        dragDistance = Math.max(dragDistance, 10);
+        sampleCount = 0;
+        fireCameraChanged();
     }
 
     /// {@inheritDoc}
@@ -723,12 +1040,37 @@ public class MapView extends Container implements MapSurface {
 
     @Override
     protected boolean pinch(float scale) {
+        settle();
+        // Between the fingers; for a gesture that has none on the screen, under
+        // the pointer; and failing both, the middle of the map.
+        int fx = getWidth() / 2;
+        int fy = getHeight() / 2;
+        if (pinchPlaced) {
+            fx = pinchX;
+            fy = pinchY;
+        } else if (pointerSeen) {
+            fx = pointerX;
+            fy = pointerY;
+        }
+        pinchPlaced = false;
         if (!pinching) {
             pinching = true;
             pinchStartZoom = engine.getZoom();
+            pinchLastX = fx;
+            pinchLastY = fy;
         }
+        // The scale is since the gesture began, so it is applied to the zoom it
+        // began at. A producer with no gesture phases (a desktop trackpad's
+        // magnify steps) delimits each step as a gesture of its own, see
+        // JavaSEPort.fireMagnify, so this never sees steps as one gesture.
         double nz = pinchStartZoom + MathUtil.log(scale) / MathUtil.log(2);
-        engine.zoomAround(nz, getWidth() / 2, getHeight() / 2);
+        // Zoomed about where the fingers were and then carried to where they
+        // are, so two fingers that travel as they spread take the map along.
+        engine.zoomAround(nz, pinchLastX, pinchLastY);
+        engine.panPixels(fx - pinchLastX, fy - pinchLastY);
+        pinchLastX = fx;
+        pinchLastY = fy;
+        sampleCount = 0;
         repaint();
         return true;
     }

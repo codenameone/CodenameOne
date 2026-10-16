@@ -72,22 +72,40 @@ public class OrmAnnotationProcessorTest {
         sources.put("repositories.Notes","package repositories; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
             + "List<Note> findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(String name,long score,PageRequest page); "
             + "List<Note> findByActiveTrue(); List<Note> findByArchivedFalse(); List<Note> findByNameAndScoreIn(String name,java.util.List<Long> scores); List<Note> findByScoreIn(Long[] scores); List<Note> findByNameIn(java.util.Set<String> names); "
-            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
+            + "List<Note> findTop1ByNameOrderByScoreDesc(String name); java.util.Optional<Note> findFirstByNameOrderByScoreAsc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
+            + "@Query(\"select max(e.score) from repositories.Note e where e.name='other'\") java.util.Optional<Long> highest(); "
+            + "@Query(\"select e.name, count(e) from repositories.Note e group by e.name\") List<Object[]> countsByName(); "
+            + "@Query(\"select coalesce(sum(e.score),0), count(e) from repositories.Note e where e.name=:name\") Object[] totals(@Param(\"name\") String name); "
+            + "@Query(\"select e.name, e.score from repositories.Note e where e.name=:name order by e.score desc\") java.util.Optional<Object[]> best(@Param(\"name\") String name); "
             + "@Modifying @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") int revise(@Param(\"name\") String name,@Param(\"score\") long score); "
+            + "@Modifying(clearAutomatically=true) @Query(\"update repositories.Note e set e.score=:score where e.name=:name\") void reviseAndClear(@Param(\"name\") String name,@Param(\"score\") long score); "
             + "@Query(value=\"SELECT COUNT(*) FROM repository_note WHERE name=:name\",nativeSql=true) Long nativeCount(@Param(\"name\") String name); }");
         // Compile the caller with the interface, before generating any implementation.
         sources.put("repositories.Check","package repositories; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
             + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); Note a=new Note(); a.name=\"same\";a.score=3;a.active=true;a.archived=false;repo.insert(a);Note b=new Note();b.name=\"same\";b.score=9;repo.insert(b);s.commitTransaction(); "
             + "if(repo.count()!=2 || !repo.existsByName(\"same\") || repo.countByName(\"same\")!=2 || repo.nativeCount(\"same\")!=2) throw new AssertionError(\"counts\"); "
             + "if(repo.findByNameAndScoreGreaterThanOrderByScoreDescIdAsc(\"same\",0,new PageRequest(1,1)).get(0)!=a || repo.findTop1ByNameOrderByScoreDesc(\"same\").get(0)!=b || repo.qualified(5)!=1) throw new AssertionError(\"queries\"); "
+            + "if(repo.findFirstByNameOrderByScoreAsc(\"same\").get()!=a || repo.findFirstByNameOrderByScoreAsc(\"none\").isPresent() || repo.highest().isPresent()) throw new AssertionError(\"optional\"); "
+            + "java.util.List<Object[]> byName=repo.countsByName(); Object[] totals=repo.totals(\"same\"); "
+            + "if(byName.size()!=1 || !\"same\".equals(byName.get(0)[0]) || ((Number)byName.get(0)[1]).longValue()!=2 || ((Number)totals[0]).longValue()!=12 || ((Number)totals[1]).longValue()!=2 "
+            + "|| ((Number)repo.best(\"same\").get()[1]).longValue()!=9 || repo.best(\"none\").isPresent()) throw new AssertionError(\"row projections\"); "
             + "if(repo.findByActiveTrue().get(0)!=a || repo.findByArchivedFalse().get(0)!=a || repo.findByNameAndScoreIn(\"same\",java.util.Arrays.asList(3L)).get(0)!=a || repo.findByScoreIn(new Long[]{9L}).get(0)!=b || repo.findByNameIn(java.util.Collections.singleton(\"same\")).size()!=2) throw new AssertionError(\"typed finders\"); "
-            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || s.contains(a)) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
+            + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || !s.contains(a) || a.score!=4) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
             + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
             + "s.beginTransaction(); if(repo.save(a)==a) throw new AssertionError(\"merge returns managed copy\"); repo.deleteById(b.id); s.commitTransaction(); "
-            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); }}");
+            + "s.beginTransaction(); if(repo.deleteByName(\"same\")!=1) throw new AssertionError(\"delete\");s.commitTransaction();if(repo.count()!=0) throw new AssertionError(); "
+            // A @Modifying statement leaves the session as it is, as Spring Data does by
+            // default: an entity read before it is still managed, and a change made to it
+            // afterwards is written. clearAutomatically empties the session instead.
+            + "s.beginTransaction(); Note c=new Note(); c.name=\"kept\"; c.score=1; repo.insert(c); s.commitTransaction(); "
+            + "s.beginTransaction(); if(s.find(Note.class,c.id)!=c || repo.revise(\"kept\",5)!=1 || !s.contains(c) || c.score!=1) throw new AssertionError(\"bulk keeps the session\"); c.name=\"renamed\"; s.commitTransaction(); "
+            + "s.refresh(c); if(c.score!=5) throw new AssertionError(\"refresh after bulk\"); s.clear(); Note again=s.find(Note.class,c.id); "
+            + "if(again==c || !\"renamed\".equals(again.name) || again.score!=5) throw new AssertionError(\"change after bulk was lost\"); "
+            + "s.beginTransaction(); repo.reviseAndClear(\"renamed\",7); if(s.contains(again)) throw new AssertionError(\"clearAutomatically\"); again.name=\"dropped\"; s.commitTransaction(); "
+            + "Note last=s.find(Note.class,c.id); if(last==again || last.score!=7 || !\"renamed\".equals(last.name)) throw new AssertionError(\"after clear\"); }}");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         assertFalse(new File(classes,"repositories/NotesCn1Repository.class").exists());
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
@@ -98,6 +116,127 @@ public class OrmAnnotationProcessorTest {
         com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
         try { loader.loadClass("repositories.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    @Test
+    public void nonPublicFieldsArePersistedOnBothRuntimes() throws Exception {
+        nonPublicFields(false);
+        nonPublicFields(true);
+    }
+    private void nonPublicFields(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        // A mapped superclass in ANOTHER package, so its fields are out of reach of
+        // the generated model even when package-private or protected.
+        sources.put("hiddenbase.Audited","package hiddenbase; import com.codename1.annotations.db.*; @MappedSuperclass public abstract class Audited { private long created; protected String createdBy; long revision; "
+            + "public long created() { return created; } public void created(long v) { created=v; } public String createdBy() { return createdBy; } public void createdBy(String v) { createdBy=v; } public long revision() { return revision; } public void revision(long v) { revision=v; } }");
+        sources.put("hidden.Place","package hidden; import com.codename1.annotations.db.*; @Embeddable public class Place { private String city; private int zip; public Place() {} "
+            + "public String city() { return city; } public void city(String v) { city=v; } public int zip() { return zip; } public void zip(int v) { zip=v; } }");
+        sources.put("hidden.Rider","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hidden_rider\") public class Rider extends hiddenbase.Audited { "
+            + "@Id private long id; private String name; int score; protected Boolean active; @Embedded private Place home; "
+            + "private transient String cached=\"c\"; private final String constant=\"k\"; private static int counter; "
+            + "public Rider() {} public long id() { return id; } public String name() { return name; } public void name(String v) { name=v; } public int score() { return score; } public void score(int v) { score=v; } "
+            + "public Boolean active() { return active; } public void active(Boolean v) { active=v; } public Place home() { return home; } public void home(Place v) { home=v; } "
+            + "public String cached() { return cached; } public void cached(String v) { cached=v; } public String constant() { return constant; } }");
+        sources.put("hidden.Riders","package hidden; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Rider.class,key=Long.class) public interface Riders extends CrudRepository<Rider,Long> { "
+            + "List<Rider> findByNameOrderByScoreDesc(String name); long countByScoreGreaterThan(int score); }");
+        sources.put("hidden.Check","package hidden; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "Riders repo=Repositories.create(Riders.class,s); s.createTables(); s.beginTransaction(); "
+            + "Rider a=new Rider(); a.name(\"ann\"); a.score(7); a.active(Boolean.TRUE); a.created(1234L); a.createdBy(\"ops\"); a.revision(3); a.cached(\"changed\"); Place p=new Place(); p.city(\"Haifa\"); p.zip(31000); a.home(p); repo.insert(a); "
+            + "Rider b=new Rider(); b.name(\"ann\"); b.score(2); repo.insert(b); s.commitTransaction(); "
+            + "if(a.id()==0 || b.id()==0) throw new AssertionError(\"generated id written through the accessor\"); "
+            + "s.clear(); Rider back=repo.findById(a.id()); "
+            + "if(back==a) throw new AssertionError(\"expected a fresh instance\"); "
+            + "if(!\"ann\".equals(back.name()) || back.score()!=7 || !Boolean.TRUE.equals(back.active())) throw new AssertionError(\"own fields \"+back.name()+\" \"+back.score()+\" \"+back.active()); "
+            + "if(back.created()!=1234L || !\"ops\".equals(back.createdBy()) || back.revision()!=3) throw new AssertionError(\"inherited fields\"); "
+            + "if(back.home()==null || !\"Haifa\".equals(back.home().city()) || back.home().zip()!=31000) throw new AssertionError(\"embedded fields\"); "
+            + "if(!\"c\".equals(back.cached()) || !\"k\".equals(back.constant())) throw new AssertionError(\"transient and final fields must not be stored\"); "
+            + "java.util.List<Rider> named=repo.findByNameOrderByScoreDesc(\"ann\"); if(named.size()!=2 || named.get(0).score()!=7 || repo.countByScoreGreaterThan(5)!=1) throw new AssertionError(\"derived queries\"); "
+            + "s.beginTransaction(); back.score(9); s.commitTransaction(); s.clear(); if(repo.findById(a.id()).score()!=9) throw new AssertionError(\"update\"); }}");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        // The accessors are woven into the class that declares each field, and the
+        // fields themselves keep the access the developer gave them.
+        java.util.Set<String> riderMethods=methodNames(new File(classes,"hidden/Rider.class"));
+        assertTrue(riderMethods.toString(),riderMethods.contains("__cn1OrmGet_name") && riderMethods.contains("__cn1OrmSet_home"));
+        assertFalse(riderMethods.toString(),riderMethods.contains("__cn1OrmGet_cached") || riderMethods.contains("__cn1OrmGet_constant"));
+        assertTrue(methodNames(new File(classes,"hiddenbase/Audited.class")).contains("__cn1OrmSet_created"));
+        assertTrue(methodNames(new File(classes,"hidden/Place.class")).contains("__cn1OrmGet_zip"));
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        assertTrue(java.lang.reflect.Modifier.isPrivate(loader.loadClass("hidden.Rider").getDeclaredField("name").getModifiers()));
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try { loader.loadClass("hidden.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+        // A second pass over the same classes, as an incremental build makes, keeps
+        // exactly one accessor per field rather than adding another.
+        ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        assertEquals(riderMethods,methodNames(new File(classes,"hidden/Rider.class")));
+    }
+
+    @Test
+    public void snakeCaseFollowsSpringPhysicalNaming() {
+        String[][] cases={{"fareCents","fare_cents"},{"distanceMeters","distance_meters"},{"RideEvent","ride_event"},
+            {"userID","userid"},{"URLValue","urlvalue"},{"home_zipCode","home_zip_code"},{"a1B2c","a1_b2c"},{"x","x"},{"already_snake","already_snake"},{"pdfURLs","pdfurls"}};
+        for(String[] c:cases) assertEquals(c[0],c[1],OrmAnnotationProcessor.snakeCase(c[0]));
+    }
+
+    @Test
+    public void backendNamesTablesAndColumnsInSnakeCaseAndTheClientKeepsFieldNames() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("naming.RiderAccount","package naming; import com.codename1.annotations.*; @Entity public class RiderAccount { @Id public long id; }");
+        sources.put("naming.HomePlace","package naming; import com.codename1.annotations.db.*; @Embeddable public class HomePlace { public String cityName; public int zipCode; }");
+        sources.put("naming.RideEvent","package naming; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class RideEvent { @Id public long id; public long fareCents; public double distanceMeters; public String userID; "
+            + "@Column(name=\"Kept_As_Written\") public String renamed; @Embedded public HomePlace homePlace; @ManyToOne public RiderAccount riderAccount; }");
+        sources.put("naming.Fixed","package naming; import com.codename1.annotations.*; @Entity(table=\"FixedTable\") public class Fixed { @Id public long id; public String someValue; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        for(boolean backend:new boolean[]{false,true}) {
+            ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+            loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+            com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+            com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+            com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+            try {
+                session.createTables();
+                java.util.Set<String> tables=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%' AND name NOT LIKE 'cn1%'",String.class).list());
+                // The entity registry is process-wide, so tables of entities other
+                // tests registered are there too; only this test's names count.
+                tables.retainAll(Arrays.asList("RideEvent","ride_event","RiderAccount","rider_account","FixedTable","fixed_table"));
+                String ride=backend?"ride_event":"RideEvent";
+                assertEquals(new java.util.TreeSet<String>(Arrays.asList(ride,backend?"rider_account":"RiderAccount","FixedTable")),tables);
+                java.util.Set<String> columns=new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM pragma_table_info('"+ride+"')",String.class).list());
+                assertEquals(backend
+                        ? new java.util.TreeSet<String>(Arrays.asList("id","fare_cents","distance_meters","userid","Kept_As_Written","home_place_city_name","home_place_zip_code","rider_account_id"))
+                        : new java.util.TreeSet<String>(Arrays.asList("id","fareCents","distanceMeters","userID","Kept_As_Written","homePlace_cityName","homePlace_zipCode","riderAccount_id")),
+                        columns);
+                assertEquals(new java.util.TreeSet<String>(Arrays.asList("id",backend?"some_value":"someValue")),
+                        new java.util.TreeSet<String>(session.createNativeQuery("SELECT name FROM pragma_table_info('FixedTable')",String.class).list()));
+                // JPQL keeps speaking in field names whatever the columns are called.
+                session.beginTransaction();Object event=loader.loadClass("naming.RideEvent").newInstance();
+                event.getClass().getField("fareCents").setLong(event,250L);session.persist(event);session.commitTransaction();
+                assertEquals(Long.valueOf(1),session.createQuery("SELECT COUNT(e) FROM naming.RideEvent e WHERE e.fareCents = :f",Long.class).setParameter("f",Long.valueOf(250)).first());
+            } finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+        }
+    }
+
+    private static java.util.Set<String> methodNames(File classFile) throws Exception {
+        final java.util.Set<String> names=new java.util.TreeSet<String>();
+        java.util.List<String> all=new java.util.ArrayList<String>();
+        org.objectweb.asm.ClassReader reader=new org.objectweb.asm.ClassReader(Files.readAllBytes(classFile.toPath()));
+        reader.accept(new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+            @Override public org.objectweb.asm.MethodVisitor visitMethod(int access,String name,String descriptor,String signature,String[] exceptions) {
+                if(!names.add(name+descriptor)) names.add("DUPLICATE "+name+descriptor);
+                return null;
+            }
+        },0);
+        for(String name:names) all.add(name.indexOf('(')>0 ? name.substring(0,name.indexOf('(')) : name);
+        names.addAll(all);
+        return names;
     }
 
     @Test
@@ -149,6 +288,9 @@ public class OrmAnnotationProcessorTest {
             "java.util.List<Note> findByScoreIn(java.util.List<? extends Long> values);",
             "java.util.List<Note> findByScoreIn(java.util.List<java.util.List<Long>> values);",
             "@Query(\"select e from badrepo.Note e where e.name=:name\") Note lookup(String name);",
+            "java.util.List<Object[]> findByName(String name);",
+            "@Query(value=\"SELECT name, score FROM note\",nativeSql=true) java.util.List<Object[]> rows();",
+            "@Query(\"select e.name from badrepo.Note e\") java.util.List<String[]> names();",
             "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
             "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
         }) {
@@ -436,7 +578,7 @@ public class OrmAnnotationProcessorTest {
             Object foundDog=s.find(base,dogId);assertFalse(s.isLoaded(foundDog,"keeper"));org.junit.Assert.assertNotNull(reader.getMethod("keeper",dogType).invoke(null,foundDog));
             List loaded=(List)reader.getMethod("animals",shelterType).invoke(null,s.find(shelterType,shelterId));org.junit.Assert.assertEquals(2,loaded.size());
             s.beginTransaction();catType.getField("lives").setInt(foundCat,8);s.commitTransaction();s.clear();org.junit.Assert.assertEquals(8,catType.getField("lives").getInt(s.find(base,catId)));
-            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update Cat c set c.name = :name").setParameter("name","Kitty").executeUpdate());s.commitTransaction();
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update Cat c set c.name = :name").setParameter("name","Kitty").executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("Fido",base.getField("name").get(s.find(base,dogId)));
             s.beginTransaction();s.remove(s.find(shelterType,shelterId));s.commitTransaction();org.junit.Assert.assertEquals(0,s.query(base).count());
         } finally { s.close();em.close();loader.close(); }
@@ -601,14 +743,14 @@ public class OrmAnnotationProcessorTest {
                 try {
                     session.createTables();session.beginTransaction();Object entity=entry.newInstance();session.persist(entity);session.commitTransaction();Object id=entry.getField("id").get(entity);
                     for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) {
-                        session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(0,entry.getField("counter").getLong(session.find(entry,id)));
+                        session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i)").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(0,entry.getField("counter").getLong(session.find(entry,id)));
                     }
                     session.beginTransaction();session.persist(other.newInstance());session.persist(other.newInstance());session.commitTransaction();
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",3L).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(5,entry.getField("counter").getLong(session.find(entry,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",3L).executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(5,entry.getField("counter").getLong(session.find(entry,id)));
                     session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",null).executeUpdate());session.rollbackTransaction();
                     for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i having count(i.id)<0)"));
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select sum(i.id) from Other i where i.id<0)"));
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=coalesce((select count(i.id) from Other i having count(i.id)<0),7)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(7,entry.getField("counter").getLong(session.find(entry,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=coalesce((select count(i.id) from Other i having count(i.id)<0),7)").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals(7,entry.getField("counter").getLong(session.find(entry,id)));
                 } finally { session.close();db.close(); }
             }
         }
@@ -751,9 +893,9 @@ public class OrmAnnotationProcessorTest {
                     String[] fields={"amount","boxed","narrow","small","letter"};long[] lows={Integer.MIN_VALUE,Integer.MIN_VALUE,Byte.MIN_VALUE,Short.MIN_VALUE,Character.MIN_VALUE},highs={Integer.MAX_VALUE,Integer.MAX_VALUE,Byte.MAX_VALUE,Short.MAX_VALUE,Character.MAX_VALUE};
                     for(int i=0;i<fields.length;i++) {
                         for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { final String predicateField=fields[i];org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(type).eq(predicateField,invalid));org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e."+predicateField+"=:value").setParameter("value",invalid).list());session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
-                        for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
+                        for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();session.clear();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
                     }
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
                     try { session.find(type,2147483648L);fail("Out-of-range identifier"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("range")); }
                 } finally { session.close();db.close(); }
             }
@@ -992,7 +1134,7 @@ public class OrmAnnotationProcessorTest {
                     }
                     org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=:code").setParameter("code","Paris").list().size());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select 'Paris' from Entry e",String.class).first());
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.code='Rome' where e.code='Paris'").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals("Rome",type.getField("code").get(session.find(type,id)));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.code='Rome' where e.code='Paris'").executeUpdate());session.commitTransaction();session.clear();session.clear();org.junit.Assert.assertEquals("Rome",type.getField("code").get(session.find(type,id)));
                 } finally { session.close();db.close(); }
             }
         }
@@ -1171,9 +1313,9 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code like :pattern escape :escape",type).setParameter("pattern",pattern).setParameter("escape","!").first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code like :pattern",type).setParameter("pattern",null).first());
             s.beginTransaction();Object replacement=codeType.getConstructor(String.class).newInstance("BULK");
-            org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();
+            org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("BULK",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
-            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",null).setParameter("id",id).executeUpdate());s.commitTransaction();
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",null).setParameter("id",id).executeUpdate());s.commitTransaction();s.clear();
             org.junit.Assert.assertNull(type.getField("code").get(s.find(type,id)));
             s.beginTransaction();s.createQuery("update converted.Entry e set e.code = :code").setParameter("code",codeType.getConstructor(String.class).newInstance("DEF")).executeUpdate();s.commitTransaction();
             s.beginTransaction();Object duplicate=type.newInstance();type.getField("code").set(duplicate,codeType.getConstructor(String.class).newInstance("DEF"));s.persist(duplicate);
@@ -1290,7 +1432,7 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).containsElement("tags","x"));
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(holder).eq("member.aOnly",5L));
                     for(String query:Arrays.asList("select b.aOnly from querysiblings.B b","select b from querysiblings.B b join fetch b.aRelation","update querysiblings.B b set b.aOnly=7")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery(query));
-                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.increment(b,id,"aOnly",1));org.junit.Assert.assertEquals(1,session.createQuery("update querysiblings.B b set b.bOnly=10").executeUpdate());session.commitTransaction();
+                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.increment(b,id,"aOnly",1));org.junit.Assert.assertEquals(1,session.createQuery("update querysiblings.B b set b.bOnly=10").executeUpdate());session.commitTransaction();session.clear();
                     org.junit.Assert.assertEquals(Long.valueOf(5),session.createQuery("select a.aOnly from querysiblings.A a",Long.class).first());org.junit.Assert.assertEquals(10,b.getField("bOnly").getLong(session.find(b,id)));
                 } finally { session.close();db.close(); }
             }
@@ -1838,7 +1980,7 @@ public class OrmAnnotationProcessorTest {
                 try { session.createQuery("update requiredsub.Child c set c.code = NULL");fail("Bulk NULL must reject a required subtype column"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
                 try { session.createQuery("update requiredsub.Base c set c.code = coalesce(NULL, NULL)");fail("Unknown-nullability bulk expressions must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
                 session.beginTransaction();try { session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value",null).executeUpdate();fail("Null bulk parameters must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }session.rollbackTransaction();
-                session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value","bulk").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals("bulk",childType.getField("code").get(session.find(childType,id)));
+                session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value","bulk").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals("bulk",childType.getField("code").get(session.find(childType,id)));
             } finally { session.close();em.close(); }
         }
     }

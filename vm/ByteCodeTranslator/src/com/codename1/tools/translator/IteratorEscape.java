@@ -78,6 +78,19 @@ class IteratorEscape {
     /// A site is only retirable if none of these leaks `this`.
     static final java.util.List<String> receiverCalls = new java.util.ArrayList<String>();
 
+    /// Prefix of a receiverCalls entry made by INVOKESPECIAL. Such a call is not
+    /// dispatched on the object: it runs the method of the class it names, so whoever
+    /// checks the callee must not look for an override. Everything else in the list is
+    /// a dispatched call and has to be resolved from the object's own class -- see
+    /// Parser.calleesKeepThis. A space cannot occur in a class name.
+    static final String EXACT_CALL = "special ";
+
+    /// Did the last clusterEscapes walk see one tracked object stored INTO another?
+    /// Valid only immediately after that walk. When it did, the tracked objects no
+    /// longer stand alone: any of them may be reachable through a field of another,
+    /// which is a route no callee check looks down. See collectRetireCandidates.
+    static boolean lastClusterStore = false;
+
     /// The local the last walk followed, or -1 if the value never reached one. Valid
     /// only immediately after a walk. Frame-exit retirement needs it: the object to
     /// retire is whatever that local holds when the frame goes.
@@ -92,6 +105,20 @@ class IteratorEscape {
     static int thisEscapes(BytecodeMethod m) {
         if (m.isStatic()) {
             return SAFE;   // no `this` to leak
+        }
+        if (m.isNative()) {
+            // NO BYTECODE IS NOT "NOTHING LEAKS".
+            //
+            // A native method has an empty instruction list, and the walk below
+            // answers SAFE for a body that never touches the reference. Read that way
+            // Thread.start() -- which hands its receiver to a new thread -- keeps
+            // `this` to itself. What native code does with its receiver is not
+            // knowable from here, so the only sound answer is the one the walk gives
+            // for anything else it cannot follow.
+            receiverCalls.clear();
+            lastTrackedLocal = -1;
+            lastReason = "native method: no body to examine";
+            return UNKNOWN;
         }
         return walk(m, true, null, true);
     }
@@ -225,6 +252,7 @@ class IteratorEscape {
             boolean returnIsLeak) {
         receiverCalls.clear();
         lastTrackedLocal = -1;
+        lastClusterStore = false;
         List<Instruction> ins = m.getInstructions();
         // WHICH LABELS ARE ACTUALLY JOIN POINTS.
         //
@@ -373,6 +401,7 @@ class IteratorEscape {
                         // frame. Per-object escape analysis rejects every member of it,
                         // which is why HotSpot does not scalar-replace these either.
                         if (target && clusterStores) {
+                            lastClusterStore = true;
                             continue;
                         }
                         return ESCAPES;   // stored into the heap
@@ -388,8 +417,24 @@ class IteratorEscape {
                     continue;
                 }
                 if (op == Opcodes.GETFIELD) {
-                    sp = Math.max(0, sp - 1);   // receiver consumed, result is "other"
-                    stack = push(stack, sp++, false);
+                    boolean receiver = sp > 0 && stack[sp - 1];
+                    sp = Math.max(0, sp - 1);   // receiver consumed
+                    // WHAT COMES OUT OF A CLUSTER MEMBER MAY BE A CLUSTER MEMBER.
+                    //
+                    // The cluster walk lets one tracked object be stored into a field
+                    // of another. Reading that field back therefore yields a tracked
+                    // object, and calling the result "other" lost it: `a.next = b;
+                    // GLOBAL = a.next;` was a store of an untracked value, and `b` was
+                    // retired at frame exit while GLOBAL pointed at it. Any reference
+                    // read out of a tracked object is tracked from here on. That is an
+                    // over-approximation for a field holding something else, which can
+                    // only turn SAFE into ESCAPES; and it is what the linked-list shape
+                    // needs anyway, since `p = p.next` now stays followed. Arrays are
+                    // left out because a tracked value can never be put in one.
+                    String fd = f.getDesc();
+                    boolean member = receiver && clusterStores
+                            && fd != null && fd.startsWith("L");
+                    stack = push(stack, sp++, member);
                     continue;
                 }
                 if (op == Opcodes.GETSTATIC) {
@@ -424,6 +469,9 @@ class IteratorEscape {
                     if (idx >= 0 && stack[idx] && !ctorAbsorbs) {
                         return ESCAPES;
                     }
+                    if (idx >= 0 && stack[idx]) {
+                        lastClusterStore = true;   // absorbed into the receiver's fields
+                    }
                 }
                 // The tracked value as a RECEIVER is not an escape here, but only
                 // because the callee is checked separately. Record WHICH callee, so
@@ -436,7 +484,8 @@ class IteratorEscape {
                 if (hasReceiver) {
                     int ridx = sp - 1 - argCount;
                     if (ridx >= 0 && stack[ridx]) {
-                        receiverCalls.add(inv.getOwner() + "." + inv.getName() + inv.getDesc());
+                        receiverCalls.add((op == Opcodes.INVOKESPECIAL ? EXACT_CALL : "")
+                                + inv.getOwner() + "." + inv.getName() + inv.getDesc());
                     }
                 }
                 sp = Math.max(0, sp - argCount - (hasReceiver ? 1 : 0));

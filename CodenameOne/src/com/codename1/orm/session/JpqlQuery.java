@@ -73,8 +73,15 @@ public interface JpqlQuery<T> {
     T first();
 
     /// Executes a bulk update or delete in an active transaction.
-    /// Flushes first, bypasses entity cascades and lifecycle callbacks, then clears
-    /// the session so subsequent reads cannot reuse stale managed entities.
+    /// Flushes pending changes first, then runs the statement directly in the
+    /// database, bypassing entity cascades and lifecycle callbacks.
+    ///
+    /// The session is not cleared, as in JPA. Entities it already manages stay
+    /// managed and keep the values they had before the statement, so a change
+    /// made to one afterwards is still written at flush. To see what the statement
+    /// wrote, call `Session.refresh(entity)` or `Session.clear()` and read again. A
+    /// managed entity whose row a bulk DELETE removed fails with an
+    /// `OptimisticLockException` if it is changed or removed afterwards.
     /// @return number of affected rows
     /// @throws IllegalStateException if this is a select
     /// @throws IllegalArgumentException if pagination is set or a parameter is unbound

@@ -199,6 +199,9 @@ public class TestRunner {
                     Class<?> c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
                     Method m = c.getDeclaredMethod("runTest", String.class, String.class, Boolean.TYPE);
                     Boolean passed = (Boolean)m.invoke(null, mainClass, currentTestClass, quietMode);
+                    // This test's Codename One is not used again: without this
+                    // its threads keep everything it loaded in memory.
+                    c.getDeclaredMethod("retire").invoke(null);
                     if(passed) {
                         passedTests++;
                     } else {

@@ -115,7 +115,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
                 properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"),
                 new File(project.getBuild().getDirectory(), "cn1-reports"));
         if (result != 0) {
-            throw new MojoExecutionException("Tests failed");
+            throw new MojoExecutionException(Cn1TestRunner.describeFailure(result));
         }
     }
 }
