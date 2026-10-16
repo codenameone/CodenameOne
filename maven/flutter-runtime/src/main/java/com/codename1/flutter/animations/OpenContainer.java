@@ -189,7 +189,7 @@ public class OpenContainer<T> extends StatelessWidget {
     }
 
     /** Pushes the opened page; closing it pops back and reports through {@code onClosed}. */
-    private void open(BuildContext context) {
+    void open(BuildContext context) {
         if (openBuilder == null) {
             return;
         }
@@ -241,14 +241,29 @@ public class OpenContainer<T> extends StatelessWidget {
                 return surface;
             }
         });
-        com.codename1.flutter.navigation.Navigator.push(context, route);
+        // onClosed follows the ROUTE, not the builder's close callback: the toolbar back,
+        // the system back and a plain Navigator.pop close it too, and the page's result is
+        // whatever it was popped with. Reporting from close() alone missed every other way
+        // out and always passed null.
+        dart.async.Future<Object> closed = com.codename1.flutter.navigation.Navigator.push(context, route);
+        if (closed != null) {
+            closed.then(new dart.runtime.Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object result) {
+                    reportClosed(result);
+                }
+            });
+        }
+    }
+
+    private void close(BuildContext context) {
+        com.codename1.flutter.navigation.Navigator.pop(context);
     }
 
     @SuppressWarnings("unchecked")
-    private void close(BuildContext context) {
-        com.codename1.flutter.navigation.Navigator.pop(context);
+    private void reportClosed(Object result) {
         if (onClosed instanceof dart.runtime.Funcs.VoidFunc1) {
-            ((dart.runtime.Funcs.VoidFunc1<Object>) onClosed).call(null);
+            ((dart.runtime.Funcs.VoidFunc1<Object>) onClosed).call(result);
         } else if (onClosed instanceof dart.runtime.Funcs.VoidFunc0) {
             ((dart.runtime.Funcs.VoidFunc0) onClosed).call();
         }

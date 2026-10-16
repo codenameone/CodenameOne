@@ -36,4 +36,30 @@ public interface Listenable {
     void addListener(Funcs.VoidFunc0 listener);
 
     void removeListener(Funcs.VoidFunc0 listener);
+
+    /**
+     * Flutter's {@code Listenable.merge}: one listenable that notifies when any of
+     * {@code listenables} does. Null entries are skipped, as in Flutter.
+     */
+    static Listenable merge(final Listenable... listenables) {
+        return new Listenable() {
+            @Override
+            public void addListener(Funcs.VoidFunc0 listener) {
+                for (Listenable l : listenables) {
+                    if (l != null) {
+                        l.addListener(listener);
+                    }
+                }
+            }
+
+            @Override
+            public void removeListener(Funcs.VoidFunc0 listener) {
+                for (Listenable l : listenables) {
+                    if (l != null) {
+                        l.removeListener(listener);
+                    }
+                }
+            }
+        };
+    }
 }

@@ -54,11 +54,19 @@ public class SharedAxisTransition extends AnimatedWidget
 
     public void animation(Animation<Double> v) {
         this.animation = v;
-        listenable(v);
+        listenToBoth();
     }
 
     public void secondaryAnimation(Animation<Double> v) {
         this.secondaryAnimation = v;
+        listenToBoth();
+    }
+
+    /// On the OUTGOING page the primary animation is finished and still; only the
+    /// secondary one moves. Listening to the primary alone never rebuilt that page, so
+    /// it neither faded nor moved.
+    private void listenToBoth() {
+        listenable(com.codename1.flutter.foundation.Listenable.merge(animation, secondaryAnimation));
     }
 
     public void transitionType(SharedAxisTransitionType v) {

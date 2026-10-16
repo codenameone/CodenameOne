@@ -23,6 +23,8 @@
  */
 package com.codename1.flutter;
 
+import com.codename1.flutter.testsupport.RasterDisplay;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,6 +38,33 @@ public class EmbeddedLifetimeTest {
         FlutterUI.EmbeddedLifetime l = new FlutterUI.EmbeddedLifetime();
         l.mounted();
         return l;
+    }
+
+    /// The attachment question asked a cycle after a deinitialize: removing an
+    /// ANCESTOR leaves a nested root's own parent link in place, so the old
+    /// getParent() test read a removal as "the form is merely hidden".
+    @Test
+    public void aRootNestedInARemovedAncestorIsNoLongerAttached() {
+        RasterDisplay.install();
+        try {
+            com.codename1.ui.Form form = new com.codename1.ui.Form();
+            com.codename1.ui.Container outer = new com.codename1.ui.Container();
+            com.codename1.ui.Container root = new com.codename1.ui.Container();
+            outer.add(root);
+            form.add(outer);
+            assertTrue(FlutterUI.stillAttached(root));
+
+            // What removing an ancestor leaves behind (Container.removeComponent clears
+            // only the removed ancestor's parent): the root still has ITS parent, but the
+            // chain no longer reaches a form.
+            com.codename1.ui.Container removedAncestor = new com.codename1.ui.Container();
+            com.codename1.ui.Container nested = new com.codename1.ui.Container();
+            removedAncestor.add(nested);
+            assertTrue(nested.getParent() == removedAncestor, "the nested root keeps its own parent");
+            assertFalse(FlutterUI.stillAttached(nested), "but it no longer belongs to a form");
+        } finally {
+            RasterDisplay.uninstall();
+        }
     }
 
     @Test

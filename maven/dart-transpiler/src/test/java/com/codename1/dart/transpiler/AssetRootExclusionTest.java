@@ -72,4 +72,30 @@ public class AssetRootExclusionTest {
         }
         assertTrue(helper, "lib/packages/helper.dart was transpiled");
     }
+
+    /// cn1:import-flutter-project copies lib/ FLAT, so lib/assets/generated.dart lands
+    /// in the asset root assets/, beside the project's real assets. The import's
+    /// lib-sources record is what says that one file is source; the asset beside it
+    /// stays data.
+    @Test
+    public void anImportedLibFileInsideTheAssetRootIsSource() throws Exception {
+        File src = new File(tmp, "imported");
+        TestSupport.write(new File(src, "assets/generated.dart"), "int generated() => 7;\n");
+        TestSupport.write(new File(src, "assets/notes.dart"), "this is an asset, not a program\n");
+        TestSupport.write(new File(src, "main.dart"),
+                "import 'assets/generated.dart';\n\nint twice() => generated() * 2;\n");
+        TestSupport.write(new File(src, DartTranspiler.LIB_SOURCES_RECORD),
+                "assets/generated.dart\nmain.dart\n");
+
+        TranspileResult r = new DartTranspiler().transpile(new TranspileRequest()
+                .sourceRoot(src).outputDir(new File(tmp, "out2"))
+                .stateFile(new File(tmp, "state2.txt")).packageName("com.example.assets"));
+
+        assertFalse(r.hasErrors(), () -> "diagnostics: " + r.errors());
+        boolean found = false;
+        for (GeneratedFile f : r.getGeneratedFiles()) {
+            found |= f.content.contains("generated()");
+        }
+        assertTrue(found, "the imported lib/assets/generated.dart was transpiled");
+    }
 }

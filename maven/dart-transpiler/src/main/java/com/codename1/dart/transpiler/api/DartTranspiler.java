@@ -259,12 +259,48 @@ public final class DartTranspiler {
         }
     }
 
+    /**
+     * Written by {@code cn1:import-flutter-project}: the {@code .dart} files it copied
+     * from {@code lib/}, relative to the source root. lib/ is copied flat, so
+     * {@code lib/assets/generated.dart} sits in {@code assets/} beside the bundled
+     * assets, and only this record says it is source.
+     */
+    public static final String LIB_SOURCES_RECORD = ".flutter-lib-sources";
+
     private void collectDartFiles(File root, File dir, List<File> out) {
+        java.util.Set<String> libSources = new java.util.HashSet<String>();
+        File record = new File(root, LIB_SOURCES_RECORD);
+        if (record.isFile()) {
+            try {
+                for (String line : Files.readAllLines(record.toPath(), StandardCharsets.UTF_8)) {
+                    if (!line.trim().isEmpty()) {
+                        libSources.add(line.trim());
+                    }
+                }
+            } catch (IOException e) {
+                // no record: the asset roots are skipped as before
+            }
+        }
+        collectDartFiles(root, dir, out, libSources, "", false);
+    }
+
+    private void collectDartFiles(File root, File dir, List<File> out, java.util.Set<String> libSources,
+                                  String rel, boolean inAssetRoot) {
         File[] children = dir.listFiles();
         if (children == null) {
             return;
         }
         for (File f : children) {
+            String path = rel + f.getName();
+            if (inAssetRoot) {
+                // Inside an asset root only what the import copied from lib/ is source.
+                if (f.isDirectory()) {
+                    collectDartFiles(root, f, out, libSources, path + "/", true);
+                } else if (f.getName().endsWith(".dart") && libSources.contains(path)) {
+                    out.add(f);
+                }
+                continue;
+            }
             if (f.isDirectory()) {
                 // Only the asset roots themselves -- src/main/flutter/assets and
                 // src/main/flutter/packages, both of which TranscodeFlutterMojo bundles
@@ -272,8 +308,10 @@ public final class DartTranspiler {
                 // silently dropped real code such as lib/assets/generated.dart from the
                 // whole-program parse; not skipping packages/ parsed a .dart file bundled
                 // there as data, and its declarations could break the build.
-                if (!(dir.equals(root) && (f.getName().equals("assets") || f.getName().equals("packages")))) {
-                    collectDartFiles(root, f, out);
+                boolean assetRoot = dir.equals(root)
+                        && (f.getName().equals("assets") || f.getName().equals("packages"));
+                if (!assetRoot || !libSources.isEmpty()) {
+                    collectDartFiles(root, f, out, libSources, path + "/", assetRoot);
                 }
             } else if (f.getName().endsWith(".dart")) {
                 out.add(f);

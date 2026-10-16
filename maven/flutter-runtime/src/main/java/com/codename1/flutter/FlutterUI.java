@@ -600,13 +600,24 @@ public final class FlutterUI {
                 com.codename1.ui.CN.callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        if (lifetime.settle(getParent() != null)) {
+                        if (lifetime.settle(stillAttached(EmbeddedRoot.this))) {
                             unmountTree(host.rootElement());
                         }
                     }
                 });
             }
         }
+    }
+
+    /**
+     * Whether {@code c} still belongs to a form: a hidden form keeps its components
+     * (navigating away), a removed subtree does not. Not {@code getParent() != null}:
+     * Codename One removes a subtree by clearing only the removed ANCESTOR's parent, so
+     * a root nested inside it kept its own parent and its Flutter tree -- State,
+     * listeners, animations -- was never unmounted.
+     */
+    static boolean stillAttached(com.codename1.ui.Component c) {
+        return c.getComponentForm() != null;
     }
 
     /**

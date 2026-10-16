@@ -275,6 +275,7 @@ public final class FlutterProjectImporter {
 
             removeStaleImports(target, previous, imported);
             writeImportRecord(target, imported);
+            writeLibSources(target, libDir);
             writeDeclaredAssetKeys(target, declaredAssetKeys);
             writePackageName(target, pubspec.name);
 
@@ -484,6 +485,38 @@ public final class FlutterProjectImporter {
     /// (lib/ is copied flat, and pubspec.yaml is not copied). Read by
     /// `com.codename1.dart.transpiler.api.DartTranspiler`, which owns the name.
     static final String PACKAGE_NAME_RECORD = ".flutter-package";
+
+    /// The `.dart` files copied from `lib/`, relative to `src/main/flutter`. lib/ is
+    /// copied flat, so `lib/assets/generated.dart` lands in `assets/` beside the
+    /// project's bundled assets; this record is how the transpiler still parses it
+    /// as source there. Read by `com.codename1.dart.transpiler.api.DartTranspiler`.
+    static final String LIB_SOURCES_RECORD = ".flutter-lib-sources";
+
+    private static void writeLibSources(File target, File libDir) throws IOException {
+        List<String> sources = new ArrayList<String>();
+        collectDartSources(libDir, "", sources);
+        java.util.Collections.sort(sources);
+        StringBuilder b = new StringBuilder();
+        for (String s : sources) {
+            b.append(s).append('\n');
+        }
+        target.mkdirs();
+        Files.write(new File(target, LIB_SOURCES_RECORD).toPath(), b.toString().getBytes(Charset.forName("UTF-8")));
+    }
+
+    private static void collectDartSources(File dir, String prefix, List<String> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                collectDartSources(f, prefix + f.getName() + "/", out);
+            } else if (f.getName().endsWith(".dart")) {
+                out.add(prefix + f.getName());
+            }
+        }
+    }
 
     private static void writePackageName(File target, String name) throws IOException {
         File record = new File(target, PACKAGE_NAME_RECORD);

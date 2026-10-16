@@ -340,6 +340,27 @@ public class FlutterProjectImporterTest {
         assertFalse(FlutterProjectImporter.hasParentSegment("a/b..c/d"));
     }
 
+    /// lib/ is copied flat, so lib/assets/x.dart shares assets/ with the bundled
+    /// assets; the lib-sources record lists exactly the Dart files that came from lib/.
+    @Test
+    public void recordsTheDartSourcesCopiedFromLib() throws Exception {
+        File root = Files.createTempDirectory("flutter-lib-sources").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n"
+                + "flutter:\n  assets:\n    - assets/logo.png\n");
+        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        write(new File(flutterProject, "lib/assets/generated.dart"), "int g() => 1;\n");
+        write(new File(flutterProject, "assets/logo.png"), "PNG");
+
+        File common = new File(root, "common");
+        new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        File record = new File(common, "src/main/flutter/" + FlutterProjectImporter.LIB_SOURCES_RECORD);
+        assertEquals("assets/generated.dart\nmain.dart\n", read(record));
+    }
+
     /// lib/ is copied flat and pubspec.yaml is not copied, so the transpiler
     /// learns the project's package name -- which `package:<name>/x.dart`
     /// imports of its own files use -- only from this record.
