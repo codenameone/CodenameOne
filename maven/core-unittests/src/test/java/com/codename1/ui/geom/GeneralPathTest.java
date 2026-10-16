@@ -343,4 +343,40 @@ class GeneralPathTest extends UITestBase {
         assertTrue(path.contains(2, 5));
         assertFalse(path.contains(-2, 5));
     }
+
+    /// A path far past its first buffers keeps every segment it was given,
+    /// in order: the buffers grow by a share of their size, many times over.
+    @Test
+    void aLongPathKeepsEverySegment() {
+        GeneralPath path = new GeneralPath();
+        int count = 5000;
+        path.moveTo(0f, 0f);
+        for (int i = 1; i < count; i++) {
+            if (i % 7 == 0) {
+                path.quadTo(i, i + 0.5f, i + 0.25f, -i);
+            } else {
+                path.lineTo(i, -i);
+            }
+        }
+        assertEquals(count, path.getTypesSize());
+        float[] points = new float[path.getPointsSize()];
+        byte[] types = new byte[path.getTypesSize()];
+        path.getPoints(points);
+        path.getTypes(types);
+        int at = 2;
+        for (int i = 1; i < count; i++) {
+            if (i % 7 == 0) {
+                assertEquals(PathIterator.SEG_QUADTO, types[i]);
+                assertEquals(i + 0.5f, points[at + 1], 0f);
+                at += 2;
+                assertEquals(i + 0.25f, points[at], 0f);
+            } else {
+                assertEquals(PathIterator.SEG_LINETO, types[i]);
+                assertEquals((float) i, points[at], 0f);
+            }
+            assertEquals((float) -i, points[at + 1], 0f);
+            at += 2;
+        }
+        assertEquals(points.length, at);
+    }
 }

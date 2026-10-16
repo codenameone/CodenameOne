@@ -1,3 +1,4 @@
+[[external-surfaces]]
 == External Surfaces: Widgets and Live Activities
 
 Home-screen widgets and live activities answer the same developer question: how to keep a live piece of information outside the app. Codename One models both as one concept -- an external surface -- under the `com.codename1.surfaces` package. A *widget* is persistent, user-placed and content-driven: the weather, the next meeting, the delivery status on the home screen. A *live activity* is transient, app-started and progress-driven: the delivery that's out right now, a running timer, a live score on the iOS lock screen and Dynamic Island, an ongoing Android notification, a floating desktop pill. Both share the same layout model, serialization, state mechanism, and action model.

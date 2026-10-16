@@ -70,61 +70,159 @@ public final class MapStyle {
 
     // ---- Built-in styles --------------------------------------------------
 
-    /// A clean light basemap (sensible default for most apps). Settlement
-    /// labels are joined by street and park names from zoom 12 and points of
-    /// interest from zoom 14, when the tile source supplies those names.
+    /// A clean light basemap (sensible default for most apps): muted land,
+    /// soft water and parks, and roads that read by their importance -- main
+    /// roads wider and faintly tinted, every road edged so that it stands off
+    /// the land, side streets and buildings only once the map is close enough
+    /// for them to mean something. Settlement names are joined by the names of
+    /// main roads and parks from zoom 12, side streets from zoom 14 and points
+    /// of interest from zoom 16, when the tile source supplies those names.
     ///
     /// Every colour falls back to the value baked in here but is overridable
     /// through a theme constant (a CSS color string) so an app can recolour the
     /// map without supplying a whole style: `mapLightWaterColor`,
     /// `mapLightLandcoverColor`, `mapLightLanduseColor`, `mapLightParkColor`,
-    /// `mapLightRoadColor`, `mapLightBuildingColor`, `mapLightBackgroundColor`,
-    /// `mapLightLabelColor`, `mapLightLabelHaloColor`. e.g. a theme constant
+    /// `mapLightRoadColor`, `mapLightMajorRoadColor`, `mapLightRoadCasingColor`,
+    /// `mapLightBuildingColor`, `mapLightBackgroundColor`, `mapLightLabelColor`,
+    /// `mapLightRoadLabelColor`, `mapLightLabelHaloColor`. e.g. a theme constant
     /// `mapLightWaterColor=#1e88e5`.
     public static MapStyle light() {
-        int water = themeColor("mapLightWaterColor", 0xffa0c8f0);
-        int road = themeColor("mapLightRoadColor", 0xffffffff);
-        int building = themeColor("mapLightBuildingColor", 0xffd9d0c9);
-        MapStyle s = new MapStyle("light", themeColor("mapLightBackgroundColor", 0xfff2efe9));
-        addPolygonRule(s, "water", water);
-        addPolygonRule(s, "ocean", water);
-        addPolygonRule(s, "landcover", themeColor("mapLightLandcoverColor", 0xffd8e8c8));
-        addPolygonRule(s, "landuse", themeColor("mapLightLanduseColor", 0xffe8f0d8));
-        addPolygonRule(s, "park", themeColor("mapLightParkColor", 0xffc8e0b0));
-        addLineRule(s, "waterway", water, WATERWAY_ZOOMS, WATERWAY_WIDTHS);
-        addLineRule(s, "road", road, ROAD_ZOOMS, ROAD_WIDTHS);
-        addLineRule(s, "transportation", road, ROAD_ZOOMS, ROAD_WIDTHS).excludeFilter("class", "ferry");
-        addPolygonRule(s, "building", building);
-        addPolygonRule(s, "buildings", building);
-        int label = themeColor("mapLightLabelColor", 0xff333333);
-        int halo = themeColor("mapLightLabelHaloColor", 0xffffffff);
-        addBasemapLabels(s, label, halo);
-        return s;
+        Palette p = new Palette();
+        p.background = themeColor("mapLightBackgroundColor", 0xfff5f3ee);
+        p.water = themeColor("mapLightWaterColor", 0xffabd3f0);
+        p.landcover = themeColor("mapLightLandcoverColor", 0xffe1edd6);
+        p.landuse = themeColor("mapLightLanduseColor", 0xfff1efe9);
+        p.park = themeColor("mapLightParkColor", 0xffd2e8c4);
+        p.road = themeColor("mapLightRoadColor", 0xffffffff);
+        p.majorRoad = themeColor("mapLightMajorRoadColor", 0xfffdf0c4);
+        p.casing = themeColor("mapLightRoadCasingColor", 0xffdcd8cf);
+        p.majorCasing = themeColor("mapLightRoadCasingColor", 0xffe3cc8c);
+        p.path = 0xffe6e1d6;
+        p.rail = 0xffd2cec6;
+        p.building = themeColor("mapLightBuildingColor", 0xffeae7e0);
+        p.label = themeColor("mapLightLabelColor", 0xff2f343b);
+        p.roadLabel = themeColor("mapLightRoadLabelColor", 0xff6a6f78);
+        p.halo = themeColor("mapLightLabelHaloColor", p.background);
+        return build("light", p);
     }
 
-    /// A dark basemap suited to night mode. Mirrors [#light()]: each colour is
-    /// overridable via a theme constant (`mapDarkWaterColor`,
-    /// `mapDarkLandcoverColor`, `mapDarkLanduseColor`, `mapDarkParkColor`,
-    /// `mapDarkRoadColor`, `mapDarkBuildingColor`, `mapDarkBackgroundColor`,
-    /// `mapDarkLabelColor`, `mapDarkLabelHaloColor`).
+    /// A dark basemap suited to night mode. Mirrors [#light()], with the same
+    /// order of importance in dark tones: each colour is overridable via a
+    /// theme constant (`mapDarkWaterColor`, `mapDarkLandcoverColor`,
+    /// `mapDarkLanduseColor`, `mapDarkParkColor`, `mapDarkRoadColor`,
+    /// `mapDarkMajorRoadColor`, `mapDarkRoadCasingColor`,
+    /// `mapDarkBuildingColor`, `mapDarkBackgroundColor`, `mapDarkLabelColor`,
+    /// `mapDarkRoadLabelColor`, `mapDarkLabelHaloColor`).
     public static MapStyle dark() {
-        int water = themeColor("mapDarkWaterColor", 0xff1b2733);
-        int road = themeColor("mapDarkRoadColor", 0xff3a4048);
-        int building = themeColor("mapDarkBuildingColor", 0xff20242a);
-        MapStyle s = new MapStyle("dark", themeColor("mapDarkBackgroundColor", 0xff121417));
-        addPolygonRule(s, "water", water);
-        addPolygonRule(s, "ocean", water);
-        addPolygonRule(s, "landcover", themeColor("mapDarkLandcoverColor", 0xff1a1d20));
-        addPolygonRule(s, "landuse", themeColor("mapDarkLanduseColor", 0xff1d2024));
-        addPolygonRule(s, "park", themeColor("mapDarkParkColor", 0xff17251a));
-        addLineRule(s, "waterway", water, WATERWAY_ZOOMS, WATERWAY_WIDTHS);
-        addLineRule(s, "road", road, ROAD_ZOOMS, ROAD_WIDTHS);
-        addLineRule(s, "transportation", road, ROAD_ZOOMS, ROAD_WIDTHS).excludeFilter("class", "ferry");
-        addPolygonRule(s, "building", building);
-        addPolygonRule(s, "buildings", building);
-        int label = themeColor("mapDarkLabelColor", 0xffe8e8e8);
-        int halo = themeColor("mapDarkLabelHaloColor", 0xff000000);
-        addBasemapLabels(s, label, halo);
+        Palette p = new Palette();
+        p.background = themeColor("mapDarkBackgroundColor", 0xff16191d);
+        p.water = themeColor("mapDarkWaterColor", 0xff0d1b29);
+        p.landcover = themeColor("mapDarkLandcoverColor", 0xff18211b);
+        p.landuse = themeColor("mapDarkLanduseColor", 0xff181b20);
+        p.park = themeColor("mapDarkParkColor", 0xff18281c);
+        p.road = themeColor("mapDarkRoadColor", 0xff323942);
+        p.majorRoad = themeColor("mapDarkMajorRoadColor", 0xff505966);
+        p.casing = themeColor("mapDarkRoadCasingColor", 0xff0e1013);
+        p.majorCasing = themeColor("mapDarkRoadCasingColor", 0xff0e1013);
+        p.path = 0xff22272e;
+        p.rail = 0xff2a2f36;
+        p.building = themeColor("mapDarkBuildingColor", 0xff1c2026);
+        p.label = themeColor("mapDarkLabelColor", 0xffe4e7eb);
+        p.roadLabel = themeColor("mapDarkRoadLabelColor", 0xff9aa2ad);
+        p.halo = themeColor("mapDarkLabelHaloColor", p.background);
+        return build("dark", p);
+    }
+
+    // The colours of a built-in style.
+    private static final class Palette {
+        private int background;
+        private int water;
+        private int landcover;
+        private int landuse;
+        private int park;
+        private int road;
+        private int majorRoad;
+        private int casing;
+        private int majorCasing;
+        private int path;
+        private int rail;
+        private int building;
+        private int label;
+        private int roadLabel;
+        private int halo;
+    }
+
+    // The classes of road, in the vocabularies of the two tile schemas in use
+    // (OpenMapTiles' `transportation`, and `road` of the Mapbox Streets one).
+    // A class that is in none of the lists is drawn as a side street: a road
+    // the style has never heard of is still a road.
+    private static final String[] MAJOR_ROADS = {"motorway", "trunk", "primary", "secondary", "tertiary",
+        "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "main"};
+    // The few that carry a city's traffic, and are tinted to say so.
+    private static final String[] HIGHWAYS = {"motorway", "trunk", "primary",
+        "motorway_link", "trunk_link", "primary_link"};
+    // Alleys, driveways and the aisles of car parks: roads, but at the scale
+    // of a neighbourhood a rash of stubs off every street.
+    private static final String[] SERVICE_ROADS = {"service", "driveway", "parking_aisle"};
+    private static final String[] PATHS = {"path", "track", "footway", "cycleway", "steps", "pedestrian"};
+    private static final String[] RAILS = {"rail", "transit", "major_rail", "minor_rail"};
+    // Neither a street nor drawn as one: the lists above, and what is no road
+    // at all. A ferry route is a line across open water, a pier is an area.
+    private static final String[] NOT_STREETS = {"motorway", "trunk", "primary", "secondary", "tertiary",
+        "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "main",
+        "path", "track", "footway", "cycleway", "steps", "pedestrian",
+        "rail", "transit", "major_rail", "minor_rail",
+        "service", "driveway", "parking_aisle",
+        "ferry", "pier", "aerialway", "golf", "bridge"};
+    private static final String[] ROAD_LAYERS = {"transportation", "road"};
+    private static final String[] ROAD_NAME_LAYERS = {"transportation_name", "road", "road_label"};
+
+    private static MapStyle build(String name, Palette p) {
+        MapStyle s = new MapStyle(name, p.background);
+        addPolygonRule(s, "landcover", p.landcover);
+        addPolygonRule(s, "landuse", p.landuse);
+        addPolygonRule(s, "park", p.park);
+        addPolygonRule(s, "water", p.water);
+        addPolygonRule(s, "ocean", p.water);
+        addLineRule(s, "waterway", p.water, WATERWAY_ZOOMS, WATERWAY_WIDTHS);
+        // Under the roads, and not before the map is close enough to tell one
+        // from the next: at city scale they are a texture, and the strongest
+        // thing on the map if they are given any weight.
+        s.add(new StyleLayer(StyleLayer.TYPE_FILL).sourceLayer("building").fillColor(p.building)
+                .zoomRange(15, 24));
+        s.add(new StyleLayer(StyleLayer.TYPE_FILL).sourceLayer("buildings").fillColor(p.building)
+                .zoomRange(15, 24));
+        for (String layer : ROAD_LAYERS) {
+            addLineRule(s, layer, p.path, PATH_ZOOMS, PATH_WIDTHS).filterIn("class", PATHS)
+                    .linesOnly().zoomRange(15, 24);
+            addLineRule(s, layer, p.rail, PATH_ZOOMS, PATH_WIDTHS).filterIn("class", RAILS)
+                    .linesOnly().zoomRange(13, 24);
+            addLineRule(s, layer, p.road, SERVICE_ZOOMS, SERVICE_WIDTHS).filterIn("class", SERVICE_ROADS)
+                    .linesOnly().zoomRange(16, 24);
+        }
+        // Every edge before any road, so that where two roads meet neither is
+        // edged across the other.
+        for (String layer : ROAD_LAYERS) {
+            addLineRule(s, layer, p.casing, STREET_ZOOMS, STREET_CASINGS).excludeIn("class", NOT_STREETS)
+                    .linesOnly().zoomRange(15, 24);
+            addLineRule(s, layer, p.casing, MAJOR_ZOOMS, MAJOR_CASINGS).filterIn("class", MAJOR_ROADS)
+                    .linesOnly().zoomRange(12, 24);
+            addLineRule(s, layer, p.majorCasing, MAJOR_ZOOMS, MAJOR_CASINGS).filterIn("class", HIGHWAYS)
+                    .linesOnly().zoomRange(12, 24);
+        }
+        for (String layer : ROAD_LAYERS) {
+            addLineRule(s, layer, p.road, STREET_ZOOMS, STREET_WIDTHS).excludeIn("class", NOT_STREETS)
+                    .linesOnly().zoomRange(12, 24);
+        }
+        for (String layer : ROAD_LAYERS) {
+            addLineRule(s, layer, p.road, MAJOR_ZOOMS, MAJOR_WIDTHS).filterIn("class", MAJOR_ROADS)
+                    .linesOnly();
+        }
+        for (String layer : ROAD_LAYERS) {
+            addLineRule(s, layer, p.majorRoad, MAJOR_ZOOMS, MAJOR_WIDTHS).filterIn("class", HIGHWAYS)
+                    .linesOnly();
+        }
+        addBasemapLabels(s, p.label, p.roadLabel, p.halo);
         return s;
     }
 
@@ -149,9 +247,18 @@ public final class MapStyle {
 
     // Line widths in logical pixels. Roads keep widening past zoom 18, where
     // the map is overzoomed and a street should read as a street, not a
-    // hairline; roughly doubling per level matches the ground they cover.
-    private static final double[] ROAD_ZOOMS = {6, 10, 14, 16, 18, 20, 22};
-    private static final double[] ROAD_WIDTHS = {0.5, 1, 2.5, 5, 10, 22, 44};
+    // hairline; roughly doubling per level matches the ground they cover. An
+    // edge is the same road drawn first, a little wider, in a darker colour.
+    private static final double[] STREET_ZOOMS = {12, 14, 16, 18, 20, 22};
+    private static final double[] STREET_WIDTHS = {0.5, 1.2, 4, 9, 20, 40};
+    private static final double[] STREET_CASINGS = {0.5, 1.2, 5.5, 10.5, 22, 42};
+    private static final double[] MAJOR_ZOOMS = {6, 10, 12, 14, 16, 18, 20, 22};
+    private static final double[] MAJOR_WIDTHS = {0.6, 1.2, 1.8, 3, 6.5, 13, 28, 52};
+    private static final double[] MAJOR_CASINGS = {0.6, 1.2, 2.8, 4.4, 8, 14.5, 30, 54};
+    private static final double[] SERVICE_ZOOMS = {16, 18, 20, 22};
+    private static final double[] SERVICE_WIDTHS = {1.2, 4, 10, 20};
+    private static final double[] PATH_ZOOMS = {13, 16, 20};
+    private static final double[] PATH_WIDTHS = {0.6, 1.2, 4};
     private static final double[] WATERWAY_ZOOMS = {6, 12, 16, 20};
     private static final double[] WATERWAY_WIDTHS = {0.5, 1, 3, 10};
 
@@ -163,29 +270,37 @@ public final class MapStyle {
         return sl;
     }
 
-    // Within each tile, consider settlement names before streets and landmarks.
-    // Detail labels only appear at neighbourhood/street zooms. Ferry routes share
-    // the street-name layer but their lines are not drawn (see the line rules),
-    // so their names are left out too: a name laid along an invisible route
-    // reads as text floating on open water.
-    private static void addBasemapLabels(MapStyle s, int label, int halo) {
-        addSymbolRule(s, "place", "name", label, halo);
-        addSymbolRule(s, "place_label", "name", label, halo);
-        addSymbolRule(s, "transportation_name", "name", label, halo).zoomRange(12, 24)
-                .excludeFilter("class", "ferry");
-        addSymbolRule(s, "road", "name", label, halo).zoomRange(12, 24)
-                .excludeFilter("class", "ferry");
-        addSymbolRule(s, "road_label", "name", label, halo).zoomRange(12, 24)
-                .excludeFilter("class", "ferry");
-        addSymbolRule(s, "park", "name", label, halo).zoomRange(12, 24);
-        addSymbolRule(s, "poi", "name", label, halo).zoomRange(14, 24);
+    // Names are considered in the order they are listed, and one that is in
+    // the way of another already placed is left out, so the order is the
+    // order of importance: settlements, then main roads, then parks, and only
+    // close in the side streets and points of interest that would otherwise
+    // crowd everything else off the map. Ferry routes share the street-name
+    // layer but their lines are not drawn (see the line rules), so their names
+    // are left out too: a name laid along an invisible route reads as text
+    // floating on open water.
+    //
+    // Sizes are in logical pixels, about the size of the small print of an
+    // interface: a map is read around its names, not through them.
+    private static void addBasemapLabels(MapStyle s, int label, int roadLabel, int halo) {
+        addSymbolRule(s, "place", "name", label, halo, 13);
+        addSymbolRule(s, "place_label", "name", label, halo, 13);
+        for (String layer : ROAD_NAME_LAYERS) {
+            addSymbolRule(s, layer, "name", roadLabel, halo, 12).zoomRange(12, 24)
+                    .filterIn("class", MAJOR_ROADS);
+        }
+        addSymbolRule(s, "park", "name", roadLabel, halo, 11).zoomRange(12, 24);
+        for (String layer : ROAD_NAME_LAYERS) {
+            addSymbolRule(s, layer, "name", roadLabel, halo, 11).zoomRange(14, 24)
+                    .excludeIn("class", NOT_STREETS);
+        }
+        addSymbolRule(s, "poi", "name", roadLabel, halo, 11).zoomRange(16, 24);
     }
 
     private static StyleLayer addSymbolRule(MapStyle s, String sourceLayer, String field,
-                                      int textColor, int haloColor) {
+                                      int textColor, int haloColor, double size) {
         StyleLayer layer = new StyleLayer(StyleLayer.TYPE_SYMBOL).sourceLayer(sourceLayer).textField(field)
                 .textColor(textColor).textHaloColor(haloColor)
-                .textSize(ZoomValue.constant(13));
+                .textSize(ZoomValue.constant(size));
         s.add(layer);
         return layer;
     }

@@ -107,11 +107,15 @@ ba_log "Building Android gradle project ($APP_DIR) using Codename One port"
 )
 cd "$REPO_ROOT"
 
-GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
+# The android module builds the project where there is one. An application in
+# the minimal layout has none, and common builds every platform itself.
+ANDROID_MODULE_DIR="$APP_DIR/android"
+[ -f "$ANDROID_MODULE_DIR/pom.xml" ] || ANDROID_MODULE_DIR="$APP_DIR/common"
+GRADLE_PROJECT_DIR=$(find "$ANDROID_MODULE_DIR/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
   ba_log "Failed to locate generated Android project" >&2
-  ba_log "Contents of $APP_DIR/android/target:" >&2
-  ls -R "$APP_DIR/android/target" >&2 || ba_log "Unable to list $APP_DIR/android/target" >&2
+  ba_log "Contents of $ANDROID_MODULE_DIR/target:" >&2
+  ls -R "$ANDROID_MODULE_DIR/target" >&2 || ba_log "Unable to list $ANDROID_MODULE_DIR/target" >&2
   exit 1
 fi
 

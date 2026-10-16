@@ -22,6 +22,8 @@
  */
 package com.codename1.maps.vector;
 
+import com.codename1.ui.Font;
+
 /// A single label to draw, captured at tile-decode time. Its anchor is stored
 /// in integer-zoom world pixels (256px tiles) so the engine can convert it to
 /// the screen at any fractional camera zoom without re-walking the tile.
@@ -41,6 +43,31 @@ final class LabelCandidate {
     /// Interleaved `x,y` world pixels of the line the label follows, or null
     /// for a label placed at a point. [#worldX]/[#worldY] is its midpoint.
     final double[] path;
+
+    // What [LabelEngine] measured this text as, and the font it measured it
+    // in: every label in view is measured on every frame, most of them only
+    // to be found in the way of another.
+    private Font measuredFont;
+    private int measuredHeight;
+    int textWidth;
+    boolean perGlyph;
+    /// The widths the text is laid along a line by, or null when it has only
+    /// been measured whole.
+    int[] cellWidths;
+
+    /// Whether the measurements here are of this text in `font`, while it
+    /// answered the height `height`.
+    boolean measured(Font font, int height) {
+        return measuredFont == font && measuredHeight == height; //NOPMD CompareObjectsWithEquals
+    }
+
+    void remember(Font font, int height, int width, boolean glyphs, int[] widths) {
+        measuredFont = font;
+        measuredHeight = height;
+        textWidth = width;
+        perGlyph = glyphs;
+        cellWidths = widths;
+    }
 
     LabelCandidate(String text, double worldX, double worldY, int tileZoom,
                    int textColor, int haloColor, double sizePx) {

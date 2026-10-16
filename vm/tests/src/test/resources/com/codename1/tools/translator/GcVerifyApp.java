@@ -170,6 +170,26 @@ public class GcVerifyApp {
                 checksum++;
             }
         }
+        // READ EVERY FIELD THE HAZARDS STORE THROUGH. DeadFieldElimination (#5903) deletes an
+        // instance field nothing reads, and these were write-only: the translated Node had no
+        // fields, so HAZARD 1's fresh node held nothing and the grace pass had nothing to
+        // rescue, and Filler shrank to an empty object. The gate still passed and its
+        // nograce half still fired -- through the hazards that store into arrays and maps,
+        // which elimination cannot touch -- so nothing said the first hazard was gone.
+        for (int i = 0; i < KEEP; i++) {
+            Object o = keep[i];
+            if (o instanceof Node) {
+                Node n = (Node) o;
+                checksum += n.tag + (n.b == n ? 7 : 0) + (n.a != null ? 5 : 0);
+            }
+        }
+        for (int i = 0; i < 16; i++) {
+            Object o = sink[i];
+            if (o instanceof Filler) {
+                Filler f = (Filler) o;
+                checksum += f.a + f.b + f.c + f.d + f.e + f.f + f.g + f.h + f.i2 + f.j + f.k + f.l;
+            }
+        }
         checksum += dict.size();
         System.out.println("RESULT=" + checksum);
         System.out.println("GC_VERIFY_APP_DONE");

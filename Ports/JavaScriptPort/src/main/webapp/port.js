@@ -1665,12 +1665,55 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
 // without a DOM. On the worker port they must run on the browser host: leaving
 // the stubs in place returns timer id 0 and silently drops every callback
 // (camera frame delivery was the first assertion test to expose this).
+// A one-shot timer's callback is released once it has fired or been cleared.
+// A function handed to the host gets an entry in jvm.workerCallbacks, and the
+// host a proxy for it, that nothing else removes: one per setTimeout kept a
+// Java handler and all it held for every timer the application ever set --
+// a pinch, a pause in a scroll, a text edit. So each timeout gets a function
+// of its own, which drops its entry when it runs, and the host drops its
+// proxy then too (browser_bridge.js). Timer id -> callback id, for a timeout
+// cleared before it fired.
+const cn1OneShotTimers = Object.create(null);
+
+function cn1ForgetOneShot(timerId) {
+  const callbackId = cn1OneShotTimers[timerId];
+  if (callbackId != null) {
+    delete cn1OneShotTimers[timerId];
+    if (jvm.workerCallbacks) {
+      delete jvm.workerCallbacks[callbackId];
+    }
+  }
+}
+
 function* cn1SetHostTimer(kind, handler, delay) {
   if (typeof jvm.invokeHostNative !== "function") {
     return 0;
   }
   if (!handler || !handler.__class) {
     return 0;
+  }
+  if (kind === "__cn1_timer_set_timeout__") {
+    let timerId = -1;
+    let fired = false;
+    const once = function() {
+      // By its own id as well: a timeout of 0 can fire before the call that
+      // set it has returned here and recorded it.
+      fired = true;
+      cn1ForgetOneShot(timerId);
+      if (jvm.workerCallbacks && typeof once.__cn1WorkerCallbackId === "number") {
+        delete jvm.workerCallbacks[once.__cn1WorkerCallbackId];
+      }
+      try {
+        spawnVirtualCallback(handler, "cn1_s_onTimer", [], "__cn1TimerCallbackPending");
+      } catch (err) {
+        jvm.fail(err);
+      }
+    };
+    timerId = (yield jvm.invokeHostNative(kind, [once, Math.max(0, delay | 0)])) | 0;
+    if (!fired && typeof once.__cn1WorkerCallbackId === "number") {
+      cn1OneShotTimers[timerId] = once.__cn1WorkerCallbackId;
+    }
+    return timerId;
   }
   if (!handler.__cn1NativeTimerCallback) {
     handler.__cn1NativeTimerCallback = function() {
@@ -1698,6 +1741,7 @@ bindNative([
   "cn1_com_codename1_html5_js_browser_Window_clearTimeout_int",
   "cn1_com_codename1_html5_js_browser_Window_clearTimeout___int"
 ], function*(id) {
+  cn1ForgetOneShot(id | 0);
   if (typeof jvm.invokeHostNative === "function") {
     yield jvm.invokeHostNative("__cn1_timer_clear_timeout__", [id | 0]);
   }
@@ -3615,92 +3659,12 @@ bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
   return 16.0;
 });
 
-const hashMapComputeHashCodeImplMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int__impl";
-const hashMapComputeHashCodeMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int";
-
-bindCiFallback("HashMap.computeHashCodeNullKey", [
-  hashMapComputeHashCodeImplMethodId,
-  hashMapComputeHashCodeMethodId
-], function*(key) {
-  if (key == null) {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
-    return 0;
-  }
-  // Resolve the translator-generated original lazily — port.js evaluates
-  // before translated_app.js, so a snapshot taken at load time would be
-  // null and force every non-null lookup down the resolveVirtual fallback.
-  // jvm.translatedMethods is populated by bindNative when registering
-  // the native overrides; checking it last preserves any port-specific
-  // override of the same method.
-  let original = null;
-  if (jvm && jvm.translatedMethods) {
-    original = jvm.translatedMethods[hashMapComputeHashCodeImplMethodId]
-      || jvm.translatedMethods[hashMapComputeHashCodeMethodId]
-      || null;
-  }
-  if (typeof original !== "function") {
-    if (typeof global[hashMapComputeHashCodeImplMethodId] === "function"
-        && !global[hashMapComputeHashCodeImplMethodId].__cn1CiFallbackSymbol) {
-      original = global[hashMapComputeHashCodeImplMethodId];
-    } else if (typeof global[hashMapComputeHashCodeMethodId] === "function"
-        && !global[hashMapComputeHashCodeMethodId].__cn1CiFallbackSymbol) {
-      original = global[hashMapComputeHashCodeMethodId];
-    }
-  }
-  if (typeof original === "function") {
-    return yield* cn1_ivAdapt(original(key));
-  }
-  // Last-ditch path when the translated original genuinely isn't
-  // available. ``computeHashCode(key)`` is just ``key.hashCode()`` —
-  // dispatch via the SHARED dispatch id (``cn1_s_hashCode_R_int``), not
-  // the legacy class-specific name. Every translated class registers its
-  // ``hashCode`` slot under the shared key after the dispatch-id
-  // refactor; resolving against ``cn1_java_lang_Object_hashCode_R_int``
-  // skips that slot and silently returns the inherited Object.hashCode
-  // (identity hash), which made every String key in CSSBorder.STYLE_MAP
-  // store under its identity hash and every subsequent ``get("solid")``
-  // miss the entry.
-  var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
-    "cn1_s_hashCode_R_int");
-  if (typeof hashCodeMethod === "function") {
-    return yield* cn1_ivAdapt(hashCodeMethod(key));
-  }
-  return 0;
-});
-if (typeof global[hashMapComputeHashCodeImplMethodId] === "function") {
-  const originalHashMapComputeHashCodeImpl = global[hashMapComputeHashCodeImplMethodId];
-  global[hashMapComputeHashCodeImplMethodId] = function*(key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalHashMapComputeHashCodeImpl(key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeImplNullKey");
-}
-if (typeof global[hashMapComputeHashCodeMethodId] === "function") {
-  const originalHashMapComputeHashCode = global[hashMapComputeHashCodeMethodId];
-  global[hashMapComputeHashCodeMethodId] = function*(key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalHashMapComputeHashCode(key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeNullKey");
-}
-const hashMapClassDef = jvm.classes && jvm.classes["java_util_HashMap"];
-if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods[hashMapComputeHashCodeMethodId] === "function") {
-  const originalClassHashMapComputeHashCode = hashMapClassDef.methods[hashMapComputeHashCodeMethodId];
-  hashMapClassDef.methods[hashMapComputeHashCodeMethodId] = function*(__cn1ThisObject, key) {
-    if (key == null) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeClass:nullKey=1");
-      return 0;
-    }
-    return yield* cn1_ivAdapt(originalClassHashMapComputeHashCode(__cn1ThisObject, key));
-  };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeClassNullKey");
-}
+// HashMap.computeHashCode used to carry a null-key fallback here, three ways (a
+// bindCiFallback and two direct replacements). The compact HashMap never passes it
+// a null key -- its one caller, cn1Marker, answers null itself -- so the fallback
+// could not fire. It was not free: a replaced method is suspending by definition,
+// and this one sat under every HashMap get/put/containsKey, so every lookup in
+// every app was a generator.
 
 const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
 const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
@@ -5861,8 +5825,6 @@ const cn1ssWs = {
   queue: [],      // {test, bytes} buffered while the socket is still connecting
   pending: 0      // sent-but-unacked frames, for an optional flush at suite end
 };
-cn1RefreshAlias(hashMapComputeHashCodeMethodId, global[hashMapComputeHashCodeMethodId]);
-cn1RefreshAlias(hashMapComputeHashCodeImplMethodId, global[hashMapComputeHashCodeImplMethodId]);
 
 function cn1ssWsHost() {
   try {

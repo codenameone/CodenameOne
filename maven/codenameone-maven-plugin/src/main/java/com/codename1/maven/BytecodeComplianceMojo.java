@@ -29,7 +29,15 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.project.MavenProject;
+
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Checks the compiled application against the Codename One Java runtime API; see
@@ -63,6 +71,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             }
         };
         check.portReport(desktopReport);
+        check.checkedDependencyRoots(plainSiblingModules());
         try {
             check.execute();
         } catch (com.codename1.build.BuildFailureException ex) {
@@ -70,5 +79,49 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         } catch (com.codename1.build.BuildExecutionException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
+    }
+
+    /// The class directories of the plain jar modules of this build that the
+    /// project depends on -- a `shared` module of DTOs and contracts. A Codename
+    /// One module (an application or a cn1lib) is left out: it runs this check
+    /// itself, on its own classes.
+    ///
+    /// Only what the application ships: a module on its compile or runtime
+    /// class path. The project's references list every module it names,
+    /// whatever the scope, and one named with `<scope>test</scope>` is a
+    /// fixture that is free to use the whole JDK -- checked here, it failed the
+    /// application's build over classes that never reach a device.
+    private List<File> plainSiblingModules() {
+        List<File> roots = new ArrayList<File>();
+        if (project.getProjectReferences() == null) {
+            return roots;
+        }
+        Set<String> shipped = new HashSet<String>();
+        if (project.getArtifacts() != null) {
+            for (Artifact artifact : project.getArtifacts()) {
+                String scope = artifact.getScope();
+                if (scope == null || Artifact.SCOPE_COMPILE.equals(scope)
+                        || Artifact.SCOPE_RUNTIME.equals(scope)) {
+                    shipped.add(artifact.getGroupId() + ":" + artifact.getArtifactId());
+                }
+            }
+        }
+        for (MavenProject sibling : project.getProjectReferences().values()) {
+            if (sibling == null || !"jar".equals(sibling.getPackaging()) || sibling.getBasedir() == null) {
+                continue;
+            }
+            if (!shipped.contains(sibling.getGroupId() + ":" + sibling.getArtifactId())) {
+                continue;
+            }
+            if (new File(sibling.getBasedir(), "codenameone_settings.properties").exists()
+                    || new File(sibling.getBasedir(), "codenameone_library_appended.properties").exists()) {
+                continue;
+            }
+            File classes = new File(sibling.getBuild().getOutputDirectory());
+            if (classes.isDirectory()) {
+                roots.add(classes);
+            }
+        }
+        return roots;
     }
 }

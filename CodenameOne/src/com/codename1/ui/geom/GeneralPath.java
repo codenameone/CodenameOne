@@ -533,11 +533,27 @@ public final class GeneralPath implements Shape {
             return true;
         }
         if (shape instanceof Rectangle) {
+            // A path equals a rectangle only when it IS that rectangle. Comparing bounds
+            // alone made EVERY non-rectangular path equal to its own bounding box, and
+            // the clip bookkeeping asks exactly this question before deciding that a
+            // setClip changes nothing and can be skipped.
+            //
+            // That is a silent, total failure of shaped clipping wherever the shape fills
+            // its own component, which is the usual case: a component's clip has just been
+            // narrowed to its bounds, so a circle or rounded rectangle inscribed in it
+            // arrives with bounds equal to the current clip, compares EQUAL, and is
+            // DISCARDED. The subtree then paints square with nothing reported. Only ports
+            // whose clip state goes through this comparison are affected, which is why it
+            // could be reproduced on a device and never in the desktop simulator.
+            //
+            // isRectangle() walks the path, so it is asked only once the bounds have
+            // already matched -- the rare case. A clip that genuinely changed is rejected
+            // on the bounds alone, as before.
             Rectangle r = (Rectangle) shape;
             Rectangle tmpRect = createRectFromPool();
             try {
                 getBounds(tmpRect);
-                return r.equals(tmpRect);
+                return r.equals(tmpRect) && isRectangle();
             } finally {
                 recycle(tmpRect);
             }
@@ -591,13 +607,17 @@ public final class GeneralPath implements Shape {
             // awt.20A=First segment should be SEG_MOVETO type
             throw new IndexOutOfBoundsException("First segment must be a moveto"); //$NON-NLS-1$
         }
+        // Both buffers grow by half their size, not by a fixed step. A fixed step
+        // copies the whole path again every ten segments, so building a path of n
+        // segments cost n * n / 20 element copies -- most of the time a vector map
+        // tile took to rasterize, whose fills are paths of thousands of points.
         if (typeSize == types.length) {
-            byte[] tmp = new byte[typeSize + BUFFER_CAPACITY];
+            byte[] tmp = new byte[typeSize + Math.max(BUFFER_CAPACITY, typeSize >> 1)];
             System.arraycopy(types, 0, tmp, 0, typeSize);
             types = tmp;
         }
         if (pointSize + pointCount > points.length) {
-            float[] tmp = new float[pointSize + Math.max(BUFFER_CAPACITY * 2, pointCount)];
+            float[] tmp = new float[pointSize + Math.max(Math.max(BUFFER_CAPACITY * 2, pointCount), pointSize >> 1)];
             System.arraycopy(points, 0, tmp, 0, pointSize);
             points = tmp;
         }

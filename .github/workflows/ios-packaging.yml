@@ -15,6 +15,16 @@ concurrency:
   group: packaging-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # A method the translator culled as unreachable is still emitted as a stub,
+  # because dispatch tables name it. With this on, the stub aborts with the
+  # method's name instead of returning 0, so a wrong cull fails the suite that
+  # reached it rather than shipping a silent null. Ours to enforce, like
+  # CN1_NATIVE_VERIFY: customer builds keep the plain stub. See
+  # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
+  # binaries should be the ones customers get.
+  CN1_CULL_TRAP: '1'
+
 jobs:
   build-port:
     if: ${{ !inputs.port_prepared }}
@@ -31,7 +41,9 @@ jobs:
     # 16s of the old two-hour budget for artifact upload and cache saves. Keep
     # the individual step limits below and allow 30m of finalization headroom.
     # The hello app now also translates the Android compatibility gallery, its runtime and the Kotlin stdlib; 150 no longer covers the three builds.
-    timeout-minutes: 210
+    # The Swing and JavaFX compatibility runtimes added about 22% more translated C again: master's 2h23 became about 3h40
+    # (Release build 41 -> 63 minutes, UI smoke 61 -> 80, notifications 21 -> over 51).
+    timeout-minutes: 270
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
     # and additionally validates that they coexist correctly. Also turns on
@@ -165,7 +177,8 @@ jobs:
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
         # A cold Release compile of the hello app (now with the Android compatibility gallery, its runtime and the Kotlin stdlib) took 42.5 of 45 minutes.
-        timeout-minutes: 70
+        # The Swing and JavaFX compatibility runtimes took it to 63.
+        timeout-minutes: 90
 
       # The binary half of scripts-ios.yml's private-API gate. App Store Connect scans the
       # linked executable, so this reads what it would read: every import of the Release
@@ -222,7 +235,8 @@ jobs:
         # run-ios-ui-tests.sh has a 12-minute no-progress watchdog and a
         # bounded 35-minute suite cap; include native build/cleanup headroom.
         # The cold -O1 compile alone reached 52 minutes once the hello app gained the Android compatibility gallery, its runtime and the Kotlin stdlib.
-        timeout-minutes: 100
+        # The Swing and JavaFX compatibility runtimes took the step from 61 to 80 minutes.
+        timeout-minutes: 130
 
       - name: Run native iOS notification tests
         env:
@@ -251,7 +265,8 @@ jobs:
         # rebuild, not a re-description of it. The real fix is to inject before the UI-smoke step
         # so this build is genuinely incremental; until then the budget has to cover the build it
         # actually does. The hello app's growth (the Android compatibility gallery, its runtime and the Kotlin stdlib) added roughly half again to that build.
-        timeout-minutes: 60
+        # The Swing and JavaFX compatibility runtimes took it from 21 minutes to over 51.
+        timeout-minutes: 90
 
       - name: Upload packaging artifacts
         if: ${{ !cancelled() }}

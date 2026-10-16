@@ -3108,8 +3108,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         data->counter++;
         data->ownerThread = own;
         cn1VirtualThreadMonitorEntered();
-        CN1_GC_WAIT_UNBLOCKED(threadStateData);
-        threadStateData->threadActive = JAVA_TRUE;
+        CN1_GC_RESUME_ACTIVE(threadStateData);
 
 
     }
@@ -3433,26 +3432,29 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
 
-    while(threadStateData->threadBlockedByGC) {
-        struct timeval   tv;
-        gettimeofday(&tv, NULL);
-        struct timespec   ts;
-        ts.tv_sec = tv.tv_sec;
-        ts.tv_nsec = (tv.tv_usec * 1000) + 2000000;
-        if ( ts.tv_nsec > 1000000000 ){
-            ts.tv_nsec -= 1000000000;
-            ts.tv_sec++;
+    // Gone active through cn1GcTryResumeActive's handshake: a block the collector raises
+    // inside the window sends this thread back to wait it out, with the monitor's mutex
+    // released by the timed wait exactly as before.
+    do {
+        while(threadStateData->threadBlockedByGC) {
+            struct timeval   tv;
+            gettimeofday(&tv, NULL);
+            struct timespec   ts;
+            ts.tv_sec = tv.tv_sec;
+            ts.tv_nsec = (tv.tv_usec * 1000) + 2000000;
+            if ( ts.tv_nsec > 1000000000 ){
+                ts.tv_nsec -= 1000000000;
+                ts.tv_sec++;
+            }
+            pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
         }
-        pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
-    }
+    } while(!cn1GcTryResumeActive(threadStateData));
 
     __atomic_store_n(&threadStateData->waitingOn, JAVA_NULL, __ATOMIC_SEQ_CST);
 
     // restore the ownership of the thread
     data->ownerThread = CN1_MONITOR_SELF();
     data->counter = counter;
-    
-    threadStateData->threadActive = JAVA_TRUE;
     //printf("Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
 
     // An interrupted wait throws once the monitor is owned again, and clears
@@ -3590,8 +3592,7 @@ JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG
         // usleep shim has no useconds_t typedef (same reason the old code cast here)
         usleep((JAVA_INT)remainMicros);
     }
-    CN1_GC_WAIT_UNBLOCKED(threadStateData);
-    threadStateData->threadActive = JAVA_TRUE;
+    CN1_GC_RESUME_ACTIVE(threadStateData);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // Mirror CN1_RESUME_THREAD: drop the capture so a stale SP can never
     // satisfy the scanner's cooperative path after this frame unwinds.
@@ -3666,8 +3667,14 @@ void* threadRunner(void *x)
     cn1InstallThreadAltStack();
     JAVA_OBJECT t = (JAVA_OBJECT)x;
     struct ThreadLocalData* d = getThreadLocalData();
-    d->lightweightThread = JAVA_TRUE;
+    // ACTIVE FIRST, then lightweight, with a full fence between. The collector only stops
+    // (and only reads threadActive for) a lightweight thread, so in the old order it could
+    // see this state lightweight and still inactive, take it as parked, and scan and hold it
+    // while it ran -- the same window cn1GcTryResumeActive closes at every resume site.
+    // In this order a collector that sees the thread lightweight sees it active, and waits.
     d->threadActive = JAVA_TRUE;
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    d->lightweightThread = JAVA_TRUE;
     d->currentThreadObject = t;
     
    // printf("launching thread %d",(int)d->threadId);

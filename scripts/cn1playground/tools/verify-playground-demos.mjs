@@ -263,7 +263,14 @@ async function selectSample(page, sample, title) {
     if (box.y >= top && box.y + box.height <= viewport.height) break;
     await page.mouse.move(searchBox.x + searchBox.width / 2, Math.min(viewport.height - 50, top + 150));
     await page.mouse.wheel(0, box.y < top ? -240 : 240);
-    await page.waitForTimeout(150);
+    // The bounds read above come from the ARIA overlay, which the port brings
+    // up to date once the screen has been quiet for a moment, and at most a
+    // second late on a screen that never is (HTML5Implementation's
+    // SEMANTIC_STALE_LIMIT_MILLIS) -- which a sample that animates, like the
+    // cube, makes of every screen. Reading sooner answers where the button was
+    // part way through the scroll, and the click below then lands on whichever
+    // sample has since moved there.
+    await page.waitForTimeout(1200);
   }
   await clickControl(page, sample);
   await (title === 'Hello World' ? appFrame.getByLabel('Hello, World!', {exact: true})

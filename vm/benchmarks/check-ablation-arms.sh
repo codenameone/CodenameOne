@@ -49,7 +49,10 @@ SRC="$REPO/vm/ByteCodeTranslator/src"
 # Not arms: these are selected by the PLATFORM or by the translator, not by a developer
 # passing -D, so building them here would either be meaningless or need another toolchain.
 # Keep this list tiny and justified -- every entry is a hole in the sweep.
-SKIP='^(CN1_USE_ARC|CN1_HAS_PROC_AVAILABLE_MEMORY|CN1_HAVE_SB_INTRINSICS|CN1_GC_CAN_FORCE_STOP|CN1_TAGGED_ACTIVE|CN1_TAGGED_EXTRA_ACTIVE|CN1_TAGGED_INT|CN1_CONSERVATIVE_GC_ROOTS|CN1_INTRINSICS_H|CN1_WIN_COMPAT_H|CN1_ON_DEVICE_DEBUG|DEBUG_GC_VARIABLES)$'
+# CN1_HAVE_DLL_INTRINSICS is CN1_HAVE_SB_INTRINSICS's twin: cn1_intrinsics.h defines
+# it when the translation contains dart_core_DartLongList.h (a transpiled Flutter app),
+# and a -D without that header names a struct that does not exist.
+SKIP='^(CN1_USE_ARC|CN1_HAS_PROC_AVAILABLE_MEMORY|CN1_HAVE_SB_INTRINSICS|CN1_HAVE_DLL_INTRINSICS|CN1_GC_CAN_FORCE_STOP|CN1_TAGGED_ACTIVE|CN1_TAGGED_EXTRA_ACTIVE|CN1_TAGGED_INT|CN1_CONSERVATIVE_GC_ROOTS|CN1_INTRINSICS_H|CN1_WIN_COMPAT_H|CN1_ON_DEVICE_DEBUG|DEBUG_GC_VARIABLES)$'
 
 discover() {
     python3 - "$SRC" <<'PY'

@@ -25,6 +25,9 @@
 
 #define JAVA_VOID void
 #define JAVA_INT int
+#define JAVA_BOOLEAN int
+#define JAVA_TRUE 1
+#define JAVA_FALSE 0
 #define JAVA_OBJECT id
 #define JAVA_NULL nil
 #define CODENAME_ONE_THREAD_STATE void *thread
@@ -45,7 +48,7 @@ static void enqueue(dispatch_block_t block) {
     NSMutableArray *deferredEdits;
 }
 @property BOOL active, pureEditor, multiline;
-@property NSUInteger maxSize;
+@property NSUInteger maxSize, selectionAnchor;
 @property(copy) NSString *text;
 @property NSRange selectedRange, markedRange;
 @property CGRect caretRect;
@@ -70,6 +73,7 @@ static void enqueue(dispatch_block_t block) {
     self.active = YES; self.pureEditor = YES; self.multiline = YES;
     self.text = text; self.selectedRange = NSMakeRange(1, 2);
     self.markedRange = NSMakeRange(NSNotFound, 0);
+    self.selectionAnchor = self.selectedRange.location;
     [self resetDeferredEditsIfNeeded];
 }
 - (void)commitFinished:(BOOL)finished { }
@@ -90,9 +94,21 @@ void com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int
         void *thread, int cmd, int modifiers, int sequence) {
     command = cmd; commandSequence = sequence; commandCount++;
 }
+static int reportedAnchor, reportedFocus;
+void com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(
+        void *thread, int anchor, int focus, int sequence) {
+    reportedAnchor = anchor; reportedFocus = focus;
+}
+void com_codename1_impl_ios_IOSImplementation_tiPublishGeometry___int_boolean(
+        void *thread, int captureId, int accepted) { }
+void com_codename1_impl_mac_MacImplementation_macTraverseTextEditing___boolean(
+        void *thread, int forward) { }
 #include "echo.h"
 
-@interface TestView : NSObject
+@interface TestView : NSResponder {
+    NSUInteger selectionAnchor;
+    BOOL selectionAnchorValid;
+}
 - (BOOL)cn1DeferNativeEdit:(void (^)(void))edit;
 - (void)cn1SendEditorKeyCommand:(int)command modifiers:(int)modifiers;
 - (void)cn1SendEditorKeyCommand:(int)command;
@@ -105,7 +121,6 @@ void com_codename1_impl_ios_IOSImplementation_tiKeyCommandWithSequence___int_int
 - (void)insertText:(id)string replacementRange:(NSRange)range;
 @end
 @implementation TestView
-- (void)cn1ForgetAnchor { }
 - (NSRange)cn1SelectionForEditing { return [CN1MacTextInputSession sharedSession].selectedRange; }
 - (void)copy:(id)sender { }
 - (void)delete:(id)sender { }
@@ -119,8 +134,8 @@ static void drain(void) {
     }
 }
 static void echo(NSString *text, int caret, int sequence) {
-    com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(
-        NULL, nil, text, caret, caret, 0, 0, 1, 20, sequence);
+    com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int_int(
+        NULL, nil, text, caret, caret, 0, 0, 1, 20, sequence, 0);
 }
 int main(void) {
     @autoreleasepool {
@@ -162,7 +177,53 @@ int main(void) {
         assert([session.text isEqualToString:@"new document"]);
         [view insertText:@"X" replacementRange:NSMakeRange(NSNotFound, 0)];
         assert([session.text isEqualToString:@"nX document"]);
-        puts("MAC_EDITOR_COMMAND_ORDER_OK");
+        for (NSNumber *pure in @[@YES, @NO]) {
+            for (NSString *grapheme in @[@"e\u0301", @"\u2764\ufe0f", @"👩‍💻", @"🇮🇱"]) {
+                NSString *text = [@"A" stringByAppendingString:[grapheme stringByAppendingString:@"B"]];
+                [session reset:text]; session.pureEditor = pure.boolValue;
+                NSUInteger end = 1 + grapheme.length;
+                session.selectedRange = NSMakeRange(end, 0);
+                session.selectionAnchor = end;
+                [view cn1ForgetAnchor];
+                [view doCommandBySelector:@selector(moveBackward:)];
+                assert(NSEqualRanges(session.selectedRange, NSMakeRange(1, 0)));
+                [view doCommandBySelector:@selector(moveForward:)];
+                assert(NSEqualRanges(session.selectedRange, NSMakeRange(end, 0)));
+                [view doCommandBySelector:@selector(moveBackwardAndModifySelection:)];
+                assert(NSEqualRanges(session.selectedRange, NSMakeRange(1, grapheme.length)));
+                [view doCommandBySelector:@selector(moveForwardAndModifySelection:)];
+                assert(NSEqualRanges(session.selectedRange, NSMakeRange(end, 0)));
+                session.selectedRange = NSMakeRange(1, 0); session.selectionAnchor = 1;
+                [view cn1ForgetAnchor];
+                [view doCommandBySelector:@selector(moveForwardAndModifySelection:)];
+                assert(NSEqualRanges(session.selectedRange, NSMakeRange(1, grapheme.length)));
+                [view insertText:@"X" replacementRange:NSMakeRange(NSNotFound, 0)];
+                assert([session.text isEqualToString:@"AXB"]);
+            }
+            for (NSNumber *backward in @[@YES, @NO]) {
+                for (NSNumber *forward in @[@YES, @NO]) {
+                    [session reset:@"abcdefgh"]; session.pureEditor = pure.boolValue;
+                    session.selectedRange = NSMakeRange(2, 3);
+                    session.selectionAnchor = backward.boolValue ? 5 : 2;
+                    [view cn1ForgetAnchor];
+                    [view doCommandBySelector:forward.boolValue ? @selector(moveForward:) : @selector(moveBackward:)];
+                    assert(NSEqualRanges(session.selectedRange, NSMakeRange(forward.boolValue ? 5 : 2, 0)));
+                }
+            }
+        }
+        for (NSNumber *menu in @[@YES, @NO]) {
+            [session reset:@"abc"];
+            session.selectedRange = NSMakeRange(3, 0); session.selectionAnchor = 3;
+            if (menu.boolValue) { [view selectAll:nil]; }
+            else { [view doCommandBySelector:@selector(selectAll:)]; }
+            assert(reportedAnchor == 0 && reportedFocus == 3);
+            [view doCommandBySelector:@selector(moveForwardAndModifySelection:)];
+            assert(NSEqualRanges(session.selectedRange, NSMakeRange(0, 3)));
+            [view doCommandBySelector:@selector(moveBackwardAndModifySelection:)];
+            assert(NSEqualRanges(session.selectedRange, NSMakeRange(0, 2)));
+            assert(reportedAnchor == 0 && reportedFocus == 2);
+        }
+        puts("MAC_EDITOR_COMMAND_ORDER_AND_SELECTION_OK");
     }
     return 0;
 }

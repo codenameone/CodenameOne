@@ -59,7 +59,7 @@ public class HostLocksIntegrationTest {
     private static final String DIR = "/com/codename1/tools/translator/hostlocks";
 
     @ParameterizedTest
-    @MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    @MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideRuntimeCompilerConfigs")
     void hostFileAndLockProgramsBuildAndRun(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

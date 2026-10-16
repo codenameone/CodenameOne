@@ -140,6 +140,12 @@ public final class ProjectOptions {
     /// builds every platform itself. Ignored for Gradle and for a backend-only
     /// project, and against a plugin that predates the minimal layout.
     public final boolean allPlatformModules;
+    /// The brand colour of a template whose stylesheet is built on variables
+    /// ([Template#isFullStack()]), as 0xRRGGBB, or -1 for the template's own.
+    public final int brandColor;
+    /// The application's icon as a PNG, or null for the stock one. Not copied:
+    /// the options are a value, and nothing writes to the array.
+    public final byte[] iconPng;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
@@ -166,6 +172,17 @@ public final class ProjectOptions {
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
                           JavaVersion javaVersion, String customThemeCss,
                           BuildTool buildTool, ProjectType projectType, boolean allPlatformModules) {
+        this(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage, javaVersion,
+                customThemeCss, buildTool, projectType, allPlatformModules, -1, null);
+    }
+
+    private ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
+                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                           JavaVersion javaVersion, String customThemeCss,
+                           BuildTool buildTool, ProjectType projectType, boolean allPlatformModules,
+                           int brandColor, byte[] iconPng) {
+        this.brandColor = brandColor;
+        this.iconPng = iconPng;
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
@@ -181,14 +198,39 @@ public final class ProjectOptions {
     /// A copy of these options with a different build tool and project type.
     public ProjectOptions withBuild(BuildTool buildTool, ProjectType projectType) {
         return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
-                javaVersion, customThemeCss, buildTool, projectType, allPlatformModules);
+                javaVersion, customThemeCss, buildTool, projectType, allPlatformModules, brandColor, iconPng);
     }
 
     /// A copy of these options that does or does not ask for every platform module;
     /// see [#allPlatformModules].
     public ProjectOptions withPlatformModules(boolean all) {
         return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
-                javaVersion, customThemeCss, buildTool, projectType, all);
+                javaVersion, customThemeCss, buildTool, projectType, all, brandColor, iconPng);
+    }
+
+    /// A copy of these options in another colour scheme: `brand` as 0xRRGGBB or -1
+    /// for the template's own colour, and square or rounded corners. Read by the
+    /// templates styled through variables; see [#brandColor].
+    public ProjectOptions withScheme(int brand, boolean rounded) {
+        return new ProjectOptions(themeMode, accent, rounded, includeLocalizationBundles, previewLanguage,
+                javaVersion, customThemeCss, buildTool, projectType, allPlatformModules, brand, iconPng);
+    }
+
+    /// These options as a full-stack template takes them
+    /// ([Template#isFullStack()]): a Maven project with its server, in Java 17,
+    /// without the language bundles a bare project can be given. What the template
+    /// leaves open -- the platform modules, the colours, the icon -- is kept.
+    public ProjectOptions forFullStack() {
+        return new ProjectOptions(themeMode, accent, roundedButtons, false, previewLanguage,
+                JavaVersion.JAVA_17, customThemeCss, BuildTool.MAVEN, ProjectType.APP_WITH_BACKEND,
+                allPlatformModules, brandColor, iconPng);
+    }
+
+    /// A copy of these options with `png` as the application's icon, or the stock
+    /// icon when it is null.
+    public ProjectOptions withIcon(byte[] png) {
+        return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
+                javaVersion, customThemeCss, buildTool, projectType, allPlatformModules, brandColor, png);
     }
 
     public boolean isGradle() {

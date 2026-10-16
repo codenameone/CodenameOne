@@ -37,7 +37,98 @@ final class OrmEnhancer {
     private static final String STATE="com/codename1/impl/orm/EntityState";
     private static final String STATE_DESC="L"+STATE+";";
     private static final String MANIFEST="META-INF/cn1/orm-enhanced-dependencies.list";
+    /// The raw accessors for non-public persistent fields. Unlike the
+    /// association bridges they do nothing but read or write the field: the
+    /// generated model is their only caller and it needs the stored value.
+    static final String GET="__cn1OrmGet_",SET="__cn1OrmSet_";
     private OrmEnhancer() {}
+
+    /// The non-public persistent fields of every entity, by declaring class:
+    /// internal name -> field name -> descriptor.
+    static Map<String,Map<String,String>> hiddenFields(Map<String,OrmAnnotationProcessor.EntityClass> entities) {
+        Map<String,Map<String,String>> result=new HashMap<String,Map<String,String>>();
+        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) for(String[] field:entity.hiddenFields) {
+            Map<String,String> fields=result.get(field[0]);
+            if(fields==null) { fields=new HashMap<String,String>();result.put(field[0],fields); }
+            fields.put(field[1],field[2]);
+        }
+        return result;
+    }
+
+    /// The classes the processor generates for its entities, by internal name.
+    /// They are the only callers of the raw accessors, and the only classes
+    /// whose own field access is never redirected through association bridges.
+    static Set<String> generatedClasses(Map<String,OrmAnnotationProcessor.EntityClass> entities) {
+        Set<String> result=new HashSet<String>();
+        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) {
+            String name=entity.binaryName.replace('.','/');
+            result.add(name+"Cn1Model");result.add(name+"Cn1BackendModel");
+            result.add(name+"Cn1Dao");result.add(name+"Cn1BackendDao");
+            if(entity.daoBinaryName!=null) result.add(entity.daoBinaryName.replace('.','/'));
+        }
+        return result;
+    }
+
+    /// Writes a copy of every class that declares a non-public persistent field,
+    /// with those fields made public, into a fresh temporary directory, for the
+    /// generated sources to compile against. Answers null when no entity has
+    /// such a field. The caller deletes the directory.
+    ///
+    /// Only javac sees these copies. The bytecode it emits is the same GETFIELD
+    /// and PUTFIELD it would emit for a public field, and [#enhance] then
+    /// rewrites each one into a call to an accessor the real class gets.
+    static File publicStubs(Map<String,OrmAnnotationProcessor.EntityClass> entities,ProcessorContext ctx) throws IOException {
+        final Map<String,Map<String,String>> hidden=hiddenFields(entities);
+        if(hidden.isEmpty()) return null;
+        File stubs=Files.createTempDirectory("cn1-orm-stubs").toFile();
+        boolean done=false;
+        try {
+            for(final Map.Entry<String,Map<String,String>> owner:hidden.entrySet()) {
+                byte[] original=classBytes(owner.getKey(),ctx);
+                if(original==null) throw new IOException("Cannot find the class file of "+owner.getKey().replace('/','.'));
+                ClassWriter writer=new ClassWriter(0);
+                new ClassReader(original).accept(new ClassVisitor(Opcodes.ASM9,writer) {
+                    @Override public FieldVisitor visitField(int access,String name,String descriptor,String signature,Object value) {
+                        if(owner.getValue().containsKey(name) && (access&Opcodes.ACC_STATIC)==0)
+                            access=(access&~(Opcodes.ACC_PRIVATE|Opcodes.ACC_PROTECTED))|Opcodes.ACC_PUBLIC;
+                        return super.visitField(access,name,descriptor,signature,value);
+                    }
+                },0);
+                File out=new File(stubs,owner.getKey()+".class");
+                Files.createDirectories(out.getParentFile().toPath());
+                Files.write(out.toPath(),writer.toByteArray());
+            }
+            done=true;
+            return stubs;
+        } finally {
+            if(!done) org.apache.commons.io.FileUtils.deleteDirectory(stubs);
+        }
+    }
+
+    /// The current bytes of a class: the output directory first, as javac and
+    /// the runtime would find it, then the compile classpath.
+    private static byte[] classBytes(String internalName,ProcessorContext ctx) throws IOException {
+        String name=internalName+".class";
+        File own=new File(ctx.getOutputClassDir(),name);
+        if(own.isFile()) return Files.readAllBytes(own.toPath());
+        for(String path:ctx.getCompileClasspath()) {
+            File file=new File(path);
+            if(file.isDirectory()) {
+                File candidate=new File(file,name);
+                if(candidate.isFile()) return Files.readAllBytes(candidate.toPath());
+            } else if(file.isFile() && file.getName().endsWith(".jar")) {
+                ZipFile zip=new ZipFile(file);
+                try {
+                    ZipEntry entry=zip.getEntry(name);
+                    if(entry!=null) {
+                        InputStream in=zip.getInputStream(entry);
+                        try { return read(in); } finally { in.close(); }
+                    }
+                } finally { zip.close(); }
+            }
+        }
+        return null;
+    }
     static Set<String> prepare(ProcessorContext ctx) throws IOException {
         Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Set<String> removed=new HashSet<String>();
@@ -69,13 +160,18 @@ final class OrmEnhancer {
             }
             if(!found) owner.relations.add(relation);
         }
+        final Map<String,Map<String,String>> hidden=hiddenFields(entities);
+        final Set<String> generated=generatedClasses(entities);
         Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Map<String,byte[]> classes=new LinkedHashMap<String,byte[]>();
         collect(ctx.getOutputClassDir(),ctx.getOutputClassDir(),classes);
         Set<String> own=new HashSet<String>(classes.keySet()),copied=new TreeSet<String>();
         if(Files.isRegularFile(manifest)) copied.addAll(readManifest(manifest.toFile()).keySet());
         own.removeAll(copied);
-        if(!owners.isEmpty()) for(String path:ctx.getCompileClasspath()) {
+        // The classpath too when an entity there needs weaving: an entity shared
+        // by the client and the server lives in a module both depend on, and the
+        // woven copy is written over it into this module's output.
+        if(!owners.isEmpty() || !hidden.isEmpty()) for(String path:ctx.getCompileClasspath()) {
             File file=new File(path);
             if(file.isDirectory()) collect(file,file,classes);
             else if(file.isFile() && file.getName().endsWith(".jar")) {
@@ -91,10 +187,11 @@ final class OrmEnhancer {
                 } finally { zip.close(); }
             }
         }
+        final Map<String,byte[]> all=classes;
         for(Map.Entry<String,byte[]> entry:classes.entrySet()) {
             String actual=new ClassReader(entry.getValue()).getClassName()+".class";
             if(!actual.equals(entry.getKey()) || actual.contains("..") || actual.startsWith("/")) throw new IOException("Invalid class entry: "+entry.getKey());
-            byte[] result=transform(entry.getValue(),owners);
+            byte[] result=transform(entry.getValue(),owners,hidden,generated,new Resolver(all,hidden));
             if(result!=null) {
                 Path output=outputPath(ctx.getOutputClassDir(),entry.getKey());
                 Files.createDirectories(output.getParent());Files.write(output,result);
@@ -178,14 +275,23 @@ final class OrmEnhancer {
         while((count=in.read(buffer))!=-1) out.write(buffer,0,count);return out.toByteArray();
     }
     static byte[] transform(byte[] original,final Map<String,OrmAnnotationProcessor.EntityClass> owners) {
+        Map<String,Map<String,String>> none=Collections.emptyMap();
+        Set<String> generated=new HashSet<String>();
+        for(String owner:owners.keySet()) {
+            generated.add(owner+"Cn1Model");generated.add(owner+"Cn1BackendModel");
+            generated.add(owner+"Cn1Dao");generated.add(owner+"Cn1BackendDao");
+        }
+        return transform(original,owners,none,generated,new Resolver(Collections.<String,byte[]>emptyMap(),none));
+    }
+
+    static byte[] transform(byte[] original,final Map<String,OrmAnnotationProcessor.EntityClass> owners,
+                            final Map<String,Map<String,String>> hidden,Set<String> generatedClasses,final Resolver resolver) {
         ClassReader reader=new ClassReader(original);
         final String className=reader.getClassName();
-        for(String owner:owners.keySet()) {
-            if(className.equals(owner+"Cn1Model") || className.equals(owner+"Cn1BackendModel")
-                || className.equals(owner+"Cn1Dao") || className.equals(owner+"Cn1BackendDao")) return null;
-        }
+        if(generatedClasses.contains(className)) return redirectHidden(reader,resolver);
         final boolean serializer=className.endsWith("Cn1Mapper");
         final OrmAnnotationProcessor.EntityClass entity=owners.get(className);
+        final Map<String,String> accessors=hidden.get(className);
         final boolean[] changed={false},already={false};
         final ClassWriter writer=new ClassWriter(reader,ClassWriter.COMPUTE_MAXS);
         reader.accept(new ClassVisitor(Opcodes.ASM9,writer) {
@@ -196,6 +302,10 @@ final class OrmEnhancer {
             }
             @Override public MethodVisitor visitMethod(int access,String name,String descriptor,String signature,String[] exceptions) {
                 if(entity!=null && (name.startsWith("__cn1OrmRead_") || name.startsWith("__cn1OrmWrite_") || name.startsWith("__cn1OrmSerialize_"))) { changed[0]=true;return null; }
+                // Raw accessors from an earlier build are always dropped and,
+                // for the fields still hidden, written again below: a field that
+                // has since become public, transient or gone must not keep one.
+                if(name.startsWith(GET) || name.startsWith(SET)) { changed[0]=true;return null; }
                 MethodVisitor method=super.visitMethod(access,name,descriptor,signature,exceptions);
                 if(name.startsWith("__cn1Orm")) return method;
                 return new MethodVisitor(Opcodes.ASM9,method) {
@@ -245,11 +355,95 @@ final class OrmEnhancer {
                         bridge(writer,className,relation,0);bridge(writer,className,relation,1);bridge(writer,className,relation,2);
                     }
                 }
+                if(accessors!=null) {
+                    changed[0]=true;
+                    for(Map.Entry<String,String> field:new TreeMap<String,String>(accessors).entrySet()) {
+                        accessor(writer,className,field.getKey(),field.getValue(),false);
+                        accessor(writer,className,field.getKey(),field.getValue(),true);
+                    }
+                }
                 super.visitEnd();
             }
         },0);
         return changed[0]?writer.toByteArray():null;
     }
+    /// `public static T __cn1OrmGet_f(Owner o)` or
+    /// `public static void __cn1OrmSet_f(Owner o, T v)`, synthetic so that no
+    /// source can call them.
+    private static void accessor(ClassWriter writer,String owner,String field,String desc,boolean write) {
+        Type type=Type.getType(desc);
+        String signature=write?"(L"+owner+";"+desc+")V":"(L"+owner+";)"+desc;
+        MethodVisitor method=writer.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC|Opcodes.ACC_SYNTHETIC,
+                (write?SET:GET)+field,signature,null,null);
+        method.visitCode();method.visitVarInsn(Opcodes.ALOAD,0);
+        if(write) method.visitVarInsn(type.getOpcode(Opcodes.ILOAD),1);
+        method.visitFieldInsn(write?Opcodes.PUTFIELD:Opcodes.GETFIELD,owner,field,desc);
+        method.visitInsn(write?Opcodes.RETURN:type.getOpcode(Opcodes.IRETURN));
+        method.visitMaxs(0,0);method.visitEnd();
+    }
+
+    /// Rewrites a generated class's GETFIELD and PUTFIELD on a non-public
+    /// persistent field into a call to that field's accessor. The stack shape
+    /// is the same before and after -- the object, then the value for a write
+    /// -- so nothing around the instruction changes.
+    private static byte[] redirectHidden(ClassReader reader,final Resolver resolver) {
+        if(resolver.isEmpty()) return null;
+        final boolean[] changed={false};
+        ClassWriter writer=new ClassWriter(reader,0);
+        reader.accept(new ClassVisitor(Opcodes.ASM9,writer) {
+            @Override public MethodVisitor visitMethod(int access,String name,String descriptor,String signature,String[] exceptions) {
+                return new MethodVisitor(Opcodes.ASM9,super.visitMethod(access,name,descriptor,signature,exceptions)) {
+                    @Override public void visitFieldInsn(int opcode,String owner,String field,String desc) {
+                        if(opcode==Opcodes.GETFIELD || opcode==Opcodes.PUTFIELD) {
+                            String declaring=resolver.declaring(owner,field);
+                            if(declaring!=null) {
+                                boolean write=opcode==Opcodes.PUTFIELD;
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC,declaring,(write?SET:GET)+field,
+                                        write?"(L"+declaring+";"+desc+")V":"(L"+declaring+";)"+desc,false);
+                                changed[0]=true;return;
+                            }
+                        }
+                        super.visitFieldInsn(opcode,owner,field,desc);
+                    }
+                };
+            }
+        },0);
+        return changed[0]?writer.toByteArray():null;
+    }
+
+    /// Answers which class declares the field an instruction names. javac
+    /// names the static type of the expression, not the declaring class, so
+    /// `e.id` on an entity whose id lives in a mapped superclass says the
+    /// entity; this walks up to the class that holds the accessor.
+    static final class Resolver {
+        private final Map<String,byte[]> classes;
+        private final Map<String,Map<String,String>> hidden;
+        Resolver(Map<String,byte[]> classes,Map<String,Map<String,String>> hidden) { this.classes=classes;this.hidden=hidden; }
+        boolean isEmpty() { return hidden.isEmpty(); }
+        String declaring(String owner,final String field) {
+            String current=owner;
+            for(int depth=0;current!=null && depth<64;depth++) {
+                Map<String,String> fields=hidden.get(current);
+                if(fields!=null && fields.containsKey(field)) return current;
+                byte[] bytes=classes.get(current+".class");
+                if(bytes==null) return null;
+                ClassReader reader=new ClassReader(bytes);
+                final boolean[] declares={false};
+                reader.accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override public FieldVisitor visitField(int access,String name,String descriptor,String signature,Object value) {
+                        if(name.equals(field)) declares[0]=true;
+                        return null;
+                    }
+                },ClassReader.SKIP_CODE|ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+                // A class that declares a field of that name and is not in the
+                // table holds a different, accessible field.
+                if(declares[0]) return null;
+                current=reader.getSuperName();
+            }
+            return null;
+        }
+    }
+
     private static void bridge(ClassWriter writer,String owner,OrmAnnotationProcessor.RelationField relation,int operation) {
         boolean write=operation==1;
         String desc=relation.descriptor;

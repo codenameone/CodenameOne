@@ -26,8 +26,10 @@ package com.codename1.ui.events;
 /// Event delivered to mouse wheel listeners when the wheel or a trackpad scroll gesture is moved.
 ///
 /// The deltas are reported in display pixels (already converted from the native notch count by the
-/// port). A positive `deltaY` reveals content above (the user scrolled the wheel down), and a
-/// positive `deltaX` reveals content to the left. Consuming this event with `#consume()` prevents
+/// port). A positive `deltaY` reveals content above: the wheel was turned up, away from the user
+/// (or, with natural scrolling, the fingers moved down). This is the opposite sign to a browser's
+/// `WheelEvent.deltaY` and to AWT's wheel rotation, which the ports negate. A positive `deltaX`
+/// reveals content to the left. Consuming this event with `#consume()` prevents
 /// the default scrolling behavior, which is useful for gestures such as control plus wheel to zoom.
 public class WheelEvent extends ActionEvent {
 

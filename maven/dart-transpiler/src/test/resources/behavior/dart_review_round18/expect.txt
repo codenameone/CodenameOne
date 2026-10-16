@@ -1,0 +1,27 @@
+[2, 4, 6]
+[2, 4]
+4
+1
+-1
+RangeError
+set 5
+set 3
+set 4
+set 3
+3
+set 13
+13 calls=1
+true
+false
+list 1
+true
+false
+false
+true
+false
+true
+calls=1
+TypeError
+TypeError for null
+null
+6

@@ -279,7 +279,11 @@ public class SwitchoverMembersApp {
             case 35: return ints(URLDecoder.decode("%F0%9F%98%80+", StandardCharsets.UTF_8).codePoints());
             case 36: return URLDecoder.decode("%zz", "UTF-8");
             case 37: return URLDecoder.decode("50%", "UTF-8");
-            case 38: return URLEncoder.encode("x", "no-such-charset");
+            // An empty name, not an unknown one: the runtime's URLEncoder looks a charset
+            // up only once a character needs escaping, and supports UTF-8 and ISO-8859-1
+            // rather than the JDK's whole registry, so "x" with an unknown name is
+            // returned as it is. An empty name is refused up front on both runtimes.
+            case 38: return URLEncoder.encode("x", "");
             case 39: return URLDecoder.decode(URLEncoder.encode("round trip?" + eAcute, "UTF-8"), "UTF-8")
                     .equals("round trip?" + eAcute) ? "same" : "differs";
             default: return null;

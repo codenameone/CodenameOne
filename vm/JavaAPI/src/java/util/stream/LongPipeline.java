@@ -282,7 +282,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                action.accept(it.next().longValue());
+                action.accept(unboxNext(it));
             }
         } catch (Throwable e) {
             throw ObjPipeline.fail(boxed, e);
@@ -304,7 +304,7 @@ final class LongPipeline implements LongStream {
             }
             long[] out = new long[all.size()];
             for (int i = 0; i < out.length; i++) {
-                out[i] = all.get(i).longValue();
+                out[i] = unboxAt(all, i);
             }
             return out;
         } catch (Throwable e) {
@@ -319,7 +319,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                result = op.applyAsLong(result, it.next().longValue());
+                result = op.applyAsLong(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -335,9 +335,9 @@ final class LongPipeline implements LongStream {
             if (!it.hasNext()) {
                 return OptionalLong.empty();
             }
-            long result = it.next().longValue();
+            long result = unboxNext(it);
             while (it.hasNext()) {
-                result = op.applyAsLong(result, it.next().longValue());
+                result = op.applyAsLong(result, unboxNext(it));
             }
             return OptionalLong.of(result);
         } catch (Throwable e) {
@@ -354,7 +354,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                accumulator.accept(result, it.next().longValue());
+                accumulator.accept(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -368,7 +368,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                total += it.next().longValue();
+                total += unboxNext(it);
             }
             return total;
         } catch (Throwable e) {
@@ -384,9 +384,9 @@ final class LongPipeline implements LongStream {
             if (!it.hasNext()) {
                 return OptionalLong.empty();
             }
-            long result = it.next().longValue();
+            long result = unboxNext(it);
             while (it.hasNext()) {
-                long v = it.next().longValue();
+                long v = unboxNext(it);
                 result = max ? Math.max(result, v) : Math.min(result, v);
             }
             return OptionalLong.of(result);
@@ -422,7 +422,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.accept(it.next().longValue());
+                all.accept(unboxNext(it));
             }
             return all;
         } catch (Throwable e) {
@@ -489,7 +489,7 @@ final class LongPipeline implements LongStream {
 
         @Override
         public long nextLong() {
-            return it.next().longValue();
+            return unboxNext(it);
         }
     }
 
@@ -524,5 +524,18 @@ final class LongPipeline implements LongStream {
     @Override
     public void close() {
         boxed.close();
+    }
+
+    // The cast an erased Iterator<Long> or List<Long> needs happens here, outside
+    // the try blocks that close the pipeline on failure. ParparVM's CHECKCAST
+    // throws nothing, so a cast under a catch (Throwable) reads as one whose
+    // failure is handled (scripts/check-cast-semantics.sh). These elements
+    // are Longs by construction, so the cast cannot fail anyway.
+    private static long unboxNext(Iterator<Long> it) {
+        return it.next().longValue();
+    }
+
+    private static long unboxAt(List<Long> all, int i) {
+        return all.get(i).longValue();
     }
 }

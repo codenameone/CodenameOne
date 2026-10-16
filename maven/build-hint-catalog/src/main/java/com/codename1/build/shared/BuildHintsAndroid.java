@@ -44,6 +44,18 @@ final class BuildHintsAndroid {
     }
 
     static void register(List<Hint> h) {
+        h.add(new Hint("android.nativeThemes.keepAll")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .doc("true/false (defaults to `false`). The Android build ships only the native "
+                        + "themes the build's theme mode can install (plus `android_holo_light`), unless "
+                        + "the application's classes name `and.themeMode` or another theme-mode property. "
+                        + "Set to `true` for an application that picks the mode through a property name "
+                        + "it computes or reads from configuration, which no build-time scan can see; "
+                        + "the iOS equivalent is `ios.nativeThemes.keepAll`."));
+
         h.add(new Hint("android.call.video")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -694,7 +706,12 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.messagingService")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .platform("android"));
+                .platform("android")
+                .doc("The Android push provider. Left unset, a build that uses PushClient picks FCM, "
+                        + "Huawei Push Kit or both from the google-services.json and "
+                        + "agconnect-services.json files present, and fails when neither is. "
+                        + "fcm or huawei forces one provider; none builds without push, for an "
+                        + "app that hasn't got its push configuration yet."));
 
         h.add(new Hint("android.migrateToAndroidX")
                 .group(HintGroup.ANDROID)

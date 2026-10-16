@@ -247,7 +247,7 @@ final class DoublePipeline implements DoubleStream {
         Iterator<Double> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                action.accept(it.next().doubleValue());
+                action.accept(unboxNext(it));
             }
         } catch (Throwable e) {
             throw ObjPipeline.fail(boxed, e);
@@ -269,7 +269,7 @@ final class DoublePipeline implements DoubleStream {
             }
             double[] out = new double[all.size()];
             for (int i = 0; i < out.length; i++) {
-                out[i] = all.get(i).doubleValue();
+                out[i] = unboxAt(all, i);
             }
             return out;
         } catch (Throwable e) {
@@ -284,7 +284,7 @@ final class DoublePipeline implements DoubleStream {
         Iterator<Double> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                result = op.applyAsDouble(result, it.next().doubleValue());
+                result = op.applyAsDouble(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -300,9 +300,9 @@ final class DoublePipeline implements DoubleStream {
             if (!it.hasNext()) {
                 return OptionalDouble.empty();
             }
-            double result = it.next().doubleValue();
+            double result = unboxNext(it);
             while (it.hasNext()) {
-                result = op.applyAsDouble(result, it.next().doubleValue());
+                result = op.applyAsDouble(result, unboxNext(it));
             }
             return OptionalDouble.of(result);
         } catch (Throwable e) {
@@ -319,7 +319,7 @@ final class DoublePipeline implements DoubleStream {
         Iterator<Double> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                accumulator.accept(result, it.next().doubleValue());
+                accumulator.accept(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -340,9 +340,9 @@ final class DoublePipeline implements DoubleStream {
             if (!it.hasNext()) {
                 return OptionalDouble.empty();
             }
-            double result = it.next().doubleValue();
+            double result = unboxNext(it);
             while (it.hasNext()) {
-                double v = it.next().doubleValue();
+                double v = unboxNext(it);
                 result = max ? Math.max(result, v) : Math.min(result, v);
             }
             return OptionalDouble.of(result);
@@ -378,7 +378,7 @@ final class DoublePipeline implements DoubleStream {
         Iterator<Double> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.accept(it.next().doubleValue());
+                all.accept(unboxNext(it));
             }
             return all;
         } catch (Throwable e) {
@@ -445,7 +445,7 @@ final class DoublePipeline implements DoubleStream {
 
         @Override
         public double nextDouble() {
-            return it.next().doubleValue();
+            return unboxNext(it);
         }
     }
 
@@ -480,5 +480,18 @@ final class DoublePipeline implements DoubleStream {
     @Override
     public void close() {
         boxed.close();
+    }
+
+    // The cast an erased Iterator<Double> or List<Double> needs happens here, outside
+    // the try blocks that close the pipeline on failure. ParparVM's CHECKCAST
+    // throws nothing, so a cast under a catch (Throwable) reads as one whose
+    // failure is handled (scripts/check-cast-semantics.sh). These elements
+    // are Doubles by construction, so the cast cannot fail anyway.
+    private static double unboxNext(Iterator<Double> it) {
+        return it.next().doubleValue();
+    }
+
+    private static double unboxAt(List<Double> all, int i) {
+        return all.get(i).doubleValue();
     }
 }

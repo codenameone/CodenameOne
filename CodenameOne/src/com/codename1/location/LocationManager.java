@@ -222,8 +222,7 @@ public abstract class LocationManager {
     /// - `req`: @param req provide the settings in which we are interested to get updates
     /// to the Listener.
     public void setLocationListener(final LocationListener l, LocationRequest req) {
-        setLocationListener(l);
-        request = req;
+        install(l, req, true);
     }
 
     /// Adds a geo fence listener to gets an event once the device is in/out of
@@ -272,6 +271,15 @@ public abstract class LocationManager {
     /// - `l`: @param l a LocationListener or null to stop the current listener
     /// from getting updates
     public void setLocationListener(final LocationListener l) {
+        install(l, null, false);
+    }
+
+    /// Installs `l`, and with `withRequest` the request it is installed with.
+    /// The request is in place BEFORE bindListener() runs: the ports read
+    /// getRequest() while binding (the priority on iOS and Android, the
+    /// accuracy in the browser), and assigning it afterwards made every port
+    /// bind the first listener with the default settings.
+    private void install(final LocationListener l, LocationRequest req, boolean withRequest) {
         synchronized (LISTENER_LOCK) {
             // Every install gets a number, and an LL is told its own. That is
             // how a timed-out getCurrentLocationSync knows whether the listener
@@ -290,6 +298,9 @@ public abstract class LocationManager {
                 status = TEMPORARILY_UNAVAILABLE;
             }
             listener = l;
+            if (withRequest) {
+                request = req;
+            }
             if (l == null) {
                 return;
             }

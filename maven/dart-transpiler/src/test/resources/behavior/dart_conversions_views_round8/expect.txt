@@ -1,0 +1,14 @@
+toInt refused NaN
+floor refused infinity
+clamp refused the range
+5
+9
+4
+view is read-only
+null
+null
+1500.0
+0.5
+string plus int refused
+true
+fixed length

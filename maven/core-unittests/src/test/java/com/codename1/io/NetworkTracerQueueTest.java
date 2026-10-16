@@ -192,6 +192,10 @@ class NetworkTracerQueueTest extends UITestBase {
         request.setUrl("http://queue.test/done");
         request.setPost(false);
         NetworkManager.getInstance().addToQueueAndWait(request);
+        // The clear is queued on the EDT behind the request's listener callbacks
+        // (a listener may still retry()), so addToQueueAndWait can return before it
+        // has run. Without this flush the assertions raced it.
+        flushSerialCalls();
         assertEquals(null, request.tracerParent);
         assertEquals(null, request.tracerParentOwner);
         assertEquals(null, request.tracerLastAttempt);

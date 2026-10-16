@@ -98,6 +98,7 @@ public class BytecodeCompliance {
     protected final ProjectHost host;
 
     private List<File> siblingClassRoots = Collections.emptyList();
+    private List<File> checkedDependencyRoots = Collections.emptyList();
 
     private boolean backendCheck;
 
@@ -118,6 +119,21 @@ public class BytecodeCompliance {
     /// none.
     public BytecodeCompliance siblingClassRoots(List<File> roots) {
         this.siblingClassRoots = roots == null ? Collections.<File>emptyList() : new ArrayList<File>(roots);
+        return this;
+    }
+
+    /// Class directories of plain modules this project depends on from the same
+    /// build, which are checked along with the project's own classes.
+    ///
+    /// A module that holds the classes an application shares with its server --
+    /// the DTOs and the `@RestClient` contracts -- is an ordinary jar module, so
+    /// nothing checks it when it is built: it compiles against the whole JDK.
+    /// Its classes end up in the application all the same, and one that names a
+    /// class the device runtime lacks would pass every step here and fail in the
+    /// device build, far from the line that caused it. Checking them where they
+    /// are consumed reports it at once, against the module's own class file.
+    public BytecodeCompliance checkedDependencyRoots(List<File> roots) {
+        this.checkedDependencyRoots = roots == null ? Collections.<File>emptyList() : new ArrayList<File>(roots);
         return this;
     }
 
@@ -426,6 +442,21 @@ public class BytecodeCompliance {
         Map<String, String> origins = CompatLibraries.classOrigins(outputDir);
         libraryOrigins = origins;
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
+        // A shared module's classes are checked as they are, never through
+        // applyInvocationRewrites, so a call the rewrites would redirect in an
+        // application class (String.replaceAll, the wrappers' static hashCode)
+        // is reported here instead. That is deliberate. The same classes are
+        // translated for the server too, against vm/JavaAPI, which has none of
+        // those methods and gets no rewrites (checkBackend applies none, and
+        // the server runtime has no JdkApiRewriteHelper). A rewritten client
+        // overlay would only move the failure into the native backend build,
+        // far from the line that caused it; a shared module keeps to what both
+        // runtimes define.
+        for (File root : checkedDependencyRoots) {
+            if (root != null && root.isDirectory()) {
+                violations.addAll(scanProjectClasses(root, allowedIndex, projectAndDependencyIndex));
+            }
+        }
         // The developer did not write a bundled library's classes: say
         // which jar a finding is in.
         if (!origins.isEmpty()) {
@@ -681,7 +712,7 @@ public class BytecodeCompliance {
 
     private static final FilenameFilter CLASS_FILES_FILTER = (dir, name) -> name.endsWith(".class");
 
-    private long getCompiledClassesModificationTime() {
+    long getCompiledClassesModificationTime() {
         long mTime = lastModifiedRecursive(new File(host.outputDirectory().getPath()), CLASS_FILES_FILTER);
         // With kotlin.compiler.incremental the Kotlin compiler writes to its
         // own output tree which executeImpl copies into the output directory,
@@ -689,6 +720,13 @@ public class BytecodeCompliance {
         File kotlinIncrementalOutputDir = new File(path(host.buildDirectory().getPath(), "kotlin-ic", "compile", "classes"));
         if (kotlinIncrementalOutputDir.exists()) {
             mTime = Math.max(mTime, lastModifiedRecursive(kotlinIncrementalOutputDir, CLASS_FILES_FILTER));
+        }
+        // The sibling modules checked with these classes (a `shared` module of
+        // DTOs and contracts). They are compiled by their own module, so a
+        // change to one alone leaves this module's sources and classes as they
+        // were, and the check would be skipped without reading the new ones.
+        for (File root : checkedDependencyRoots) {
+            mTime = Math.max(mTime, lastModifiedRecursive(root, CLASS_FILES_FILTER));
         }
         return mTime;
     }
@@ -1501,7 +1539,12 @@ public class BytecodeCompliance {
                     || "runtime".equals(artifact.getScope())
                     || "test".equals(artifact.getScope())) {
                 File jar = host.getJar(artifact);
-                if (isClassArchive(jar)) {
+                // A module of the same build resolves to its classes DIRECTORY
+                // whenever the build stops short of `package` -- `mvn compile`,
+                // an IDE's incremental build. Left out, every class of that
+                // module was reported as a forbidden API, hundreds of
+                // violations naming the application's own DTOs.
+                if (isClassArchive(jar) || (jar != null && jar.isDirectory())) {
                     jars.add(jar);
                 }
             }

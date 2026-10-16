@@ -55,9 +55,10 @@ public final class StyleLayer {
     private String textField;
 
     private String filterKey;
-    private String filterValue;
+    private String[] filterValues;
     private String excludeKey;
-    private String excludeValue;
+    private String[] excludeValues;
+    private boolean linesOnly;
 
     StyleLayer(int type) {
         this.type = type;
@@ -150,24 +151,47 @@ public final class StyleLayer {
     }
 
     StyleLayer filter(String key, String value) {
+        return filterIn(key, new String[]{value});
+    }
+
+    /// Keeps only the features whose `key` attribute is one of `values`: the
+    /// classes of road that are drawn as main roads, say.
+    StyleLayer filterIn(String key, String[] values) {
         this.filterKey = key;
-        this.filterValue = value;
+        this.filterValues = values;
         return this;
+    }
+
+    /// Drops features whose `key` attribute is one of `values`.
+    StyleLayer excludeIn(String key, String[] values) {
+        this.excludeKey = key;
+        this.excludeValues = values;
+        return this;
+    }
+
+    /// Makes a line layer stroke lines alone. A layer of roads also carries
+    /// areas -- piers, squares, the decks of bridges -- and stroking the edge
+    /// of an area as though it were a road draws a road around every pier.
+    StyleLayer linesOnly() {
+        this.linesOnly = true;
+        return this;
+    }
+
+    boolean isLinesOnly() {
+        return linesOnly;
     }
 
     /// Drops features whose `key` attribute equals `value` (e.g. excluding
     /// `class=ferry` so ferry routes are not drawn as roads across the water).
     StyleLayer excludeFilter(String key, String value) {
-        this.excludeKey = key;
-        this.excludeValue = value;
-        return this;
+        return excludeIn(key, new String[]{value});
     }
 
     /// Whether `feature` passes this layer's optional equality / exclusion filters.
     boolean accepts(VectorFeature feature) {
         if (excludeKey != null) {
             Object ev = feature.getAttribute(excludeKey);
-            if (ev != null && excludeValue != null && excludeValue.equals(String.valueOf(ev))) {
+            if (ev != null && among(excludeValues, String.valueOf(ev))) {
                 return false;
             }
         }
@@ -175,6 +199,17 @@ public final class StyleLayer {
             return true;
         }
         Object v = feature.getAttribute(filterKey);
-        return v != null && filterValue != null && filterValue.equals(String.valueOf(v));
+        return v != null && among(filterValues, String.valueOf(v));
+    }
+
+    private static boolean among(String[] values, String value) {
+        if (values != null) {
+            for (String candidate : values) {
+                if (candidate != null && candidate.equals(value)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

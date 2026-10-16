@@ -54,6 +54,8 @@ void CN1MacTextInputNotifyEditorAction(void);
 @property (nonatomic, copy) NSString *text;
 
 @property (nonatomic) NSRange selectedRange;
+/// Direction is separate from AppKit's ordered NSRange; Java uses anchor/focus offsets.
+@property (nonatomic) NSUInteger selectionAnchor;
 @property (nonatomic) NSRange markedRange;
 
 /// Whether the session accepts a newline as text rather than as "done".

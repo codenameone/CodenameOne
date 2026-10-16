@@ -34,7 +34,21 @@ static NSString *CN1MacAppName(void) {
     return name != nil ? name : @"Application";
 }
 
+/// Set once the menu bar exists; see CN1MacInstallMainMenu. Main thread only.
+static BOOL cn1MacMainMenuInstalled = NO;
+
 void CN1MacInstallMainMenu(void) {
+    // Idempotent, because it now has two callers that can run in either order.
+    // The generated main installs the menu only after the first frame (see the
+    // comment there), and by then the application may already have published
+    // its own commands -- CN1MacHostSetMenuCommands installs the menu itself
+    // when it finds none and appends to it. Building a second menu over that one
+    // would silently drop every command the application had added.
+    if (cn1MacMainMenuInstalled) {
+        return;
+    }
+    cn1MacMainMenuInstalled = YES;
+    cn1StartupPhase("installMainMenu.enter");
     NSString *appName = CN1MacAppName();
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
 
@@ -112,6 +126,16 @@ void CN1MacInstallMainMenu(void) {
     [NSApp setHelpMenu:helpMenu];
 
     [NSApp setMainMenu:mainMenu];
+
+    // The menu can be installed after the main window is already on screen, and
+    // a Window menu handed over late does not necessarily list the windows that
+    // existed before it. changeWindowsItem adds the entry when there is none and
+    // only retitles one that is already there, so this is safe either way.
+    for (NSWindow *w in [NSApp windows]) {
+        if (w.isVisible && !w.isExcludedFromWindowsMenu) {
+            [NSApp changeWindowsItem:w title:(w.title != nil ? w.title : @"") filename:NO];
+        }
+    }
 }
 
 #endif

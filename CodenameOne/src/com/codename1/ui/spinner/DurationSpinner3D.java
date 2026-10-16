@@ -31,8 +31,18 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
-/// A duration Spinner widget  Used by the Picker in lightweight mode.
-class DurationSpinner3D extends Container implements InternalPickerWidget {
+/// Wheels that select a LENGTH of time rather than a point in it -- days,
+/// hours and minutes, according to how it is configured.
+///
+/// The body of a lightweight [Picker][com.codename1.ui.spinner.Picker] of type
+/// duration, and usable on its own as an ordinary `Container`. Which wheels
+/// appear is decided at construction; a duration picker that only needs hours
+/// and minutes does not show a day wheel.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
+/// the duration in MILLISECONDS, as a `Long`, so that it can be added to a
+/// timestamp without unit conversion at the call site.
+public class DurationSpinner3D extends Container implements InternalPickerWidget {
     public static final int FIELD_YEAR = 0;
     public static final int FIELD_MONTH = 1;
     public static final int FIELD_DAY = 2;

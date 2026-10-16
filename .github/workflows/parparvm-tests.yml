@@ -122,6 +122,14 @@ env:
   # the translator so a customer build that succeeds today keeps succeeding; see
   # NativeSignatureVerifier.
   CN1_NATIVE_VERIFY: strict
+  # A method the translator culled as unreachable is still emitted as a stub,
+  # because dispatch tables name it. With this on, the stub aborts with the
+  # method's name instead of returning 0, so a wrong cull fails the suite that
+  # reached it rather than shipping a silent null. Ours to enforce, like
+  # CN1_NATIVE_VERIFY: customer builds keep the plain stub. See
+  # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
+  # binaries should be the ones customers get.
+  CN1_CULL_TRAP: '1'
 
 jobs:
   # EVERY DOCUMENTED RUNTIME CONFIGURATION MUST STILL COMPILE.
@@ -181,6 +189,10 @@ jobs:
     # The full suite and serial GC benchmarks took 69 and 47 minutes in run
     # 38355108612. Both passed, but setup plus reporting exceeded two hours.
     # Leave reporting headroom; each GC workload retains its own timeout.
+    #
+    # The tests of the runtime library no longer run once per JDK
+    # (CompilerHelper.getBookendCompilers), which gives back some of that
+    # time; the limit stays where a slow runner still fits inside it.
     timeout-minutes: 150
     # The two database engines the backend speaks a wire protocol to.
     #

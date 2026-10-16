@@ -99,6 +99,8 @@ final class BackendJsonCodecs {
         String field;
         /// The setter the reader calls instead, or null.
         String setter;
+        /// A record component: the reader passes it to the canonical constructor.
+        boolean component;
     }
 
     /// A class that gets a codec.
@@ -277,7 +279,7 @@ final class BackendJsonCodecs {
             return null;
         }
         for (Prop p : dto.props) {
-            if (read ? p.field == null && p.setter == null : p.get == null) {
+            if (read ? p.field == null && p.setter == null && !p.component : p.get == null) {
                 continue;
             }
             String why = check(p.type, read, visiting);
@@ -328,7 +330,7 @@ final class BackendJsonCodecs {
         if (cls.isAbstract()) {
             dto.readProblem = "the abstract class " + binary + ", which a body cannot "
                     + "create; accept a concrete subclass";
-        } else if (!hasNoArgConstructor(cls)) {
+        } else if (!cls.isRecord() && !hasNoArgConstructor(cls)) {
             dto.readProblem = binary + ", which has no constructor without arguments for a "
                     + "body to create it with; add one";
         }
@@ -348,12 +350,19 @@ final class BackendJsonCodecs {
         }
         String pkg = packageOf(dto.binary);
         Set<String> names = new HashSet<String>();
+        // A record's state is its components: private final fields, in
+        // declaration order, read through the public accessor of the same name
+        // and set all at once through the canonical constructor. Java records
+        // carry no JavaBeans getters or setters, so the rules below would find
+        // nothing and the record would go over the wire as {}.
+        boolean record = cls.isRecord();
         for (AnnotatedClass c : chain) {
             for (FieldInfo f : c.getFields()) {
                 int access = f.getAccess();
+                boolean ignored = f.getAnnotation(JSON_IGNORE) != null;
                 if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_TRANSIENT
                         | Opcodes.ACC_SYNTHETIC)) != 0 || f.getName().startsWith("this$")
-                        || f.getAnnotation(JSON_IGNORE) != null) {
+                        || ignored && !record) {
                     continue;
                 }
                 Prop p = new Prop();
@@ -375,6 +384,25 @@ final class BackendJsonCodecs {
                         && packageOf(c.getBinaryName()).equals(pkg));
                 String cap = Character.toUpperCase(f.getName().charAt(0))
                         + f.getName().substring(1);
+                if (record) {
+                    // An ignored component is still an argument of the canonical
+                    // constructor: it is neither written nor read, and arrives as
+                    // its type's default.
+                    p.get = ignored ? null : "v." + f.getName() + "()";
+                    p.component = !ignored;
+                    if (ignored) {
+                        p.json = null;
+                        dto.props.add(p);
+                        continue;
+                    }
+                    if (!names.add(p.json)) {
+                        dto.problem = "a record with two components named \"" + p.json
+                                + "\" in JSON (" + dto.binary + "); rename one with @JsonProperty";
+                        return;
+                    }
+                    dto.props.add(p);
+                    continue;
+                }
                 if (reachable) {
                     p.get = "v." + f.getName();
                 } else {
@@ -1155,10 +1183,26 @@ final class BackendJsonCodecs {
             sb.append("        java.util.Map m = (java.util.Map) json;\n");
             sb.append("        ").append(CODEC).append(".Path here = ").append(CODEC)
               .append(".enter(at, name, index);\n");
-            sb.append("        ").append(type).append(" v = new ").append(type).append("();\n");
+            boolean record = dto.cls.isRecord();
+            // A record is built last, from one local per component; an absent
+            // member leaves its local at the type's default, as it leaves a
+            // field of a class.
+            List<String> args = new ArrayList<String>();
+            if (!record) {
+                sb.append("        ").append(type).append(" v = new ").append(type).append("();\n");
+            }
             for (Prop p : dto.props) {
                 boolean direct = p.field != null;
-                if (!direct && p.setter == null) {
+                String local = null;
+                if (record) {
+                    local = fresh("c");
+                    args.add(local);
+                    sb.append("        ").append(source(strip(p.type))).append(' ').append(local)
+                      .append(" = ").append(defaultOf(strip(p.type))).append(";\n");
+                    if (!p.component) {
+                        continue;        // @JsonIgnore: the default, never the body's value
+                    }
+                } else if (!direct && p.setter == null) {
                     continue;
                 }
                 String t = strip(p.type);
@@ -1172,7 +1216,8 @@ final class BackendJsonCodecs {
                     // Jackson's answer for a primitive too.
                     String value = scalar(t, j, "here, " + quote(p.json) + ", -1");
                     sb.append("        if (").append(j).append(" != null) {\n");
-                    sb.append("            ").append(direct ? "v." + p.field + " = " + value + ";"
+                    sb.append("            ").append(local != null ? local + " = " + value + ";"
+                            : direct ? "v." + p.field + " = " + value + ";"
                             : "v." + p.setter + "(" + value + ");").append("\n");
                     sb.append("        }\n");
                     continue;
@@ -1182,9 +1227,18 @@ final class BackendJsonCodecs {
                 sb.append("            ").append(source(t)).append(' ').append(tmp).append(" = ")
                   .append(defaultOf(t)).append(";\n");
                 read(sb, t, j, "here", quote(p.json), "-1", "depth", tmp, "            ");
-                sb.append("            ").append(direct ? "v." + p.field + " = " + tmp + ";"
+                sb.append("            ").append(local != null ? local + " = " + tmp + ";"
+                        : direct ? "v." + p.field + " = " + tmp + ";"
                         : "v." + p.setter + "(" + tmp + ");").append("\n");
                 sb.append("        }\n");
+            }
+            if (record) {
+                sb.append("        return new ").append(type).append('(');
+                for (int i = 0; i < args.size(); i++) {
+                    sb.append(i == 0 ? "" : ", ").append(args.get(i));
+                }
+                sb.append(");\n");
+                return sb.append("    }\n}\n").toString();
             }
             sb.append("        return v;\n");
             sb.append("    }\n");

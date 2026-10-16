@@ -25,6 +25,16 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `Property` fields work the same way; the dao calls `Property#get` and
 `Property#set` for read and write.
 
+Every field that isn't `static` or `transient` is stored, whatever its access:
+a `private` field with a getter and a setter is mapped the same way a `public`
+one is. The build weaves a static accessor into the class that declares each
+non-public field and the generated code calls it, so no reflection is involved
+on any platform. A field is left out of the table when it's `static`, marked
+with the Java `transient` modifier, annotated `@DbTransient`, or is a non-public
+`final` field without a mapping annotation, such as a `PropertyIndex`. A `final`
+field that does carry a mapping annotation fails the build, since nothing could
+write a loaded value into it.
+
 ==== Field-level annotations
 
 [cols="1,3", options="header"]
@@ -35,7 +45,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
                      `autoIncrement=true` (the default) emits
                      `INTEGER PRIMARY KEY AUTOINCREMENT` and back-fills
                      the field after `insert`.
-| `@Column(name)`  | Rename the column. Default: the field name.
+| `@Column(name)`  | Rename the column. Default: the field name in the app;
+                     on the backend the field name in snake case
+                     (`fareCents -> fare_cents`), as Spring Boot names it.
 | `@Column(type)`  | Override the SQL type. Default: inferred from the
                      Java type (`String -> TEXT`, `int/long -> INTEGER`,
                      `float/double -> REAL`, `boolean -> INTEGER`,
@@ -188,8 +200,12 @@ targets are rejected during query creation. Aggregate functions
 are allowed inside scalar nested queries, but not directly in assignments or bulk
 predicates. On MySQL and MariaDB, nested queries that read the bulk mutation target
 table are rejected during query creation. They flush pending
-managed changes, bypass per-entity callbacks and cascades, and clear the context
-so later reads can't reuse stale entities. Bulk assignments to required subtype
+managed changes and bypass per-entity callbacks and cascades. As in JPA, they
+don't clear the session: an entity it already manages stays managed and keeps
+the values it had before the statement, and a change made to it afterward is
+still written. Call `refresh(entity)` to read what the statement wrote, or
+`clear()` and read again. An entity whose row a bulk DELETE removed fails with an
+`OptimisticLockException` if it's changed or removed afterward. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Primitive assignments also reject
@@ -254,8 +270,8 @@ correlated nested queries. `LENGTH` counts characters on every backend.
 
 ==== Values and callbacks
 
-`@MappedSuperclass` contributes public inherited fields to a concrete entity.
-`@Embedded` flattens a public `@Embeddable` value into columns prefixed with the
+`@MappedSuperclass` contributes its inherited fields to a concrete entity.
+`@Embedded` flattens an `@Embeddable` value into columns prefixed with the
 embedding field name. An all-null embedded value reads as null. Embedded fields
 can be used in query paths. Enums are stored by name. Mapped query parameters and
 literals accept the declared enum type, a valid constant name, or null. Invalid
@@ -377,7 +393,7 @@ are rejected before pending changes are flushed.
 ==== Supported boundary
 
 This API provides managed persistence through CN1 annotations; it's not a JPA
-provider or a Hibernate binary replacement. Entity access uses public fields.
+provider or a Hibernate binary replacement. Entity access is by field, whether the field is public or private.
 Getter/setter access mappings, property-backed associations, joined/table-per-class
 inheritance, embeddable element collections, and independently stored entity-map
 keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL
@@ -466,8 +482,11 @@ transaction.
 Derived methods support the following bounded grammar:
 
 * `findBy`, `findFirstBy`, `findTopBy`, `findFirstNBy`, and `findTopNBy` return the
-  entity or `List<Entity>`. A single result means the first row, not a uniqueness
-  assertion.
+  entity, `Optional<Entity>` or `List<Entity>`. A single result means the first row,
+  not a uniqueness assertion; an entity return answers null when there is no row,
+  and an `Optional` answers `Optional.empty()`. A declared `@Query` select can
+  return `Optional` of its scalar the same way. `Optional` is part of the backend's
+  class library, not the client's, so it's for repositories the server uses.
 * `countBy` returns `long`; `existsBy` returns `boolean`; `deleteBy` returns `int`
   (affected rows) or `void`.
 * Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.
@@ -489,7 +508,16 @@ Derived methods support the following bounded grammar:
 `@Query` declares the existing JPQL subset. Every value argument requires a unique
 `@Param("name")` matching the query exactly. SQL values are bound, never
 interpolated. `@Modifying` is required for declared UPDATE/DELETE and forbidden
-for SELECT. Such methods return `int` or `void`. Native SQL uses
+for SELECT. Such methods return `int` or `void`. They behave like
+`executeUpdate()`: pending changes are flushed first, and the session is left
+unchanged, so an entity the caller read before the call is still managed and a
+change made to it afterward is written. `@Modifying(clearAutomatically = true)`
+empties the session after the statement instead, so what's read next comes from
+the database; an entity read before the call is then detached, and nothing
+written to it later reaches the database. `flushAutomatically` is accepted for
+compatibility with Spring Data and changes nothing, because the flush always
+happens. A derived `deleteBy` method is a bulk DELETE too and leaves the session
+the same way. Native SQL uses
 `@Query(value="...", nativeSql=true)` with the same named parameters, including
 repeated occurrences. Native parameters accept primitive and boxed scalar types,
 String, Date, BigInteger, BigDecimal, and `byte[]` BLOBs. Date values bind as epoch

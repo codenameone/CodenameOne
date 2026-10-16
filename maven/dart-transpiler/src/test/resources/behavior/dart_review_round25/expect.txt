@@ -1,0 +1,33 @@
+3 2 4
+2 true
+2 2
+3 two
+18
+a=1
+b=2
+x|y
+one
+4
+1 true
+top const list add: UnsupportedError
+top const list []=: UnsupportedError
+top const set add: UnsupportedError
+top const map []=: UnsupportedError
+top mixed add: UnsupportedError
+static const list add: UnsupportedError
+static const set add: UnsupportedError
+static const map []=: UnsupportedError
+instance const list add: UnsupportedError
+instance const set add: UnsupportedError
+instance const map []=: UnsupportedError
+top final list add: allowed
+top var map []=: allowed
+static var map []=: allowed
+static nested inner add: allowed
+instance final list add: allowed
+instance var list add: allowed
+[10, 20, 30]
+{any: 1}
+{n: 1}
+[[1, 2], [3, 4]]
+[7, 8] [anything]

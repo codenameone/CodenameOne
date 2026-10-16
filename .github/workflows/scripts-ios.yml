@@ -127,6 +127,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # A method the translator culled as unreachable is still emitted as a stub,
+  # because dispatch tables name it. With this on, the stub aborts with the
+  # method's name instead of returning 0, so a wrong cull fails the suite that
+  # reached it rather than shipping a silent null. Ours to enforce, like
+  # CN1_NATIVE_VERIFY: customer builds keep the plain stub. See
+  # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
+  # binaries should be the ones customers get.
+  CN1_CULL_TRAP: '1'
+
 jobs:
   select:
     runs-on: ubuntu-24.04
@@ -160,7 +170,8 @@ jobs:
       issues: write
     runs-on: macos-15
     # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
-    timeout-minutes: 95
+    # The Swing and JavaFX compatibility runtimes add about 22% more translated C: the Metal compile alone ran past 62 minutes.
+    timeout-minutes: 125
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -415,8 +426,9 @@ jobs:
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
-        # DeviceRunner after 12 minutes without CN1SS progress.
-        timeout-minutes: 80
+        # DeviceRunner after 12 minutes without CN1SS progress. The Swing and
+        # JavaFX compatibility runtimes took the step past 76 minutes.
+        timeout-minutes: 110
 
       - name: Upload iOS Metal port status
         if: ${{ !cancelled() }}
@@ -547,7 +559,8 @@ jobs:
       issues: write
     runs-on: xcode-27
     # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
-    timeout-minutes: 95
+    # The Swing and JavaFX compatibility runtimes add about 22% more translated C: the Metal compile alone ran past 62 minutes.
+    timeout-minutes: 125
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -832,8 +845,9 @@ jobs:
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
-        # DeviceRunner after 12 minutes without CN1SS progress.
-        timeout-minutes: 80
+        # DeviceRunner after 12 minutes without CN1SS progress. The Swing and
+        # JavaFX compatibility runtimes took the step past 76 minutes.
+        timeout-minutes: 110
 
       # NO port-status upload here, deliberately. The published port report is
       # keyed on the port id `ios-metal`, and there is only one iOS port -- this

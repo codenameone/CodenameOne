@@ -81,6 +81,43 @@ def check_maven_layout_fixture(archive, z):
     return True
 
 
+def check_wayline_fixture(archive, z):
+    """The full-stack template: WAYLINE-<layout>-<IDE>.zip. An app, its server and
+    the contract module both compile against, all of it renamed to the project."""
+    names = set(z.namelist())
+    full = archive.name.split('-')[1] == 'FULL'
+    root_pom = ''.join(z.read('pom.xml').decode().split())
+    assert '<module>shared</module><module>common</module>' in root_pom, archive.name
+    for module in ('shared', 'common', 'backend'):
+        assert module + '/pom.xml' in names, (archive.name, module)
+    for module in ('common', 'backend'):
+        assert '<artifactId>launcherprobe-shared</artifactId>' in z.read(module + '/pom.xml').decode(), \
+            (archive.name, module)
+    assert ('javase/pom.xml' in names) == full, archive.name
+    for name in ['shared/src/main/java/com/example/probe/api/RiderApi.java',
+                 'backend/src/main/java/com/example/probe/SecurityConfig.java',
+                 'backend/src/main/resources/db/migration/V1__accounts.sql',
+                 'backend/server.sh',
+                 'common/src/main/java/com/example/probe/LauncherProbe.java',
+                 'common/src/main/java/com/example/probe/rider/RiderForm.java']:
+        assert name in names, (archive.name, name)
+    # The generic server every other project gets is replaced, not merged with.
+    assert 'backend/src/main/java/com/example/probe/Greeter.java' not in names, archive.name
+    css = z.read('common/src/main/css/theme.css').decode()
+    assert '--brand: #0f766e;' in css and '--radius: 0.6mm;' in css and 'Initializr Theme Overrides' not in css, \
+        archive.name
+    assert z.read('common/icon.png') == b'\x89PNG', archive.name
+    settings = z.read('common/codenameone_settings.properties').decode()
+    assert 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
+    assert '## The app and its server' in z.read('README.md').decode(), archive.name
+    for name in names:
+        assert 'wayline' not in name.lower(), (archive.name, name)
+        if name.endswith(('.png', '.jar', '.res', '.ttf')):
+            continue
+        text = z.read(name).decode('utf-8', 'replace')
+        assert 'wayline' not in text.lower() and 'myappname' not in text.lower(), (archive.name, name)
+
+
 with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
     work = Path(directory)
     deps = []
@@ -117,13 +154,16 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None
             for entry in z.infolist():
-                expected = 0o100755 if entry.filename in ('build.sh', 'run.sh', 'mvnw', 'gradlew') else 0o100644
+                executable = ('build.sh', 'run.sh', 'mvnw', 'gradlew', 'backend/server.sh')
+                expected = 0o100755 if entry.filename in executable else 0o100644
                 assert entry.create_system == 3 and entry.external_attr >> 16 == expected, entry.filename
             if archive.name.startswith('GRADLE-'):
                 check_gradle_fixture(archive, z, maven_settings)
                 continue
             if archive.name.startswith('MAVEN-') and not check_maven_layout_fixture(archive, z):
                 continue
+            if archive.name.startswith('WAYLINE-'):
+                check_wayline_fixture(archive, z)
             readme = z.read('README.md').decode()
             assert 'JDK ' + ('8' if 'JAVA_8' in archive.name else '17') + ' or newer' in readme
             assert '.\\build.bat javascript_cloud' in readme and './build.sh javascript_cloud' in readme
@@ -134,4 +174,5 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
         reasons = ['--reasons'] if archive.name == 'INTELLIJ-JAVA_17.zip' else []
         subprocess.run([sys.executable, str(root / 'scripts/test-starter-launchers.py'), str(archive)] + reasons,
                        check=True)
-    print('PASS: real Initializr ZIPs across all IDEs, Java 8/17 Maven, every Maven layout and every Gradle project type')
+    print('PASS: real Initializr ZIPs across all IDEs, Java 8/17 Maven, every Maven layout, every Gradle project type '
+          'and the full-stack template')

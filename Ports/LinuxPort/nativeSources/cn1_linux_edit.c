@@ -247,7 +247,8 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_editGetText___long_R_java_lang_
         return JAVA_NULL;
     }
     pthread_mutex_lock(&e->lock);
-    result = newStringFromCString(threadStateData, e->text ? e->text : "");
+    result = newStringFromUtf8Len(threadStateData, e->text ? e->text : "",
+            e->text ? (int) strlen(e->text) : 0);
     pthread_mutex_unlock(&e->lock);
     return result;
 }

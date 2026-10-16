@@ -261,10 +261,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // for a screenshot that then matched its reference. Two serial
             // phases means paying the stall window twice.
             //
-            // Three times the default covers the work plus a stall window per
-            // phase. The suite caps are 2100s absolute and 720s idle, so
-            // neither is threatened by a 90s test.
-            return TEST_TIMEOUT_MS_NATIVE * 3;
+            // Three times the default was not enough either: on the
+            // cross-compiled Windows build (run 38758239027) VideoIODecodedFrames
+            // timed out at 90s "stage=created" and its PNG then arrived during
+            // VideoIORoundTripTest, the test after next -- late, not hung, and
+            // it matched its reference. Five times the default leaves room for
+            // the work plus a stall in each phase on the slowest runner. The
+            // suite caps are 2100s absolute and 720s idle, so neither is
+            // threatened by a 150s test.
+            return TEST_TIMEOUT_MS_NATIVE * 5;
         }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5

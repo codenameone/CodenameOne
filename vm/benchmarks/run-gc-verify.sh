@@ -93,6 +93,15 @@ done
 # #5442 fixed (grace-subtree pass disabled, the #5436 behavior) and require the
 # verifier to catch it. If this run comes back clean the gate above is inert and
 # a green result from it means nothing.
+#
+# It caught NOTHING from #5903 until this note was written, and not because grace stopped
+# mattering. DeadFieldElimination (#5903) deletes instance fields nothing reads, and
+# GraceAudit's Node fields were write-only, so the translated Node had no fields: the fresh
+# node held no reference to its older child, the grace pass had nothing to rescue, and
+# skipping it lost nothing. #5940's stop-the-world cycles do not remove the need either --
+# they grace nothing on pre-cycle pages, but concurrent cycles (the default outside a
+# generational phase) still keep every fresh object by grace and trace it only through this
+# pass. GraceAudit now reads its fields, and the fault is caught again (5 of 5 runs).
 printf '%-16s ' "self-test"
 # The faulted run is EXPECTED to abort. Capture it in a command substitution so
 # the shell does not print its own job-control notice for the SIGABRT -- a line
@@ -199,26 +208,52 @@ elif [ ! -x ./target/bin/MapTorture2-verify ]; then
     echo "BROKEN -- could not build MapTorture2 for the block self-test"
     fail=1
 else
-    # A 4MB collection trigger, and it is what makes this a test rather than a coin flip.
-    # The damage only appears if a collection lands while live entries sit in the
-    # untraced half of a block, and at the default trigger MapTorture2 runs few enough
-    # cycles that it often does not: measured 2 of 8 runs detected on one tree and 5 of
-    # 8 on the next, so a single attempt reported BROKEN on code that was fine. At 4MB
-    # both trees detected 8 of 8, and at 1MB too.
+    # PROBABILISTIC PER RUN, SO REPEATED UNTIL IT IS NOT. The damage appears only if a
+    # collection that TRACES the held map completes while live entries sit in the untraced
+    # half of its block, those entries age out, and the driver's read-back lands after that
+    # sweep. MapTorture2 cannot wait for that: System.gc() is a request the collector drops
+    # while a cycle is running, the driver also runs in run-gauntlet.sh against a host JVM
+    # (so no verifier-only native can tell it a cycle finished), and under the hybrid
+    # collector a stop-the-world MINOR never traces the old held map at all. One attempt at
+    # the old 4MB trigger caught the fault in 7 of 20 runs after #5940 (8 of 8 before it),
+    # and a single attempt reported BROKEN on a tree that was fine.
     #
-    # The CONTROL run at the same trigger is what keeps that honest: if a small trigger
+    # So: a 1MB trigger (18 of 20 runs caught, measured; each run takes well under a
+    # second), and up to HB_ATTEMPTS attempts, stopping at the first catch. At 90% per run
+    # ten attempts miss with probability 1e-10, and the line reports how many it took, so a
+    # drift towards needing many is visible long before it reaches the limit.
+    #
+    # The CONTROL runs at the same trigger are what keep that honest: if a small trigger
     # alone made MapTorture2 lose entries, "detection" would be a real bug and not the
-    # injected one, so the unfaulted run must stay clean (measured 4 of 4 on both trees).
-    hbCtl="$(CN1_GC_TRIGGER_MB=4 ./target/bin/MapTorture2-verify 2>&1)" || true
-    hbOut="$(CN1_GC_TRIGGER_MB=4 CN1_GC_FAULT=halfblock ./target/bin/MapTorture2-verify 2>&1)" || true
-    if printf '%s' "$hbCtl" | grep -qE 'LOST|CORRUPT|violations=[1-9]'; then
-        echo "BROKEN -- MapTorture2 loses entries at a 4MB trigger WITHOUT the fault (a real bug)"
-        printf '%s\n' "$hbCtl" | grep -E 'LOST|CORRUPT|violations=' | head -5
+    # injected one. Every one of the same number of unfaulted runs must stay clean.
+    HB_ATTEMPTS=10
+    hbBad=""
+    for hbI in $(seq 1 $HB_ATTEMPTS); do
+        hbCtl="$(CN1_GC_TRIGGER_MB=1 ./target/bin/MapTorture2-verify 2>&1)" || true
+        if printf '%s' "$hbCtl" | grep -qE 'LOST|CORRUPT|violations=[1-9]'; then
+            hbBad="$hbCtl"
+            break
+        fi
+    done
+    hbCaught=0
+    hbOut=""
+    if [ -z "$hbBad" ]; then
+        for hbI in $(seq 1 $HB_ATTEMPTS); do
+            hbOut="$(CN1_GC_TRIGGER_MB=1 CN1_GC_FAULT=halfblock ./target/bin/MapTorture2-verify 2>&1)" || true
+            if printf '%s' "$hbOut" | grep -qE 'LOST|CORRUPT'; then
+                hbCaught=$hbI
+                break
+            fi
+        done
+    fi
+    if [ -n "$hbBad" ]; then
+        echo "BROKEN -- MapTorture2 loses entries at a 1MB trigger WITHOUT the fault (a real bug)"
+        printf '%s\n' "$hbBad" | grep -E 'LOST|CORRUPT|violations=' | head -5
         fail=1
-    elif printf '%s' "$hbOut" | grep -qE 'LOST|CORRUPT'; then
-        echo "detected the injected half-traced block ($(printf '%s' "$hbOut" | grep -oE 'LOST[^"]*|CORRUPT[^"]*' | head -1))"
+    elif [ "$hbCaught" -gt 0 ]; then
+        echo "detected the injected half-traced block on attempt $hbCaught of $HB_ATTEMPTS ($(printf '%s' "$hbOut" | grep -oE 'LOST[^"]*|CORRUPT[^"]*' | head -1)); $HB_ATTEMPTS controls clean"
     else
-        echo "BROKEN -- tracing only half of every reference block lost nothing"
+        echo "BROKEN -- tracing only half of every reference block lost nothing in $HB_ATTEMPTS attempts"
         printf '%s\n' "$hbOut" | tail -5
         fail=1
     fi

@@ -38,6 +38,15 @@ package com.codename1.ui;
 /// All offsets exchanged with the platform are UTF-16 character indices. All callbacks are delivered on
 /// the EDT.
 public interface TextInputClient {
+    /// Optional contract for clients that can restore a canceled composition, including rich text
+    /// attributes and undo state. Ports may restore text and selection for older clients; rich editors
+    /// should implement this contract to restore their complete pre-composition state.
+    interface CompositionCancellation {
+        /// Restores the text, selection and attributes from before composition without recording an
+        /// undo entry. Does nothing when no composition is active.
+        void cancelComposing();
+    }
+
     /// Key command: move / extend to the left.
     int KEY_LEFT = 1;
     /// Key command: move / extend to the right.
@@ -75,6 +84,16 @@ public interface TextInputClient {
     /// Key command: tab. With `#MOD_SHIFT` this is a dedent (shift-tab); otherwise an indent. A plain
     /// editor with no indentation behavior may treat it as inserting a tab character.
     int KEY_TAB = 18;
+
+    /// Key command: scroll up one viewport without moving the caret or selection.
+    int KEY_SCROLL_PAGE_UP = 19;
+    /// Key command: scroll down one viewport without moving the caret or selection.
+    int KEY_SCROLL_PAGE_DOWN = 20;
+
+    /// Key command: move to the next word boundary spatially to the left, including in RTL text.
+    int KEY_WORD_LEFT = 21;
+    /// Key command: move to the next word boundary spatially to the right, including in RTL text.
+    int KEY_WORD_RIGHT = 22;
 
     /// Modifier bit: shift held (used to extend a selection).
     int MOD_SHIFT = 1;

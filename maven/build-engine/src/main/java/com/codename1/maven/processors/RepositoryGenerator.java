@@ -38,6 +38,7 @@ final class RepositoryGenerator {
     static final String REPOSITORY = PREFIX + "Repository;";
     private static final String BASE = "com/codename1/orm/repository/CrudRepository";
     private static final String PAGE = "com.codename1.orm.repository.PageRequest";
+    private static final String ROW = "[Ljava/lang/Object;";
     private final OrmAnnotationProcessor.EntityClass entity;
     private final String entityType;
     private final String keyType;
@@ -105,7 +106,14 @@ final class RepositoryGenerator {
         Type result = Type.getReturnType(method.getDescriptor());
         String name = method.getName();
         AnnotationValues query = method.getAnnotation(PREFIX + "Query;"), lock = method.getAnnotation(PREFIX + "Lock;");
-        boolean modifying = method.getAnnotation(PREFIX + "Modifying;") != null;
+        AnnotationValues modifyingValues = method.getAnnotation(PREFIX + "Modifying;");
+        boolean modifying = modifyingValues != null;
+        // Spring Data's default: the session is left as it is, so an entity the
+        // caller read before the statement is still managed and a change made to it
+        // afterwards is still written. clearAutomatically empties it after the
+        // statement. flushAutomatically needs no code: executeUpdate always flushes
+        // first (see Modifying.flushAutomatically).
+        boolean clearAfter = modifying && modifyingValues.getBoolOrDefault("clearAutomatically", false);
         if (method.getSignature() != null && method.getSignature().startsWith("<")) throw invalid("Generic methods are unsupported");
         if (lock != null) {
             if (!name.equals("findById") || args.length != 1 || !args[0].getClassName().equals(keyType)
@@ -120,13 +128,23 @@ final class RepositoryGenerator {
             throw invalid("Use the inherited CRUD method; only findById may be redeclared with @Lock");
         }
         boolean list = result.getClassName().equals("java.util.List");
+        // Optional<T> is a single result that may be absent, as Spring Data
+        // reads it: the query's first row wrapped, or Optional.empty().
+        boolean optional = result.getClassName().equals("java.util.Optional");
         String scalar = result.getClassName();
-        if (list) {
+        if (list || optional) {
+            String container = list ? "List" : "Optional";
             String sig = method.getSignature();
-            int pos = sig == null ? -1 : sig.indexOf(")Ljava/util/List<");
-            if (pos < 0 || !sig.endsWith(">;")) throw invalid("Use List<ConcreteType>, not a raw List or wildcard");
-            String item = sig.substring(pos + ")Ljava/util/List<".length(), sig.length() - 2);
-            if (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";")) throw invalid("List needs a concrete element class");
+            String marker = ")Ljava/util/" + container + "<";
+            int pos = sig == null ? -1 : sig.indexOf(marker);
+            if (pos < 0 || !sig.endsWith(">;")) throw invalid("Use " + container + "<ConcreteType>, not a raw " + container + " or wildcard");
+            String item = sig.substring(pos + marker.length(), sig.length() - 2);
+            // A row of several values -- `select a.x, count(a) ... group by a.x` --
+            // is an Object[], as Spring Data returns it; checked below to be a
+            // declared JPQL select.
+            if (!item.equals(ROW) && (!item.startsWith("L") || item.indexOf('<') >= 0 || !item.endsWith(";"))) {
+                throw invalid(container + " needs a concrete element class");
+            }
             scalar = Type.getType(item).getClassName();
         }
         int page = -1;
@@ -216,9 +234,12 @@ final class RepositoryGenerator {
             if (count && !scalar.equals("long") || exists && !scalar.equals("boolean")) throw invalid("countBy returns long; existsBy returns boolean");
             if (!delete && !count && !exists && !scalar.equals(entityType)) throw invalid("Derived find returns entity or List<entity>");
         }
+        boolean row = scalar.equals("java.lang.Object[]");
+        if (row && (query == null || nativeSql)) throw invalid("Object[] rows come from a declared JPQL @Query select");
         boolean mutation = modifying || delete;
-        if (mutation && (!scalar.equals("int") && !scalar.equals("void") || list || page >= 0)) throw invalid("Modifying queries return int or void without pagination");
-        if (!mutation && result.getSort() != Type.OBJECT && !count && !exists) throw invalid("Declared scalar selects must use boxed return types for SQL NULL");
+        if (mutation && (!scalar.equals("int") && !scalar.equals("void") || list || optional || page >= 0)) throw invalid("Modifying queries return int or void without pagination");
+        if (optional && (count || exists)) throw invalid("countBy returns long; existsBy returns boolean");
+        if (!mutation && result.getSort() != Type.OBJECT && !row && !count && !exists) throw invalid("Declared scalar selects must use boxed return types for SQL NULL");
         if (page >= 0 && limit > 0) throw invalid("Do not combine PageRequest with Top/First");
         String valueType = mutation ? "Object" : count || exists ? "Long" : scalar;
         if (nativeSql && !mutation && !scalar.equals("java.lang.String") && !scalar.equals("java.lang.Long")
@@ -226,14 +247,18 @@ final class RepositoryGenerator {
             throw invalid("Native repository selects return String, Long, Integer, Double or Boolean (or List thereof)");
         }
         String create = "session." + (nativeSql ? "createNativeQuery" : "createQuery") + "(" + quote(statement) + "," + valueType + ".class)";
-        StringBuilder body = new StringBuilder(declaration(method, args, list ? "java.util.List<" + scalar + ">" : scalar));
+        StringBuilder body = new StringBuilder(declaration(method, args, list ? "java.util.List<" + scalar + ">"
+                : optional ? "java.util.Optional<" + scalar + ">" : scalar));
         body.append("com.codename1.orm.session.JpqlQuery<").append(valueType).append("> q=").append(create).append(';');
         for (int i = 0; i < names.size(); i++) body.append("q.setParameter(").append(quote(names.get(i))).append(",p").append(i).append(");");
         if (page >= 0) body.append("q.offset(p").append(page).append(".getOffset()).limit(p").append(page).append(".getSize());");
         if (limit > 0) body.append("q.limit(").append(limit).append(");");
-        body.append(mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"
+        body.append(mutation && clearAfter ? scalar.equals("void") ? "q.executeUpdate();session.clear();"
+                        : "int changed=q.executeUpdate();session.clear();return changed;"
+                : mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"
                 : count ? "return q.first().longValue();" : exists ? "return q.first().longValue()!=0;"
-                : list ? "return q.list();" : "return q.first();");
+                : list ? "return q.list();" : optional ? "return java.util.Optional.ofNullable(q.first());"
+                : "return q.first();");
         return body.append("}\n").toString();
     }
     private void checkArgument(String field, String suffix, Type argument, MethodInfo method, int parameter) {

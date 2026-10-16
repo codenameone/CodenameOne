@@ -150,7 +150,10 @@ public class OrmCheck {
                     "repository",0,new com.codename1.orm.repository.PageRequest(1,1)).get(0).id);
             s.beginTransaction();first.score=4;
             check("repository bulk rows", "2", ""+records.revise("repository",11));
-            check("repository bulk clears", "false", ""+s.contains(first));
+            // A @Modifying statement leaves the session as it is, as Spring Data does
+            // unless the method asks for clearAutomatically.
+            check("repository bulk keeps the session", "true", ""+s.contains(first));
+            check("repository bulk leaves managed values", "4", ""+first.score);
             s.rollbackTransaction();
             check("repository rollback", "1", ""+records.qualified(5));
             s.beginTransaction();

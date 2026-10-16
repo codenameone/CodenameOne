@@ -290,7 +290,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                action.accept(it.next().intValue());
+                action.accept(unboxNext(it));
             }
         } catch (Throwable e) {
             throw ObjPipeline.fail(boxed, e);
@@ -312,7 +312,7 @@ final class IntPipeline implements IntStream {
             }
             int[] out = new int[all.size()];
             for (int i = 0; i < out.length; i++) {
-                out[i] = all.get(i).intValue();
+                out[i] = unboxAt(all, i);
             }
             return out;
         } catch (Throwable e) {
@@ -327,7 +327,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                result = op.applyAsInt(result, it.next().intValue());
+                result = op.applyAsInt(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -343,9 +343,9 @@ final class IntPipeline implements IntStream {
             if (!it.hasNext()) {
                 return OptionalInt.empty();
             }
-            int result = it.next().intValue();
+            int result = unboxNext(it);
             while (it.hasNext()) {
-                result = op.applyAsInt(result, it.next().intValue());
+                result = op.applyAsInt(result, unboxNext(it));
             }
             return OptionalInt.of(result);
         } catch (Throwable e) {
@@ -362,7 +362,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                accumulator.accept(result, it.next().intValue());
+                accumulator.accept(result, unboxNext(it));
             }
             return result;
         } catch (Throwable e) {
@@ -376,7 +376,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                total += it.next().intValue();
+                total += unboxNext(it);
             }
             return total;
         } catch (Throwable e) {
@@ -392,9 +392,9 @@ final class IntPipeline implements IntStream {
             if (!it.hasNext()) {
                 return OptionalInt.empty();
             }
-            int result = it.next().intValue();
+            int result = unboxNext(it);
             while (it.hasNext()) {
-                int v = it.next().intValue();
+                int v = unboxNext(it);
                 result = max ? Math.max(result, v) : Math.min(result, v);
             }
             return OptionalInt.of(result);
@@ -430,7 +430,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.accept(it.next().intValue());
+                all.accept(unboxNext(it));
             }
             return all;
         } catch (Throwable e) {
@@ -497,7 +497,7 @@ final class IntPipeline implements IntStream {
 
         @Override
         public int nextInt() {
-            return it.next().intValue();
+            return unboxNext(it);
         }
     }
 
@@ -532,5 +532,18 @@ final class IntPipeline implements IntStream {
     @Override
     public void close() {
         boxed.close();
+    }
+
+    // The cast an erased Iterator<Integer> or List<Integer> needs happens here, outside
+    // the try blocks that close the pipeline on failure. ParparVM's CHECKCAST
+    // throws nothing, so a cast under a catch (Throwable) reads as one whose
+    // failure is handled (scripts/check-cast-semantics.sh). These elements
+    // are Integers by construction, so the cast cannot fail anyway.
+    private static int unboxNext(Iterator<Integer> it) {
+        return it.next().intValue();
+    }
+
+    private static int unboxAt(List<Integer> all, int i) {
+        return all.get(i).intValue();
     }
 }

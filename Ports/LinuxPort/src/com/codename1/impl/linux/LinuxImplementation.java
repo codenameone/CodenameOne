@@ -325,12 +325,32 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     private static LinuxImplementation mainLoopInstance;
 
+    /// The size the main window opens at, before the user or the window manager
+    /// changes it. Set by the generated bootstrap stub from the `desktop.width` and
+    /// `desktop.height` build hints, BEFORE Display.init: init creates the window,
+    /// and a resize afterwards would lay the first form out twice.
+    private static int defaultWindowWidth = 800;
+    private static int defaultWindowHeight = 600;
+
+    /// Called by the generated bootstrap stub only; see defaultWindowWidth.
+    ///
+    /// @param width the window's initial content width in pixels; ignored unless positive
+    /// @param height the window's initial content height in pixels; ignored unless positive
+    public static void setDefaultWindowSize(int width, int height) {
+        if (width > 0) {
+            defaultWindowWidth = width;
+        }
+        if (height > 0) {
+            defaultWindowHeight = height;
+        }
+    }
+
     @Override
     public void init(Object m) {
         // The class library (vm/JavaAPI) reaches files, preferences, the
         // network and the EDT through Codename One from here on.
         com.codename1.impl.CoreJdkHostInstaller.install();
-        LinuxNative.initDisplay("Codename One", 800, 600);
+        LinuxNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
         windowGraphicsPeer = LinuxNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(LinuxNative.getDefaultFont());
@@ -339,7 +359,19 @@ public class LinuxImplementation extends CodenameOneImplementation {
             screenDpi = 96;
         }
         mainLoopInstance = this;
-        installNativeTheme();
+        // Deferred, not installed here: an application that installs its own theme
+        // with setThemeProps -- every Flutter application, and any theme without
+        // @includeNativeBool -- resets the table and discards this one before
+        // anything reads it, and parsing and applying it was about 26ms of every
+        // launch of the transpiled Flutter gallery, all of it thrown away. It is
+        // still installed for an application with no theme of its own, the moment
+        // anything first reads the theme. See UIManager.setDeferredBaseTheme.
+        com.codename1.ui.plaf.UIManager.getInstance().setDeferredBaseTheme(new Runnable() {
+            @Override
+            public void run() {
+                installNativeTheme();
+            }
+        });
     }
 
     /**
@@ -409,7 +441,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
      * iOSModernTheme.res. An app that loads its own theme layers over this.
      * Silently does nothing when the theme resource is absent. This is the
      * framework hook (UIManager calls it for {@code @includeNativeBool} themes);
-     * init() also calls it so an app with no theme of its own still gets it.
+     * init() defers it (UIManager.setDeferredBaseTheme) so an app with no
+     * theme of its own still gets it, without paying for it when the app installs one.
      */
     private boolean installingNativeTheme;
 
@@ -1063,6 +1096,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     private void drainInput() {
+        lowLevelTextInput.drain();
         while (LinuxNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
             int x = eventScratch[1];
@@ -2172,9 +2206,18 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.drawImage(peer(graphics), peer(img), x, y);
     }
 
-    /// Cairo scales an image as it draws it, and `drawImageScaled` has done so
-    /// since the port was written -- but nothing called it. Without this answer the
-    /// core scales for the port: `Image.scaled` makes a second surface of the size
+    /// Cairo scales while it paints (drawImageScaled: the same cairo_scale and
+    /// default filter a pre-scaled copy would have been made with), so this port
+    /// can draw an image at any size directly. It used to answer the inherited
+    /// false, and Graphics.drawImage(img, x, y, w, h) then scaled the picture
+    /// first -- which for an EncodedImage means EncodedImage.scaled: decode,
+    /// scale, RE-ENCODE to PNG (or lossy JPEG for an opaque picture), decode
+    /// again. On every paint, since nothing kept the result: the transpiled
+    /// Flutter gallery ran 13 PNG encodes before its first frame, all from
+    /// scaled draws of its cards, icons and logo.
+    ///
+    /// The same answer also stops a memory leak. Without it the core scales for
+    /// the port: `Image.scaled` makes a second surface of the size
     /// asked for and keeps it in the image's scale cache for as long as the image
     /// lives, one per size. An application that zooms a picture draws it at a new
     /// size every frame, so every frame left a surface behind, each larger than the
@@ -2370,13 +2413,39 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     /**
      * Native input is supported: while a TextField/TextArea is edited it is
-     * overlaid by a real Win32 EDIT control with a native caret, selection,
+     * overlaid by a native GTK text widget with a native caret, selection,
      * keyboard and IME -- so {@code TextArea} routes here instead of the
      * lightweight (CN1-drawn) editor.
      */
     @Override
     public boolean isNativeInputSupported() {
         return true;
+    }
+
+    private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client,
+            com.codename1.ui.TextInputConfig config) {
+        if (editPeer != 0) {
+            commitEdit();
+        }
+        return lowLevelTextInput.start(client, config);
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        lowLevelTextInput.update(handle, state);
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        lowLevelTextInput.stop(handle);
     }
 
     /**
@@ -2393,7 +2462,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * Overlays a native Win32 EDIT control over the field's text area (inside the
+     * Overlays a native GTK text widget over the field's text area (inside the
      * field's padding so its border/background still show), styled to match the
      * field's font and colours, and focuses it. Returns immediately (async); the
      * value is delivered through {@code Display.onEditingComplete} when the user
@@ -2402,6 +2471,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        lowLevelTextInput.stopCurrent();
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
         if (editPeer != 0) {
@@ -3104,6 +3174,24 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        long handle = LinuxNative.socketListenLoopback(port);
+        return handle == 0 ? null : new LinuxSocket(handle);
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        if (loopbackOnly) {
+            LinuxNative.socketStopListening(port);
+        }
+    }
+
+    @Override
     public Object connectSocket(String host, int port, int connectTimeout) {
         LinuxSocket socket = new LinuxSocket(host, port, connectTimeout);
         return socket.isConnected() ? socket : null;
@@ -3116,7 +3204,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void disconnectSocket(Object socket) {
-        ((LinuxSocket) socket).close();
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).close();
+        }
     }
 
     @Override
@@ -3126,27 +3216,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public int getSocketAvailableInput(Object socket) {
-        return ((LinuxSocket) socket).available();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).available() : 0;
     }
 
     @Override
     public byte[] readFromSocketStream(Object socket) {
-        return ((LinuxSocket) socket).readChunk();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).readChunk() : null;
     }
 
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
-        ((LinuxSocket) socket).write(data, 0, data.length);
+        if (socket instanceof LinuxSocket) {
+            ((LinuxSocket) socket).write(data, 0, data.length);
+        }
     }
 
     @Override
     public String getSocketErrorMessage(Object socket) {
-        return ((LinuxSocket) socket).getErrorMessage();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorMessage() : null;
     }
 
     @Override
     public int getSocketErrorCode(Object socket) {
-        return ((LinuxSocket) socket).getErrorCode();
+        return socket instanceof LinuxSocket ? ((LinuxSocket) socket).getErrorCode() : -1;
     }
 
     /* ---------------------------------------------------------- websocket */

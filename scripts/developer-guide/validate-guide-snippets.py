@@ -15,6 +15,7 @@ TAG_RE = re.compile(r"(?:^|,)tag=([^,\]]+)")
 LISTING_DELIMITER_RE = re.compile(r"^-{4,}\s*$")
 TAG_BLOCK_RE = re.compile(r"// tag::([^\[]+)\[\]\n(.*?)\n// end::\1\[\]", re.S)
 JAVA_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.java$")
+INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/")
 
 
 def parse_args():
@@ -134,9 +135,13 @@ def validate_includes(includes):
     cache = {}
     java_snippets = []
     for item in includes:
-        if not item["target"].startswith("../demos/"):
+        # The Wayline chapters show the sample application itself, which is
+        # built and tested by wayline.yml, so they include its sources directly
+        # rather than through copies under docs/demos that could drift from it.
+        if not item["target"].startswith(INCLUDE_ROOTS):
             errors.append(
-                f"{item['sourceFile']}:{item['line']}: source include must target ../demos/: {item['target']}"
+                f"{item['sourceFile']}:{item['line']}: source include must target one of "
+                f"{', '.join(INCLUDE_ROOTS)}: {item['target']}"
             )
             continue
 
@@ -289,8 +294,14 @@ def java_compile_classpath():
     candidates = [
         Path("docs/demos/common/target/classes"),
         Path("maven/core/target/classes"),
+        # The Flutter runtime, so the guide's FlutterUI examples are compiled
+        # rather than taken on trust. Absent entries are dropped below, so a
+        # checkout that has not built it simply cannot use those types -- which
+        # surfaces as the snippet failing to compile, not as it being skipped.
+        Path("maven/flutter-runtime/target/classes"),
         Path.home() / ".m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar",
         Path.home() / ".m2/repository/com/codenameone/java-runtime/8.0-SNAPSHOT/java-runtime-8.0-SNAPSHOT.jar",
+        Path.home() / ".m2/repository/com/codenameone/codenameone-flutter-runtime/8.0-SNAPSHOT/codenameone-flutter-runtime-8.0-SNAPSHOT.jar",
     ]
     return os.pathsep.join(str(p) for p in candidates if p.exists())
 

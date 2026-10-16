@@ -408,6 +408,7 @@ toolchain
 toolchains
 toolset
 transferal
+transpiled
 transpiler
 unix
 unlayout
@@ -809,3 +810,7 @@ inlined
 # tables): the SwingX component set and the CPU architecture of the test machine.
 SwingX
 aarch64
+
+# -----------------------------------------------------------------------------
+# The sample application the Wayline chapters walk through.
+Wayline

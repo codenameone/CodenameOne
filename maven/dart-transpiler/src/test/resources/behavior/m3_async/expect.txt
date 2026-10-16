@@ -1,0 +1,7 @@
+start
+42
+DART
+caught: FormatException: bad
+done
+generic: Exception: boom
+[41, 41]

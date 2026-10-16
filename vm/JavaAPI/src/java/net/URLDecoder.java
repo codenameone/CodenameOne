@@ -25,19 +25,42 @@ package java.net;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 
-/// A string out of its
-/// `application/x-www-form-urlencoded` form. A plus is a space and a run of
-/// `%XX` is the bytes of some characters.
-public final class URLDecoder {
-
+/**
+ * Decodes application/x-www-form-urlencoded text with the JDK's rules: a
+ * {@code +} becomes a space, each run of {@code %XY} escapes is collected into
+ * bytes and decoded in the named charset, and every other character is kept.
+ * An escape that is cut short or is not hexadecimal is refused with an
+ * {@link IllegalArgumentException}, as the JDK refuses it.
+ *
+ * Pure Java, for the reason {@link URLEncoder} gives.
+ */
+public class URLDecoder {
     private URLDecoder() {
     }
 
-    /// Decodes as UTF-8, where the JDK uses the platform's default.
+    /**
+     * Decodes {@code s} as UTF-8.
+     *
+     * @deprecated name the charset with {@link #decode(String, String)}, as the
+     *     JDK asks.
+     */
     public static String decode(String s) {
-        return decodeAs(s, "UTF-8");
+        try {
+            return decode(s, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e.toString());
+        }
     }
 
+    /**
+     * Decodes {@code s}, reading escaped bytes in the charset named {@code enc}.
+     *
+     * Charset support is platform specific; this class library is not the
+     * JDK. Only UTF-8 and ISO-8859-1 are supported everywhere, and any other
+     * name is whatever the platform's conversion makes of it.
+     *
+     * @throws UnsupportedEncodingException when the charset is empty or not supported
+     */
     public static String decode(String s, String enc) throws UnsupportedEncodingException {
         if (enc == null) {
             throw new NullPointerException("charsetName");
@@ -45,68 +68,72 @@ public final class URLDecoder {
         if (enc.length() == 0) {
             throw new UnsupportedEncodingException("URLDecoder: empty string enc parameter");
         }
-        return decodeAs(s, URLEncoder.charsetName(enc));
+        return decodeWith(s, enc);
     }
 
+    /**
+     * Decodes {@code s}, reading escaped bytes in {@code charset}.
+     */
     public static String decode(String s, Charset charset) {
-        return decodeAs(s, charset.name());
+        if (charset == null) {
+            throw new NullPointerException("Charset");
+        }
+        try {
+            return decodeWith(s, charset.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalArgumentException(e.toString());
+        }
     }
 
-    private static int hex(char c) {
-        if (c >= '0' && c <= '9') {
-            return c - '0';
-        }
-        if (c >= 'a' && c <= 'f') {
-            return c - 'a' + 10;
-        }
-        if (c >= 'A' && c <= 'F') {
-            return c - 'A' + 10;
-        }
-        return -1;
-    }
-
-    private static String decodeAs(String s, String charset) {
-        int n = s.length();
-        StringBuilder out = new StringBuilder(n);
-        byte[] bytes = null;
+    private static String decodeWith(String s, String enc) throws UnsupportedEncodingException {
+        int length = s.length();
+        StringBuilder out = null;
         int i = 0;
-        while (i < n) {
+        while (i < length) {
             char c = s.charAt(i);
+            if (c != '+' && c != '%') {
+                if (out != null) {
+                    out.append(c);
+                }
+                i++;
+                continue;
+            }
+            if (out == null) {
+                out = new StringBuilder(length);
+                out.append(s, 0, i);
+            }
             if (c == '+') {
                 out.append(' ');
                 i++;
-            } else if (c == '%') {
-                if (bytes == null) {
-                    bytes = new byte[(n - i) / 3];
-                }
-                int count = 0;
-                while (i + 2 < n && c == '%') {
-                    int high = hex(s.charAt(i + 1));
-                    int low = hex(s.charAt(i + 2));
-                    if (high < 0 || low < 0) {
-                        throw new IllegalArgumentException(
-                                "URLDecoder: Illegal hex characters in escape (%) pattern - Error at index "
-                                + (high < 0 ? 0 : 1) + " in: \"" + s.substring(i + 1, i + 3) + "\"");
-                    }
-                    bytes[count++] = (byte) (high * 16 + low);
-                    i += 3;
-                    if (i < n) {
-                        c = s.charAt(i);
-                    }
-                }
-                if (i < n && c == '%') {
-                    throw new IllegalArgumentException("URLDecoder: Incomplete trailing escape (%) pattern");
-                }
-                try {
-                    out.append(new String(bytes, 0, count, charset));
-                } catch (UnsupportedEncodingException e) {
-                    throw new IllegalArgumentException(charset);
-                }
-            } else {
-                out.append(c);
-                i++;
+                continue;
             }
+            // A run of escapes is one byte sequence: a multi-byte character is
+            // spread over several of them and only decodes as a whole.
+            byte[] bytes = new byte[(length - i) / 3];
+            int count = 0;
+            while (i + 2 < length && s.charAt(i) == '%') {
+                int high = Character.digit(s.charAt(i + 1), 16);
+                int low = Character.digit(s.charAt(i + 2), 16);
+                if (high < 0 || low < 0) {
+                    throw new IllegalArgumentException(
+                            "URLDecoder: Illegal hex characters in escape (%) pattern - "
+                            + s.substring(i + 1, i + 3));
+                }
+                bytes[count++] = (byte) ((high << 4) | low);
+                i += 3;
+            }
+            if (i < length && s.charAt(i) == '%') {
+                throw new IllegalArgumentException(
+                        "URLDecoder: Incomplete trailing escape (%) pattern");
+            }
+            out.append(new String(bytes, 0, count, enc));
         }
-        return out.toString();
+        // A string with no escapes comes back as it is without `enc` being
+        // looked at, so an encoding this runtime lacks is reported only once
+        // an escape needs it. The JDK would refuse it at once. This is not the
+        // JDK: the runtime has UTF-8 and ISO-8859-1, which are what a URL is
+        // decoded with, and a check for the others on every call would be
+        // paid by every caller for a mistake none of them makes.
+        return out == null ? s : out.toString();
     }
 }

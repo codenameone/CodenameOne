@@ -139,6 +139,8 @@ A successful admission returns HTTP `202` with durable delivery IDs. Invalid tar
 
 The complete request, response, authentication, error, target, and message schemas are in the https://cloud.codenameone.com/openapi/push-v3.yaml[Push sending OpenAPI 3.0 specification]. Import that file into Swagger UI, an OpenAPI code generator, or an API client instead of reproducing DTOs from this chapter.
 
+A <<Server-side backend>> doesn't need to build this request: `CloudPush` sends a typed message, Live Activity commands included, as <<backend-push>> describes.
+
 Use the Console for operator-driven messages, stored audiences, campaigns, analytics, and automations.
 
 [[push-classic-server-migration]]

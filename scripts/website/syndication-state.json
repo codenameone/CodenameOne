@@ -2764,6 +2764,32 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-15T00:01:14+00:00"
+      },
+      "devto": {
+        "id": 4857916,
+        "url": "https://dev.to/codenameone/dont-order-fish-on-monday-dont-release-on-friday-me0",
+        "syndicated_at": "2026-10-15T17:45:59+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d02ee6a41cf8/edit",
+        "syndicated_at": "2026-10-15T19:01:12+00:00"
+      }
+    },
+    "android-apps-beyond-android": {
+      "hashnode": {
+        "url": "https://debugagent.com/android-on-ios-web-desktop-efficiently-and-for-free",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad1691246767b966e8e0cf4",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-16T00:01:16+00:00"
+      },
+      "devto": {
+        "id": 4863776,
+        "url": "https://dev.to/codenameone/android-on-ios-web-desktop-efficiently-and-for-free-3fp6",
+        "syndicated_at": "2026-10-16T17:23:45+00:00"
       }
     }
   }

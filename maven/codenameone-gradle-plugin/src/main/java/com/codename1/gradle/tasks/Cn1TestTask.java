@@ -103,7 +103,7 @@ public abstract class Cn1TestTask extends Cn1Task {
         }
         int result = runner.run(layout().projectDir(), all, main, getReportsDirectory().get().getAsFile());
         if (result != 0) {
-            throw new GradleException("Tests failed; see " + getReportsDirectory().get().getAsFile());
+            throw new GradleException(Cn1TestRunner.describeFailure(result) + "; see " + getReportsDirectory().get().getAsFile());
         }
     }
 }

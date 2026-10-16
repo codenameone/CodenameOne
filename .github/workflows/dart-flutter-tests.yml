@@ -1,0 +1,145 @@
+name: Dart and Flutter tests
+
+# Runs the unit and behavior tests of the Dart transpiler and the two runtimes
+# it targets (maven/dart-transpiler, maven/dart-runtime, maven/flutter-runtime).
+#
+# Nothing else does. pr.yml runs core-unittests only, and flutter-bench.yml
+# builds these modules with -DskipTests. The transpiler's BehaviorTest and
+# CompileGeneratedTest are also SKIPPED, not failed, when JAVA17_HOME or the
+# runtime jars are missing, so a leg that merely forgot JAVA17_HOME would stay
+# green having executed nothing. CN1_DART_TESTS_REQUIRED=1 below turns those
+# skips into failures, and the last step checks the reports independently.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      # Everything those modules compile against: the runtimes depend on core,
+      # whose sources are CodenameOne/src, and -am builds factory with it.
+      - 'CodenameOne/src/**'
+      - 'Factory/src/**'
+      - 'maven/core/**'
+      - 'maven/factory/**'
+      - 'maven/pom.xml'
+      - 'scripts/ci/retry.sh'
+      - '.github/workflows/dart-flutter-tests.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      - 'CodenameOne/src/**'
+      - 'Factory/src/**'
+      - 'maven/core/**'
+      - 'maven/factory/**'
+      - 'maven/pom.xml'
+      - 'scripts/ci/retry.sh'
+      - '.github/workflows/dart-flutter-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # The pr-ci-container image lives on ghcr; without this the job dies in
+  # "Initialize containers" with a bare "denied".
+  packages: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dart-flutter-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    env:
+      # The behavior tests write UTF-8 sources and read UTF-8 output.
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check the container's JDK 17
+        run: |
+          if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/javac" ]; then
+            echo "JAVA_HOME_17 is unset or has no javac: '${JAVA_HOME_17:-<unset>}'" >&2
+            exit 1
+          fi
+          echo "JAVA_HOME=$JAVA_HOME_17" >> "$GITHUB_ENV"
+          echo "JAVA17_HOME=$JAVA_HOME_17" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-dart-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-dart-
+            ${{ runner.os }}-m2
+
+      # JDK 17, because the runtimes compile at release 17: maven/pom.xml adds
+      # them to the reactor only on 17+ (flutter-modules), and the transpiler
+      # only gets them on its test classpath there (transpiler-tests).
+      #
+      # verify rather than test: the transpiler's harness links the generated
+      # Java against the runtime JARS in each module's target/, which test never
+      # packages. Javadoc and the static analysis gates are skipped -- they are
+      # not what this job is for, and the core's run in pr.yml.
+      - name: Run the transpiler and runtime tests
+        env:
+          CN1_DART_TESTS_REQUIRED: '1'
+          # Retry only a dependency-resolution failure, never a failing test.
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B verify \
+            -pl core,dart-runtime,flutter-runtime,dart-transpiler -am \
+            -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true
+
+      # Independent of the switch above: a module whose tests silently stopped
+      # running (a profile that no longer activates, a surefire include that
+      # matches nothing) produces no report at all, which no test can notice.
+      - name: Check that every suite ran
+        run: |
+          python3 - <<'EOF'
+          import glob, os, sys
+          import xml.etree.ElementTree as ET
+
+          def totals(pattern):
+              tests = skipped = 0
+              files = glob.glob(pattern)
+              for f in files:
+                  r = ET.parse(f).getroot()
+                  tests += int(r.get("tests", 0))
+                  skipped += int(r.get("skipped", 0))
+              return len(files), tests, skipped
+
+          failed = False
+          for module in ("dart-runtime", "flutter-runtime", "dart-transpiler"):
+              n, tests, skipped = totals("maven/%s/target/surefire-reports/TEST-*.xml" % module)
+              print("%s: %d reports, %d tests, %d skipped" % (module, n, tests, skipped))
+              if tests == 0:
+                  print("::error::%s ran no tests" % module)
+                  failed = True
+
+          harness = "maven/dart-transpiler/target/surefire-reports/TEST-com.codename1.dart.transpiler.harness.%s.xml"
+          cases = [d for d in os.listdir("maven/dart-transpiler/src/test/resources/behavior")
+                   if os.path.isdir(os.path.join("maven/dart-transpiler/src/test/resources/behavior", d))]
+          for name, expected in (("BehaviorTest", len(cases)), ("CompileGeneratedTest", 2)):
+              n, tests, skipped = totals(harness % name)
+              print("%s: %d tests, %d skipped (expected %d)" % (name, tests, skipped, expected))
+              if n == 0 or tests < expected or skipped != 0:
+                  print("::error::%s did not run every case: %d run, %d skipped, %d expected"
+                        % (name, tests, skipped, expected))
+                  failed = True
+          sys.exit(1 if failed else 0)
+          EOF

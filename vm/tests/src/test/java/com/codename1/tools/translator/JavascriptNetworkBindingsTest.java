@@ -112,8 +112,16 @@ class JavascriptNetworkBindingsTest {
         assertTrue(out.contains("NULL=null"), "the @JSBody must answer null without a request: " + out);
     }
 
-    /// The send `@JSBody` applies the request's timeout and reports a timeout -- which a
-    /// synchronous XHR throws -- as a failure string instead of letting it escape.
+    /// The send `@JSBody` applies the request's timeout and reports a failure to SEND as a
+    /// string instead of letting it escape.
+    ///
+    /// The request is asynchronous: a synchronous one stopped the worker, and with it the
+    /// event thread, until the server answered. So `send()` returns while the request is
+    /// still in flight, when `status` is 0 and nothing has been received for EVERY request.
+    /// The script must therefore not read that state as "no response" -- it did while the
+    /// request was synchronous, and kept here it would fail every request the port makes.
+    /// How a request ended is reported by its events, and `openInputStream()` makes the
+    /// no-response check after it has waited for one; the last assertion holds it there.
     @Test
     void sendScriptAppliesTheTimeoutAndReportsTimingOut() throws Exception {
         String source = read(NETWORK_CONNECTION);
@@ -141,9 +149,14 @@ class JavascriptNetworkBindingsTest {
                 "a timeout must be applied and reported: " + out);
         assertTrue(out.contains("FAST=null SENT=payload TIMEOUT=0"),
                 "a request without a timeout is sent as it was: " + out);
-        assertTrue(out.contains("QUIET=NetworkError: no response"),
-                "a request that came back with no response at all must be a failure: " + out);
+        assertTrue(out.contains("QUIET=null"),
+                "a request still in flight has status 0 and no response, and is not a failure: " + out);
         assertTrue(out.contains("ANSWERED=null"), "an answered request is not a failure: " + out);
+        assertTrue(Pattern.compile("outcome\\.wait\\(.*?req\\.getStatus\\(\\) == 0 && req\\.getResponse\\(\\) == null\\)"
+                + "\\s*\\{\\s*throw new IOException\\([^;]*NetworkError: no response", Pattern.DOTALL)
+                .matcher(source).find(),
+                "a request that ended with no response at all must still be a failure, decided in"
+                + " openInputStream() after the wait for the request's events");
     }
 
     /// `ArrayBufferInputStream.read(byte[], int, int)` stores signed Java bytes. A raw 0..255

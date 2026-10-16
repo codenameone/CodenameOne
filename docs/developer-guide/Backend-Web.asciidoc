@@ -4,8 +4,8 @@
 A controller turns HTTP into method calls. This chapter covers how requests are
 mapped to methods and how their parts are bound to parameters, how a return value
 becomes a response, how the app and the server share one declaration of their
-API, and how a server holds WebSocket connections open. <<A first server>>
-introduced the shape; this is the detail.
+API, how a server holds WebSocket connections open, and how it sends push
+notifications. <<A first server>> introduced the shape; this is the detail.
 
 === Mapping requests
 
@@ -125,6 +125,21 @@ Any other return type is a build error: a JDK class with no JSON form, such as
 with the build and the request both reporting success. `@ResponseStatus` takes a
 final status between 200 and 599.
 
+A method that returns its own type can't return a refusal, because its return
+type is the body of a success. It throws one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RefusalSnippets.java[tag=backend-web-refusal,indent=0]
+----
+
+The reason is sent as the body, in plain text, so keep out of it anything the
+caller shouldn't learn. A status below 500 is an answer: it isn't logged and
+isn't counted as a failed request. A status of 500 or above is reported the way
+any other failure of the handler is, and answered with the status given. The
+exception is unchecked, so inside a `@Transactional` method it rolls the
+transaction back.
+
 ==== Your own classes as JSON
 
 A method can return an entity or any class of your own, or take one as its body,
@@ -162,6 +177,10 @@ app and the server reads the same on both sides:
   `getX` (or `isX`) and `setX` methods, and is left out when it has neither.
 * `@JsonProperty("due_at")` renames a field and `@JsonIgnore` leaves one out, both
   from `com.codename1.annotations`.
+* A `record` is written from its accessors and read through its canonical
+  constructor, so it needs no constructor without arguments. A component the body
+  leaves out, or one marked `@JsonIgnore`, is passed its default: `null`, `0` or
+  `false`.
 * A `Date` is written as milliseconds since the epoch, which is Jackson's default
   and what the app's mapper reads, and is read from that or from an ISO-8601 date
   such as `2025-03-01T09:30:00Z`. A `byte[]` is base64, an enum is its name.
@@ -186,8 +205,8 @@ it, would be written forever, so a response that nests more than 64 objects deep
 is answered 500 with a message naming the class; mark the field that points back
 `@JsonIgnore`. The build refuses what it can't write a codec for, and says why: a
 field typed by a type variable, such as `List<T>` in a generic `Page<T>`; a body
-class with no constructor without arguments; an interface; and an array other
-than `byte[]`.
+class other than a record with no constructor without arguments; an interface;
+and an array other than `byte[]`.
 
 A method that throws is answered 500 with the body `internal error`, and the
 exception is logged. The message isn't sent to the client, because an exception
@@ -316,6 +335,188 @@ Conditional requests and ranges are honoured, and where the platform supports it
 the file is sent from the page cache to the socket without passing through the
 process.
 
+[[backend-hosting-the-app]]
+==== Hosting the app in the browser
+
+A project with an app and a server can have the server host the app's browser
+build. One address is then both the API and the app: somebody opens it and is
+using the app, with nothing to install.
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.sh[tag=backend-web-hosting,indent=0]
+----
+<1> Builds the app for the browser and stages it in `backend/target/webapp`.
+<2> Runs the server, which now answers `/` with the app.
+
+`cn1:backend-webapp` runs the project's own JavaScript build on this machine,
+the one `mvn package -Dcodename1.platform=javascript
+-Dcodename1.buildTarget=local-javascript` runs, then unpacks the bundle into the
+server module's `target/webapp`. It's a goal of its own because that build takes
+about a minute. Run it when the app changed, not every time the server restarts;
+what it staged stays until `mvn clean`.
+
+The server looks for the app in a directory named `webapp` in its working
+directory, beside `application.properties`, and serves it when the directory holds
+an `index.html`. There's no setting to turn on. `cn1:backend` points the server at
+`target/webapp` for you, and `cn1:backend-package` leaves the directory beside the
+binary, so a deployment is the binary with `webapp` next to it:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.txt[tag=backend-web-hosting-layout,indent=0]
+----
+
+The files aren't linked into the binary. They're sent from the page cache, which
+needs them to be files.
+
+Routes still come first. A request reaches the app's files only when no route
+answered it, so `/api/notes` is the API and `/` is the app, and a file can't
+shadow a route by being named like one.
+
+The files of a build keep their names from one build to the next, so each is
+served with `Cache-Control: no-cache` and an entity tag: a browser asks every
+time and is told `304 Not Modified` for a file that didn't change. A deployment
+that puts a version in the path can set a longer policy. The build also writes a
+gzip copy beside each text file that shrinks, and a browser that accepts gzip is
+sent that copy; a range request, and a browser that doesn't accept it, get the
+file itself.
+
+[cols="1,2"]
+|===
+| Setting | What it does
+
+| `cn1.webapp.root`
+| The directory holding the app. `webapp` in the working directory by default.
+  A directory named here that holds no `index.html` stops the server from
+  starting, since a server told where its app is shouldn't answer 404 there.
+
+| `cn1.webapp.path`
+| Where the app is served. `/` by default.
+
+| `cn1.webapp.cacheControl`
+| The `Cache-Control` header of every file. `no-cache` by default.
+
+| `cn1.webapp.enabled`
+| Set to `false` to serve no app even when the directory is there.
+|===
+
+The goal has a few parameters of its own:
+
+[cols="1,2"]
+|===
+| Parameter | What it does
+
+| `cn1.backend.webapp.bundle`
+| A bundle to stage instead of building one: the archive a JavaScript build
+  produced, or a directory unpacked from it. Use it for a bundle built by an
+  earlier job or by the build server.
+
+| `cn1.backend.webapp.output`
+| Where to stage it. `target/webapp` in the server module by default.
+
+| `cn1.backend.webapp.appRoot`
+| The app's root project. The directory above the server module by default.
+|===
+
+A <<gradle-backend,Gradle project>> has the same step as a task of its `backend`
+project:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.sh[tag=backend-web-hosting-gradle,indent=0]
+----
+<1> Builds the app for the browser and stages it in `backend/build/webapp`.
+<2> Runs the server, which now answers `/` with the app.
+
+`backendWebApp` runs the root project's local JavaScript build, the one
+`buildJavascriptLocal` runs, and unpacks the bundle into the backend's
+`build/webapp`. `runBackend` points the server at that directory, and
+`backendPackage` writes the binary into `build`, where `webapp` is beside it
+already. What it staged stays until `./gradlew clean`.
+
+`-Pcn1.backend.webapp.bundle` and `-Pcn1.backend.webapp.output` do what the Maven
+parameters of the same names do. There's no `appRoot`: the app is the root
+project of the build. A backend-only project has no app to build, so its
+`backendWebApp` stages a bundle named with `-Pcn1.backend.webapp.bundle`.
+
+A test that needs the app served names the directory, since a test runs in the
+module directory and not in `target`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/HostedAppTest.java[tag=backend-web-hosted-test,indent=0]
+----
+
+===== Talking to the server from the hosted app
+
+The hosted app and its API share an origin, so the app needs no server address
+compiled in. In the browser the address of the page is the address of the server:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/HostedAppSnippets.java[tag=backend-web-hosted-origin,indent=0]
+----
+
+A same-origin request needs no CORS configuration and goes straight to the
+server. The JavaScript build can route requests to other origins through a
+proxy servlet; a backend isn't a servlet container, so the hosted build is made
+without one unless the project sets `javascript.inject_proxy` or
+`javascript.proxy.url` itself. A hosted app that calls a third-party service
+directly needs that service to allow the app's origin.
+
+A WebSocket follows the same rule. Replace `http` with `ws` in the origin and
+the socket goes to the server the page came from, over TLS when the page did.
+
+===== Signing in from the hosted app
+
+An installed app that signs in against the server's own authorization server
+usually asks for the code to be sent to a loopback address and reads it off the
+redirect. A page in a browser can't do that. The browser follows a redirect
+itself, shows the page only what was at the end of it, and refuses to show it
+anything from another origin. It also keeps the session cookie to itself: the
+page can neither read `Set-Cookie` nor set `Cookie`.
+
+Three things make the same flow work there:
+
+* Register a redirect address on the server's own origin for the app's client,
+  such as `https://app.example.com/signin/code`, beside the loopback one. A
+  redirect address is matched exactly, scheme, host and port included, so it
+  has to be the address people open the app at.
+* Answer that path with the code it was given, as JSON. The redirect then ends
+  on a same-origin response the app can read. The path needs no sign-in: it
+  repeats what was in its own address, and a code is worth nothing without the
+  PKCE verifier that only the app that started the sign-in holds.
+* Answer the sign-in form with a status and not a redirect, using
+  `formLogin(form -> form.successHandler(...).failureHandler(...))`. The app
+  can't see which page a redirect led to, so `200` and `401` are how it learns
+  whether the password was accepted.
+
+The browser then carries the session cookie from the form to `/oauth2/authorize`
+on its own, because both are the same origin, and the token request is the same
+one the installed app makes. Tokens are kept by the app's token store, which in
+a browser is the browser's storage for that origin.
+
+That cookie changes what the sign-in chain has to defend against. An installed
+app holds its session itself, so no other site can ride on it. A browser sends
+the cookie on its own. If the chain runs without CSRF tokens, because the app
+posts the form itself, two things have to do their work:
+
+* The session cookie is `HttpOnly` and `SameSite=Lax` unless
+  `cn1.session.same-site` says otherwise, and `Secure` under TLS. Leave it that
+  way: `None` sends the session along with another site's requests.
+* Refuse a request that changes something and names another site in `Origin`.
+  A browser sets that header on every such request and a page can't alter it.
+  The installed app sends none, so a request without one passes. A filter added
+  with `addFilterBefore(filter, LogoutFilter.class)` covers the form, the token
+  endpoint and sign-out. Compare against the configured issuer.
+
+With CSRF off, sign-out answers a `GET` as well as a `POST`. Narrow it with
+`logout(logout -> logout.logoutRequestMatcher(...))`, and have the app send
+`POST /logout` once it has its tokens. The session has done its work by then.
+One that's never ended lasts until `cn1.session.timeout` seconds pass without a
+request, which is 1800 unless set.
+
 === Sharing the contract with the app
 
 This is where having the same language on both ends stops being a slogan. An
@@ -349,6 +550,30 @@ drift.
 The server half is off by default. Every existing project carries these
 interfaces for its client alone, and generating server classes into those builds
 would grow them for nothing.
+
+==== A module both sides depend on
+
+A project with an app and a server keeps the contract in a module of its own,
+which `common` and `backend` both depend on. Nothing needs switching on there:
+
+* The app's build finds the contract in the dependency and generates its client,
+  exactly as it does for an interface in `common` itself.
+* The backend's `generate-annotation-stubs` goal writes, for each contract,
+  `NotesApiServer` and a `NotesApiController` into
+  `target/generated-sources/cn1-annotations`. The controller is an ordinary
+  `@RestController` that takes the `@Component` implementing `NotesApiServer`
+  and maps each operation to it, so routing, binding, security rules and
+  filters treat it like one written by hand.
+
+The module holds the data classes and the interfaces and nothing else. It
+compiles against `codenameone-core` for the callback types the interfaces name,
+with `provided` scope, so the server doesn't inherit the client library. A
+contract method can't answer with a status of its own, so the implementation
+throws `ResponseStatusException` to refuse a request.
+
+The Initializr's ride-hailing template is built this way and generates a
+starting point under your own name and package. <<wayline-implementors-guide>>
+describes it.
 
 === Real-time with WebSockets
 
@@ -501,3 +726,81 @@ suite can't shrink unnoticed to the ones that happen to pass.
 Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They're
 excluded rather than tolerated: accepting their result as a pass would also accept
 it for a case that used to work.
+
+[[backend-push]]
+=== Sending push notifications
+
+A WebSocket reaches an app that's running. A push notification reaches a phone
+whose app isn't: a server tells a rider their driver has arrived, or moves the
+countdown on the lock screen. The server hands the message to the Codename One
+push service, which delivers it through Firebase, APNs, Huawei, WNS, or Web Push,
+and the app receives it with `PushClient`. <<push-notifications-section>> covers the
+app's half and the Console.
+
+A server needs two values from the Console, both described in
+<<push-notifications-section,Push notifications>>: the application UUID of the push
+application, and a server API key created with the `push` scope. The key is a
+credential; keep it in configuration or the environment, never in source and never
+in the app.
+
+`CloudPush` sends, `PushNotification` builds the message, and `PushTarget` names a
+device:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-send,indent=0]
+----
+
+A device is a provider and that provider's token. `PushTarget.of("fcm", token)`
+takes the two values and accepts the older spellings the app can report (`gcm`,
+`ios`, `hms`). `PushTarget.fromDeviceKey` reads the `cn1-fcm-...` form that
+`Push.getPushKey()` returns. One `send` can address many devices at once.
+
+`PushNotification` writes the same envelope the app's `PushMessage` reads: title,
+body, image, deep link, collapse key, time to live, silent delivery, application
+data, and options for one provider. A message needs a body, data, or a surface
+command.
+
+==== Live Activities and widgets
+
+A message can carry a command the app applies before its listener runs, which keeps
+a Live Activity or a widget current while the app is in the background. Three
+helpers build the command:
+
+* `PushNotification.liveUpdate(id, state)` gives a running activity new state.
+* `PushNotification.liveEnd(id, finalState, dismissImmediately)` ends it, optionally
+  with a last state.
+* `PushNotification.widget(kind, timelineJson)` publishes new widget content.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-live-activity,indent=0]
+----
+
+The `id` is the one the app started the activity under, and the state map uses the
+names the activity's layout binds. The helpers turn the map into the JSON string
+the envelope carries, with its keys sorted the way the app writes state itself.
+<<push-notifications-section>> describes how each platform applies a command.
+
+==== What the answer means
+
+`send` returns a `PushResult` for every answer the service gives, a refusal
+included. `isAccepted()` is true for a `202`, and that means _admitted_: the
+service has queued the message durably, but no provider or device has seen it yet.
+Whether it arrived is reported later, through delivery feedback. `getDeliveryIds()`
+lists one id per admitted target, to match against that feedback.
+
+A refusal carries its status and the service's explanation in `getError()`:
+
+* *400*: the request is malformed, such as an unknown provider or an `appId` that
+  isn't the application UUID.
+* *401*: the key is missing, wrong, or lacks the `push` scope.
+* *402*: the account doesn't include what the message asked for.
+* *429*: slow down. `getRetryAfterSeconds()` says how long to wait, or answers
+  `-1` when the service didn't say.
+
+Only a request that got no answer at all, because the service was unreachable or
+the connection failed, throws an `IOException`. Each notification is one HTTPS request on the
+calling thread, so a server that notifies as part of handling a request can hand it
+to an `@Async` method rather than make its own caller wait. `withEndpoint` points a
+sender at another URL, such as a stub server in a test.

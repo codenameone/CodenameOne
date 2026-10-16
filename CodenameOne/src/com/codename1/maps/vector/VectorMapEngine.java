@@ -81,7 +81,12 @@ public final class VectorMapEngine {
     private double pixelRatio = 1.0;
 
     private final TileCache rendered;
-    private final Map labels = new HashMap();
+    // The labels of each tile, bounded like the tiles themselves: a plain map
+    // kept the labels of every tile a long session had ever shown, long after
+    // the tile's picture was evicted. Twice the tiles' bound, so the labels of
+    // a tile still drawn are never the ones to go: every set of labels newer
+    // than a tile's came with at least one tile newer than it.
+    private final TileCache labels = new TileCache(512);
     private final Map pending = new HashMap();
     private final Map failed = new HashMap();
     private final LabelEngine labelEngine = new LabelEngine();
@@ -90,6 +95,32 @@ public final class VectorMapEngine {
     private final TileCache decodedParents = new TileCache(8);
     private final Map parentWaiters = new HashMap();
     private int generation;
+
+    // The most tiles asked of the source at one time. A view that has just
+    // moved wants every tile it shows, and a drag wants a new row of them every
+    // few frames. Handed to the source all at once they are fetched in the
+    // order they were asked for, each waiting for all of those before it --
+    // including the ones the drag left behind long before their turn came.
+    private static final int MAX_IN_FLIGHT = 6;
+    // How many levels up a stand-in for a missing tile is looked for.
+    private static final int STAND_IN_LEVELS = 5;
+    // The first wait before a tile that failed is asked for again, doubled for
+    // each failure after it up to the longest.
+    private static final int RETRY_FIRST_MILLIS = 2000;
+    private static final int RETRY_LONGEST_MILLIS = 60000;
+    private static final int RETRY_SLACK_MILLIS = 50;
+
+    // The tiles wanted and not yet asked of the source: tile key to FetchJob.
+    // Every pass over the view says again which of them it still wants, and
+    // the ones it did not mention are dropped before any more are sent.
+    private final Map queued = new HashMap();
+    private int inFlight;
+    private int pass;
+    private boolean dispatching;
+    // The middle of the view as a fraction of the world, for sending the
+    // tiles nearest to it first.
+    private double passCenterX;
+    private double passCenterY;
 
     // What [#paintTiles] saw, for the [#paintLabels] call that follows it.
     private List frameLabels;
@@ -120,6 +151,12 @@ public final class VectorMapEngine {
     /// Replaces the tile source, clearing cached tiles.
     public void setSource(TileSource source) {
         this.source = source;
+        discardTiles();
+    }
+
+    // Forgets every tile and every request for one. What is on its way from
+    // the source still arrives, and is recognised by its generation.
+    private void discardTiles() {
         generation++;
         rendered.clear();
         labels.clear();
@@ -127,6 +164,10 @@ public final class VectorMapEngine {
         failed.clear();
         decodedParents.clear();
         parentWaiters.clear();
+        queued.clear();
+        inFlight = 0;
+        pieces.clear();
+        waitingPieces.clear();
     }
 
     /// The active tile source.
@@ -137,13 +178,7 @@ public final class VectorMapEngine {
     /// Replaces the style, clearing rendered tiles so they redraw.
     public void setStyle(MapStyle style) {
         this.style = style;
-        generation++;
-        rendered.clear();
-        labels.clear();
-        pending.clear();
-        failed.clear();
-        decodedParents.clear();
-        parentWaiters.clear();
+        discardTiles();
     }
 
     /// The active style.
@@ -211,13 +246,7 @@ public final class VectorMapEngine {
     public void setPixelRatio(double ratio) {
         if (ratio > 0 && Math.abs(ratio - pixelRatio) > 1e-9) {
             pixelRatio = ratio;
-            generation++;
-            rendered.clear();
-            labels.clear();
-            pending.clear();
-            failed.clear();
-            decodedParents.clear();
-            parentWaiters.clear();
+            discardTiles();
         }
     }
 
@@ -411,6 +440,7 @@ public final class VectorMapEngine {
         Set labelKeys = new HashSet();
         int sourceMax = source.getMaxZoom();
 
+        beginPass(cwx, cwy);
         for (int tx = txMin; tx <= txMax; tx++) {
             for (int ty = tyMin; ty <= tyMax; ty++) {
                 if (ty < 0 || ty >= tiles) {
@@ -419,13 +449,14 @@ public final class VectorMapEngine {
                 int wrappedTx = ((tx % tiles) + tiles) % tiles;
                 String key = TileUtil.key(z, wrappedTx, ty);
                 Image img = (Image) rendered.get(key);
+                int left = screenX(tx * (double) tileSize, s, cwx, originX, width);
+                int top = screenY(ty * (double) tileSize, s, cwy, originY, height);
+                int right = screenX((tx + 1) * (double) tileSize, s, cwx, originX, width);
+                int bottom = screenY((ty + 1) * (double) tileSize, s, cwy, originY, height);
                 if (img == null) {
                     requestTile(z, wrappedTx, ty);
+                    paintStandIn(g, z, wrappedTx, ty, left, top, right - left, bottom - top);
                 } else {
-                    int left = screenX(tx * (double) tileSize, s, cwx, originX, width);
-                    int top = screenY(ty * (double) tileSize, s, cwy, originY, height);
-                    int right = screenX((tx + 1) * (double) tileSize, s, cwx, originX, width);
-                    int bottom = screenY((ty + 1) * (double) tileSize, s, cwy, originY, height);
                     g.drawImage(img, left, top, right - left, bottom - top);
                 }
                 // An overzoomed tile shows part of a deeper-level tile, whose
@@ -442,6 +473,8 @@ public final class VectorMapEngine {
                 }
             }
         }
+
+        endPass();
 
         frameLabels = visibleLabels;
         frameScale = s;
@@ -489,6 +522,7 @@ public final class VectorMapEngine {
 
         boolean ready = true;
         boolean sawTile = false;
+        beginPass(cwx, cwy);
         for (int tx = txMin; tx <= txMax; tx++) {
             for (int ty = tyMin; ty <= tyMax; ty++) {
                 if (ty < 0 || ty >= tiles) {
@@ -504,16 +538,70 @@ public final class VectorMapEngine {
                 }
             }
         }
+        endPass();
         return sawTile && ready;
+    }
+
+    // What a tile that has not arrived shows in the meantime: the part of a
+    // shallower tile that covers it, stretched, or failing that whichever of
+    // the four tiles one level down are at hand. Either is blurred or partial,
+    // and either is the map -- where a blank square is a hole in it, which is
+    // what every zoom across a whole level and every drag onto new ground
+    // showed until the tiles came.
+    private void paintStandIn(Graphics g, int z, int x, int y, int left, int top, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        Image ancestor = null;
+        int up = 0;
+        while (ancestor == null && up < STAND_IN_LEVELS && z - up > 0) {
+            up++;
+            ancestor = (Image) rendered.get(TileUtil.key(z - up, x >> up, y >> up));
+        }
+        if (ancestor != null) {
+            int span = 1 << up;
+            int subX = x - ((x >> up) << up);
+            int subY = y - ((y >> up) << up);
+            int clipX = g.getClipX();
+            int clipY = g.getClipY();
+            int clipW = g.getClipWidth();
+            int clipH = g.getClipHeight();
+            g.clipRect(left, top, w, h);
+            g.drawImage(ancestor, left - subX * w, top - subY * h, w * span, h * span);
+            g.setClip(clipX, clipY, clipW, clipH);
+            return;
+        }
+        int midX = left + w / 2;
+        int midY = top + h / 2;
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                Image child = (Image) rendered.get(TileUtil.key(z + 1, x * 2 + i, y * 2 + j));
+                if (child != null) {
+                    int cx = i == 0 ? left : midX;
+                    int cy = j == 0 ? top : midY;
+                    g.drawImage(child, cx, cy, (i == 0 ? midX : left + w) - cx, (j == 0 ? midY : top + h) - cy);
+                }
+            }
+        }
     }
 
     private void drawLabels(Graphics g, List candidates, double s, double cwx, double cwy,
                             int originX, int originY, int width, int height, int z) {
-        labelEngine.reset();
-        for (Object cand : candidates) {
-            LabelCandidate c = (LabelCandidate) cand;
+        labelEngine.reset(originX, originY, originX + width, originY + height);
+        labelEngine.setHalo((int) Math.floor(1.2 * pixelRatio + 0.5));
+        // The labels of one view nearly all come from tiles of one zoom, and
+        // a power is not cheap everywhere: worked out per label, it was a
+        // tenth of a frame in the browser.
+        int factorZoom = z;
+        double factor = 1;
+        int count = candidates.size();
+        for (int i = 0; i < count; i++) {
+            LabelCandidate c = (LabelCandidate) candidates.get(i);
             // Candidate world coords are at its own tile zoom; rescale to this z.
-            double factor = MathUtil.pow(2, z - c.tileZoom);
+            if (c.tileZoom != factorZoom) {
+                factorZoom = c.tileZoom;
+                factor = MathUtil.pow(2, z - factorZoom);
+            }
             if (c.path != null) {
                 drawLineLabel(g, c, factor * s, cwx, cwy, originX, originY, width, height);
                 continue;
@@ -527,7 +615,7 @@ public final class VectorMapEngine {
                 continue;
             }
             int sizePx = (int) Math.round(c.sizePx * pixelRatio);
-            labelEngine.place(g, c.text, sizePx, c.textColor, c.haloColor, sx, sy);
+            labelEngine.place(g, c, sizePx, sx, sy);
         }
     }
 
@@ -556,7 +644,7 @@ public final class VectorMapEngine {
             return;
         }
         int sizePx = (int) Math.round(c.sizePx * pixelRatio);
-        labelEngine.placeAlongLine(g, c.text, sizePx, c.textColor, c.haloColor, pts,
+        labelEngine.placeAlongLine(g, c, pts, sizePx,
                 ROAD_LABEL_REPEAT * pixelRatio, originX, originY, originX + width, originY + height);
     }
 
@@ -594,10 +682,28 @@ public final class VectorMapEngine {
 
     private void requestTile(final int z, final int x, final int y) {
         final String key = TileUtil.key(z, x, y);
-        if (pending.containsKey(key) || failed.containsKey(key)) {
+        boolean overzoomed = source.isVector() && z > source.getMaxZoom();
+        if (pending.containsKey(key)) {
+            // Asked for already, and perhaps still waiting its turn: the view
+            // wants it yet.
+            if (overzoomed) {
+                int depth = z - source.getMaxZoom();
+                String parentKey = TileUtil.key(source.getMaxZoom(), x >> depth, y >> depth);
+                stillWanted(parentKey);
+                Piece waiting = (Piece) waitingPieces.get(key);
+                if (waiting != null) {
+                    waiting.pass = pass;
+                }
+                stillWaiting(parentKey, z, x, y);
+            } else {
+                stillWanted(key);
+            }
             return;
         }
-        if (source.isVector() && z > source.getMaxZoom()) {
+        if (failedForNow(key)) {
+            return;
+        }
+        if (overzoomed) {
             requestOverzoomTile(key, z, x, y);
             return;
         }
@@ -606,7 +712,8 @@ public final class VectorMapEngine {
             // An overzoom fetch of this very tile is in flight (the user zoomed
             // back out): join it as its depth-0 piece instead of fetching again.
             pending.put(key, Integer.valueOf(generation));
-            loading.add(new int[]{z, x, y});
+            loading.add(new int[]{z, x, y, pass});
+            stillWanted(key);
             return;
         }
         final int requestGeneration = generation;
@@ -614,7 +721,7 @@ public final class VectorMapEngine {
         final MapStyle requestStyle = style;
         final int requestRasterSize = rasterTileSize();
         pending.put(key, Integer.valueOf(requestGeneration));
-        requestSource.fetchTile(z, x, y, new TileCallback() {
+        enqueue(key, z, x, y, new TileCallback() {
             @Override
             public void tileLoaded(int tz, int tx, int ty, byte[] data) {
                 prepareTile(key, tz, tx, ty, data, requestSource, requestStyle,
@@ -624,6 +731,222 @@ public final class VectorMapEngine {
             @Override
             public void tileFailed(int tz, int tx, int ty) {
                 finishFailed(key, requestGeneration);
+            }
+        });
+    }
+
+    // ---- The queue between the view and the source --------------------------
+
+    // Starts a pass over the tiles in view. Both passes there are -- a paint,
+    // and the readiness probe -- name every tile the view shows.
+    private void beginPass(double centerWorldX, double centerWorldY) {
+        pass++;
+        double world = tileSize * MathUtil.pow(2, zoom);
+        passCenterX = centerWorldX / world;
+        passCenterY = centerWorldY / world;
+    }
+
+    // Ends it: what the pass did not ask for again is no longer in view, and is
+    // dropped unsent; then as many of the rest go to the source as it has room
+    // for.
+    private void endPass() {
+        if (!queued.isEmpty()) {
+            List gone = null;
+            for (Object o : queued.values()) {
+                FetchJob job = (FetchJob) o;
+                if (job.pass != pass) {
+                    if (gone == null) {
+                        gone = new ArrayList();
+                    }
+                    gone.add(job);
+                }
+            }
+            if (gone != null) {
+                for (Object o : gone) {
+                    FetchJob job = (FetchJob) o;
+                    queued.remove(job.key);
+                    forget(job.key);
+                }
+            }
+        }
+        // The pieces of an overzoomed tile whose parent was already decoded
+        // never were in the queue above: they wait here to be drawn. One the
+        // pass did not ask for has left the view, and left waiting it stayed
+        // wanted for good -- a fast drag across a deep zoom queued every tile
+        // it crossed and then drew them all, on the event thread, pushing the
+        // tiles now in view out of the cache.
+        if (!pieces.isEmpty()) {
+            for (int i = pieces.size() - 1; i >= 0; i--) {
+                Piece piece = (Piece) pieces.get(i);
+                if (piece.pass != pass) {
+                    pieces.remove(i);
+                    if (stopWaiting(piece)) {
+                        Object wanted = pending.get(piece.key);
+                        if (wanted instanceof Integer
+                                && ((Integer) wanted).intValue() == piece.generation) {
+                            pending.remove(piece.key);
+                        }
+                    }
+                }
+            }
+        }
+        dispatch();
+    }
+
+    private void enqueue(String key, int z, int x, int y, TileCallback callback) {
+        FetchJob job = new FetchJob();
+        job.key = key;
+        job.z = z;
+        job.x = x;
+        job.y = y;
+        job.callback = callback;
+        job.pass = pass;
+        queued.put(key, job);
+    }
+
+    private void stillWanted(String fetchKey) {
+        FetchJob job = (FetchJob) queued.get(fetchKey);
+        if (job != null) {
+            job.pass = pass;
+        }
+    }
+
+    // A tile dropped from the queue was never asked of the source, so nothing
+    // will come to finish it: it, and the overzoomed pieces waiting on it, go
+    // back to being simply absent, to be asked for again if they come back
+    // into view.
+    private void forget(String key) {
+        pending.remove(key);
+        List waiting = (List) parentWaiters.remove(key);
+        if (waiting != null) {
+            for (Object w : waiting) {
+                int[] a = (int[]) w;
+                pending.remove(TileUtil.key(a[0], a[1], a[2]));
+            }
+        }
+    }
+
+    private void dispatch() {
+        if (dispatching) {
+            // A source that answers before fetchTile returns ends up here from
+            // inside the loop below, which sends the next one itself.
+            return;
+        }
+        dispatching = true;
+        try {
+            while (inFlight < MAX_IN_FLIGHT && !queued.isEmpty()) {
+                FetchJob next = null;
+                double nearest = 0;
+                for (Object o : queued.values()) {
+                    FetchJob job = (FetchJob) o;
+                    double span = 1 << job.z;
+                    double dx = (job.x + 0.5) / span - passCenterX;
+                    double dy = (job.y + 0.5) / span - passCenterY;
+                    double distance = dx * dx + dy * dy;
+                    if (next == null || distance < nearest) {
+                        next = job;
+                        nearest = distance;
+                    }
+                }
+                queued.remove(next.key);
+                inFlight++;
+                send(next);
+            }
+        } finally {
+            dispatching = false;
+        }
+    }
+
+    private void send(final FetchJob job) {
+        final int sent = generation;
+        source.fetchTile(job.z, job.x, job.y, new TileCallback() {
+            @Override
+            public void tileLoaded(int tz, int tx, int ty, byte[] data) {
+                arrived(sent);
+                job.callback.tileLoaded(tz, tx, ty, data);
+                dispatch();
+            }
+
+            @Override
+            public void tileFailed(int tz, int tx, int ty) {
+                arrived(sent);
+                job.callback.tileFailed(tz, tx, ty);
+                dispatch();
+            }
+        });
+    }
+
+    private void arrived(int sent) {
+        if (sent == generation && inFlight > 0) {
+            inFlight--;
+        }
+    }
+
+    // Whether the tile failed and it is too soon to ask for it again. A
+    // failure used to be for good: one request lost to a tunnel left a hole in
+    // the map until the application was restarted.
+    private boolean failedForNow(String key) {
+        long[] failure = (long[]) failed.get(key);
+        return failure != null && System.currentTimeMillis() < failure[0];
+    }
+
+    private void markFailed(String key) {
+        long[] failure = (long[]) failed.get(key);
+        long wait = RETRY_FIRST_MILLIS;
+        if (failure == null) {
+            failure = new long[2];
+            failed.put(key, failure);
+        } else {
+            wait = Math.min(RETRY_LONGEST_MILLIS, failure[1] * 2);
+        }
+        failure[1] = wait;
+        failure[0] = System.currentTimeMillis() + wait;
+        scheduleRetry(wait);
+    }
+
+    // When the timer that looks at the failed tiles again is due, or 0 when
+    // none is waiting.
+    private long retryAt;
+
+    // Which timer that is. One replaced by an earlier one still fires, and
+    // must then do nothing.
+    private int retryTimer;
+
+    // A tile is only asked for by a paint, and a map nobody is touching does
+    // not paint: without this, the delay above ran out with nothing left to
+    // notice, and the hole stayed until the user happened to move the map.
+    // One timer counts at a time, set for the tile that may be retried
+    // soonest. A tile that has failed many times waits up to a minute, so a
+    // timer already waiting says nothing about a tile that failed just now:
+    // when the new moment is the earlier one, the timer is replaced.
+    private void scheduleRetry(long wait) {
+        long due = System.currentTimeMillis() + wait;
+        if (retryAt != 0L && retryAt <= due) {
+            return;
+        }
+        retryAt = due;
+        final int timer = ++retryTimer;
+        // A little past the moment, so the paint finds the tile retryable.
+        com.codename1.ui.CN.setTimeout((int) wait + RETRY_SLACK_MILLIS, new Runnable() {
+            @Override
+            public void run() {
+                if (timer != retryTimer) {
+                    return;
+                }
+                retryAt = 0L;
+                long now = System.currentTimeMillis();
+                long soonest = Long.MAX_VALUE;
+                for (Object value : failed.values()) {
+                    long at = ((long[]) value)[0];
+                    if (at > now && at < soonest) {
+                        soonest = at;
+                    }
+                }
+                if (soonest != Long.MAX_VALUE) {
+                    // Tiles that failed later are still waiting their turn.
+                    scheduleRetry(soonest - now);
+                }
+                repaint();
             }
         });
     }
@@ -679,9 +1002,10 @@ public final class VectorMapEngine {
                     image = Image.createImage(result.data, 0, result.data.length);
                 }
                 rendered.put(key, image);
+                failed.remove(key);
                 drawn = true;
             } catch (Throwable t) {
-                failed.put(key, Boolean.TRUE);
+                markFailed(key);
                 failWaiters(key, requestGeneration);
             }
             // Outside the try on purpose: the waiter list is read through
@@ -697,7 +1021,7 @@ public final class VectorMapEngine {
                 repaint();
             }
         } else {
-            failed.put(key, Boolean.TRUE);
+            markFailed(key);
             failWaiters(key, requestGeneration);
         }
     }
@@ -714,37 +1038,40 @@ public final class VectorMapEngine {
         final String parentKey = TileUtil.key(parentZ, px, py);
         final int requestGeneration = generation;
         pending.put(key, Integer.valueOf(requestGeneration));
-        final int[] address = new int[]{z, x, y};
+        // The last element is the last pass that asked for the tile; see
+        // stillWaiting.
+        final int[] address = new int[]{z, x, y, pass};
         final VectorTile parent = (VectorTile) decodedParents.get(parentKey);
         if (parent != null) {
             // Rasterizing is EDT work, but not work for the middle of a paint.
-            MapTileWorker.callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    if (requestGeneration != generation) {
-                        return;
-                    }
-                    renderOverzoomed(parent, parentZ, address, requestGeneration);
-                    repaint();
-                }
-            });
+            queuePiece(parent, parentZ, address, requestGeneration);
             return;
         }
         List waiters = (List) parentWaiters.get(parentKey);
-        boolean inFlight = waiters != null || pending.containsKey(parentKey);
+        boolean underway = waiters != null || pending.containsKey(parentKey);
+        if (!underway && failedForNow(parentKey)) {
+            // The ancestor failed and is waiting out its back-off. Each piece
+            // of it has a key of its own, so without this every sibling the
+            // view reaches would ask the source for the same tile again --
+            // once per piece within a single paint when the source refuses at
+            // once -- and the back-off would hold for none of them.
+            finishFailed(key, requestGeneration);
+            return;
+        }
         if (waiters == null) {
             waiters = new ArrayList();
             parentWaiters.put(parentKey, waiters);
         }
         waiters.add(address);
-        if (inFlight) {
+        if (underway) {
             // Either another piece already fetches the ancestor, or it is
             // loading as an ordinary deepest-level tile (the user zoomed in
             // while it loaded) and applyTileResult hands it to the waiters:
             // one download and one decode either way.
+            stillWanted(parentKey);
             return;
         }
-        source.fetchTile(parentZ, px, py, new TileCallback() {
+        enqueue(parentKey, parentZ, px, py, new TileCallback() {
             @Override
             public void tileLoaded(int tz, int tx, int ty, final byte[] data) {
                 MapTileWorker.run(new Runnable() {
@@ -785,14 +1112,139 @@ public final class VectorMapEngine {
             return;
         }
         if (tile == null) {
+            // Under the ancestor's own key, which every later piece of it
+            // consults before asking again; see requestOverzoomTile.
+            markFailed(parentKey);
             failAll(waiters, requestGeneration);
             return;
         }
+        failed.remove(parentKey);
         decodedParents.put(parentKey, tile);
         for (Object w : waiters) {
-            renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
+            queuePiece(tile, parentZ, (int[]) w, requestGeneration);
         }
-        repaint();
+    }
+
+    // ---- Drawing the pieces of an overzoomed tile, a few at a time ---------
+
+    // One tile of the source's deepest level is, three levels further in,
+    // sixty-four tiles of the map, and a view holds a dozen or more of them.
+    // They used to be drawn one after the other the moment their tile arrived,
+    // on the event thread, which did nothing else until the last was done: a
+    // third of a second of a map that would not move, each time a tile came
+    // in. Now they are drawn for a few milliseconds at a time, with a frame
+    // in between.
+    private static final int PIECE_BUDGET_MILLIS = 6;
+    private final List pieces = new ArrayList();
+    // The same pieces by the key of the tile each will draw, so a pass can
+    // say which of them the view still shows.
+    private final Map waitingPieces = new HashMap();
+    private boolean piecesScheduled;
+    private int pieceSerial;
+
+    // Takes a piece off the map of those waiting, when it is the one waiting
+    // under its key: a tile dropped and asked for again has a newer piece
+    // there, which this one must not remove. False for a piece that had
+    // already been replaced.
+    private boolean stopWaiting(Piece piece) {
+        Piece waiting = (Piece) waitingPieces.get(piece.key);
+        if (waiting == null || waiting.serial != piece.serial) {
+            return false;
+        }
+        waitingPieces.remove(piece.key);
+        return true;
+    }
+
+    // A tile waiting on an ancestor whose fetch is already at the source is in
+    // neither the queue nor the pieces endPass looks at, so a pass that no
+    // longer shows it cannot drop it. Its address records the last pass that
+    // asked for it instead, and is refreshed here each time one does.
+    private void stillWaiting(String parentKey, int z, int x, int y) {
+        List waiters = (List) parentWaiters.get(parentKey);
+        if (waiters == null) {
+            return;
+        }
+        for (Object w : waiters) {
+            int[] a = (int[]) w;
+            if (a[0] == z && a[1] == x && a[2] == y) {
+                a[3] = pass;
+            }
+        }
+    }
+
+    private void queuePiece(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
+        if (address[3] != pass) {
+            // Its ancestor arrived after the view moved on: the last pass did
+            // not ask for it, and drawing it would spend the event thread on
+            // a tile nobody sees and push ones in view out of the cache. It
+            // goes back to being absent, as endPass leaves the tiles it drops.
+            removePendingIfMatches(TileUtil.key(address[0], address[1], address[2]),
+                    requestGeneration);
+            return;
+        }
+        Piece piece = new Piece();
+        piece.parent = parent;
+        piece.parentZ = parentZ;
+        piece.address = address;
+        piece.generation = requestGeneration;
+        piece.key = TileUtil.key(address[0], address[1], address[2]);
+        piece.pass = pass;
+        piece.serial = ++pieceSerial;
+        pieces.add(piece);
+        waitingPieces.put(piece.key, piece);
+        schedulePieces();
+    }
+
+    private void schedulePieces() {
+        if (piecesScheduled || pieces.isEmpty()) {
+            return;
+        }
+        piecesScheduled = true;
+        MapTileWorker.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                piecesScheduled = false;
+                drawPieces();
+            }
+        });
+    }
+
+    private void drawPieces() {
+        long started = System.currentTimeMillis();
+        boolean drew = false;
+        while (!pieces.isEmpty()) {
+            Piece piece = (Piece) pieces.remove(0);
+            String key = piece.key;
+            stopWaiting(piece);
+            Object wanted = pending.get(key);
+            // Dropped since -- the view moved on before its turn -- or asked
+            // for by a map that has been reset.
+            if (piece.generation != generation || !(wanted instanceof Integer)
+                    || ((Integer) wanted).intValue() != piece.generation) {
+                continue;
+            }
+            renderOverzoomed(piece.parent, piece.parentZ, piece.address, piece.generation);
+            drew = true;
+            if (System.currentTimeMillis() - started >= PIECE_BUDGET_MILLIS) {
+                break;
+            }
+        }
+        if (drew) {
+            repaint();
+        }
+        schedulePieces();
+    }
+
+    private static final class Piece {
+        private VectorTile parent;
+        private int parentZ;
+        private int[] address;
+        private int generation;
+        // The tile this will draw, and the last pass that asked for it.
+        private String key;
+        private int pass;
+        // Which piece this is, counted as they are queued.
+        private int serial;
     }
 
     private void renderOverzoomed(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
@@ -806,6 +1258,7 @@ public final class VectorMapEngine {
             Image buffer = Image.createImage(size, size, 0);
             TileRenderer.renderTile(buffer.getGraphics(), parent, style, address[0], size, subX, subY, depth);
             rendered.put(key, buffer);
+            failed.remove(key);
             // The parent's labels, styled for the zoom actually shown: a symbol
             // layer's minzoom/maxzoom and text size are judged at this zoom,
             // not at the source's deepest one, while the anchors stay in the
@@ -814,12 +1267,12 @@ public final class VectorMapEngine {
             // any ordinary tile.
             String labelKey = depth == 0 ? key : overzoomLabelKey(address[0],
                     TileUtil.key(parentZ, address[1] >> depth, address[2] >> depth));
-            if (!labels.containsKey(labelKey)) {
+            if (!labels.contains(labelKey)) {
                 labels.put(labelKey, TileRenderer.extractLabels(parent, style, address[0], parentZ,
                         address[1] >> depth, address[2] >> depth, tileSize));
             }
         } catch (Throwable t) {
-            failed.put(key, Boolean.TRUE);
+            markFailed(key);
         }
     }
 
@@ -835,7 +1288,7 @@ public final class VectorMapEngine {
             return;
         }
         removePendingIfMatches(key, requestGeneration);
-        failed.put(key, Boolean.TRUE);
+        markFailed(key);
         failWaiters(key, requestGeneration);
     }
 
@@ -843,7 +1296,7 @@ public final class VectorMapEngine {
         List waiting = (List) parentWaiters.remove(parentKey);
         if (waiting != null) {
             for (Object w : waiting) {
-                renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
+                queuePiece(tile, parentZ, (int[]) w, requestGeneration);
             }
         }
     }
@@ -892,13 +1345,18 @@ public final class VectorMapEngine {
 
     /// Drops all cached tiles (e.g. on low memory).
     public void clearCache() {
-        generation++;
-        rendered.clear();
-        labels.clear();
-        pending.clear();
-        failed.clear();
-        decodedParents.clear();
-        parentWaiters.clear();
+        discardTiles();
+    }
+
+    // A tile to ask the source for when its turn comes.
+    private static final class FetchJob {
+        private String key;
+        private int z;
+        private int x;
+        private int y;
+        private TileCallback callback;
+        // The last pass over the view that wanted it.
+        private int pass;
     }
 
     private static final class TileResult {

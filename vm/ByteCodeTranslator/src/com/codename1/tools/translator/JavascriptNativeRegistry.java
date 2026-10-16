@@ -177,17 +177,11 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_System_gcMarkSweep",
             "cn1_java_lang_System_identityHashCode_java_lang_Object_R_int",
             "cn1_java_lang_Integer_cn1Value_R_int",
-            "cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer",
             "cn1_java_lang_Long_cn1Value_R_long",
-            "cn1_java_lang_Long_valueOf_long_R_java_lang_Long",
             "cn1_java_lang_Double_cn1Value_R_double",
-            "cn1_java_lang_Double_valueOf_double_R_java_lang_Double",
             "cn1_java_lang_Float_cn1Value_R_float",
-            "cn1_java_lang_Float_valueOf_float_R_java_lang_Float",
             "cn1_java_lang_Character_cn1Value_R_char",
-            "cn1_java_lang_Character_valueOf_char_R_java_lang_Character",
             "cn1_java_lang_Short_cn1Value_R_short",
-            "cn1_java_lang_Short_valueOf_short_R_java_lang_Short",
             "cn1_java_lang_System_isHighFrequencyGC_R_boolean",
             "cn1_java_lang_System_gcIdleWaitMillis_R_int",
             "cn1_java_lang_Thread_currentThread_R_java_lang_Thread",
@@ -224,19 +218,6 @@ final class JavascriptNativeRegistry {
             "cn1_java_util_NativeStorage_clear_long_int_int",
             "cn1_java_util_NativeStorage_copy_long_int_long_int_int",
             "cn1_java_util_NativeStorage_rehash_long_long_long_long_int_long_long_long_long_long_R_int",
-            "cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean",
-            "cn1_java_util_HashMap_get_java_lang_Object_R_java_lang_Object",
-            "cn1_java_util_HashMap_put_java_lang_Object_java_lang_Object_R_java_lang_Object",
-            "cn1_java_util_HashMap_remove_java_lang_Object_R_java_lang_Object",
-            "cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean",
-            "cn1_java_util_HashSet_cn1AddNative_java_lang_Object_R_boolean",
-            "cn1_java_util_HashSet_cn1ContainsNative_java_lang_Object_R_boolean",
-            "cn1_java_util_HashSet_cn1RemoveNative_java_lang_Object_R_boolean",
-            "cn1_java_util_HashSet_cn1ClearNative",
-            "cn1_java_util_HashSet_cn1NextOccupied_int_R_int",
-            "cn1_java_util_HashSet_cn1ElementAt_int_R_java_lang_Object",
-            "cn1_java_util_HashSet_cn1RemoveSlot_int",
-            "cn1_java_util_HashMap_clear",
             "cn1_java_util_Locale_getOSLanguage_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int",
@@ -280,6 +261,7 @@ final class JavascriptNativeRegistry {
             "java_util_HashMap.removeImpl",
             "java_util_HashMap.containsKeyImpl",
             "java_util_HashMap.clearImpl",
+            "java_util_HashMap.areEqualKeysImpl",
             "java_util_HashSet.cn1AddImpl",
             "java_util_HashSet.cn1ContainsImpl",
             "java_util_HashSet.cn1RemoveImpl",
@@ -294,6 +276,61 @@ final class JavascriptNativeRegistry {
             "java_lang_Character.valueOfHeap",
             "java_lang_Short.valueOfHeap"
     ));
+
+    // Natives the JavaScript target implements IN THE TRANSLATOR, as a direct call
+    // to a pure-Java twin declared in the same class with the same descriptor.
+    // Keyed "<mangled-class>.<native-name>", valued with the twin's name. These
+    // natives exist for the C targets -- a hand-tuned probe loop, a tagged
+    // immediate -- and on JavaScript each one only ever forwarded to its twin.
+    //
+    // They used to forward through a ``function*`` binding in
+    // parparvm_runtime.js. A generator binding is a native the suspension
+    // analysis cannot see into, so it was classified suspending: every HashMap
+    // get/put/containsKey and every autobox paid for a generator and a
+    // ``yield*``, and every method that called one was forced to suspend too.
+    // Emitted by the translator, the native is a plain call whose suspension is
+    // exactly its twin's (JavascriptSuspensionAnalysis records the edge), so it
+    // is a plain function wherever the twin is.
+    //
+    // The twins are also RUNTIME_DELEGATE_TARGETS: no bytecode calls them, so
+    // the cull would otherwise remove them.
+    private static final java.util.Map<String, String> TRANSLATED_DELEGATES = new java.util.HashMap<String, String>();
+    static {
+        String[] pairs = {
+                "java_util_HashMap.get", "getImpl",
+                "java_util_HashMap.put", "putImpl",
+                "java_util_HashMap.remove", "removeImpl",
+                "java_util_HashMap.containsKey", "containsKeyImpl",
+                "java_util_HashMap.clear", "clearImpl",
+                "java_util_HashMap.areEqualKeys", "areEqualKeysImpl",
+                "java_util_HashSet.cn1AddNative", "cn1AddImpl",
+                "java_util_HashSet.cn1ContainsNative", "cn1ContainsImpl",
+                "java_util_HashSet.cn1RemoveNative", "cn1RemoveImpl",
+                "java_util_HashSet.cn1ClearNative", "cn1ClearImpl",
+                "java_util_HashSet.cn1NextOccupied", "cn1NextOccupiedImpl",
+                "java_util_HashSet.cn1ElementAt", "cn1ElementAtImpl",
+                "java_util_HashSet.cn1RemoveSlot", "cn1RemoveSlotImpl",
+                "java_lang_Integer.valueOf", "valueOfHeap",
+                "java_lang_Long.valueOf", "valueOfHeap",
+                "java_lang_Double.valueOf", "valueOfHeap",
+                "java_lang_Float.valueOf", "valueOfHeap",
+                "java_lang_Character.valueOf", "valueOfHeap",
+                "java_lang_Short.valueOf", "valueOfHeap"
+        };
+        for (int i = 0; i < pairs.length; i += 2) {
+            TRANSLATED_DELEGATES.put(pairs[i], pairs[i + 1]);
+        }
+    }
+
+    /// The twin a native delegates to on the JavaScript target (see
+    /// TRANSLATED_DELEGATES), or null. Only a native method qualifies: the
+    /// String-argument valueOf overloads are ordinary Java methods.
+    static String translatedDelegateTwin(String mangledClassName, BytecodeMethod method) {
+        if (!method.isNative()) {
+            return null;
+        }
+        return TRANSLATED_DELEGATES.get(mangledClassName + "." + method.getMethodName());
+    }
 
     static boolean isRuntimeDelegateTarget(String mangledClassName, String methodName) {
         return RUNTIME_DELEGATE_TARGETS.contains(mangledClassName + "." + methodName);

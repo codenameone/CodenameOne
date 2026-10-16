@@ -28,6 +28,9 @@ import com.codename1.ui.ComboBoxPopupTestSupport.PopupScript;
 import com.codename1.ui.ComboBoxPopupTestSupport.ScriptedComboBox;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,6 +42,7 @@ class ComboBoxPopupWidthTest extends UITestBase {
         int popupWidth;
         int popupLeft;
         int sideGap;
+        int listPreferredWidth;
 
         @Override
         public void run(Dialog popup, List<String> list) {
@@ -47,10 +51,19 @@ class ComboBoxPopupWidthTest extends UITestBase {
             popupWidth = box.getWidth();
             popupLeft = box.getAbsoluteX();
             sideGap = list.getSideGap();
+            listPreferredWidth = list.getPreferredW();
         }
     }
 
     private ScriptedComboBox comboOnForm(String... items) {
+        // A wide desktop gutter exposes the assumption that a naturally sized combo
+        // is always wider than its popup rows. Fonts and themes can make either wider.
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@interactiveScrollBool", "true");
+        theme.put("DesktopScroll.padding", "0,0,24,24");
+        theme.put("DesktopScroll.padUnit", new byte[]{Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        UIManager.getInstance().addThemeProps(theme);
         Form form = new Form("combo", new BorderLayout());
         ScriptedComboBox combo = new ScriptedComboBox(items) {
             @Override
@@ -76,10 +89,15 @@ class ComboBoxPopupWidthTest extends UITestBase {
     void aDesktopPopupIsAsWideAsItsCombo() throws Exception {
         implementation.setDesktop(true);
         ScriptedComboBox combo = comboOnForm("One", "Two", "Three");
+        combo.setPreferredW(200);
+        combo.getComponentForm().revalidate();
+        DisplayTest.flushEdt();
         Widths w = new Widths();
         ComboBoxPopupTestSupport.open(combo, w);
 
-        assertTrue(w.sideGap > 0, "the case needs a scrollbar gutter to mean anything");
+        assertTrue(w.sideGap >= 48, "the fixture must reserve its wide scrollbar gutter");
+        assertTrue(w.listPreferredWidth < combo.getWidth(),
+                "this case needs the combo to be wider than the rows including their gutter");
         assertEquals(combo.getWidth(), w.popupWidth, "the popup lines up with both edges of the combo");
         assertEquals(combo.getAbsoluteX(), w.popupLeft);
     }
@@ -95,7 +113,11 @@ class ComboBoxPopupWidthTest extends UITestBase {
         ComboBoxPopupTestSupport.open(combo, w);
 
         assertTrue(combo.getWidth() <= 40);
+        assertTrue(w.listPreferredWidth > combo.getWidth(),
+                "this case needs the rows including their gutter to be wider than the combo");
         assertTrue(w.popupWidth > combo.getWidth(),
                 "rows wider than the combo are not clipped to it");
+        assertEquals(w.listPreferredWidth, w.popupWidth,
+                "the scrollbar gutter is already included in the rows' preferred width");
     }
 }

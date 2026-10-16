@@ -45,6 +45,85 @@
   if (typeof window.createConfigOptions !== "function") {
     window.createConfigOptions = function() { return {}; };
   }
+  // ``WindowExt.createEmptyObject`` is the same kind of member: a TeaVM
+  // @JSBody ("return new Object()") the Java side calls on the window, which
+  // the JSO bridge looks up as a property of the host window and does not find.
+  // It is how HTML5LocationManager builds the options it passes to the
+  // Geolocation API, so without it the first location request -- the first
+  // screen of any app with a map -- ended in "Missing JS member
+  // createEmptyObject for host receiver" and the internal-error dialog. It
+  // lives here because this is the file that supplies such members, and it is
+  // loaded before the bridge.
+  if (typeof window.createEmptyObject !== "function") {
+    window.createEmptyObject = function() { return {}; };
+  }
+  // Geolocation, for HTML5LocationManager. The application runs in a worker
+  // and the Geolocation API exists only here, on the page, so a position has
+  // to cross to the worker as a message. The bridge sends every callback
+  // argument as if it were a DOM event: it copies the event fields it knows
+  // and nothing else. A GeolocationPosition has none of them -- ``coords`` is
+  // an accessor on its prototype, not even an own property -- so what reached
+  // the worker was an object with no position in it, the Java callback threw
+  // on ``getCoords()`` before it woke the thread waiting for the answer, and
+  // an application that asked for the position on its event thread stopped
+  // for good the moment the user ALLOWED location. Refusing it worked, which
+  // is what made it look like a problem with the place.
+  //
+  // So the answer is flattened here into the one field the bridge carries
+  // verbatim, a string in ``data``:
+  //   "P|latitude|longitude|accuracy|altitude|heading|speed|timestamp"
+  //   "E|code|message"   (code as in GeolocationPositionError: 1 denied,
+  //                       2 unavailable, 3 timed out)
+  // A value the browser does not know (altitude on a desktop) is left empty.
+  if (typeof window.cn1GeoRequest !== "function") {
+    var cn1GeoNumber = function(v) {
+      return (v == null || typeof v !== "number" || !isFinite(v)) ? "" : String(v);
+    };
+    // watch: keep reporting until cn1GeoClear(the id returned). timeoutMillis
+    // and maximumAgeMillis: 0 or less leaves the browser's default. Answers -1
+    // when no watch was started: 0 is a watch id a browser may hand out.
+    window.cn1GeoRequest = function(callback, watch, timeoutMillis, maximumAgeMillis, highAccuracy) {
+      var answer = function(text) {
+        try { callback({ type: "cn1geolocation", data: text }); } catch (_e) { /* the worker is gone */ }
+      };
+      var geo = window.navigator && window.navigator.geolocation;
+      if (!geo) {
+        window.setTimeout(function() { answer("E|2|This browser has no location service"); }, 0);
+        return -1;
+      }
+      var options = {};
+      if (timeoutMillis > 0) { options.timeout = timeoutMillis; }
+      if (maximumAgeMillis > 0) { options.maximumAge = maximumAgeMillis; }
+      if (highAccuracy) { options.enableHighAccuracy = true; }
+      var onPosition = function(position) {
+        var c = (position && position.coords) || {};
+        answer("P|" + cn1GeoNumber(c.latitude) + "|" + cn1GeoNumber(c.longitude) + "|"
+            + cn1GeoNumber(c.accuracy) + "|" + cn1GeoNumber(c.altitude) + "|"
+            + cn1GeoNumber(c.heading) + "|" + cn1GeoNumber(c.speed) + "|"
+            + cn1GeoNumber(position && position.timestamp));
+      };
+      var onError = function(error) {
+        answer("E|" + ((error && error.code) | 0) + "|" + ((error && error.message) || ""));
+      };
+      try {
+        if (watch) {
+          return geo.watchPosition(onPosition, onError, options) | 0;
+        }
+        geo.getCurrentPosition(onPosition, onError, options);
+      } catch (err) {
+        // A page that is not a secure context, or a policy that forbids it.
+        window.setTimeout(function() { answer("E|2|" + (err && err.message ? err.message : err)); }, 0);
+      }
+      return -1;
+    };
+    window.cn1GeoClear = function(id) {
+      var geo = window.navigator && window.navigator.geolocation;
+      // Zero is a real watch id; only the -1 cn1GeoRequest answers is none.
+      if (geo && typeof id === "number" && id >= 0) {
+        try { geo.clearWatch(id); } catch (_e) { /* nothing to clear */ }
+      }
+    };
+  }
   // This synchronous-callback shim MUST own ``window.localforage`` on the
   // ParparVM port. The CN1 worker can't pump the async microtask/Promise loop
   // a real localForage relies on, so its callbacks must fire inline (see the
@@ -171,10 +250,12 @@
       } catch (_l) {}
       throw e;
     }
+    // The key and the length, never the value: what is stored here includes
+    // the app's sign-in tokens, and a prefix of the serialised form is a
+    // prefix of the token for anyone reading the console or a captured log.
     try {
       console.log("LF-SHIM:set-ok key=" + nk + " valType=" + valCtor
-              + " serLen=" + (serialised == null ? "null" : serialised.length)
-              + " serPrefix=" + (serialised == null ? "null" : serialised.substring(0, Math.min(60, serialised.length))));
+              + " serLen=" + (serialised == null ? "null" : serialised.length));
     } catch (_l) {}
     return value;
   }
@@ -182,7 +263,7 @@
     var nk = namespacedKey(key);
     var raw = window.localStorage.getItem(nk);
     try {
-      console.log("LF-SHIM:get key=" + nk + " raw=" + (raw == null ? "null" : ("len=" + raw.length + " prefix=" + raw.substring(0, Math.min(40, raw.length)))));
+      console.log("LF-SHIM:get key=" + nk + " raw=" + (raw == null ? "null" : ("len=" + raw.length)));
     } catch (_l) {}
     if (raw == null) {
       return null;

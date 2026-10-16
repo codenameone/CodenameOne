@@ -190,4 +190,53 @@ class EditorGeometrySnapshotTest extends UITestBase {
         assertArrayEquals(new int[]{150, 145}, client.samples.get(3));
     }
 
+    @FormTest
+    void fallbackCapsGeometryAroundBackwardSelectionFocus() {
+        final int[] range = {-1, -1};
+        ScrolledClient client = new ScrolledClient() {
+            @Override public TextInputState getEditingState() { return new TextInputState("", 9000, 100); }
+            @Override public int getTextLength() { return 10000; }
+            @Override public int offsetAtPoint(int x, int y) { return y == 0 ? 0 : 9999; }
+            @Override public int[] rectForOffset(int offset) { return new int[]{offset, 0, 1, 20}; }
+            @Override public int[] getCaretRect() { return new int[]{-1, -1, 1, 20}; }
+            @Override public int[] selectionRects(int a, int b) { range[0] = a; range[1] = b; return new int[0]; }
+        };
+        client.setWidth(100);
+        client.setHeight(100);
+        TextInputGeometry geometry = TextInputGeometry.capture(client);
+        assertArrayEquals(new int[]{100, 0, 1, 20}, geometry.rectForOffset(100));
+        assertArrayEquals(new int[]{-1, -1, 1, 20}, geometry.rectForOffset(9000));
+        assertEquals(100, geometry.offsetAtPoint(100, 0));
+        assertArrayEquals(new int[]{100, 9000}, range);
+    }
+
+    @FormTest
+    void providerWithoutVisibleCaretPointsRetainsSelectionFocus() {
+        class ScrolledEditor extends EditorView {
+            final CountingFont font = new CountingFont();
+            ScrolledEditor() { super(null, false); }
+            @Override protected Font getEditorFont() { return font; }
+            void hideVisibleShortLines() {
+                scrollByPixels(-500, -200);
+                assertTrue(getHorizontalScroll() >= 500);
+                assertTrue(getVerticalScroll() >= 200);
+            }
+        }
+        ScrolledEditor editor = new ScrolledEditor();
+        editor.setWidth(200);
+        editor.setHeight(80);
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 2000; i++) { text.append('x'); }
+        for (int i = 0; i < 100; i++) { text.append("\nabc"); }
+        editor.setText(text.toString());
+        for (int[] selection : new int[][]{{2004, 2001}, {2001, 2004}, {2002, 2002}}) {
+            editor.setSelectionRange(selection[0], selection[1]);
+            editor.hideVisibleShortLines();
+            TextInputGeometry geometry = TextInputGeometry.capture(editor);
+            assertEquals(selection[1], geometry.offsetAtPoint(0, 0));
+            assertEquals(selection[1], geometry.offsetAtPoint(150, 60));
+            assertArrayEquals(editor.getCaretRect(), geometry.rectForOffset(0));
+        }
+    }
+
 }

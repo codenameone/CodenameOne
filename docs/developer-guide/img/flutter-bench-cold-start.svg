@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="316" viewBox="0 0 720 316" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="16" y="26" font-size="17" font-weight="bold" fill="#202124">Cold start to first frame (lower is better)</text>
+<rect x="16" y="38" width="12" height="12" fill="#1a73e8"/>
+<text x="34" y="49" font-size="12" fill="#202124">Codename One</text>
+<rect x="136" y="38" width="12" height="12" fill="#9aa0a6"/>
+<text x="154" y="49" font-size="12" fill="#202124">Flutter</text>
+<text x="86" y="86" font-size="13" text-anchor="end" fill="#202124">Android</text>
+<rect x="96" y="64" width="118.3" height="16" fill="#1a73e8"/>
+<text x="220.3" y="76" font-size="11" fill="#5f6368">367 ms</text>
+<rect x="96" y="84" width="474.0" height="16" fill="#9aa0a6"/>
+<text x="576.0" y="96" font-size="11" fill="#5f6368">1470 ms</text>
+<text x="712" y="86" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">3.76x faster</text>
+<text x="86" y="140" font-size="13" text-anchor="end" fill="#202124">Linux</text>
+<rect x="96" y="118" width="49.3" height="16" fill="#1a73e8"/>
+<text x="151.3" y="130" font-size="11" fill="#5f6368">153 ms</text>
+<rect x="96" y="138" width="71.6" height="16" fill="#9aa0a6"/>
+<text x="173.6" y="150" font-size="11" fill="#5f6368">222 ms</text>
+<text x="712" y="140" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.45x faster</text>
+<text x="86" y="194" font-size="13" text-anchor="end" fill="#202124">Windows</text>
+<rect x="96" y="172" width="50.4" height="16" fill="#1a73e8"/>
+<text x="152.4" y="184" font-size="11" fill="#5f6368">156 ms</text>
+<rect x="96" y="192" width="76.4" height="16" fill="#9aa0a6"/>
+<text x="178.4" y="204" font-size="11" fill="#5f6368">237 ms</text>
+<text x="712" y="194" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.55x faster</text>
+<text x="86" y="248" font-size="13" text-anchor="end" fill="#202124">macOS</text>
+<rect x="96" y="226" width="173.3" height="16" fill="#1a73e8"/>
+<text x="275.3" y="238" font-size="11" fill="#5f6368">537 ms</text>
+<rect x="96" y="246" width="224.7" height="16" fill="#9aa0a6"/>
+<text x="326.7" y="258" font-size="11" fill="#5f6368">697 ms</text>
+<text x="712" y="248" font-size="13" font-weight="bold" text-anchor="end" fill="#1a73e8">1.35x faster</text>
+<text x="16" y="304" font-size="11" fill="#5f6368">Same Flutter Gallery source on both sides; Codename One builds it from the Dart.</text>
+</svg>

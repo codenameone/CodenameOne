@@ -1,0 +1,21 @@
+{
+ "floor": {
+  "code_bytes": 0.0,
+  "cold_start_ratio": 0.0,
+  "idle_memory_ratio": 0.0,
+  "install_bytes": 0.0,
+  "wire_bytes": 0.0
+ },
+ "tolerance": {
+  "code_bytes": 0.0,
+  "cold_start_ratio": 0.25,
+  "idle_memory_ratio": 0.15,
+  "install_bytes": 0.0,
+  "wire_bytes": 0.0
+ },
+ "ungated": {
+  "macos": {
+   "cold_start_ratio": "Recorded, not gated, carried over from the retired baselines/macos.json, which gave macOS start-up no tolerance: On the hosted macOS runner one run spread Codename One's start-up from 465 to 2588 ms at a host load of 12-32, so any band wide enough not to fire on that noise would catch nothing. Sizes and memory at rest (101.3-111.3 MB in the same run) are stable and gated."
+  }
+ }
+}

@@ -44,6 +44,19 @@ echo "Version: $version"
 mvn versions:set -DnewVersion=$version
 mvn versions:commit
 
+# dart-runtime and flutter-runtime are listed only in the JDK-17 flutter-modules
+# profile, so on the release job's JDK 8 they are not reactor projects. versions:set
+# still rewrites them: it reads every profile's <modules>, active or not (verified:
+# a JDK 8 run of the line above sets both POMs' parent and own version). Checked
+# rather than assumed, because a runtime left on the old version would stage
+# snapshot coordinates the release's R2 checks then cannot find.
+for f in ./dart-runtime/pom.xml ./flutter-runtime/pom.xml; do
+  if [ -f "$f" ] && grep -q "<version>$oldVersion</version>" "$f"; then
+    echo "update-version.sh: $f still names $oldVersion after versions:set" >&2
+    exit 1
+  fi
+done
+
 # Archetype metadata and IT fixtures: mvn versions:set does not reach inside
 # the archetype-resources templates or the IT archetype.properties files, so
 # bump the embedded version references by hand. Mirrors what the historical

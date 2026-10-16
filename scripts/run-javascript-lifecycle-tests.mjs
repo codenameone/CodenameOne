@@ -302,7 +302,7 @@ async function runBundle({ name, bundle }) {
       bundle,
       browser: BROWSER_NAME,
       engineVersion,
-      ok: milestones.cn1Initialized && milestones.cn1Started && !pageError,
+      ok: milestones.cn1Initialized && milestones.cn1Started && !milestones.startedTooEarly && !pageError,
       milestones,
       lifecycle,
       firstFailure,
@@ -333,22 +333,37 @@ async function pollLifecycle(page, timeoutSeconds) {
   let cn1Initialized = false;
   let cn1Started = false;
   let parparError = null;
+  let lifecycleSources = [];
 
   while (Date.now() < deadline) {
     const state = await page.evaluate(() => ({
       initialized: !!window.cn1Initialized,
       started: !!window.cn1Started,
-      error: window.__parparError ? JSON.stringify(window.__parparError) : ''
+      error: window.__parparError ? JSON.stringify(window.__parparError) : '',
+      lifecycleSources: (window.__parparMessages || [])
+        .filter(m => m && m.type === 'lifecycle')
+        .map(m => String(m.source || ''))
     }));
     if (state.initialized) cn1Initialized = true;
     if (state.started) cn1Started = true;
     if (state.error) parparError = state.error;
     if (cn1Started || parparError) {
+      lifecycleSources = state.lifecycleSources;
       break;
     }
     await new Promise(r => setTimeout(r, 500));
   }
-  return { cn1Initialized, cn1Started, parparError };
+  // ``cn1Started`` is raised by the FIRST ``lifecycle`` message, and two kinds exist:
+  // the runtime's (source "main-thread", when the worker's main thread finishes) and
+  // ParparVMBootstrap's (source "bootstrap", once Lifecycle.start returns). The main
+  // thread may only finish after start() has returned, so in a Codename One app the
+  // bootstrap's must come first. When the bootstrap queued the lifecycle to the EDT
+  // without waiting for it, the main-thread one came first and cn1Started went true
+  // before any form was shown -- every harness that then clicked the app clicked an
+  // empty display, and a start() that hung still counted as started here.
+  const firstSource = lifecycleSources.length ? lifecycleSources[0] : '';
+  const startedTooEarly = firstSource === 'main-thread';
+  return { cn1Initialized, cn1Started, parparError, lifecycleSources, startedTooEarly };
 }
 
 function summarise(results) {
@@ -365,6 +380,10 @@ function summarise(results) {
       }
       if (r.milestones) {
         console.log(`       milestones: cn1Initialized=${r.milestones.cn1Initialized} cn1Started=${r.milestones.cn1Started}`);
+        if (r.milestones.startedTooEarly) {
+          console.log(`       cn1Started was raised by the main thread finishing before Lifecycle.start returned`
+              + ` (lifecycle message order: ${JSON.stringify(r.milestones.lifecycleSources)})`);
+        }
         if (r.milestones.parparError) {
           console.log(`       __parparError: ${r.milestones.parparError.substring(0, 300)}`);
         }

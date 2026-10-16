@@ -25,16 +25,15 @@ package com.codename1.ui;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Drives an open `ComboBox` popup from a test.
 ///
-/// The popup is modal: showing it parks the caller until it goes away. So the click
-/// happens on a thread of its own, and everything the test wants to do to the open
-/// popup runs from the popup's show listener, which is dispatch-thread work. Whatever
-/// the script leaves open is disposed afterwards, because a caller left parked in
-/// invokeAndBlock outlives the test.
+/// The popup is modal: showing it parks the caller until it goes away. The click is
+/// made on the dispatch thread, as a real one is, and the modal wait nests the event
+/// loop there; everything the test wants to do to the open popup runs from the popup's
+/// show listener, inside that loop. Whatever the script leaves open is disposed
+/// afterwards, which is what lets the click return.
 final class ComboBoxPopupTestSupport {
 
     private ComboBoxPopupTestSupport() {
@@ -100,21 +99,15 @@ final class ComboBoxPopupTestSupport {
         combo.script = script;
         combo.shown = false;
         combo.failure = null;
-        Thread caller = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                combo.fireClicked();
-            }
-        }, "cn1-test-combo-popup");
-        caller.start();
-        for (int i = 0; i < 400 && caller.isAlive(); i++) {
-            DisplayTest.flushEdt();
-            Thread.sleep(5);
-        }
-        caller.join(2000);
+        // On the dispatch thread, which is where a @FormTest body runs. This used to click
+        // from a thread of its own while the test thread pumped the queue, so the popup was
+        // built and measured off the dispatch thread at the same time as that thread laid
+        // the form out. What the popup measured then depended on which side got there
+        // first, and the width test failed now and then in CI (a popup 80 wide against a
+        // 64 wide combo) while it passed every time when run on its own.
+        assertTrue(Display.getInstance().isEdt(), "a popup is opened from the dispatch thread");
+        combo.fireClicked();
         DisplayTest.flushEdt();
-        assertFalse(caller.isAlive(),
-                "the popup has to come back down, or its caller is parked for good");
         assertTrue(combo.shown, "the popup never showed");
         if (combo.failure != null) {
             throw new AssertionError("the popup script failed", combo.failure);

@@ -3406,6 +3406,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if ("legacy".equalsIgnoreCase(iosMode) || "iphone".equalsIgnoreCase(iosMode)) {
                     return "iPhoneTheme";
                 }
+                if ("custom".equalsIgnoreCase(iosMode)) {
+                    // The device installs none; the modern default below would not match it.
+                    return null;
+                }
             }
             String shared = sharedNativeThemeHint();
             if ("legacy".equalsIgnoreCase(shared)) {
@@ -3431,6 +3435,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 if ("legacy".equalsIgnoreCase(andMode)) {
                     return "androidTheme";
+                }
+                if ("custom".equalsIgnoreCase(andMode)) {
+                    // The device installs none; Material 3 below would not match it.
+                    return null;
                 }
             }
             String shared = sharedNativeThemeHint();
@@ -3909,7 +3917,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void hierarchyChanged(HierarchyEvent e) {
                     long flags = e.getChangeFlags();
                     if ((flags & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0 || (flags & HierarchyEvent.PARENT_CHANGED) != 0) {
-                        installNativeMagnificationListeners();
+                        if (getParent() == null) {
+                            // Taken out of its window, which is what deinitialize() does
+                            // last. Installing here put the wheel listener straight back
+                            // on the Toolkit, one statement after deinitialize() had taken
+                            // it off: the Toolkit is the process's, so the listener, this
+                            // canvas and the whole port behind it were never collected.
+                            disposeGestureListeners();
+                        } else {
+                            installNativeMagnificationListeners();
+                        }
                     }
                 }
             });
@@ -4106,7 +4123,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // Routed by window id like every other input this canvas
                     // produces: the canvas a trackpad magnify arrived on is the
                     // window whose component tree has to see it.
+                    //
+                    // Each step is a whole gesture, begun and released. A
+                    // component reads pinch(scale) as the scale since the
+                    // gesture began, as a touch pinch reports it, and this
+                    // listener reports no phases: undelimited, every 1.14 step
+                    // read as the same one step from where the first began,
+                    // and a component that waits for pinchReleased (MapView,
+                    // ImageViewer) never left its pinch.
+                    Display d = Display.getInstance();
+                    d.firePinchBeginGesture();
                     com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+                    d.firePinchReleaseGesture(x, y);
                 }
             });
         }
@@ -4230,6 +4258,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(menuDisplayed){
                 return;
             }
+            long blitStartNanos = BLIT_TRACE ? System.nanoTime() : 0;
+            long bufferDoneNanos = 0;
 
             // We keep a blitCounter that gets reset in paintComponent()
             // If blit is called a number of times with no call to paintComponet
@@ -4289,6 +4319,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
             
+            if (BLIT_TRACE) {
+                bufferDoneNanos = System.nanoTime();
+            }
             try {
                 Runnable r = new Runnable() {
                     public void run() {
@@ -4345,6 +4378,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             } catch(Exception err) {
                 err.printStackTrace();
+            }
+            if (BLIT_TRACE) {
+                recordBlit(bufferDoneNanos - blitStartNanos,
+                        System.nanoTime() - bufferDoneNanos, bufferSafeMode);
             }
         }
 
@@ -13067,6 +13104,60 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    /**
+     * Diagnostic for simulator frame pacing, enabled with -Dcn1.blit.trace=true.
+     *
+     * <p>The simulator presents a frame by handing the buffer to AWT through
+     * {@code SwingUtilities.invokeAndWait}, which BLOCKS the Codename One EDT until the
+     * AWT event thread has run it. That makes the simulator's frame rate a property of
+     * AWT's scheduling rather than of how long the app takes to paint, and it is
+     * invisible to any measurement taken inside Codename One - which is exactly why an
+     * app can paint a frame in 5ms and still advance only a few times a second.</p>
+     *
+     * <p>The two phases are reported separately because they have different causes: the
+     * buffer copy is work the simulator does (and in {@code bufferSafeMode} it copies
+     * the whole screen under a lock, every frame), while the present time is pure
+     * waiting on AWT.</p>
+     */
+    private static final boolean BLIT_TRACE = "true".equals(System.getProperty("cn1.blit.trace"));
+    private static int blitTraceCount;
+    private static long blitTraceBufferNanos;
+    private static long blitTracePresentNanos;
+    private static long blitTraceWorstPresentNanos;
+    private static long blitTraceLastReport;
+    private static int blitTraceSafeModeFrames;
+
+    private static synchronized void recordBlit(long bufferNanos, long presentNanos,
+            boolean safeMode) {
+        blitTraceCount++;
+        blitTraceBufferNanos += bufferNanos;
+        blitTracePresentNanos += presentNanos;
+        blitTraceWorstPresentNanos = Math.max(blitTraceWorstPresentNanos, presentNanos);
+        if (safeMode) {
+            blitTraceSafeModeFrames++;
+        }
+        long now = System.currentTimeMillis();
+        if (blitTraceLastReport == 0) {
+            blitTraceLastReport = now;
+            return;
+        }
+        if (now - blitTraceLastReport < 1000) {
+            return;
+        }
+        System.out.println("BLITTRACE frames=" + blitTraceCount
+                + " fps=" + (blitTraceCount * 1000L / Math.max(1, now - blitTraceLastReport))
+                + " bufferMs=" + (blitTraceBufferNanos / 1000000.0 / blitTraceCount)
+                + " presentMs=" + (blitTracePresentNanos / 1000000.0 / blitTraceCount)
+                + " worstPresentMs=" + (blitTraceWorstPresentNanos / 1000000.0)
+                + " safeModeFrames=" + blitTraceSafeModeFrames);
+        blitTraceCount = 0;
+        blitTraceBufferNanos = 0;
+        blitTracePresentNanos = 0;
+        blitTraceWorstPresentNanos = 0;
+        blitTraceSafeModeFrames = 0;
+        blitTraceLastReport = now;
+    }
+
     public void flushGraphics(int x, int y, int width, int height) {
         if (isShowEDTWarnings()) {
             checkEDT();
@@ -14311,16 +14402,31 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
         if (hasUnsupportedChars(font, str)) {
-            TextLayout textLayout = new TextLayout( 
-                    createAttributedString(font, str).getIterator(), 
-                    canvas.getFRC()
-            );
-            
-            Rectangle2D.Float textBounds = ( Rectangle2D.Float ) textLayout.getBounds();
-            return textBounds;
+            return mixedFontBounds(createAttributedString(font, str).getIterator(), canvas.getFRC());
         } else {
             return font.getStringBounds(str, canvas.getFRC());
         }
+    }
+
+    /**
+     * The box a string drawn in more than one font occupies, measured the way
+     * {@code Font.getStringBounds} measures a single font: by the advance, not
+     * by the ink.
+     *
+     * {@code TextLayout.getBounds()} is the tight box around the pixels. It
+     * leaves out the side bearings of the first and last glyph and every
+     * trailing space, and it starts at the first glyph's bearing rather than
+     * at the pen. drawString() draws from the pen, so a string measured by its
+     * ink ended that bearing past the width it reported: right aligned text in
+     * a component with no side padding lost the edge of its last glyph. Every
+     * string the bundled fonts cannot display takes this path -- Hebrew,
+     * Arabic, CJK, emoji.
+     */
+    static Rectangle2D mixedFontBounds(java.text.AttributedCharacterIterator text, FontRenderContext frc) {
+        TextLayout layout = new TextLayout(text, frc);
+        Rectangle2D ink = layout.getBounds();
+        double width = Math.max(layout.getAdvance(), ink.getX() + ink.getWidth());
+        return new Rectangle2D.Double(0, ink.getY(), width, ink.getHeight());
     }
     
     private java.awt.Font emojiFont;
@@ -14625,7 +14731,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Float weight;
         if ("Thin".equals(weightName)) weight = TextAttribute.WEIGHT_EXTRA_LIGHT;
         else if ("Light".equals(weightName)) weight = TextAttribute.WEIGHT_LIGHT;
-        else if ("Regular".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
+        else if ("Regular".equals(weightName) || "Normal".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
         else if ("Bold".equals(weightName)) weight = TextAttribute.WEIGHT_BOLD;
         else if ("Black".equals(weightName)) weight = TextAttribute.WEIGHT_HEAVY;
         else throw new IllegalArgumentException("Unsupported native font type: " + alias);
@@ -14668,6 +14774,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     case "native:MainRegular":
                         res = "Medium";
+                        break;
+
+                    // The system face at its TRUE regular weight. native:MainRegular
+                    // has meant Roboto-Medium since the alias was introduced and the
+                    // iOS port maps it one step heavy too, so the honest regular gets
+                    // a name of its own rather than a change that would restyle every
+                    // existing application.
+                    case "native:MainNormal":
+                        res = "Regular";
                         break;
 
                     case "native:MainBold":
@@ -17131,6 +17246,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * The body of an error response. {@code getErrorStream()} answers null for
+     * one that has no body -- a bare 403 or 404 -- and wrapping that null made
+     * the first read fail with "Stream closed", so a response the server did
+     * send reached the application as an I/O failure with no status to act on.
+     */
+    private static InputStream errorStream(HttpURLConnection connection) {
+        InputStream body = connection.getErrorStream();
+        return body == null ? new ByteArrayInputStream(new byte[0]) : body;
+    }
+
+    /**
      * @inheritDoc
      */
     public InputStream openInputStream(Object connection) throws IOException {
@@ -17167,7 +17293,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(con.getResponseCode() >= 200 && con.getResponseCode() < 300){
                     is = con.getInputStream();
                 }else{
-                    is = con.getErrorStream();
+                    is = errorStream(con);
                 }
                 boolean isText = false;
                 String contentType = con.getContentType();
@@ -17216,7 +17342,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(ht.getResponseCode() < 400) {
                 return new BufferedInputStream(ht.getInputStream());
             }
-            return new BufferedInputStream(ht.getErrorStream());
+            return new BufferedInputStream(errorStream(ht));
         } else {
             return new BufferedInputStream(((URLConnection) connection).getInputStream());
         }        

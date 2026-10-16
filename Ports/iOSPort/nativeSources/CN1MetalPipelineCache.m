@@ -30,6 +30,10 @@
 @interface CN1MetalPipelineCache () {
     id<MTLDevice> _device;
     id<MTLRenderPipelineState> _states[CN1MetalPipelineCount];
+    /// The app's default.metallib, loaded once. newDefaultLibrary opens and
+    /// parses the library file on every call, and each pipeline the first frame
+    /// needed used to call it again -- and, without ARC, leaked the result.
+    id<MTLLibrary> _library;
 }
 @end
 
@@ -207,7 +211,10 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
     if (pipeline < 0 || pipeline >= CN1MetalPipelineCount) return nil;
     if (_states[pipeline] != nil) return _states[pipeline];
 
-    id<MTLLibrary> library = [_device newDefaultLibrary];
+    if (_library == nil) {
+        _library = [_device newDefaultLibrary];
+    }
+    id<MTLLibrary> library = _library;
     if (library == nil) {
         NSLog(@"CN1MetalPipelineCache: device has no default.metallib — is CN1MetalShaders.metal in the Xcode project?");
         return nil;

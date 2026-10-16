@@ -135,6 +135,11 @@ CN1Graphics* cn1LinuxDesktopGraphics(int slot) {
     return &w->g;
 }
 
+GtkWidget* cn1LinuxDesktopDrawingArea(int slot) {
+    CN1LinuxWindow* w = slotAt(slot);
+    return w == 0 ? 0 : w->drawingArea;
+}
+
 GtkWidget* cn1LinuxDesktopWidget(int slot) {
     CN1LinuxWindow* w = slotAt(slot);
     return w == 0 ? 0 : w->window;
@@ -431,6 +436,9 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
         if (focus != 0 && focus != w->drawingArea) {
             return FALSE;
         }
+    }
+    if (cn1LinuxTextInputFilter((int) (w - cn1DesktopWindows), e)) {
+        return TRUE;
     }
     /* Same mapping the main window uses: GDK encodes many Unicode keyvals
      * differently from their code point, so a raw keyval gives the wrong key code
@@ -730,6 +738,8 @@ static void cn1DesktopCreateOnMain(void* arg) {
 
     gtk_container_add(GTK_CONTAINER(w->overlay), w->drawingArea);
     gtk_overlay_add_overlay(GTK_OVERLAY(w->overlay), w->fixed);
+    /* Empty peer-layer space must reach the canvas, as in the main window. */
+    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(w->overlay), w->fixed, TRUE);
     gtk_container_add(GTK_CONTAINER(w->window), w->overlay);
 
     gtk_widget_add_events(w->drawingArea,
