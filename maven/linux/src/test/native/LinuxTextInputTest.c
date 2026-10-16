@@ -157,12 +157,32 @@ int main(int argc, char** argv) {
     g_object_get(cn1TextInput.im, "input-hints", &hints, "input-purpose", &purpose, NULL);
     assert(purpose == GTK_INPUT_PURPOSE_EMAIL);
     assert(!(hints & GTK_INPUT_HINT_WORD_COMPLETION));
-    for (int i = 5; i < 105; i++) {
+    /* Explicit capitalization takes precedence over the boolean fallback.
+     * Privacy and non-predictive constraints must not discard explicit case hints. */
+    const int capsConstraints[] = {0x100000, 0x200000, 0x800000,
+            0x800000 | 0x100000 | 0x200000, 0x100000 | 0x80000,
+            0x100000 | 0x40000, 0, 0};
+    const GtkInputHints capsExpected[] = {GTK_INPUT_HINT_UPPERCASE_WORDS,
+            GTK_INPUT_HINT_UPPERCASE_SENTENCES, GTK_INPUT_HINT_UPPERCASE_CHARS,
+            GTK_INPUT_HINT_UPPERCASE_CHARS, GTK_INPUT_HINT_UPPERCASE_WORDS,
+            GTK_INPUT_HINT_UPPERCASE_WORDS, GTK_INPUT_HINT_UPPERCASE_SENTENCES, 0};
+    const GtkInputHints capsMask = GTK_INPUT_HINT_UPPERCASE_WORDS
+            | GTK_INPUT_HINT_UPPERCASE_SENTENCES | GTK_INPUT_HINT_UPPERCASE_CHARS;
+    for (int i = 0; i < 8; i++) {
+        /* Explicit flags also apply when autoCapitalize is false. */
+        assert(START(NULL, 5 + i, -1, capsConstraints[i], 1, i == 6));
+        g_object_get(cn1TextInput.im, "input-hints", &hints, NULL);
+        assert((hints & capsMask) == capsExpected[i]);
+    }
+    assert(START(NULL, 13, -1, 0x100000, 1, 1));
+    g_object_get(cn1TextInput.im, "input-hints", &hints, NULL);
+    assert((hints & capsMask) == GTK_INPUT_HINT_UPPERCASE_WORDS);
+    for (int i = 14; i < 114; i++) {
         assert(START(NULL, i, -1, 0, 1, 1));
         STOP(NULL, i); STOP(NULL, i);
         assert(!cn1TextInput.im && !cn1TextInput.session);
     }
     clearEvents(); gtk_widget_destroy(testWindow);
-    puts("PASS: real GTK commit/dead-key composition, UTF-16 caret, stale-state rejection, delete-surrounding, navigation/shortcuts, owner-window routing, privacy hints, focus loss, 100 session replacements/stops");
+    puts("PASS: real GTK commit/dead-key composition, UTF-16 caret, stale-state rejection, delete-surrounding, navigation/shortcuts, owner-window routing, privacy/capitalization hints, focus loss, 100 session replacements/stops");
     return 0;
 }

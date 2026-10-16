@@ -172,19 +172,22 @@ static void cn1TextStartOnMain(void* data) {
         case 5: purpose = GTK_INPUT_PURPOSE_NUMBER; break;
         default: break;
     }
-    if (request->capitalize) {
+    if (request->constraint & 0x800000) { /* UPPERCASE */
+        hints |= GTK_INPUT_HINT_UPPERCASE_CHARS;
+    } else if (request->constraint & 0x100000) { /* INITIAL_CAPS_WORD */
+        hints |= GTK_INPUT_HINT_UPPERCASE_WORDS;
+    } else if ((request->constraint & 0x200000) || request->capitalize) {
         hints |= GTK_INPUT_HINT_UPPERCASE_SENTENCES;
     }
-    if (request->constraint & 0x80000) {
-        hints = GTK_INPUT_HINT_NO_SPELLCHECK;
-    }
-    if (request->constraint & (0x10000 | 0x40000)) {
-        hints = GTK_INPUT_HINT_NO_SPELLCHECK;
+    if (request->constraint & (0x80000 | 0x10000 | 0x40000)) {
+        hints &= ~(GTK_INPUT_HINT_SPELLCHECK | GTK_INPUT_HINT_WORD_COMPLETION);
+        hints |= GTK_INPUT_HINT_NO_SPELLCHECK;
         /* GTK 3 has no PRIVATE hint. Do not request spelling/completion or
          * supply surrounding text; retain the ordinary IME purpose. */
     }
     if (request->constraint & 0x10000) {
         purpose = GTK_INPUT_PURPOSE_PASSWORD;
+        hints = GTK_INPUT_HINT_NO_SPELLCHECK;
     }
     input->session = request->session;
     input->slot = request->slot;
