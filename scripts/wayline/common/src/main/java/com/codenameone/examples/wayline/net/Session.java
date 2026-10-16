@@ -109,6 +109,11 @@ public final class Session {
                 .setStoreKey(storeKey(base));
         authorizer = new OidcRequestAuthorizer(client);
         authorizer.install(base + "/api");
+        // Not tied to this start(). A request to an earlier server still in
+        // flight when the app switched, answered 401 with its refresh refused,
+        // signs the new server out too: one more sign-in, after a server
+        // switch that already asked for one, and nothing of either account is
+        // exposed by it.
         authorizer.addSignInRequiredListener((source, reason) -> {
             user = null;
             session++;
@@ -278,6 +283,13 @@ public final class Session {
         final boolean web = AppConfig.pageOrigin() != null;
         final String redirect = AppConfig.redirectUri();
 
+        // The steps read `base` as they go rather than pinning it. Changing
+        // the server in the middle of a sign-in hands the next step to the new
+        // server, which can do nothing with what it gets: a session cookie and
+        // a code that only the first server honours, single use and good for
+        // minutes. A server the user chose is trusted with more than that --
+        // the password in step 1 goes to it -- and the last check in
+        // signIn drops the tokens of a sign-in that outlived its server.
         // 1. The password, for a session.
         final Step login = new Step("POST", base + "/login");
         login.addArgument("username", email);

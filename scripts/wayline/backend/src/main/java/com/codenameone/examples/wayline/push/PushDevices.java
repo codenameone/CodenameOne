@@ -79,6 +79,11 @@ public class PushDevices {
         if (profiles.hold(username) == 0) {
             throw new ResponseStatusException(404, "No such account");
         }
+        // The device row itself is not locked. Two accounts registering one
+        // token at the same moment -- a registration of the account that
+        // signed out still in flight as the next one signs in -- can leave it
+        // with the earlier account, but not for long: the app registers again
+        // each time it comes to the foreground, for whoever is signed in then.
         PushDevice row = devices.findById(id);
         if (row == null || !username.equals(row.getUsername())) {
             // A device new to this account, whether its token is new or moves
