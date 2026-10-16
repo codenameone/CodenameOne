@@ -600,6 +600,14 @@ public class Payments {
         if (amountCents < 1L || amountCents > MAX_TIP_CENTS) {
             throw new ResponseStatusException(400, "That is not an amount for a tip");
         }
+        // Not for a driver who has closed the account: the tip would be
+        // credited to a name nobody can sign in as or cash out. A tip and a
+        // closure at the same moment can still cross; the closure then sees
+        // the balance and is refused.
+        String driver = ride.getDriver();
+        if (driver == null || driver.length() == 0 || profiles.findById(driver) == null) {
+            throw new ResponseStatusException(409, "That driver can no longer be tipped");
+        }
         // Claimed before the charge: of two requests, one changes the row and
         // only that one charges.
         if (rides.claimTip(rideId, rider, amountCents) != 1 && !tipLeftUnknown(ride, amountCents)) {

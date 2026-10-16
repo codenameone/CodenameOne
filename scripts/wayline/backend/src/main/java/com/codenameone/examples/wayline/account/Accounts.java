@@ -261,6 +261,11 @@ public class Accounts {
             throw new ResponseStatusException(409,
                     "That driver is on a ride. Withdraw the role when it has ended");
         }
+        // A driver can lose the role with earnings not yet cashed out, and
+        // the payouts are driver routes. The money is still theirs in the
+        // ledger, and settling it is the admin's to arrange -- the role given
+        // back for the cash-out, or paid outside the app. A removal for cause
+        // must not wait on a payout, so it is not refused here.
         users.updateUser(User.withUserDetails(signIn).roles(roles(driver, admin)).build());
         // The role and the approval go together, whichever way it was given:
         // being approved is what lets a driver go on line.

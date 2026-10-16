@@ -180,6 +180,11 @@ public class PhoneVerification {
     /// could have thrown.
     @Transactional
     boolean guess(String username, String code) throws IOException {
+        // The hold store() and discard() take, and in the same order as a
+        // closure, which holds the profile and then deletes the code: taken
+        // the other way round, a guess and a closure could each wait on the
+        // row the other has.
+        accounts.hold(username);
         PhoneCode pending = codes.findById(username);
         if (pending == null || pending.getExpiresAt() < System.currentTimeMillis()) {
             throw new ResponseStatusException(400, "That code has expired. Ask for a new one");
