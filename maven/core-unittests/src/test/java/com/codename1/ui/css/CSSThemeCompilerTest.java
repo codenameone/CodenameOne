@@ -120,7 +120,8 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("Label", theme.get("Button.derive"));
         assertEquals("#abc", theme.get("@primary"));
         assertEquals("4px", theme.get("@spacing"));
-        assertEquals("#abc", theme.get("@primaryColor"));
+        // A constant resolving to a color is stored as plain hex; :root's own stays as written.
+        assertEquals("aabbcc", theme.get("@primaryColor"));
         assertEquals(Integer.valueOf(Component.CENTER), theme.get("Button.align"));
         assertTrue(theme.get("Button.border") instanceof CSSBorder);
         assertEquals("00ff00", theme.get("Button.press#fgColor"));
@@ -445,6 +446,55 @@ public class CSSThemeCompilerTest extends UITestBase {
         Font dark = (Font) theme.get("$DarkLabel.dis#font");
         assertEquals(9f, dark.getPixelSize(), 0.001f);
         assertEquals("native:MainBold", fontName(dark));
+    }
+
+    @Test
+    public void testColorConstantFromVarIsStoredAsPlainHex() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--c:#f00;}"
+                + "#Constants{infiniteDefaultColor:var(--c); label:var(--name);}"
+                + ":root{--name:hello;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals("hello", theme.get("@label"));
+    }
+
+    @Test
+    public void testLaterDeclarationWinsBetweenRootAndConstants() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--accent:#00ff00;} #Constants{--accent:#ff0000;}"
+                + "Label{color:var(--accent);}", resource, "Theme");
+        assertEquals("ff0000", resource.getTheme("Theme").get("@accent"));
+        assertEquals("ff0000", resource.getTheme("Theme").get("Label.fgColor"));
+
+        resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} :root{--accent:#00ff00;}"
+                + "Label{color:var(--accent);}", resource, "Theme");
+        assertEquals("#00ff00", resource.getTheme("Theme").get("@accent"));
+        // A constant declared after the rule that uses it is still seen by that rule.
+        resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{color:var(--late);} #Constants{late:#0000ff;}", resource, "Theme");
+        assertEquals("0000ff", resource.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
+    public void testStateFontFollowsTheDeriveChain() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Child:selected{font-size:20px;}"
+                + "Child{cn1-derive:Middle;}"
+                + "Middle{cn1-derive:Base;}"
+                + "Base:selected{font-family:'native:MainBold';}"
+                + "Base{font-family:'native:MainLight';font-size:2mm;}"
+                + "Cyc1{cn1-derive:Cyc2;} Cyc2{cn1-derive:Cyc1;} Cyc1:pressed{font-size:7px;}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font selected = (Font) theme.get("Child.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        // Base's selected family wins over Base's unselected one: same state first.
+        assertEquals("native:MainBold", fontName(selected));
+        Font cyclic = (Font) theme.get("Cyc1.press#font");
+        assertEquals(7f, cyclic.getPixelSize(), 0.001f);
+        assertEquals("native:MainRegular", fontName(cyclic));
     }
 
     private static String fontName(Font font) {

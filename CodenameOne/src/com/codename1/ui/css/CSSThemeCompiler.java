@@ -94,21 +94,33 @@ public class CSSThemeCompiler {
 
         String strippedCss = stripComments(css);
         Rule[] rules = parseRulesWithMedia(strippedCss);
-        // Constants first, wherever their block sits, so a var() in any rule can see them.
+        ArrayList<String> varConstants = new ArrayList<String>();
+        // Constants first, wherever their block sits, so a var() in any rule can see them...
         for (Rule rule : rules) {
             if (rule.constants) {
-                compileConstants(rule.declarations, theme, resources);
+                compileConstants(rule.declarations, theme, resources, varConstants);
             }
         }
+        // ...and then again in source order, so the last declaration of a name still wins
+        // against a `:root` or in-rule custom property, as it does in the build-time compiler.
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
         for (Rule rule : rules) {
-            if (!rule.constants) {
+            if (rule.constants) {
+                compileConstants(rule.declarations, theme, resources, varConstants);
+            } else {
                 applyRule(theme, resources, rule, fonts);
             }
         }
         compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
+        // A constant written as var(--x) is only a color once x is resolved.
+        for (String key : varConstants) {
+            Object value = theme.get(key);
+            if (value instanceof String && isColorLiteral((String) value)) {
+                theme.put(key, normalizeHexColor((String) value));
+            }
+        }
         resources.setTheme(themeName, theme);
     }
 
@@ -217,7 +229,8 @@ public class CSSThemeCompiler {
         }
     }
 
-    private void compileConstants(Declaration[] declarations, Hashtable theme, MutableResource resources) {
+    private void compileConstants(Declaration[] declarations, Hashtable theme, MutableResource resources,
+                                  ArrayList<String> varConstants) {
         for (Declaration declaration : declarations) {
             String name = declaration.name;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
@@ -238,10 +251,14 @@ public class CSSThemeCompiler {
                 theme.put("@" + name, image);
                 continue;
             }
-            if (raw.equals(value) && isColorLiteral(value)) {
-                // Stored as plain hex, as the build-time compiler stores it: color constants are
-                // read with Integer.parseInt(value, 16), which a leading '#' would break.
-                value = normalizeHexColor(value);
+            if (raw.equals(value)) {
+                if (isColorLiteral(value)) {
+                    // Stored as plain hex, as the build-time compiler stores it: color constants
+                    // are read with Integer.parseInt(value, 16), which a leading '#' would break.
+                    value = normalizeHexColor(value);
+                } else if (value.indexOf("var(--") > -1) {
+                    varConstants.add("@" + name);
+                }
             }
             theme.put("@" + name, value);
         }
@@ -363,9 +380,10 @@ public class CSSThemeCompiler {
     }
 
     /// Builds the font of every UIID state that declared a font property. A state that sets only
-    /// one of family and size takes the other from the unselected style, since both rules apply
-    /// in that state -- the build-time compiler flattens the base style into each state the
-    /// same way. A dark style falls back to the light style of the same UIID after that.
+    /// one of family and size takes the other from what applies in that state, as the build-time
+    /// compiler's flattening does: the UIID's unselected style, then each `cn1-derive` parent's
+    /// matching state and unselected style in turn. A dark style looks at the dark keys of each
+    /// UIID before the light ones.
     private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
         // A font is a live platform object, so it can only be made with a running Display.
         // Without one -- a tool that only checks that a stylesheet compiles -- every
@@ -381,15 +399,22 @@ public class CSSThemeCompiler {
             int dot = keyPrefix.indexOf('.');
             String uiid = keyPrefix.substring(0, dot);
             String state = keyPrefix.substring(dot + 1);
-            String[] fallbacks = uiid.startsWith("$Dark")
-                    ? new String[]{uiid + ".", uiid.substring(5) + "." + state, uiid.substring(5) + "."}
-                    : new String[]{uiid + "."};
-            for (String fallback : fallbacks) {
-                String[] other = fonts.get(fallback);
-                if (other != null) {
-                    family = family == null ? other[0] : family;
-                    size = size == null ? other[1] : size;
+            boolean dark = uiid.startsWith("$Dark");
+            String id = dark ? uiid.substring(5) : uiid;
+            ArrayList<String> seen = new ArrayList<String>();
+            while (id != null && !seen.contains(id) && (family == null || size == null)) {
+                seen.add(id);
+                String[] fallbacks = dark
+                        ? new String[]{"$Dark" + id + "." + state, "$Dark" + id + ".", id + "." + state, id + "."}
+                        : new String[]{id + "." + state, id + "."};
+                for (String fallback : fallbacks) {
+                    String[] other = fonts.get(fallback);
+                    if (other != null) {
+                        family = family == null ? other[0] : family;
+                        size = size == null ? other[1] : size;
+                    }
                 }
+                id = hoverBase(theme, id, dark);
             }
             theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
         }
