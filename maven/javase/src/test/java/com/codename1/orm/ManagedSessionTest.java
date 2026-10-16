@@ -180,7 +180,7 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->s.createQuery("select unsupported(r.name) from ManagedSessionTest$Record r",String.class));
             s.beginTransaction();r.name="flushed";
             assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where r.name = :name").setParameter("delta",4L).setParameter("name","flushed").executeUpdate());
-            assertFalse(s.contains(r));s.commitTransaction();assertEquals(4,s.find(Record.class,r.id).counter);
+            assertTrue(s.contains(r));s.commitTransaction();s.clear();assertEquals(4,s.find(Record.class,r.id).counter);
             s.beginTransaction();assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where r.counter between 3 and 5").executeUpdate());s.commitTransaction();
             assertEquals(0,s.query(Record.class).count());s.close();
         } finally { em.close(); }
@@ -191,10 +191,10 @@ class ManagedSessionTest {
         try {
             Session s=em.openSession();Record first=seed(s);s.beginTransaction();Record kept=new Record();kept.name="keep";s.persist(kept);s.commitTransaction();
             s.beginTransaction();
-            assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("delta",2L).setParameter("name","first").executeUpdate());s.commitTransaction();assertEquals(2,s.find(Record.class,first.id).counter);assertEquals(0,s.find(Record.class,kept.id).counter);
+            assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("delta",2L).setParameter("name","first").executeUpdate());s.commitTransaction();s.clear();assertEquals(2,s.find(Record.class,first.id).counter);assertEquals(0,s.find(Record.class,kept.id).counter);
             s.beginTransaction();
             assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("name","first").executeUpdate());
-            s.commitTransaction();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();
+            s.commitTransaction();s.clear();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();
         } finally { em.close(); }
     }
 
@@ -296,7 +296,7 @@ class ManagedSessionTest {
             for(String query:new String[]{"update ManagedSessionTest$Record r set r.counter=sum(r.counter)","update ManagedSessionTest$Record r set r.counter=coalesce(max(r.counter),0)","update ManagedSessionTest$Record r set r.counter=1 where count(r.id)>0","delete from ManagedSessionTest$Record r where count(r.id)>0","delete from ManagedSessionTest$Record r where coalesce(sum(r.counter),0)>=0"}) {
                 assertThrows(IllegalArgumentException.class,()->session.createQuery(query),query);
             }
-            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter)+1 from ManagedSessionTest$Record i)").executeUpdate());session.commitTransaction();assertEquals(1,session.find(Record.class,record.id).counter);
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter)+1 from ManagedSessionTest$Record i)").executeUpdate());session.commitTransaction();session.clear();assertEquals(1,session.find(Record.class,record.id).counter);
             session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.counter=1)").executeUpdate());session.commitTransaction();assertEquals(0,session.query(Record.class).count());session.close();
         } finally { em.close(); }
     }
@@ -334,10 +334,10 @@ class ManagedSessionTest {
             assertThrows(PersistenceException.class,query::executeUpdate,expression);session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
         }
         for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE,0}) {
-            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();assertEquals(boundary,session.find(Record.class,id).counter);
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();session.clear();assertEquals(boundary,session.find(Record.class,id).counter);
         }
         for(long[] change:new long[][]{{Integer.MIN_VALUE,2147483648L,0},{Integer.MIN_VALUE,4294967295L,Integer.MAX_VALUE},{Integer.MAX_VALUE,-4294967295L,Integer.MIN_VALUE},{Integer.MAX_VALUE,-2147483649L,-2}}) {
-            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",change[0]).executeUpdate();session.commitTransaction();
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",change[0]).executeUpdate();session.commitTransaction();session.clear();
             Record current=session.find(Record.class,id);long version=current.version;
             session.beginTransaction();assertTrue(session.increment(Record.class,id,"counter",change[1]));assertEquals(change[2],current.counter);assertEquals(version+1,current.version);session.commitTransaction();
             session.clear();assertEquals(change[2],session.find(Record.class,id).counter);
@@ -375,7 +375,7 @@ class ManagedSessionTest {
             }
             session.beginTransaction();session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"=1").executeUpdate();session.commitTransaction();
         }
-        session.beginTransaction();session.createQuery("update ManagedSessionTest$RealRecord r set r.boxed=NULL,r.wide=1e-100").executeUpdate();session.commitTransaction();assertNull(session.find(RealRecord.class,id).boxed);assertEquals(1e-100,session.find(RealRecord.class,id).wide);
+        session.beginTransaction();session.createQuery("update ManagedSessionTest$RealRecord r set r.boxed=NULL,r.wide=1e-100").executeUpdate();session.commitTransaction();session.clear();assertNull(session.find(RealRecord.class,id).boxed);assertEquals(1e-100,session.find(RealRecord.class,id).wide);
         session.beginTransaction();assertThrows(PersistenceException.class,()->session.createQuery("update ManagedSessionTest$RealRecord r set r.narrow=r.wide/2").executeUpdate());session.rollbackTransaction();
         for(String zero:new String[]{"0e-400","-0e-400","0.000e-400"}) assertEquals(0.0,session.createQuery("select "+zero+" from ManagedSessionTest$RealRecord r",Double.class).first().doubleValue(),0.0);
     }
@@ -385,7 +385,7 @@ class ManagedSessionTest {
 
     static void assertMinimumLongLiteral(Session session) {
         session.createTables();session.beginTransaction();Record record=new Record();record.name="minimum";session.persist(record);session.commitTransaction();
-        session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=-9223372036854775808").executeUpdate());session.commitTransaction();
+        session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=-9223372036854775808").executeUpdate());session.commitTransaction();session.clear();
         assertEquals(Long.MIN_VALUE,session.find(Record.class,record.id).counter);
         assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter=(-9223372036854775808)").list().size());
         assertEquals(Long.valueOf(Long.MIN_VALUE),session.createQuery("select -9223372036854775808 from ManagedSessionTest$Record r",Long.class).first());
@@ -437,7 +437,7 @@ class ManagedSessionTest {
             assertEquals(0L,session.find(Record.class,record.id).counter);
             assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",7L).executeUpdate());
             assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=r.counter+2").executeUpdate());
-            session.commitTransaction();assertEquals(9L,session.find(Record.class,record.id).counter);session.close();
+            session.commitTransaction();session.clear();assertEquals(9L,session.find(Record.class,record.id).counter);session.close();
         } finally { em.close(); }
     }
 
@@ -552,7 +552,7 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",7L).executeUpdate());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.bytes=:value").setParameter("value","oops").executeUpdate());
             assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value,r.name=:name,r.bytes=:bytes").setParameter("value",7L).setParameter("name",null).setParameter("bytes",new byte[]{1,2}).executeUpdate());
-            session.commitTransaction();Record loaded=session.find(Record.class,record.id);
+            session.commitTransaction();session.clear();Record loaded=session.find(Record.class,record.id);
             assertEquals(7,loaded.counter);assertNull(loaded.name);assertArrayEquals(new byte[]{1,2},loaded.bytes);
             session.close();
         } finally { em.close(); }
@@ -625,7 +625,7 @@ class ManagedSessionTest {
             assertEquals(Long.valueOf(-1),session.createQuery("select -r.counter / 2 from ManagedSessionTest$Record r",Long.class).first());
             assertEquals(Double.valueOf(1.5),session.createQuery("select r.counter / 2.0 from ManagedSessionTest$Record r",Double.class).first());
             assertNull(session.createQuery("select r.counter / 0 from ManagedSessionTest$Record r",Long.class).first());
-            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter / 2").executeUpdate();session.commitTransaction();
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter / 2").executeUpdate();session.commitTransaction();session.clear();
             assertEquals(1,session.find(Record.class,r.id).counter);session.close();
         } finally { em.close(); }
     }

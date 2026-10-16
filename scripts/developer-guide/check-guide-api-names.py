@@ -60,8 +60,14 @@ APP_ROOTS = [
 # which the workflow watches. Triggering on Ports/**, vm/** and maven/**
 # instead would run this job -- maven install, the demo build and the
 # screenshots -- for nearly every change in the repository.
+#
+# scripts/wayline is the sample application two chapters of the guide walk
+# through class by class. Its names -- AppConfig, MapStage, the WlRoute style --
+# are real identifiers of this repository that live outside the four framework
+# trees, and several are a short edit from a framework class.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
-                    for d in ('CodenameOne', 'Ports', 'vm', 'maven')]
+                    for d in ('CodenameOne', 'Ports', 'vm', 'maven',
+                              os.path.join('scripts', 'wayline'))]
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 

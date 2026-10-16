@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if
+ * you need additional information or have any questions.
+ */
 package com.codename1.ui.layouts;
 
 import com.codename1.junit.FormTest;
@@ -444,5 +466,38 @@ class GridLayoutTest extends UITestBase {
         // Preferred size should be positive
         assertTrue(preferredSize.getWidth() > 0);
         assertTrue(preferredSize.getHeight() > 0);
+    }
+
+    /// GridLayout(int columns) is one row that grows as components are added,
+    /// and layoutContainer() has always laid the further rows out. The
+    /// preferred size answered the height of one row all the same, so a grid
+    /// of four in two columns was given half the height it needs and the
+    /// bottom of every cell was cut off.
+    @Test
+    void testPreferredHeightCountsImplicitRows() {
+        GridLayout planned = new GridLayout(2, 2);
+        Container expected = new Container(planned);
+        GridLayout implicit = new GridLayout(2);
+        Container actual = new Container(implicit);
+        for (int i = 0; i < 4; i++) {
+            expected.add(new Button("Button " + i));
+            actual.add(new Button("Button " + i));
+        }
+
+        Dimension twoRows = planned.getPreferredSize(expected);
+        Dimension grown = implicit.getPreferredSize(actual);
+        assertEquals(twoRows.getHeight(), grown.getHeight(),
+                "a one-row grid that ran onto a second row is as tall as a two-row grid");
+        assertEquals(twoRows.getWidth(), grown.getWidth());
+
+        // An odd one out starts a row of its own.
+        actual.add(new Button("Button 4"));
+        actual.setShouldCalcPreferredSize(true);
+        assertEquals(twoRows.getHeight() / 2 * 3, implicit.getPreferredSize(actual).getHeight());
+
+        // And a grid that fits its one row is still one row.
+        Container single = new Container(new GridLayout(3));
+        single.add(new Button("Button 0")).add(new Button("Button 1"));
+        assertEquals(twoRows.getHeight() / 2, single.getLayout().getPreferredSize(single).getHeight());
     }
 }

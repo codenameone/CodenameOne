@@ -67,14 +67,20 @@ final class BackendSources {
             BackendBeans.Aspect aspect = a.methods.get(index);
             MethodInfo m = aspect.method;
             boolean isStatic = m.isStatic();
-            Type[] args = Type.getArgumentTypes(m.getDescriptor());
-            Type ret = Type.getReturnType(m.getDescriptor());
+            // A signature naming a type this class cannot write -- a private
+            // member class of the component -- is written with the nearest
+            // superclass it can, and calls the entry the weaver added for it.
+            String descriptor = aspect.erased != null ? aspect.erased : m.getDescriptor();
+            Type[] args = Type.getArgumentTypes(descriptor);
+            Type ret = Type.getReturnType(descriptor);
             boolean isVoid = ret.getSort() == Type.VOID;
             String retType = isVoid ? "void" : typeName(ret);
             String params = parameters(owner, isStatic, args);
             String callArgs = arguments(isStatic, args.length);
             String inner = (isStatic ? owner : "self") + "."
-                    + BackendWeaver.bodyName(cls.getInternalName(), m.getName())
+                    + (aspect.erased != null
+                            ? BackendWeaver.erasedBodyName(cls.getInternalName(), m.getName())
+                            : BackendWeaver.bodyName(cls.getInternalName(), m.getName()))
                     + "(" + plainArguments(args.length) + ")";
             List<String> layers = new ArrayList<String>();
             if (aspect.transactional != null) {

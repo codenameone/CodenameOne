@@ -177,6 +177,21 @@ class LocationManagerTest extends UITestBase {
         assertNotNull(manager.getCurrentListener());
     }
 
+    /// The ports read the request while binding, so it has to be there by then,
+    /// both for the first listener and for one that replaces another.
+    @FormTest
+    void theRequestIsInPlaceWhenTheListenerBinds() {
+        manager.notifyOnBind = false;
+        LocationRequest first = new LocationRequest();
+        manager.setLocationListener(new DummyLocationListener(), first);
+        assertSame(first, manager.requestAtBind);
+
+        LocationRequest second = new LocationRequest();
+        manager.setLocationListener(new DummyLocationListener(), second);
+        assertSame(second, manager.requestAtBind);
+        assertSame(second, manager.getStoredRequest());
+    }
+
     @FormTest
     void getLastKnownLocationReturnsStoredLocation() {
         Location expected = new Location(9.0, 10.0);
@@ -248,6 +263,7 @@ class LocationManagerTest extends UITestBase {
         private Location lastLocation;
         private Class backgroundListenerClass;
         int bindCount;
+        LocationRequest requestAtBind;
         int clearCount;
         int getCurrentLocationCalls;
         boolean notifyOnBind = true;
@@ -276,6 +292,7 @@ class LocationManagerTest extends UITestBase {
         @Override
         protected void bindListener() {
             bindCount++;
+            requestAtBind = getRequest();
             if (notifyOnBind) {
                 LocationListener l = getLocationListener();
                 if (l != null && currentLocation != null) {

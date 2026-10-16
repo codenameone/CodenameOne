@@ -478,6 +478,11 @@ public class Parser extends ClassVisitor {
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;
+    /// The simple name the InnerClasses attribute gives this class, which is
+    /// what a record's toString starts with; null for a top-level class.
+    private String innerSimpleName;
+    /// The record helpers already added to this class, by name.
+    private final Set<String> recordHelpers = new HashSet<>();
     public static void cleanup() {
         if ("true".equals(System.getProperty("cn1.iteratorCensus"))) {
             // Reported HERE rather than from the census itself: the census runs BEFORE
@@ -1492,6 +1497,17 @@ public class Parser extends ClassVisitor {
                 for (ByteCodeClass ownershipClass : classes) {
                     for (BytecodeMethod method : ownershipClass.getMethods()) method.freezeBuilderOwnership();
                 }
+                // A loop of its own, and before the one below: a frame-exit retirement
+                // candidate is decided by reading the bodies of the methods called on
+                // the object, so EVERY body has to be raw while ANY candidate is
+                // decided. See BytecodeMethod.freezeRetireCandidates.
+                if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                    for (ByteCodeClass retireCls : classes) {
+                        for (BytecodeMethod retireMtd : retireCls.getMethods()) {
+                            retireMtd.freezeRetireCandidates();
+                        }
+                    }
+                }
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
                         // These rewrites preserve local-stack semantics but introduce
@@ -2097,6 +2113,7 @@ public class Parser extends ClassVisitor {
     public void visitInnerClass(String name, String outerName, String innerName, int access) {
         if(name.equals(cls.getOriginalClassName())) {
             cls.setIsAnonymous(innerName==null);
+            innerSimpleName = innerName;
         }
         super.visitInnerClass(name, outerName, innerName, access); 
     }
@@ -2326,12 +2343,205 @@ public class Parser extends ClassVisitor {
             super.visitJumpInsn(opcode, label); 
         }
 
+        /**
+         * A record's equals, hashCode or toString. javac does not write these out:
+         * each is an invokedynamic of java.lang.runtime.ObjectMethods, a bootstrap
+         * this runtime does not have, so a record of any kind failed translation
+         * -- a transfer object shared with a server included. The call is replaced
+         * with one to a static helper holding what ObjectMethods would build: the
+         * components compared, hashed (31 * h + each, as the JDK does) and printed
+         * as Name[a=1, b=x]. Float and double components are compared and hashed by
+         * their bits with every NaN made the canonical one, which is what the JDK's
+         * Float.floatToIntBits and Double.doubleToLongBits answer; the native
+         * conversions keep a NaN's payload, so they are not asked. The arguments
+         * are the record class, the component names and one getter handle per
+         * component. Answers false, leaving the call unsupported, for a shape
+         * javac does not emit.
+         */
+        private boolean recordMethod(String name, String desc, Object[] bsmArgs) {
+            if (bsmArgs == null || bsmArgs.length < 2 || !(bsmArgs[0] instanceof Type)) {
+                return false;
+            }
+            String owner = ((Type) bsmArgs[0]).getInternalName();
+            List<Handle> getters = new ArrayList<>();
+            for (int i = 2; i < bsmArgs.length; i++) {
+                if (!(bsmArgs[i] instanceof Handle) || ((Handle) bsmArgs[i]).getTag() != Opcodes.H_GETFIELD) {
+                    return false;
+                }
+                getters.add((Handle) bsmArgs[i]);
+            }
+            String helperName = "cn1$record$" + name;
+            boolean equals = "equals".equals(name) && ("(L" + owner + ";Ljava/lang/Object;)Z").equals(desc);
+            boolean hash = "hashCode".equals(name) && ("(L" + owner + ";)I").equals(desc);
+            boolean text = "toString".equals(name) && ("(L" + owner + ";)Ljava/lang/String;").equals(desc);
+            if (!equals && !hash && !text) {
+                return false;
+            }
+            if (recordHelpers.add(helperName)) {
+                BytecodeMethod helper = new BytecodeMethod(clsName,
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
+                cls.addMethod(helper);
+                if (equals) {
+                    Label no = new Label();
+                    helper.addVariableOperation(Opcodes.ALOAD, 1);
+                    helper.addTypeInstruction(Opcodes.INSTANCEOF, owner);
+                    helper.addJump(Opcodes.IFEQ, no);
+                    for (Handle g : getters) {
+                        if ("F".equals(g.getDesc()) || "D".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                            recordBits(helper, owner, g, 1);
+                            if ("D".equals(g.getDesc())) {
+                                helper.addInstruction(Opcodes.LCMP);
+                                helper.addJump(Opcodes.IFNE, no);
+                            } else {
+                                helper.addJump(Opcodes.IF_ICMPNE, no);
+                            }
+                        } else {
+                            recordComponent(helper, owner, g, 0);
+                            recordComponent(helper, owner, g, 1);
+                            helper.addInvoke(Opcodes.INVOKESTATIC, "java/util/Objects", "equals",
+                                    "(Ljava/lang/Object;Ljava/lang/Object;)Z", false);
+                            helper.addJump(Opcodes.IFEQ, no);
+                        }
+                    }
+                    helper.addInstruction(Opcodes.ICONST_1);
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.addLabel(no);
+                    helper.addInstruction(Opcodes.ICONST_0);
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.setMaxes(8, 2);
+                } else if (hash) {
+                    helper.addInstruction(Opcodes.ICONST_0);
+                    for (Handle g : getters) {
+                        helper.addInstruction(Opcodes.BIPUSH, 31);
+                        helper.addInstruction(Opcodes.IMUL);
+                        if ("Z".equals(g.getDesc())) {
+                            // Boolean.hashCode without a branch: 1237 - 6 * value.
+                            helper.addInstruction(Opcodes.SIPUSH, 1237);
+                            helper.addVariableOperation(Opcodes.ALOAD, 0);
+                            helper.addField(cls, Opcodes.GETFIELD, owner, g.getName(), "Z");
+                            helper.addInstruction(Opcodes.BIPUSH, 6);
+                            helper.addInstruction(Opcodes.IMUL);
+                            helper.addInstruction(Opcodes.ISUB);
+                        } else if ("F".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                        } else if ("D".equals(g.getDesc())) {
+                            recordBits(helper, owner, g, 0);
+                            helper.addInstruction(Opcodes.DUP2);
+                            helper.addInstruction(Opcodes.BIPUSH, 32);
+                            helper.addInstruction(Opcodes.LUSHR);
+                            helper.addInstruction(Opcodes.LXOR);
+                            helper.addInstruction(Opcodes.L2I);
+                        } else {
+                            recordComponent(helper, owner, g, 0);
+                            helper.addInvoke(Opcodes.INVOKESTATIC, "java/util/Objects", "hashCode",
+                                    "(Ljava/lang/Object;)I", false);
+                        }
+                        helper.addInstruction(Opcodes.IADD);
+                    }
+                    helper.addInstruction(Opcodes.IRETURN);
+                    helper.setMaxes(8, 1);
+                } else {
+                    String simple = innerSimpleName != null ? innerSimpleName
+                            : owner.substring(owner.lastIndexOf('/') + 1);
+                    helper.addTypeInstruction(Opcodes.NEW, "java/lang/StringBuilder");
+                    helper.addInstruction(Opcodes.DUP);
+                    helper.addLdc(simple + "[");
+                    helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V", false);
+                    boolean first = true;
+                    for (Handle g : getters) {
+                        helper.addLdc((first ? "" : ", ") + g.getName() + "=");
+                        helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                        recordComponent(helper, owner, g, 0);
+                        helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                                "(Ljava/lang/Object;)Ljava/lang/StringBuilder;", false);
+                        first = false;
+                    }
+                    helper.addLdc("]");
+                    helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
+                            "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                    helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString",
+                            "()Ljava/lang/String;", false);
+                    helper.addInstruction(Opcodes.ARETURN);
+                    helper.setMaxes(8, 1);
+                }
+            }
+            mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, helperName, desc, false);
+            return true;
+        }
+
+        /** Pushes a record component, boxed when it is a primitive, read from local `local`. */
+        private void recordComponent(BytecodeMethod helper, String owner, Handle getter, int local) {
+            helper.addVariableOperation(Opcodes.ALOAD, local);
+            if (local != 0) {
+                // Guarded by the INSTANCEOF the equals helper starts with.
+                helper.addTypeInstruction(Opcodes.CHECKCAST, owner);
+            }
+            helper.addField(cls, Opcodes.GETFIELD, owner, getter.getName(), getter.getDesc());
+            String wrapper;
+            switch (getter.getDesc().charAt(0)) {
+                case 'Z': wrapper = "Boolean"; break;
+                case 'B': wrapper = "Byte"; break;
+                case 'C': wrapper = "Character"; break;
+                case 'S': wrapper = "Short"; break;
+                case 'I': wrapper = "Integer"; break;
+                case 'J': wrapper = "Long"; break;
+                case 'F': wrapper = "Float"; break;
+                case 'D': wrapper = "Double"; break;
+                default: return;
+            }
+            helper.addInvoke(Opcodes.INVOKESTATIC, "java/lang/" + wrapper, "valueOf",
+                    "(" + getter.getDesc() + ")Ljava/lang/" + wrapper + ";", false);
+        }
+
+        /** Pushes a float or double component's canonical bits, an int or a long. */
+        private void recordBits(BytecodeMethod helper, String owner, Handle getter, int local) {
+            boolean isDouble = "D".equals(getter.getDesc());
+            String bitsName = isDouble ? "cn1$recordDoubleBits" : "cn1$recordFloatBits";
+            String bitsDesc = isDouble ? "(D)J" : "(F)I";
+            if (recordHelpers.add(bitsName)) {
+                BytecodeMethod bits = new BytecodeMethod(clsName,
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, bitsName, bitsDesc, null, null);
+                cls.addMethod(bits);
+                Label notNaN = new Label();
+                int load = isDouble ? Opcodes.DLOAD : Opcodes.FLOAD;
+                bits.addVariableOperation(load, 0);
+                bits.addVariableOperation(load, 0);
+                bits.addInstruction(isDouble ? Opcodes.DCMPL : Opcodes.FCMPL);
+                bits.addJump(Opcodes.IFEQ, notNaN);
+                if (isDouble) {
+                    bits.addLdc(Long.valueOf(0x7ff8000000000000L));
+                    bits.addInstruction(Opcodes.LRETURN);
+                } else {
+                    bits.addLdc(Integer.valueOf(0x7fc00000));
+                    bits.addInstruction(Opcodes.IRETURN);
+                }
+                bits.addLabel(notNaN);
+                bits.addVariableOperation(load, 0);
+                bits.addInvoke(Opcodes.INVOKESTATIC, isDouble ? "java/lang/Double" : "java/lang/Float",
+                        isDouble ? "doubleToLongBits" : "floatToIntBits", bitsDesc, false);
+                bits.addInstruction(isDouble ? Opcodes.LRETURN : Opcodes.IRETURN);
+                bits.setMaxes(4, 2);
+            }
+            helper.addVariableOperation(Opcodes.ALOAD, local);
+            if (local != 0) {
+                helper.addTypeInstruction(Opcodes.CHECKCAST, owner);
+            }
+            helper.addField(cls, Opcodes.GETFIELD, owner, getter.getName(), getter.getDesc());
+            helper.addInvoke(Opcodes.INVOKESTATIC, clsName, bitsName, bitsDesc, false);
+        }
+
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
             indyLambdas.add(null);
             if (bsm.getTag() != Opcodes.H_INVOKESTATIC || bsm.isInterface()) {
                 mtd.unsupportedBootstrap(bsm.getOwner() + "." + bsm.getName());
+                return;
+            }
+            if ("java/lang/runtime/ObjectMethods".equals(bsm.getOwner()) && "bootstrap".equals(bsm.getName())
+                    && recordMethod(name, desc, bsmArgs)) {
                 return;
             }
             if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
@@ -3159,33 +3369,104 @@ public class Parser extends ClassVisitor {
     /// Do all of these callees keep `this` to themselves? The precise form of the
     /// receiver check: only the methods a site ACTUALLY invokes on the tracked object
     /// matter, not every method the class happens to declare.
-    static boolean calleesKeepThis(List<String> calls, Map<String, Boolean> memo) {
+    ///
+    /// WHAT "CHECKED ON ITS OWN" HAS TO MEAN.
+    ///
+    /// The escape walk lets the tracked object be a receiver because the callee is
+    /// examined separately, and frame-exit retirement stamps the object dead on the
+    /// strength of that examination. A wrong yes is not a missed optimization: a
+    /// retired object that is still reachable only from a thread's roots is not
+    /// re-marked (the root scan refuses a reference whose mark reads as already
+    /// reclaimed), so the next sweep frees it under its user. Four ways the answer
+    /// used to be yes without the body that runs ever having been read, each of
+    /// which emitted a retirement for a live object:
+    ///
+    ///   1. A NATIVE callee has no bytecode, so the walk saw an empty method and
+    ///      found nothing wrong with it. `Thread.start()` is native and hands its
+    ///      receiver to a new thread: `Thread t = new Thread(r); t.start();` with
+    ///      `t` kept in a local retired the Thread object of a running thread, and
+    ///      `Thread.finalize()` then freed that thread's native state while it was
+    ///      executing on it. An ABSTRACT callee is the same empty body.
+    ///   2. The call site names the method by the receiver's STATIC type. What runs
+    ///      is the override in the object's own class, which the static name does
+    ///      not lead to. The allocation site knows the exact class -- it is the
+    ///      operand of the NEW -- so virtual calls are resolved from there.
+    ///   3. The callee's own calls on `this` were recorded by its walk and then
+    ///      dropped: `void publish() { register(); }` read as keeping `this`
+    ///      whatever `register` did. They are followed now, against the same exact
+    ///      class, because `this` in the callee is the same object.
+    ///   4. A callee that could not be found answered no already, and still does.
+    ///
+    /// `exactClass` is the class named by the NEW whose object is being retired.
+    static boolean calleesKeepThis(String exactClass, List<String> calls,
+            Map<String, Boolean> memo) {
         for (int i = 0; i < calls.size(); i++) {
-            String key = calls.get(i);
-            Boolean cached = memo.get(key);
-            if (cached == null) {
-                cached = Boolean.valueOf(calleeIsSafe(key));
-                memo.put(key, cached);
-            }
-            if (!cached.booleanValue()) {
+            if (!calleeKeepsThis(exactClass, calls.get(i), memo)) {
                 return false;
             }
         }
         return true;
     }
 
-    /// owner.name+desc -> does that one method keep `this`? A callee that cannot be
-    /// resolved in this closed world answers NO: an unknown body is an unchecked body.
-    static boolean calleeIsSafe(String key) {
+    /// One callee, and everything it in turn calls on `this`.
+    ///
+    /// A callee already being examined further up this same query answers yes for
+    /// now. That is sound and not a shortcut: "nothing reachable from here leaks
+    /// `this`" is refuted only by an actual leaking instruction, every method on a
+    /// cycle has its own body walked exactly once, and one refusal anywhere fails the
+    /// whole query. The provisional yes must therefore never outlive the query, which
+    /// is why the memo is created per allocation site and is not a field.
+    private static boolean calleeKeepsThis(String exactClass, String call,
+            Map<String, Boolean> memo) {
+        Boolean cached = memo.get(call);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        memo.put(call, Boolean.TRUE);
+        boolean safe = false;
+        BytecodeMethod m = resolveReceiverCall(exactClass, call);
+        // An unresolved callee, or one with no body, answers NO: an unknown body is
+        // an unchecked body.
+        if (m != null && !m.isNative() && !m.isAbstract()
+                && IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE) {
+            // Copied before recursing: the list belongs to the last walk and the
+            // next thisEscapes call clears it.
+            List<String> inner = new ArrayList<String>(IteratorEscape.receiverCalls);
+            safe = true;
+            for (int i = 0; i < inner.size(); i++) {
+                if (!calleeKeepsThis(exactClass, inner.get(i), memo)) {
+                    safe = false;
+                    break;
+                }
+            }
+        }
+        memo.put(call, Boolean.valueOf(safe));
+        return safe;
+    }
+
+    /// The method a recorded receiver call actually runs, or null when that cannot
+    /// be established.
+    ///
+    /// `call` is owner.name+desc as IteratorEscape recorded it, prefixed with
+    /// IteratorEscape.EXACT_CALL for an INVOKESPECIAL. That one is not dispatched: it
+    /// runs the method of the class it names (a constructor, a private method, a
+    /// `super.` call), found there or inherited from above it. Everything else is
+    /// dispatched on the object, so the search starts at the object's own class and
+    /// the first declaration going up the superclass chain is the one that runs.
+    ///
+    /// A default method inherited from an interface is found by neither search and
+    /// answers null, which the caller reads as no.
+    private static BytecodeMethod resolveReceiverCall(String exactClass, String call) {
+        boolean exact = call.startsWith(IteratorEscape.EXACT_CALL);
+        String key = exact ? call.substring(IteratorEscape.EXACT_CALL.length()) : call;
         int dot = key.indexOf('.');
         if (dot < 0) {
-            return false;
+            return null;
         }
-        String owner = IteratorEscape.mangle(key.substring(0, dot));
         String rest = key.substring(dot + 1);
         int paren = rest.indexOf('(');
         if (paren < 0) {
-            return false;
+            return null;
         }
         String name = rest.substring(0, paren);
         // BytecodeMethod renames <init> to __INIT__ (see BytecodeMethod:902). Without
@@ -3196,18 +3477,24 @@ public class Parser extends ClassVisitor {
             name = "__INIT__";
         }
         String desc = rest.substring(paren);
-        for (ByteCodeClass c : classes) {
-            if (!IteratorEscape.mangle(c.getClsName()).equals(owner)) {
-                continue;
+        String start = exact ? key.substring(0, dot) : exactClass;
+        // Bounded so that a malformed hierarchy cannot spin here.
+        for (int depth = 0; start != null && depth < 256; depth++) {
+            ByteCodeClass c = getClassByName(start.replace('.', '_'));
+            if (c == null) {
+                return null;    // not in this closed world
             }
             for (BytecodeMethod m : c.getMethods()) {
                 if (m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
-                    return IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE;
+                    return m;
                 }
             }
-            return false;   // class found, method not -- inherited or synthetic
+            if ("__INIT__".equals(name)) {
+                return null;    // a constructor is never inherited
+            }
+            start = c.getBaseClass();
         }
-        return false;       // not in this closed world
+        return null;
     }
 
     static void iteratorStackCensus() {

@@ -13,11 +13,13 @@
 #
 # Usage:
 #   scripts/website/check-javadoc-urls.sh <public-dir> [port]
+#
+# With no port, a free one is chosen.
 set -euo pipefail
 
 PUBLIC_DIR="${1:?usage: check-javadoc-urls.sh <public-dir> [port]}"
-PORT="${2:-8788}"
-WRANGLER_VERSION="${WRANGLER_VERSION:-4.129.0}"
+# No port means a free one the OS picks.
+PORT="${2:-}"
 
 for reference in javadoc backend/javadoc; do
   if [ ! -d "${PUBLIC_DIR}/${reference}" ]; then
@@ -26,17 +28,14 @@ for reference in javadoc backend/javadoc; do
   fi
 done
 
-npx --yes "wrangler@${WRANGLER_VERSION}" pages dev "${PUBLIC_DIR}" \
-  --port "${PORT}" --log-level error >/tmp/check-javadoc-urls.log 2>&1 &
-server=$!
-trap 'kill "${server}" 2>/dev/null || true' EXIT
-
-for _ in $(seq 1 60); do
-  if curl -fsS -o /dev/null "http://localhost:${PORT}/" 2>/dev/null; then
-    break
-  fi
-  sleep 2
-done
+# The server runs in its own process group and is stopped as a group: killing
+# only npx left wrangler's workerd holding the port after this script returned,
+# and a later check on the same port tested that leftover instead of its own
+# server. See pages-dev-server.sh.
+. "$(dirname "$0")/pages-dev-server.sh"
+trap pages_dev_stop EXIT
+pages_dev_start "${PUBLIC_DIR}" /tmp/check-javadoc-urls.log "${PORT}" --log-level error
+BASE_URL="${PAGES_DEV_URL}"
 
 # Every shape a reader can arrive by. The .html spellings are what javadoc
 # publishes and what 304 links in the guide and the site content use; the
@@ -64,8 +63,8 @@ URLS=(
 failures=0
 for url in "${URLS[@]}"; do
   body="$(mktemp)"
-  code="$(curl -sS -o "${body}" -w '%{http_code}' -L "http://localhost:${PORT}${url}")"
-  final="$(curl -sS -o /dev/null -w '%{url_effective}' -L "http://localhost:${PORT}${url}")"
+  code="$(curl -sS -o "${body}" -w '%{http_code}' -L "${BASE_URL}${url}")"
+  final="$(curl -sS -o /dev/null -w '%{url_effective}' -L "${BASE_URL}${url}")"
   title="$(grep -o '<title>[^<]*</title>' "${body}" | head -1 | sed 's/<[^>]*>//g' || true)"
   rm -f "${body}"
 
@@ -78,7 +77,7 @@ for url in "${URLS[@]}"; do
   # for: an alias built with the production baseURL sent preview readers to
   # www.codenameone.com, so the preview could never show the new pages at all.
   case "${final}" in
-    "http://localhost:${PORT}"*) ;;
+    "${BASE_URL}"*) ;;
     *) echo "FAIL ${url} -> left the deployment: ${final}"; failures=$((failures + 1)); continue ;;
   esac
   if [ -z "${title}" ]; then

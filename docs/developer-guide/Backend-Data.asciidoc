@@ -100,6 +100,15 @@ local SQLite database, and a module compiled against this runtime gets one whose
 statements are built for whichever engine the connection turns out to be. The
 class says what the data is; the module says where its rows live.
 
+The names differ too. A table or column the entity doesn't name is called
+after the class or field in the app's database, and after the same name in
+snake case on the server, the way Spring Boot names it: `RideEvent` is stored in
+`ride_event` and `fareCents` in `fare_cents`. An underscore goes before an upper
+case letter that sits between two lower case letters or digits, so `userID`
+becomes `userid` rather than `user_i_d`. A name given with `@Entity(table)` or
+`@Column(name)` is used as written on both. Queries keep naming the Java fields;
+only SQL written by hand sees the column names.
+
 [source,java]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-dao,indent=0]
@@ -159,9 +168,10 @@ transaction instead of starting another.
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-transaction,indent=0]
 ----
 
-Three things this doesn't do, on purpose. Relationships aren't supported --
-`@OneToMany` and friends don't exist, and a field referencing another entity
-fails the build with a message saying to persist the foreign key as a scalar.
+Three things this doesn't do, on purpose. A `Dao` maps one row to one object and
+nothing more: an entity with a relationship, such as `@OneToMany`, is refused by
+it, and belongs to a managed session instead -- see <<annotation-orm-section>>
+and <<backend-transaction-session>>.
 `createTable` creates a table that isn't there and does nothing at all to one
 that is, so it's a convenience for development and for tests rather than a
 migration tool; see <<backend-schema-migrations>> for that. And a boolean, a date and a char are stored as integers on every
@@ -513,6 +523,19 @@ Spring; list it in `rollbackFor` to make it roll back, as the `Signups` example
 does. `noRollbackFor = DataAccessException.class` restores plain commit-on-checked.
 ====
 
+One kind of failure isn't a fault in the statement or the data. When two
+transactions change the same rows, the database may end one of them: as the loser
+of a deadlock, after a lock wait that timed out, or because a row changed after the
+transaction first read it. PostgreSQL, MySQL and MariaDB each report that their own
+way, and every one arrives as `ConcurrencyFailureException`, a
+`DataAccessException`. The transaction rolls back like any other, and the code
+that called the `@Transactional` method can run it again or answer that someone
+else made the change first. A session reports a database failure as an unchecked
+`PersistenceException`, so `ConcurrencyFailureException.isCauseOf(err)` looks for
+it among the causes. Catch it outside the `@Transactional` method, not inside: the
+database has usually ended the whole transaction by then, so nothing in it can
+continue.
+
 A method that joined a transaction can't roll back what the method that began it
 did before it, so when it fails with an exception that rolls back, it marks the
 whole transaction rollback-only instead. The method that began the transaction
@@ -659,6 +682,7 @@ savepoint however it's made.
 The savepoints are named by the runtime and released when the method returns
 normally. All three engines support them.
 
+[[backend-transaction-session]]
 ==== The transaction's session
 
 A bean can inject `com.codename1.orm.session.Session`, the persistence session of
@@ -677,6 +701,12 @@ also clears the session, since the rows it had loaded since the savepoint no lon
 exist. Used outside a transaction, it throws with a message saying to annotate the
 method, or to open a session with `EntityManager.openSession()`.
 
+A `@Repository` interface, described in the SQLite ORM chapter, is injected the
+same way, as Spring Data injects one: the generated implementation is built once,
+over this session, and handed to every bean that asks for the interface. Its
+methods therefore run in the calling `@Transactional` method's transaction, and
+refuse outside one exactly as the session does.
+
 ==== Why a call through this works
 
 Spring applies `@Transactional` with a proxy: a wrapper object stands between a
@@ -690,6 +720,13 @@ and the method keeps its name, now starting the transaction, calling that body,
 and committing, with the rollback decision written in. The transaction is
 therefore a property of the method, and every call gets it. The same rewriting
 gives `@Async`, `@Timed` and `@Counted` the same property.
+
+A private method may take and return private nested classes of its bean; the
+method needs no change for that. Two things must stay nameable from the bean's
+package, and the build reports each with the class and method concerned: the class
+that declares the annotated method can't itself be private, local or anonymous,
+and an exception listed in `rollbackFor` or `noRollbackFor` can't be a private
+class.
 
 ==== Pitfalls
 

@@ -69,6 +69,11 @@ CN1_PROFILE=dev ./gradlew :backend:runBackend  # run it on this JVM
 ./gradlew :backend:backendTest                 # and as a native binary
 # end::gradle-backend[]
 
+# tag::gradle-backend-webapp[]
+./gradlew :backend:backendWebApp               # build the app for the browser and stage it
+CN1_PROFILE=dev ./gradlew :backend:runBackend  # the server now answers / with the app
+# end::gradle-backend-webapp[]
+
 # tag::gradle-backend-only[]
 CN1_PROFILE=dev ./gradlew runBackend
 ./gradlew backendPackage

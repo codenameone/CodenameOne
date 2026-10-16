@@ -58,9 +58,17 @@ public class XMLParser {
     /// A constant containing the CDATA tag identifier (minus the C which is read anyway first)
     /// CDATA nodes will be converted to text nodes
     private static final String CDATA_STR = "DATA[";
-    private static final char[] buffer = new char[8192];
-    private static int buffOffset;
-    private static int buffSize = -1;
+    // The read-ahead buffer belongs to the parser, and both entry points empty
+    // it. It used to be static and only parse() emptied it, so an eventParser
+    // run that a callback ended early -- RSSService stops at its item limit by
+    // throwing -- left the rest of that document in the buffer, and the next
+    // eventParser call in the process read it before its own input: the next
+    // feed came back with the previous feed's leftover items. A static buffer
+    // was also shared by parsers running on different threads, and by a parse
+    // started from inside another parser's callback.
+    private char[] buffer;
+    private int buffOffset;
+    private int buffSize = -1;
     ParserCallback parserCallback;
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
     private boolean eventParser;
@@ -93,9 +101,13 @@ public class XMLParser {
     /// This hashtable contains user defined char entities
     private Hashtable userDefinedCharEntities;
 
-    private static int read(Reader is) throws IOException {
+    private int read(Reader is) throws IOException {
         int c = -1;
         if (buffSize < 0 || buffOffset >= buffSize) {
+            if (buffer == null) {
+                // A subclass may call parseTagContent without an entry point.
+                buffer = new char[8192];
+            }
             buffSize = is.read(buffer, 0, buffer.length);
             if (buffSize < 0) {
                 return -1;
@@ -106,6 +118,11 @@ public class XMLParser {
         buffOffset++;
 
         return c;
+    }
+
+    private void resetBuffer() {
+        buffOffset = 0;
+        buffSize = -1;
     }
 
     /// Trims unneeded & and ; from the symbol if exist
@@ -270,8 +287,7 @@ public class XMLParser {
     ///
     /// an Element object describing the parsed document (Basically its DOM)
     public Element parse(Reader is) {
-        buffOffset = 0;
-        buffSize = -1;
+        resetBuffer();
         eventParser = false;
         Element rootElement = createNewElement("ROOT"); // ROOT is a "dummy" element that all other document elements are added to
         try {
@@ -355,6 +371,7 @@ public class XMLParser {
     ///
     /// - `java.io.IOException`: if an exception is thrown by the reader
     public void eventParser(Reader r) throws IOException {
+        resetBuffer();
         eventParser = true;
         parseTagContent(null, r);
     }

@@ -70,6 +70,9 @@ public class BackendRunMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${reactorProjects}", readonly = true)
+    private java.util.List<MavenProject> reactorProjects;
+
     /**
      * The class to run. Found automatically when the module has exactly one class
      * with a main method, which is the usual shape.
@@ -85,7 +88,17 @@ public class BackendRunMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.jvmArgs")
     private String jvmArgs;
 
+    /**
+     * Where cn1:backend-webapp staged the application: that goal's own
+     * parameter, read here so a non-default directory is the one served.
+     */
+    @Parameter(property = "cn1.backend.webapp.output", defaultValue = "${project.build.directory}/webapp")
+    private File webApp;
+
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (BackendModules.passOver(project, reactorProjects, getLog(), "backend")) {
+            return;
+        }
         File classes = new File(project.getBuild().getOutputDirectory());
         if (!classes.isDirectory()) {
             throw new MojoFailureException("Nothing is compiled in "
@@ -121,6 +134,21 @@ public class BackendRunMojo extends AbstractMojo {
         command.add(javaExecutable());
         if (jvmArgs != null && jvmArgs.trim().length() > 0) {
             command.addAll(Arrays.asList(jvmArgs.trim().split("\\s+")));
+        }
+        // What cn1:backend-webapp staged. The server looks for its application in
+        // `webapp` in its working directory, which here is the module -- and build
+        // output does not belong in a source directory, so it is under target and
+        // the server is told. Not when the project says where its application is:
+        // a system property outranks the module's own files, and answering for it
+        // would override a setting somebody wrote down.
+        try {
+            if (webApp != null && new File(webApp, BackendWebApp.INDEX).isFile()
+                    && !BackendWebApp.rootIsConfigured(project.getBasedir(), System.getenv(), jvmArgs)) {
+                command.add("-D" + BackendWebApp.ROOT_PROPERTY + "=" + webApp.getAbsolutePath());
+                getLog().info("Serving the web app staged in " + webApp);
+            }
+        } catch (com.codename1.build.BuildExecutionException err) {
+            throw new MojoExecutionException(err.getMessage(), err);
         }
         command.add("-cp");
         command.add(join(classpath, File.pathSeparator));

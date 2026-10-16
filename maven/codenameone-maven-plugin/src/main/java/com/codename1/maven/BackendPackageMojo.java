@@ -85,6 +85,9 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${reactorProjects}", readonly = true)
+    private java.util.List<MavenProject> reactorProjects;
+
     @Parameter(defaultValue = "${session}", readonly = true, required = true)
     private org.apache.maven.execution.MavenSession session;
 
@@ -112,6 +115,13 @@ public class BackendPackageMojo extends AbstractMojo {
      */
     @Parameter(property = "cn1.backend.output")
     private File output;
+
+    /**
+     * Where cn1:backend-webapp staged the application: that goal's own
+     * parameter, read here so a non-default directory is the one served.
+     */
+    @Parameter(property = "cn1.backend.webapp.output", defaultValue = "${project.build.directory}/webapp")
+    private File webApp;
 
     /**
      * A Linux deployment target -- musl-x86_64, musl-arm64, glibc-x86_64,
@@ -174,13 +184,42 @@ public class BackendPackageMojo extends AbstractMojo {
     private boolean devTools;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (BackendModules.passOver(project, reactorProjects, getLog(), "backend-package")) {
+            return;
+        }
         try {
             packager().execute();
+            webAppBesideTheBinary();
         } catch (BuildFailureException ex) {
             throw new MojoFailureException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         } catch (BuildExecutionException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
+    }
+
+    /**
+     * Puts the web app cn1:backend-webapp staged beside the binary.
+     *
+     * A packaged server looks for its application in `webapp` in its working
+     * directory, the way it looks for application.properties, so a deployment is
+     * the binary with that directory next to it. The default output is
+     * target/&lt;artifactId&gt; and the app is staged in target/webapp, so they are
+     * neighbours already; a binary written anywhere else, or an app staged
+     * anywhere else, has the app copied to the binary's directory.
+     * The files are not linked into the binary: it serves them straight from the
+     * page cache, which needs them to be files.
+     */
+    private void webAppBesideTheBinary() throws BuildExecutionException {
+        File staged = webApp;
+        if (staged == null || !new File(staged, BackendWebApp.INDEX).isFile()) {
+            return;
+        }
+        File binaryDir = output != null && output.getAbsoluteFile().getParentFile() != null
+                ? output.getAbsoluteFile().getParentFile() : new File(project.getBuild().getDirectory());
+        File beside = new File(binaryDir, "webapp");
+        // A no-op when the app was staged there already, the default.
+        new BackendWebApp(MavenLog.of(getLog())).copy(staged, beside);
+        getLog().info("The web app is in " + beside + "; deploy that directory beside the binary");
     }
 
     /** The engine packager, answering from this mojo's project and parameters. */
@@ -466,17 +505,17 @@ public class BackendPackageMojo extends AbstractMojo {
     /// sources and has to read them the same way.
     static String sourceEncodingOf(MavenProject project) {
         Plugin compiler = compilerPlugin(project);
-        if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
-            Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
-            if (encoding != null && encoding.getValue() != null) {
-                String declared = encoding.getValue().trim();
-                // A configuration that is still a property reference is one Maven
-                // would have interpolated; an uninterpolated ${...} names no
-                // charset, so fall through rather than hand javac a literal.
-                if (declared.length() > 0 && declared.indexOf("${") < 0) {
-                    return declared;
-                }
-            }
+        // The execution that compiles these sources first -- the one
+        // compilerExecutionConfiguration picks for every other compiler option
+        // -- and only then the plugin-level value. Read the other way, a module
+        // that declares its encoding on the execution was recompiled here with
+        // the plugin's, or with UTF-8.
+        String declared = encodingIn(compilerExecutionConfiguration(compiler, "compile"));
+        if (declared == null && compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
+            declared = encodingIn((Xpp3Dom) compiler.getConfiguration());
+        }
+        if (declared != null) {
+            return declared;
         }
         String property = project.getProperties() == null ? null
                 : project.getProperties().getProperty("project.build.sourceEncoding");
@@ -484,6 +523,18 @@ public class BackendPackageMojo extends AbstractMojo {
             return property.trim();
         }
         return "UTF-8";
+    }
+
+    private static String encodingIn(Xpp3Dom configuration) {
+        Xpp3Dom encoding = configuration == null ? null : configuration.getChild("encoding");
+        if (encoding == null || encoding.getValue() == null) {
+            return null;
+        }
+        String declared = encoding.getValue().trim();
+        // A configuration that is still a property reference is one Maven
+        // would have interpolated; an uninterpolated ${...} names no
+        // charset, so fall through rather than hand javac a literal.
+        return declared.length() > 0 && declared.indexOf("${") < 0 ? declared : null;
     }
 
     private File resolve(String groupId, String artifactId, String version, String classifier)

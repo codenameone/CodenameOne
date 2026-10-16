@@ -34,6 +34,13 @@
       with no runtime to install, which is what lets the deployed container be the
       size of the binary and a serverless cold start be a process exec.
 
+      The server can also host the app itself, so it runs in a browser with
+      nothing to install:
+
+        mvn -pl backend -Dcodename1.platform=backend cn1:backend-webapp
+            builds the app for the browser into target/webapp; the first two
+            commands then serve it at /, after this module's own routes
+
       This module deliberately does NOT depend on codenameone-core: a server has no
       display, and the compiler saying so at the point of the import is more useful
       than a crash at start-up. Share types with the app by putting them in a module
@@ -91,6 +98,19 @@
                      server writes its own main instead.
                 -->
                 <executions>
+                    <execution>
+                        <id>cn1-generate-annotation-stubs</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <!-- Does nothing until this module depends on one
+                                 that declares a @RestClient contract, such as a
+                                 module the app depends on too. Then it writes an
+                                 <Api>Server interface for this module to
+                                 implement, and a controller routing to it, into
+                                 target/generated-sources/cn1-annotations. -->
+                            <goal>generate-annotation-stubs</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>cn1-process-annotations</id>
                         <phase>process-classes</phase>

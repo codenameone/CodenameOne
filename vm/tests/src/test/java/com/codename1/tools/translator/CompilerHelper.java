@@ -310,6 +310,25 @@ public class CompilerHelper {
         return out;
     }
 
+    // The oldest and the newest of the diagonal, for a test whose subject is the
+    // runtime and not the shape of the bytecode: a lock, a file, an uncaught
+    // exception behave the same whichever javac compiled the few lines that call
+    // them, and each configuration costs a whole translation and C build. The
+    // two ends are kept because they are where javac's output differs most
+    // (string concatenation, nest access), so a library that only works under
+    // one of them still fails here. Tests of what the translator makes of
+    // bytecode keep the whole diagonal.
+    public static List<CompilerConfig> getBookendCompilers() {
+        List<CompilerConfig> all = getDiagonalCompilers();
+        if (all.size() <= 2) {
+            return all;
+        }
+        List<CompilerConfig> out = new ArrayList<>();
+        out.add(all.get(0));
+        out.add(all.get(all.size() - 1));
+        return out;
+    }
+
     private static boolean canCompile(String compilerVersion, String targetVersion) {
         int compilerMajor = parseJavaMajor(compilerVersion);
         int targetMajor = parseJavaMajor(targetVersion);

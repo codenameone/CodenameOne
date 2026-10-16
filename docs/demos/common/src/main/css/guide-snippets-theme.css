@@ -850,3 +850,15 @@ Button.hover {
 }
 
 /* end::native-theme-os-settings[] */
+
+/* tag::wayline-css-brand[] */
+#Constants {
+    --brand: #0f766e;
+    --brand-pressed: #115e59;
+    --brand-contrast: #ffffff;
+    --brand-dark: #5eead4;
+    --brand-pressed-dark: #2dd4bf;
+    --brand-contrast-dark: #042f2e;
+    --radius: 1.5mm;
+}
+/* end::wayline-css-brand[] */

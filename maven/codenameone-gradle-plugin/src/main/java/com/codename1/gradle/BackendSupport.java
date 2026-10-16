@@ -22,6 +22,7 @@
  */
 package com.codename1.gradle;
 
+import com.codename1.gradle.tasks.BackendWebAppTask;
 import com.codename1.gradle.tasks.ProcessAnnotationsAction;
 import com.codename1.gradle.tasks.ProcessTestAnnotationsAction;
 import com.codename1.gradle.tasks.RunBackendTask;
@@ -62,6 +63,25 @@ final class BackendSupport {
     /// translates them against codenameone-backend-test's subset of the same API.
     static final String JUNIT_JUPITER = "org.junit.jupiter:junit-jupiter:5.9.3";
     static final String JUNIT_LAUNCHER = "org.junit.platform:junit-platform-launcher:1.9.3";
+    /// The task that stages the application's browser build for this backend.
+    static final String WEB_APP_TASK = "backendWebApp";
+    /// The directory it stages into, under the backend's build directory.
+    static final String WEB_APP_DIRECTORY = "webapp";
+
+    /// Where the web app is staged: `cn1.backend.webapp.output`, relative to
+    /// the project, or `build/webapp`. The staging task writes it and the run
+    /// and package tasks read it, so all three take it from here -- a custom
+    /// output staged by one and looked for at the default by the others was
+    /// never served or packaged.
+    ///
+    /// The project directory is looked up here, outside the lambda: a lambda
+    /// that held the Project could not be stored in the configuration cache.
+    static Provider<org.gradle.api.file.Directory> webAppDirectory(Project project) {
+        final org.gradle.api.file.Directory projectDirectory = project.getLayout().getProjectDirectory();
+        return project.getProviders().gradleProperty("cn1.backend.webapp.output")
+                .map(projectDirectory::dir)
+                .orElse(project.getLayout().getBuildDirectory().dir(WEB_APP_DIRECTORY));
+    }
 
     private BackendSupport() {
     }
@@ -128,7 +148,12 @@ final class BackendSupport {
             t.getJvmArgs().set(project.getProviders().gradleProperty("cn1.backend.jvmArgs")
                     .map(BackendSupport::split).orElse(Collections.<String>emptyList()));
             t.getWorkingDirectory().set(layout.projectDir());
+            // What backendWebApp staged, when it has; never a dependency, so a
+            // restart does not pay for a browser build.
+            t.getWebAppDirectory().set(webAppDirectory(project));
+            t.mustRunAfter(WEB_APP_TASK);
         });
+        registerWebApp(project, layout);
         registerMigrate(project, layout, main, "backendMigrate", "migrate",
                 "Applies pending schema migrations to the configured database");
         registerMigrate(project, layout, main, "backendMigrateInfo", "info",
@@ -141,6 +166,49 @@ final class BackendSupport {
                 "Marks an existing database as already being at cn1.flyway.baselineVersion");
         BackendPackageSupport.register(project, layout, main, ext);
         UpdateSupport.register(project, layout);
+    }
+
+    /// `backendWebApp`: the application's browser build, staged where
+    /// `runBackend` serves it and `backendPackage` ships it.
+    ///
+    /// In an application's `backend/` subproject the bundle is the root
+    /// project's, so the task depends on the root's [AppSupport#WEB_APP_BUILD_TASK]
+    /// -- the local JavaScript build, made without the proxy servlet a backend
+    /// does not have. Not when a bundle is given: staging one that is already
+    /// built needs no build. A backend that is the root project has no
+    /// application to build and takes a bundle only.
+    private static void registerWebApp(Project project, ProjectLayout layout) {
+        final Provider<String> bundle = project.getProviders().gradleProperty("cn1.backend.webapp.bundle");
+        final Project root = project.getRootProject();
+        final boolean hasApp = hostsApplication(project != root,
+                project != root ? ProjectSupport.kind(root) : null);
+        project.getTasks().register(WEB_APP_TASK, BackendWebAppTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription("Builds the app for the browser and stages it for this backend to serve");
+            // Never up to date. The bundle is a path that may name an archive
+            // or a directory, and with none given it is whichever the
+            // application's build directory holds, so none of it is an input
+            // Gradle could snapshot: a browser build rebuilt in place, or an
+            // archive replaced at the same path, would otherwise leave the old
+            // scripts and styles staged. Nothing depends on this task, so it
+            // runs only when asked for, and then it stages.
+            t.getOutputs().upToDateWhen(task -> false);
+            t.getBundle().set(bundle);
+            t.getWorkingDirectory().set(layout.projectDir());
+            t.getOutputDirectory().set(webAppDirectory(project));
+            if (hasApp) {
+                t.getAppBuildDirectory().set(root.getLayout().getBuildDirectory());
+                if (!bundle.isPresent()) {
+                    t.dependsOn(root.getPath() + AppSupport.WEB_APP_BUILD_TASK);
+                }
+            }
+        });
+    }
+
+    /// Whether a backend has an application whose browser build it can stage:
+    /// it is a subproject, and the root project is an application.
+    static boolean hostsApplication(boolean subproject, com.codename1.project.ProjectKind rootKind) {
+        return subproject && rootKind == com.codename1.project.ProjectKind.APP;
     }
 
     /// One migration command, as the Maven `cn1:migrate` goals run it: the entry point the

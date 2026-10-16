@@ -88,6 +88,53 @@ public final class AnnotationProcessing {
         this.compileClasspath = compileClasspath == null ? Collections.<String>emptyList() : compileClasspath;
     }
 
+    /// Class directories on the compile classpath that hold this module's OWN
+    /// classes, compiled by another pass of the same build.
+    private List<File> ownClassDirectories = Collections.<File>emptyList();
+
+    /// Names the classpath entries that are the module's own classes and not a
+    /// dependency's, so no dependency class is offered out of them.
+    ///
+    /// A project in two languages is compiled in two passes, and each pass has
+    /// the other's classes on its classpath: Kotlin's pass sees the Java it has
+    /// not compiled yet, javac's sees Kotlin's output. Those are this module's
+    /// classes and the other pass processes them. Read as a dependency's, a
+    /// `@Mapped` Java class was mapped by Kotlin's pass and then again by its
+    /// own, and the build stopped on two copies of one generated class.
+    ///
+    /// The entries stay on the classpath -- types are still resolved from them.
+    public AnnotationProcessing withOwnClassDirectories(List<File> directories) {
+        this.ownClassDirectories = directories == null
+                ? Collections.<File>emptyList() : new ArrayList<File>(directories);
+        return this;
+    }
+
+    /// The compile classpath without [#ownClassDirectories].
+    private List<String> dependencyClasspath() {
+        if (ownClassDirectories.isEmpty()) {
+            return compileClasspath;
+        }
+        Set<File> own = new java.util.HashSet<File>();
+        for (File directory : ownClassDirectories) {
+            own.add(canonical(directory));
+        }
+        List<String> out = new ArrayList<String>();
+        for (String element : compileClasspath) {
+            if (!own.contains(canonical(new File(element)))) {
+                out.add(element);
+            }
+        }
+        return out;
+    }
+
+    private static File canonical(File file) {
+        try {
+            return file.getCanonicalFile();
+        } catch (java.io.IOException e) {
+            return file.getAbsoluteFile();
+        }
+    }
+
     /// Runs every processor.
     public void run() throws BuildExecutionException {
         List<File> classpath = new java.util.ArrayList<File>();
@@ -173,6 +220,8 @@ public final class AnnotationProcessing {
                 }
             }
         }
+
+        offerDependencyClasses(processors, ctx);
 
         // finish()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
@@ -271,6 +320,65 @@ public final class AnnotationProcessing {
         } catch (IOException ioe) {
             throw new BuildExecutionException(
                     "Could not stamp the build hint manifest under " + outputDirectory, ioe);
+        }
+    }
+
+    /// Offers the annotated classes of the module's dependencies to the
+    /// processors that asked for them.
+    ///
+    /// This is what lets a library be shared between an application and its
+    /// server: the REST contract and the objects it transfers are compiled once,
+    /// in a module both depend on, and each side generates its own half from
+    /// them here. Without it a class outside the module's own output directory
+    /// was invisible to every processor.
+    ///
+    /// A class is not offered when the module itself defines one of the same
+    /// name -- the module's own definition shadows it on the classpath, and has
+    /// already been processed above.
+    private void offerDependencyClasses(List<AnnotationProcessor> processors, ProcessorContext ctx)
+            throws BuildExecutionException {
+        List<AnnotationProcessor> interested = new ArrayList<AnnotationProcessor>();
+        Set<String> descriptors = new java.util.LinkedHashSet<String>();
+        for (AnnotationProcessor p : processors) {
+            if (p instanceof com.codename1.maven.annotations.ProcessesDependencyClasses
+                    && ((com.codename1.maven.annotations.ProcessesDependencyClasses) p)
+                            .acceptsDependencyClasses(ctx)) {
+                interested.add(p);
+                descriptors.addAll(p.getAnnotationDescriptors());
+            }
+        }
+        if (interested.isEmpty()) {
+            return;
+        }
+        Map<String, AnnotatedClass> dependencies;
+        try {
+            dependencies = com.codename1.maven.annotations.DependencyClasses.scan(
+                    dependencyClasspath(), outputDirectory, descriptors);
+        } catch (ProcessingException e) {
+            throw new BuildExecutionException("Failed to scan the classes of "
+                    + outputDirectory + "'s dependencies: " + e.getMessage(), e);
+        }
+        if (dependencies.isEmpty()) {
+            return;
+        }
+        ctx.setDependencyIndex(dependencies);
+        for (AnnotatedClass cls : dependencies.values()) {
+            if (ctx.lookup(cls.getInternalName()) != null) {
+                continue;
+            }
+            Set<String> present = cls.getAllAnnotationDescriptors();
+            for (AnnotationProcessor p : interested) {
+                if (intersects(p.getAnnotationDescriptors(), present)) {
+                    try {
+                        p.processClass(cls, ctx);
+                    } catch (ProcessingException e) {
+                        throw new BuildFailureException(
+                                "Annotation processor " + p.getClass().getName()
+                                        + " failed on dependency class " + cls.getBinaryName()
+                                        + ": " + e.getMessage(), e);
+                    }
+                }
+            }
         }
     }
 

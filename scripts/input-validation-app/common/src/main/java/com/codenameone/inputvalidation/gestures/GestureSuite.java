@@ -45,11 +45,18 @@ public final class GestureSuite {
     /// tap before it can type anything, which took three and a half seconds
     /// on a simulator busy serving XCUITest accessibility snapshots.
     private static final long DEFAULT_STEP_TIMEOUT_MS = 30000L;
-    // XCUITest can still be waiting for the preceding long-press action to idle
-    // when this step becomes ready. The iOS 18.5 CI log spent 28 seconds there,
-    // exhausting the old 30-second budget before the first browser focus tap.
-    // Allow that handoff plus the driver's bounded 25-second real-key retry loop.
-    private static final long IOS_BROWSER_STEP_TIMEOUT_MS = 90000L;
+    // Budget for every step on iOS. XCUITest waits for the app to go idle before
+    // it synthesizes anything, and that wait has run past 30 seconds ahead of
+    // more than one step: 28 seconds after the long-press before the first
+    // browser focus tap, and 31.6 seconds before the very first tap, which the
+    // driver only asked for once its own launch had taken 15 of the 30 seconds
+    // the step was already counting. That tap arrived 0.45 seconds after the
+    // step had timed out. The step is armed at READY, before the driver acts, so
+    // its budget has to cover the driver's idle wait as well as the gesture --
+    // plus, for the browser step, the driver's bounded 25-second real-key retry
+    // loop. A step that succeeds ends at its event, so this only lengthens a
+    // failure.
+    private static final long IOS_STEP_TIMEOUT_MS = 90000L;
     /// Non-iOS drivers retain the automatic exit. On iOS, XCUITest owns
     /// termination so completion cannot race a key still being synthesized.
     private static final long SUITE_EXIT_DELAY_MS = 8000L;
@@ -117,8 +124,7 @@ public final class GestureSuite {
         });
         this.targetArea.revalidate();
         log("CN1IV:READY:" + step.name());
-        long timeout = "ios".equals(CN.getPlatformName()) && "browserkeytype".equals(step.name())
-                ? IOS_BROWSER_STEP_TIMEOUT_MS : DEFAULT_STEP_TIMEOUT_MS;
+        long timeout = "ios".equals(CN.getPlatformName()) ? IOS_STEP_TIMEOUT_MS : DEFAULT_STEP_TIMEOUT_MS;
         this.activeTimeout = UITimer.timer((int) timeout, false, this.form, () -> {
             if (stepToken != activeStepToken) {
                 return;
