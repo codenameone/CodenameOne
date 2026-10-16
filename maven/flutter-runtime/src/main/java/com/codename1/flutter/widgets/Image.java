@@ -252,7 +252,12 @@ public class Image extends Widget {
             base = headers == null ? "url:" + url
                     : "url:" + url + "#" + ImageRenderElement.storageKey(url, headers);
         }
-        return base + decodeHintSuffix();
+        // The scale is part of the identity too (NetworkImage/MemoryImage scale): a rebuild
+        // that only changed it reused the loaded image and kept the old intrinsic logical
+        // size -- scale 1.0 -> 2.0 still drew it twice as large.
+        String scale = memoryBytes != null || assetName == null
+                ? (memoryScale != 1 ? "@scale=" + memoryScale : "") : "";
+        return base + scale + decodeHintSuffix();
     }
 
     /// Folds the decode-size hints into the source identity: a rebuild that only

@@ -39,6 +39,21 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 /// what the provider describes.
 public class ImageProviderSourceTest {
 
+    /// A rebuild that only changes a NetworkImage's scale is a new source: with the
+    /// key unchanged the render element kept the old intrinsic size.
+    @Test
+    public void aNetworkImagesScaleIsPartOfItsSourceKey() {
+        NetworkImage one = new NetworkImage("https://example.com/a.png");
+        NetworkImage two = new NetworkImage("https://example.com/a.png");
+        two.scale(2.0);
+        Image a = new Image();
+        a.image(one);
+        Image b = new Image();
+        b.image(two);
+        assertNotEquals(a.sourceKey(), b.sourceKey());
+        assertEquals("url:https://example.com/a.png", a.sourceKey(), "scale 1 keeps the plain key");
+    }
+
     @Test
     public void networkImageHeadersReachTheWidget() {
         DartMap<String, String> headers = new DartMap<String, String>();

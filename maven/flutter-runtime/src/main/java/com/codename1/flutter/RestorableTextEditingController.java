@@ -55,8 +55,12 @@ public class RestorableTextEditingController extends RestorableProperty<TextEdit
     public void initWithValue(TextEditingController value) {
     }
 
+    /// Disposes the controller this property OWNS, then the property: clearing only the
+    /// property's listeners left the controller's own listeners and field bindings live,
+    /// so code holding the controller kept calling back into the disposed state.
     @Override
     public void dispose() {
+        controller.dispose();
         super.dispose();
     }
 }

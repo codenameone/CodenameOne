@@ -155,9 +155,16 @@ public final class Dialogs {
         }
         DialogEntry e = dialogStack.get(dialogStack.size() - 1);
         e.popResult = result;
-        close(e);
         if (e.dialog != null) {
+            // Native dialog away FIRST; its dispose() override then calls close(e), which
+            // completes the future. Completing first ran an `await showDialog` continuation
+            // that popped the route beneath while the dialog was still current, and the
+            // dialog's own disposal then restored its recorded previous form -- the route
+            // that had just been popped.
             e.dialog.dispose();
+            close(e);   // no-op when dispose() already closed it
+        } else {
+            close(e);
         }
         return true;
     }

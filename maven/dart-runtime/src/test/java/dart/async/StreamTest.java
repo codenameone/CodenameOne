@@ -93,6 +93,22 @@ public class StreamTest {
         assertEquals(0, never[0], "never listened: nothing to cancel");
     }
 
+    /// An upstream that emits synchronously inside listen(), into a map whose transform
+    /// throws for a cancelOnError listener: the derived stream lost its listener before
+    /// it had stored the upstream subscription, so the upstream was never cancelled.
+    @Test
+    public void aDerivedStreamCancelledDuringListenStillCancelsItsUpstream() {
+        final int[] upstreamCancels = {0};
+        final StreamController<String> c = new StreamController<String>();
+        c.onListen((Funcs.VoidFunc0) () -> c.add("boom"));
+        c.onCancel((Funcs.VoidFunc0) () -> upstreamCancels[0]++);
+        Stream<String> mapped = c.stream().map(v -> {
+            throw new IllegalStateException("transform failed");
+        });
+        mapped.listen(v -> { }, (Funcs.VoidFunc1<Object>) e -> { }, null, Boolean.TRUE);
+        assertEquals(1, upstreamCancels[0], "the upstream source got its cancel hook");
+    }
+
     @Test
     public void everyLiveListenerReceivesEveryEvent() {
         StreamController<String> c = new StreamController<String>();

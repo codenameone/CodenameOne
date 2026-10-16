@@ -444,6 +444,14 @@ public class Stream<T> {
                         self.emitDone();
                     }
                 });
+                // The upstream may emit synchronously inside listen(), and a cancelOnError
+                // listener can then leave this stream with no listeners -- onNoListeners ran
+                // before upstreamSub was assigned, so there was nothing to cancel and the
+                // source (a controller, an EventChannel) never got its cancel hook.
+                if (!hasListeners() && upstreamSub != null) {
+                    upstreamSub.cancel();
+                    upstreamSub = null;
+                }
             }
 
             @Override
@@ -494,6 +502,14 @@ public class Stream<T> {
                         self.emitDone();
                     }
                 });
+                // The upstream may emit synchronously inside listen(), and a cancelOnError
+                // listener can then leave this stream with no listeners -- onNoListeners ran
+                // before upstreamSub was assigned, so there was nothing to cancel and the
+                // source (a controller, an EventChannel) never got its cancel hook.
+                if (!hasListeners() && upstreamSub != null) {
+                    upstreamSub.cancel();
+                    upstreamSub = null;
+                }
             }
 
             @Override

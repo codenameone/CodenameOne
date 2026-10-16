@@ -98,4 +98,26 @@ class NavigatorOrderingTest {
         assertTrue(Navigator.previousFormOfTop() == first,
                 "it returns to the first page, not to the page that was being popped");
     }
+
+    /// A displayed dialog is disposed BEFORE its future completes, so a continuation that
+    /// pops the page beneath runs with the dialog already gone.
+    @Test
+    void aDialogIsGoneBeforeItsResultIsDelivered() {
+        Navigator.push(null, page(null));
+        final List<Integer> openAtCallback = new ArrayList<Integer>();
+        final List<Boolean> showingAtCallback = new ArrayList<Boolean>();
+        dart.async.Future<Object> result = Dialogs.showDialog(null, (context) -> new ProbeBox(5, 5));
+        result.then((dart.runtime.Funcs.VoidFunc1<Object>) v -> {
+            openAtCallback.add(Dialogs.openDialogCount());
+            com.codename1.ui.Form now = com.codename1.ui.Display.getInstance().getCurrent();
+            showingAtCallback.add(now instanceof com.codename1.ui.Dialog && now.isVisible());
+        });
+
+        Navigator.pop(null, "ok");
+
+        assertEquals(java.util.Arrays.asList(0), openAtCallback, "off the dialog stack");
+        assertEquals(java.util.Arrays.asList(Boolean.FALSE), showingAtCallback,
+                "and no longer the shown dialog when the result arrives");
+        assertEquals(1, Navigator.stackSize(), "the page beneath is untouched");
+    }
 }
