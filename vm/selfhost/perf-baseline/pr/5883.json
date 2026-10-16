@@ -1,20 +1,6 @@
 {
  "pr": 5883,
  "rebaseline": {
-  "linux-arm64@neoverse-n2": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.868,
-      "time": 0.931
-     },
-     "memory": 0.724,
-     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite, which lowers the self-hosted translator's peak RSS; linux-arm64 hello RAM 0.87x -> 0.72x, run 38499309411 at a1e23b56c1",
-     "runs": 1,
-     "time": 0.931
-    }
-   }
-  },
   "linux-x64@amd-epyc-9v45-96-core-processor": {
    "arrayRandom": {
     "all": {
@@ -254,26 +240,6 @@
      "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite, which lowers the self-hosted translator's peak RSS; windows-arm64 translator RAM 0.51x -> 0.43x on top of #6010's record, run 38499309506 at a1e23b56c1",
      "runs": 1,
      "time": 0.838
-    }
-   }
-  },
-  "windows-x64@amd64-family-25-model-17-authenticamd": {
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.551,
-      "time": 0.777,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.454,
-     "reason": "MethodDependencyGraph.getCallers returns a read-only view instead of copying the caller set on every lookup (a4254d5453): ~3.26GB allocated instead of ~3.84GB translating the hello suite; windows-x64 translator RAM 0.55x -> 0.45x, run 38535042911 at 6245994207",
-     "runs": 1,
-     "time": 0.777,
-     "tolerance": {
-      "time": 0.2
-     }
     }
    }
   },
