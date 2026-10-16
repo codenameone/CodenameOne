@@ -99,12 +99,12 @@ loss pauses input without discarding the component's session; returning to that 
 
 Linux queues native input onto the EDT with a session identifier and edit sequence. Callbacks from a
 closed session are discarded. The port supplies surrounding text only after Java has acknowledged
-all queued edits; an older state update cannot overwrite the latest context. Password and sensitive
-fields do not expose surrounding text to the input method. GTK's character-based
+all queued edits; an older state update can't overwrite the latest context. Password and sensitive
+fields don't expose surrounding text to the input method. GTK's character-based
 composition and deletion offsets are converted to UTF-16. Deletion requests for a disconnected range
-that does not touch the caret are declined because `deleteSurroundingText` cannot represent them.
+that doesn't touch the caret are declined because `deleteSurroundingText` can't represent them.
 Input-method availability depends on the GTK modules installed on the user's system. Local GTK
-composition tests do not certify every IBus/Fcitx engine or a complete language-specific editor.
+composition tests don't certify every installed input-method engine or a complete language-specific editor.
 
 All offsets in this contract are UTF-16 indices, matching Java `String`, Android `Editable`, and Apple
 string indices. The document canonicalizes CRLF and bare CR line endings to LF before it updates the
