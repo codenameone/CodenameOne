@@ -719,6 +719,13 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
             return FALSE;
         }
     }
+    /* Our handler consumes unhandled canvas keys below, so GTK's default
+     * handler never gets to activate menu accelerators. Resolve them here,
+     * after native peers have had their normal focus-based dispatch. */
+    if (e->type == GDK_KEY_PRESS && cn1Window != NULL
+            && gtk_window_activate_key(GTK_WINDOW(cn1Window), e)) {
+        return TRUE;
+    }
     if (cn1LinuxTextInputFilter(CN1_MAIN_WINDOW_SLOT, e)) {
         return TRUE;
     }
