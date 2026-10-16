@@ -470,6 +470,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String css = getText(styled, themePath);
         assertContains(css, "--brand: #0f766e;", "The chosen brand colour should be the theme's");
         assertFalse(css.indexOf("#" + brand) >= 0, "The template's own brand colour should be gone from the theme");
+        assertFalse(css.indexOf("#edf2ff") >= 0 || css.indexOf("#1a2440") >= 0,
+                "The brand's tints should follow the chosen colour in both modes");
         assertContains(css, "--radius: 0.6mm;", "Square corners should set the radius");
         assertContains(css, "--radius-small: 0.4mm;", "Square corners should set the small radius");
         assertContains(css, "@media (prefers-color-scheme: dark)", "The theme keeps its dark mode");

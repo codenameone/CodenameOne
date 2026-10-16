@@ -210,3 +210,10 @@ Android and iOS through `scripts/build-android-app.sh` and
 `scripts/sync-initializr-wayline.py --write` copies this project into the
 Initializr's resources; without `--write` it fails when they differ, which is what
 CI runs. Change the project here, never the copies.
+
+== Licence
+
+Wayline is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep. The same
+holds for everything Initializr writes into a generated project.

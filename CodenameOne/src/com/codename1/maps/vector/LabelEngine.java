@@ -34,7 +34,7 @@ import java.util.Map;
 
 /// Places and draws text labels with greedy collision avoidance: a label is
 /// only drawn when its bounding box does not overlap one already placed this
-/// frame. Each label is rendered with a one-pixel halo for legibility over
+/// frame. Each label is rendered with a halo (see setHalo) for legibility over
 /// busy map content. This is a lightweight stand-in for a full label engine,
 /// adequate for place names on a basemap.
 ///
@@ -125,6 +125,14 @@ final class LabelEngine {
     /// on a phone, where it is a third of the thinnest stroke of a letter.
     void setHalo(int pixels) {
         halo = Math.max(1, pixels);
+    }
+
+    // How far past its text a label is drawn: the offset of the outline's
+    // copies in draw(). What a label reserves and what has to fit in the view
+    // are measured with it, or a wide outline on a dense display would paint
+    // over a neighbour accepted as clear, or past the edge of the map.
+    private int reach() {
+        return halo > 1 ? Math.max(1, (halo * 3 + 2) / 4) : 1;
     }
 
     private void clearBuckets() {
@@ -414,8 +422,8 @@ final class LabelEngine {
             ga[i] = angle;
             double c = Math.abs(Math.cos(angle));
             double s = Math.abs(Math.sin(angle));
-            int ex = (int) Math.ceil(c * widths[i] / 2.0 + s * h / 2.0) + 1;
-            int ey = (int) Math.ceil(s * widths[i] / 2.0 + c * h / 2.0) + 1;
+            int ex = (int) Math.ceil(c * widths[i] / 2.0 + s * h / 2.0) + reach();
+            int ey = (int) Math.ceil(s * widths[i] / 2.0 + c * h / 2.0) + reach();
             int[] box = new int[]{round(p[0]) - ex, round(p[1]) - ey, ex * 2, ey * 2};
             if (collides(box[0], box[1], box[2], box[3])) {
                 return false;
@@ -731,11 +739,13 @@ final class LabelEngine {
         }
         int x = cx - w / 2;
         int y = cy - h / 2;
-        int bx = x - 2;
-        int by = y - 2;
-        int bw = w + 4;
-        int bh = h + 4;
-        if (bounded && (x < boundLeft || y < boundTop || x + w > boundRight || y + h > boundBottom)) {
+        int r = reach();
+        int bx = x - r - 1;
+        int by = y - r - 1;
+        int bw = w + 2 * r + 2;
+        int bh = h + 2 * r + 2;
+        if (bounded && (x - r < boundLeft || y - r < boundTop || x + w + r > boundRight
+                || y + h + r > boundBottom)) {
             return false;
         }
         if (collides(bx, by, bw, bh)) {
@@ -759,7 +769,7 @@ final class LabelEngine {
                 // four ghosts of the name with the corners between them bare.
                 // Still four, though -- the outline is most of what a label
                 // costs to draw, and it is drawn for every label every frame.
-                int d = Math.max(1, (halo * 3 + 2) / 4);
+                int d = reach();
                 g.drawString(text, x - d, y - d);
                 g.drawString(text, x + d, y - d);
                 g.drawString(text, x - d, y + d);

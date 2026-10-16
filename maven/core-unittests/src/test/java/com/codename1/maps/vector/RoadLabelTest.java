@@ -173,6 +173,46 @@ class RoadLabelTest extends UITestBase {
         assertTrue(engine.placeAlongLine(g, "Other Road", 13, TEXT, HALO, neighbour, 300, 0, 0, 2000, 800));
     }
 
+    /// A wider outline -- a dense display's -- is room the label takes: from
+    /// the label beside it, and from the edge of the map.
+    @FormTest
+    void aWiderHaloKeepsLabelsFurtherApartAndInsideTheView() {
+        Graphics g = Image.createImage(800, 800).getGraphics();
+        int thinGap = closestNeighbour(g, 1);
+        int wideGap = closestNeighbour(g, 4);
+        assertTrue(wideGap >= thinGap + 4, "neighbours at " + thinGap + " and " + wideGap);
+        int thinEdge = closestToEdge(g, 1);
+        int wideEdge = closestToEdge(g, 4);
+        assertTrue(wideEdge >= thinEdge + 2, "edge at " + thinEdge + " and " + wideEdge);
+    }
+
+    // The nearest a second label's centre may come to the first's, sideways.
+    private static int closestNeighbour(Graphics g, int halo) {
+        for (int dx = 1; dx < 400; dx++) {
+            LabelEngine engine = new LabelEngine();
+            engine.setHalo(halo);
+            engine.reset(0, 0, 800, 800);
+            assertTrue(engine.place(g, "Name", 13, TEXT, HALO, 200, 200));
+            if (engine.place(g, "Name", 13, TEXT, HALO, 200 + dx, 200)) {
+                return dx;
+            }
+        }
+        throw new AssertionError("never placed");
+    }
+
+    // The nearest a label's centre may come to the left edge of the view.
+    private static int closestToEdge(Graphics g, int halo) {
+        for (int cx = 0; cx < 400; cx++) {
+            LabelEngine engine = new LabelEngine();
+            engine.setHalo(halo);
+            engine.reset(0, 0, 800, 800);
+            if (engine.place(g, "Name", 13, TEXT, HALO, cx, 200)) {
+                return cx;
+            }
+        }
+        throw new AssertionError("never placed");
+    }
+
     /// The collision index against the definition it replaces: a label is
     /// placed exactly when it overlaps none of those placed before it, taken
     /// one pair at a time. Points on both sides of zero, so that cells with

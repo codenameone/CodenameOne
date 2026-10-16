@@ -1733,6 +1733,12 @@ public class GeneratorModel {
             css = setCssVariable(css, "--brand-dark", toCssColor(brandDark));
             css = setCssVariable(css, "--brand-pressed-dark", toCssColor(lightenColor(brand, 0.15f)));
             css = setCssVariable(css, "--brand-contrast-dark", toCssColor(contrastColor(brandDark)));
+            // The pale ground of a selected card or a badge: the brand nearly
+            // washed out to white, and in dark mode barely lifted off the
+            // near-black surface. The stock values are these same mixes of the
+            // stock brand, so every scheme keeps the template's proportions.
+            css = setCssVariable(css, "--brand-tint", toCssColor(lightenColor(brand, 0.92f)));
+            css = setCssVariable(css, "--brand-tint-dark", toCssColor(mixColor(DARK_SURFACE, brand, 0.16f)));
         }
         if (!effective.roundedButtons) {
             css = setCssVariable(css, "--radius", "0.6mm");
@@ -1762,6 +1768,20 @@ public class GeneratorModel {
         // Perceived brightness; the weights are the usual ones for sRGB.
         return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? 0x0b1020 : 0xffffff;
     }
+
+    /// `from` moved `ratio` of the way towards `to`.
+    private static int mixColor(int from, int to, float ratio) {
+        int r = (from >> 16) & 0xff;
+        int g = (from >> 8) & 0xff;
+        int b = from & 0xff;
+        r += (int) ((((to >> 16) & 0xff) - r) * ratio);
+        g += (int) ((((to >> 8) & 0xff) - g) * ratio);
+        b += (int) (((to & 0xff) - b) * ratio);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    /// The full-stack template's dark-mode surface, `--surface-dark`.
+    private static final int DARK_SURFACE = 0x12161c;
 
     private static int lightenColor(int color, float ratio) {
         int r = (color >> 16) & 0xff;
