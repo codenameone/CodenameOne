@@ -35,6 +35,7 @@ class LinuxSocketMetadataTest {
         try {
             LinuxImplementation port = new LinuxImplementation();
             assertTrue(port.isLoopbackServerSocketAvailable());
+            assertTrue(port.isTextInputSupported());
             assertFalse(port.isServerSocketAvailable());
             assertFalse(port.isDebuggableBuild());
             for (Object invalid : new Object[] {null, "not a socket"}) {

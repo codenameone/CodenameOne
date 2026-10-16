@@ -89,6 +89,23 @@ autocorrection and automatic capitalization. The immutable
 https://www.codenameone.com/javadoc/com/codename1/ui/TextInputState.html[`TextInputState`] returns the
 authoritative text, selection, and composing range to the port after each edit.
 
+The native Linux port binds this contract to GTK's
+https://docs.gtk.org/gtk3/class.IMContext.html[`GtkIMContext`]. The document stays in the lightweight
+canvas while GTK handles composed text and input-method candidate UI. Navigation, deletion,
+clipboard, and undo shortcuts are delivered as semantic commands. Native `TextField`/`TextArea`
+editing takes over the input session when one of those fields starts native editing. A dialog's
+initially focused editor can bind before its native window is shown. Temporary native window focus
+loss pauses input without discarding the component's session; returning to that window resumes it.
+
+Linux queues native input onto the EDT with a session identifier and edit sequence. Callbacks from a
+closed session are discarded. The port supplies surrounding text only after Java has acknowledged
+all queued edits; an older state update cannot overwrite the latest context. Password and sensitive
+fields do not expose surrounding text to the input method. GTK's character-based
+composition and deletion offsets are converted to UTF-16. Deletion requests for a disconnected range
+that does not touch the caret are declined because `deleteSurroundingText` cannot represent them.
+Input-method availability depends on the GTK modules installed on the user's system. Local GTK
+composition tests do not certify every IBus/Fcitx engine or a complete language-specific editor.
+
 All offsets in this contract are UTF-16 indices, matching Java `String`, Android `Editable`, and Apple
 string indices. The document canonicalizes CRLF and bare CR line endings to LF before it updates the
 caret, undo history, formatting runs, or platform state. Port authors must deliver composition updates

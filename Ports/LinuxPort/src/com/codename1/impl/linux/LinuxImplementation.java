@@ -822,6 +822,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     private void drainInput() {
+        lowLevelTextInput.drain();
         while (LinuxNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
             int x = eventScratch[1];
@@ -2104,13 +2105,39 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     /**
      * Native input is supported: while a TextField/TextArea is edited it is
-     * overlaid by a real Win32 EDIT control with a native caret, selection,
+     * overlaid by a native GTK text widget with a native caret, selection,
      * keyboard and IME -- so {@code TextArea} routes here instead of the
      * lightweight (CN1-drawn) editor.
      */
     @Override
     public boolean isNativeInputSupported() {
         return true;
+    }
+
+    private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client,
+            com.codename1.ui.TextInputConfig config) {
+        if (editPeer != 0) {
+            commitEdit();
+        }
+        return lowLevelTextInput.start(client, config);
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        lowLevelTextInput.update(handle, state);
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        lowLevelTextInput.stop(handle);
     }
 
     /**
@@ -2127,7 +2154,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * Overlays a native Win32 EDIT control over the field's text area (inside the
+     * Overlays a native GTK text widget over the field's text area (inside the
      * field's padding so its border/background still show), styled to match the
      * field's font and colours, and focuses it. Returns immediately (async); the
      * value is delivered through {@code Display.onEditingComplete} when the user
@@ -2136,6 +2163,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        lowLevelTextInput.stopCurrent();
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
         if (editPeer != 0) {

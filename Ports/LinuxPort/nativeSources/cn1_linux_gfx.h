@@ -132,6 +132,9 @@ void cn1LinuxOverlayRemove(int slot, GtkWidget* w);
 
 /* The top-level GtkWindow (NULL in headless mode). */
 GtkWidget* cn1LinuxWindowWidget(void);
+GtkWidget* cn1LinuxTextCanvas(int slot);
+GtkWidget* cn1LinuxDesktopDrawingArea(int slot);
+gboolean cn1LinuxTextInputFilter(int slot, GdkEventKey* event);
 
 /* Additional desktop windows (cn1_linux_desktopwindow.c). A secondary window
  * carries its own GtkWindow, drawing area, peer overlay and cairo back buffer;
