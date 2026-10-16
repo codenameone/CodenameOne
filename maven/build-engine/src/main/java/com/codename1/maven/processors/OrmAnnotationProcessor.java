@@ -1053,6 +1053,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// ship SQLite files whose columns are named after their fields, and
     /// `CREATE TABLE IF NOT EXISTS` would leave those tables alone while the
     /// generated SQL went looking for columns they do not have.
+    ///
+    /// There is no switch back to the Java names on the backend. The backend is
+    /// a technology preview that follows Spring Boot, and a mode that kept the
+    /// old names would keep a default that was wrong; a schema made with them
+    /// keeps working by naming its tables and columns with `@Entity(table)` and
+    /// `@Column(name)`.
     String physical(String name) {
         String flat=name.replace('.','_');
         return backend ? snakeCase(flat) : flat;
