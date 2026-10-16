@@ -38,6 +38,15 @@ package com.codename1.ui;
 /// All offsets exchanged with the platform are UTF-16 character indices. All callbacks are delivered on
 /// the EDT.
 public interface TextInputClient {
+    /// Optional contract for clients that can restore a canceled composition, including rich text
+    /// attributes and undo state. Ports may restore text and selection for older clients; rich editors
+    /// should implement this contract to restore their complete pre-composition state.
+    interface CompositionCancellation {
+        /// Restores the text, selection and attributes from before composition without recording an
+        /// undo entry. Does nothing when no composition is active.
+        void cancelComposing();
+    }
+
     /// Key command: move / extend to the left.
     int KEY_LEFT = 1;
     /// Key command: move / extend to the right.
