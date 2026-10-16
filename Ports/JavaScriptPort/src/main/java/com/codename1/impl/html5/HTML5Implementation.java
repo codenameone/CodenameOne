@@ -5140,30 +5140,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private void armSemanticRefresh(int millis) {
-        Window.setTimeout(new TimerHandler() {
-            @Override
-            public void onTimer() {
-                // On the event thread: the tree is only ever built there, and
-                // anywhere else is handed the one built last.
-                callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        long now = System.currentTimeMillis();
-                        long quiet = now - semanticLastChangeMillis;
-                        if (quiet >= 0 && quiet < SEMANTIC_QUIET_MILLIS
-                                && now - semanticFirstChangeMillis < SEMANTIC_STALE_LIMIT_MILLIS) {
-                            armSemanticRefresh((int) (SEMANTIC_QUIET_MILLIS - quiet));
-                            return;
-                        }
-                        // Cleared before the tree is read, so a change that
-                        // arrives while it is being described arms the next one.
-                        semanticRefreshArmed = false;
-                        accessibilityTreeChanged(0);
-                    }
-                });
-            }
-        }, millis);
+        Window.setTimeout(semanticRefreshTimer, millis);
     }
+
+    // One handler for every refresh, not one per arming. The timer runs on the
+    // page, and a callback handed to the page keeps its entry in the runtime's
+    // table of worker callbacks for good: a new handler per batch of changes
+    // was one more kept for every pause in a scroll. At most one is armed at a
+    // time, and the next is armed only after this one has fired.
+    private final TimerHandler semanticRefreshTimer = new TimerHandler() {
+        @Override
+        public void onTimer() {
+            // On the event thread: the tree is only ever built there, and
+            // anywhere else is handed the one built last.
+            callSerially(semanticRefresh);
+        }
+    };
+
+    private final Runnable semanticRefresh = new Runnable() {
+        @Override
+        public void run() {
+            long now = System.currentTimeMillis();
+            long quiet = now - semanticLastChangeMillis;
+            if (quiet >= 0 && quiet < SEMANTIC_QUIET_MILLIS
+                    && now - semanticFirstChangeMillis < SEMANTIC_STALE_LIMIT_MILLIS) {
+                armSemanticRefresh((int) (SEMANTIC_QUIET_MILLIS - quiet));
+                return;
+            }
+            // Cleared before the tree is read, so a change that
+            // arrives while it is being described arms the next one.
+            semanticRefreshArmed = false;
+            accessibilityTreeChanged(0);
+        }
+    };
 
     @Override
     public boolean isAccessibilityTreeSupported() {

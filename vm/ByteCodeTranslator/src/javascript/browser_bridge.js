@@ -2294,11 +2294,36 @@
     return callback;
   }
 
+  // The worker gives each timeout a callback of its own and forgets it once
+  // the timer has fired or been cleared (port.js, cn1SetHostTimer). The proxy
+  // cached for it here goes at the same moment, or it would be kept for good.
+  // Timer id -> worker callback id.
+  var oneShotTimerCallbacks = Object.create(null);
+
+  function forgetOneShotTimer(id) {
+    var callbackId = oneShotTimerCallbacks[id];
+    if (callbackId != null) {
+      delete oneShotTimerCallbacks[id];
+      delete workerCallbackProxies[callbackId];
+    }
+  }
+
   hostBridge.register('__cn1_timer_set_timeout__', function(callback, delay) {
-    return global.setTimeout(cn1TimerCallback(callback), Math.max(0, delay | 0));
+    var fn = cn1TimerCallback(callback);
+    var callbackId = typeof fn.__cn1WorkerCallbackId === 'number' ? fn.__cn1WorkerCallbackId : null;
+    if (callbackId == null) {
+      return global.setTimeout(fn, Math.max(0, delay | 0));
+    }
+    var id = global.setTimeout(function() {
+      forgetOneShotTimer(id);
+      fn();
+    }, Math.max(0, delay | 0));
+    oneShotTimerCallbacks[id] = callbackId;
+    return id;
   });
 
   hostBridge.register('__cn1_timer_clear_timeout__', function(id) {
+    forgetOneShotTimer(id | 0);
     global.clearTimeout(id | 0);
     return true;
   });

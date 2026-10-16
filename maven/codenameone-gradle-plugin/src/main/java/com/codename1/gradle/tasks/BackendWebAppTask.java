@@ -59,7 +59,9 @@ import java.io.File;
 public abstract class BackendWebAppTask extends DefaultTask {
     /// A browser build to stage instead of the application's own: the archive a
     /// JavaScript build produced, or a directory unpacked from it. A path, and
-    /// not a tracked file, because it may be either.
+    /// not a tracked file, because it may be either. The contents are not
+    /// inputs either, so `BackendSupport` registers this task as never up to
+    /// date: a bundle rebuilt at the same path is staged again.
     @Input
     @Optional
     public abstract Property<String> getBundle();

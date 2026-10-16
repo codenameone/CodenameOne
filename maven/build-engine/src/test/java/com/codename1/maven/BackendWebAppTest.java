@@ -236,6 +236,26 @@ class BackendWebAppTest {
         assertEquals("keep", read(new File(outside, "keep.txt")));
     }
 
+    /// A directory bundle with a link back to one of its own ancestors is
+    /// refused when the link is reached, not copied into itself until the
+    /// stack or the path length gives out.
+    @Test
+    void aLinkBackIntoTheBundleIsRefused() throws Exception {
+        File dir = tmp.resolve("site").toFile();
+        File assets = new File(dir, "assets");
+        assets.mkdirs();
+        Files.write(new File(dir, "index.html").toPath(), "dir".getBytes("UTF-8"));
+        try {
+            Files.createSymbolicLink(new File(assets, "loop").toPath(), dir.toPath());
+        } catch (UnsupportedOperationException | IOException | SecurityException noLinks) {
+            assumeTrue(false, "this filesystem cannot create a symbolic link: " + noLinks);
+        }
+        File out = tmp.resolve("webapp").toFile();
+        Exception refused = assertThrows(Exception.class, () -> webApp.stage(dir, out));
+        assertTrue(String.valueOf(refused.getMessage()).contains("links back")
+                || String.valueOf(refused.getCause()).contains("links back"), String.valueOf(refused));
+    }
+
     @Test
     void findsTheBundleOfWhicheverModuleBuildsForTheBrowser() throws Exception {
         File root = tmp.resolve("app").toFile();

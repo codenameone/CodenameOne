@@ -196,8 +196,6 @@ final class BackendSupport {
             t.getBundle().set(bundle);
             t.getWorkingDirectory().set(layout.projectDir());
             t.getOutputDirectory().set(webAppDirectory(project));
-            // Staging replaces the directory with whatever the bundle holds now.
-            t.getOutputs().upToDateWhen(x -> false);
             if (hasApp) {
                 t.getAppBuildDirectory().set(root.getLayout().getBuildDirectory());
                 if (!bundle.isPresent()) {
