@@ -85,7 +85,7 @@ public final class RegisterForm {
                     request.password(), () -> {
                         // Someone who came to drive starts on the driver's side,
                         // which for them is the application.
-                        AppConfig.setMode(driving ? Nav.DRIVER : Nav.RIDER, request.email());
+                        AppConfig.setMode(driving ? Nav.DRIVER : Nav.RIDER, Session.owner(request.email()));
                         Telemetry.registered(driving);
                         VerifyPhoneForm.show(Nav::enter);
                     }, failed), failed));

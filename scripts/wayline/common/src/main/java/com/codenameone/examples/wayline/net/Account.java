@@ -24,7 +24,6 @@ import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.api.PlaceDto;
 import com.codenameone.examples.wayline.api.PreferencesDto;
 import com.codenameone.examples.wayline.api.ProfileDto;
-import com.codenameone.examples.wayline.api.UserDto;
 
 /// Keeps what the user chose in Settings with their account.
 ///
@@ -96,7 +95,7 @@ public final class Account {
         preferencesLoaded = false;
         profileLoaded = false;
         // What another account left unsent is not this one's to send.
-        String owner = Session.user().username();
+        String owner = Session.owner();
         if (!isUnsent(UNSENT_PREFERENCES, owner)) {
             Preferences.delete(UNSENT_PREFERENCES);
         }
@@ -107,7 +106,7 @@ public final class Account {
     }
 
     private static void fetch(final Runnable done) {
-        final String owner = Session.user().username();
+        final String owner = Session.owner();
         final Runnable thenProfile = () -> {
             if (profileLoaded || !signedInAs(owner)) {
                 done.run();
@@ -172,7 +171,7 @@ public final class Account {
             return;
         }
         ProfileDto wanted = described(name, gender);
-        final String owner = Session.user() == null ? null : Session.user().username();
+        final String owner = Session.owner();
         Api.account().saveProfile(wanted, Net.to(user -> {
             // The answer is about the account that asked; see send().
             if (signedInAs(owner)) {
@@ -240,7 +239,7 @@ public final class Account {
             profileChanged = profileChanged && profileLoaded;
             fetch(() -> { });
         }
-        final String owner = Session.user().username();
+        final String owner = Session.owner();
         if (preferencesChanged) {
             preferencesChanged = false;
             sent = preferences();
@@ -307,11 +306,11 @@ public final class Account {
         return owner != null && owner.equals(Preferences.get(key, ""));
     }
 
-    /// Whether the account signed in now is `username`: an answer that comes
-    /// back after the session it was asked in has ended is not acted on.
-    private static boolean signedInAs(String username) {
-        UserDto now = Session.user();
-        return now != null && username != null && username.equals(now.username());
+    /// Whether the account signed in now is `owner` ([Session#owner()]): an
+    /// answer that comes back after the session it was asked in has ended is
+    /// not acted on.
+    private static boolean signedInAs(String owner) {
+        return owner != null && owner.equals(Session.owner());
     }
 
     private static PreferencesDto preferences() {

@@ -95,13 +95,15 @@ public final class AppConfig {
         Preferences.set(SERVER_KEY, clean(url));
     }
 
-    /// The mode `username` chose last -- `rider`, `driver` or `admin` -- or
+    /// The mode the account `owner` (see
+    /// [com.codenameone.examples.wayline.net.Session#owner(String)]) chose last
+    /// -- `rider`, `driver` or `admin` -- or
     /// empty when they have chosen none, or the choice on record is someone
     /// else's. A choice recorded with no name is anyone's: that is how a test
     /// puts the app in a mode before it signs in.
-    public static String mode(String username) {
-        String owner = Preferences.get(MODE_OWNER_KEY, "");
-        if (owner.length() > 0 && !owner.equals(username)) {
+    public static String mode(String owner) {
+        String chosenBy = Preferences.get(MODE_OWNER_KEY, "");
+        if (chosenBy.length() > 0 && !chosenBy.equals(owner)) {
             return "";
         }
         return Preferences.get(MODE_KEY, "");

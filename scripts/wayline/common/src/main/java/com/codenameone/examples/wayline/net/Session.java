@@ -66,6 +66,12 @@ public final class Session {
     private static TokenStore store;
     private static UserDto user;
     private static Runnable onSignedOut;
+    /// Counts the sessions: moved on whenever the server changes, an account
+    /// signs in, or the session ends. An answer to a request made in an
+    /// earlier session describes somebody who is no longer signed in here --
+    /// another server's account, or the account before a sign-out on this
+    /// one -- and is dropped rather than installed for whoever is now.
+    private static int session;
 
     private Session() {
     }
@@ -88,6 +94,7 @@ public final class Session {
         }
         base = baseUrl;
         user = null;
+        session++;
         client = OidcClient.create(OidcConfiguration.newBuilder()
                         .issuer(base)
                         .authorizationEndpoint(base + "/oauth2/authorize")
@@ -104,6 +111,7 @@ public final class Session {
         authorizer.install(base + "/api");
         authorizer.addSignInRequiredListener((source, reason) -> {
             user = null;
+            session++;
             if (onSignedOut != null) {
                 onSignedOut.run();
             }
@@ -158,8 +166,22 @@ public final class Session {
         user = described;
         if (described != null && described.username() != null) {
             // What the device keeps about one person is not the next one's.
-            Prefs.ownedBy(described.username());
+            Prefs.ownedBy(owner(described.username()));
         }
+    }
+
+    /// Who what the device keeps belongs to: the signed-in account, or null.
+    /// See [#owner(String)].
+    public static String owner() {
+        return user == null || user.username() == null ? null : owner(user.username());
+    }
+
+    /// The device's name for the account `username` on the server in use. A
+    /// name is unique on one server only: the same e-mail address signed in
+    /// to two servers is two accounts, and what one left -- recent places,
+    /// a change it has not sent yet -- is not the other's to see or send.
+    public static String owner(String username) {
+        return storeKey(base == null ? "" : base) + "/" + username;
     }
 
     /// Picks up the session a previous run left, if it is still good.
@@ -195,12 +217,13 @@ public final class Session {
     /// Asks the server who this is. The roles in the answer decide which modes
     /// the app offers, so it is asked again whenever that could have changed.
     public static void refreshUser(final Runnable done, Net.Failed failed) {
-        // An answer from a server the app has since been moved off (Settings
-        // can change it while an approval poll is waiting) describes an
-        // account on that server, not this one; it is dropped.
-        final String asked = base;
+        // An answer from a session that has since ended -- the server was
+        // changed while an approval poll waited, or the account signed out
+        // and another signed in -- describes that account, not this one;
+        // it is dropped. See [#session].
+        final int asked = session;
         Api.account().me(Net.to(described -> {
-            if (asked == null || !asked.equals(base)) {
+            if (asked != session) {
                 return;
             }
             setUser(described);
@@ -215,12 +238,13 @@ public final class Session {
         // start() then puts a new authorizer in place. Tokens the old server
         // issued are dropped rather than installed in the new one, which would
         // send them -- the refresh token too -- to a server that never issued
-        // them. Each start() makes a new authorizer, so it names the session.
-        final OidcRequestAuthorizer asked = authorizer;
+        // them. See [#session].
+        final int asked = session;
         authenticate(email, password, tokens -> {
-            if (asked != authorizer) {
+            if (asked != session) {
                 return;
             }
+            session++;
             authorizer.setTokens(tokens);
             store.save(storeKey(base), tokens);
             refreshUser(done, failed);
@@ -321,6 +345,7 @@ public final class Session {
             client.revoke(tokens.getRefreshToken());
         }
         user = null;
+        session++;
         authorizer.signOut().ready(new SuccessCallback<Boolean>() {
             @Override
             public void onSucess(Boolean cleared) {

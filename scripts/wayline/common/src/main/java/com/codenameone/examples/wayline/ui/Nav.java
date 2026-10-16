@@ -144,7 +144,7 @@ public final class Nav {
     /// account that made it, so the next person to sign in on the same device
     /// starts where their own account does.
     public static String mode(UserDto user) {
-        String saved = AppConfig.mode(user.username());
+        String saved = AppConfig.mode(Session.owner(user.username()));
         if (ADMIN.equals(saved) && user.admin()) {
             return ADMIN;
         }
@@ -162,7 +162,7 @@ public final class Nav {
     /// The user chose `mode` from the menu.
     public static void switchTo(String mode) {
         UserDto user = Session.user();
-        AppConfig.setMode(mode, user == null ? "" : user.username());
+        AppConfig.setMode(mode, user == null ? "" : Session.owner(user.username()));
         home();
     }
 
@@ -179,7 +179,7 @@ public final class Nav {
         if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
             return;
         }
-        AppConfig.setMode(wanted, user.username());
+        AppConfig.setMode(wanted, Session.owner(user.username()));
         home();
     }
 

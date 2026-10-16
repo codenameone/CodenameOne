@@ -297,8 +297,12 @@ public final class Prefs {
     /// The listener is told of the recent destinations alone. It sends what
     /// it is told of to the server, and values dropped here were not changed
     /// by anyone: reported, they would be saved over the new account's.
-    public static void ownedBy(String username) {
-        String owner = username == null ? "" : username;
+    ///
+    /// @param account the account, with its server, as
+    ///     [com.codenameone.examples.wayline.net.Session#owner(String)] names
+    ///     it, or empty for none
+    public static void ownedBy(String account) {
+        String owner = account == null ? "" : account;
         if (owner.equals(text(RECENTS_OWNER, ""))) {
             return;
         }
