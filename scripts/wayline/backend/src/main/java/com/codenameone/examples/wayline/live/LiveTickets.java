@@ -47,6 +47,11 @@ public class LiveTickets {
         this.tickets = tickets;
     }
 
+    /// Not held against the account being closed, as the rows that last are.
+    /// A ticket issued in the instant an account is erased outlives it by at
+    /// most [#TICKET_SECONDS] plus one [#sweep], and opens nothing meanwhile:
+    /// `LiveEndpoint` checks the account again when the ticket is redeemed.
+    /// A row lock on every socket connect is not worth that minute.
     @Transactional
     public TicketDto issue(String username) throws IOException {
         String ticket = Ids.hex(Crypto.randomBytes(24));
