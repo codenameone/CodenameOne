@@ -2231,10 +2231,14 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             command = 5; modifiers |= 2; // KEY_HOME, MOD_CTRL
         } else if ([name isEqualToString:@"moveToEndOfDocument:"]) {
             command = 6; modifiers |= 2; // KEY_END, MOD_CTRL
-        } else if ([name isEqualToString:@"pageUp:"] || [name isEqualToString:@"scrollPageUp:"]) {
+        } else if ([name isEqualToString:@"pageUp:"]) {
             command = 7;
-        } else if ([name isEqualToString:@"pageDown:"] || [name isEqualToString:@"scrollPageDown:"]) {
+        } else if ([name isEqualToString:@"pageDown:"]) {
             command = 8;
+        } else if ([name isEqualToString:@"scrollPageUp:"]) {
+            command = 19; // KEY_SCROLL_PAGE_UP: viewport only
+        } else if ([name isEqualToString:@"scrollPageDown:"]) {
+            command = 20; // KEY_SCROLL_PAGE_DOWN: viewport only
         } else if ([name isEqualToString:@"deleteWordBackward:"]) {
             command = 9; modifiers |= 4;
         } else if ([name isEqualToString:@"deleteWordForward:"]) {

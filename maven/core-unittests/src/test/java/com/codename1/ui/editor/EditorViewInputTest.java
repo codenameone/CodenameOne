@@ -41,7 +41,10 @@ class EditorViewInputTest extends UITestBase {
     private static final String KANA = "\u306B\u307B\u3093";
     private static final String KANJI = "\u65E5\u672C";
 
+    private NoopHost lastHost;
+
     private static final class NoopHost implements EditorHost {
+        int changes;
         public boolean isTextInputSupported() {
             return false;
         }
@@ -57,6 +60,7 @@ class EditorViewInputTest extends UITestBase {
         }
 
         public void editorChanged() {
+            changes++;
         }
 
         public void fireEditorEvent(String type, String value) {
@@ -64,7 +68,8 @@ class EditorViewInputTest extends UITestBase {
     }
 
     private EditorView show(String text) {
-        EditorView v = new EditorView(new NoopHost(), true);
+        lastHost = new NoopHost();
+        EditorView v = new EditorView(lastHost, true);
         Form f = new Form("ev", new BorderLayout());
         f.add(BorderLayout.CENTER, v);
         f.show();
@@ -152,8 +157,10 @@ class EditorViewInputTest extends UITestBase {
         EditorView v = show("one\ntwo\nthree");
         v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_CTRL | TextInputClient.MOD_SHIFT);
         TextInputState state = v.getEditingState();
-        assertEquals(13, state.getSelectionStart());
-        assertEquals(0, state.getSelectionEnd());
+        assertEquals(0, state.getSelectionStart());
+        assertEquals(13, state.getSelectionEnd());
+        assertEquals(13, state.getSelectionAnchor());
+        assertEquals(0, state.getSelectionFocus());
         v.commitText("replacement");
         assertEquals("replacement", v.getText());
         v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_CTRL);
@@ -188,8 +195,10 @@ class EditorViewInputTest extends UITestBase {
         v.onKeyCommand(TextInputClient.KEY_HOME, TextInputClient.MOD_ALT);
         assertEquals(4, v.getEditingState().getSelectionEnd());
         v.onKeyCommand(TextInputClient.KEY_UP, TextInputClient.MOD_ALT | TextInputClient.MOD_SHIFT);
-        assertEquals(4, v.getEditingState().getSelectionStart());
-        assertEquals(0, v.getEditingState().getSelectionEnd());
+        assertEquals(0, v.getEditingState().getSelectionStart());
+        assertEquals(4, v.getEditingState().getSelectionEnd());
+        assertEquals(4, v.getEditingState().getSelectionAnchor());
+        assertEquals(0, v.getEditingState().getSelectionFocus());
         v.setSelectionRange(5, 5);
         v.onKeyCommand(TextInputClient.KEY_END, TextInputClient.MOD_ALT);
         assertEquals(7, v.getEditingState().getSelectionEnd());
@@ -200,4 +209,65 @@ class EditorViewInputTest extends UITestBase {
         assertEquals(13, v.getEditingState().getSelectionEnd());
     }
 
+
+    @FormTest
+    void wordDeletionUsesUnicodeLettersMarksAndCodePoints() {
+        String[] words = {"ελληνικά", "العربية", "中文", "हिन्दी", "a\u0301", "\uD801\uDC00\uD801\uDC01"};
+        for (String word : words) {
+            EditorView v = show(word + " " + word);
+            v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+            assertEquals(word + " ", v.getText());
+            v.performUndo();
+            v.setSelectionRange(0, 0);
+            v.onKeyCommand(TextInputClient.KEY_DELETE, TextInputClient.MOD_ALT);
+            assertEquals(" " + word, v.getText());
+            v.performUndo();
+            v.setSelectionRange(0, 0);
+            v.onKeyCommand(TextInputClient.KEY_RIGHT, TextInputClient.MOD_ALT | TextInputClient.MOD_SHIFT);
+            assertEquals(word.length(), v.getEditingState().getSelectionFocus());
+        }
+    }
+
+    @FormTest
+    void emptyWordDeletionPreservesRedoAndDoesNotNotifyHost() {
+        EditorView v = show("one two");
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        v.performUndo();
+        v.setSelectionRange(0, 0);
+        int changes = lastHost.changes;
+        v.onKeyCommand(TextInputClient.KEY_BACKSPACE, TextInputClient.MOD_ALT);
+        assertEquals(changes, lastHost.changes);
+        v.performRedo();
+        assertEquals("one ", v.getText());
+        v.performUndo();
+        v.setSelectionRange(v.getText().length(), v.getText().length());
+        changes = lastHost.changes;
+        v.onKeyCommand(TextInputClient.KEY_DELETE, TextInputClient.MOD_ALT);
+        assertEquals(changes, lastHost.changes);
+        v.performRedo();
+        assertEquals("one ", v.getText());
+    }
+
+    @FormTest
+    void scrollPageCommandsKeepCaretSelectionAndUndoHistory() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 200; i++) {
+            text.append("line ").append(i).append('\n');
+        }
+        EditorView v = show(text.toString());
+        v.setSelectionRange(2, 0);
+        TextInputState before = v.getEditingState();
+        int changes = lastHost.changes;
+        assertEquals(0, v.getVerticalScroll());
+        v.onKeyCommand(TextInputClient.KEY_SCROLL_PAGE_DOWN, TextInputClient.MOD_SHIFT);
+        assertTrue(v.getVerticalScroll() > 0);
+        assertEquals(before.getSelectionAnchor(), v.getEditingState().getSelectionAnchor());
+        assertEquals(before.getSelectionFocus(), v.getEditingState().getSelectionFocus());
+        assertEquals(text.toString(), v.getText());
+        assertEquals(changes, lastHost.changes);
+        v.onKeyCommand(TextInputClient.KEY_SCROLL_PAGE_UP, 0);
+        assertEquals(0, v.getVerticalScroll());
+        v.onKeyCommand(TextInputClient.KEY_PAGE_DOWN, 0);
+        assertTrue(v.getEditingState().getSelectionFocus() > 0);
+    }
 }

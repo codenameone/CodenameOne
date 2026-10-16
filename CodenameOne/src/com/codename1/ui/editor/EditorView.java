@@ -1745,17 +1745,31 @@ public class EditorView extends Component implements TextInputClient, com.codena
         return false;
     }
 
-    private static boolean isWordChar(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    private int wordCodePointAt(int offset) {
+        char first = doc.charAt(offset);
+        if (Character.isHighSurrogate(first) && offset + 1 < doc.length()
+                && Character.isLowSurrogate(doc.charAt(offset + 1))) {
+            return Character.toCodePoint(first, doc.charAt(offset + 1));
+        }
+        return first;
+    }
+
+    private int previousWordOffset(int offset) {
+        int previous = offset - 1;
+        if (previous > 0 && Character.isLowSurrogate(doc.charAt(previous))
+                && Character.isHighSurrogate(doc.charAt(previous - 1))) {
+            previous--;
+        }
+        return previous;
     }
 
     private int wordLeft() {
         int p = caret;
-        while (p > 0 && !isWordChar(doc.charAt(p - 1))) {
-            p--;
+        while (p > 0 && !WordCharacters.contains(wordCodePointAt(previousWordOffset(p)))) {
+            p = previousWordOffset(p);
         }
-        while (p > 0 && isWordChar(doc.charAt(p - 1))) {
-            p--;
+        while (p > 0 && WordCharacters.contains(wordCodePointAt(previousWordOffset(p)))) {
+            p = previousWordOffset(p);
         }
         return p;
     }
@@ -1763,11 +1777,11 @@ public class EditorView extends Component implements TextInputClient, com.codena
     private int wordRight() {
         int p = caret;
         int n = doc.length();
-        while (p < n && !isWordChar(doc.charAt(p))) {
-            p++;
+        while (p < n && !WordCharacters.contains(wordCodePointAt(p))) {
+            p += Character.charCount(wordCodePointAt(p));
         }
-        while (p < n && isWordChar(doc.charAt(p))) {
-            p++;
+        while (p < n && WordCharacters.contains(wordCodePointAt(p))) {
+            p += Character.charCount(wordCodePointAt(p));
         }
         return p;
     }
@@ -1775,11 +1789,11 @@ public class EditorView extends Component implements TextInputClient, com.codena
     private void selectWordAt(int offset) {
         int s = offset;
         int e = offset;
-        while (s > 0 && isWordChar(doc.charAt(s - 1))) {
-            s--;
+        while (s > 0 && WordCharacters.contains(wordCodePointAt(previousWordOffset(s)))) {
+            s = previousWordOffset(s);
         }
-        while (e < doc.length() && isWordChar(doc.charAt(e))) {
-            e++;
+        while (e < doc.length() && WordCharacters.contains(wordCodePointAt(e))) {
+            e += Character.charCount(wordCodePointAt(e));
         }
         anchor = s;
         caret = e;
@@ -2024,16 +2038,28 @@ public class EditorView extends Component implements TextInputClient, com.codena
             case KEY_PAGE_DOWN:
                 moveCaret(caretVertical(Math.max(1, contentHeight() / getLineHeight())), extend);
                 break;
+            case KEY_SCROLL_PAGE_UP:
+                scrollByPixels(0, Math.max(1, contentHeight()));
+                break;
+            case KEY_SCROLL_PAGE_DOWN:
+                scrollByPixels(0, -Math.max(1, contentHeight()));
+                break;
             case KEY_BACKSPACE:
                 if (word && !hasSelection() && editable) {
-                    replaceRange(wordLeft(), caret, "", true);
+                    int start = wordLeft();
+                    if (start != caret) {
+                        replaceRange(start, caret, "", true);
+                    }
                 } else {
                     deleteBackward();
                 }
                 break;
             case KEY_DELETE:
                 if (word && !hasSelection() && editable) {
-                    replaceRange(caret, wordRight(), "", true);
+                    int end = wordRight();
+                    if (end != caret) {
+                        replaceRange(caret, end, "", true);
+                    }
                 } else {
                     deleteForward();
                 }

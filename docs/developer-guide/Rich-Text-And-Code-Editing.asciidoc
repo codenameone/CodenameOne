@@ -89,17 +89,21 @@ autocorrection and automatic capitalization. The immutable
 https://www.codenameone.com/javadoc/com/codename1/ui/TextInputState.html[`TextInputState`] returns the
 authoritative text, selection, and composing range to the port after each edit.
 
-Selection offsets in `TextInputState` are the anchor and focus, in that order. They aren't sorted:
-a backward selection can have a larger start offset than end offset. The macOS bridge keeps that
-direction alongside the ordered range required by AppKit, so extending a selection and typing
-into it preserve the same range in Java and native code.
+`TextInputState.getSelectionStart()` and `getSelectionEnd()` return an ordered range for existing
+input bridges. `getSelectionAnchor()` and `getSelectionFocus()` retain direction: a backward
+selection has an anchor greater than its focus. The Apple bridge uses those directional getters;
+UIKit normalizes its native range, while macOS retains the anchor alongside AppKit's ordered range.
 
 On macOS, pure editors receive word movement and deletion, visual line and paragraph boundaries,
 document boundaries, and page movement through `onKeyCommand(...)`. AppKit interprets the key event first. Paragraph boundary commands use `MOD_ALT` with `KEY_HOME` or `KEY_END`.
 Paragraph selection uses `MOD_ALT` with `KEY_UP` or `KEY_DOWN` and retains `MOD_SHIFT`. The editor owns
 its visual line layout; the port waits for its updated state before replaying later native edits.
 Word commands carry `MOD_ALT`, document Home/End commands carry `MOD_CTRL`, and selection commands
-also carry `MOD_SHIFT`. These callbacks don't change the legacy `TextArea` editing path.
+also carry `MOD_SHIFT`. `KEY_SCROLL_PAGE_UP` and `KEY_SCROLL_PAGE_DOWN` scroll the viewport without changing the caret or
+selection; they're distinct from caret-moving `KEY_PAGE_UP` and `KEY_PAGE_DOWN`. Word navigation
+classifies Unicode letters, marks, decimal digits and underscore consistently across ports and keeps
+surrogate pairs intact. It doesn't perform dictionary segmentation. Boundary word deletions are no-ops.
+These callbacks don't change the legacy `TextArea` editing path.
 
 All offsets in this contract are UTF-16 indices, matching Java `String`, Android `Editable`, and Apple
 string indices. The document canonicalizes CRLF and bare CR line endings to LF before it updates the

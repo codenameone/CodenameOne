@@ -1894,7 +1894,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean autoCap = config == null || config.isAutoCapitalize();
         boolean multiline = config == null || config.isMultiline();
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
-                st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
+                st.getText(), st.getSelectionAnchor(), st.getSelectionFocus(),
                 config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT, captureId);
         tiBounds = null;
         refreshTextInputBounds(client);
@@ -1913,7 +1913,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
         int captureId = queueTextInputCapture(state, c);
         refreshTextInputBounds(c);
-        nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
+        nativeInstance.updateTextInputState(state.getText(), state.getSelectionAnchor(), state.getSelectionFocus(),
                 r[0], r[1], r[2], r[3], tiNativeSeq, captureId);
         tiKeepNativeCallbacksAlive();
     }
