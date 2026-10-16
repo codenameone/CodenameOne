@@ -2785,6 +2785,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-16T00:01:16+00:00"
+      },
+      "devto": {
+        "id": 4863776,
+        "url": "https://dev.to/codenameone/android-on-ios-web-desktop-efficiently-and-for-free-3fp6",
+        "syndicated_at": "2026-10-16T17:23:45+00:00"
       }
     }
   }
