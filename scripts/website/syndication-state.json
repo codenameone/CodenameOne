@@ -2794,6 +2794,14 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/android-on-ios-web-desktop-efficiently-and-for-free-4bd57cc74625?postPublishedType=initial",
         "syndicated_at": "2026-10-16T19:02:40+00:00"
+      },
+      "foojay": {
+        "id": 135,
+        "url": "https://github.com/foojayio/website/pull/135",
+        "pull_request_url": "https://github.com/foojayio/website/pull/135",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-17T13:44:07+00:00"
       }
     },
     "sign-in-client-server-contract": {
