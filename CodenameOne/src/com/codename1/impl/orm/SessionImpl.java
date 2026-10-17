@@ -1329,6 +1329,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
                             attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
+                if (found.length > 7) {
+                    // An insert omits a generated id and names every other column.
+                    if (attr.generated && ((Number) found[6]).intValue() == 0) {
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                                "The database does not generate " + name + ", which the mapping leaves to it"));
+                    } else if (!attr.generated && ((Number) found[7]).intValue() != 0) {
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                                "The database generates " + name + " and refuses writes the mapping makes"));
+                    }
+                }
                 String expected = columnType(model, i);
                 if (!storageCompatible(attr, (String) found[1], expected)) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
@@ -1477,6 +1487,26 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return "utf8mb4_0900_bin".equalsIgnoreCase(collation) || "binary".equalsIgnoreCase(collation)
                 || collation.regionMatches(true, collation.length() - 10, "_nopad_bin", 0, 10);
+    }
+    /// Shapes `PRAGMA table_info` rows as [SqlAccess#describe] answers them. A
+    /// literal NULL default fills nothing, and the one INTEGER primary key
+    /// column is the rowid, which SQLite assigns.
+    static List<Object[]> sqliteColumns(List<Object[]> raw) {
+        int keys = 0;
+        for (Object[] row : raw) {
+            if (row[5] instanceof Number && ((Number) row[5]).intValue() != 0) {
+                keys++;
+            }
+        }
+        List<Object[]> result = new ArrayList<Object[]>();
+        for (Object[] row : raw) {
+            boolean filled = row[4] != null && !"NULL".equalsIgnoreCase(String.valueOf(row[4]).trim());
+            boolean rowid = keys == 1 && row[5] instanceof Number && ((Number) row[5]).intValue() != 0
+                    && "INTEGER".equalsIgnoreCase(String.valueOf(row[2]).trim());
+            result.add(new Object[] {row[1], row[2], row[3], row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
+                    Integer.valueOf(rowid ? 1 : 0), Integer.valueOf(0)});
+        }
+        return result;
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();

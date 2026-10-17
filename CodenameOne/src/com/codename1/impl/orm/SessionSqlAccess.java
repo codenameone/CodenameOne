@@ -55,11 +55,7 @@ public final class SessionSqlAccess implements SqlAccess {
         List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0],
                 new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
                         Attribute.INTEGER});
-        List<Object[]> result = new ArrayList<Object[]>();
-        for (Object[] row : raw) {
-            result.add(new Object[] {row[1], row[2], row[3], row[5], Integer.valueOf(row[4] != null ? 1 : 0), null});
-        }
-        return result;
+        return SessionImpl.sqliteColumns(raw);
     }
     @Override
     public String quote(String name) {

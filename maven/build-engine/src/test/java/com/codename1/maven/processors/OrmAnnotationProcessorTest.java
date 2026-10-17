@@ -272,7 +272,7 @@ public class OrmAnnotationProcessorTest {
             // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the
             // server's default collation folds case, so "A" and "a" collide.
             "CREATE TABLE legacy_customer_tag (customer_no BIGINT NOT NULL, tag VARCHAR(255)"+(postgres ? " NOT NULL" : mysql ? " NOT NULL COLLATE utf8mb4_0900_ai_ci" : "")+", PRIMARY KEY (customer_no, tag))",
-            "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", source VARCHAR(10) NOT NULL)"};
+            "CREATE TABLE legacy_visit (id "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY")+", happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", source VARCHAR(10) NOT NULL)"};
         for(String statement:ddl) {
             if(backend) db.execute(statement,new Object[0]);
             else try(java.sql.Statement st=jdbc.createStatement()) { st.execute(statement); }
@@ -298,7 +298,7 @@ public class OrmAnnotationProcessorTest {
         try {
             loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
             String path=new File(tmp.newFolder(),"existing.db").getAbsolutePath();
-            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened TIMESTAMP, hits BIGINT NOT NULL)");
+            schema(path,"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened TIMESTAMP, hits BIGINT NOT NULL)");
             try {
                 startBackend(path,true).stop();
                 fail("a plain Date over a TIMESTAMP column must not start");
@@ -308,15 +308,22 @@ public class OrmAnnotationProcessorTest {
             }
             startBackend(path,false).stop();
             // Stricter than the mapping: tolerated, and logged.
-            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT NOT NULL, hits BIGINT NOT NULL)");
+            schema(path,"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT NOT NULL, hits BIGINT NOT NULL)");
             startBackend(path,true).stop();
             // Looser than the mapping: a NULL in hits could never load into a long.
-            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT)");
+            schema(path,"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT)");
             try {
                 startBackend(path,true).stop();
                 fail("a primitive over a nullable column must not start");
             } catch(java.io.IOException expected) {
                 assertTrue(expected.getMessage(),expected.getMessage().contains("Missing NOT NULL on startup_visit.hits"));
+            }
+            // A literal NULL default fills nothing, and a BIGINT key is not the rowid.
+            for(String[] c:new String[][]{{"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL, note TEXT NOT NULL DEFAULT NULL)","startup_visit.note"},
+                    {"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL)","The database does not generate startup_visit.id"}}) {
+                schema(path,c[0]);
+                try { startBackend(path,true).stop(); fail(c[0]); }
+                catch(java.io.IOException expected) { assertTrue(expected.getMessage(),expected.getMessage().contains(c[1])); }
             }
         } finally { loader.close(); }
     }

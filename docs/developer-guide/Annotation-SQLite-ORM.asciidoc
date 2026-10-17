@@ -424,8 +424,8 @@ A backend server validates the schema at startup, after migrations and
 `UNSUPPORTED` issue, so a mapping the database can't serve fails before the
 first request rather than on the requests that touch it. It also refuses a
 `CONSTRAINT_MISMATCH` that would fail at runtime: a missing `NOT NULL`, or a
-required column the mapping doesn't fill. A column that is only stricter than
-its mapping is logged and tolerated. Set `cn1.orm.validateSchema=false` to start
+required column the mapping doesn't fill. A column stricter than its mapping
+is only logged. Set `cn1.orm.validateSchema=false` to start
 anyway.
 
 [[orm-native-dates]]
