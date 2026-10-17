@@ -1551,6 +1551,13 @@ SvStepText { color: var(--text); font-family: "native:MainBold"; font-size: 2.1m
 SvDiscount { color: var(--success); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
 SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
 
+/* THE KITCHEN'S QUEUE -- down the left on a wide screen, the order beside it. */
+SvQueuePane { background-color: var(--surface); border-right: 1px solid var(--line); padding: 0; margin: 0; }
+SvDetailPane { background-color: var(--surface-alt); padding: 0; margin: 0; }
+SvQueueRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
+SvQueueRow.pressed { background-color: var(--surface-alt); }
+SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
+
 @media (prefers-color-scheme: dark) {
     SvForm { background-color: var(--surface-dark); }
     SvPage { background-color: var(--surface-dark); }
@@ -1796,4 +1803,9 @@ SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; 
     SvStepText { color: var(--text-dark); }
     SvDiscount { color: var(--success-dark); }
     SvTotal { color: var(--text-dark); }
+    SvQueuePane { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    SvDetailPane { background-color: var(--surface-alt-dark); }
+    SvQueueRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
+    SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
 }

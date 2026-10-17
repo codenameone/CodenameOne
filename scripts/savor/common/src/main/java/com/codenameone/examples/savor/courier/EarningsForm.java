@@ -113,7 +113,7 @@ public final class EarningsForm {
                 Math.max(1, days - 1))), Lang.tr("Today")));
 
         StatRow numbers = Ui.stats(2);
-        numbers.stat(String.valueOf(summary.trips()), "Trips", "trips");
+        numbers.stat(String.valueOf(summary.trips()), "Deliveries", "deliveries");
         numbers.stat(Ui.money(summary.tips(), currency), "Tips", "tips");
         numbers.stat(summary.rating() > 0 ? Ui.tenths(summary.rating()) : "-", "Rating",
                 "rating");

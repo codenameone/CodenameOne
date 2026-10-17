@@ -84,7 +84,7 @@ public final class Shift {
                 && !CN.isSimulator()) {
             RUNNING.set(true);
             service = ForegroundService.start(CHANNEL, "You're online",
-                    "Savor shares your location with customers while you drive.", null,
+                    "Savor shares your location with customers while you deliver.", null,
                     Shift::keepAlive);
         }
     }

@@ -40,7 +40,7 @@ import com.codenameone.examples.savor.ui.Ui;
 /// The courier's side of the app for someone who is not a courier yet: where
 /// their application stands, and the way on from there.
 ///
-/// Whether anyone drives is the server's decision and an admin's: an
+/// Whether anyone delivers is the server's decision and an admin's: an
 /// application is filled in, handed in, and approved or sent back with a
 /// reason. This screen shows which of those it is. There is no way from here
 /// to going online -- the screen that has that button is not built for an
@@ -60,7 +60,7 @@ public class ApplyForm implements Nav.Home {
         bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
         bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(
-                Ui.label("Drive with Savor", "SvHeading")));
+                Ui.label("Deliver with Savor", "SvHeading")));
         page.setSafeArea(false);
         Container screen = new Container(new BorderLayout());
         // The strip the status bar is drawn in is the bar's colour, not

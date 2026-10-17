@@ -55,7 +55,7 @@ import com.codenameone.examples.savor.ui.StatRow;
 import com.codenameone.examples.savor.ui.Ui;
 import java.io.IOException;
 
-/// Onboarding: go online, answer the offer, drive the delivery.
+/// Onboarding: go online, answer the offer, carry the order from kitchen to door.
 ///
 /// While online the app reports the car's position every few seconds. That
 /// report is three things at once to the server: where to draw the car on the
@@ -91,7 +91,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     private boolean online;
     private DeliveryDto delivery;
     private EarningsDto earnings;
-    /// What the last finished trip paid, to say so until the next one starts.
+    /// What the last finished delivery paid, to say so until the next one starts.
     private String lastFare;
     private String showing = "";
     /// Where the car is being driven to, as `deliveryId:state`, and the way there.
@@ -105,9 +105,9 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     private int ticks;
 
     public CourierForm() {
-        menu.item(FontImage.MATERIAL_DIRECTIONS_CAR, "Drive", "home", () -> { });
-        menu.item(FontImage.MATERIAL_HISTORY, "Your trips", "history",
-                () -> DeliveryListForm.show(form, "Your trips", cb -> Api.courier().history(cb), false));
+        menu.item(FontImage.MATERIAL_TWO_WHEELER, "Deliver", "home", () -> { });
+        menu.item(FontImage.MATERIAL_HISTORY, "Your deliveries", "history",
+                () -> DeliveryListForm.show(form, "Your deliveries", cb -> Api.courier().history(cb), false));
         menu.item(FontImage.MATERIAL_PAYMENTS, "Earnings", "earnings",
                 () -> EarningsForm.show(form));
         stage = new MapStage(here, Maps.STREET_ZOOM, menu.button());
@@ -377,7 +377,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             Container today = new Container(BoxLayout.y());
             today.add(Ui.label(Ui.money(earnings.todayCents(), earnings.currency()),
                     "SvStatusValue"));
-            today.add(Ui.label(Lang.tr("Today, {0} trips", String.valueOf(earnings.todayDeliveries())),
+            today.add(Ui.label(Lang.tr("Today, {0} deliveries", String.valueOf(earnings.todayDeliveries())),
                     "SvStatusDetail"));
             card.add(BorderLayout.EAST, today);
         }
@@ -390,7 +390,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         title.setName("courierState");
         peek.add(title);
         if (lastFare != null) {
-            peek.add(Ui.text(Lang.tr("Trip complete: {0}", lastFare), "SvNotice"));
+            peek.add(Ui.text(Lang.tr("Delivered: {0} earned", lastFare), "SvNotice"));
         }
         if (online) {
             peek.add(Ui.label("Stay close to busy streets; requests come to the nearest car.",
@@ -409,7 +409,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
                     "earnedToday");
             numbers.stat(Ui.money(earnings.weekCents(), earnings.currency()), "This week",
                     "earnedWeek");
-            numbers.stat(String.valueOf(earnings.deliveries()), "Trips", "trips");
+            numbers.stat(String.valueOf(earnings.deliveries()), "Deliveries", "deliveries");
             peek.add(numbers);
         }
         if (online) {
@@ -435,7 +435,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         top.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(countdown));
         peek.add(top);
         double away = Maps.meters(here, new LatLng(delivery.pickupLat(), delivery.pickupLng()));
-        peek.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, delivery.pickupAddress(),
+        peek.add(Ui.row(FontImage.MATERIAL_STOREFRONT, delivery.pickupAddress(),
                 Lang.tr("{0} away, {1}", Ui.distance(away), Ui.minutes(away / CITY_SPEED)), null));
         peek.add(Ui.row(FontImage.MATERIAL_PLACE, delivery.dropoffAddress(),
                 Ui.distance(delivery.distanceMeters()) + Ui.DOT + Ui.minutes(delivery.durationSeconds()),
@@ -455,17 +455,18 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         DeliveryState state = delivery.state();
         Container peek = sheet.peek();
         Label title = Ui.label(DeliveryState.ACCEPTED == state
-                ? Lang.tr("Pick up {0}", delivery.customerName())
-                : DeliveryState.ARRIVED == state ? Lang.tr("Waiting for {0}", delivery.customerName())
-                : Lang.tr("On the trip"), "SvHeading");
+                ? Lang.tr("Head to the restaurant")
+                : DeliveryState.ARRIVED == state
+                        ? Lang.tr("Collect the order for {0}", delivery.customerName())
+                : Lang.tr("Deliver to {0}", delivery.customerName()), "SvHeading");
         title.setName("courierState");
         peek.add(title);
         boolean aboard = DeliveryState.IN_PROGRESS == state;
-        peek.add(Ui.row(aboard ? FontImage.MATERIAL_PLACE : FontImage.MATERIAL_TRIP_ORIGIN,
+        peek.add(Ui.row(aboard ? FontImage.MATERIAL_PLACE : FontImage.MATERIAL_STOREFRONT,
                 aboard ? delivery.dropoffAddress() : delivery.pickupAddress(),
-                aboard ? "Drop-off" : "Pickup", null));
+                aboard ? "Door" : "Restaurant", null));
         if (delivery.cash()) {
-            // Said before the trip ends, so that it is not a surprise at the door.
+            // Said before the delivery ends, so that it is not a surprise at the door.
             Label cash = Ui.label(Lang.tr("Collect {0} in cash", Ui.money(
                     delivery.total() > 0 ? delivery.total() : delivery.fareCents(), delivery.currency())),
                     "SvNotice");
@@ -481,19 +482,20 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             peek.add(reach);
         }
         if (DeliveryState.ACCEPTED == state) {
-            peek.add(Ui.primary("I have arrived", "arrived",
+            peek.add(Ui.primary("I am at the restaurant", "arrived",
                     e -> act(cb -> Api.courier().arrived(id, cb))));
         } else if (DeliveryState.ARRIVED == state) {
-            peek.add(Ui.primary("Start trip", "start",
+            // Refused with the reason until the kitchen has marked it ready.
+            peek.add(Ui.primary("I have the food", "start",
                     e -> act(cb -> Api.courier().start(id, cb))));
         } else {
-            peek.add(Ui.primary("Complete trip", "complete",
+            peek.add(Ui.primary("Delivered", "complete",
                     e -> Api.courier().complete(id, Net.to(finished -> {
                         Telemetry.deliveryCompleted("courier", finished.fareCents(), finished.cash());
                         lastFare = Ui.money(finished.fareCents(), finished.currency());
                         Ui.say(finished.cash() ? Lang.tr("Collect {0} in cash", Ui.money(
                                 finished.total() > 0 ? finished.total() : finished.fareCents(),
-                                finished.currency())) : Lang.tr("Trip complete: {0}", lastFare));
+                                finished.currency())) : Lang.tr("Delivered: {0} earned", lastFare));
                         delivery = null;
                         aim();
                         display();

@@ -53,7 +53,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-/// The application to drive, a step at a time: you, your licence, your car,
+/// The application to deliver, a step at a time: you, your licence, your vehicle,
 /// your documents, and a last look before it is handed in.
 ///
 /// Each step is saved as it is left, so an application can be put down half
@@ -77,7 +77,7 @@ public final class ApplicationForm {
         "Your documents", "Review and submit"};
     private static final String ISO = "yyyy-MM-dd";
 
-    private final Form form = Ui.form("Drive with Savor", "Application");
+    private final Form form = Ui.form("Deliver with Savor", "Application");
     private final Runnable done;
     private final Container body = Ui.page();
     private final Label stepLabel = Ui.plain("", "SvStepLabel");
