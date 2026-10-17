@@ -616,6 +616,13 @@ public class Transform extends Component implements IEnumerable {
 
     /// `foreach (Transform child in transform)`: the children as they are
     /// now, so the loop may reparent or destroy them.
+    ///
+    /// A snapshot, deliberately, and not a walk of the live list by index:
+    /// Unity's documentation does not say how this enumerator behaves when
+    /// the loop changes the hierarchy, and Unity's source is not read for
+    /// this runtime. The common loop that detaches or destroys every child
+    /// visits each one exactly once here, where an index walk over a
+    /// shrinking list skips every other child.
     @Override
     public IEnumerator GetEnumerator() {
         final java.lang.Object[] snapshot = children == null ? new java.lang.Object[0] : children.toArray(); // NOPMD UnnecessaryFullyQualifiedName

@@ -625,7 +625,17 @@ public final class UnityRuntime {
                 delayed.remove(i);
             }
         }
-        doomed.clear();
+        // An outgoing script's OnDestroy may have destroyed something the
+        // unload keeps, a DontDestroyOnLoad object; the frame's flush is
+        // over, so those requests are carried out here rather than dropped.
+        while (!doomed.isEmpty()) {
+            java.lang.Object[] batch = doomed.toArray(); // NOPMD UnnecessaryFullyQualifiedName
+            doomed.clear();
+            for (int i = 0; i < batch.length; i++) { // NOPMD ForLoopCanBeForeach
+                destroyNow((Object) batch[i]);
+            }
+        }
+        compact();
         PhysicsWorld.flush();
         load(index);
     }
@@ -1708,8 +1718,14 @@ public final class UnityRuntime {
 
     private static float canvasScale(Canvas canvas) {
         java.lang.Object scaler = canvas.gameObject.GetComponent(CanvasScaler.class);
-        if (scaler != null) {
+        // A disabled scaler scales nothing, as any disabled component does
+        // nothing; the scale it left goes back to 1 when it stops.
+        if (scaler instanceof CanvasScaler && ((CanvasScaler) scaler).get_isActiveAndEnabled()) {
             canvas.scaleFactor = ((CanvasScaler) scaler).$scale(Screen.width, Screen.height);
+            canvas.scaledByScaler = true;
+        } else if (canvas.scaledByScaler) {
+            canvas.scaleFactor = 1f;
+            canvas.scaledByScaler = false;
         }
         return canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
     }

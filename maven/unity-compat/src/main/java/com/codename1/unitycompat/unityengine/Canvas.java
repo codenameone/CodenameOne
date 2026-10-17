@@ -49,6 +49,10 @@ public final class Canvas extends Behaviour {
     /// com.codename1.unitycompat.unityengine.ui.CanvasScaler] beside the
     /// canvas decides it, and it is refreshed whenever the canvas is drawn.
     float scaleFactor = 1f;
+    /// Whether an enabled scaler set [#scaleFactor] last: one disabled
+    /// since puts the canvas back at a scale of 1, once, and leaves what a
+    /// script sets afterwards alone.
+    boolean scaledByScaler;
 
     /// What a scene file sets.
     public void $setup(int mode, Camera camera, int order, int layerId, float distance) {
