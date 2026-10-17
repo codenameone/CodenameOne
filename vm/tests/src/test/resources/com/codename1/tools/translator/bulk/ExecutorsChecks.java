@@ -358,6 +358,32 @@ public final class ExecutorsChecks {
             pool.shutdown();
             Bulk.p("terminated", pool.awaitTermination(20, TimeUnit.SECONDS));
         });
+        // Completing the root of a long chain of stages must not take a stack
+        // frame per stage.
+        Bulk.check("Executors.aLongCompletionChainCompletes", () -> {
+            CompletableFuture<Integer> root = new CompletableFuture<Integer>();
+            CompletableFuture<Integer> tail = root;
+            for (int i = 0; i < 100000; i++) {
+                tail = tail.thenApply(v -> v + 1);
+            }
+            root.complete(0);
+            Bulk.p("tail", tail.get(20, TimeUnit.SECONDS));
+        });
+        Bulk.check("Executors.timedGetsOnAPendingFutureStillComplete", () -> {
+            CompletableFuture<String> f = new CompletableFuture<String>();
+            int timeouts = 0;
+            for (int i = 0; i < 50; i++) {
+                try {
+                    f.get(1, TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                    timeouts++;
+                }
+            }
+            CompletableFuture<String> after = f.thenApply(s -> s + "!");
+            f.complete("done");
+            Bulk.p("timeouts", timeouts);
+            Bulk.p("after", after.get(20, TimeUnit.SECONDS));
+        });
         Bulk.check("Executors.cancelFalseLeavesTheRunnersInterruptAlone", () -> {
             final CountDownLatch started = new CountDownLatch(1);
             final CountDownLatch cancelled = new CountDownLatch(1);

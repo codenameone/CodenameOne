@@ -984,13 +984,35 @@ public final class DateTimeFormatter {
                     p.offset = ZoneOffset.UTC;
                     return;
                 }
-                p.setOffset(p.offsetSeconds(), p.pos);
+                p.setOffset(t.letter == 'Z' && count == 4 ? p.offsetSeconds() : offsetOfWidth(p, count, t.letter == 'Z'), p.pos);
                 return;
             case 'x':
-                p.setOffset(p.offsetSeconds(), p.pos);
+                p.setOffset(offsetOfWidth(p, count, false), p.pos);
                 return;
             default:
                 throw new IllegalStateException(String.valueOf(t.letter));
+        }
+    }
+
+    /// Parses the offset form one width of `X`, `x` or `Z` prints, and no
+    /// other: `X` is +HH with optional minutes, `XX` +HHMM, `XXX` +HH:MM,
+    /// `XXXX` +HHMM with optional seconds, `XXXXX` +HH:MM with optional
+    /// seconds; one to three `Z` are +HHMM and five are +HH:MM[:SS].
+    private static int offsetOfWidth(Parsed p, int count, boolean zone) {
+        if (zone) {
+            return count == 5 ? p.offsetSeconds(true, 2, 3) : p.offsetSeconds(false, 2, 2);
+        }
+        switch (count) {
+            case 1:
+                return p.offsetSeconds(false, 1, 2);
+            case 2:
+                return p.offsetSeconds(false, 2, 2);
+            case 3:
+                return p.offsetSeconds(true, 2, 2);
+            case 4:
+                return p.offsetSeconds(false, 2, 3);
+            default:
+                return p.offsetSeconds(true, 2, 3);
         }
     }
 
@@ -1148,6 +1170,44 @@ public final class DateTimeFormatter {
         }
 
         /// `+HH`, `+HHMM`, `+HH:MM`, `+HHMMss` or `+HH:MM:ss`.
+        /// An offset of hours, minutes and seconds, each two digits: at least
+        /// `required` and at most `allowed` of them, separated by colons
+        /// exactly when `colon` is set.
+        int offsetSeconds(boolean colon, int required, int allowed) {
+            int start = pos;
+            if (pos >= text.length() || (text.charAt(pos) != '+' && text.charAt(pos) != '-')) {
+                fail(start);
+            }
+            boolean negative = text.charAt(pos) == '-';
+            pos++;
+            int[] fields = new int[3];
+            fields[0] = (int) digits(2, 2);
+            int found = 1;
+            while (found < allowed) {
+                int mark = pos;
+                if (colon) {
+                    if (pos >= text.length() || text.charAt(pos) != ':') {
+                        break;
+                    }
+                    pos++;
+                }
+                if (pos + 1 < text.length() && isDigit(pos) && isDigit(pos + 1)) {
+                    fields[found++] = (int) digits(2, 2);
+                } else {
+                    pos = mark;
+                    break;
+                }
+            }
+            if (found < required || fields[1] > 59 || fields[2] > 59) {
+                fail(start);
+            }
+            int total = fields[0] * 3600 + fields[1] * 60 + fields[2];
+            if (total > 18 * 3600) {
+                fail(start);
+            }
+            return negative ? -total : total;
+        }
+
         int offsetSeconds() {
             int start = pos;
             if (pos >= text.length() || (text.charAt(pos) != '+' && text.charAt(pos) != '-')) {

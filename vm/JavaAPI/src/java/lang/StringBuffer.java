@@ -456,8 +456,14 @@ public final class StringBuffer implements CharSequence, Appendable, Comparable<
     }
 
     /// Compares the contents lexicographically.
-    public synchronized int compareTo(StringBuffer another) {
-        return CharSequence.compare(this, another);
+    public int compareTo(StringBuffer another) {
+        // Snapshot the other buffer under its own lock first: holding this
+        // one while reading that one would deadlock against a thread
+        // comparing the pair the other way around.
+        String theirs = another.toString();
+        synchronized (this) {
+            return CharSequence.compare(this, theirs);
+        }
     }
 
 

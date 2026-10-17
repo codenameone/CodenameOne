@@ -69,6 +69,23 @@ public final class LangMembersChecks {
                 Bulk.p(r[0] + "," + r[1], got);
             }
         });
+        Bulk.check("Lang.hypotIsWithinAnUlp", () -> {
+            double[][] xy = {{-0x1.30ad286c08edp745, 0x1.be3f115b1361dp769}, {2.5917508825783748e48, 1.5152149925235254e41},
+                    {3, 4}, {1e-310, 3e-311}, {Double.MIN_VALUE, Double.MIN_VALUE}, {1e300, 1e300}, {Double.MAX_VALUE, 1},
+                    {0.1, 0.2}, {1, 1e-20}, {-0.0, 0.0}};
+            for (double[] v : xy) {
+                long got = Double.doubleToLongBits(Math.hypot(v[0], v[1]));
+                long want = Double.doubleToLongBits(StrictMath.hypot(v[0], v[1]));
+                Bulk.p("hypot " + v[0] + "," + v[1], Math.abs(got - want) <= 1);
+            }
+        });
+        Bulk.check("Lang.stringBufferComparesBothWays", () -> {
+            StringBuffer a = new StringBuffer("abc");
+            StringBuffer b = new StringBuffer("abd");
+            Bulk.p("ab", Integer.signum(a.compareTo(b)));
+            Bulk.p("ba", Integer.signum(b.compareTo(a)));
+            Bulk.p("aa", a.compareTo(a));
+        });
         Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
     }
 }

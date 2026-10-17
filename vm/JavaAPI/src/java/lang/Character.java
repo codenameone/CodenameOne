@@ -1538,37 +1538,48 @@ public final class Character implements Comparable<Character>{
                 || c >= 0x1fa8 && c <= 0x1faf || c == 0x1fbc || c == 0x1fcc || c == 0x1ffc;
     }
 
-    private static boolean isScriptLetter(int c) {
-        return c >= 0x100 && c <= 0x24f // Latin Extended
-                || c >= 0x370 && c <= 0x3ff && c != 0x37e && c != 0x387 && c != 0x375
-                        && c != 0x384 && c != 0x385 && c != 0x3f6
-                        && c != 0x378 && c != 0x379 && (c < 0x380 || c > 0x383)
-                        && c != 0x38b && c != 0x38d && c != 0x3a2 // Greek, less its unassigned holes
-                || c >= 0x400 && c <= 0x481 || c >= 0x48a && c <= 0x52f // Cyrillic
-                || c >= 0x531 && c <= 0x556 || c >= 0x561 && c <= 0x587 // Armenian
-                || c >= 0x5d0 && c <= 0x5ea // Hebrew
-                || c >= 0x620 && c <= 0x64a || c >= 0x671 && c <= 0x6d3 // Arabic
-                || c >= 0x904 && c <= 0x939 // Devanagari
-                || c >= 0xe01 && c <= 0xe30 // Thai
-                || c >= 0x10a0 && c <= 0x10ff && c != 0x10fb // Georgian
-                || c >= 0x1e00 && c <= 0x1fff && !isGreekExtendedSymbol(c) // Latin and Greek Extended Additional
-                || c >= 0x3041 && c <= 0x3096 || c >= 0x30a1 && c <= 0x30fa // Kana
-                || c >= 0x3400 && c <= 0x4dbf || c >= 0x4e00 && c <= 0x9fff // CJK
-                || c >= 0xac00 && c <= 0xd7a3 // Hangul
-                || c >= 0xf900 && c <= 0xfa6d || c >= 0xfa70 && c <= 0xfad9 // CJK compatibility ideographs, less the unassigned
-                || c >= 0xff21 && c <= 0xff3a || c >= 0xff41 && c <= 0xff5a // fullwidth Latin
-                || c >= 0x20000 && c <= 0x2a6df || c >= 0x2a700 && c <= 0x2b739 // CJK extensions B, C
-                || c >= 0x2b740 && c <= 0x2b81d || c >= 0x2b820 && c <= 0x2cea1 // CJK extensions D, E
-                || c >= 0x2ceb0 && c <= 0x2ebe0 || c >= 0x2ebf0 && c <= 0x2ee5d // CJK extensions F, I
-                || c >= 0x2f800 && c <= 0x2fa1d // CJK compatibility supplement
-                || c >= 0x30000 && c <= 0x3134a; // CJK extension G
-    }
+    // The letters of the scripts above Latin-1, as inclusive [first, last]
+    // pairs in ascending order: the maximal runs that Character.isLetter
+    // answers true for in JDK 21 (Unicode 15), inside the Latin Extended,
+    // Greek, Cyrillic, Armenian, Hebrew, Arabic, Devanagari, Thai, Georgian,
+    // Latin and Greek Extended Additional, kana, CJK, Hangul, fullwidth Latin
+    // and CJK extension B-G blocks. Generated from the JDK's own data rather
+    // than written by hand, so the unassigned holes and the symbols between
+    // the letters are left out exactly; scripts outside those blocks are not
+    // covered at all.
+    private static final int[] SCRIPT_LETTERS = {
+            0x100, 0x24f, 0x370, 0x374, 0x376, 0x377, 0x37a, 0x37d,
+            0x37f, 0x37f, 0x386, 0x386, 0x388, 0x38a, 0x38c, 0x38c,
+            0x38e, 0x3a1, 0x3a3, 0x3f5, 0x3f7, 0x3ff, 0x400, 0x481,
+            0x48a, 0x52f, 0x531, 0x556, 0x559, 0x559, 0x560, 0x587,
+            0x5d0, 0x5ea, 0x620, 0x64a, 0x66e, 0x66f, 0x671, 0x6d3,
+            0x904, 0x939, 0xe01, 0xe30, 0x10a0, 0x10c5, 0x10c7, 0x10c7,
+            0x10cd, 0x10cd, 0x10d0, 0x10fa, 0x10fc, 0x10ff, 0x1e00, 0x1f15,
+            0x1f18, 0x1f1d, 0x1f20, 0x1f45, 0x1f48, 0x1f4d, 0x1f50, 0x1f57,
+            0x1f59, 0x1f59, 0x1f5b, 0x1f5b, 0x1f5d, 0x1f5d, 0x1f5f, 0x1f7d,
+            0x1f80, 0x1fb4, 0x1fb6, 0x1fbc, 0x1fbe, 0x1fbe, 0x1fc2, 0x1fc4,
+            0x1fc6, 0x1fcc, 0x1fd0, 0x1fd3, 0x1fd6, 0x1fdb, 0x1fe0, 0x1fec,
+            0x1ff2, 0x1ff4, 0x1ff6, 0x1ffc, 0x3041, 0x3096, 0x309d, 0x309f,
+            0x30a1, 0x30fa, 0x3400, 0x4dbf, 0x4e00, 0x9fff, 0xac00, 0xd7a3,
+            0xf900, 0xfa6d, 0xfa70, 0xfad9, 0xff21, 0xff3a, 0xff41, 0xff5a,
+            0x20000, 0x2a6df, 0x2a700, 0x2b739, 0x2b740, 0x2b81d, 0x2b820, 0x2cea1,
+            0x2ceb0, 0x2ebe0, 0x2f800, 0x2fa1d, 0x30000, 0x3134a
+    };
 
-    // Greek Extended holds spacing accents (Sk) and unassigned holes between its letters.
-    private static boolean isGreekExtendedSymbol(int c) {
-        return c == 0x1fbd || c >= 0x1fbf && c <= 0x1fc1 || c >= 0x1fcd && c <= 0x1fcf
-                || c >= 0x1fdd && c <= 0x1fdf || c >= 0x1fed && c <= 0x1fef
-                || c >= 0x1ffd && c <= 0x1fff;
+    private static boolean isScriptLetter(int c) {
+        int lo = 0;
+        int hi = SCRIPT_LETTERS.length / 2 - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            if (c < SCRIPT_LETTERS[2 * mid]) {
+                hi = mid - 1;
+            } else if (c > SCRIPT_LETTERS[2 * mid + 1]) {
+                lo = mid + 1;
+            } else {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**

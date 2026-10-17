@@ -193,6 +193,14 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             try {
                 V value;
                 runner.set(Thread.currentThread());
+                if (outcome.isDone()) {
+                    // cancel() completes the future and then reads the runner,
+                    // and this publishes the runner and then reads the future:
+                    // a cancel that missed the runner is seen here, so work
+                    // never starts after a cancellation that won.
+                    disarm();
+                    return false;
+                }
                 try {
                     value = work.call();
                 } catch (Throwable t) {

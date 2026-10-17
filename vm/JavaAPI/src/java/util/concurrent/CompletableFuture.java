@@ -22,6 +22,7 @@
  */
 package java.util.concurrent;
 
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -103,11 +104,67 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             ordered = head;
             head = next;
         }
-        while (ordered != null) {
-            ordered.action.run();
-            ordered = ordered.next;
+        // Completing a dependent stage completes its own dependents in turn,
+        // so a long chain run by recursion would use a stack frame per stage
+        // and overflow. The outermost completion on a thread drains a queue
+        // that nested completions only add to.
+        LinkedList<Runnable> queue = DRAINING.get();
+        if (queue != null) {
+            for (; ordered != null; ordered = ordered.next) {
+                queue.add(ordered.action);
+            }
+            return true;
+        }
+        queue = new LinkedList<Runnable>();
+        for (; ordered != null; ordered = ordered.next) {
+            queue.add(ordered.action);
+        }
+        DRAINING.set(queue);
+        try {
+            Runnable next;
+            while ((next = queue.poll()) != null) {
+                next.run();
+            }
+        } finally {
+            DRAINING.set(null);
         }
         return true;
+    }
+
+    /// The queue of actions the outermost completion on this thread is
+    /// running, or null when no completion is under way.
+    private static final ThreadLocal<LinkedList<Runnable>> DRAINING = new ThreadLocal<LinkedList<Runnable>>();
+
+    /// Takes `action` off the stack again, for a waiter that stopped waiting
+    /// before completion: a future polled with a timeout over and over must
+    /// not keep every poll's waiter. The stack is copied without it, since
+    /// nodes another thread may be reading are never changed.
+    private void forget(Runnable action) {
+        while (true) {
+            Waiting head = waiting.get();
+            if (head == null || head == RELEASED) {
+                return;
+            }
+            Waiting kept = null;
+            Waiting tail = null;
+            boolean found = false;
+            for (Waiting w = head; w != null; w = w.next) {
+                if (w.action == action) {
+                    found = true;
+                    continue;
+                }
+                Waiting copy = new Waiting(w.action);
+                if (tail == null) {
+                    kept = copy;
+                } else {
+                    tail.next = copy;
+                }
+                tail = copy;
+            }
+            if (!found || waiting.compareAndSet(head, kept)) {
+                return;
+            }
+        }
     }
 
     /// Runs `action` when this future is complete: now if it already is.
@@ -202,7 +259,13 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
         final Signal signal = new Signal();
         whenDone(signal);
-        new SignalWait(signal, millis < 0 ? BlockingWait.FOREVER : BlockingWait.deadline(millis)).await();
+        try {
+            new SignalWait(signal, millis < 0 ? BlockingWait.FOREVER : BlockingWait.deadline(millis)).await();
+        } finally {
+            if (result.get() == null) {
+                forget(signal);
+            }
+        }
         outcome = result.get();
         if (outcome == null) {
             throw new TimeoutException();

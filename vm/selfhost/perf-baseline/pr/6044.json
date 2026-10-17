@@ -1,6 +1,26 @@
 {
  "pr": 6044,
  "rebaseline": {
+  "linux-x64@intel-xeon-platinum-8370c": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.509,
+      "time": 0.531,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.431,
+     "reason": "The translator's RAM dropped on linux-x64 (0.43x vs 0.51x); recorded as measured, like the Windows hello rows",
+     "runs": 1,
+     "time": 0.531,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "hello": {
     "all": {

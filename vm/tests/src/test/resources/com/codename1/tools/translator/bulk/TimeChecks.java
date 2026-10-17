@@ -154,6 +154,22 @@ public final class TimeChecks {
     public static void run() {
         // Past 292 years the nanosecond count overflows a long; the quotient
         // still has to be exact.
+        Bulk.check("Time.eachOffsetWidthParsesItsOwnForm", () -> {
+            String[] patterns = {"X", "XX", "XXX", "XXXX", "XXXXX", "x", "xxx", "Z", "ZZZZZ"};
+            String[] inputs = {"+01", "+0130", "+01:30", "+013045", "+01:30:45", "Z", "+1", "+01:3"};
+            for (String pattern : patterns) {
+                for (String input : inputs) {
+                    String got;
+                    try {
+                        got = String.valueOf(OffsetDateTime.parse("2024-05-06T07:08" + input,
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm" + pattern)).getOffset().getTotalSeconds());
+                    } catch (DateTimeException e) {
+                        got = "rejected";
+                    }
+                    Bulk.p(pattern + " " + input, got);
+                }
+            }
+        });
         Bulk.check("Time.aLongDurationDividesExactly", () -> {
             Bulk.p("max/max", java.time.Duration.ofSeconds(Long.MAX_VALUE).dividedBy(Long.MAX_VALUE));
             Bulk.p("max/2", java.time.Duration.ofSeconds(Long.MAX_VALUE, 999999999).dividedBy(2));
