@@ -96,7 +96,26 @@ public final class RectTransform extends Transform {
     /// A rectangle is laid out in its parent's own units and then scaled
     /// about its pivot, which is what a transform's scale means; so a
     /// scaled button's label, laid out inside the button, grows with it.
+    ///
+    /// A negative scale mirrors: the width and height answered are never
+    /// negative, x and y stay the bottom left corner, and the mirror is
+    /// the sign of `out[4]` and `out[5]` alone. A negative extent made
+    /// every hit test of a mirrored button fail and its text be dropped.
     public void $rect(float canvasWidth, float canvasHeight, float[] out) {
+        signedRect(canvasWidth, canvasHeight, out);
+        if (out[2] < 0f) {
+            out[0] += out[2];
+            out[2] = -out[2];
+        }
+        if (out[3] < 0f) {
+            out[1] += out[3];
+            out[3] = -out[3];
+        }
+    }
+
+    /// `#$rect` before the extent is made positive: the parent's width is
+    /// recovered by dividing by its scale, which takes the signed one.
+    private void signedRect(float canvasWidth, float canvasHeight, float[] out) {
         boolean root = gameObject.GetComponent(Canvas.class) != null || !(parent instanceof RectTransform);
         if (root) {
             out[0] = 0f;
@@ -107,7 +126,7 @@ public final class RectTransform extends Transform {
             out[5] = 1f;
             return;
         }
-        ((RectTransform) parent).$rect(canvasWidth, canvasHeight, out);
+        ((RectTransform) parent).signedRect(canvasWidth, canvasHeight, out);
         float parentScaleX = out[4];
         float parentScaleY = out[5];
         // The parent's size in its own units, before it was scaled.

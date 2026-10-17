@@ -2081,7 +2081,8 @@ public final class UnityRuntime {
                 rect[0] = 0f;
                 rect[1] = 0f;
                 rect[2] = canvasWidth;
-                rect[3] = canvasHeight;                rect[4] = 1f;
+                rect[3] = canvasHeight;
+                rect[4] = 1f;
                 rect[5] = 1f;
             }
             DrawCommand d = drawList.next();
@@ -2098,16 +2099,18 @@ public final class UnityRuntime {
             d.anchorX = 0f;
             d.anchorY = 0f;
             d.rotation = 0f;
-            d.flipX = false;
-            d.flipY = false;
+            // A mirrored rectangle is drawn flipped; its size is positive.
+            d.flipX = rect[4] < 0f;
+            d.flipY = rect[5] < 0f;
+            float textScale = rect[5] < 0f ? -rect[5] : rect[5];
             canvasKeys(canvas, d);
             if (c instanceof Text) {
-                ((Text) c).$fill(d, s * rect[5]);
+                ((Text) c).$fill(d, s * textScale);
             } else if (c instanceof Image) {
                 if (!((Image) c).$fill(d)) {
                     drawList.drop();
                 }
-            } else if (!((Graphic) c).$paint(d, s * rect[5])) {
+            } else if (!((Graphic) c).$paint(d, s * textScale)) {
                 drawList.drop();
             }
         }

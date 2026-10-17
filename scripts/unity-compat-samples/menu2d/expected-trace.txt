@@ -23,7 +23,7 @@ draw frame=1 commands=13 background=ff141a29
   text "menu" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
   text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
   unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=99000000 flip=00
-  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff66cc66 flip=00
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff66cc66 flip=10
   text "PLAY" layer=0 order=0 at=14000,14750 size=12000x4500 font=1500 fit=0 min=750 max=3000 align=4 style=0 wrap=1 color=ff1a1a1a
   unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
 input frame=10 key=32 down
@@ -50,7 +50,7 @@ draw frame=42 commands=13 background=ff141a29
   text "menu" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
   text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
   unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=99000000 flip=00
-  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff339933 flip=00
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff339933 flip=10
   text "PLAY" layer=0 order=0 at=14000,14750 size=12000x4500 font=1500 fit=0 min=750 max=3000 align=4 style=0 wrap=1 color=ff1a1a1a
   unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
 input frame=44 pointer=200,170 up
@@ -80,11 +80,13 @@ input frame=92 key=32 up
 bounce 1 on Floor at y=-210 frame 100
 pitch clamped 300 -300
 sought to 40ms of 100 playing=True
+clip swap playing=True same=True replaced=False
 caught: Input Axis Nope is not setup.
 caught a child out of range=True
 audio frame=100 shot beep
 audio frame=100 play beep
 audio frame=100 seek beep 40
+audio frame=100 play beep
 voice 3 frames on: 65ms playing=True
 tick, frame 105 clicks=1 selected=True
 voice 9 frames on: 100ms playing=False

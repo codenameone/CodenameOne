@@ -291,7 +291,13 @@ public final class AudioSource extends Behaviour {
         return clip;
     }
 
+    /// Unity documents that the clip a new one replaces stops, and that the
+    /// new one waits for `Play`; so the voice and the clip that times it
+    /// never differ. Setting the clip it already has stops nothing.
     public void set_clip(AudioClip value) {
+        if (value != clip && (playing || paused)) { // NOPMD CompareObjectsWithEquals
+            Stop();
+        }
         clip = value;
     }
 

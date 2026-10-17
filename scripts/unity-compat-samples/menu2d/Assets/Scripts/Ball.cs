@@ -75,6 +75,17 @@ public class Ball : MonoBehaviour
         soughtAt = Time.frameCount;
         Debug.Log("sought to " + Mathf.RoundToInt(source.time * 1000f) + "ms of "
             + Mathf.RoundToInt(beep.length * 1000f) + " playing=" + source.isPlaying);
+        // A clip replacing the one that plays stops it, and waits for Play;
+        // the same clip again stops nothing.
+        AudioSource swap = new GameObject("Swap").AddComponent<AudioSource>();
+        swap.clip = beep;
+        swap.Play();
+        bool started = swap.isPlaying;
+        swap.clip = beep;
+        bool same = swap.isPlaying;
+        swap.clip = null;
+        Debug.Log("clip swap playing=" + started + " same=" + same + " replaced=" + swap.isPlaying);
+        DestroyImmediate(swap.gameObject);
     }
 
     // What the engine refuses, a script can catch: an axis that is not set

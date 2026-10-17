@@ -461,8 +461,14 @@ public final class Animator extends Behaviour {
         events(c.stateClips[state], time, moved);
         time = moved;
         if (next >= 0) {
+            // The incoming clip plays during the blend, and its events are
+            // due as its time passes them; the outgoing clip's were sent
+            // above. Left until it became current, the time it had already
+            // gone past was never walked again.
             float nextAdvance = step * c.stateSpeeds[next];
-            nextTime = nextTime + nextAdvance;
+            float nextMoved = nextTime + nextAdvance;
+            events(c.stateClips[next], nextTime, nextMoved);
+            nextTime = nextMoved;
             blendTime = blendTime + step;
             if (blendTime >= blendLength) {
                 state = next;

@@ -63,6 +63,10 @@ public class Menu : MonoBehaviour
         best.text = "Best: " + PlayerPrefs.GetInt("best");
         Time.timeScale = 0;
         play.onClick.AddListener(() => clicks++);
+        // Mirrored about its centre, the button covers the same rectangle and
+        // still takes the click: a negative scale is drawn flipped, not lost.
+        Vector3 playScale = play.transform.localScale;
+        play.transform.localScale = new Vector3(-playScale.x, playScale.y, playScale.z);
         ball.Bounced += (_, hit) => OnBounce(hit.level, hit.count);
         StartCoroutine(Tick());
         Debug.Log("menu level=" + level + " hard defined=" + Enum.IsDefined(typeof(Level), 2) + " nine defined="

@@ -168,6 +168,26 @@
      "time": 0.838
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 0.945,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "Windows x64 Intel Family 6 Model 207 recursion time is bimodal: base folds moved it 1.204x -> 0.943x -> 1.212x -> 0.945x, each from one or two runs; this branch measured 1.207x across five rounds (1.197-1.217), the upper mode",
+     "runs": 1,
+     "time": 1.207,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }

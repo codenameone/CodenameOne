@@ -69,11 +69,11 @@ draw frame=130 commands=20 background=ff1a1f33
   text "Steps 5" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
 frame 154 landed on Ground at 196
 frame 155 state Jump -> Idle sprite=hero_0
-frame 156 state Idle -> Proud sprite=hero_0
 frame 158 dust particles=6 playing=True
-frame 167 bowed after 1 steps=5
-frame 171 state Proud -> Idle sprite=hero_0
-frame 172 state Idle -> Run sprite=hero_2
+frame 166 bowed after 1 steps=5
+frame 168 state Idle -> Proud sprite=hero_2
+frame 170 state Proud -> Idle sprite=hero_0
+frame 171 state Idle -> Run sprite=hero_2
 frame 177 ran into Thorn
 frame 178 state Run -> Hurt sprite=hero_1
 frame 180 objects=15 drawn=25 text="Steps 5"
