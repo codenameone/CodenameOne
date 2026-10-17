@@ -126,4 +126,53 @@ public final class Boolean implements Comparable<Boolean> {
         }
         return 1;
     }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// A Boolean of `parseBoolean(s)`.
+    @Deprecated
+    public Boolean(String s) {
+        this(parseBoolean(s));
+    }
+
+    /// `"true"` or `"false"`.
+    public static String toString(boolean b) {
+        return b ? "true" : "false";
+    }
+
+    /// 1231 for true, 1237 for false, as the JDK hashes them.
+    public static int hashCode(boolean value) {
+        return value ? 1231 : 1237;
+    }
+
+    /// 0 when equal, otherwise positive when `x` is true.
+    public static int compare(boolean x, boolean y) {
+        return x == y ? 0 : (x ? 1 : -1);
+    }
+
+    /// `a && b`.
+    public static boolean logicalAnd(boolean a, boolean b) {
+        return a && b;
+    }
+
+    /// `a || b`.
+    public static boolean logicalOr(boolean a, boolean b) {
+        return a || b;
+    }
+
+    /// `a ^ b`.
+    public static boolean logicalXor(boolean a, boolean b) {
+        return a ^ b;
+    }
+
+    /// Whether the system property `name` is `"true"`, ignoring case.
+    public static boolean getBoolean(String name) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        String value = System.getProperty(name);
+        return value != null && value.equalsIgnoreCase("true");
+    }
 }

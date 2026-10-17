@@ -207,7 +207,8 @@ java/util/concurrent/TimeoutException.java"
 python3 "$ROOT_DIR/scripts/check-backend-jdk-surface.py"
 {
   find "$BACKEND_STAGE" -name "*.java" | grep -v '/com/codename1/impl/'
-  find "$ROOT_DIR/Ports/CLDC11/src" -name "*.java"
+  # The class library's internal com.codename1.impl.JdkHost lives there too.
+  find "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" | grep -v '/com/codename1/impl/'
   echo "$BACKEND_PROMOTED_JDK" | while IFS= read -r promoted; do
     echo "$ROOT_DIR/vm/JavaAPI/src/$promoted"
   done

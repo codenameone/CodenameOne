@@ -64,20 +64,49 @@ public class DateFormat extends Format {
 	}
 
 
-	/// Format a given object.
+	/// Format a given object, a date or a number of milliseconds since the epoch.
 	///
-	/// Parameter `obj`: object to be formatted.
+	/// #### Parameters
+	///
+	/// - `obj`: object to be formatted.
+	///
+	/// - `toAppendTo`: buffer to which to append output.
+	///
+	/// - `fieldPosition`: not updated: no field is reported.
 	///
 	/// #### Returns
 	///
-	/// formatted object.
+	/// `toAppendTo`.
 	///
 	/// #### Throws
 	///
-	/// - `IllegalArgumentException`: of the source can not be formatted.
+	/// - `IllegalArgumentException`: if the source is neither a date nor a number.
 	@Override
-	public String format(Object obj) throws IllegalArgumentException {
-		return format(obj, new StringBuffer());
+	public StringBuffer format(Object obj, StringBuffer toAppendTo, FieldPosition fieldPosition) {
+		if (obj instanceof Date) {
+			return format((Date) obj, toAppendTo, fieldPosition);
+		}
+		if (obj instanceof Number) {
+			return format(new Date(((Number) obj).longValue()), toAppendTo, fieldPosition);
+		}
+		throw new IllegalArgumentException("Cannot format given Object as a Date");
+	}
+
+	/// Format a given date.
+	///
+	/// #### Parameters
+	///
+	/// - `date`: date to be formatted.
+	///
+	/// - `toAppendTo`: buffer to which to append output.
+	///
+	/// - `fieldPosition`: not updated: no field is reported.
+	///
+	/// #### Returns
+	///
+	/// `toAppendTo`.
+	public StringBuffer format(Date date, StringBuffer toAppendTo, FieldPosition fieldPosition) {
+		return toAppendTo.append(format(date));
 	}
 
 	/// Format a given object.
@@ -127,16 +156,44 @@ public class DateFormat extends Format {
 		return null;
 	}
 
-	/// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
+	/// Parse a date from the beginning of the source. NOT IMPLEMENTED for the
+	/// style based formats - use SimpleDateFormat for parsing instead.
 	@Override
 	public Object parseObject(String source) throws ParseException {
-		// can't parse because we don't know the L10NManagers templates
-		throw new ParseException("Not implemented", 0);
+		return parse(source);
 	}
 
-	/// NOT IMPLEMENTED - use SimpleDateFormat for parsing instead.
+	/// Parse a date from the beginning of the source. NOT IMPLEMENTED for the
+	/// style based formats - use SimpleDateFormat for parsing instead.
 	public Date parse(String source) throws ParseException {
-		return (Date) parseObject(source);
+		return parseAt(source, 0, null);
+	}
+
+	/// Parse a date starting at a position. On success the index of the
+	/// position is moved past the date; on failure it is left alone, its
+	/// error index is set and null is returned.
+	public Date parse(String source, ParsePosition pos) {
+		int[] end = new int[1];
+		try {
+			Date result = parseAt(source, pos.getIndex(), end);
+			pos.setIndex(end[0]);
+			return result;
+		} catch (ParseException e) {
+			pos.setErrorIndex(e.getErrorOffset());
+			return null;
+		}
+	}
+
+	@Override
+	public Object parseObject(String source, ParsePosition pos) {
+		return parse(source, pos);
+	}
+
+	/// Parse a date at index start of source and, when end is not null, store
+	/// in end[0] the index just past it.
+	Date parseAt(String source, int start, int[] end) throws ParseException {
+		// can't parse because we don't know the L10NManagers templates
+		throw new ParseException("Not implemented", start);
 	}
 
 	/// Get a DateFormat instance with default style for date/time (SHORT/SHORT).

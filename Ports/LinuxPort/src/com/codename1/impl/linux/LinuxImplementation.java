@@ -241,6 +241,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches the EDT, the log, secure
+        // random bytes, digests and locale symbols through Codename One.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         LinuxNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
         windowGraphicsPeer = LinuxNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);

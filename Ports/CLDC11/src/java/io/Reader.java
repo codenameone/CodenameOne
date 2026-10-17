@@ -24,7 +24,7 @@
 package java.io;
 /// Abstract class for reading character streams. The only methods that a subclass must implement are read(char[], int, int) and close(). Most subclasses, however, will override some of the methods defined here in order to provide higher efficiency, additional functionality, or both.
 /// Since: JDK1.1, CLDC 1.0 See Also:InputStreamReader, Writer
-public abstract class Reader  implements AutoCloseable {
+public abstract class Reader implements Closeable {
     /// The object used to synchronize operations on this stream. For efficiency, a character-stream object may use an object other than itself to protect critical sections. A subclass should therefore use the object in this field rather than this or a synchronized method.
     protected java.lang.Object lock;
 
@@ -81,4 +81,23 @@ public abstract class Reader  implements AutoCloseable {
         return 0l; //TODO codavaj!!
     }
 
+    /// Copies everything left in this reader to `out`, closing neither.
+    ///
+    /// #### Returns
+    ///
+    /// how many characters were copied
+    public long transferTo(Writer out) throws IOException {
+        if (out == null) {
+            throw new NullPointerException("out");
+        }
+        char[] chunk = new char[8192];
+        long total = 0;
+        int n = read(chunk, 0, chunk.length);
+        while (n >= 0) {
+            out.write(chunk, 0, n);
+            total += n;
+            n = read(chunk, 0, chunk.length);
+        }
+        return total;
+    }
 }

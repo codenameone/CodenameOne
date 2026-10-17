@@ -83,4 +83,16 @@ public class ByteArrayOutputStream extends java.io.OutputStream{
         return; //TODO codavaj!!
     }
 
+    @Deprecated
+    public String toString(int hibyte) {
+        return null;
+    }
+
+    /// The contents decoded with `charset`.
+    public synchronized String toString(java.nio.charset.Charset charset) {
+        return null;
+    }
+
+    public synchronized void writeTo(OutputStream out) throws IOException {
+    }
 }

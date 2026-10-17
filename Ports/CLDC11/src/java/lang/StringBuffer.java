@@ -31,7 +31,7 @@ package java.lang;
 /// In general, if sb refers to an instance of a StringBuffer, then sb.append(x) has the same effect as sb.insert(sb.length(),x).
 /// Every string buffer has a capacity. As long as the length of the character sequence contained in the string buffer does not exceed the capacity, it is not necessary to allocate a new internal buffer array. If the internal buffer overflows, it is automatically made larger.
 /// Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
-public final class StringBuffer implements CharSequence {
+public final class StringBuffer implements CharSequence, Appendable, Comparable<StringBuffer> {
     /// Constructs a string buffer with no characters in it and an initial capacity of 16 characters.
     public StringBuffer(){
          //TODO codavaj!!
@@ -63,7 +63,7 @@ public final class StringBuffer implements CharSequence {
         return null; //TODO codavaj!!
     }
 
-    java.lang.StringBuffer append(char[] str){
+    public java.lang.StringBuffer append(char[] str){
         return null; //TODO codavaj!!
     }
 
@@ -158,7 +158,7 @@ public final class StringBuffer implements CharSequence {
         return null; //TODO codavaj!!
     }
 
-    java.lang.StringBuffer insert(int offset, char[] str){
+    public java.lang.StringBuffer insert(int offset, char[] str){
         return null; //TODO codavaj!!
     }
 
@@ -239,9 +239,9 @@ public final class StringBuffer implements CharSequence {
         return null; //TODO codavaj!!
     }
 
-    	public StringBuffer StringBuffer(java.lang.CharSequence cs) {
-		return new StringBuffer(cs.toString());
-	}
+    /// A StringBuffer holding the characters of `cs`.
+    public StringBuffer(java.lang.CharSequence cs) {
+    }
 
 	public void trimToSize() {
 		// do nothing: according to the 1.5 javadoc,
@@ -273,5 +273,88 @@ public final class StringBuffer implements CharSequence {
         return null;
     }
 
+    /// Appends the contents of `sb`, or `"null"`.
+    public synchronized StringBuffer append(StringBuffer sb) {
+        return null;
+    }
 
+    /// Inserts `len` chars of `str` from `offset` at `index`.
+    public synchronized StringBuffer insert(int index, char[] str, int offset, int len) {
+        return null;
+    }
+
+    /// Appends the code point, as one char or as a surrogate pair.
+    public synchronized StringBuffer appendCodePoint(int codePoint) {
+        return null;
+    }
+
+    /// The code point at `index`.
+    public synchronized int codePointAt(int index) {
+        return 0;
+    }
+
+    /// The code point that ends just before `index`.
+    public synchronized int codePointBefore(int index) {
+        return 0;
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public synchronized int codePointCount(int beginIndex, int endIndex) {
+        return 0;
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public synchronized int offsetByCodePoints(int index, int codePointOffset) {
+        return 0;
+    }
+
+    /// The first index of `str`, or -1.
+    public synchronized int indexOf(String str) {
+        return 0;
+    }
+
+    /// The first index of `str` at or after `fromIndex`, or -1.
+    public synchronized int indexOf(String str, int fromIndex) {
+        return 0;
+    }
+
+    /// The last index of `str`, or -1.
+    public synchronized int lastIndexOf(String str) {
+        return 0;
+    }
+
+    /// The last index of `str` at or before `fromIndex`, or -1.
+    public synchronized int lastIndexOf(String str, int fromIndex) {
+        return 0;
+    }
+
+    /// Replaces the characters from `start` to `end` with `str`.
+    public synchronized StringBuffer replace(int start, int end, String str) {
+        return null;
+    }
+
+    /// The characters from `start` to the end.
+    public synchronized String substring(int start) {
+        return null;
+    }
+
+    /// The characters from `start` to `end`.
+    public synchronized String substring(int start, int end) {
+        return null;
+    }
+
+    /// Appends the code point `count` times.
+    public synchronized StringBuffer repeat(int codePoint, int count) {
+        return null;
+    }
+
+    /// Appends `cs` `count` times.
+    public synchronized StringBuffer repeat(CharSequence cs, int count) {
+        return null;
+    }
+
+    /// Compares the contents lexicographically.
+    public synchronized int compareTo(StringBuffer another) {
+        return 0;
+    }
 }

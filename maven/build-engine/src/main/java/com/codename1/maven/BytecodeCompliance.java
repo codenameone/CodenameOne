@@ -32,6 +32,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -213,6 +214,17 @@ public class BytecodeCompliance {
 
     private static final int MAX_CLASS_MAJOR_VERSION = Opcodes.V17;
     private static final String JDK_API_REWRITE_HELPER_INTERNAL_NAME = "com/codename1/impl/JdkApiRewriteHelper";
+    private static final String STRING_REGEX_INTERNAL_NAME = "com/codename1/util/regex/StringRegex";
+    /// Name and descriptor of every `java.lang.String` member that takes a
+    /// regular expression. See the comment in createInvocationRewriteRules:
+    /// this list is complete by test, and every entry is rewritten always.
+    static final String[][] STRING_REGEX_MEMBERS = {
+        {"matches", "(Ljava/lang/String;)Z"},
+        {"split", "(Ljava/lang/String;)[Ljava/lang/String;"},
+        {"split", "(Ljava/lang/String;I)[Ljava/lang/String;"},
+        {"replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"},
+        {"replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"},
+    };
     private static final String SIMD_INTERNAL_NAME = "com/codename1/util/Simd";
     private static final Map<MethodRef, MethodRef> INVOCATION_REWRITE_RULES = createInvocationRewriteRules();
 
@@ -222,22 +234,35 @@ public class BytecodeCompliance {
 
     private static Map<MethodRef, MethodRef> createInvocationRewriteRules() {
         Map<MethodRef, MethodRef> rules = new LinkedHashMap<MethodRef, MethodRef>();
-        rules.put(
-                MethodRef.virtual("java/lang/String", "split", "(Ljava/lang/String;)[Ljava/lang/String;"),
-                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "split", "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;")
-        );
-        rules.put(
-                MethodRef.virtual("java/lang/String", "split", "(Ljava/lang/String;I)[Ljava/lang/String;"),
-                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "split", "(Ljava/lang/String;Ljava/lang/String;I)[Ljava/lang/String;")
-        );
-        rules.put(
-                MethodRef.virtual("java/lang/String", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
-                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
-        );
-        rules.put(
-                MethodRef.virtual("java/lang/String", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
-                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
-        );
+        // ====================================================================
+        // THE STRING REGEX REWRITE IS UNCONDITIONAL. DO NOT GATE IT, DO NOT
+        // MOVE IT, DO NOT GIVE IT A SECOND ENGINE.
+        //
+        // Every String member that takes a regular expression is redirected,
+        // in EVERY application on EVERY target -- the simulator and Android
+        // included -- to com.codename1.util.regex.StringRegex. That is what
+        // makes `s.split(",")` give the same answer everywhere without a JDK
+        // TCK: no target ever runs its own String regex code, so there is
+        // nothing to diverge.
+        //
+        // It was once broken twice at the same time: `matches` was missing
+        // from this list, and the full set lived in a rewrite that ran only
+        // when a desktop compatibility layer was active, over a different
+        // engine than these rules used. The same call then answered
+        // differently depending on which layers an application happened to
+        // pull in. BytecodeComplianceTest#theStringRegexRewriteIsUnconditional
+        // and #everyRegexMemberOfStringIsRewritten fail if any of that comes
+        // back: the second derives the list from the JDK's own String, so a
+        // member left out here is a test failure, not a silent hole.
+        //
+        // Method references (`String::matches`) are rewritten too, in
+        // rewriteClassInvocations' invokedynamic visitor.
+        // ====================================================================
+        for (String[] member : STRING_REGEX_MEMBERS) {
+            rules.put(MethodRef.virtual("java/lang/String", member[0], member[1]),
+                    MethodRef.staticRef(STRING_REGEX_INTERNAL_NAME, member[0],
+                            "(Ljava/lang/String;" + member[1].substring(1)));
+        }
         // Java 8's static wrapper hash and compare methods (Kotlin data classes
         // call them), onto the helper's identical implementations.
         String[][] wrappers = {
@@ -657,7 +682,13 @@ public class BytecodeCompliance {
         return summary;
     }
 
-    private InvocationRewriteResult rewriteClassInvocations(byte[] classBytes) {
+    /// `classBytes` with every invocation rewrite rule applied, as a build
+    /// applies them: for tests that run a class the way it ships.
+    static byte[] rewriteInvocations(byte[] classBytes) {
+        return rewriteClassInvocations(classBytes).bytes;
+    }
+
+    private static InvocationRewriteResult rewriteClassInvocations(byte[] classBytes) {
         final InvocationRewriteResult result = new InvocationRewriteResult();
         final ClassReader reader = new ClassReader(classBytes);
         final ClassWriter writer = new ClassWriter(reader, 0);
@@ -676,6 +707,34 @@ public class BytecodeCompliance {
                             return;
                         }
                         super.visitMethodInsn(opcode, owner, methodName, methodDescriptor, isInterface);
+                    }
+
+                    @Override
+                    public void visitInvokeDynamicInsn(String indyName, String indyDescriptor, Handle bootstrap,
+                            Object... arguments) {
+                        Object[] moved = arguments;
+                        for (int i = 0; i < arguments.length; i++) {
+                            if (!(arguments[i] instanceof Handle)) {
+                                continue;
+                            }
+                            Handle h = (Handle) arguments[i];
+                            int opcode = h.getTag() == Opcodes.H_INVOKESTATIC ? Opcodes.INVOKESTATIC
+                                    : h.getTag() == Opcodes.H_INVOKEVIRTUAL ? Opcodes.INVOKEVIRTUAL : -1;
+                            MethodRef target = opcode < 0 ? null
+                                    : INVOCATION_REWRITE_RULES.get(new MethodRef(opcode, h.getOwner(), h.getName(), h.getDesc()));
+                            if (target == null) {
+                                continue;
+                            }
+                            if (moved == arguments) {
+                                moved = arguments.clone();
+                            }
+                            // A reference to an instance method takes its receiver
+                            // first, which is what the static stand-in takes.
+                            moved[i] = new Handle(Opcodes.H_INVOKESTATIC, target.owner, target.name,
+                                    target.descriptor, false);
+                            result.rewrittenCallsites++;
+                        }
+                        super.visitInvokeDynamicInsn(indyName, indyDescriptor, bootstrap, moved);
                     }
                 };
             }

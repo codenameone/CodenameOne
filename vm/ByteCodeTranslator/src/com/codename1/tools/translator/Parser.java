@@ -3522,6 +3522,20 @@ public class Parser extends ClassVisitor {
             name = "__INIT__";
         }
         String desc = rest.substring(paren);
+        if (!exact) {
+            // A private method is never overridden, yet class files from Java 11 on
+            // call one with INVOKEVIRTUAL (nestmates). Searching from the object's
+            // class would find a subclass's unrelated method of the same name and
+            // check the wrong body, so the owner's private method wins.
+            ByteCodeClass owner = getClassByName(key.substring(0, dot).replace('.', '_'));
+            if (owner != null) {
+                for (BytecodeMethod m : owner.getMethods()) {
+                    if (m.isPrivate() && m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
+                        return m;
+                    }
+                }
+            }
+        }
         String start = exact ? key.substring(0, dot) : exactClass;
         // Bounded so that a malformed hierarchy cannot spin here.
         for (int depth = 0; start != null && depth < 256; depth++) {

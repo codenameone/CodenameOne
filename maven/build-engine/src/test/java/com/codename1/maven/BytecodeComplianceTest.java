@@ -243,7 +243,7 @@ class BytecodeComplianceTest {
         applyInvocationRewrites(mojo, outputDir.toFile());
 
         byte[] rewritten = Files.readAllBytes(classFile);
-        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "split", "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;", Opcodes.INVOKESTATIC));
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/util/regex/StringRegex", "split", "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;", Opcodes.INVOKESTATIC));
     }
 
     @Test
@@ -256,7 +256,7 @@ class BytecodeComplianceTest {
         applyInvocationRewrites(mojo, outputDir.toFile());
 
         byte[] rewritten = Files.readAllBytes(classFile);
-        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/util/regex/StringRegex", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
     }
 
     @Test
@@ -269,7 +269,118 @@ class BytecodeComplianceTest {
         applyInvocationRewrites(mojo, outputDir.toFile());
 
         byte[] rewritten = Files.readAllBytes(classFile);
-        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/util/regex/StringRegex", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    /// THE STRING REGEX REWRITE IS UNCONDITIONAL (see the comment in
+    /// BytecodeCompliance#createInvocationRewriteRules). An application with
+    /// no compatibility layer at all -- the plain project every customer has --
+    /// must get every regex member of String, called directly or through a
+    /// method reference, sent to StringRegex. If this fails, `split` and
+    /// friends answer differently on some target. Do not weaken it.
+    @Test
+    void theStringRegexRewriteIsUnconditional(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/PlainRegexUser", null, "java/lang/Object", null);
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        org.objectweb.asm.Handle metafactory = new org.objectweb.asm.Handle(Opcodes.H_INVOKESTATIC,
+                "java/lang/invoke/LambdaMetafactory", "metafactory",
+                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;"
+                + "Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)"
+                + "Ljava/lang/invoke/CallSite;", false);
+        for (String[] m : BytecodeCompliance.STRING_REGEX_MEMBERS) {
+            // A receiver and every argument, so the method is stack-correct.
+            run.visitInsn(Opcodes.ACONST_NULL);
+            for (org.objectweb.asm.Type arg : org.objectweb.asm.Type.getArgumentTypes(m[1])) {
+                run.visitInsn(arg.getSort() == org.objectweb.asm.Type.INT ? Opcodes.ICONST_0 : Opcodes.ACONST_NULL);
+            }
+            run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", m[0], m[1], false);
+            run.visitInsn(Opcodes.POP);
+            String asStatic = "(Ljava/lang/String;" + m[1].substring(1);
+            run.visitInvokeDynamicInsn("apply", "()Ljava/lang/Object;", metafactory,
+                    org.objectweb.asm.Type.getMethodType("()V"),
+                    new org.objectweb.asm.Handle(Opcodes.H_INVOKEVIRTUAL, "java/lang/String", m[0], m[1], false),
+                    org.objectweb.asm.Type.getMethodType(asStatic));
+            run.visitInsn(Opcodes.POP);
+        }
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(4, 0);
+        run.visitEnd();
+        writer.visitEnd();
+        Path classFile = outputDir.resolve("app/PlainRegexUser.class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, writer.toByteArray());
+
+        applyInvocationRewrites(new BytecodeCompliance(TestProjectHost.empty()), outputDir.toFile());
+
+        final java.util.List<String> left = new java.util.ArrayList<String>();
+        final java.util.List<String> sent = new java.util.ArrayList<String>();
+        new ClassReader(Files.readAllBytes(classFile)).accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                return new MethodVisitor(Opcodes.ASM9) {
+                    private void see(String owner, String name, String desc, boolean handle) {
+                        String key = (handle ? "handle " : "call ") + owner + "." + name + desc;
+                        if ("java/lang/String".equals(owner)) {
+                            left.add(key);
+                        } else if ("com/codename1/util/regex/StringRegex".equals(owner)) {
+                            sent.add(key);
+                        }
+                    }
+
+                    @Override
+                    public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
+                        see(owner, name, desc, false);
+                    }
+
+                    @Override
+                    public void visitInvokeDynamicInsn(String name, String desc, org.objectweb.asm.Handle bsm, Object... args) {
+                        for (Object a : args) {
+                            if (a instanceof org.objectweb.asm.Handle) {
+                                org.objectweb.asm.Handle h = (org.objectweb.asm.Handle) a;
+                                see(h.getOwner(), h.getName(), h.getDesc(), true);
+                            }
+                        }
+                    }
+                };
+            }
+        }, 0);
+        assertTrue(left.isEmpty(), "String regex members left un-rewritten: " + left);
+        assertEquals(2 * BytecodeCompliance.STRING_REGEX_MEMBERS.length, sent.size(), sent.toString());
+    }
+
+    /// The rewritten list is checked against the JDK's own String: every
+    /// overload of a regex member, as the running JDK declares it, must be in
+    /// STRING_REGEX_MEMBERS, so a member left out fails here rather than
+    /// running the target's own regex code on some platform.
+    @Test
+    void everyRegexMemberOfStringIsRewritten() {
+        java.util.Set<String> listed = new java.util.HashSet<String>();
+        for (String[] m : BytecodeCompliance.STRING_REGEX_MEMBERS) {
+            listed.add(m[0] + m[1]);
+        }
+        java.util.Set<String> regexNames = new java.util.HashSet<String>(
+                java.util.Arrays.asList("matches", "split", "splitWithDelimiters", "replaceAll", "replaceFirst"));
+        for (Method m : String.class.getMethods()) {
+            if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) || !regexNames.contains(m.getName())) {
+                continue;
+            }
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 0 || p[0] != String.class) {
+                continue;
+            }
+            String desc = org.objectweb.asm.Type.getMethodDescriptor(m);
+            if ("splitWithDelimiters".equals(m.getName())) {
+                // Java 21+, beyond the Java 17 bytecode Codename One accepts.
+                continue;
+            }
+            assertTrue(listed.contains(m.getName() + desc),
+                    "String." + m.getName() + desc + " takes a regex and is not always rewritten");
+        }
+        assertEquals(5, listed.size());
     }
 
     /// Kotlin data classes hash each property through Java 8's static wrapper

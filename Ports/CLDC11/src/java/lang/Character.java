@@ -26,7 +26,7 @@ package java.lang;
 /// In addition, this class provides several methods for determining the type of a character and converting characters from uppercase to lowercase and vice versa.
 /// Character information is based on the Unicode Standard, version 3.0. However, in order to reduce footprint, by default the character property and case conversion operations in CLDC are available only for the ISO Latin-1 range of characters. Other Unicode character blocks can be supported as necessary.
 /// Since: JDK1.0, CLDC 1.0
-public final class Character{
+public final class Character implements Comparable<Character> {
     /// The maximum radix available for conversion to and from Strings.
     /// See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
     public static final int MAX_RADIX=36;
@@ -1167,4 +1167,325 @@ public final class Character{
         return (char) 0;
     }
 
+    public static final Class<Character> TYPE = char.class;
+
+    public static final byte UNASSIGNED = 0;
+
+    public static final byte UPPERCASE_LETTER = 1;
+
+    public static final byte LOWERCASE_LETTER = 2;
+
+    public static final byte TITLECASE_LETTER = 3;
+
+    public static final byte MODIFIER_LETTER = 4;
+
+    public static final byte OTHER_LETTER = 5;
+
+    public static final byte NON_SPACING_MARK = 6;
+
+    public static final byte ENCLOSING_MARK = 7;
+
+    public static final byte COMBINING_SPACING_MARK = 8;
+
+    public static final byte DECIMAL_DIGIT_NUMBER = 9;
+
+    public static final byte LETTER_NUMBER = 10;
+
+    public static final byte OTHER_NUMBER = 11;
+
+    public static final byte SPACE_SEPARATOR = 12;
+
+    public static final byte LINE_SEPARATOR = 13;
+
+    public static final byte PARAGRAPH_SEPARATOR = 14;
+
+    public static final byte CONTROL = 15;
+
+    public static final byte FORMAT = 16;
+
+    public static final byte PRIVATE_USE = 17;
+
+    public static final byte SURROGATE = 19;
+
+    public static final byte DASH_PUNCTUATION = 20;
+
+    public static final byte START_PUNCTUATION = 21;
+
+    public static final byte END_PUNCTUATION = 22;
+
+    public static final byte CONNECTOR_PUNCTUATION = 23;
+
+    public static final byte OTHER_PUNCTUATION = 24;
+
+    public static final byte MATH_SYMBOL = 25;
+
+    public static final byte CURRENCY_SYMBOL = 26;
+
+    public static final byte MODIFIER_SYMBOL = 27;
+
+    public static final byte OTHER_SYMBOL = 28;
+
+    public static final byte INITIAL_QUOTE_PUNCTUATION = 29;
+
+    public static final byte FINAL_QUOTE_PUNCTUATION = 30;
+
+    public static final byte DIRECTIONALITY_UNDEFINED = -1;
+
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT = 0;
+
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT = 1;
+
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC = 2;
+
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER = 3;
+
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER_SEPARATOR = 4;
+
+    public static final byte DIRECTIONALITY_EUROPEAN_NUMBER_TERMINATOR = 5;
+
+    public static final byte DIRECTIONALITY_ARABIC_NUMBER = 6;
+
+    public static final byte DIRECTIONALITY_COMMON_NUMBER_SEPARATOR = 7;
+
+    public static final byte DIRECTIONALITY_NONSPACING_MARK = 8;
+
+    public static final byte DIRECTIONALITY_BOUNDARY_NEUTRAL = 9;
+
+    public static final byte DIRECTIONALITY_PARAGRAPH_SEPARATOR = 10;
+
+    public static final byte DIRECTIONALITY_SEGMENT_SEPARATOR = 11;
+
+    public static final byte DIRECTIONALITY_WHITESPACE = 12;
+
+    public static final byte DIRECTIONALITY_OTHER_NEUTRALS = 13;
+
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT_EMBEDDING = 14;
+
+    public static final byte DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE = 15;
+
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING = 16;
+
+    public static final byte DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE = 17;
+
+    public static final byte DIRECTIONALITY_POP_DIRECTIONAL_FORMAT = 18;
+
+    public static int digit(int codePoint, int radix) {
+        return 0;
+    }
+
+    public static boolean isLetterOrDigit(char ch) {
+        return false;
+    }
+
+    public static boolean isLetterOrDigit(int codePoint) {
+        return false;
+    }
+
+    public static boolean isLetter(char ch) {
+        return false;
+    }
+
+    public static boolean isLetter(int codePoint) {
+        return false;
+    }
+
+    public static boolean isIdentifierIgnorable(char ch) {
+        return false;
+    }
+
+    public static boolean isIdentifierIgnorable(int codePoint) {
+        return false;
+    }
+
+    public static boolean isDigit(int codePoint) {
+        return false;
+    }
+
+    public static boolean isLowerCase(int codePoint) {
+        return false;
+    }
+
+    public static boolean isUpperCase(int codePoint) {
+        return false;
+    }
+
+    public static int toLowerCase(int codePoint) {
+        return 0;
+    }
+
+    public static int toUpperCase(int codePoint) {
+        return 0;
+    }
+
+    public static char highSurrogate(int codePoint) {
+        return 0;
+    }
+
+    public static char lowSurrogate(int codePoint) {
+        return 0;
+    }
+
+    /// Whether the code point is a Unicode space separator, line separator or
+    /// paragraph separator.
+    public static boolean isSpaceChar(int codePoint) {
+        return false;
+    }
+
+    public static byte getDirectionality(char ch) {
+        return 0;
+    }
+
+    public static int getType(char c) {
+        return 0;
+    }
+
+    public static boolean isBmpCodePoint(int codePoint) {
+        return false;
+    }
+
+    public static boolean isSurrogate(char ch) {
+        return false;
+    }
+
+    public static int getType(int codePoint) {
+        return 0;
+    }
+
+    public int compareTo(Character another) {
+        return 0;
+    }
+
+    /// The size of a char in bytes.
+    public static final int BYTES = 2;
+
+    /// A one-char string of `c`.
+    public static String toString(char c) {
+        return null;
+    }
+
+    /// The string of the code point: one char, or a surrogate pair.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if it is not a valid code point
+    public static String toString(int codePoint) {
+        return null;
+    }
+
+    /// The char itself, as the JDK hashes it.
+    public static int hashCode(char value) {
+        return 0;
+    }
+
+    /// `x - y`.
+    public static int compare(char x, char y) {
+        return 0;
+    }
+
+    /// Whether the char is an ISO control character: U+0000 to U+001F or
+    /// U+007F to U+009F.
+    public static boolean isISOControl(char ch) {
+        return false;
+    }
+
+    /// Whether the code point is an ISO control character.
+    public static boolean isISOControl(int codePoint) {
+        return false;
+    }
+
+    /// The char of `digit` in `radix`, a lower case letter from 10 on, or
+    /// U+0000 when either is out of range.
+    public static char forDigit(int digit, int radix) {
+        return 0;
+    }
+
+    /// The value of a digit, or of a Latin letter read as a digit of base
+    /// 36, or -1.
+    public static int getNumericValue(char ch) {
+        return 0;
+    }
+
+    /// The value of a digit, or of a Latin letter read as a digit of base
+    /// 36, or -1.
+    public static int getNumericValue(int codePoint) {
+        return 0;
+    }
+
+    /// Whether the code point is alphabetic. This runtime answers as for
+    /// `isLetter`.
+    public static boolean isAlphabetic(int codePoint) {
+        return false;
+    }
+
+    /// Whether the char has a category in this runtime's classification.
+    public static boolean isDefined(char ch) {
+        return false;
+    }
+
+    /// Whether the code point has a category in this runtime's
+    /// classification. Above Latin-1 that classification is partial, so an
+    /// assigned symbol it does not know answers false.
+    public static boolean isDefined(int codePoint) {
+        return false;
+    }
+
+    /// Whether the code point is a CJK ideograph.
+    public static boolean isIdeographic(int codePoint) {
+        return false;
+    }
+
+    /// Whether the char is a title case letter.
+    public static boolean isTitleCase(char ch) {
+        return false;
+    }
+
+    /// Whether the code point is a title case letter.
+    public static boolean isTitleCase(int codePoint) {
+        return false;
+    }
+
+    /// Whether the char is mirrored in right-to-left text: the ASCII
+    /// brackets and the guillemets.
+    public static boolean isMirrored(char ch) {
+        return false;
+    }
+
+    /// Whether the code point is mirrored in right-to-left text. This
+    /// runtime knows the ASCII brackets and the guillemets.
+    public static boolean isMirrored(int codePoint) {
+        return false;
+    }
+
+    /// As `isJavaIdentifierStart(char)`.
+    @Deprecated
+    public static boolean isJavaLetter(char ch) {
+        return false;
+    }
+
+    /// As `isJavaIdentifierPart(char)`.
+    @Deprecated
+    public static boolean isJavaLetterOrDigit(char ch) {
+        return false;
+    }
+
+    /// Whether the char may start a Unicode identifier.
+    public static boolean isUnicodeIdentifierStart(char ch) {
+        return false;
+    }
+
+    /// Whether the code point may start a Unicode identifier: a letter.
+    public static boolean isUnicodeIdentifierStart(int codePoint) {
+        return false;
+    }
+
+    /// Whether the char may continue a Unicode identifier.
+    public static boolean isUnicodeIdentifierPart(char ch) {
+        return false;
+    }
+
+    /// Whether the code point may continue a Unicode identifier: a letter, a
+    /// digit, connecting punctuation or an ignorable character.
+    public static boolean isUnicodeIdentifierPart(int codePoint) {
+        return false;
+    }
 }

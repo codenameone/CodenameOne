@@ -236,7 +236,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len){
-        this(bytesToChars(bytes, off, len, "UTF-8"));
+        this(bytesToChars(checkRange(bytes, off, len), off, len, "UTF-8"));
     }
 
     /**
@@ -246,11 +246,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, off, len, enc));
+        this(bytesToChars(checkRange(bytes, off, len), off, len, knownEncoding(enc)));
     }
     
-    public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
-        this(bytes, 0, bytes.length, charset.name());
+    /// Decodes `bytes` with `charset`. Unlike the constructor taking a
+    /// charset name, this throws no checked exception, as in the JDK.
+    public String(byte[] bytes, java.nio.charset.Charset charset) {
+        this(bytesToChars(bytes, 0, bytes.length, charset.name()));
     }
 
     /**
@@ -260,7 +262,16 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, 0, bytes.length, enc));
+        this(bytesToChars(bytes, 0, bytes.length, knownEncoding(enc)));
+    }
+
+    // The native reads len bytes from b + off with no bounds check of its own.
+    private static byte[] checkRange(byte[] b, int off, int len) {
+        if (off < 0 || len < 0 || off > b.length - len) {
+            throw new StringIndexOutOfBoundsException("offset " + off + ", length " + len
+                    + ", array length " + b.length);
+        }
+        return b;
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 
@@ -667,6 +678,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
+        enc = knownEncoding(enc);
         if(isLatin1()) {
             byte[] compact = compactBytes(enc);
             if(compact != null) return compact;
@@ -683,8 +695,46 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return charsToBytes(toCharArray(), enc.toCharNoCopy()); 
     }
     
-    public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
-        return getBytes(charset.name());
+    /// The name the encoding natives know `enc` by: the canonical name of a
+    /// charset, so an alias or another case reaches them as the name they
+    /// compare with. `null` stays `null`, which they read as UTF-8.
+    ///
+    /// UTF-16 and ISO-8859-2 have no `Charset` here but the natives encode them
+    /// on Apple platforms, so they are names this runtime knows.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedEncodingException`: for a name this runtime has no
+    ///   encoding for, as the JDK throws. The natives used to encode such a
+    ///   name as UTF-8 without a word.
+    private static String knownEncoding(String enc) throws java.io.UnsupportedEncodingException {
+        if (enc == null || "UTF-8".equals(enc)) {
+            return enc;
+        }
+        if (enc.equalsIgnoreCase("UTF-16") || enc.equalsIgnoreCase("UTF16")) {
+            return "UTF-16";
+        }
+        if (enc.equalsIgnoreCase("ISO-8859-2") || enc.equalsIgnoreCase("ISO8859-2")
+                || enc.equalsIgnoreCase("ISO8859_2") || enc.equalsIgnoreCase("LATIN2")) {
+            return "ISO-8859-2";
+        }
+        try {
+            return Charset.forName(enc).name();
+        } catch (IllegalArgumentException e) {
+            // UnsupportedCharsetException and IllegalCharsetNameException
+            throw new java.io.UnsupportedEncodingException(enc);
+        }
+    }
+
+    /// The string encoded with `charset`. Unlike `getBytes(String)`, this
+    /// throws no checked exception, as in the JDK.
+    public byte[] getBytes(Charset charset) {
+        try {
+            return getBytes(charset.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+            // Every Charset this runtime hands out is one it can encode.
+            throw new IllegalStateException(e.getMessage());
+        }
     }
 
     /**
@@ -1328,5 +1378,423 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     
     public boolean isEmpty() {
         return length() == 0;
+    }
+
+    // ---------------------------------------------------------------------
+    // The members of the JDK's String the class did not have. Plain Java over
+    // the members above: none of them is a native, so the JavaScript port and
+    // every ParparVM target run the same code. The regular expression members
+    // (matches, split, replaceAll, replaceFirst) are deliberately absent; the
+    // build rewrites them to com.codename1.util.regex.StringRegex.
+    // ---------------------------------------------------------------------
+
+    /// A string of the code points `codePoints[offset]` to
+    /// `codePoints[offset + count - 1]`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if one of them is not a valid code point
+    /// - `IndexOutOfBoundsException`: if the range is outside the array
+    public String(int[] codePoints, int offset, int count) {
+        this(codePointsToChars(codePoints, offset, count));
+    }
+
+    /// Decodes `length` bytes of `bytes` from `offset` with `charset`.
+    public String(byte[] bytes, int offset, int length, Charset charset) {
+        this(bytesToChars(checkRange(bytes, offset, length), offset, length, charset.name()));
+    }
+
+    private static char[] codePointsToChars(int[] codePoints, int offset, int count) {
+        if (offset < 0 || count < 0 || offset > codePoints.length - count) {
+            throw new StringIndexOutOfBoundsException("offset " + offset + ", count " + count
+                    + ", length " + codePoints.length);
+        }
+        int units = 0;
+        for (int i = offset; i < offset + count; i++) {
+            int cp = codePoints[i];
+            if (!Character.isValidCodePoint(cp)) {
+                throw new IllegalArgumentException(Integer.toString(cp));
+            }
+            units += Character.charCount(cp);
+        }
+        char[] out = new char[units];
+        int at = 0;
+        for (int i = offset; i < offset + count; i++) {
+            at += Character.toChars(codePoints[i], out, at);
+        }
+        return out;
+    }
+
+    /// The code point at `index`: a surrogate pair starting there is one code
+    /// point, an unpaired surrogate is itself.
+    public int codePointAt(int index) {
+        if (index < 0 || index >= count) {
+            throw new StringIndexOutOfBoundsException(index);
+        }
+        return Character.codePointAt(this, index);
+    }
+
+    /// The code point that ends just before `index`.
+    public int codePointBefore(int index) {
+        if (index < 1 || index > count) {
+            throw new StringIndexOutOfBoundsException(index);
+        }
+        return Character.codePointBefore(this, index);
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public int codePointCount(int beginIndex, int endIndex) {
+        if (beginIndex < 0 || endIndex > count || beginIndex > endIndex) {
+            throw new IndexOutOfBoundsException();
+        }
+        return Character.codePointCount(this, beginIndex, endIndex);
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public int offsetByCodePoints(int index, int codePointOffset) {
+        if (index < 0 || index > count) {
+            throw new IndexOutOfBoundsException();
+        }
+        return Character.offsetByCodePoints(this, index, codePointOffset);
+    }
+
+    /// The first index of `ch` in `[beginIndex, endIndex)`, or -1.
+    public int indexOf(int ch, int beginIndex, int endIndex) {
+        checkBoundsBeginEnd(beginIndex, endIndex);
+        int found = indexOf(ch, beginIndex);
+        return found >= 0 && found < endIndex ? found : -1;
+    }
+
+    /// The first index of `str` that lies wholly in `[beginIndex, endIndex)`,
+    /// or -1.
+    public int indexOf(String str, int beginIndex, int endIndex) {
+        if (str == null) {
+            throw new NullPointerException();
+        }
+        checkBoundsBeginEnd(beginIndex, endIndex);
+        int found = indexOf(str, beginIndex);
+        return found >= 0 && found + str.length() <= endIndex ? found : -1;
+    }
+
+    private void checkBoundsBeginEnd(int beginIndex, int endIndex) {
+        if (beginIndex < 0 || beginIndex > endIndex || endIndex > count) {
+            throw new StringIndexOutOfBoundsException("begin " + beginIndex + ", end " + endIndex
+                    + ", length " + count);
+        }
+    }
+
+    /// The elements, each as `String.valueOf` writes it, with `delimiter`
+    /// between every two.
+    public static String join(CharSequence delimiter, CharSequence... elements) {
+        if (delimiter == null || elements == null) {
+            throw new NullPointerException();
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < elements.length; i++) {
+            if (i > 0) {
+                out.append(delimiter);
+            }
+            out.append(String.valueOf(elements[i]));
+        }
+        return out.toString();
+    }
+
+    /// The elements, each as `String.valueOf` writes it, with `delimiter`
+    /// between every two.
+    public static String join(CharSequence delimiter, Iterable<? extends CharSequence> elements) {
+        if (delimiter == null || elements == null) {
+            throw new NullPointerException();
+        }
+        StringBuilder out = new StringBuilder();
+        boolean first = true;
+        for (CharSequence element : elements) {
+            if (!first) {
+                out.append(delimiter);
+            }
+            first = false;
+            out.append(String.valueOf(element));
+        }
+        return out.toString();
+    }
+
+    /// As `format(String, Object...)`. The locale is not consulted: this
+    /// runtime formats one way.
+    public static String format(java.util.Locale l, String format, Object... args) {
+        return StringFormatter.format(format, args);
+    }
+
+    /// As `toLowerCase()`. The locale is not consulted.
+    public java.lang.String toLowerCase(java.util.Locale locale) {
+        if (locale == null) {
+            throw new NullPointerException();
+        }
+        return toLowerCase();
+    }
+
+    /// `String.format(this, args)`.
+    public String formatted(Object... args) {
+        return StringFormatter.format(this, args);
+    }
+
+    /// Whether the string is empty or holds nothing but white space.
+    public boolean isBlank() {
+        return indexOfNonWhitespace() == count;
+    }
+
+    /// The string without its leading and trailing white space, as
+    /// `Character.isWhitespace` defines it. Unlike `trim`, which drops every
+    /// character up to the space, this keeps control characters that are not
+    /// white space and drops white space beyond ASCII.
+    public String strip() {
+        int start = indexOfNonWhitespace();
+        if (start == count) {
+            return "";
+        }
+        int end = lastIndexOfNonWhitespace() + 1;
+        return start == 0 && end == count ? this : substring(start, end);
+    }
+
+    /// The string without its leading white space.
+    public String stripLeading() {
+        int start = indexOfNonWhitespace();
+        return start == 0 ? this : substring(start);
+    }
+
+    /// The string without its trailing white space.
+    public String stripTrailing() {
+        int end = lastIndexOfNonWhitespace() + 1;
+        return end == count ? this : substring(0, end);
+    }
+
+    private int indexOfNonWhitespace() {
+        int i = 0;
+        while (i < count && Character.isWhitespace(charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private int lastIndexOfNonWhitespace() {
+        int i = count - 1;
+        while (i >= 0 && Character.isWhitespace(charAt(i))) {
+            i--;
+        }
+        return i;
+    }
+
+    /// The string `count` times over.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `count` is negative
+    /// - `OutOfMemoryError`: if the result would be longer than a String can be
+    public String repeat(int count) {
+        if (count < 0) {
+            throw new IllegalArgumentException("count is negative: " + count);
+        }
+        if (count == 1) {
+            return this;
+        }
+        int length = length();
+        if (count == 0 || length == 0) {
+            return "";
+        }
+        if ((long) length * count > Integer.MAX_VALUE) {
+            throw new OutOfMemoryError("Required length exceeds implementation limit");
+        }
+        StringBuilder out = new StringBuilder(length * count);
+        for (int i = 0; i < count; i++) {
+            out.append(this);
+        }
+        return out.toString();
+    }
+
+    /// The lines of the string, without their terminators: a line feed, a
+    /// carriage return, or the two together. A terminator at the very end
+    /// starts no empty last line.
+    public java.util.stream.Stream<String> lines() {
+        return splitLines().stream();
+    }
+
+    private ArrayList<String> splitLines() {
+        ArrayList<String> out = new ArrayList<String>();
+        int n = count;
+        int start = 0;
+        while (start < n) {
+            int end = start;
+            char c = 0;
+            while (end < n) {
+                c = charAt(end);
+                if (c == '\n' || c == '\r') {
+                    break;
+                }
+                end++;
+            }
+            out.add(substring(start, end));
+            if (end < n && c == '\r' && end + 1 < n && charAt(end + 1) == '\n') {
+                end++;
+            }
+            start = end + 1;
+        }
+        return out;
+    }
+
+    /// Every line indented by `n` spaces, or, for a negative `n`, with up to
+    /// `-n` leading white space characters removed. Each line, the last
+    /// included, ends with a line feed in the result.
+    public String indent(int n) {
+        if (count == 0) {
+            return "";
+        }
+        ArrayList<String> lines = splitLines();
+        StringBuilder out = new StringBuilder(count + 16);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (n > 0) {
+                for (int s = 0; s < n; s++) {
+                    out.append(' ');
+                }
+                out.append(line);
+            } else if (n < 0) {
+                // -n overflows for Integer.MIN_VALUE; negate as a long.
+                int drop = (int) Math.min(-(long) n, (long) line.indexOfNonWhitespace());
+                out.append(line, drop, line.length());
+            } else {
+                out.append(line);
+            }
+            out.append('\n');
+        }
+        return out.toString();
+    }
+
+    /// The string with the indentation common to its lines removed, trailing
+    /// white space removed from every line, and its line terminators
+    /// normalized to a line feed, as for a text block.
+    public String stripIndent() {
+        if (count == 0) {
+            return "";
+        }
+        char last = charAt(count - 1);
+        boolean optOut = last == '\n' || last == '\r';
+        ArrayList<String> lines = splitLines();
+        if (optOut) {
+            lines.add("");
+        }
+        int outdent = Integer.MAX_VALUE;
+        if (!optOut) {
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                int leading = line.indexOfNonWhitespace();
+                if (leading != line.length()) {
+                    outdent = Math.min(outdent, leading);
+                }
+            }
+            String lastLine = lines.get(lines.size() - 1);
+            if (lastLine.isBlank()) {
+                outdent = Math.min(outdent, lastLine.length());
+            }
+        } else {
+            outdent = 0;
+        }
+        StringBuilder out = new StringBuilder(count);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (i > 0) {
+                out.append('\n');
+            }
+            int first = line.indexOfNonWhitespace();
+            int lastNonWs = line.lastIndexOfNonWhitespace();
+            if (first > lastNonWs) {
+                continue;
+            }
+            out.append(line, Math.min(outdent, first), lastNonWs + 1);
+        }
+        // With optOut, the empty line added above produced the final terminator.
+        return out.toString();
+    }
+
+    /// The string with its escape sequences translated as the Java language
+    /// translates them in a literal: `\b`, `\t`, `\n`, `\f`, `\r`, `\s`, the
+    /// quotes, the backslash, octal escapes, and a backslash before a line
+    /// terminator, which joins the lines.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for an escape the language does not have
+    public String translateEscapes() {
+        if (indexOf('\\') < 0) {
+            return this;
+        }
+        StringBuilder out = new StringBuilder(count);
+        int i = 0;
+        while (i < count) {
+            char c = charAt(i++);
+            if (c != '\\') {
+                out.append(c);
+                continue;
+            }
+            c = i < count ? charAt(i++) : '\0';
+            switch (c) {
+                case 'b':
+                    out.append('\b');
+                    break;
+                case 'f':
+                    out.append('\f');
+                    break;
+                case 'n':
+                    out.append('\n');
+                    break;
+                case 'r':
+                    out.append('\r');
+                    break;
+                case 's':
+                    out.append(' ');
+                    break;
+                case 't':
+                    out.append('\t');
+                    break;
+                case '\'':
+                case '"':
+                case '\\':
+                    out.append(c);
+                    break;
+                case '\n':
+                    break;
+                case '\r':
+                    if (i < count && charAt(i) == '\n') {
+                        i++;
+                    }
+                    break;
+                default:
+                    if (c >= '0' && c <= '7') {
+                        int limit = c <= '3' ? 2 : 1;
+                        int code = c - '0';
+                        while (limit > 0 && i < count && charAt(i) >= '0' && charAt(i) <= '7') {
+                            code = code * 8 + (charAt(i++) - '0');
+                            limit--;
+                        }
+                        out.append((char) code);
+                    } else {
+                        throw new IllegalArgumentException("Invalid escape sequence: \\" + c + " \\\\u"
+                                + hex4(c));
+                    }
+            }
+        }
+        return out.toString();
+    }
+
+    private static String hex4(char c) {
+        String digits = "0123456789ABCDEF";
+        char[] out = new char[4];
+        for (int i = 3; i >= 0; i--) {
+            out[i] = digits.charAt(c & 0xf);
+            c >>>= 4;
+        }
+        return new String(out);
+    }
+
+    /// `f.apply(this)`.
+    public <R> R transform(java.util.function.Function<? super String, ? extends R> f) {
+        return f.apply(this);
     }
 }

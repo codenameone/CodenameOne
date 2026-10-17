@@ -1,0 +1,74 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/// LangMembersApp, which used to be translated and built by a test of its own,
+/// run as one check of the bulk program. Its `fixtureMain` (the translator
+/// allows one `main` per program) prints what its `main` always
+/// printed (case lines and a RESULT line); a difference names the line.
+public final class LangMembersChecks {
+    private LangMembersChecks() {
+    }
+
+    /// Runs the group.
+    public static void run() {
+        // scalb by a huge negative factor underflows to a signed zero;
+        // cbrt of a subnormal keeps the JDK's one-ulp accuracy.
+        Bulk.check("Lang.scalbUnderflowsAndCbrtOfSubnormals", () -> {
+            Bulk.p("scalb.max.minInt", Double.doubleToRawLongBits(Math.scalb(Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.-max.minInt", Double.doubleToRawLongBits(Math.scalb(-Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalbf.max.minInt", Float.floatToRawIntBits(Math.scalb(Float.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.min.2098", Double.doubleToRawLongBits(Math.scalb(Double.MIN_VALUE, 2098)));
+            double[] tiny = {Double.MIN_VALUE, -Double.MIN_VALUE, 3 * Double.MIN_VALUE, 0x1.0p-1030, Double.MIN_NORMAL / 3};
+            for (double t : tiny) {
+                long got = Double.doubleToRawLongBits(Math.cbrt(t));
+                long want = Double.doubleToRawLongBits(StrictMath.cbrt(t));
+                Bulk.p("cbrt " + t, Math.abs(got - want) <= 1);
+            }
+        });
+        Bulk.check("Lang.tanhSmallInputsAreAccurate", () -> {
+            double[] xs = {-0.25444256546893085, 0.9900105052487167, -0.5414934855402953, 0.5, 1e-3, 1e-9, 0.999999};
+            for (double x : xs) {
+                Bulk.p("tanh " + x, Math.abs(Math.tanh(x) - StrictMath.tanh(x)) <= 2 * Math.ulp(StrictMath.tanh(x)));
+            }
+        });
+        Bulk.check("Lang.unassignedCjkExtensionGapsAreNotLetters", () -> {
+            int[] cps = {0x2a6f0, 0x2b73f, 0x2b81e, 0x2cea2, 0x2ee5e, 0x2f7ff, 0x2fa1e, 0x2ffff, 0x2f800, 0x2b740};
+            for (int cp : cps) {
+                Bulk.p(Integer.toHexString(cp), Character.isLetter(cp));
+            }
+        });
+        Bulk.check("Lang.aStringDecodedOutOfRangeThrows", () -> {
+            int[][] ranges = {{1, 1}, {-1, 1}, {0, -1}, {2, 0}};
+            for (int[] r : ranges) {
+                String got;
+                try {
+                    got = new String(new byte[1], r[0], r[1], java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IndexOutOfBoundsException e) {
+                    got = "IOOBE";
+                }
+                Bulk.p(r[0] + "," + r[1], got);
+            }
+        });
+        Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
+    }
+}

@@ -127,9 +127,17 @@ public class Random{
         return nextInt() % 2 == 0;
     }
     
+    /// Fills `bytes` with random bytes. Four bytes come from each `nextInt()`,
+    /// low byte first, which is the algorithm the JDK documents: a seeded
+    /// generator must hand out the same bytes as on the JVM, and one `next(8)`
+    /// per byte does not.
     public void nextBytes(byte[] bytes) {
-        for (int i = 0; i < bytes.length; ++i) {
-            bytes[i] = (byte) next(8);
+        int len = bytes.length;
+        for (int i = 0; i < len;) {
+            int rnd = nextInt();
+            for (int n = Math.min(len - i, 4); n-- > 0; rnd >>= 8) {
+                bytes[i++] = (byte) rnd;
+            }
         }
     }
 

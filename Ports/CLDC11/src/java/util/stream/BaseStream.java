@@ -24,14 +24,25 @@ package java.util.stream;
 
 import java.util.Iterator;
 
+/// What the
+/// object stream and the three primitive ones have in common.
+///
+/// Streams here are sequential. `parallel()` exists because code calls it,
+/// and answers the stream it was called on.
 public interface BaseStream<T, S extends BaseStream<T, S>> extends AutoCloseable {
+
     Iterator<T> iterator();
+
+    boolean isParallel();
 
     S sequential();
 
     S parallel();
 
+    S unordered();
+
     S onClose(Runnable closeHandler);
 
+    @Override
     void close();
 }

@@ -16,3 +16,13 @@ paths-ignore:
   # casts -- so every program there must compile and behave exactly as javac's
   # output does; "fixing" what CodeQL flags would remove the case under test.
   - 'vm/JavaCompiler/tests/**'
+  # The device class library's own java.security.SecureRandom. CodeQL runs
+  # without a build here (build-mode: none), so it resolves `SecureRandom`
+  # everywhere -- the JDK-compiled backend included -- to this source file
+  # rather than to the JDK's class, sees `extends java.util.Random`, and
+  # reports every key the backend draws from the JDK's SecureRandom as
+  # "insecure randomness". The class itself delegates every byte to the
+  # platform's secure generator (JdkHost.randomBytes) and is not what the
+  # backend runs.
+  - 'vm/JavaAPI/src/java/security/SecureRandom.java'
+  - 'Ports/CLDC11/src/java/security/SecureRandom.java'

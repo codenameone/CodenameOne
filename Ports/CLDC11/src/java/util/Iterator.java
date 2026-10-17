@@ -17,6 +17,8 @@
 
 package java.util;
 
+import java.util.function.Consumer;
+
 /// An `Iterator` is used to sequence over a collection of objects.
 /// Conceptually, an iterator is always positioned between two elements of a
 /// collection. A fresh iterator is always positioned in front of the first
@@ -56,17 +58,26 @@ public interface Iterator<E> {
     /// - #hasNext
     public E next();
 
-    /// Removes the last object returned by `next` from the collection.
-    /// This method can only be called once after `next` was called.
+    /// Removes the last element `next` answered from the collection being
+    /// iterated, which this iterator does not support unless it says otherwise.
     ///
     /// #### Throws
     ///
-    /// - `UnsupportedOperationException`: @throws UnsupportedOperationException
-    /// if removing is not supported by the collection being
-    /// iterated.
+    /// - `UnsupportedOperationException`: when removing is not supported
     ///
-    /// - `IllegalStateException`: @throws IllegalStateException
-    /// if `next` has not been called, or `remove` has
-    /// already been called after the last call to `next`.
-    public void remove();
+    /// - `IllegalStateException`: when `next` has not been called, or `remove`
+    ///   has already been called after the last call to `next`
+    default void remove() {
+        throw new UnsupportedOperationException("remove");
+    }
+
+    /// Hands each remaining element to `action`, in order.
+    default void forEachRemaining(Consumer<? super E> action) {
+        if (action == null) {
+            throw new NullPointerException();
+        }
+        while (hasNext()) {
+            action.accept(next());
+        }
+    }
 }

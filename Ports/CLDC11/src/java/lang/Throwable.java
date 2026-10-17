@@ -92,6 +92,10 @@ public class Throwable{
         return; //TODO codavaj!!
     }
 
+    /// Prints this throwable and its backtrace to the given writer.
+    public void printStackTrace(java.io.PrintWriter s){
+    }
+
     /// Returns a short description of this Throwable object. If this Throwable object was
     /// with an error message string, then the result is the concatenation of three strings: The name of the actual class of this object ": " (a colon and a space) The result of the
     /// method for this object If this Throwable object was

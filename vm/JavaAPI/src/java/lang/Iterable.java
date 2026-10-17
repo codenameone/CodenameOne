@@ -47,4 +47,9 @@ public interface Iterable<T> {
             action.accept(t);
         }
     }
+
+    /// The elements, as a [java.util.Spliterator] whose size is not known.
+    default java.util.Spliterator<T> spliterator() {
+        return java.util.Spliterators.spliteratorUnknownSize(iterator(), 0);
+    }
 }

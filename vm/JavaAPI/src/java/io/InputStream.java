@@ -27,7 +27,7 @@ package java.io;
  * Applications that need to define a subclass of InputStream must always provide a method that returns the next byte of input.
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayInputStream, DataInputStream, read(), OutputStream
  */
-public abstract class InputStream implements AutoCloseable {
+public abstract class InputStream implements Closeable {
     public InputStream(){
     }
 
@@ -127,4 +127,85 @@ public abstract class InputStream implements AutoCloseable {
         return read(new byte[(int)n]); 
     }
 
+    /// Reads everything left in this stream, until its end. The stream is
+    /// not closed.
+    ///
+    /// #### Returns
+    ///
+    /// the bytes read, an empty array when the stream was at its end
+    public byte[] readAllBytes() throws IOException {
+        return readNBytes(Integer.MAX_VALUE);
+    }
+
+    /// Reads up to `len` bytes, fewer only when the stream ends first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `len`: the most bytes to read
+    ///
+    /// #### Returns
+    ///
+    /// the bytes read
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `len` is negative
+    public byte[] readNBytes(int len) throws IOException {
+        if (len < 0) {
+            throw new IllegalArgumentException("len < 0");
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int left = len;
+        while (left > 0) {
+            int n = read(chunk, 0, left < chunk.length ? left : chunk.length);
+            if (n < 0) {
+                break;
+            }
+            out.write(chunk, 0, n);
+            left -= n;
+        }
+        return out.toByteArray();
+    }
+
+    /// Reads into `b` from `off` until `len` bytes arrived or the stream
+    /// ended, where a single `read` may stop short.
+    ///
+    /// #### Returns
+    ///
+    /// how many bytes were read, 0 at the end of the stream
+    public int readNBytes(byte[] b, int off, int len) throws IOException {
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        }
+        int total = 0;
+        while (total < len) {
+            int n = read(b, off + total, len - total);
+            if (n < 0) {
+                break;
+            }
+            total += n;
+        }
+        return total;
+    }
+
+    /// Copies everything left in this stream to `out`, closing neither.
+    ///
+    /// #### Returns
+    ///
+    /// how many bytes were copied
+    public long transferTo(OutputStream out) throws IOException {
+        if (out == null) {
+            throw new NullPointerException("out");
+        }
+        byte[] chunk = new byte[8192];
+        long total = 0;
+        int n = read(chunk, 0, chunk.length);
+        while (n >= 0) {
+            out.write(chunk, 0, n);
+            total += n;
+            n = read(chunk, 0, chunk.length);
+        }
+        return total;
+    }
 }

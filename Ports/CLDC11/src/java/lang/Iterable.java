@@ -39,4 +39,9 @@ public interface Iterable<T> {
     /// from the platform's JDK at runtime.
     default void forEach(Consumer<? super T> action) {
     }
+
+    /// The elements, as a [java.util.Spliterator] whose size is not known.
+    default java.util.Spliterator<T> spliterator() {
+        return java.util.Spliterators.spliteratorUnknownSize(iterator(), 0);
+    }
 }

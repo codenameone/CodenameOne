@@ -31,6 +31,9 @@ package java.util;
 ///
 /// This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
 public final class Objects {
+    private Objects() {
+    }
+
     /// Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
     ///
     /// #### Parameters
@@ -127,6 +130,75 @@ public final class Objects {
 
     public static int hash(Object... values) {
         return Arrays.hashCode(values);
+    }
+
+    /// Whether `obj` is null.
+    public static boolean isNull(Object obj) {
+        return false;
+    }
+
+    /// `obj`, or a NullPointerException whose message `messageSupplier`
+    /// makes, only when it is needed.
+    public static <T> T requireNonNull(T obj, java.util.function.Supplier<String> messageSupplier) {
+        return null;
+    }
+
+    /// `obj`, or `defaultObj` when `obj` is null.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if both are null
+    public static <T> T requireNonNullElse(T obj, T defaultObj) {
+        return null;
+    }
+
+    /// `obj`, or what `supplier` gives when `obj` is null.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `obj` is null and the supplier is null or gives null
+    public static <T> T requireNonNullElseGet(T obj, java.util.function.Supplier<? extends T> supplier) {
+        return null;
+    }
+
+    /// `index`, if it lies in `[0, length)`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: otherwise
+    public static int checkIndex(int index, int length) {
+        return 0;
+    }
+
+    /// `index`, if it lies in `[0, length)`.
+    public static long checkIndex(long index, long length) {
+        return 0;
+    }
+
+    /// `fromIndex`, if `[fromIndex, toIndex)` lies in `[0, length)`.
+    public static int checkFromToIndex(int fromIndex, int toIndex, int length) {
+        return 0;
+    }
+
+    /// `fromIndex`, if `[fromIndex, toIndex)` lies in `[0, length)`.
+    public static long checkFromToIndex(long fromIndex, long toIndex, long length) {
+        return 0;
+    }
+
+    /// `fromIndex`, if `[fromIndex, fromIndex + size)` lies in `[0, length)`.
+    public static int checkFromIndexSize(int fromIndex, int size, int length) {
+        return 0;
+    }
+
+    /// `fromIndex`, if `[fromIndex, fromIndex + size)` lies in `[0, length)`.
+    public static long checkFromIndexSize(long fromIndex, long size, long length) {
+        return 0;
+    }
+
+    /// What `Object.toString` would answer for `o`, even when its class
+    /// overrides it.
+    public static String toIdentityString(Object o) {
+        return null;
     }
 }
 

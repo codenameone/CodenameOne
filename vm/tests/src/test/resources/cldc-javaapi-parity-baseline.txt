@@ -1,0 +1,6 @@
+# CLDC11 API members vm/JavaAPI does not provide. A RATCHET, not an
+# allow-list: CldcJavaApiParityTest fails on a new entry and on a stale
+# one. Close a gap by adding the member to JavaAPI, then delete its line.
+MISSING java/lang/ref/Reference#<init>()V
+MISSING java/util/Calendar#DAY_OF_WEEK_IN_MONTH:I
+MISSING java/util/Calendar#WEEK_OF_MONTH:I

@@ -1,0 +1,25 @@
+{
+ "pr": 6044,
+ "rebaseline": {
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.277,
+      "time": 1.107,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 0.72,
+     "reason": "Hello's RAM dropped on both Windows legs (arm64 0.72x vs 1.28x, x64 0.47x vs 1.00x in the earlier run) after the master merge; the measured value is recorded rather than tolerated",
+     "runs": 1,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  }
+ }
+}

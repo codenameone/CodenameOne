@@ -68,14 +68,10 @@ public final class String implements CharSequence, Comparable<String> {
     }
     
     /// Construct a new String by converting the specified array of bytes using the specified character encoding. The length of the new String is a function of the encoding, and hence may not be equal to the length of the byte array.
-    /// bytes - The bytes to be converted into charactersenc - The name of a supported character encoding
-    /// - If the named encoding is not supported
-    ///
-    /// #### Since
-    ///
-    /// 8.0
-    public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
-        this(bytes, 0, bytes.length, charset.name());
+    /// Unlike the constructor taking a charset name, this throws no checked
+    /// exception.
+    public String(byte[] bytes, java.nio.charset.Charset charset) {
+        this(bytes, 0, bytes.length, charset);
     }
 
     /// Construct a new String by converting the specified array of bytes using the specified character encoding. The length of the new String is a function of the encoding, and hence may not be equal to the length of the byte array.
@@ -186,8 +182,9 @@ public final class String implements CharSequence, Comparable<String> {
     }
     
     /// Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
-    public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
-        return getBytes(charset.name());
+    /// Unlike `getBytes(String)`, this throws no checked exception.
+    public byte[] getBytes(Charset charset) {
+        return null;
     }
 
     /// Copies characters from this string into the destination character array.
@@ -425,7 +422,8 @@ public final class String implements CharSequence, Comparable<String> {
         return null; //TODO codavaj!!
     }
 
-    java.lang.String valueOf(char[] data){
+    /// Returns the string representation of the char array argument.
+    public static java.lang.String valueOf(char[] data){
         return null; //TODO codavaj!!
     }
 
@@ -517,6 +515,120 @@ public final class String implements CharSequence, Comparable<String> {
     /// - `NullPointerException`: if `string` is `null`.
     public boolean regionMatches(int thisStart, String string, int start, int length) {
         return false;
+    }
+
+    /// A string of the code points `codePoints[offset]` to
+    /// `codePoints[offset + count - 1]`.
+    public String(int[] codePoints, int offset, int count) {
+    }
+
+    /// Decodes `length` bytes of `bytes` from `offset` with `charset`.
+    public String(byte[] bytes, int offset, int length, java.nio.charset.Charset charset) {
+    }
+
+    /// The code point at `index`.
+    public int codePointAt(int index) {
+        return 0;
+    }
+
+    /// The code point that ends just before `index`.
+    public int codePointBefore(int index) {
+        return 0;
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public int codePointCount(int beginIndex, int endIndex) {
+        return 0;
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public int offsetByCodePoints(int index, int codePointOffset) {
+        return 0;
+    }
+
+    /// The first index of `ch` in `[beginIndex, endIndex)`, or -1.
+    public int indexOf(int ch, int beginIndex, int endIndex) {
+        return -1;
+    }
+
+    /// The first index of `str` that lies wholly in `[beginIndex, endIndex)`, or -1.
+    public int indexOf(String str, int beginIndex, int endIndex) {
+        return -1;
+    }
+
+    /// The elements with `delimiter` between every two.
+    public static String join(CharSequence delimiter, CharSequence... elements) {
+        return null;
+    }
+
+    /// The elements with `delimiter` between every two.
+    public static String join(CharSequence delimiter, Iterable<? extends CharSequence> elements) {
+        return null;
+    }
+
+    /// As `format(String, Object...)`.
+    public static String format(java.util.Locale l, String format, Object... args) {
+        return null;
+    }
+
+    /// As `toLowerCase()`.
+    public java.lang.String toLowerCase(java.util.Locale locale) {
+        return null;
+    }
+
+    /// `String.format(this, args)`.
+    public String formatted(Object... args) {
+        return null;
+    }
+
+    /// Whether the string is empty or holds nothing but white space.
+    public boolean isBlank() {
+        return false;
+    }
+
+    /// The string without its leading and trailing white space.
+    public String strip() {
+        return null;
+    }
+
+    /// The string without its leading white space.
+    public String stripLeading() {
+        return null;
+    }
+
+    /// The string without its trailing white space.
+    public String stripTrailing() {
+        return null;
+    }
+
+    /// The string `count` times over.
+    public String repeat(int count) {
+        return null;
+    }
+
+    /// The lines of the string, without their terminators.
+    public java.util.stream.Stream<String> lines() {
+        return null;
+    }
+
+    /// Every line indented by `n` spaces, or outdented for a negative `n`.
+    public String indent(int n) {
+        return null;
+    }
+
+    /// The string with the indentation common to its lines removed.
+    public String stripIndent() {
+        return null;
+    }
+
+    /// The string with its escape sequences translated.
+    public String translateEscapes() {
+        return null;
+    }
+
+    /// `f.apply(this)`.
+    public <R> R transform(java.util.function.Function<? super String, ? extends R> f) {
+        return null;
     }
 
 }

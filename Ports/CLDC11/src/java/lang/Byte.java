@@ -105,11 +105,59 @@ public final class Byte extends Number implements Comparable<Byte> {
         return 0.0;
     }
     
-    public int compare(byte b1, byte b2) {
+    public static int compare(byte b1, byte b2) {
         return b1 < b2 ? -1 : b1 > b2 ? 1 : 0;
     }
     
     public int compareTo(Byte b) {
         return compare(this, b);
+    }
+
+    /// The size of a byte in bytes.
+    public static final int BYTES = 1;
+
+    /// A Byte of `parseByte(s)`.
+    @Deprecated
+    public Byte(String s) throws NumberFormatException {
+    }
+
+    /// The decimal string of `b`.
+    public static String toString(byte b) {
+        return null;
+    }
+
+    /// A Byte of `parseByte(s)`.
+    public static Byte valueOf(String s) throws NumberFormatException {
+        return null;
+    }
+
+    /// A Byte of `parseByte(s, radix)`.
+    public static Byte valueOf(String s, int radix) throws NumberFormatException {
+        return null;
+    }
+
+    /// Decodes a decimal, hexadecimal or octal byte, as `Integer.decode`.
+    public static Byte decode(String nm) throws NumberFormatException {
+        return null;
+    }
+
+    /// The value itself.
+    public static int hashCode(byte value) {
+        return 0;
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(byte x, byte y) {
+        return 0;
+    }
+
+    /// The value as an unsigned int.
+    public static int toUnsignedInt(byte x) {
+        return 0;
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(byte x) {
+        return 0;
     }
 }

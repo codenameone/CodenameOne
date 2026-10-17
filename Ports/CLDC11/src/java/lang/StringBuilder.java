@@ -31,7 +31,7 @@ package java.lang;
 /// In general, if sb refers to an instance of a StringBuilder, then sb.append(x) has the same effect as sb.insert(sb.length(),x).
 /// Every string builder has a capacity. As long as the length of the character sequence contained in the string builder does not exceed the capacity, it is not necessary to allocate a new internal builder array. If the internal builder overflows, it is automatically made larger.
 /// Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
-public final class StringBuilder implements CharSequence {
+public final class StringBuilder implements CharSequence, Appendable, Comparable<StringBuilder> {
     /// Constructs a string builder with no characters in it and an initial capacity of 16 characters.
     public StringBuilder(){
          //TODO codavaj!!
@@ -171,7 +171,7 @@ public final class StringBuilder implements CharSequence {
         return null; //TODO codavaj!!
     }
 
-    java.lang.StringBuilder insert(int offset, char[] str){
+    public java.lang.StringBuilder insert(int offset, char[] str){
         return null; //TODO codavaj!!
     }
 
@@ -286,5 +286,87 @@ public final class StringBuilder implements CharSequence {
         return null;
     }
 
+    public StringBuilder insert(int index, char[] value, int offset, int length) {
+        return null;
+    }
 
+    /// The characters from `start` to the end, as a String.
+    public String substring(int start) {
+        return null;
+    }
+
+    /// The characters from `start` to `end`, as a String.
+    public String substring(int start, int end) {
+        return null;
+    }
+
+    /// Appends the code point, as one char or as a surrogate pair.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if it is not a valid code point
+    public StringBuilder appendCodePoint(int codePoint) {
+        return null;
+    }
+
+    /// The code point at `index`.
+    public int codePointAt(int index) {
+        return 0;
+    }
+
+    /// The code point that ends just before `index`.
+    public int codePointBefore(int index) {
+        return 0;
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public int codePointCount(int beginIndex, int endIndex) {
+        return 0;
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public int offsetByCodePoints(int index, int codePointOffset) {
+        return 0;
+    }
+
+    /// The first index of `str`, or -1.
+    public int indexOf(String str) {
+        return 0;
+    }
+
+    /// The first index of `str` at or after `fromIndex`, or -1.
+    public int indexOf(String str, int fromIndex) {
+        return 0;
+    }
+
+    /// The last index of `str`, or -1.
+    public int lastIndexOf(String str) {
+        return 0;
+    }
+
+    /// The last index of `str` at or before `fromIndex`, or -1.
+    public int lastIndexOf(String str, int fromIndex) {
+        return 0;
+    }
+
+    /// Replaces the characters from `start` to `end` (clamped to the length)
+    /// with `str`.
+    public StringBuilder replace(int start, int end, String str) {
+        return null;
+    }
+
+    /// Appends the code point `count` times.
+    public StringBuilder repeat(int codePoint, int count) {
+        return null;
+    }
+
+    /// Appends `cs` (or `"null"`) `count` times.
+    public StringBuilder repeat(CharSequence cs, int count) {
+        return null;
+    }
+
+    /// Compares the contents lexicographically.
+    public int compareTo(StringBuilder another) {
+        return 0;
+    }
 }
