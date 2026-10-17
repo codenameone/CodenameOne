@@ -159,6 +159,7 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 // file does not, so a tool reading the file looked at a different
                 // class than the build and reported the annotations on the
                 // selected one as absent.
+                + bindingValue("mavenHome", System.getProperty("maven.home"))
                 + bindingValue("mainName", effective("codename1.mainName"))
                 + bindingValue("packageName", effective("codename1.packageName"));
         try {

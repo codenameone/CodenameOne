@@ -29,6 +29,7 @@ public final class ProjectBinding {
     public static final String BUILD_MAVEN = "MAVEN";
     public static final String BUILD_GRADLE = "GRADLE";
 
+    private String mavenHome;
     private String projectDir;
     private String settings;
     private String pom;
@@ -41,6 +42,10 @@ public final class ProjectBinding {
     private String sourceEncoding;
     private String mainName;
     private String packageName;
+
+    public String mavenHome() {
+        return mavenHome;
+    }
 
     public String projectDir() {
         return projectDir;
@@ -168,6 +173,7 @@ public final class ProjectBinding {
             String key = trimmed.substring(0, eq).trim();
             String val = trimmed.substring(eq + 1).trim();
             switch (key) {
+                case "mavenHome" -> b.mavenHome = val;
                 case "projectDir" -> b.projectDir = val;
                 case "settings" -> b.settings = val;
                 case "pom" -> b.pom = val;

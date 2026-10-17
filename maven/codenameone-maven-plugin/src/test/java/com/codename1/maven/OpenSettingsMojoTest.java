@@ -45,6 +45,22 @@ public class OpenSettingsMojoTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void forwardsMavenHomeToSettingsBinding() throws Exception {
+        String previous = System.getProperty("maven.home");
+        try {
+            System.setProperty("maven.home", "/tools/maven with spaces");
+            File common = tmp.newFolder("binding-common");
+            File input = tmp.newFile("binding.input");
+            new OpenSettingsMojo().writeBinding(input, common);
+            assertTrue(new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8)
+                    .contains("mavenHome=/tools/maven with spaces\n"));
+        } finally {
+            if (previous == null) System.clearProperty("maven.home");
+            else System.setProperty("maven.home", previous);
+        }
+    }
+
+    @Test
     public void extractsPackagedIconForDesktopLaunchers() throws Exception {
         File jar = jarWithIcon("settings.jar");
         File runtimeDir = tmp.newFolder("runtime");

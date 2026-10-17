@@ -10,6 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class PomEditorTest {
     @Test
+    public void removingInstalledLegacyDependencyPreservesCompactPom() {
+        String pom = "<project><dependencies></dependencies></project>";
+        MavenDependency dependency = new MavenDependency("example", "app-CN1JSON", "1", "pom");
+        String installed = PomEditor.addDependency(pom, dependency);
+        assertEquals(pom, PomEditor.removeDependency(installed, dependency));
+    }
+
+    @Test
     public void addsDependencyToExistingDependenciesBlock() {
         String pom = "<project>\n    <dependencies>\n    </dependencies>\n</project>\n";
         MavenDependency dep = new MavenDependency("com.codenameone", "cn1-demo", "1.0");

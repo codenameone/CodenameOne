@@ -124,7 +124,7 @@ public final class PomEditor implements DependencyEditor {
             String block = pom.substring(start, end);
             if (matches(block, dependency)) {
                 int lineStart = start;
-                while (lineStart > 0 && pom.charAt(lineStart - 1) != '\n') {
+                while (lineStart > 0 && (pom.charAt(lineStart - 1) == ' ' || pom.charAt(lineStart - 1) == '\t')) {
                     lineStart--;
                 }
                 int lineEnd = end;
