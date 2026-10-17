@@ -54,10 +54,28 @@ abstract class BlockingWait implements Runnable {
         this.deadline = deadline;
     }
 
+    /// The clock every deadline and delay in this package is read from:
+    /// monotonic milliseconds. The wall clock moves when the user or the
+    /// network changes the time, and a timed wait or a scheduled task must
+    /// not fire early or late because of it.
+    static long now() {
+        return System.nanoTime() / 1000000L;
+    }
+
+    /// `timeout` in milliseconds, rounded UP: a positive timeout shorter
+    /// than a millisecond still waits rather than being due immediately.
+    static long millis(long timeout, TimeUnit unit) {
+        long ms = unit.toMillis(timeout);
+        if (timeout > 0 && ms < Long.MAX_VALUE / 1000000L && unit.toNanos(timeout) > ms * 1000000L) {
+            ms++;
+        }
+        return ms;
+    }
+
     /// The deadline `millis` from now, saturating at [#FOREVER]; a negative
     /// duration is due now.
     static long deadline(long millis) {
-        long now = System.currentTimeMillis();
+        long now = now();
         if (millis <= 0) {
             return now;
         }
@@ -110,7 +128,7 @@ abstract class BlockingWait implements Runnable {
                 if (deadline == FOREVER) {
                     monitor.wait();
                 } else {
-                    long left = deadline - System.currentTimeMillis();
+                    long left = deadline - now();
                     if (left <= 0) {
                         return;
                     }

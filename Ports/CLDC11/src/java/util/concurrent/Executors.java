@@ -295,7 +295,7 @@ public class Executors {
                 throw new NullPointerException();
             }
             if (!isTerminated()) {
-                new Termination(this, BlockingWait.deadline(unit.toMillis(timeout))).await();
+                new Termination(this, BlockingWait.deadline(BlockingWait.millis(timeout, unit))).await();
             }
             return isTerminated();
         }
@@ -316,9 +316,9 @@ public class Executors {
                     boolean timedOut = false;
                     try {
                         if (keepAliveMillis > 0) {
-                            long before = System.currentTimeMillis();
+                            long before = BlockingWait.now();
                             queue.wait(keepAliveMillis);
-                            timedOut = System.currentTimeMillis() - before >= keepAliveMillis;
+                            timedOut = BlockingWait.now() - before >= keepAliveMillis;
                         } else {
                             queue.wait();
                         }

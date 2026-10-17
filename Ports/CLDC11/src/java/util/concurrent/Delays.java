@@ -86,7 +86,7 @@ final class Delays {
     static Handle after(long millis, Runnable action) {
         // A delay too long to add to the clock (Long.MAX_VALUE as "never",
         // say) is due at the end of time rather than wrapping into the past.
-        long now = System.currentTimeMillis();
+        long now = BlockingWait.now();
         long due = millis > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + Math.max(0, millis);
         Handle handle = new Handle(due, action);
         synchronized (LOCK) {
@@ -150,7 +150,7 @@ final class Delays {
                     return null;
                 }
                 Handle first = QUEUE.get(0);
-                long wait = first.due - System.currentTimeMillis();
+                long wait = first.due - BlockingWait.now();
                 if (wait <= 0) {
                     QUEUE.remove(0);
                     Runnable action = first.action;

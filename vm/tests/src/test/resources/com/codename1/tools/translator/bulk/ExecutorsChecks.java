@@ -35,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -314,6 +315,43 @@ public final class ExecutorsChecks {
             } finally {
                 stop(pool);
             }
+        });
+        // A positive timeout under a millisecond still waits: truncating it
+        // to 0ms made the timed get time out before looking.
+        Bulk.check("Executors.aSubMillisecondTimedGetStillWaits", () -> {
+            FutureTask<String> never = new FutureTask<String>(() -> "never run");
+            long before = System.nanoTime();
+            boolean timedOut = false;
+            try {
+                never.get(900000, TimeUnit.NANOSECONDS);
+            } catch (TimeoutException e) {
+                timedOut = true;
+            }
+            Bulk.p("timedOut", timedOut);
+            Bulk.p("waited", System.nanoTime() - before >= 800000);
+        });
+        // Only the interrupt cancel(true) delivered is consumed when the run
+        // ends; after cancel(false) the runner's own interrupt is its own.
+        Bulk.check("Executors.cancelFalseLeavesTheRunnersInterruptAlone", () -> {
+            final CountDownLatch started = new CountDownLatch(1);
+            final CountDownLatch cancelled = new CountDownLatch(1);
+            final FutureTask<String> task = new FutureTask<String>(() -> {
+                started.countDown();
+                cancelled.await(20, TimeUnit.SECONDS);
+                Thread.currentThread().interrupt();
+                return "ran";
+            });
+            final AtomicBoolean stillInterrupted = new AtomicBoolean();
+            Thread runner = new Thread(() -> {
+                task.run();
+                stillInterrupted.set(Thread.interrupted());
+            });
+            runner.start();
+            Bulk.p("started", started.await(20, TimeUnit.SECONDS));
+            Bulk.p("cancel", task.cancel(false));
+            cancelled.countDown();
+            runner.join(20000);
+            Bulk.p("stillInterrupted", stillInterrupted.get());
         });
         // Was ExecutorIntegrationTest, disabled for a crash in the one-off
         // harness it ran in; the two programs it never ran are this check.

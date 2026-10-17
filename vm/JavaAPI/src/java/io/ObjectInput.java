@@ -20,33 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+
 package java.io;
 
-/// Reads objects as well as primitive values. Codename One has no object
-/// serialization of its own; this type exists so code written against it
-/// compiles, and an implementation supplies the reading.
+/**
+ * Here to simplify porting, won't actually work...
+ *
+ */
 public interface ObjectInput extends DataInput, AutoCloseable {
-
-    /// Reads the next object.
-    Object readObject() throws ClassNotFoundException, IOException;
-
-    /// Reads one byte, or -1 at the end of the input.
-    int read() throws IOException;
-
-    /// Reads into `b`, returning how many bytes were read or -1 at the end.
-    int read(byte[] b) throws IOException;
-
-    /// Reads into `b` from `off`, returning how many bytes were read or -1
-    /// at the end.
-    int read(byte[] b, int off, int len) throws IOException;
-
-    /// Skips up to `n` bytes, returning how many were skipped.
-    long skip(long n) throws IOException;
-
-    /// How many bytes can be read without blocking.
-    int available() throws IOException;
-
-    /// Closes the input.
-    @Override
-    void close() throws IOException;
 }

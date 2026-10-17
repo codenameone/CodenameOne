@@ -1541,7 +1541,9 @@ public final class Character implements Comparable<Character>{
     private static boolean isScriptLetter(int c) {
         return c >= 0x100 && c <= 0x24f // Latin Extended
                 || c >= 0x370 && c <= 0x3ff && c != 0x37e && c != 0x387 && c != 0x375
-                        && c != 0x384 && c != 0x385 && c != 0x3f6 // Greek
+                        && c != 0x384 && c != 0x385 && c != 0x3f6
+                        && c != 0x378 && c != 0x379 && (c < 0x380 || c > 0x383)
+                        && c != 0x38b && c != 0x38d && c != 0x3a2 // Greek, less its unassigned holes
                 || c >= 0x400 && c <= 0x481 || c >= 0x48a && c <= 0x52f // Cyrillic
                 || c >= 0x531 && c <= 0x556 || c >= 0x561 && c <= 0x587 // Armenian
                 || c >= 0x5d0 && c <= 0x5ea // Hebrew

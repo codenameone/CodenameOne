@@ -39,6 +39,8 @@ public class FutureTask<V> implements RunnableFuture<V> {
     private Callable<V> callable;
     private int state;
     private Object outcome;
+    /// Whether `cancel(true)` interrupted [#runner]. Guarded by `this`.
+    private boolean interruptedRunner;
     /// The thread inside [#run], so that `cancel(true)` can interrupt it.
     private Thread runner;
 
@@ -64,6 +66,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
             state = CANCELLED;
             callable = null;
             if (mayInterruptIfRunning && runner != null) {
+                interruptedRunner = true;
                 runner.interrupt();
             }
             notifyAll();
@@ -128,7 +131,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
             throw new NullPointerException();
         }
         if (!isDone()) {
-            new Wait(this, BlockingWait.deadline(unit.toMillis(timeout))).await();
+            new Wait(this, BlockingWait.deadline(BlockingWait.millis(timeout, unit))).await();
             if (!isDone()) {
                 throw new TimeoutException();
             }
@@ -204,13 +207,16 @@ public class FutureTask<V> implements RunnableFuture<V> {
     /// Forgets the runner. A cancel(true) that arrived during the run has
     /// interrupted this thread; that interrupt is meant for the task, so it
     /// is consumed here rather than leaking into the next task the thread runs.
+    /// Only that interrupt: after cancel(false), or an interrupt from anyone
+    /// else, the thread's status is left as it is.
     private void release() {
-        boolean cancelled;
+        boolean consume;
         synchronized (this) {
             runner = null;
-            cancelled = state == CANCELLED;
+            consume = interruptedRunner;
+            interruptedRunner = false;
         }
-        if (cancelled) {
+        if (consume) {
             Thread.interrupted();
         }
     }

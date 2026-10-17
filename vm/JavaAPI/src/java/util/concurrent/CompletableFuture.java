@@ -272,7 +272,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return reportGet(await(Math.max(0, unit.toMillis(timeout))));
+        return reportGet(await(Math.max(0, BlockingWait.millis(timeout, unit))));
     }
 
     /// The result, waiting for it; a failure is a [CompletionException].
@@ -510,7 +510,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new NullPointerException();
         }
         if (!isDone()) {
-            later(unit.toMillis(timeout), new Runnable() {
+            later(BlockingWait.millis(timeout, unit), new Runnable() {
                 @Override
                 public void run() {
                     fail(new TimeoutException());
@@ -526,7 +526,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new NullPointerException();
         }
         if (!isDone()) {
-            later(unit.toMillis(timeout), new Runnable() {
+            later(BlockingWait.millis(timeout, unit), new Runnable() {
                 @Override
                 public void run() {
                     complete(value);

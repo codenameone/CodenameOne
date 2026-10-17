@@ -107,7 +107,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
         if (tasks == null || unit == null) {
             throw new NullPointerException();
         }
-        long deadline = BlockingWait.deadline(unit.toMillis(timeout));
+        long deadline = BlockingWait.deadline(BlockingWait.millis(timeout, unit));
         List<Future<T>> futures = new ArrayList<Future<T>>(tasks.size());
         boolean done = false;
         try {
@@ -115,7 +115,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
                 futures.add(newTaskFor(t));
             }
             for (int i = 0; i < futures.size(); i++) {
-                if (System.currentTimeMillis() >= deadline) {
+                if (BlockingWait.now() >= deadline) {
                     return futures;
                 }
                 execute((Runnable) futures.get(i));
@@ -123,7 +123,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
             for (int i = 0; i < futures.size(); i++) {
                 Future<T> f = futures.get(i);
                 if (!f.isDone()) {
-                    long left = deadline - System.currentTimeMillis();
+                    long left = deadline - BlockingWait.now();
                     if (left <= 0) {
                         return futures;
                     }
@@ -174,7 +174,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
         if (unit == null) {
             throw new NullPointerException();
         }
-        return doInvokeAny(tasks, BlockingWait.deadline(unit.toMillis(timeout)));
+        return doInvokeAny(tasks, BlockingWait.deadline(BlockingWait.millis(timeout, unit)));
     }
 
     private <T> T doInvokeAny(Collection<? extends Callable<T>> tasks, long deadline)

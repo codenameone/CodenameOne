@@ -101,7 +101,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             if (rate > 0) {
                 // A fixed rate keeps its beat whatever a run takes.
                 due.set(due.get() + rate);
-                arm(due.get() - System.currentTimeMillis());
+                arm(due.get() - BlockingWait.now());
                 // A firing that comes while a run is under way is owed, not
                 // dropped: as with the JDK's scheduleAtFixedRate, an overrun
                 // makes the next runs start late and one after another,
@@ -221,13 +221,13 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         }
 
         private void again() {
-            due.set(System.currentTimeMillis() + delayAfter);
+            due.set(BlockingWait.now() + delayAfter);
             arm(delayAfter);
         }
 
         @Override
         public long getDelay(TimeUnit unit) {
-            return unit.convert(due.get() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            return unit.convert(due.get() - BlockingWait.now(), TimeUnit.MILLISECONDS);
         }
 
         @Override
@@ -345,8 +345,8 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         if (callable == null || unit == null) {
             throw new NullPointerException();
         }
-        final long millis = Math.max(0, unit.toMillis(delay));
-        final Scheduled<V> task = new Scheduled<V>(callable, System.currentTimeMillis() + millis, false, 0, 0);
+        final long millis = Math.max(0, BlockingWait.millis(delay, unit));
+        final Scheduled<V> task = new Scheduled<V>(callable, BlockingWait.now() + millis, false, 0, 0);
         return accept(task, millis);
     }
 
@@ -363,10 +363,10 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         if (period <= 0) {
             throw new IllegalArgumentException();
         }
-        final long millis = Math.max(0, unit.toMillis(initialDelay));
-        final long every = Math.max(1, unit.toMillis(period));
+        final long millis = Math.max(0, BlockingWait.millis(initialDelay, unit));
+        final long every = Math.max(1, BlockingWait.millis(period, unit));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                System.currentTimeMillis() + millis, true, 0, every);
+                BlockingWait.now() + millis, true, 0, every);
         return accept(task, millis);
     }
 
@@ -379,9 +379,9 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         if (delay <= 0) {
             throw new IllegalArgumentException();
         }
-        final long millis = Math.max(0, unit.toMillis(initialDelay));
+        final long millis = Math.max(0, BlockingWait.millis(initialDelay, unit));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                System.currentTimeMillis() + millis, true, Math.max(1, unit.toMillis(delay)), 0);
+                BlockingWait.now() + millis, true, Math.max(1, BlockingWait.millis(delay, unit)), 0);
         return accept(task, millis);
     }
 

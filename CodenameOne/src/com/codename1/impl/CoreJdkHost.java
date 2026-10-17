@@ -90,20 +90,33 @@ public class CoreJdkHost extends JdkHost {
         return s == null || s.length() == 0 ? null : s;
     }
 
-    /// The first character of `text` that sits between two ASCII digits, or 0.
+    /// The first character of `text` that sits between two digits, or 0.
+    /// Digits are any script's decimal digits, not only ASCII: a locale such
+    /// as Arabic or Hindi formats `1.5` with its own digits, and stopping at
+    /// the first non-ASCII character would report no separator at all.
+    /// Signs, currency and spacing before the number are skipped.
     private static char firstSeparator(String text) {
         if (text == null) {
             return 0;
         }
-        for (int i = 0; i < text.length(); i++) {
+        for (int i = 1; i + 1 < text.length(); i++) {
             char c = text.charAt(i);
-            if (c < '0' || c > '9') {
-                boolean between = i > 0 && i + 1 < text.length()
-                        && text.charAt(i + 1) >= '0' && text.charAt(i + 1) <= '9';
-                return between ? c : 0;
+            if (!isDecimalDigit(c) && isDecimalDigit(text.charAt(i - 1))
+                    && isDecimalDigit(text.charAt(i + 1))) {
+                return c;
             }
         }
         return 0;
+    }
+
+    /// Whether `c` is a decimal digit in a script `L10NManager` may format
+    /// with: ASCII, Arabic-Indic, extended Arabic-Indic, Devanagari, Bengali,
+    /// Thai and fullwidth.
+    private static boolean isDecimalDigit(char c) {
+        return c >= '0' && c <= '9'
+                || c >= 0x660 && c <= 0x669 || c >= 0x6f0 && c <= 0x6f9
+                || c >= 0x966 && c <= 0x96f || c >= 0x9e6 && c <= 0x9ef
+                || c >= 0xe50 && c <= 0xe59 || c >= 0xff10 && c <= 0xff19;
     }
 
     @Override
