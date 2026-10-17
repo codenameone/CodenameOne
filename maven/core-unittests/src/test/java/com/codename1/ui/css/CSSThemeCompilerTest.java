@@ -25,14 +25,20 @@ package com.codename1.ui.css;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.MutableResource;
 import java.util.Hashtable;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -108,12 +114,14 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("ffc0cb", theme.get("Button.fgColor"));
         assertEquals("112233", theme.get("Button.bgColor"));
         assertEquals("255", theme.get("Button.transparency"));
-        assertEquals("1,2,1,2", theme.get("Button.padding"));
-        assertEquals("2,4,6,8", theme.get("Label.margin"));
+        // Theme storage order is top,bottom,left,right; CSS writes top,right,bottom,left.
+        assertEquals("1,1,2,2", theme.get("Button.padding"));
+        assertEquals("2,6,8,4", theme.get("Label.margin"));
         assertEquals("Label", theme.get("Button.derive"));
         assertEquals("#abc", theme.get("@primary"));
         assertEquals("4px", theme.get("@spacing"));
-        assertEquals("#abc", theme.get("@primarycolor"));
+        // A constant resolving to a color is stored as plain hex; :root's own stays as written.
+        assertEquals("aabbcc", theme.get("@primaryColor"));
         assertEquals(Integer.valueOf(Component.CENTER), theme.get("Button.align"));
         assertTrue(theme.get("Button.border") instanceof CSSBorder);
         assertEquals("00ff00", theme.get("Button.press#fgColor"));
@@ -237,6 +245,571 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertTrue(css.contains("border-style:dashed none none none"));
         assertTrue(css.contains("3px"));
         assertTrue(css.contains("#ff0000ff"));
+    }
+
+    @Test
+    public void testHashConstantsBlockKeepsCaseAndDecodesQuotes() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants {\n"
+                + "    includeNativeBool: true;\n"
+                + "    customMessage: \"Hello\";\n"
+                + "    singleQuotedBool: 'true';\n"
+                + "    withSemicolon: \"a;b\";\n"
+                + "    --accentColor: #ff2d95;\n"
+                + "}\n"
+                + "Label{color:var(--accentColor);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("true", theme.get("@includeNativeBool"));
+        assertFalse(theme.containsKey("@includenativebool"));
+        assertEquals("Hello", theme.get("@customMessage"));
+        assertEquals("true", theme.get("@singleQuotedBool"));
+        assertEquals("a;b", theme.get("@withSemicolon"));
+        // Plain hex, as the build-time compiler stores a color constant.
+        assertEquals("ff2d95", theme.get("@accentColor"));
+        assertEquals("ff2d95", theme.get("Label.fgColor"));
+        // The block is constants only, never a UIID called "#Constants".
+        for (Object key : theme.keySet()) {
+            assertFalse(String.valueOf(key).indexOf("Constants") > -1, String.valueOf(key));
+        }
+    }
+
+    @Test
+    public void testLegacyConstantsBlockStillWorksAndMayFollowItsUse() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{color:var(--tint);}"
+                + "@constants{ tint: #102030; quoted: \"x y\"; plain: 12; }"
+                + "@constants{ second: 'two'; }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("102030", theme.get("@tint"));
+        assertEquals("x y", theme.get("@quoted"));
+        assertEquals("12", theme.get("@plain"));
+        assertEquals("two", theme.get("@second"));
+        assertEquals("102030", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testRootCustomPropertiesKeepCase() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--mainColor:#123456;}Label{color:var(--mainColor);}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("#123456", theme.get("@mainColor"));
+        assertEquals("123456", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testBoxShorthandForEveryLength() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("One{padding:5px;}"
+                + "Two{padding:1px 2px;}"
+                + "Three{padding:1px 2px 3px;}"
+                + "Four{padding:1px 2px 3px 4px;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("5,5,5,5", theme.get("One.padding"));
+        assertEquals("1,1,2,2", theme.get("Two.padding"));
+        assertEquals("1,3,2,2", theme.get("Three.padding"));
+        assertEquals("1,3,4,2", theme.get("Four.padding"));
+        byte px = Style.UNIT_TYPE_PIXELS;
+        assertArrayEquals(new byte[]{px, px, px, px}, (byte[]) theme.get("Four.padUnit"));
+    }
+
+    @Test
+    public void testIssueExampleResolvesToTheRightSides() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label {\n    padding: 1px 2px 3px 4px;\n    margin: 1mm 2mm;\n}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("1,3,4,2", theme.get("Label.padding"));
+        assertEquals("1,1,2,2", theme.get("Label.margin"));
+        byte mm = Style.UNIT_TYPE_DIPS;
+        assertArrayEquals(new byte[]{mm, mm, mm, mm}, (byte[]) theme.get("Label.marUnit"));
+
+        UIManager.getInstance().addThemeProps(theme);
+        Style s = new Label("x").getUnselectedStyle();
+        assertEquals(1f, s.getPaddingFloatValue(false, Component.TOP), 0f);
+        assertEquals(2f, s.getPaddingFloatValue(false, Component.RIGHT), 0f);
+        assertEquals(3f, s.getPaddingFloatValue(false, Component.BOTTOM), 0f);
+        assertEquals(4f, s.getPaddingFloatValue(false, Component.LEFT), 0f);
+        assertEquals(1f, s.getMarginFloatValue(false, Component.TOP), 0f);
+        assertEquals(2f, s.getMarginFloatValue(false, Component.RIGHT), 0f);
+        assertEquals(1f, s.getMarginFloatValue(false, Component.BOTTOM), 0f);
+        assertEquals(2f, s.getMarginFloatValue(false, Component.LEFT), 0f);
+        assertEquals(mm, s.getMarginUnit()[Component.LEFT]);
+        assertEquals(Style.UNIT_TYPE_PIXELS, s.getPaddingUnit()[Component.LEFT]);
+    }
+
+    @Test
+    public void testMixedUnitsKeepEachSidesUnit() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Mixed{padding:1mm 2vw 2.5pt 3px;}"
+                + "Mixed:pressed{margin:1.5mm 2cm;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        // top=1mm, bottom=2.5pt (a density independent pixel, rounded), left=3px, right=2vw.
+        assertEquals("1,3,3,2", theme.get("Mixed.padding"));
+        assertArrayEquals(new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS,
+                        Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_VW},
+                (byte[]) theme.get("Mixed.padUnit"));
+        assertEquals("1.5,1.5,20,20", theme.get("Mixed.press#margin"));
+        byte mm = Style.UNIT_TYPE_DIPS;
+        assertArrayEquals(new byte[]{mm, mm, mm, mm}, (byte[]) theme.get("Mixed.press#marUnit"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("Mixed.marUnit"));
+    }
+
+    @Test
+    public void testRejectsMalformedBoxValues() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{padding:1px 2px 3px 4px 5px;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{margin:wide;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{font-size:huge;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{font-size:not-small;}", resource, "Theme"));
+        // The build-time compiler has no percentage inset.
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{padding:10%;}", resource, "Theme"));
+    }
+
+    @Test
+    public void testFontSizeWithFamilyResolvesToTheRequestedSize() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label {\n    font-family: \"native:MainRegular\";\n    font-size: 3mm;\n}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font font = (Font) theme.get("Label.font");
+        assertNotNull(font);
+        assertTrue(font.isTTFNativeFont());
+        assertEquals(Display.getInstance().convertToPixels(30, true) / 10f, font.getPixelSize(), 0.001f);
+
+        UIManager.getInstance().addThemeProps(theme);
+        assertEquals(font, new Label("x").getUnselectedStyle().getFont());
+    }
+
+    @Test
+    public void testFontSizeUnitsAndStateWithoutFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Sized{font-size:12px;}"
+                + "Sized:selected{font-size:18pt;}"
+                + "Split{font-family:'native:MainBold';}"
+                + "Split{font-size:2mm;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals(12f, ((Font) theme.get("Sized.font")).getPixelSize(), 0.001f);
+        // 18pt is 6.35mm, the build-time compiler's conversion.
+        float pt = Display.getInstance().convertToPixels((int) (18f / 72f * 25.4f * 10), true) / 10f;
+        assertEquals(pt, ((Font) theme.get("Sized.sel#font")).getPixelSize(), 0.001f);
+        // Family and size declared in two rules for the same UIID still meet.
+        Font split = (Font) theme.get("Split.font");
+        assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, split.getPixelSize(), 0.001f);
+    }
+
+    @Test
+    public void testColorConstantsAreStoredAsPlainHex() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ infiniteDefaultColor: #f00; rgbColor: rgb(1, 2, 3);"
+                + " quotedHash: \"#abc\"; word: red; }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals(0xff0000, Integer.parseInt((String) theme.get("@infiniteDefaultColor"), 16));
+        assertEquals("010203", theme.get("@rgbColor"));
+        // A quoted value is a string, not a color.
+        assertEquals("#abc", theme.get("@quotedHash"));
+        assertEquals("red", theme.get("@word"));
+    }
+
+    @Test
+    public void testImageConstantsResolveToTheResourceImage() {
+        MutableResource resource = new MutableResource();
+        Image spinner = Image.createImage(4, 4, 0xff00ff00);
+        resource.setImage("spinner.png", spinner);
+        new CSSThemeCompiler().compile("#Constants{ infiniteImage: spinner.png; }", resource, "Theme");
+        assertTrue(resource.getTheme("Theme").get("@infiniteImage") instanceof Image);
+        UIManager.getInstance().addThemeProps(resource.getTheme("Theme"));
+        assertNotNull(UIManager.getInstance().getThemeImageConstant("infiniteImage"));
+
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ missingImage: nothing.png; }", new MutableResource(), "Theme"));
+
+        // Through a custom property declared after the constants block, quoted or not.
+        MutableResource viaVar = new MutableResource();
+        viaVar.setImage("spinner.png", spinner);
+        new CSSThemeCompiler().compile("#Constants{ infiniteImage: var(--spinner); quotedImage: var(--q); }"
+                + ":root{ --spinner: spinner.png; --q: \"spinner.png\"; }", viaVar, "Theme");
+        assertTrue(viaVar.getTheme("Theme").get("@infiniteImage") == spinner);
+        assertTrue(viaVar.getTheme("Theme").get("@quotedImage") == spinner);
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ goneImage: var(--x); } :root{ --x: nothing.png; }",
+                        new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testStateFontInheritsTheUndeclaredHalfFromTheBase() {
+        MutableResource resource = new MutableResource();
+        // The state rule comes first on purpose: the merge must not depend on rule order.
+        new CSSThemeCompiler().compile("Label:selected{font-size:20px;}"
+                + "Label{font-family:'native:MainBold';font-size:2mm;}"
+                + "Label:pressed{font-family:'native:MainLight';}"
+                + "@media (prefers-color-scheme: dark){ Label:disabled{color:#ffffff;font-size:9px;} }",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font selected = (Font) theme.get("Label.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+        Font pressed = (Font) theme.get("Label.press#font");
+        assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, pressed.getPixelSize(), 0.001f);
+        assertEquals("native:MainLight", fontName(pressed));
+        Font dark = (Font) theme.get("$DarkLabel.dis#font");
+        assertEquals(9f, dark.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(dark));
+    }
+
+    @Test
+    public void testColorConstantFromVarIsStoredAsPlainHex() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--c:#f00;}"
+                + "#Constants{infiniteDefaultColor:var(--c); label:var(--name);}"
+                + ":root{--name:hello;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals("hello", theme.get("@label"));
+    }
+
+    @Test
+    public void testLaterDeclarationWinsBetweenRootAndConstants() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--accent:#00ff00;} #Constants{--accent:#ff0000;}"
+                + "Label{color:var(--accent);}", resource, "Theme");
+        assertEquals("ff0000", resource.getTheme("Theme").get("@accent"));
+        assertEquals("ff0000", resource.getTheme("Theme").get("Label.fgColor"));
+
+        resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} :root{--accent:#00ff00;}"
+                + "Label{color:var(--accent);}", resource, "Theme");
+        assertEquals("#00ff00", resource.getTheme("Theme").get("@accent"));
+        // A constant declared after the rule that uses it is still seen by that rule.
+        resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{color:var(--late);} #Constants{late:#0000ff;}", resource, "Theme");
+        assertEquals("0000ff", resource.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
+    public void testStateFontFollowsTheDeriveChain() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Child:selected{font-size:20px;}"
+                + "Child{cn1-derive:Middle;}"
+                + "Middle{cn1-derive:Base;}"
+                + "Base:selected{font-family:'native:MainBold';}"
+                + "Base{font-family:'native:MainLight';font-size:2mm;}"
+                + "Cyc1{cn1-derive:Cyc2;} Cyc2{cn1-derive:Cyc1;} Cyc1:pressed{font-size:7px;}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        Font selected = (Font) theme.get("Child.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        // Base's selected family wins over Base's unselected one: same state first.
+        assertEquals("native:MainBold", fontName(selected));
+        Font cyclic = (Font) theme.get("Cyc1.press#font");
+        assertEquals(7f, cyclic.getPixelSize(), 0.001f);
+        assertEquals("native:MainRegular", fontName(cyclic));
+    }
+
+    @Test
+    public void testImageConstantMaySeeAnImageARuleCreates() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Maker{cn1-mutable-image:spinner #ffffff;}"
+                + "#Constants{infiniteImage:spinner;}", resource, "Theme");
+        assertTrue(resource.getTheme("Theme").get("@infiniteImage") == resource.getImage("spinner"));
+    }
+
+    @Test
+    public void testOnlyTheWinningConstantDeclarationIsReinterpreted() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--x:#00ff00;}"
+                + "#Constants{token:var(--x);} #Constants{token:\"#abc\";}", resource, "Theme");
+        assertEquals("#abc", resource.getTheme("Theme").get("@token"));
+    }
+
+    @Test
+    public void testQuotedBraceDoesNotEndTheConstantsBlock() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{customMessage:\"a}b\"; enabled:true;}"
+                + "Label{color:#ff0000;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("a}b", theme.get("@customMessage"));
+        assertEquals("true", theme.get("@enabled"));
+        assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testDerivedStateFontBeatsTheChildsUnselectedFont() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Child{cn1-derive:Base;font-family:'native:MainLight';}"
+                + "Base:selected{font-family:'native:MainBold';}"
+                + "Child:selected{font-size:20px;}", resource, "Theme");
+        Font selected = (Font) resource.getTheme("Theme").get("Child.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+    }
+
+    @Test
+    public void testRgbaColorConstantKeepsItsRgb() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--half:rgba(0, 0, 255, 0.25);}"
+                + "#Constants{infiniteDefaultColor: rgba(255, 0, 0, 0.5); viaVar: var(--half);}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals("0000ff", theme.get("@viaVar"));
+    }
+
+    @Test
+    public void testCommentMarkersInsideQuotesAreText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("/* a real comment */ #Constants{ message: \"a/*b*/c\"; open: '/*'; }"
+                + "Label{color:#ff0000;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("a/*b*/c", theme.get("@message"));
+        assertEquals("/*", theme.get("@open"));
+        assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testStateFontIgnoresTheUniversalStyle() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("* { font-family: 'native:MainBold'; } Label:selected { font-size: 20px; }",
+                resource, "Theme");
+        Font selected = (Font) resource.getTheme("Theme").get("Label.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        // The build-time compiler ignores `*` rules, so nothing is inherited from it.
+        assertEquals("native:MainRegular", fontName(selected));
+    }
+
+    @Test
+    public void testCyclicConstantsAreRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ a: var(--a); }", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ a: var(--b); b: var(--a); }", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
+                        new MutableResource(), "Theme"));
+        // Two uses of one constant are not a cycle.
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ c: #ff0000; pair: var(--c) var(--c); }", resource, "Theme");
+        assertEquals("ff0000 ff0000", resource.getTheme("Theme").get("@pair"));
+    }
+
+    @Test
+    public void testQuotedVarTextIsNotResolved() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{ --name: world; --rootQuoted: \"var(--name)\"; }"
+                + "#Constants{ message: \"var(--name)\"; plain: var(--name); }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("var(--name)", theme.get("@message"));
+        assertEquals("var(--name)", theme.get("@rootQuoted"));
+        assertEquals("world", theme.get("@plain"));
+    }
+
+    @Test
+    public void testRulesSeeTheFinalValueOfARedeclaredConstant() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} Label{color:var(--accent);}"
+                + " #Constants{--accent:#0000ff;}"
+                + ":root{--bg:#ff0000;} Button{background-color:var(--bg);} :root{--bg:#00ff00;}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("0000ff", theme.get("@accent"));
+        assertEquals("0000ff", theme.get("Label.fgColor"));
+        // A :root property takes effect where it is declared, as in the build-time parser.
+        assertEquals("ff0000", theme.get("Button.bgColor"));
+        assertEquals("#00ff00", theme.get("@bg"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{color:var(--late);} :root{--late:#ff0000;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testStateDeriveIsFollowedAtEveryHop() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:'native:MainBold';}"
+                + "Middle:selected{cn1-derive:Base;}"
+                + "Child:selected{cn1-derive:Middle;font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Child.sel#font")));
+    }
+
+    @Test
+    public void testAliasOfAQuotedConstantStaysText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{literal:\"#abc\"; alias:var(--literal); twice:var(--alias);"
+                + " color:#abc; colorAlias:var(--color);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("#abc", theme.get("@alias"));
+        assertEquals("#abc", theme.get("@twice"));
+        assertEquals("aabbcc", theme.get("@colorAlias"));
+    }
+
+    @Test
+    public void testCn1ColorFunctionsInConstants() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ a: cn1rgb(255,0,0); b: cn1rgba(0,255,0,0.5); }",
+                resource, "Theme");
+        assertEquals("ff0000", resource.getTheme("Theme").get("@a"));
+        assertEquals("00ff00", resource.getTheme("Theme").get("@b"));
+    }
+
+    @Test
+    public void testQuotedConstantStaysTextThroughAnAlias() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--name:world;--message:\"var(--name)\";alias:var(--message);}",
+                resource, "Theme");
+        assertEquals("var(--name)", resource.getTheme("Theme").get("@alias"));
+    }
+
+    @Test
+    public void testStateFontFollowsTheStatesOwnDerive() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:'native:MainBold';}"
+                + "Child:selected{cn1-derive:Base;font-size:20px;}", resource, "Theme");
+        Font selected = (Font) resource.getTheme("Theme").get("Child.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+    }
+
+    @Test
+    public void testQuotedConstantsDecodeHexEscapes() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ a: \"\\41\"; b: \"\\41 B\"; c: \"\\1F600\"; d: \"x\\\"y\"; }",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("A", theme.get("@a"));
+        assertEquals("AB", theme.get("@b"));
+        assertEquals(new String(Character.toChars(0x1F600)), theme.get("@c"));
+        assertEquals("x\"y", theme.get("@d"));
+    }
+
+    @Test
+    public void testSecondCompileKeepsEarlierLiteralConstants() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{message:\"var(--name)\";}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{color:#ff0000;}", resource, "Theme");
+        assertEquals("var(--name)", resource.getTheme("Theme").get("@message"));
+    }
+
+    @Test
+    public void testSiblingStateFontUsesADeriveDeclaredInAnotherState() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:'native:MainBold';}"
+                + "Child:selected{cn1-derive:Base;}"
+                + "Child:pressed{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
+    public void testRelativeFontSizeKeywordsAreRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{font-size:smaller;}", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{font-size:larger;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testCrlfLineContinuationInAQuotedConstant() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{a:\"first\\\r\nsecond\";b:\"x\\\ry\";}", resource, "Theme");
+        assertEquals("firstsecond", resource.getTheme("Theme").get("@a"));
+        assertEquals("xy", resource.getTheme("Theme").get("@b"));
+    }
+
+    @Test
+    public void testCustomPropertyInARuleAppliesInDeclarationOrder() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{--accent:#ff0000;color:var(--accent);--accent:#0000ff;}",
+                resource, "Theme");
+        assertEquals("ff0000", resource.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
+    public void testUnitlessDecimalInsetIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{padding:1.5;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testLastStateDeriveWinsForTheOwningUiid() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("BaseA{font-family:'native:MainBold';}"
+                + "BaseB{font-family:'native:MainLight';}"
+                + "Child:selected{cn1-derive:BaseA;}"
+                + "Child:disabled{cn1-derive:BaseB;}"
+                + "Child:pressed{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainLight", fontName((Font) resource.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
+    public void testSecondCompileKeepsTheFamilyOfAnEarlierFont() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:'native:MainBold';font-size:10px;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label:selected{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.sel#font")));
+    }
+
+    @Test
+    public void testSameStateRecompileKeepsTheEarlierFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:'native:MainBold';font-size:10px;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.font")));
+    }
+
+    @Test
+    public void testAliasOfAnEarlierCompilesLiteralStaysText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{message:\"var(--name)\";}", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{alias:var(--message);}", resource, "Theme");
+        assertEquals("var(--name)", resource.getTheme("Theme").get("@alias"));
+    }
+
+    @Test
+    public void testAliasOfAnEarlierUnquotedColorBecomesAColor() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--accent:#abc;}", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{alias:var(--accent);}", resource, "Theme");
+        assertEquals("aabbcc", String.valueOf(resource.getTheme("Theme").get("@alias")).toLowerCase());
+    }
+
+    @Test
+    public void testRecompileKeepsAMonospaceFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:monospace;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{font-size:20px;}", resource, "Theme");
+        assertEquals(Font.FACE_MONOSPACE, ((Font) resource.getTheme("Theme").get("Label.font")).getFace());
+    }
+
+    @Test
+    public void testDeclarationPriorityIsNotPartOfTheValue() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{includeNativeBool:true !important;msg:\"a !important\";}",
+                resource, "Theme");
+        assertEquals("true", resource.getTheme("Theme").get("@includeNativeBool"));
+        assertEquals("a !important", resource.getTheme("Theme").get("@msg"));
+    }
+
+    @Test
+    public void testQuotedCustomPropertyIsNotAColorInAStyle() {
+        MutableResource resource = new MutableResource();
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{--accent:\"#f00\";} Label{color:var(--accent);}", resource, "Theme"));
+        new CSSThemeCompiler().compile("#Constants{--accent:\"#f00\";}", resource, "Theme");
+        assertEquals("#f00", resource.getTheme("Theme").get("@accent"));
+    }
+
+    private static String fontName(Font font) {
+        try {
+            java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");
+            id.setAccessible(true);
+            return (String) id.get(font);
+        } catch (ReflectiveOperationException err) {
+            throw new AssertionError(err);
+        }
     }
 
 }
