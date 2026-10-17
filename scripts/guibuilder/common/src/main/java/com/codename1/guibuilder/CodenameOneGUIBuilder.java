@@ -5478,8 +5478,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * The canvas compiles into an empty resource, so an image constant such as
      * {@code #Constants{mediaPlayImage:play.png}} found nothing and the stylesheet was rejected,
      * although the project build resolves it. This looks an image up where the build-time
-     * compiler does: {@code res/<theme>/<name>/<density>.png} beside the stylesheet, or a file of
-     * that name there. Images added to the project's own resource file in the designer are not
+     * compiler does: {@code res/<theme>/<name>/<density>.png} beside the stylesheet. Images added to the project's own resource file in the designer are not
      * visible here.
      */
     static final class ProjectImageResource extends MutableResource {
@@ -5494,8 +5493,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         public com.codename1.ui.Image getImage(String id) {
             com.codename1.ui.Image image = super.getImage(id);
             if (image != null || cssDir == null || id == null) return image;
-            image = load(cssDir + "/" + id);
-            if (image == null) {
+            // No file of that name beside the stylesheet: the build-time compiler only reads the
+            // multi-image folder, so the canvas must not accept what the build would reject.
+            {
                 com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
                 String res = ProjectIO.fsUrl(cssDir + "/res");
                 try {
@@ -5538,15 +5538,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         /**
          * The variant files of a multi-image, best first for a display of {@code density}: the
          * project build stores every variant and the device picks its own, so the canvas shows
-         * the one the running density would get -- that density, then the nearest larger one
-         * (scaled down), then the nearest smaller.
+         * the one the running density would get. That is the rule of
+         * {@code EditableResources.MultiImage.getBest()}: the largest variant not above the
+         * density, and only when there is none, the nearest larger one.
          */
         static String[] densityOrder(int density) {
             int at = 0;
             while (at < DENSITIES.length - 1 && DENSITIES[at] < density) at++;
             java.util.List<String> out = new java.util.ArrayList<String>();
-            for (int i = at; i < DENSITIES.length; i++) out.add(DENSITY_FILES[i]);
-            for (int i = at - 1; i >= 0; i--) out.add(DENSITY_FILES[i]);
+            if (DENSITIES[at] > density && at > 0) at--;
+            for (int i = at; i >= 0; i--) out.add(DENSITY_FILES[i]);
+            for (int i = at + 1; i < DENSITIES.length; i++) out.add(DENSITY_FILES[i]);
             return out.toArray(new String[out.size()]);
         }
 

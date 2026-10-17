@@ -752,6 +752,22 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.sel#font")));
     }
 
+    @Test
+    public void testSameStateRecompileKeepsTheEarlierFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:'native:MainBold';font-size:10px;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.font")));
+    }
+
+    @Test
+    public void testAliasOfAnEarlierCompilesLiteralStaysText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{message:\"var(--name)\";}", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{alias:var(--message);}", resource, "Theme");
+        assertEquals("var(--name)", resource.getTheme("Theme").get("@alias"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

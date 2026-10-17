@@ -1814,12 +1814,23 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", dir.resolve("play.png").toFile());
+        assertNull(new CodenameOneGUIBuilder.ProjectImageResource(dir.resolve("theme.css").toString())
+                .getImage("play.png"), "the build-time compiler reads only res/<theme>/<name>/");
+    }
+
+    @Test
     void anImageVariantIsChosenForTheDisplayDensity() {
         String[] high = CodenameOneGUIBuilder.ProjectImageResource.densityOrder(com.codename1.ui.Display.DENSITY_HIGH);
         assertEquals("high.png", high[0]);
-        assertEquals("veryhigh.png", high[1]);
-        assertEquals("medium.png", high[high.length - 3]);
-        assertEquals("verylow.png", high[high.length - 1]);
+        assertEquals("medium.png", high[1]);
+        assertEquals("verylow.png", high[3]);
+        assertEquals("veryhigh.png", high[4]);
+        assertEquals("4k.png", high[high.length - 1]);
+        assertEquals("verylow.png", CodenameOneGUIBuilder.ProjectImageResource.densityOrder(0)[0]);
         assertEquals("4k.png", CodenameOneGUIBuilder.ProjectImageResource.densityOrder(1000)[0]);
     }
 

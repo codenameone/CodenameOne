@@ -191,7 +191,10 @@ public class CSSThemeCompiler {
                     break;
                 }
                 target = "@" + v.substring("var(--".length(), v.length() - 1).trim();
-                if (DEFERRED_LITERAL.equals(deferred.get(target))) {
+                // A constant a previous compile stored is a final value; when it is text the
+                // alias must stay text as well.
+                boolean earlier = deferred.get(target) == null && theme.get(target) instanceof String;
+                if (DEFERRED_LITERAL.equals(deferred.get(target)) || earlier) {
                     deferred.put(key, DEFERRED_TEXT);
                     break;
                 }
@@ -569,7 +572,10 @@ public class CSSThemeCompiler {
                         if (other != null) {
                             family = family == null ? other[0] : family;
                             size = size == null ? other[1] : size;
-                        } else if (inherited == null) {
+                        }
+                        // Also when this compile has a spec for the key: a recompile of the same
+                        // state that sets only one field keeps the other from the earlier font.
+                        if (inherited == null) {
                             Object existing = theme.get(fallback + Style.FONT);
                             if (existing instanceof Font && ((Font) existing).isTTFNativeFont()) {
                                 inherited = (Font) existing;
@@ -954,8 +960,11 @@ public class CSSThemeCompiler {
             }
             Object replacement = theme.get("@" + key);
             String replaceValue = replacement == null ? "" : replacement.toString();
-            // A quoted constant is text, also when it is reached through another constant.
-            if (!DEFERRED_LITERAL.equals(deferredConstants.get("@" + key))) {
+            // A quoted constant is text, also when it is reached through another constant. So
+            // is one a previous compile into the same theme left: it is already resolved, and
+            // any var() still in it was quoted text there.
+            String kind = deferredConstants.get("@" + key);
+            if (kind != null && !DEFERRED_LITERAL.equals(kind)) {
                 resolving.add(key);
                 replaceValue = resolveVars(theme, replaceValue, resolving);
                 resolving.remove(resolving.size() - 1);
