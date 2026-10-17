@@ -54,22 +54,13 @@ public final class PomEditor implements DependencyEditor {
         if (pom == null || dependency == null) {
             return false;
         }
-        int searchFrom = 0;
-        while (searchFrom < pom.length()) {
-            int start = pom.indexOf("<dependency", searchFrom);
-            if (start < 0) {
-                return false;
+        Element deps = child(parse(pom), "dependencies");
+        if (deps != null) {
+            for (Element entry : deps.children) {
+                if ("dependency".equals(entry.name) && matches(pom, entry, dependency)) {
+                    return true;
+                }
             }
-            int openEnd = pom.indexOf('>', start);
-            int close = openEnd < 0 ? -1 : pom.indexOf("</dependency>", openEnd);
-            if (openEnd < 0 || close < 0) {
-                return false;
-            }
-            String block = pom.substring(start, close + "</dependency>".length());
-            if (matches(block, dependency)) {
-                return true;
-            }
-            searchFrom = close + "</dependency>".length();
         }
         return false;
     }
@@ -87,90 +78,145 @@ public final class PomEditor implements DependencyEditor {
                 + "            <version>" + xml(dependency.version()) + "</version>\n"
                 + (dependency.type().length() == 0 ? "" : "            <type>" + xml(dependency.type()) + "</type>\n")
                 + "        </dependency>\n";
-        int depsEnd = projectDependenciesEnd(pom);
-        if (depsEnd >= 0) {
-            return pom.substring(0, depsEnd) + xml + pom.substring(depsEnd);
+        Element project = parse(pom);
+        Element deps = child(project, "dependencies");
+        if (deps != null) {
+            return insert(pom, deps, xml);
         }
-        int insertion = pom.indexOf("<profiles");
-        if (insertion < 0) {
-            insertion = pom.indexOf("</project>");
+        if (project != null) {
+            return insert(pom, project, "    <dependencies>\n" + xml + "    </dependencies>\n");
         }
-        if (insertion >= 0) {
-            return pom.substring(0, insertion)
-                    + "    <dependencies>\n"
-                    + xml
-                    + "    </dependencies>\n"
-                    + pom.substring(insertion);
-        }
-        return pom + "\n<dependencies>\n" + xml + "</dependencies>\n";
+        throw new IllegalArgumentException("Cannot find the Maven project element");
     }
 
     public static String removeDependency(String pom, MavenDependency dependency) {
         if (pom == null || dependency == null) {
             return pom;
         }
-        int searchFrom = 0;
-        while (searchFrom < pom.length()) {
-            int start = pom.indexOf("<dependency", searchFrom);
-            if (start < 0) {
-                return pom;
-            }
-            int openEnd = pom.indexOf('>', start);
-            int close = openEnd < 0 ? -1 : pom.indexOf("</dependency>", openEnd);
-            if (openEnd < 0 || close < 0) {
-                return pom;
-            }
-            int end = close + "</dependency>".length();
-            String block = pom.substring(start, end);
-            if (matches(block, dependency)) {
-                int lineStart = start;
-                while (lineStart > 0 && (pom.charAt(lineStart - 1) == ' ' || pom.charAt(lineStart - 1) == '\t')) {
-                    lineStart--;
+        Element deps = child(parse(pom), "dependencies");
+        if (deps == null) {
+            return pom;
+        }
+        for (Element entry : deps.children) {
+            if ("dependency".equals(entry.name) && matches(pom, entry, dependency)) {
+                int start = entry.start;
+                while (start > 0 && (pom.charAt(start - 1) == ' ' || pom.charAt(start - 1) == '\t')) {
+                    start--;
                 }
-                int lineEnd = end;
-                while (lineEnd < pom.length() && (pom.charAt(lineEnd) == ' ' || pom.charAt(lineEnd) == '\t')) {
-                    lineEnd++;
+                int end = entry.end;
+                while (end < pom.length() && (pom.charAt(end) == ' ' || pom.charAt(end) == '\t')) {
+                    end++;
                 }
-                if (lineEnd < pom.length() && pom.charAt(lineEnd) == '\n') {
-                    lineEnd++;
+                if (end < pom.length() && pom.charAt(end) == '\n') {
+                    end++;
                 }
-                return pom.substring(0, lineStart) + pom.substring(lineEnd);
+                return pom.substring(0, start) + pom.substring(end);
             }
-            searchFrom = end;
         }
         return pom;
     }
 
-    private static int projectDependenciesEnd(String pom) {
-        int profiles = pom.indexOf("<profiles");
-        int dependencyManagementStart = pom.indexOf("<dependencyManagement");
-        int dependencyManagementEnd = dependencyManagementStart < 0
-                ? -1 : pom.indexOf("</dependencyManagement>", dependencyManagementStart);
-        int searchFrom = 0;
-        while (searchFrom < pom.length()) {
-            int start = pom.indexOf("<dependencies", searchFrom);
-            if (start < 0 || profiles >= 0 && start > profiles) {
-                return -1;
-            }
-            int openEnd = pom.indexOf('>', start);
-            int close = openEnd < 0 ? -1 : pom.indexOf("</dependencies>", openEnd);
-            if (openEnd < 0 || close < 0) {
-                return -1;
-            }
-            boolean managed = dependencyManagementStart >= 0
-                    && start > dependencyManagementStart
-                    && dependencyManagementEnd >= close;
-            if (!managed) {
-                return close;
-            }
-            searchFrom = close + "</dependencies>".length();
+    private static String insert(String text, Element element, String xml) {
+        if (element.end == element.openEnd) { // Self-closing element.
+            return text.substring(0, element.openEnd - 2) + ">\n" + xml
+                    + "</" + element.name + ">" + text.substring(element.end);
         }
-        return -1;
+        return text.substring(0, element.close) + xml + text.substring(element.close);
     }
 
-    private static boolean matches(String block, MavenDependency dependency) {
-        return block.contains("<groupId>" + dependency.groupId() + "</groupId>")
-                && block.contains("<artifactId>" + dependency.artifactId() + "</artifactId>");
+    private static boolean matches(String pom, Element entry, MavenDependency dependency) {
+        return value(pom, child(entry, "groupId")).equals(xml(dependency.groupId()))
+                && value(pom, child(entry, "artifactId")).equals(xml(dependency.artifactId()));
+    }
+
+    private static String value(String text, Element element) {
+        return element == null ? "" : text.substring(element.openEnd, element.close).trim();
+    }
+
+    private static Element child(Element parent, String name) {
+        if (parent != null) {
+            for (Element child : parent.children) {
+                if (name.equals(child.name)) {
+                    return child;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Keep source offsets rather than serializing an XML tree: unrelated POM
+    // formatting and comments must survive edits. Only direct project children
+    // are eligible; plugin, managed and profile dependencies are separate scopes.
+    private static final class Element {
+        String name;
+        int start, openEnd, close, end;
+        java.util.List<Element> children = new java.util.ArrayList<>();
+    }
+
+    private static Element parse(String text) {
+        java.util.List<Element> stack = new java.util.ArrayList<>();
+        Element root = null;
+        for (int pos = 0; (pos = text.indexOf('<', pos)) >= 0;) {
+            String terminator = text.startsWith("<!--", pos) ? "-->"
+                    : text.startsWith("<![CDATA[", pos) ? "]]>"
+                    : text.startsWith("<?", pos) ? "?>" : null;
+            if (terminator != null) {
+                int end = text.indexOf(terminator, pos + 2);
+                if (end < 0) throw new IllegalArgumentException("Incomplete XML markup");
+                pos = end + terminator.length();
+                continue;
+            }
+            if (text.startsWith("<!", pos)) {
+                throw new IllegalArgumentException("Unsupported XML declaration in POM");
+            }
+            int end = pos + 1;
+            char quote = 0;
+            for (; end < text.length(); end++) {
+                char ch = text.charAt(end);
+                if (quote != 0) {
+                    if (ch == quote) quote = 0;
+                } else if (ch == '\'' || ch == '"') {
+                    quote = ch;
+                } else if (ch == '>') {
+                    break;
+                }
+            }
+            if (end == text.length()) throw new IllegalArgumentException("Incomplete XML tag");
+            boolean closing = text.charAt(pos + 1) == '/';
+            int nameStart = pos + (closing ? 2 : 1);
+            int nameEnd = nameStart;
+            while (nameEnd < end && !Character.isWhitespace(text.charAt(nameEnd))
+                    && text.charAt(nameEnd) != '/') nameEnd++;
+            String name = text.substring(nameStart, nameEnd);
+            if (closing) {
+                if (stack.isEmpty()) throw new IllegalArgumentException("Unexpected XML closing tag");
+                Element element = stack.remove(stack.size() - 1);
+                if (!element.name.equals(name)) throw new IllegalArgumentException("Mismatched XML tag");
+                element.close = pos;
+                element.end = end + 1;
+            } else {
+                Element element = new Element();
+                element.name = name;
+                element.start = pos;
+                element.openEnd = end + 1;
+                if (stack.isEmpty()) {
+                    if (root != null || !"project".equals(name)) {
+                        throw new IllegalArgumentException("Expected one Maven project element");
+                    }
+                    root = element;
+                } else {
+                    stack.get(stack.size() - 1).children.add(element);
+                }
+                if (text.charAt(end - 1) == '/') {
+                    element.close = element.end = end + 1;
+                } else {
+                    stack.add(element);
+                }
+            }
+            pos = end + 1;
+        }
+        if (!stack.isEmpty()) throw new IllegalArgumentException("Unclosed XML element");
+        return root;
     }
 
     private static String xml(String value) {

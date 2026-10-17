@@ -63,9 +63,7 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
         // dependency removed in Settings without overwriting its wrapper.
         File pom = new File(binding.pom());
         String original = Files.readString(pom.toPath(), StandardCharsets.UTF_8);
-        String editable = PomEditor.containsDependency(original, dependency) ? original
-                : original.replaceAll("<dependencies\\s*/>", "<dependencies></dependencies>");
-        String updated = PomEditor.addDependency(editable, dependency);
+        String updated = PomEditor.addDependency(original, dependency);
         if (!original.equals(updated)) {
             Files.writeString(pom.toPath(), updated, StandardCharsets.UTF_8);
         }
@@ -98,7 +96,46 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
         if (!dependency.isValid()) {
             throw new IOException("Library wrapper has incomplete Maven coordinates: " + wrapper);
         }
+        File aggregator = new File(wrapper.getParentFile().getParentFile(), "pom.xml");
+        String module = wrapper.getParentFile().getName();
+        if (!aggregator.isFile() || !registered(
+                factory.newDocumentBuilder().parse(aggregator).getDocumentElement(), module)) {
+            throw new IOException("Incomplete library installation: " + wrapper
+                    + " is not registered as module " + module + " in " + aggregator
+                    + ". Restore the module registration before reinstalling. The wrapper was preserved.");
+        }
         return dependency;
+    }
+
+    private static boolean registered(Element project, String module) {
+        if (hasModule(child(project, "modules"), module)) return true;
+        Element profiles = child(project, "profiles");
+        if (profiles != null) {
+            for (Node node = profiles.getFirstChild(); node != null; node = node.getNextSibling()) {
+                if (node instanceof Element && "profile".equals(node.getNodeName())
+                        && hasModule(child((Element) node, "modules"), module)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasModule(Element modules, String name) {
+        if (modules != null) {
+            for (Node node = modules.getFirstChild(); node != null; node = node.getNextSibling()) {
+                if (node instanceof Element && "module".equals(node.getNodeName())
+                        && name.equals(node.getTextContent().trim())) return true;
+            }
+        }
+        return false;
+    }
+
+    private static Element child(Element parent, String name) {
+        if (parent != null) {
+            for (Node node = parent.getFirstChild(); node != null; node = node.getNextSibling()) {
+                if (node instanceof Element && name.equals(node.getNodeName())) return (Element) node;
+            }
+        }
+        return null;
     }
 
     private static String value(Element project, String name) {
@@ -122,13 +159,17 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
         boolean windows = System.getProperty("os.name", "").startsWith("Windows");
         String java = new File(System.getProperty("java.home"), "bin/java" + (windows ? ".exe" : "")).getPath();
         File root = new File(binding.projectDir()).getCanonicalFile().getParentFile();
-        return new ArrayList<>(Arrays.asList(java, "-Duser.home=" + System.getProperty("user.home"),
+        List<String> command = new ArrayList<>(Arrays.asList(java, "-Duser.home=" + System.getProperty("user.home"),
                 "-Dmaven.home=" + home,
                 "-Dmaven.multiModuleProjectDirectory=" + root,
                 "-Dclassworlds.conf=" + new File(home, "bin/m2.conf"),
                 "-cp", boot[0].getPath(), "org.codehaus.plexus.classworlds.launcher.Launcher",
-                "--batch-mode", "--non-recursive", "cn1:install-cn1lib",
-                "-Dfile=" + library.getAbsolutePath()));
+                "--batch-mode", "--non-recursive"));
+        command.addAll(binding.mavenArguments());
+        // The selected archive always wins over a -Dfile from the Settings invocation.
+        command.add("cn1:install-cn1lib");
+        command.add("-Dfile=" + library.getAbsolutePath());
+        return command;
     }
 
     private File mavenHome(ProjectBinding binding) throws IOException {

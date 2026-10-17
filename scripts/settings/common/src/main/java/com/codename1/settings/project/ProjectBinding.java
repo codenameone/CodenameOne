@@ -30,6 +30,20 @@ public final class ProjectBinding {
     public static final String BUILD_GRADLE = "GRADLE";
 
     private String mavenHome;
+    private final java.util.List<String> mavenArguments = new java.util.ArrayList<>();
+
+    public java.util.List<String> mavenArguments() {
+        return mavenArguments;
+    }
+
+    private static String decodeArgument(String encoded) {
+        try {
+            return new String(com.codename1.util.Base64.decode(encoded.getBytes("UTF-8")), "UTF-8");
+        } catch (java.io.UnsupportedEncodingException ex) {
+            throw new IllegalStateException("UTF-8 is unavailable", ex);
+        }
+    }
+
     private String projectDir;
     private String settings;
     private String pom;
@@ -174,6 +188,7 @@ public final class ProjectBinding {
             String val = trimmed.substring(eq + 1).trim();
             switch (key) {
                 case "mavenHome" -> b.mavenHome = val;
+                case "mavenArgument" -> b.mavenArguments.add(decodeArgument(val));
                 case "projectDir" -> b.projectDir = val;
                 case "settings" -> b.settings = val;
                 case "pom" -> b.pom = val;

@@ -56,7 +56,64 @@ class MavenLibraryInstallerTest {
         Files.writeString(wrapper, "<project><parent><groupId>parent</groupId><artifactId>parent</artifactId>"
                 + "<version>0</version></parent><groupId>example</groupId><artifactId>example-lib</artifactId>"
                 + "<version>1</version><packaging>pom</packaging></project>");
+        Files.writeString(wrapper.getParent().getParent().resolve("pom.xml"),
+                "<project><profiles><profile><id>Example.cn1lib-cn1lib</id>"
+                + "<activation><file><exists>${basedir}/Example/pom.xml</exists></file></activation>"
+                + "<modules><module>Example</module></modules></profile></profiles></project>");
         return wrapper;
+    }
+
+    @Test void retainsLaunchingMavenOptionsWithoutShellSplitting() throws Exception {
+        ProjectBinding original = project();
+        List<String> options = List.of("--settings", root.resolve("alternate settings.xml").toString(),
+                "--global-settings", root.resolve("global settings.xml").toString(),
+                "--offline", "-Pprivate", "-P!public", "-Dmaven.repo.local=" + root.resolve("local repo"),
+                "-Dcustom=spaces & equals=and\nnewlines Ω ", "-Dfile=old.cn1lib");
+        StringBuilder content = new StringBuilder("projectDir=" + original.projectDir()
+                + "\nmavenHome=" + original.mavenHome() + "\n");
+        for (String option : options) {
+            content.append("mavenArgument=").append(java.util.Base64.getEncoder().encodeToString(
+                    option.getBytes(java.nio.charset.StandardCharsets.UTF_8))).append('\n');
+        }
+        ProjectBinding binding = ProjectBinding.parse(content.toString());
+        assertEquals(options, binding.mavenArguments());
+        File archive = root.resolve("Example.cn1lib").toFile();
+        List<String> command = new MavenLibraryInstaller().command(binding, archive);
+        int first = command.indexOf("--non-recursive") + 1;
+        assertEquals(options, command.subList(first, first + options.size()));
+        assertEquals("-Dfile=" + archive, command.get(command.size() - 1));
+    }
+
+    @Test void partialConversionCannotBecomeSuccessOnRetry() throws Exception {
+        ProjectBinding binding = project();
+        Path archive = root.resolve("Example.cn1lib");
+        Files.writeString(archive, "archive");
+        String commonBefore = Files.readString(Path.of(binding.pom()));
+        MavenLibraryInstaller installer = new MavenLibraryInstaller() {
+            @Override void runMaven(List<String> command, File common) throws IOException {
+                try {
+                    Path generated = wrapper(binding);
+                    Files.delete(generated.getParent().getParent().resolve("pom.xml"));
+                } catch (Exception ex) { throw new IOException(ex); }
+                throw new IOException("Conversion interrupted after writing wrapper");
+            }
+        };
+        assertThrows(IOException.class, () -> installer.install(binding, archive.toString()));
+        Path generated = Path.of(binding.projectDir()).getParent().resolve("cn1libs/Example/pom.xml");
+        String wrapperBefore = Files.readString(generated);
+        IOException retry = assertThrows(IOException.class, () -> installer.install(binding, archive.toString()));
+        assertTrue(retry.getMessage().contains("not registered as module Example"));
+        assertEquals(commonBefore, Files.readString(Path.of(binding.pom())));
+        assertEquals(wrapperBefore, Files.readString(generated));
+        Files.writeString(generated.getParent().getParent().resolve("pom.xml"),
+                "<project><modules><module>Other</module></modules>"
+                + "<!-- <module>Example</module> --></project>");
+        assertThrows(IOException.class, () -> installer.dependency(binding, "Example.cn1lib"));
+        Files.writeString(generated.getParent().getParent().resolve("pom.xml"),
+                "<project><modules><module>Example</module></modules></project>");
+        installer.install(binding, archive.toString());
+        assertTrue(Files.readString(Path.of(binding.pom())).contains("<artifactId>example-lib</artifactId>"));
+        assertEquals(wrapperBefore, Files.readString(generated));
     }
 
     @Test void downloadedFileAloneIsNotInstalled() throws Exception {

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.settings;
 
 import com.codename1.settings.extensions.MavenDependency;
@@ -9,6 +31,39 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class PomEditorTest {
+    @Test
+    public void ignoresPluginManagedProfileAndCommentDependencies() throws Exception {
+        MavenDependency dep = new MavenDependency("example", "target", "1");
+        String dependency = "<dependency><groupId>example</groupId><artifactId>target</artifactId></dependency>";
+        String[] otherScopes = {
+            "<build><plugins><plugin><dependencies/></plugin></plugins></build>",
+            "<build><plugins><plugin><dependencies>" + dependency + "</dependencies></plugin></plugins></build>",
+            "<dependencyManagement><dependencies>" + dependency + "</dependencies></dependencyManagement>",
+            "<profiles><profile><dependencies>" + dependency + "</dependencies></profile></profiles>",
+            "<!-- <dependencies>" + dependency + "</dependencies> -->",
+            "<properties><example><![CDATA[<dependencies/>]]></example></properties>"
+        };
+        for (String other : otherScopes) {
+            for (String projectDeps : new String[]{"", "<dependencies/>", "<dependencies />",
+                    "<dependencies></dependencies>"}) {
+                String pom = "<?xml version=\"1.0\"?><project note=\"a > b\">" + other + projectDeps + "</project>";
+                assertFalse(PomEditor.containsDependency(pom, dep));
+                assertEquals(pom, PomEditor.removeDependency(pom, dep));
+                String installed = PomEditor.addDependency(pom, dep);
+                assertTrue(installed.contains(other), "Unrelated XML must remain byte-for-byte intact");
+                assertTrue(PomEditor.containsDependency(installed, dep));
+                org.w3c.dom.Document document = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+                        .newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(installed)));
+                assertEquals("1", javax.xml.xpath.XPathFactory.newInstance().newXPath().evaluate(
+                        "count(/project/dependencies/dependency[artifactId='target'])", document));
+                assertEquals(installed, PomEditor.addDependency(installed, dep));
+                String removed = PomEditor.removeDependency(installed, dep);
+                assertTrue(removed.contains(other));
+                assertFalse(PomEditor.containsDependency(removed, dep));
+            }
+        }
+    }
+
     @Test
     public void removingInstalledLegacyDependencyPreservesCompactPom() {
         String pom = "<project><dependencies></dependencies></project>";
