@@ -711,6 +711,47 @@ public class CSSThemeCompilerTest extends UITestBase {
                 .compile("Label{font-size:larger;}", new MutableResource(), "Theme"));
     }
 
+    @Test
+    public void testCrlfLineContinuationInAQuotedConstant() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{a:\"first\\\r\nsecond\";b:\"x\\\ry\";}", resource, "Theme");
+        assertEquals("firstsecond", resource.getTheme("Theme").get("@a"));
+        assertEquals("xy", resource.getTheme("Theme").get("@b"));
+    }
+
+    @Test
+    public void testCustomPropertyInARuleAppliesInDeclarationOrder() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{--accent:#ff0000;color:var(--accent);--accent:#0000ff;}",
+                resource, "Theme");
+        assertEquals("ff0000", resource.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
+    public void testUnitlessDecimalInsetIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{padding:1.5;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testLastStateDeriveWinsForTheOwningUiid() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("BaseA{font-family:'native:MainBold';}"
+                + "BaseB{font-family:'native:MainLight';}"
+                + "Child:selected{cn1-derive:BaseA;}"
+                + "Child:disabled{cn1-derive:BaseB;}"
+                + "Child:pressed{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainLight", fontName((Font) resource.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
+    public void testSecondCompileKeepsTheFamilyOfAnEarlierFont() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:'native:MainBold';font-size:10px;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label:selected{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.sel#font")));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

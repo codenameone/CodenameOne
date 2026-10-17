@@ -1813,6 +1813,16 @@ class GeneratedSourceTest {
                 "the image comes from res/<theme>/play.png/medium.png");
     }
 
+    @Test
+    void anImageVariantIsChosenForTheDisplayDensity() {
+        String[] high = CodenameOneGUIBuilder.ProjectImageResource.densityOrder(com.codename1.ui.Display.DENSITY_HIGH);
+        assertEquals("high.png", high[0]);
+        assertEquals("veryhigh.png", high[1]);
+        assertEquals("medium.png", high[high.length - 3]);
+        assertEquals("verylow.png", high[high.length - 1]);
+        assertEquals("4k.png", CodenameOneGUIBuilder.ProjectImageResource.densityOrder(1000)[0]);
+    }
+
     private static String describe(Object diagnostic) throws Exception {
         for (String getter : new String[]{"getMessage", "getDescription", "getText"}) {
             try {

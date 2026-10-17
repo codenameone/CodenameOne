@@ -5503,7 +5503,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                         for (String theme : fs.listFiles(res)) {
                             String folder = res + "/" + stripSlash(theme) + "/" + id;
                             if (!fs.isDirectory(folder)) continue;
-                            for (String density : new String[]{"veryhigh.png", "high.png", "medium.png"}) {
+                            for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
                                 image = load(folder + "/" + density);
                                 if (image != null) break;
                             }
@@ -5524,6 +5524,30 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
             if (image != null) setImage(id, image);
             return image;
+        }
+
+        private static final int[] DENSITIES = {
+            com.codename1.ui.Display.DENSITY_VERY_LOW, com.codename1.ui.Display.DENSITY_LOW,
+            com.codename1.ui.Display.DENSITY_MEDIUM, com.codename1.ui.Display.DENSITY_HIGH,
+            com.codename1.ui.Display.DENSITY_VERY_HIGH, com.codename1.ui.Display.DENSITY_HD,
+            com.codename1.ui.Display.DENSITY_560, com.codename1.ui.Display.DENSITY_2HD,
+            com.codename1.ui.Display.DENSITY_4K};
+        private static final String[] DENSITY_FILES = {
+            "verylow.png", "low.png", "medium.png", "high.png", "veryhigh.png", "hd.png", "560.png", "2hd.png", "4k.png"};
+
+        /**
+         * The variant files of a multi-image, best first for a display of {@code density}: the
+         * project build stores every variant and the device picks its own, so the canvas shows
+         * the one the running density would get -- that density, then the nearest larger one
+         * (scaled down), then the nearest smaller.
+         */
+        static String[] densityOrder(int density) {
+            int at = 0;
+            while (at < DENSITIES.length - 1 && DENSITIES[at] < density) at++;
+            java.util.List<String> out = new java.util.ArrayList<String>();
+            for (int i = at; i < DENSITIES.length; i++) out.add(DENSITY_FILES[i]);
+            for (int i = at - 1; i >= 0; i--) out.add(DENSITY_FILES[i]);
+            return out.toArray(new String[out.size()]);
         }
 
         private static String stripSlash(String name) {

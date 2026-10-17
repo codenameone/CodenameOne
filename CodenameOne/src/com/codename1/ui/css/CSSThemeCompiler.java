@@ -97,6 +97,10 @@ public class CSSThemeCompiler {
     /// The `deferred` table of the compile in progress; resolveVars reads which constants are literal.
     private Hashtable<String, String> deferredConstants = new Hashtable<String, String>();
 
+    /// The `cn1-derive` each UIID (with its `$Dark` prefix) declared last in any state, in source
+    /// order: the build-time compiler sets every such derive on the owning UIID, so the last one wins.
+    private Hashtable<String, String> ownerDerives = new Hashtable<String, String>();
+
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
         if (theme == null) {
@@ -119,7 +123,11 @@ public class CSSThemeCompiler {
             if (rule.constants) {
                 compileConstants(rule.declarations, theme, deferred);
                 for (Declaration declaration : rule.declarations) {
-                    finalConstants.put(declaration.name, declaration);
+                    Declaration previous = finalConstants.put(declaration.name, declaration);
+                    if (previous != null) {
+                        previous.winner = false;
+                    }
+                    declaration.winner = true;
                 }
             }
         }
@@ -128,21 +136,19 @@ public class CSSThemeCompiler {
         // Only the winning declaration of a #Constants name is applied again here, so it still
         // overrides a custom property declared before it.
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
+        ownerDerives = new Hashtable<String, String>();
         for (Rule rule : rules) {
             if (rule.constants) {
                 ArrayList<Declaration> winners = new ArrayList<Declaration>();
                 for (Declaration declaration : rule.declarations) {
-                    if (finalConstants.get(declaration.name) == declaration) {
+                    if (declaration.winner) {
                         winners.add(declaration);
                     }
                 }
                 compileConstants(winners.toArray(new Declaration[winners.size()]), theme, deferred);
                 continue;
             }
-            for (Declaration declaration : rule.declarations) {
-                applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
-            }
-            applyRule(theme, resources, rule, fonts);
+            applyRule(theme, resources, rule, fonts, deferred);
         }
         markLiteralAliases(theme, deferred);
         compileFonts(theme, fonts);
@@ -393,8 +399,11 @@ public class CSSThemeCompiler {
             }
             i++;
             c = v.charAt(i);
-            if (c == '\n') {
-                // An escaped newline continues the string.
+            if (c == '\n' || c == '\r' || c == '\f') {
+                // An escaped newline (LF, CRLF, CR or FF) continues the string.
+                if (c == '\r' && i + 1 < end && v.charAt(i + 1) == '\n') {
+                    i++;
+                }
                 continue;
             }
             int digits = 0;
@@ -425,9 +434,12 @@ public class CSSThemeCompiler {
         return out.toString();
     }
 
-    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts) {
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts,
+                           Hashtable<String, String> deferred) {
         if (":root".equals(rule.selector)) {
-            // Its custom properties were stored just before this call.
+            for (Declaration declaration : rule.declarations) {
+                applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
+            }
             return;
         }
 
@@ -439,10 +451,15 @@ public class CSSThemeCompiler {
         for (int i = 0; i < rule.declarations.length; i++) {
             Declaration declaration = rule.declarations[i];
             String property = declaration.property;
-            if (declaration.name.startsWith("--")) {
+            // A custom property takes effect where it is declared, also within a rule: the
+            // build-time parser resolves each declaration as it reads it.
+            if (applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred)) {
                 continue;
             }
             String value = resolveVars(theme, declaration.value);
+            if ("cn1-derive".equals(property) && statePrefix.length() > 0) {
+                ownerDerives.put(uiid, value.trim());
+            }
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
             }
@@ -531,6 +548,9 @@ public class CSSThemeCompiler {
             // `*` compiles to Component, the implicit parent of every UIID in the build-time
             // compiler, so it comes after the explicit derive chain.
             String own = dark ? uiid.substring(5) : uiid;
+            // A font a previous compile into the same theme built, when this compile has no
+            // spec for that key: its family and size stand in for the missing half.
+            Font inherited = null;
             for (int pass = 0; pass < 2 && (family == null || size == null); pass++) {
                 String lookup = pass == 0 ? state : "";
                 if (pass == 1 && state.length() == 0) {
@@ -549,11 +569,28 @@ public class CSSThemeCompiler {
                         if (other != null) {
                             family = family == null ? other[0] : family;
                             size = size == null ? other[1] : size;
+                        } else if (inherited == null) {
+                            Object existing = theme.get(fallback + Style.FONT);
+                            if (existing instanceof Font && ((Font) existing).isTTFNativeFont()) {
+                                inherited = (Font) existing;
+                            }
                         }
                     }
                 }
             }
-            theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
+            FontSize parsed = size == null ? null : parseFontSize(size);
+            Font font;
+            if (inherited != null && family == null && parsed != null && parsed.unit >= 0) {
+                font = inherited.derive(fontSizeInPixels(parsed), inherited.getStyle());
+            } else {
+                if (inherited != null && family != null && parsed == null) {
+                    parsed = new FontSize();
+                    parsed.unit = Style.UNIT_TYPE_PIXELS;
+                    parsed.value = inherited.getPixelSize();
+                }
+                font = createFont(family, parsed);
+            }
+            theme.put(keyPrefix + Style.FONT, font);
         }
     }
 
@@ -586,6 +623,14 @@ public class CSSThemeCompiler {
     /// The build-time compiler applies a `cn1-derive` declared in any state to the owning UIID,
     /// so `Child:selected{cn1-derive:Base}` is also where `Child:pressed` inherits from.
     private String anyStateDerive(Hashtable theme, String id, boolean dark) {
+        String recorded = dark ? ownerDerives.get("$Dark" + id) : null;
+        if (recorded == null) {
+            recorded = ownerDerives.get(id);
+        }
+        if (recorded != null) {
+            return recorded;
+        }
+        // A derive a previous compile into the same theme stored: its order is gone.
         String[] states = {"sel#", "press#", "dis#", "hover#"};
         for (int pass = dark ? 0 : 1; pass < 2; pass++) {
             String prefix = pass == 0 ? "$Dark" + id + "." : id + ".";
@@ -1142,6 +1187,11 @@ public class CSSThemeCompiler {
             throw new CSSSyntaxException("Unsupported unit for padding or margin: " + value);
         }
         String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "rem", "vw", "vh", "vmin", "vmax"});
+        // A bare number must be whole: the build-time compiler takes `1.5` for a dimension
+        // missing its unit and fails the build.
+        if (unit == null && v.indexOf('.') > -1) {
+            throw new CSSSyntaxException("A unitless padding or margin must be a whole number: " + value);
+        }
         float n = number(unit == null ? v : v.substring(0, v.length() - unit.length()), value);
         if (unit == null || "px".equals(unit) || "pt".equals(unit)) {
             out.unit = Style.UNIT_TYPE_PIXELS;
@@ -1438,6 +1488,8 @@ public class CSSThemeCompiler {
         /// The lower case name ordinary CSS properties are matched by.
         String property;
         String value;
+        /// The last declaration of its name across every #Constants block.
+        boolean winner;
     }
 
     private static class Length {
