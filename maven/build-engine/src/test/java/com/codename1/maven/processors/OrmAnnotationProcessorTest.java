@@ -224,9 +224,11 @@ public class OrmAnnotationProcessorTest {
         // DATE mapping over a timestamp column, which would drop the time it reads.
         // SQLite has no date type, so there the last one fits.
         sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
+        sources.put("adopt.Code","package adopt; import com.codename1.annotations.*; @Entity(table=\"legacy_code\") public class Code { @Id(autoIncrement=false) public String code; }");
         sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite,int tagIssues) { "
-            + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(),tags=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().equals(\"legacy_customer_tag\")) tags.add(i); else if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
+            + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(),tags=new ArrayList<SchemaReport.Issue>(),codes=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().equals(\"legacy_customer_tag\")) tags.add(i); else if(i.getTable().equals(\"legacy_code\")) codes.add(i); else if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
             + "if(tags.size()!=tagIssues || tagIssues>0 && !(tags.get(0).getKind()==(sqlite?SchemaReport.Kind.CONSTRAINT_MISMATCH:SchemaReport.Kind.UNSUPPORTED) && \"tag\".equals(tags.get(0).getColumn()))) throw new AssertionError(\"tag report \"+tags); "
+            + "boolean mysql=!sqlite && tagIssues==1; if(codes.size()!=(mysql?1:0) || mysql && !(codes.get(0).getKind()==SchemaReport.Kind.UNSUPPORTED && codes.get(0).getMessage().contains(\"folds case\"))) throw new AssertionError(\"code report \"+codes); "
             + "if(mine.size()!=(sqlite?3:4)) throw new AssertionError(\"report \"+mine); "
             + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED : \"source\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.CONSTRAINT_MISMATCH; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
@@ -266,7 +268,7 @@ public class OrmAnnotationProcessorTest {
         String dialect=backend ? db.dialect().getName().toLowerCase(java.util.Locale.ROOT) : "sqlite";
         boolean postgres=dialect.startsWith("postgres"), mysql=dialect.startsWith("mysql") || dialect.startsWith("mariadb");
         String[] ddl={
-            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
+            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code","CREATE TABLE legacy_code (code VARCHAR(40)"+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : "")+" NOT NULL PRIMARY KEY)","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
             // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the

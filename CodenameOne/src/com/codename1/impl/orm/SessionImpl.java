@@ -1329,6 +1329,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
                             attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
+                if (attr.id && attr.kind == Attribute.TEXT && found.length > 5
+                        && !distinctKeyCollation((String) found[5])) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Identifier " + name + " uses collation " + found[5]
+                            + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
+                }
                 if (found.length > 7) {
                     // An insert omits a generated id and names every other column.
                     if (attr.generated && ((Number) found[6]).intValue() == 0) {
