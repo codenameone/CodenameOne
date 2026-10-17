@@ -768,6 +768,31 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("var(--name)", resource.getTheme("Theme").get("@alias"));
     }
 
+    @Test
+    public void testAliasOfAnEarlierUnquotedColorBecomesAColor() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--accent:#abc;}", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{alias:var(--accent);}", resource, "Theme");
+        assertEquals("aabbcc", String.valueOf(resource.getTheme("Theme").get("@alias")).toLowerCase());
+    }
+
+    @Test
+    public void testRecompileKeepsAMonospaceFamily() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:monospace;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{font-size:20px;}", resource, "Theme");
+        assertEquals(Font.FACE_MONOSPACE, ((Font) resource.getTheme("Theme").get("Label.font")).getFace());
+    }
+
+    @Test
+    public void testDeclarationPriorityIsNotPartOfTheValue() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{includeNativeBool:true !important;msg:\"a !important\";}",
+                resource, "Theme");
+        assertEquals("true", resource.getTheme("Theme").get("@includeNativeBool"));
+        assertEquals("a !important", resource.getTheme("Theme").get("@msg"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

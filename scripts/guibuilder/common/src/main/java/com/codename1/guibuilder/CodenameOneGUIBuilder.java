@@ -5500,7 +5500,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 String res = ProjectIO.fsUrl(cssDir + "/res");
                 try {
                     if (fs.isDirectory(res)) {
-                        for (String theme : fs.listFiles(res)) {
+                        // res/Theme first, as CSSTheme.getResourceImage() does, then the others.
+                        java.util.List<String> themes = new java.util.ArrayList<String>();
+                        themes.add("Theme");
+                        for (String listed : fs.listFiles(res)) {
+                            if (!"Theme".equals(stripSlash(listed))) themes.add(listed);
+                        }
+                        for (String theme : themes) {
                             String folder = res + "/" + stripSlash(theme) + "/" + id;
                             if (!fs.isDirectory(folder)) continue;
                             for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {

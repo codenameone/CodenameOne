@@ -191,9 +191,11 @@ public class CSSThemeCompiler {
                     break;
                 }
                 target = "@" + v.substring("var(--".length(), v.length() - 1).trim();
-                // A constant a previous compile stored is a final value; when it is text the
-                // alias must stay text as well.
-                boolean earlier = deferred.get(target) == null && theme.get(target) instanceof String;
+                // A constant a previous compile stored is a final value: a var() still in it was
+                // quoted text there, and must not be expanded through the alias. Any other earlier
+                // value is classified like a fresh one, so `#abc` still becomes a color.
+                Object earlierValue = deferred.get(target) == null ? theme.get(target) : null;
+                boolean earlier = earlierValue instanceof String && ((String) earlierValue).indexOf("var(--") > -1;
                 if (DEFERRED_LITERAL.equals(deferred.get(target)) || earlier) {
                     deferred.put(key, DEFERRED_TEXT);
                     break;
@@ -577,12 +579,23 @@ public class CSSThemeCompiler {
                         // state that sets only one field keeps the other from the earlier font.
                         if (inherited == null) {
                             Object existing = theme.get(fallback + Style.FONT);
-                            if (existing instanceof Font && ((Font) existing).isTTFNativeFont()) {
+                            if (existing instanceof Font) {
                                 inherited = (Font) existing;
                             }
                         }
                     }
                 }
+            }
+            // A system font keeps only what it can say: monospace, and its system size.
+            if (inherited != null && !inherited.isTTFNativeFont()) {
+                if (family == null && inherited.getFace() == Font.FACE_MONOSPACE) {
+                    family = "monospace";
+                }
+                if (size == null) {
+                    size = inherited.getSize() == Font.SIZE_SMALL ? "small"
+                            : inherited.getSize() == Font.SIZE_LARGE ? "large" : "medium";
+                }
+                inherited = null;
             }
             FontSize parsed = size == null ? null : parseFontSize(size);
             Font font;
@@ -1384,6 +1397,31 @@ public class CSSThemeCompiler {
         return out.toString();
     }
 
+    /// Drops a trailing `!important`: the build-time SAC parser reports priority apart from the
+    /// value and the compiler ignores it, so `includeNativeBool: true !important` stores `true`.
+    private static String stripPriority(String value) {
+        String marker = "!important";
+        int at = value.length() - marker.length();
+        if (at < 0 || !value.regionMatches(true, at, marker, 0, marker.length())) {
+            return value;
+        }
+        int bang = at;
+        while (bang > 0 && value.charAt(bang - 1) <= ' ') {
+            bang--;
+        }
+        // Inside an unterminated quote the marker is text, not a priority.
+        int quotes = 0;
+        for (int i = 0; i < bang; i++) {
+            char c = value.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == '"' || c == '\'') {
+                quotes++;
+            }
+        }
+        return quotes % 2 == 0 ? value.substring(0, bang).trim() : value;
+    }
+
     private Declaration[] parseDeclarations(String body) {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
         String[] segments = splitDeclarations(body);
@@ -1399,7 +1437,7 @@ public class CSSThemeCompiler {
             Declaration dec = new Declaration();
             dec.name = trimmed.substring(0, colon).trim();
             dec.property = dec.name.toLowerCase();
-            dec.value = trimmed.substring(colon + 1).trim();
+            dec.value = stripPriority(trimmed.substring(colon + 1).trim());
             if (dec.property.length() == 0 || dec.value.length() == 0) {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
             }

@@ -1814,6 +1814,21 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void theThemeFolderNamedThemeIsSearchedFirst() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        for (String theme : new String[]{"Aaa", "Theme"}) {
+            java.nio.file.Path folder = dir.resolve("res").resolve(theme).resolve("play.png");
+            java.nio.file.Files.createDirectories(folder);
+            int size = "Theme".equals(theme) ? 3 : 2;
+            javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(size, size,
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        }
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(3, image.getWidth());
+    }
+
+    @Test
     void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
