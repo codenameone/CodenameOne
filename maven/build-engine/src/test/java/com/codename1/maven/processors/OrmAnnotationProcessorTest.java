@@ -224,8 +224,9 @@ public class OrmAnnotationProcessorTest {
         // DATE mapping over a timestamp column, which would drop the time it reads.
         // SQLite has no date type, so there the last one fits.
         sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
-        sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite) { "
-            + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
+        sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite,int tagIssues) { "
+            + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(),tags=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().equals(\"legacy_customer_tag\")) tags.add(i); else if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
+            + "if(tags.size()!=tagIssues || tagIssues>0 && !(tags.get(0).getKind()==(sqlite?SchemaReport.Kind.CONSTRAINT_MISMATCH:SchemaReport.Kind.UNSUPPORTED) && \"tag\".equals(tags.get(0).getColumn()))) throw new AssertionError(\"tag report \"+tags); "
             + "if(mine.size()!=(sqlite?3:4)) throw new AssertionError(\"report \"+mine); "
             + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED : \"source\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.CONSTRAINT_MISMATCH; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
@@ -267,7 +268,9 @@ public class OrmAnnotationProcessorTest {
             "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
-            "CREATE TABLE legacy_customer_tag (customer_no BIGINT NOT NULL, tag VARCHAR(255) NOT NULL, PRIMARY KEY (customer_no, tag))",
+            // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the
+            // server's default collation folds case, so "A" and "a" collide.
+            "CREATE TABLE legacy_customer_tag (customer_no BIGINT NOT NULL, tag VARCHAR(255)"+(postgres ? " NOT NULL" : mysql ? " NOT NULL COLLATE utf8mb4_0900_ai_ci" : "")+", PRIMARY KEY (customer_no, tag))",
             "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", source VARCHAR(10) NOT NULL)"};
         for(String statement:ddl) {
             if(backend) db.execute(statement,new Object[0]);
@@ -276,7 +279,7 @@ public class OrmAnnotationProcessorTest {
         com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(db) : null;
         com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(jdbc));
         com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
-        try { loader.loadClass("adopt.Check").getMethod("run",com.codename1.orm.session.Session.class,boolean.class).invoke(null,session,"sqlite".equals(dialect)); }
+        try { loader.loadClass("adopt.Check").getMethod("run",com.codename1.orm.session.Session.class,boolean.class,int.class).invoke(null,session,"sqlite".equals(dialect),postgres?0:1); }
         catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError(dialect+(backend?" backend: ":" client: ")+error.getCause(),error.getCause()); }
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }

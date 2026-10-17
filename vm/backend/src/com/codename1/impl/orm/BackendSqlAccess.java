@@ -62,7 +62,7 @@ public final class BackendSqlAccess implements SqlAccess {
             List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]);
             List<Object[]> result = new ArrayList<Object[]>();
             for (Object[] row : raw) {
-                result.add(new Object[]{row[1], row[2], row[3], row[5], Integer.valueOf(row[4] != null ? 1 : 0)});
+                result.add(new Object[]{row[1], row[2], row[3], row[5], Integer.valueOf(row[4] != null ? 1 : 0), null});
             }
             return result;
         }
@@ -74,10 +74,10 @@ public final class BackendSqlAccess implements SqlAccess {
         String filled = mysql
                 ? "CASE WHEN c.column_default IS NOT NULL OR c.extra LIKE '%auto_increment%' OR c.extra LIKE '%GENERATED%' THEN 1 ELSE 0 END"
                 : "CASE WHEN c.column_default IS NOT NULL OR c.is_identity='YES' OR c.is_generated='ALWAYS' THEN 1 ELSE 0 END";
-        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled "
+        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, c.collation_name "
                 + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
                 + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
-        return query(statement, mysql ? new Object[]{table} : new Object[]{table, table}, new int[5]);
+        return query(statement, mysql ? new Object[]{table} : new Object[]{table, table}, new int[6]);
     }
 
     @Override

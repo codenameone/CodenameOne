@@ -1408,7 +1408,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 continue;
             }
             boolean primary = ((Number) found[3]).intValue() != 0;
-            boolean required = ((Number) found[2]).intValue() != 0 || primary;
+            // SQLite lets a composite primary key column hold NULL, so only its
+            // NOT NULL flag says the column is required there.
+            boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
+            if (attr.id && attr.kind == Attribute.TEXT && found.length > 5 && !distinctKeyCollation((String) found[5])) {
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Collection key " + name + " uses collation " + found[5]
+                        + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
+            }
             if (attr.id != primary) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Primary key mismatch on collection " + name));
@@ -1457,6 +1464,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, (String) column[0],
                 "Unmapped NOT NULL column without a default " + table + "." + column[0]));
+    }
+    /// Whether a MySQL text key column keeps every value a Java set or map
+    /// keeps apart: binary, and NO PAD so trailing spaces still differ -- the
+    /// collations the backend itself declares. Other engines report no such
+    /// collation here and are accepted.
+    private boolean distinctKeyCollation(String collation) {
+        if (collation == null || !"mysql".equals(sql.dialect())) {
+            return true;
+        }
+        return "utf8mb4_0900_bin".equalsIgnoreCase(collation) || "binary".equalsIgnoreCase(collation)
+                || collation.regionMatches(true, collation.length() - 10, "_nopad_bin", 0, 10);
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();

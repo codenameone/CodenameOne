@@ -39,7 +39,8 @@ public interface SqlAccess {
     String dialect();
     /// Rows contain column name, declared SQL type, not-null flag, primary-key flag, and a
     /// flag that is 1 when the database fills the column itself (a default, identity or
-    /// generated column).
+    /// generated column), and the column's collation name, or null when the
+    /// database reports none or the dialect does not say.
     List<Object[]> describe(String table) throws IOException;
     /// Quotes a single SQL identifier for this dialect.
     String quote(String name);
