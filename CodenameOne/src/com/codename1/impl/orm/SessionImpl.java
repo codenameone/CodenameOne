@@ -1172,6 +1172,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if ("sqlite".equals(sql.dialect())) {
             return family == typeFamily(expected) || attr.temporal != 0 && family == 2;
         }
+        if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && "mysql".equals(sql.dialect())
+                && "timestamp".equals(firstTypeToken(found))) {
+            // MySQL's TIMESTAMP ends in 2038; a Date the converter accepts
+            // would be rejected or coerced. DATETIME is what the mapping needs.
+            return false;
+        }
         return family == typeFamily(expected) && (attr.temporal == 0 || family != 5 || temporalKind(found) == attr.temporal);
     }
 
@@ -1330,6 +1336,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             }
             for (Object[] column : columns) {
+                unmappedRequired(errors, model.table(), column, attrs);
                 if (((Number) column[3]).intValue() != 0) {
                     boolean mapped = false;
                     for (Attribute attr : attrs) {
@@ -1417,7 +1424,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         + ", the mapping stores " + type));
             }
         }
+        Attribute[] attrs = expected.toArray(new Attribute[expected.size()]);
         for (Object[] column : columns) {
+            unmappedRequired(errors, table, column, attrs);
             if (((Number) column[3]).intValue() != 0) {
                 boolean mapped = false;
                 for (Attribute attr : expected) {
@@ -1431,6 +1440,23 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             }
         }
+    }
+    /// A NOT NULL column the mapping does not write and the database does not
+    /// fill fails every insert, so it is reported rather than found at the
+    /// first save. Primary key columns are reported on their own.
+    private void unmappedRequired(List<SchemaReport.Issue> errors, String table, Object[] column,
+            Attribute[] attrs) {
+        if (((Number) column[2]).intValue() == 0 || ((Number) column[3]).intValue() != 0
+                || column.length > 4 && ((Number) column[4]).intValue() != 0) {
+            return;
+        }
+        for (Attribute attr : attrs) {
+            if (columnNameMatches(attr.column, (String) column[0])) {
+                return;
+            }
+        }
+        errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, (String) column[0],
+                "Unmapped NOT NULL column without a default " + table + "." + column[0]));
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();

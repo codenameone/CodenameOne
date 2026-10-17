@@ -37,7 +37,9 @@ public interface SqlAccess {
     int NATIVE_SCALAR = -2;
     /// Returns the dialect identifier used for schema and query choices.
     String dialect();
-    /// Rows contain column name, declared SQL type, not-null flag, primary-key flag.
+    /// Rows contain column name, declared SQL type, not-null flag, primary-key flag, and a
+    /// flag that is 1 when the database fills the column itself (a default, identity or
+    /// generated column).
     List<Object[]> describe(String table) throws IOException;
     /// Quotes a single SQL identifier for this dialect.
     String quote(String name);

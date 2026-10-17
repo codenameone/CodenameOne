@@ -226,8 +226,8 @@ public class OrmAnnotationProcessorTest {
         sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
         sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite) { "
             + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
-            + "if(mine.size()!=(sqlite?2:3)) throw new AssertionError(\"report \"+mine); "
-            + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED; "
+            + "if(mine.size()!=(sqlite?3:4)) throw new AssertionError(\"report \"+mine); "
+            + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED : \"source\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.CONSTRAINT_MISMATCH; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
             + "s.beginTransaction(); Customer c=new Customer(); c.name(\"Ada\"); c.signedUp(new Date(1709214306789L)); c.birthday(new Date(-14256000000L)); c.lastSeen(new Date(1672628645000L)); "
             + "c.tags().add(\"vip\"); c.tags().add(\"beta\"); s.persist(c); s.commitTransaction(); "
@@ -266,9 +266,9 @@ public class OrmAnnotationProcessorTest {
         String[] ddl={
             "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
-                + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT)",
+                + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
             "CREATE TABLE legacy_customer_tag (customer_no BIGINT NOT NULL, tag VARCHAR(255) NOT NULL, PRIMARY KEY (customer_no, tag))",
-            "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+")"};
+            "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", source VARCHAR(10) NOT NULL)"};
         for(String statement:ddl) {
             if(backend) db.execute(statement,new Object[0]);
             else try(java.sql.Statement st=jdbc.createStatement()) { st.execute(statement); }

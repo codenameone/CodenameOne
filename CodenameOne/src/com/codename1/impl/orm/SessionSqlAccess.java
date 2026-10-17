@@ -57,7 +57,7 @@ public final class SessionSqlAccess implements SqlAccess {
                         Attribute.INTEGER});
         List<Object[]> result = new ArrayList<Object[]>();
         for (Object[] row : raw) {
-            result.add(new Object[] {row[1], row[2], row[3], row[5]});
+            result.add(new Object[] {row[1], row[2], row[3], row[5], Integer.valueOf(row[4] != null ? 1 : 0)});
         }
         return result;
     }
