@@ -26,6 +26,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.mapping.Mapper;
 import com.codename1.mapping.Mappers;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+import com.codename1.testing.TestUtils;
 import com.codename1.util.OnComplete;
 import com.codename1.xml.Element;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,12 +72,16 @@ class FetchAsMappedListTest extends UITestBase {
     }
 
     @Test
-    void unregisteredTypeYieldsEmptyList() {
+    void unregisteredTypeNeverAnswersWithAnEmptyList() {
+        // A missing @Mapped used to answer an empty list, which a screen shows
+        // as "nothing here" with no hint of the cause. It fails instead.
         prepareJson(BASE_URL + "/unmapped", "[{\"title\":\"A\"}]");
 
-        Response<List<Unmapped>> response = fetch(BASE_URL + "/unmapped", Unmapped.class);
-        assertNotNull(response);
-        assertTrue(response.getResponseData().isEmpty());
+        Response<List<Unmapped>> response = fetch(BASE_URL + "/unmapped", Unmapped.class, false);
+        assertNull(response);
+        IllegalStateException failed = assertThrows(IllegalStateException.class,
+                () -> Mappers.require(Unmapped.class));
+        assertTrue(failed.getMessage().contains("@Mapped"), failed.getMessage());
     }
 
     @Test
@@ -91,6 +96,10 @@ class FetchAsMappedListTest extends UITestBase {
     }
 
     private <T> Response<List<T>> fetch(String url, Class<T> type) {
+        return fetch(url, type, true);
+    }
+
+    private <T> Response<List<T>> fetch(String url, Class<T> type, boolean required) {
         RequestBuilder builder = new RequestBuilder("GET", url);
         final AtomicReference<Response<List<T>>> holder = new AtomicReference<Response<List<T>>>();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -100,7 +109,14 @@ class FetchAsMappedListTest extends UITestBase {
                 latch.countDown();
             }
         });
-        waitFor(latch, 2000);
+        if (required) {
+            waitFor(latch, 2000);
+        } else {
+            // The callback may never run; poll instead of asserting it does.
+            for (int waited = 0; latch.getCount() > 0 && waited < 1000; waited += 5) {
+                TestUtils.waitFor(5);
+            }
+        }
         return holder.get();
     }
 

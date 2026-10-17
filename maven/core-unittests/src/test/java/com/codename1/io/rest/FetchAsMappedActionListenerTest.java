@@ -26,6 +26,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.mapping.Mapper;
 import com.codename1.mapping.Mappers;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+import com.codename1.testing.TestUtils;
 import com.codename1.util.OnComplete;
 import com.codename1.xml.Element;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,16 +68,19 @@ class FetchAsMappedActionListenerTest extends UITestBase {
     }
 
     @Test
-    void unregisteredTypeYieldsNullData() {
+    void unregisteredTypeNeverAnswersWithNull() {
+        // A missing @Mapped fails rather than answering null data.
         prepareJson(BASE_URL + "/unmapped", "{\"title\":\"Widget\"}");
 
-        Response<Unmapped> response = fetch(BASE_URL + "/unmapped", Unmapped.class);
-        assertNotNull(response);
-        assertEquals(200, response.getResponseCode());
-        assertNull(response.getResponseData());
+        Response<Unmapped> response = fetch(BASE_URL + "/unmapped", Unmapped.class, false);
+        assertNull(response);
     }
 
     private <T> Response<T> fetch(String url, Class<T> type) {
+        return fetch(url, type, true);
+    }
+
+    private <T> Response<T> fetch(String url, Class<T> type, boolean required) {
         RequestBuilder builder = new RequestBuilder("GET", url);
         final AtomicReference<Response<T>> holder = new AtomicReference<Response<T>>();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -86,7 +90,14 @@ class FetchAsMappedActionListenerTest extends UITestBase {
                 latch.countDown();
             }
         });
-        waitFor(latch, 2000);
+        if (required) {
+            waitFor(latch, 2000);
+        } else {
+            // The callback may never run; poll instead of asserting it does.
+            for (int waited = 0; latch.getCount() > 0 && waited < 1000; waited += 5) {
+                TestUtils.waitFor(5);
+            }
+        }
         return holder.get();
     }
 

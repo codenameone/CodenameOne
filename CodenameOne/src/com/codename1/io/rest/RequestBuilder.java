@@ -1373,11 +1373,7 @@ public class RequestBuilder {
             Map<String, Object> parsed = (Map<String, Object>) evt.getMetaData();
             T result = null;
             if (parsed != null) {
-                com.codename1.mapping.Mapper<T> m =
-                        com.codename1.mapping.Mappers.get(type);
-                if (m != null) {
-                    result = m.fromMap(parsed);
-                }
+                result = com.codename1.mapping.Mappers.require(type).fromMap(parsed);
             }
             Response<T> res = new Response<T>(evt.getResponseCode(), result, evt.getMessage());
             callback.completed(res);
@@ -1414,16 +1410,12 @@ public class RequestBuilder {
                 out = java.util.Collections.emptyList();
             } else {
                 com.codename1.mapping.Mapper<T> m =
-                        com.codename1.mapping.Mappers.get(type);
-                if (m == null) {
-                    out = java.util.Collections.emptyList();
-                } else {
-                    out = new ArrayList<T>(raw.size());
-                    for (Object e : raw) {
-                        if (e instanceof Map) {
-                            Map<String, Object> mm = (Map<String, Object>) e;
-                            out.add(m.fromMap(mm));
-                        }
+                        com.codename1.mapping.Mappers.require(type);
+                out = new ArrayList<T>(raw.size());
+                for (Object e : raw) {
+                    if (e instanceof Map) {
+                        Map<String, Object> mm = (Map<String, Object>) e;
+                        out.add(m.fromMap(mm));
                     }
                 }
             }
