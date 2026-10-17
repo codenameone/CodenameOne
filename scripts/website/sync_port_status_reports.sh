@@ -126,7 +126,8 @@ if git -C "${REPO_ROOT}" show "FETCH_HEAD:benchmarks/flutter.json" > "${benchmar
       (.platform_order | type == "array") and
       (.metric_order | type == "array") and
       (.workload_order | type == "array") and
-      any(.platforms[]; .status == "measured")
+      # A platform the page shows: it leaves JavaScript out (see port-status.html).
+      any(.platforms | to_entries[]; .key != "javascript" and .value.status == "measured")
    ' "${benchmark_candidate}" >/dev/null; then
   cp "${benchmark_candidate}" "${benchmark_target}"
   echo "Resolved the Flutter benchmark from ${DATA_REF}."
