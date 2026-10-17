@@ -320,58 +320,6 @@
     </p>
   </section>
 
-  {{- with $flutterBench }}
-  <section class="cn1-port-status__performance cn1-port-status__flutter-benchmark" data-flutter-benchmark aria-labelledby="flutter-benchmark-title">
-    <header>
-      <p class="cn1-port-status__eyebrow">Flutter compared</p>
-      <h2 id="flutter-benchmark-title">One Flutter application, built by Flutter and by Codename One</h2>
-      <p>
-        {{ .app }}. Lower is better for every metric, so a ratio above 1.00x means Codename One is ahead by that factor.
-        {{- with .generated_at }} Measured {{ . }}{{ end }}{{ with .commit }} from commit <code>{{ substr . 0 10 }}</code>{{ end }}.
-      </p>
-    </header>
-    {{- range $id, $platform := .platforms }}
-    <h3 data-flutter-benchmark-platform="{{ $id }}">{{ $id }}</h3>
-    {{- if eq $platform.status "measured" }}
-    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance" aria-label="{{ $id }}: Codename One and Flutter">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Metric</th>
-            <th scope="col">Codename One</th>
-            <th scope="col">Flutter</th>
-            <th scope="col">Ratio</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{- range $key, $metric := $platform.metrics }}
-          {{- if $metric.label }}
-          <tr data-flutter-benchmark-row="{{ $id }}-{{ $key }}">
-            <th scope="row">{{ $metric.label }}</th>
-            {{- if eq $metric.unit "bytes" }}
-            <td>{{ printf "%.1f MB" (div (float $metric.codenameone) 1048576.0) }}</td>
-            <td>{{ printf "%.1f MB" (div (float $metric.flutter) 1048576.0) }}</td>
-            {{- else }}
-            <td>{{ printf "%.0f ms" (float $metric.codenameone) }}</td>
-            <td>{{ printf "%.0f ms" (float $metric.flutter) }}</td>
-            {{- end }}
-            <td>{{ printf "%.2fx" (float $metric.ratio) }}</td>
-          </tr>
-          {{- end }}
-          {{- end }}
-        </tbody>
-      </table>
-    </div>
-    {{- else }}
-    <p data-flutter-benchmark-unmeasured="{{ $id }}">Not measured: {{ $platform.reason }}</p>
-    {{- end }}
-    {{- end }}
-    <p class="cn1-port-status__source-note">
-      <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/flutter-bench" target="_blank" rel="noopener">Benchmark harness and method</a>
-    </p>
-  </section>
-  {{- end }}
-
   {{- /* Rendered by scripts/website/build.sh from vm/selfhost/perf-baseline: the ratios
          every platform build's performance gate holds ParparVM to, so this table and the
          gate cannot disagree. Absent from a bare `hugo` run, hence the guard. */ -}}
@@ -425,6 +373,151 @@
     </div>
     <p class="cn1-port-status__source-note">
       <a href="https://github.com/codenameone/CodenameOne/tree/master/vm/selfhost/perf-baseline" target="_blank" rel="noopener">Performance gate baselines</a>
+    </p>
+  </section>
+  {{- end }}
+  {{- /* Published nightly by flutter-bench.yml to the port-status-data branch and fetched
+         by scripts/website/sync_port_status_reports.sh; absent until the first complete
+         master run, hence the guard. Laid out like the JDK 25 table above it -- one column
+         per platform -- because what it adds is the platforms that table cannot cover. */ -}}
+  {{- with $flutterBench }}
+  {{- $bench := . -}}
+  {{- /* The web leg is measured and published, but not shown: Flutter's web build returns
+         wrong results on several compute workloads (Dart compiled to JavaScript cannot hold
+         a 64-bit integer) and does not run others, and the web adapter times neither
+         start-up nor memory. Its sizes alone are not the comparison this table makes, so
+         the column is left out and the erratum below says why, rather than presenting a
+         partial, unlike-for-like column beside complete ones. */ -}}
+  {{- $excluded := slice "javascript" -}}
+  {{- $names := dict "macos" "macOS" "ios" "iOS" "android" "Android" "linux" "Linux" "windows" "Windows" "javascript" "JavaScript" -}}
+  {{- $platformIds := slice -}}
+  {{- range $bench.platform_order -}}
+    {{- if and (not (in $excluded .)) (index $bench.platforms .) -}}{{- $platformIds = $platformIds | append . -}}{{- end -}}
+  {{- end }}
+  <section class="cn1-port-status__performance cn1-port-status__flutter-benchmark" data-flutter-benchmark aria-labelledby="flutter-benchmark-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Flutter compared</p>
+      <h2 id="flutter-benchmark-title">Codename One against Flutter</h2>
+      <p>
+        {{ $bench.app }}: Flutter's own release build, and the identical Dart source transpiled by Codename One, measured on the same CI runner.
+        Each value is Flutter's size, time or memory divided by Codename One's, so above 1.00x Codename One is smaller or faster by that factor;
+        beneath it are the two measurements, Codename One's first. Start-up and memory are the median of interleaved, paired rounds. The compute rows run the
+        ParparVM common workloads in each application, checked against the same checksum, and compare only workloads both sides computed correctly.
+        {{- with $bench.generated_at }} Measured {{ . }}{{ end }}{{ with $bench.commit }} from commit <code>{{ substr . 0 10 }}</code>{{ end }}.
+      </p>
+    </header>
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance cn1-port-status__matrix--jdk25" aria-label="Flutter to Codename One ratio matrix">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            {{- range $platformIds }}<th scope="col"><span>{{ index $names . | default . }}</span></th>{{- end }}
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $bench.metric_order }}
+          {{- $metric := . -}}
+          {{- /* A row states ratios; one no shown platform measured has nothing to state. */ -}}
+          {{- $anyMetric := false -}}
+          {{- range $platformIds -}}
+            {{- $p := index $bench.platforms . -}}
+            {{- if eq $p.status "measured" -}}{{- with index $p.metrics $metric.id -}}{{- if .ratio -}}{{- $anyMetric = true -}}{{- end -}}{{- end -}}{{- end -}}
+          {{- end -}}
+          {{- if $anyMetric }}
+          <tr data-flutter-benchmark-row="{{ .id }}">
+            <th scope="row"><strong>{{ .label }}</strong><small>Flutter / Codename One</small></th>
+            {{- range $platformIds }}
+              {{- $platform := index $bench.platforms . -}}
+              {{- $m := dict -}}
+              {{- if eq $platform.status "measured" -}}{{- with index $platform.metrics $metric.id -}}{{- $m = . -}}{{- end -}}{{- end -}}
+              <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: {{ $metric.label }}, Flutter / Codename One">
+                {{- /* A measured metric carries its ratio; an unmeasured one is only {"status": "not measured"}. */ -}}
+                {{- if $m.ratio -}}
+                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $m.ratio) }}
+                    {{- if eq $metric.unit "bytes" -}}
+                      <small>{{ printf "%.1f" (div (float $m.codenameone) 1048576.0) }} vs {{ printf "%.1f MB" (div (float $m.flutter) 1048576.0) }}</small>
+                    {{- else -}}
+                      <small>{{ printf "%.0f" (float $m.codenameone) }} vs {{ printf "%.0f ms" (float $m.flutter) }}</small>
+                    {{- end -}}
+                  </span>
+                {{- else -}}Not measured{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- end }}
+          {{- end }}
+          {{- $anyGeomean := false -}}
+          {{- range $platformIds -}}
+            {{- with (index $bench.platforms .).compute -}}{{- if and (eq .status "measured") .geomean -}}{{- $anyGeomean = true -}}{{- end -}}{{- end -}}
+          {{- end -}}
+          {{- if $anyGeomean }}
+          <tr data-flutter-benchmark-row="compute-geomean">
+            <th scope="row"><strong>Compute</strong><p>Geometric mean of the workloads below</p><small>Flutter time / Codename One time</small></th>
+            {{- range $platformIds }}
+              {{- $platform := index $bench.platforms . -}}
+              {{- $c := dict -}}
+              {{- with $platform.compute -}}{{- $c = . -}}{{- end -}}
+              <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: compute geometric mean, Flutter / Codename One">
+                {{- if and (eq $c.status "measured") $c.geomean -}}
+                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $c.geomean) }}<small>{{ $c.compared }} workloads</small></span>
+                {{- else -}}Not measured{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- end }}
+          {{- range $bench.workload_order }}
+          {{- $workload := . -}}
+          {{- /* A workload no shown platform could compare has nothing to state. */ -}}
+          {{- $anyRatio := false -}}
+          {{- range $platformIds -}}
+            {{- with (index $bench.platforms .).compute -}}{{- with .workloads -}}{{- with index . $workload -}}
+              {{- if eq .status "measured" -}}{{- $anyRatio = true -}}{{- end -}}
+            {{- end -}}{{- end -}}{{- end -}}
+          {{- end -}}
+          {{- if $anyRatio }}
+          <tr data-flutter-benchmark-row="compute-{{ $workload }}">
+            <th scope="row"><code>{{ $workload }}</code><small>Flutter time / Codename One time</small></th>
+            {{- range $platformIds }}
+              {{- $w := dict -}}
+              {{- with (index $bench.platforms .).compute -}}{{- with .workloads -}}{{- with index . $workload -}}{{- $w = . -}}{{- end -}}{{- end -}}{{- end -}}
+              <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: {{ $workload }}, Flutter / Codename One">
+                {{- if eq $w.status "measured" -}}
+                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $w.ratio) }}<small>{{ $w.codenameone }} vs {{ $w.flutter }} ms</small></span>
+                {{- else -}}Not measured{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- end }}
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    {{- range $id := $platformIds }}
+    {{- $platform := index $bench.platforms $id -}}
+    {{- if ne $platform.status "measured" }}
+    <p data-flutter-benchmark-unmeasured="{{ $id }}">{{ index $names $id | default $id }} not measured: {{ $platform.reason }}</p>
+    {{- else }}{{ with $platform.compute }}{{ if ne .status "measured" }}
+    <p data-flutter-benchmark-unmeasured="{{ $id }}-compute">{{ .reason }}</p>
+    {{- end }}{{ end }}
+    {{- end }}
+    {{- end }}
+    {{- $shownExcluded := slice -}}
+    {{- range $excluded -}}{{- if index $bench.platforms . -}}{{- $shownExcluded = $shownExcluded | append . -}}{{- end -}}{{- end -}}
+    {{- if in $shownExcluded "javascript" }}
+    <div class="cn1-port-status__errata-list">
+      <article data-flutter-benchmark-erratum="javascript">
+        <h3>Erratum: JavaScript is not compared</h3>
+        <p>
+          The benchmark builds and measures the web leg like every other platform, but Flutter's web results are not correct enough to compare against.
+          Dart compiled to JavaScript cannot hold a 64-bit integer, so Flutter's web build returns wrong checksums on several compute workloads and does not complete others,
+          and the web harness does not time start-up or memory at rest for either side. A ratio over the few rows that remain would compare different computations
+          and incomplete measurements, so the JavaScript port is left out of this table instead.
+        </p>
+      </article>
+    </div>
+    {{- end }}
+    <p class="cn1-port-status__source-note">
+      <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/flutter-bench" target="_blank" rel="noopener">Benchmark harness and method</a>
     </p>
   </section>
   {{- end }}
