@@ -5275,7 +5275,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             normalizeCompiledTheme(projectTheme);
             // Declarations this compiler does not implement are reported rather than passed over.
             // The canvas runs the Codename One CSS compiler that ships in core, while the project
-            // is built by the Maven one, which understands more -- font-size and font-style among
+            // is built by the Maven one, which understands more -- font-style and font-weight among
             // them. Silently dropping those and announcing success let the canvas differ from the
             // built application with nothing to say so.
             List<CodeDiagnostic> ignored = unsupportedDeclarations(css);

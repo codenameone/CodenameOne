@@ -88,6 +88,7 @@ public class CSSThemeCompiler {
 
     private static final String DEFERRED_IMAGE = "image";
     private static final String DEFERRED_VAR = "var";
+    private static final String DEFERRED_LITERAL = "literal";
 
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
@@ -119,7 +120,7 @@ public class CSSThemeCompiler {
         }
         compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
-        resolveThemeConstantVars(theme);
+        resolveThemeConstantVars(theme, deferred);
         for (Map.Entry<String, String> entry : deferred.entrySet()) {
             String key = entry.getKey();
             Object value = theme.get(key);
@@ -129,9 +130,9 @@ public class CSSThemeCompiler {
             String resolved = unquote((String) value);
             if (DEFERRED_IMAGE.equals(entry.getValue())) {
                 theme.put(key, imageConstant(resources, key.substring(1), resolved));
-            } else if (isColorLiteral(resolved)) {
+            } else if (DEFERRED_VAR.equals(entry.getValue()) && isColorLiteral(resolved)) {
                 // A constant written as var(--x) is only a color once x is resolved.
-                theme.put(key, normalizeHexColor(resolved));
+                theme.put(key, constantColor(resolved));
             }
         }
         resources.setTheme(themeName, theme);
@@ -228,10 +229,11 @@ public class CSSThemeCompiler {
         return false;
     }
 
-    private void resolveThemeConstantVars(Hashtable theme) {
+    private void resolveThemeConstantVars(Hashtable theme, Hashtable<String, String> deferred) {
         for (Object keyObj : theme.keySet()) {
             String key = String.valueOf(keyObj);
-            if (!key.startsWith("@")) {
+            // A quoted value is a string: `"var(--name)"` is text, not a reference.
+            if (!key.startsWith("@") || DEFERRED_LITERAL.equals(deferred.get(key))) {
                 continue;
             }
             Object value = theme.get(key);
@@ -257,14 +259,14 @@ public class CSSThemeCompiler {
             deferred.remove(key);
             if (name.endsWith("Image")) {
                 deferred.put(key, DEFERRED_IMAGE);
-            } else if (raw.equals(value)) {
-                if (isColorLiteral(value)) {
-                    // Stored as plain hex, as the build-time compiler stores it: color constants
-                    // are read with Integer.parseInt(value, 16), which a leading '#' would break.
-                    value = normalizeHexColor(value);
-                } else if (value.indexOf("var(--") > -1) {
-                    deferred.put(key, DEFERRED_VAR);
-                }
+            } else if (!raw.equals(value)) {
+                deferred.put(key, DEFERRED_LITERAL);
+            } else if (isColorLiteral(value)) {
+                // Stored as plain hex, as the build-time compiler stores it: color constants
+                // are read with Integer.parseInt(value, 16), which a leading '#' would break.
+                value = constantColor(value);
+            } else if (value.indexOf("var(--") > -1) {
+                deferred.put(key, DEFERRED_VAR);
             }
             theme.put(key, value);
         }
@@ -282,11 +284,24 @@ public class CSSThemeCompiler {
     }
 
     private boolean isColorLiteral(String value) {
-        if (value.regionMatches(true, 0, "rgb(", 0, 4)) {
+        if (value.regionMatches(true, 0, "rgb(", 0, 4) || value.regionMatches(true, 0, "rgba(", 0, 5)) {
             return true;
         }
         int len = value.length();
         return value.startsWith("#") && (len == 4 || len == 7) && isHexColor(value.substring(1));
+    }
+
+    /// A color constant as plain hex. A color constant has no alpha, so `rgba()` keeps its RGB
+    /// part, as the build-time compiler stores it.
+    private String constantColor(String value) {
+        if (value.regionMatches(true, 0, "rgba(", 0, 5) && value.endsWith(")")) {
+            String[] parts = splitOnComma(value.substring(5, value.length() - 1));
+            if (parts.length != 4) {
+                throw new CSSSyntaxException("rgba() must have exactly 4 components: " + value);
+            }
+            return normalizeHexColor("rgb(" + parts[0] + "," + parts[1] + "," + parts[2] + ")");
+        }
+        return normalizeHexColor(value);
     }
 
     private static boolean isConstantsSelector(String selector) {
@@ -332,11 +347,10 @@ public class CSSThemeCompiler {
         for (int i = 0; i < rule.declarations.length; i++) {
             Declaration declaration = rule.declarations[i];
             String property = declaration.property;
-            String value = resolveVars(theme, declaration.value);
-
-            if (applyThemeConstantProperty(theme, declaration.name, value, deferred)) {
+            if (applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred)) {
                 continue;
             }
+            String value = resolveVars(theme, declaration.value);
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
             }
@@ -359,7 +373,7 @@ public class CSSThemeCompiler {
 
     private void applyRootDeclarations(Hashtable theme, Declaration[] declarations, Hashtable<String, String> deferred) {
         for (Declaration declaration : declarations) {
-            applyThemeConstantProperty(theme, declaration.name, resolveVars(theme, declaration.value), deferred);
+            applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
         }
     }
 
@@ -369,9 +383,16 @@ public class CSSThemeCompiler {
             return false;
         }
         String key = "@" + property.substring(2);
+        String raw = value.trim();
+        String unquoted = unquote(raw);
         // A later custom property replaces a #Constants entry outright, deferred handling included.
         deferred.remove(key);
-        theme.put(key, unquote(value));
+        if (raw.equals(unquoted)) {
+            unquoted = resolveVars(theme, unquoted);
+        } else {
+            deferred.put(key, DEFERRED_LITERAL);
+        }
+        theme.put(key, unquoted);
         return true;
     }
 
@@ -400,8 +421,8 @@ public class CSSThemeCompiler {
 
     /// Builds the font of every UIID state that declared a font property. A state that sets only
     /// one of family and size takes the other from what applies in that state, as the build-time
-    /// compiler's flattening does: the matching state of the UIID and each `cn1-derive` parent in
-    /// turn, then their unselected styles in the same order. A dark style looks at the dark keys
+    /// compiler's flattening does: the matching state of the UIID, each `cn1-derive` parent and
+    /// finally `*` in turn, then their unselected styles in the same order. A dark style looks at the dark keys
     /// of each UIID before the light ones.
     private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
         // A font is a live platform object, so it can only be made with a running Display.
@@ -422,15 +443,24 @@ public class CSSThemeCompiler {
             // The matching state along the whole derive chain comes before any unselected
             // style: the build-time flattener lays a parent's selected style over the child's
             // unselected one, so `Base:selected` beats `Child`.
+            // `*` compiles to Component, the implicit parent of every UIID in the build-time
+            // compiler, so it comes after the explicit derive chain.
+            ArrayList<String> chain = new ArrayList<String>();
+            String id = dark ? uiid.substring(5) : uiid;
+            while (id != null && !chain.contains(id)) {
+                chain.add(id);
+                id = hoverBase(theme, id, dark);
+            }
+            if (!chain.contains("Component")) {
+                chain.add("Component");
+            }
             for (int pass = 0; pass < 2 && (family == null || size == null); pass++) {
                 String lookup = pass == 0 ? state : "";
                 if (pass == 1 && state.length() == 0) {
                     break;
                 }
-                String id = dark ? uiid.substring(5) : uiid;
-                ArrayList<String> seen = new ArrayList<String>();
-                while (id != null && !seen.contains(id) && (family == null || size == null)) {
-                    seen.add(id);
+                for (int i = 0; i < chain.size() && (family == null || size == null); i++) {
+                    id = chain.get(i);
                     String[] fallbacks = dark
                             ? new String[]{"$Dark" + id + "." + lookup, id + "." + lookup}
                             : new String[]{id + "." + lookup};
@@ -441,7 +471,6 @@ public class CSSThemeCompiler {
                             size = size == null ? other[1] : size;
                         }
                     }
-                    id = hoverBase(theme, id, dark);
                 }
             }
             theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
@@ -732,20 +761,39 @@ public class CSSThemeCompiler {
     }
 
     private String resolveVars(Hashtable theme, String value) {
-        String out = value;
-        int varPos = out.indexOf("var(--");
+        return resolveVars(theme, value, new ArrayList<String>());
+    }
+
+    /// Expands every `var(--x)`, including those inside the values it substitutes. `resolving`
+    /// holds the names being expanded, so `a: var(--b); b: var(--a)` is an error instead of a
+    /// compile that never returns.
+    private String resolveVars(Hashtable theme, String value, ArrayList<String> resolving) {
+        int varPos = value.indexOf("var(--");
+        if (varPos < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder();
+        int pos = 0;
         while (varPos > -1) {
-            int end = out.indexOf(')', varPos);
+            int end = value.indexOf(')', varPos);
             if (end < 0) {
                 break;
             }
-            String key = out.substring(varPos + "var(--".length(), end).trim();
+            String key = value.substring(varPos + "var(--".length(), end).trim();
+            if (resolving.contains(key)) {
+                throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
+            }
             Object replacement = theme.get("@" + key);
             String replaceValue = replacement == null ? "" : replacement.toString();
-            out = out.substring(0, varPos) + replaceValue + out.substring(end + 1);
-            varPos = out.indexOf("var(--");
+            resolving.add(key);
+            replaceValue = resolveVars(theme, replaceValue, resolving);
+            resolving.remove(resolving.size() - 1);
+            out.append(value.substring(pos, varPos)).append(replaceValue);
+            pos = end + 1;
+            varPos = value.indexOf("var(--", pos);
         }
-        return out;
+        out.append(value.substring(pos));
+        return out.toString();
     }
 
     private String[] selector(String selector) {
@@ -1109,9 +1157,24 @@ public class CSSThemeCompiler {
     private String stripComments(String css) {
         StringBuilder out = new StringBuilder();
         int i = 0;
+        char quote = 0;
         while (i < css.length()) {
             char c = css.charAt(i);
-            if (c == '/' && i + 1 < css.length() && css.charAt(i + 1) == '*') {
+            // Comment delimiters inside a quoted string are text.
+            if (quote != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < css.length()) {
+                    out.append(css.charAt(i + 1));
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '/' && i + 1 < css.length() && css.charAt(i + 1) == '*') {
                 i += 2;
                 boolean closed = false;
                 while (i + 1 < css.length()) {

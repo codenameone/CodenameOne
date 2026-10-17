@@ -546,6 +546,64 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("native:MainBold", fontName(selected));
     }
 
+    @Test
+    public void testRgbaColorConstantKeepsItsRgb() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--half:rgba(0, 0, 255, 0.25);}"
+                + "#Constants{infiniteDefaultColor: rgba(255, 0, 0, 0.5); viaVar: var(--half);}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
+        assertEquals("0000ff", theme.get("@viaVar"));
+    }
+
+    @Test
+    public void testCommentMarkersInsideQuotesAreText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("/* a real comment */ #Constants{ message: \"a/*b*/c\"; open: '/*'; }"
+                + "Label{color:#ff0000;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("a/*b*/c", theme.get("@message"));
+        assertEquals("/*", theme.get("@open"));
+        assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testStateFontFallsBackToTheUniversalStyle() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("* { font-family: 'native:MainBold'; } Label:selected { font-size: 20px; }",
+                resource, "Theme");
+        Font selected = (Font) resource.getTheme("Theme").get("Label.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+    }
+
+    @Test
+    public void testCyclicConstantsAreRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ a: var(--a); }", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ a: var(--b); b: var(--a); }", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
+                        new MutableResource(), "Theme"));
+        // Two uses of one constant are not a cycle.
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ c: #ff0000; pair: var(--c) var(--c); }", resource, "Theme");
+        assertEquals("ff0000 ff0000", resource.getTheme("Theme").get("@pair"));
+    }
+
+    @Test
+    public void testQuotedVarTextIsNotResolved() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{ --name: world; --rootQuoted: \"var(--name)\"; }"
+                + "#Constants{ message: \"var(--name)\"; plain: var(--name); }", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("var(--name)", theme.get("@message"));
+        assertEquals("var(--name)", theme.get("@rootQuoted"));
+        assertEquals("world", theme.get("@plain"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

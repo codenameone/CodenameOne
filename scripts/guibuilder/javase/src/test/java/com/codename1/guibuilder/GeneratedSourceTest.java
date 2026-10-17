@@ -1773,21 +1773,21 @@ class GeneratedSourceTest {
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> reported = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label {\n  color: #ff0000;\n  font-size: 3mm;\n}\n");
+                "Label {\n  color: #ff0000;\n  font-style: italic;\n}\n");
         assertEquals(1, reported.size(), "one declaration the canvas drops: " + reported);
-        assertTrue(reported.get(0).toString().contains("font-size")
-                        || describe(reported.get(0)).contains("font-size"),
+        assertTrue(reported.get(0).toString().contains("font-style")
+                        || describe(reported.get(0)).contains("font-style"),
                 "and it names the property: " + describe(reported.get(0)));
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> clean = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label { color: #ff0000; background-color: #00ff00; padding: 2mm; margin: 1mm; }\n");
+                "Label { color: #ff0000; background-color: #00ff00; padding: 2mm; margin: 1mm; font-size: 3mm; }\n");
         assertTrue(clean.isEmpty(), "everything here reaches the canvas: " + clean);
 
         // A comment is not a declaration.
         @SuppressWarnings("unchecked")
         java.util.List<Object> commented = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label {\n  /* font-size: 3mm; */\n  color: #ff0000;\n}\n");
+                "Label {\n  /* font-style: italic; */\n  color: #ff0000;\n}\n");
         assertTrue(commented.isEmpty(), "a commented-out declaration is not reported: " + commented);
     }
 
