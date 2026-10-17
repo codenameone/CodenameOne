@@ -75,12 +75,6 @@ codename1.arg.desktop.themeMode=native
 EOF
 printf '<project><modelVersion>4.0.0</modelVersion><groupId>com.example</groupId><artifactId>fieldnotes</artifactId><version>1.0</version></project>\n' \
   > "$PROJECT/pom.xml"
-cat > "$WORK/binding.input" <<EOF
-projectDir=$PROJECT
-settings=$PROJECT/codenameone_settings.properties
-pom=$PROJECT/pom.xml
-multimoduleRoot=$PROJECT
-EOF
 
 downscale() {
   local file="$1"
@@ -105,12 +99,20 @@ for theme in "${THEMES[@]}"; do
     diag="$WORK/$theme-$appearance.txt"
     rm -f "$out"
     log "$theme / $appearance -> $out"
+    # Each Settings process consumes its binding after loading the project.
+    binding="$WORK/$theme-$appearance.input"
+    cat > "$binding" <<EOF
+projectDir=$PROJECT
+settings=$PROJECT/codenameone_settings.properties
+pom=$PROJECT/pom.xml
+multimoduleRoot=$PROJECT
+EOF
     # settings.darkMode overrides both the saved preference and the OS appearance.
     "$JAVA_BIN" \
       -Dcodename1.arg.desktop.themeMode="$theme" \
       -Dsettings.darkMode="$dark" \
       -Dsettings.section=BASIC \
-      -Dsettings.input="$WORK/binding.input" \
+      -Dsettings.input="$binding" \
       -Dsettings.screenshot="$out" \
       -Dsettings.screenshot.onscreen=false \
       -Dsettings.screenshot.delay=3000 \

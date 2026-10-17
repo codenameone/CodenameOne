@@ -55,17 +55,20 @@ app.show();</code></pre>
         <p>Use Spring-style controllers, dependency injection and transactions. The build generates the wiring and compiles a native executable. Add SQL persistence, OAuth2/OIDC, migrations and OpenTelemetry as your service grows.</p>
         <p>The backend is evolving, with its own supported APIs and libraries. It is not a drop-in Spring Boot replacement.</p>
         <a href="/developer-guide/backend/" data-cn1-conversion="home-backend">Build a native Java backend</a>
+        <p>Serve browser pages too: <a href="/developer-guide/backend-views/" data-cn1-conversion="home-backend-views">compiled HTML views</a> turn supported Thymeleaf attributes into Java renderers, with htmx for partial-page updates.</p>
       </article>
       <article class="cn1-v2-feature">
         <h3>Your Android app on more platforms</h3>
         <p>Import classic Android Java or Kotlin code, activities, XML layouts and resources. Supported Android and AndroidX APIs run over Codename One on iOS, desktop and the web, as well as Android.</p>
         <p>Check your dependencies and data flows against the compatibility guide. Coverage is specific to the documented APIs.</p>
         <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android app compatibility</a>
+        <p>Have Flutter screens? <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">Experimental Flutter compatibility</a> translates supported Dart and widgets to Java. Some callbacks and parameters are not implemented; check the guide before porting.</p>
       </article>
       <article class="cn1-v2-feature">
         <h3>Keep app and server contracts together</h3>
         <p>Share Java models and generate typed REST clients instead of maintaining a second definition of every object crossing the network. Initializr creates app-only, app-with-backend and backend-only projects.</p>
         <a href="/blog/java-backend-shared-models/" data-cn1-conversion="home-shared-models">See the shared-model example</a>
+        <p>Run a complete example with <a href="/developer-guide/wayline-implementors-guide/" data-cn1-conversion="home-wayline">Wayline, the ride-hailing sample</a>: rider, driver and admin screens with a Java backend. Generate it from Initializr’s ride-hailing template.</p>
       </article>
     </div>
   </section>
@@ -181,7 +184,7 @@ app.show();</code></pre>
         <p>Initializr places the Codename One authoring skill in the project. The JavaSE tooling can register its built-in semantic UI tools with supported MCP hosts.</p>
       </article>
     </div>
-    <p class="cn1-v2-agent__scope">MCP control currently covers the simulator and JavaSE-hosted desktop tools. Packaged native and mobile targets do not yet include the launcher and transport.</p>
+    <p class="cn1-v2-agent__scope">MCP also supports loopback connections to native development builds on ports that provide server sockets, including Linux. Device connections need forwarding. Release builds block access by default; the guide covers setup and controlled-development opt-ins.</p>
   </section>
 
   <section class="cn1-v2-section cn1-v2-reach">

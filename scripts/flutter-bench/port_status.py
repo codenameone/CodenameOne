@@ -39,6 +39,29 @@ def collect(patterns):
     return reports
 
 
+def compute_summary(compute):
+    """The VM workloads as the page shows them: the geometric mean, and each
+    workload's ratio keyed by name. A workload either side got wrong or did not
+    run carries no ratio -- compute_verdict already refused to score it -- so the
+    page states it as unmeasured instead of inventing a number."""
+    if not compute or compute.get("status") != "measured":
+        return {"status": "not measured",
+                "reason": (compute or {}).get("reason", "no compute result")}
+    verdict = compute.get("verdict") or {}
+    workloads = {}
+    for row in verdict.get("workloads", []):
+        entry = {"status": row.get("status")}
+        if row.get("status") == "measured":
+            entry.update(codenameone=row["codenameone"], flutter=row["flutter"],
+                         ratio=row["ratio"])
+        workloads[row["name"]] = entry
+    out = {"status": "measured", "compared": verdict.get("compared", 0),
+           "workloads": workloads}
+    if "geomean" in verdict:
+        out["geomean"] = verdict["geomean"]
+    return out
+
+
 def to_port_status(reports, commit):
     platforms = {}
     for report in reports:
@@ -73,6 +96,7 @@ def to_port_status(reports, commit):
             "load_average": report.get("load_average"),
             "generated_at": report.get("generated_at"),
             "metrics": metrics,
+            "compute": compute_summary(report.get("compute")),
             "regressions": report.get("regressions", []),
         }
 
@@ -84,6 +108,12 @@ def to_port_status(reports, commit):
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "app": "flutter gallery (new_gallery), same Dart source on both sides",
         "summary": {"codenameone_wins": wins, "metrics_measured": measured},
+        # The row order the page renders in. Hugo ranges over a map in key order,
+        # so without these the table would be alphabetical rather than grouped.
+        "metric_order": [{"id": key, "label": label, "unit": unit}
+                         for key, label, unit in benchlib.METRICS],
+        "platform_order": list(benchlib.PLATFORM_IDS),
+        "workload_order": list(benchlib.COMPUTE_WORKLOADS),
         "platforms": platforms,
     }
 

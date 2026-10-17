@@ -31,6 +31,59 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ProjectIOTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path root;
+
+    @Test
+    public void consumesBindingAfterClosingStreamEvenIfInvalidOrReadFails() throws Exception {
+        java.lang.reflect.Field implementation = com.codename1.io.Util.class.getDeclaredField("implInstance");
+        implementation.setAccessible(true);
+        com.codename1.impl.CodenameOneImplementation previous =
+                (com.codename1.impl.CodenameOneImplementation) implementation.get(null);
+        com.codename1.impl.javase.JavaSEPort previousPort = com.codename1.impl.javase.JavaSEPort.instance;
+        String property = System.getProperty(ProjectIO.INPUT_PROPERTY);
+        try {
+            for (int scenario = 0; scenario < 3; scenario++) {
+                final boolean failRead = scenario == 2;
+                final boolean[] closed = {false};
+                com.codename1.io.Util.setImplementation(new com.codename1.impl.javase.JavaSEPort() {
+                    @Override public java.io.InputStream openFileInputStream(String file) throws java.io.IOException {
+                        return new java.io.FilterInputStream(super.openFileInputStream(file)) {
+                            @Override public int read(byte[] buffer, int offset, int length) throws java.io.IOException {
+                                if (failRead) throw new java.io.IOException("Simulated binding read failure");
+                                return super.read(buffer, offset, length);
+                            }
+                            @Override public void close() throws java.io.IOException {
+                                super.close();
+                                closed[0] = true;
+                            }
+                        };
+                    }
+                    @Override public void deleteFile(String file) {
+                        assertTrue(closed[0], "Close the stream before deleting on Windows");
+                        super.deleteFile(file);
+                    }
+                });
+                java.nio.file.Path input = root.resolve("settings-" + scenario + ".input");
+                String argument = "-Dprivate.token=example secret";
+                String content = (scenario == 1 ? "" : "settings=/app/codenameone_settings.properties\n")
+                        + "mavenArgument=" + java.util.Base64.getEncoder().encodeToString(
+                                argument.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "\n";
+                java.nio.file.Files.writeString(input, content);
+                System.setProperty(ProjectIO.INPUT_PROPERTY, input.toString());
+                ProjectBinding loaded = ProjectIO.loadBinding();
+                assertTrue(closed[0]);
+                org.junit.jupiter.api.Assertions.assertFalse(java.nio.file.Files.exists(input));
+                if (scenario == 0) assertEquals(java.util.List.of(argument), loaded.mavenArguments());
+                else assertNull(loaded);
+            }
+        } finally {
+            com.codename1.io.Util.setImplementation(previous);
+            com.codename1.impl.javase.JavaSEPort.instance = previousPort;
+            if (property == null) System.clearProperty(ProjectIO.INPUT_PROPERTY);
+            else System.setProperty(ProjectIO.INPUT_PROPERTY, property);
+        }
+    }
+
     @Test
     public void unixPathsGetTheStandardFileUrlPrefix() {
         assertEquals("file:///Users/dev/app", ProjectIO.fsUrl("/Users/dev/app"));

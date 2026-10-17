@@ -2794,6 +2794,14 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/android-on-ios-web-desktop-efficiently-and-for-free-4bd57cc74625?postPublishedType=initial",
         "syndicated_at": "2026-10-16T19:02:40+00:00"
+      },
+      "foojay": {
+        "id": 135,
+        "url": "https://github.com/foojayio/website/pull/135",
+        "pull_request_url": "https://github.com/foojayio/website/pull/135",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-17T13:44:07+00:00"
       }
     },
     "sign-in-client-server-contract": {
@@ -2806,6 +2814,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-17T00:01:10+00:00"
+      },
+      "devto": {
+        "id": 4868310,
+        "url": "https://dev.to/codenameone/easy-full-stack-authentication-and-login-in-the-style-of-spring-455a",
+        "syndicated_at": "2026-10-17T16:27:04+00:00"
       }
     }
   }

@@ -36,6 +36,7 @@ import com.codename1.settings.extensions.ExtensionDescriptor;
 import com.codename1.settings.extensions.ExtensionCatalogMerger;
 import com.codename1.settings.extensions.MavenCentralSearch;
 import com.codename1.settings.extensions.MavenDependency;
+import com.codename1.settings.extensions.LegacyMavenInstaller;
 import com.codename1.settings.extensions.DependencyEditor;
 import com.codename1.settings.hints.BuildHintCatalog;
 import com.codename1.settings.hints.BuildHintMetadata;
@@ -117,6 +118,13 @@ public class CodenameOneSettings extends Lifecycle {
     private final Map<String, Boolean> expandedExtensions = new LinkedHashMap<String, Boolean>();
     private Button toolbarMenuButton;
     private static CodenameOneSettings activeSettings;
+    private static LegacyMavenInstaller legacyMavenInstaller;
+    private boolean legacyInstallRunning;
+
+    /// Supplied by the desktop launcher; Maven execution is unavailable on mobile ports.
+    public static void setLegacyMavenInstaller(LegacyMavenInstaller installer) {
+        legacyMavenInstaller = installer;
+    }
 
     public static void adjustActiveFontSizeForDesktopShortcut(int deltaPx) {
         CodenameOneSettings s = activeSettings;
@@ -1513,6 +1521,7 @@ public class CodenameOneSettings extends Lifecycle {
             boolean installed = isDependencyInstalled(descriptor.dependency());
             Button add = new Button(installed ? "Installed ✓" : "Download",
                     installed ? "SettingsSave" : "SettingsExtensionPrimary");
+            add.setEnabled(!legacyInstallRunning);
             add.addActionListener(e -> {
                 if (installed) {
                     offerUninstall(descriptor);
@@ -1529,6 +1538,7 @@ public class CodenameOneSettings extends Lifecycle {
             boolean installed = isLegacyCn1LibInstalled(descriptor);
             Button install = new Button(installed ? "Installed ✓" : "Install",
                     installed ? "SettingsSave" : "SettingsExtensionPrimary");
+            install.setEnabled(!legacyInstallRunning);
             install.addActionListener(e -> {
                 if (installed) {
                     offerUninstall(descriptor);
@@ -1777,44 +1787,77 @@ public class CodenameOneSettings extends Lifecycle {
             ToastBar.showErrorMessage("Gradle projects do not support legacy cn1lib files.");
             return;
         }
-        if (!confirmCompatibility(descriptor)) {
+        if (legacyInstallRunning || !confirmCompatibility(descriptor)) {
             return;
         }
+        if (binding.isMaven() && legacyMavenInstaller == null) {
+            ToastBar.showErrorMessage("Maven library installation requires the desktop Settings launcher.");
+            return;
+        }
+        legacyInstallRunning = true;
+        renderPage();
+        ToastBar.showInfoMessage("Installing " + descriptor.fileName() + "…");
         Display.getInstance().startThread(() -> {
             try {
-                ConnectionRequest req = new ConnectionRequest();
-                req.setUrl("https://www.codenameone.com/files/cn1libs/" + encodeUrlPath(descriptor.fileName()));
-                req.setPost(false);
-                NetworkManager.getInstance().addToQueueAndWait(req);
-                if (req.getResponseCode() >= 400 || req.getResponseData() == null) {
-                    throw new java.io.IOException("Download failed with HTTP " + req.getResponseCode());
-                }
+                System.out.println("Installing legacy library " + descriptor.fileName());
                 String dir = legacyCn1LibDir();
                 FileSystemStorage fs = FileSystemStorage.getInstance();
-                fs.mkdir(ProjectIO.fsUrl(dir));
                 String dest = dir + "/" + descriptor.fileName();
-                OutputStream out = null;
-                try {
-                    out = fs.openOutputStream(ProjectIO.fsUrl(dest));
-                    out.write(req.getResponseData());
-                    out.flush();
-                } finally {
-                    Util.cleanup(out);
+                // A removed dependency can reuse its wrapper without replacing user-edited files.
+                boolean hasWrapper = binding.isMaven()
+                        && legacyMavenInstaller.dependency(binding, descriptor.fileName()) != null;
+                if (!hasWrapper) {
+                    ConnectionRequest req = new ConnectionRequest();
+                    req.setUrl("https://www.codenameone.com/files/cn1libs/" + encodeUrlPath(descriptor.fileName()));
+                    req.setPost(false);
+                    NetworkManager.getInstance().addToQueueAndWait(req);
+                    if (req.getResponseCode() >= 400 || req.getResponseData() == null) {
+                        throw new java.io.IOException("Download failed with HTTP " + req.getResponseCode());
+                    }
+                    fs.mkdir(ProjectIO.fsUrl(dir));
+                    OutputStream out = null;
+                    try {
+                        out = fs.openOutputStream(ProjectIO.fsUrl(dest));
+                        out.write(req.getResponseData());
+                        out.flush();
+                    } finally {
+                        Util.cleanup(out);
+                    }
                 }
+                if (binding.isMaven()) {
+                    legacyMavenInstaller.install(binding, dest);
+                }
+                System.out.println("Installed legacy library " + descriptor.fileName());
                 CN.callSerially(() -> {
                     ToastBar.showMessage("Installed " + descriptor.fileName()
-                            + " into cn1libs/", FontImage.MATERIAL_CHECK);
+                            + (binding.isMaven() ? ". Reload the Maven project in your IDE." : " into lib/"), FontImage.MATERIAL_CHECK);
                     renderPage();
                     animatePage();
                 });
             } catch (Exception ex) {
                 Log.e(ex);
+                ex.printStackTrace(); // The desktop launcher redirects stderr to settings.log.
                 CN.callSerially(() -> ToastBar.showErrorMessage("Failed to install cn1lib: " + ex.getMessage()));
+            } finally {
+                CN.callSerially(() -> {
+                    legacyInstallRunning = false;
+                    renderPage();
+                });
             }
         }, "SettingsLegacyCn1LibInstall").start();
     }
 
     private boolean isLegacyCn1LibInstalled(ExtensionDescriptor descriptor) {
+        if (binding.isMaven()) {
+            try {
+                MavenDependency dependency = legacyMavenInstaller == null ? null
+                        : legacyMavenInstaller.dependency(binding, descriptor.fileName());
+                return dependency != null && isDependencyInstalled(dependency);
+            } catch (Exception ex) {
+                Log.e(ex);
+                return false;
+            }
+        }
         return descriptor.fileName().length() > 0 && legacyCn1LibDir() != null
                 && FileSystemStorage.getInstance().exists(ProjectIO.fsUrl(legacyCn1LibPath(descriptor)));
     }
@@ -1831,6 +1874,17 @@ public class CodenameOneSettings extends Lifecycle {
         }
         if (descriptor.dependency() != null) {
             removeDependency(descriptor.dependency());
+        } else if (binding.isMaven()) {
+            try {
+                MavenDependency dependency = legacyMavenInstaller.dependency(binding, descriptor.fileName());
+                if (dependency != null) {
+                    // Keep the wrapper so reinstalling never destroys its local modifications.
+                    removeDependency(dependency);
+                }
+            } catch (Exception ex) {
+                Log.e(ex);
+                ToastBar.showErrorMessage("Failed to remove library: " + ex.getMessage());
+            }
         } else {
             String path = legacyCn1LibPath(descriptor);
             FileSystemStorage fs = FileSystemStorage.getInstance();
@@ -1891,10 +1945,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (ProjectBinding.BUILD_ANT.equals(binding.buildSystem())) {
             return binding.projectDir() + "/lib";
         }
-        if (binding.multimoduleRoot() != null && binding.multimoduleRoot().length() > 0) {
-            return binding.multimoduleRoot() + "/cn1libs";
-        }
-        String projectDir = binding.projectDir();
+        String projectDir = binding.projectDir() == null ? null : binding.projectDir().replace('\\', '/');
         if (projectDir != null && projectDir.endsWith("/common")) {
             return projectDir.substring(0, projectDir.length() - "/common".length()) + "/cn1libs";
         }

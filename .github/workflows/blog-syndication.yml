@@ -82,19 +82,14 @@ jobs:
           set -euo pipefail
           python3 scripts/website/queue_social_posts.py --validate-only
 
-      # Run after queue creation so missing cross-repository credentials cannot
-      # prevent the existing local publisher from receiving its Medium work.
-      - name: Submit Foojay article for editorial review
-        env:
-          FOOJAY_GITHUB_TOKEN: ${{ secrets.FOOJAY_GITHUB_TOKEN }}
-          FOOJAY_HEAD_REPO: ${{ vars.FOOJAY_HEAD_REPO }}
+      # Foojay is submitted by the signed-in local runner (run-syndication.sh),
+      # which opens the editorial PR with the runner's own `gh` login, like the
+      # other signed-in platforms. CI holds no Foojay credential; it only checks
+      # that the next eligible digest still selects and renders.
+      - name: Check Foojay selection (submitted by the local runner)
         run: |
           set -euo pipefail
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python3 scripts/website/syndicate_foojay_posts.py --dry-run
-          else
-            python3 scripts/website/syndicate_foojay_posts.py --submit
-          fi
+          python3 scripts/website/syndicate_foojay_posts.py --dry-run
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
