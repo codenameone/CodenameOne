@@ -254,6 +254,7 @@ public class Initializr extends Lifecycle {
         // button still carried the default Button style is what painted a white
         // box behind the download glyph.
         FontImage.setMaterialIcon(generateButton, FontImage.MATERIAL_DOWNLOAD);
+        generateButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_DOWNLOAD));
         this.generateButton = generateButton;
         generateButton.addActionListener(e -> {
             if (!validateInputs(appNameField, packageField)) {
@@ -285,6 +286,7 @@ public class Initializr extends Lifecycle {
         final Button browserButton = new Button("Open in browser");
         browserButton.setUIID("InitializrSecondaryButton");
         FontImage.setMaterialIcon(browserButton, FontImage.MATERIAL_OPEN_IN_BROWSER);
+        browserButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_OPEN_IN_BROWSER));
         browserButton.addActionListener(e -> {
             if (!validateInputs(appNameField, packageField)) {
                 updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
@@ -1088,6 +1090,12 @@ public class Initializr extends Lifecycle {
         String themed = themedUiid(uiid, dark);
         if (!uiid.equals(themed)) {
             component.setUIID(themed);
+            // A material icon is drawn from the style it was made with; remake
+            // it from the new UIID's colours.
+            Object icon = component.getClientProperty(MATERIAL_ICON);
+            if (icon instanceof Character && component instanceof Button) {
+                FontImage.setMaterialIcon((Button) component, ((Character) icon).charValue());
+            }
         }
         if (component instanceof Container) {
             Container cnt = (Container) component;
@@ -1122,8 +1130,13 @@ public class Initializr extends Lifecycle {
         return "https://cloud.codenameone.com/ide/?new=" + kind
                 + "&name=" + com.codename1.io.Util.encodeUrl(appName)
                 + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
-                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE ? "gradle" : "maven");
+                // Full-stack projects are Maven-only (ProjectOptions.forFullStack),
+                // whatever the hidden build-tool choice still holds.
+                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE && !"fullstack".equals(kind) ? "gradle" : "maven");
     }
+
+    /// Client property: the material icon a button carries, so a theme switch can redraw it.
+    private static final String MATERIAL_ICON = "initializr.materialIcon";
 
     private boolean isThemeable(String uiid) {
         for (String s : THEMEABLE) {

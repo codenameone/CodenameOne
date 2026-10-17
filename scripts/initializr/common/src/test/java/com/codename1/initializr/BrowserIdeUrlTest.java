@@ -38,6 +38,9 @@ public class BrowserIdeUrlTest extends AbstractTest {
         assertTrue(gradle.contains("new=backend") && gradle.endsWith("&build=gradle"), gradle);
         assertTrue(Initializr.browserIdeUrl("MyApp", "com.example.myapp", Template.BAREBONES,
                 ProjectOptions.ProjectType.APP_WITH_BACKEND, ProjectOptions.BuildTool.MAVEN).contains("new=fullstack"));
+        // Full-stack is Maven-only, even if Gradle was picked before switching template.
+        assertTrue(Initializr.browserIdeUrl("MyApp", "com.example.myapp", Template.BAREBONES,
+                ProjectOptions.ProjectType.APP_WITH_BACKEND, ProjectOptions.BuildTool.GRADLE).endsWith("&build=maven"));
         // Names are encoded, so nothing can add its own parameters.
         assertTrue(Initializr.browserIdeUrl("A&b=c", "com.example.myapp", Template.BAREBONES,
                 ProjectOptions.ProjectType.APP, ProjectOptions.BuildTool.MAVEN).contains("name=A%26b%3Dc"));
