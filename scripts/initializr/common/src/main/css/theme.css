@@ -703,6 +703,42 @@ InitializrPrimaryButton.disabled {
     text-align: center;
 }
 
+/* "Open in browser": outlined beside the lime Generate Project. */
+InitializrSecondaryButton {
+    color: #1A2614;
+    background-color: transparent;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 2.2mm 3.6mm;
+    margin: 0 1.6mm 0 0;
+    border: 0.25mm solid #9AA58F;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+InitializrSecondaryButton.pressed {
+    color: #1A2614;
+    background-color: #EEF3E2;
+    border: 0.25mm solid #9AA58F;
+    border-radius: 0.8mm;
+}
+InitializrSecondaryButtonDark {
+    color: #E8EEDD;
+    background-color: transparent;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 2.2mm 3.6mm;
+    margin: 0 1.6mm 0 0;
+    border: 0.25mm solid #5C6653;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+InitializrSecondaryButtonDark.pressed {
+    color: #E8EEDD;
+    background-color: #2A3022;
+    border: 0.25mm solid #5C6653;
+    border-radius: 0.8mm;
+}
+
 InitializrPrimaryButtonDark {
     color: #1A2614;
     background-color: #B8D532;

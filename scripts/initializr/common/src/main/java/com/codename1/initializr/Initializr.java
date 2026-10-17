@@ -51,6 +51,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
@@ -81,7 +82,7 @@ public class Initializr extends Lifecycle {
     // UIIDs that have a "...Dark" variant in theme.css. Used to re-skin the whole
     // tree when the host website / system switches between light and dark.
     private static final String[] THEMEABLE = {
-            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar",
+            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar", "InitializrSecondaryButton",
             "InitializrWordmark", "InitializrHero", "InitializrHeroTitle", "InitializrHeroSubtitle",
             "InitializrPill", "InitializrPillDot", "InitializrPillText",
             "InitializrPanel", "InitializrPanelHeader", "InitializrPanelTitle",
@@ -277,10 +278,29 @@ public class Initializr extends Lifecycle {
             }
         });
 
+        // Zero install: open the same app in the browser IDE, where it runs at once
+        // and can be sent to the cloud. The IDE creates it from its own template
+        // with this name, package, kind and build tool (or reopens the project it
+        // already has with this package).
+        final Button browserButton = new Button("Open in browser");
+        browserButton.setUIID("InitializrSecondaryButton");
+        FontImage.setMaterialIcon(browserButton, FontImage.MATERIAL_OPEN_IN_BROWSER);
+        browserButton.addActionListener(e -> {
+            if (!validateInputs(appNameField, packageField)) {
+                updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
+                ToastBar.showErrorMessage("Please fix validation errors before opening the project.");
+                form.revalidate();
+                return;
+            }
+            String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
+            String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
+            Display.getInstance().execute(browserIdeUrl(appName, packageName, selectedTemplate[0], projectType[0], buildTool[0]));
+        });
+
         Container generateBar = new Container(new BorderLayout());
         generateBar.setUIID("InitializrGenerateBar");
         generateBar.add(BorderLayout.CENTER, bundleInfo);
-        generateBar.add(BorderLayout.EAST, generateButton);
+        generateBar.add(BorderLayout.EAST, FlowLayout.encloseRight(browserButton, generateButton));
 
         Container body = new Container(new BorderLayout());
         body.add(BorderLayout.CENTER, column);
@@ -1092,6 +1112,17 @@ public class Initializr extends Lifecycle {
         }
         String base = uiid.substring(0, uiid.length() - "Dark".length());
         return isThemeable(base) ? base : uiid;
+    }
+
+    /// The browser IDE link for a project: `?new=<kind>&name=&package=&build=`.
+    static String browserIdeUrl(String appName, String packageName, Template template,
+                                ProjectOptions.ProjectType type, ProjectOptions.BuildTool build) {
+        String kind = template.isFullStack() || type == ProjectOptions.ProjectType.APP_WITH_BACKEND ? "fullstack"
+                : type == ProjectOptions.ProjectType.BACKEND_ONLY ? "backend" : "app";
+        return "https://cloud.codenameone.com/ide/?new=" + kind
+                + "&name=" + com.codename1.io.Util.encodeUrl(appName)
+                + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
+                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE ? "gradle" : "maven");
     }
 
     private boolean isThemeable(String uiid) {
