@@ -27,6 +27,7 @@ import com.codename1.orm.session.LazyInitializationException;
 import com.codename1.orm.session.LockMode;
 import com.codename1.orm.session.OptimisticLockException;
 import com.codename1.orm.session.PersistenceException;
+import com.codename1.orm.session.SchemaReport;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -989,6 +990,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (a.generated) {
                     statement.append(sql.generatedKeyColumn(a.kind, q(a.column)));
                 } else {
+                    if (a.temporal == Attribute.TEMPORAL_TIMESTAMP && a.declaredType != null
+                            && "mysql".equals(sql.dialect()) && "timestamp".equals(firstTypeToken(a.declaredType))) {
+                        // The schema report refuses it right after: MySQL's
+                        // TIMESTAMP ends in 2038.
+                        throw new PersistenceException("A @Temporal(TIMESTAMP) field needs DATETIME(3) on MySQL, "
+                                + "not " + a.declaredType + ": " + model.table() + "." + a.column);
+                    }
                     statement.append(columnType(model, i)).append(a.nullable && !a.id ? "" : " NOT NULL");
                 }
             }
@@ -1100,7 +1108,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             for (Relationship relation : model.relationships()) {
                 if (relation.many && relation.mappedBy.length() == 0) {
-                    int suffix = relation.element ? (relation.mapKey.length() > 0 ? 1020 : 4)
+                    // A map key is text; a keyed-by-value set's key ends in the
+                    // value itself, sized by its kind like any other key column.
+                    int suffix = relation.element ? (relation.mapKey.length() > 0 ? 1020
+                            : keyedByValue(relation) ? (Elements.kind(relation.target) == Attribute.TEXT ? 1020 : 8) : 4)
                             : relation.orderColumn.length() > 0 ? 4
                             : keyWidth(model(relation.target), model(relation.target).idIndexes());
                     checkKeyWidth(relation.joinTable, primary + suffix);
@@ -1118,7 +1129,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     throw new PersistenceException("MySQL/MariaDB binary keys and indexes require an explicit " +
                             "bounded column declaration: " + model.table() + "." + attribute.column);
                 }
-                width += attribute.kind == Attribute.TEXT ? 255 * 4
+                // A @Temporal field is a native DATE/DATETIME column, not its TEXT storage.
+                width += attribute.temporal != 0 ? 8 : attribute.kind == Attribute.TEXT ? 255 * 4
                         : attribute.kind == Attribute.INTEGER ? 4 : attribute.kind == Attribute.BOOLEAN ? 2 : 8;
             }
         }
@@ -1134,6 +1146,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (attr.declaredType != null) {
             return attr.declaredType;
         }
+        if (attr.temporal != 0) {
+            return temporalType(attr.temporal);
+        }
         if (!keyColumn(model, index)) {
             return sql.columnType(attr.kind);
         }
@@ -1141,6 +1156,60 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int end = declaration.indexOf(" PRIMARY KEY");
         return end < 0 ? sql.columnType(attr.kind) : declaration.substring(0, end).replace(" NOT NULL", "");
     }
+    /// The native column of a @Temporal field. DATETIME rather than TIMESTAMP on
+    /// MySQL: its TIMESTAMP ends in 2038 and, unless explicit_defaults_for_timestamp
+    /// is on, gives the first such column an ON UPDATE CURRENT_TIMESTAMP that
+    /// would overwrite the value on every update. Millisecond precision, which
+    /// is what a Date holds; SQLite stores the text whatever the type says.
+    private String temporalType(int temporal) {
+        if (temporal == Attribute.TEMPORAL_DATE) {
+            return "DATE";
+        }
+        String dialect = sql.dialect();
+        return "postgresql".equals(dialect) ? "TIMESTAMP(3)" : "mysql".equals(dialect) ? "DATETIME(3)" : "TIMESTAMP";
+    }
+
+    /// Whether an existing column can hold what the mapping stores. A @Temporal
+    /// field on SQLite also accepts a TEXT column: SQLite has no date type, and
+    /// schemas written for it commonly declare their dates as TEXT. Elsewhere
+    /// the column has to be the same temporal kind: a DATE column drops the
+    /// time of a timestamp, and a DATE mapping drops the time it reads from a
+    /// timestamp column.
+    private boolean storageCompatible(Attribute attr, String found, String expected) {
+        int family = typeFamily(found);
+        if ("sqlite".equals(sql.dialect())) {
+            return family == typeFamily(expected) || attr.temporal != 0 && family == 2;
+        }
+        if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && "mysql".equals(sql.dialect())
+                && "timestamp".equals(firstTypeToken(found))) {
+            // MySQL's TIMESTAMP ends in 2038; a Date the converter accepts
+            // would be rejected or coerced. DATETIME is what the mapping needs.
+            return false;
+        }
+        if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)) {
+            // A long over a 32-bit column fails writes, and an int over a
+            // 64-bit column cannot load what is already there. An unsigned
+            // column has neither the negatives nor the range of a Java type.
+            int width = integerWidth(found);
+            if (width != 0 && width != (attr.kind == Attribute.BIGINT ? 8 : 4)
+                    || asciiLower(found).indexOf("unsigned") >= 0) {
+                return false;
+            }
+        }
+        return family == typeFamily(expected) && (attr.temporal == 0 || family != 5 || temporalKind(found) == attr.temporal);
+    }
+
+    /// The @Temporal kind a date/time column holds: TEMPORAL_DATE for a date,
+    /// TEMPORAL_TIMESTAMP for one with a time of day, and 0 for a time-only
+    /// column, which holds neither.
+    private int temporalKind(String type) {
+        String token = firstTypeToken(type);
+        if ("date".equals(token)) {
+            return Attribute.TEMPORAL_DATE;
+        }
+        return token.startsWith("time") && !token.startsWith("timestamp") ? 0 : Attribute.TEMPORAL_TIMESTAMP;
+    }
+
     private boolean keyColumn(EntityModel model, int index) {
         Attribute attr = model.attributes()[index];
         if (attr.id) {
@@ -1226,12 +1295,29 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// Read-only validation of mapped columns, nullability, storage types, and primary keys.
     @Override
     public void validateSchema() {
+        SchemaReport report = schemaReport();
+        if (!report.isCompatible()) {
+            throw new PersistenceException("Schema validation failed:\n" + report);
+        }
+    }
+
+    /// A missing table or column is a migration: the mapping is right and the
+    /// schema is behind it. Nullability is reported apart, since a schema may be
+    /// stricter than its mapping on purpose. A storage-type or key mismatch is not -- the
+    /// existing column holds something this mapping would misread or refuse to
+    /// write, so the MAPPING has to change. An existing native TIMESTAMP column
+    /// against a plain Date field is the case that matters: converting it to
+    /// epoch milliseconds would be a silent rewrite of the data, so it is
+    /// reported for the developer to map with @Temporal instead.
+    @Override
+    public SchemaReport schemaReport() {
         check();
-        List<String> errors = new ArrayList<String>();
+        List<SchemaReport.Issue> errors = new ArrayList<SchemaReport.Issue>();
         for (EntityModel model : models.values()) {
             List<Object[]> columns = describe(model.table());
             if (columns.isEmpty()) {
-                errors.add("Missing table " + model.table());
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, model.table(), null,
+                        "Missing table " + model.table()));
                 continue;
             }
             Attribute[] attrs = model.attributes();
@@ -1244,24 +1330,47 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         break;
                     }
                 }
+                String name = model.table() + "." + attr.column;
                 if (found == null) {
-                    errors.add("Missing column " + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, model.table(),
+                            attr.column, "Missing column " + name));
                     continue;
                 }
                 boolean primary = ((Number) found[3]).intValue() != 0;
-                boolean required = ((Number) found[2]).intValue() != 0 || primary;
+                boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
                 if (primary != attr.id) {
-                    errors.add("Primary key mismatch on " + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Primary key mismatch on " + name));
                 }
                 if (attr.nullable == required) {
-                    errors.add((required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ")
-                            + model.table() + "." + attr.column);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
+                            attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
-                if (typeFamily((String) found[1]) != typeFamily(columnType(model, i))) {
-                    errors.add("Storage type mismatch on " + model.table() + "." + attr.column);
+                if (attr.id && attr.kind == Attribute.TEXT && found.length > 5
+                        && !distinctKeyCollation((String) found[5])) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Identifier " + name + " uses collation " + found[5]
+                            + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
+                }
+                if (found.length > 7) {
+                    // An insert omits a generated id and names every other column.
+                    if (attr.generated && ((Number) found[6]).intValue() == 0) {
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                                "The database does not generate " + name + ", which the mapping leaves to it"));
+                    } else if (!attr.generated && ((Number) found[7]).intValue() != 0) {
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                                "The database generates " + name + " and refuses writes the mapping makes"));
+                    }
+                }
+                String expected = columnType(model, i);
+                if (!storageCompatible(attr, (String) found[1], expected)) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Storage type mismatch on " + name + ": the column is " + found[1]
+                            + ", the mapping stores " + expected));
                 }
             }
             for (Object[] column : columns) {
+                unmappedRequired(errors, model.table(), column, attrs);
                 if (((Number) column[3]).intValue() != 0) {
                     boolean mapped = false;
                     for (Attribute attr : attrs) {
@@ -1270,7 +1379,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         }
                     }
                     if (!mapped) {
-                        errors.add("Unmapped primary key column " + model.table() + "." + column[0]);
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(),
+                                (String) column[0], "Unmapped primary key column " + model.table() + "." + column[0]));
                     }
                 }
             }
@@ -1280,14 +1390,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (relation.many && relation.mappedBy.length() == 0) {
                     List<Object[]> columns = describe(relation.joinTable);
                     if (columns.isEmpty()) {
-                        errors.add("Missing collection table " + relation.joinTable);
+                        errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, relation.joinTable,
+                                null, "Missing collection table " + relation.joinTable));
                         continue;
                     }
                     List<Attribute> expected = new ArrayList<Attribute>();
                     collectionKeys(expected, joinColumns(relation.joinColumn, owner), owner, true);
                     if (relation.element) {
+                        boolean keyed = keyedByValue(relation);
                         expected.add(new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
-                                false, false, true, false));
+                                keyed, false, !keyed, false));
                         if (relation.mapKey.length() > 0) {
                             expected.add(new Attribute("", relation.mapKey, Attribute.TEXT, true, false, false, false));
                         }
@@ -1304,9 +1416,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             }
         }
-        if (!errors.isEmpty()) {
-            throw new PersistenceException("Schema validation failed: " + errors);
-        }
+        return new SchemaReport(errors);
     }
     private void collectionKeys(List<Attribute> expected, String[] names, EntityModel model, boolean primary) {
         int[] ids = model.idIndexes();
@@ -1316,7 +1426,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private void validateCollectionColumns(String table, List<Attribute> expected, List<Object[]> columns,
-            List<String> errors) {
+            List<SchemaReport.Issue> errors) {
         for (Attribute attr : expected) {
             Object[] found = null;
             for (Object[] column : columns) {
@@ -1327,23 +1437,38 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             String name = table + "." + attr.column;
             if (found == null) {
-                errors.add("Missing collection column " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.MIGRATION_REQUIRED, table, attr.column,
+                        "Missing collection column " + name));
                 continue;
             }
             boolean primary = ((Number) found[3]).intValue() != 0;
-            boolean required = ((Number) found[2]).intValue() != 0 || primary;
+            // SQLite lets a composite primary key column hold NULL, so only its
+            // NOT NULL flag says the column is required there.
+            boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
+            if (attr.id && attr.kind == Attribute.TEXT && found.length > 5 && !distinctKeyCollation((String) found[5])) {
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Collection key " + name + " uses collation " + found[5]
+                        + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
+            }
             if (attr.id != primary) {
-                errors.add("Primary key mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Primary key mismatch on collection " + name));
             }
             if (attr.nullable == required) {
-                errors.add("Nullability mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, attr.column,
+                        "Nullability mismatch on collection " + name
+                        + (required ? ": unexpected NOT NULL" : ": missing NOT NULL")));
             }
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
             if (typeFamily((String) found[1]) != typeFamily(type)) {
-                errors.add("Storage type mismatch on collection " + name);
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Storage type mismatch on collection " + name + ": the column is " + found[1]
+                        + ", the mapping stores " + type));
             }
         }
+        Attribute[] attrs = expected.toArray(new Attribute[expected.size()]);
         for (Object[] column : columns) {
+            unmappedRequired(errors, table, column, attrs);
             if (((Number) column[3]).intValue() != 0) {
                 boolean mapped = false;
                 for (Attribute attr : expected) {
@@ -1352,10 +1477,137 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 }
                 if (!mapped) {
-                    errors.add("Unmapped primary key column " + table + "." + column[0]);
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, (String) column[0],
+                            "Unmapped primary key column " + table + "." + column[0]));
                 }
             }
         }
+    }
+    /// A NOT NULL column the mapping does not write and the database does not
+    /// fill fails every insert, so it is reported rather than found at the
+    /// first save. Primary key columns are reported on their own.
+    private void unmappedRequired(List<SchemaReport.Issue> errors, String table, Object[] column,
+            Attribute[] attrs) {
+        if (((Number) column[2]).intValue() == 0 || ((Number) column[3]).intValue() != 0
+                || column.length > 4 && ((Number) column[4]).intValue() != 0) {
+            return;
+        }
+        for (Attribute attr : attrs) {
+            if (columnNameMatches(attr.column, (String) column[0])) {
+                return;
+            }
+        }
+        errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, (String) column[0],
+                "Unmapped NOT NULL column without a default " + table + "." + column[0]));
+    }
+    /// Whether a MySQL text key column keeps every value a Java set or map
+    /// keeps apart: binary, and NO PAD so trailing spaces still differ -- the
+    /// collations the backend itself declares. Other engines report no such
+    /// collation here and are accepted.
+    private boolean distinctKeyCollation(String collation) {
+        if (collation == null || !"mysql".equals(sql.dialect())) {
+            return true;
+        }
+        return "utf8mb4_0900_bin".equalsIgnoreCase(collation) || "binary".equalsIgnoreCase(collation)
+                || collation.regionMatches(true, collation.length() - 10, "_nopad_bin", 0, 10);
+    }
+    /// Shapes `PRAGMA table_info` rows as [SqlAccess#describe] answers them. A
+    /// literal NULL default fills nothing, and the one INTEGER primary key
+    /// column is the rowid, which SQLite assigns.
+    static List<Object[]> sqliteColumns(List<Object[]> raw, String createSql) {
+        int keys = 0;
+        for (Object[] row : raw) {
+            if (row[5] instanceof Number && ((Number) row[5]).intValue() != 0) {
+                keys++;
+            }
+        }
+        // A WITHOUT ROWID table has no rowid, and a column declared
+        // INTEGER PRIMARY KEY DESC is an ordinary column, not its alias. Read
+        // from the statement's tokens, so a name, string or comment that
+        // happens to spell either does not count.
+        List<String> tokens = sqlTokens(createSql == null ? "" : createSql);
+        int close = tokens.lastIndexOf(")");
+        boolean withoutRowid = false;
+        boolean descendingKey = false;
+        for (int i = 0; i + 1 < tokens.size(); i++) {
+            if (i > close && "without".equals(tokens.get(i)) && "rowid".equals(tokens.get(i + 1))) {
+                withoutRowid = true;
+            }
+            if (i + 2 < tokens.size() && "primary".equals(tokens.get(i)) && "key".equals(tokens.get(i + 1))
+                    && "desc".equals(tokens.get(i + 2))) {
+                descendingKey = true;
+            }
+        }
+        boolean rowidTable = !withoutRowid && !descendingKey;
+        List<Object[]> result = new ArrayList<Object[]>();
+        for (Object[] row : raw) {
+            boolean filled = row[4] != null && !"null".equals(unparenthesized(asciiLower(String.valueOf(row[4]))));
+            boolean rowid = rowidTable && keys == 1 && row[5] instanceof Number && ((Number) row[5]).intValue() != 0
+                    && "INTEGER".equalsIgnoreCase(String.valueOf(row[2]).trim());
+            // A key column holds NULL in SQLite unless it is the rowid, the
+            // table has none, or the column says NOT NULL.
+            boolean key = row[5] instanceof Number && ((Number) row[5]).intValue() != 0;
+            Object notNull = key && (rowid || withoutRowid) ? Integer.valueOf(1) : row[3];
+            result.add(new Object[] {row[1], row[2], notNull, row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
+                    Integer.valueOf(rowid ? 1 : 0), Integer.valueOf(0)});
+        }
+        return result;
+    }
+    private static boolean wordChar(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$' || c > 127;
+    }
+    /// The keywords and punctuation of a statement, lower case, with string
+    /// literals, quoted identifiers and comments left out.
+    private static List<String> sqlTokens(String text) {
+        List<String> tokens = new ArrayList<String>();
+        int i = 0;
+        int n = text.length();
+        while (i < n) {
+            char c = text.charAt(i);
+            if (c == '\'' || c == '"' || c == '`' || c == '[') {
+                char end = c == '[' ? ']' : c;
+                i++;
+                while (i < n) {
+                    if (text.charAt(i) == end) {
+                        if (end != ']' && i + 1 < n && text.charAt(i + 1) == end) {
+                            i += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    i++;
+                }
+                i++;
+                tokens.add("?");
+            } else if (c == '-' && i + 1 < n && text.charAt(i + 1) == '-') {
+                while (i < n && text.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && i + 1 < n && text.charAt(i + 1) == '*') {
+                int stop = text.indexOf("*/", i + 2);
+                i = stop < 0 ? n : stop + 2;
+            } else if (wordChar(c)) {
+                int start = i;
+                while (i < n && wordChar(text.charAt(i))) {
+                    i++;
+                }
+                tokens.add(asciiLower(text.substring(start, i)));
+            } else {
+                if (c > ' ') {
+                    tokens.add(String.valueOf(c));
+                }
+                i++;
+            }
+        }
+        return tokens;
+    }
+    /// `((NULL))` is NULL: SQLite keeps a default's redundant parentheses.
+    private static String unparenthesized(String value) {
+        String text = value.trim();
+        while (text.length() >= 2 && text.charAt(0) == '(' && text.charAt(text.length() - 1) == ')') {
+            text = text.substring(1, text.length() - 1).trim();
+        }
+        return text;
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();
@@ -1372,15 +1624,42 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return parts.toArray(new String[parts.size()]);
     }
-    private int typeFamily(String type) {
+    private static String asciiLower(String type) {
         StringBuilder lower = new StringBuilder();
         for (int i = 0; i < type.length(); i++) {
             char ch = type.charAt(i);
             lower.append(ch >= 'A' && ch <= 'Z' ? (char) (ch + 32) : ch);
         }
-        String name = lower.toString();
-        String[] tokens = split(name.replace('(', ' '), ' ');
-        String token = tokens.length == 0 ? "" : tokens[0];
+        return lower.toString();
+    }
+    /// The byte width of an integer column type off SQLite, whose integers are
+    /// all 64-bit, or 0 when the type does not say.
+    private static int integerWidth(String type) {
+        String token = firstTypeToken(type);
+        if (" tinyint ".contains(" " + token + " ")) {
+            return 1;
+        }
+        if (" smallint int2 smallserial serial2 ".contains(" " + token + " ")) {
+            return 2;
+        }
+        if (" mediumint ".contains(" " + token + " ")) {
+            return 3;
+        }
+        if (" int integer int4 serial serial4 ".contains(" " + token + " ")) {
+            return 4;
+        }
+        if (" bigint int8 bigserial serial8 ".contains(" " + token + " ")) {
+            return 8;
+        }
+        return 0;
+    }
+    private static String firstTypeToken(String type) {
+        String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
+        return tokens.length == 0 ? "" : tokens[0];
+    }
+    private int typeFamily(String type) {
+        String name = asciiLower(type);
+        String token = firstTypeToken(type);
         if ("postgresql".equals(sql.dialect()) && ("bool".equals(token) || "boolean".equals(token))) {
             return 6;
         }
@@ -1824,25 +2103,40 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new PersistenceException("Wrong element type: " + relation.field);
         }
     }
+    /// An element Set declared with no position column: its table is keyed by
+    /// the owner and the value, as JPA providers lay one out.
+    private static boolean keyedByValue(Relationship relation) {
+        return relation.element && relation.orderColumn.length() == 0 && relation.mapKey.length() == 0;
+    }
     private void createElementTable(EntityModel owner, Relationship relation, List<ForeignKey> foreignKeys) {
         String[] columns = joinColumns(relation.joinColumn, owner);
         StringBuilder definition = new StringBuilder("CREATE TABLE ").append(q(relation.joinTable)).append(" (");
         appendJoinDefinition(definition, columns, owner);
-        definition.append(", ")
-                .append(q(relation.orderColumn))
-                .append(" INTEGER NOT NULL, ")
-                .append(q(relation.inverseJoinColumn))
-                .append(' ')
-                .append(sql.columnType(Elements.kind(relation.target)));
-        if (relation.mapKey.length() > 0) {
-            String type = sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
-            definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");
+        if (keyedByValue(relation)) {
+            // The key type, not the plain one: a value that is part of the key
+            // needs a bounded type on MySQL, which cannot index TEXT.
+            String type = sql.assignedKeyColumn(Elements.kind(relation.target))
+                    .replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
+            definition.append(", ").append(q(relation.inverseJoinColumn)).append(' ').append(type)
+                    .append(" NOT NULL, PRIMARY KEY (").append(quoted(columns)).append(", ")
+                    .append(q(relation.inverseJoinColumn)).append(')');
+        } else {
+            definition.append(", ")
+                    .append(q(relation.orderColumn))
+                    .append(" INTEGER NOT NULL, ")
+                    .append(q(relation.inverseJoinColumn))
+                    .append(' ')
+                    .append(sql.columnType(Elements.kind(relation.target)));
+            if (relation.mapKey.length() > 0) {
+                String type = sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
+                definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");
+            }
+            definition.append(", PRIMARY KEY (")
+                    .append(quoted(columns))
+                    .append(", ")
+                    .append(q(relation.mapKey.length() > 0 ? relation.mapKey : relation.orderColumn))
+                    .append(')');
         }
-        definition.append(", PRIMARY KEY (")
-                .append(quoted(columns))
-                .append(", ")
-                .append(q(relation.mapKey.length() > 0 ? relation.mapKey : relation.orderColumn))
-                .append(')');
         ForeignKey key = new ForeignKey(relation.joinTable, columns, owner.table(), keyColumns(owner));
         if ("sqlite".equals(sql.dialect())) {
             definition.append(", ").append(foreignDeclaration(key));
@@ -1858,7 +2152,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                           : new int[] {Elements.kind(relation.target)};
         List<Object[]> rows = read("SELECT " + selection + " FROM " + q(relation.joinTable) + " WHERE " +
                                            matches(joinColumns(relation.joinColumn, owner), null) + " ORDER BY " +
-                                           q(relation.orderColumn),
+                                           q(keyedByValue(relation) ? relation.inverseJoinColumn : relation.orderColumn),
                 owner.keyValues(owner.identifier(entity)), kinds);
         List values = new ArrayList();
         Map mapping = new LinkedHashMap();
@@ -1880,6 +2174,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String[] ownerColumns = joinColumns(relation.joinColumn, entry.model);
         Object[] owner = entry.model.keyValues(entry.model.identifier(entry.entity));
         write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null), owner);
+        if (keyedByValue(relation)) {
+            for (Object row : rows) {
+                Object value = ((ElementRow) row).value;
+                if (value == null) {
+                    throw new PersistenceException("A Set without a position column cannot hold null: "
+                            + relation.field);
+                }
+                if (value instanceof String && characterCount((String) value) > 255) {
+                    throw new PersistenceException("Element value exceeds the portable key limit of 255 characters: "
+                            + relation.field);
+                }
+                Object[] args = concat(owner, new Object[] {value});
+                write("INSERT INTO " + q(relation.joinTable) + " (" + quoted(ownerColumns) + ", "
+                        + q(relation.inverseJoinColumn) + ") VALUES (" + placeholders(args.length) + ")", args);
+            }
+            entry.collections[index] = rows;
+            return;
+        }
         for (int i = 0; i < rows.size(); i++) {
             ElementRow row = (ElementRow) rows.get(i);
             boolean map = relation.mapKey.length() > 0;

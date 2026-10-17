@@ -59,18 +59,30 @@ public final class BackendSqlAccess implements SqlAccess {
     @Override
     public List<Object[]> describe(String table) throws IOException {
         if ("sqlite".equals(dialect())) {
-            List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]);
-            List<Object[]> result = new ArrayList<Object[]>();
-            for (Object[] row : raw) {
-                result.add(new Object[]{row[1], row[2], row[3], row[5]});
-            }
-            return result;
+            List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                    new Object[]{table}, new int[1]);
+            Object createSql = definition.isEmpty() ? null : definition.get(0)[0];
+            return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
+                    createSql instanceof String ? (String) createSql : null);
         }
-        String schema = "mysql".equals(dialect()) ? "DATABASE()" : "current_schema()";
-        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key "
+        boolean mysql = "mysql".equals(dialect());
+        // PostgreSQL: the schema an unqualified name resolves to through the
+        // whole search_path, which is the table the ORM's SQL actually reads.
+        String schema = mysql ? "DATABASE()"
+                : "(SELECT n.nspname FROM pg_catalog.pg_class r INNER JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE r.oid=to_regclass(quote_ident(?)))";
+        // A literal NULL default fills nothing. MySQL's DEFAULT_GENERATED is a
+        // CURRENT_TIMESTAMP default, not a generated column.
+        String filled = mysql
+                ? "CASE WHEN c.column_default IS NOT NULL OR c.extra LIKE '%auto_increment%' OR c.extra LIKE '%DEFAULT_GENERATED%' OR c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.column_default IS NOT NULL AND upper(c.column_default) <> 'NULL' AND upper(c.column_default) NOT LIKE 'NULL::%' OR c.is_identity='YES' OR c.is_generated='ALWAYS' THEN 1 ELSE 0 END";
+        String keyGenerated = mysql ? "CASE WHEN c.extra LIKE '%auto_increment%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.is_identity='YES' OR c.column_default LIKE 'nextval(%' THEN 1 ELSE 0 END";
+        String readOnly = mysql ? "CASE WHEN c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' AND c.identity_generation='ALWAYS' THEN 1 ELSE 0 END";
+        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, c.collation_name, " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
                 + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
                 + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
-        return query(statement, new Object[]{table}, new int[4]);
+        return query(statement, mysql ? new Object[]{table} : new Object[]{table, table}, new int[8]);
     }
 
     @Override

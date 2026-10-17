@@ -125,6 +125,12 @@ public final class MySql {
         try {
             MySql session = new MySql(new Wire(connection));
             session.handshake(host, database, user, password, sslMode, caFile);
+            // UTC, whatever the server's default. A TIMESTAMP column is converted
+            // to and from the session zone on every read and write, and a
+            // @Temporal value is written as UTC text, so a session left in the
+            // server's zone stored a different instant than the one written. An
+            // offset rather than 'UTC', which needs the zone tables loaded.
+            session.command("SET time_zone = '+00:00'");
             return session;
         } catch (IOException err) {
             connection.close();

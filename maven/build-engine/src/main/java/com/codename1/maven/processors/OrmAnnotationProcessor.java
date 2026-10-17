@@ -420,11 +420,27 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
 
         String[] events={"PrePersist","PostPersist","PreUpdate","PostUpdate","PreRemove","PostRemove","PostLoad"};
-        for (MethodInfo method : persistentMethods(cls,ctx)) for (int event=0;event<events.length;event++) {
+        Map<MethodInfo,String> methodOwners=new java.util.IdentityHashMap<MethodInfo,String>();
+        for (MethodInfo method : persistentMethods(cls,ctx,methodOwners)) for (int event=0;event<events.length;event++) {
             if (method.getAnnotations().containsKey("Lcom/codename1/annotations/db/"+events[event]+";")) {
-                if (!method.isPublic() || !"()V".equals(method.getDescriptor()) || method.isStatic()) {
-                    ctx.error(cls,"Lifecycle callback must be a public non-static void method with no parameters: "+method.getName());
-                } else ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
+                if (!"()V".equals(method.getDescriptor()) || method.isStatic() || method.isAbstract()) {
+                    ctx.error(cls,"Lifecycle callback must be a non-static, non-abstract void method with no parameters: "+method.getName());
+                } else {
+                    // Any access, like a persistent field: a non-public callback
+                    // is called through a static accessor OrmEnhancer weaves into
+                    // its declaring class, so the generated model never needs
+                    // reflection to reach it.
+                    // The call is cast to the declaring class so the accessor
+                    // is resolved from there: a private callback of a mapped
+                    // superclass is not overridden by a subclass method of the
+                    // same name, and `e.name()` would resolve to that one.
+                    String call="e."+method.getName()+"()";
+                    if (!method.isPublic()) {
+                        hideCallback(ec,methodOwners.get(method),method);
+                        call="(("+methodOwners.get(method).replace('/','.')+")(Object)e)."+method.getName()+"()";
+                    }
+                    ec.callbacks[event]=ec.callbacks[event]==null?call:ec.callbacks[event]+"; "+call;
+                }
             }
         }
 
@@ -442,6 +458,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             hide(ec,fieldPath.owner.replace('.','/'),f);
             RelationField relationship = relation(f, ec, ctx);
             if (relationship != null) {
+                // Element collections and relationships keep their own column
+                // format; a @Temporal there would be silently ignored.
+                if(f.getAnnotation("Lcom/codename1/annotations/db/Temporal;")!=null) { ctx.error(cls,"@Temporal applies to a single java.util.Date field, not a relationship or collection: "+fieldPath.path);continue; }
                 if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
                 relationship.declaringType=fieldPath.declaringType;relationship.index=ec.relations.size(); ec.relations.add(relationship); continue; }
             PersistedField pf = new PersistedField();
@@ -461,6 +480,24 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 AnnotatedClass converterClass=findType(pf.converter,ctx);
                 if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
                 if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot declare converters");
+            }
+            AnnotationValues temporal=f.getAnnotation("Lcom/codename1/annotations/db/Temporal;");
+            if(temporal!=null) {
+                // A native date or timestamp column, opted into per field. It is
+                // a built-in converter to UTC ISO text -- the form every engine
+                // accepts for those columns -- so writes, loads and query
+                // parameters all take the path a @Convert field already takes.
+                Object value=temporal.get("value");
+                boolean day=value instanceof String[] && "DATE".equals(((String[])value)[1]);
+                if(conversion!=null) ctx.error(cls,"@Temporal cannot be combined with @Convert: "+pf.fieldName);
+                else if(!"Ljava/util/Date;".equals(f.getDescriptor())) ctx.error(cls,"@Temporal requires a java.util.Date field: "+pf.fieldName);
+                else if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot be @Temporal: "+pf.fieldName);
+                else {
+                    pf.converter="com.codename1.impl.orm.TemporalConverter."+(day?"Day":"Timestamp");
+                    pf.domainType="java.util.Date";
+                    pf.kind=PropertyTypeKind.scalar("java.lang.String");
+                    pf.temporal=day?1:2;
+                }
             }
             AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())
@@ -507,6 +544,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             // with no @Column(type) is typed by the dialect, which is what keeps
             // the entity portable.
             pf.explicitSqlType = (colType == null || colType.length() == 0) ? null : colType;
+            // An explicit type wins over the @Temporal one in the DDL and the
+            // schema report alike, so a BIGINT here would be created and
+            // accepted while the converter writes ISO text into it.
+            if (pf.temporal != 0 && pf.explicitSqlType != null && !holdsTemporal(pf.explicitSqlType,pf.temporal))
+                ctx.error(cls,"@Column(type=\""+pf.explicitSqlType+"\") does not hold a @Temporal("
+                        +(pf.temporal==1?"DATE":"TIMESTAMP")+") value: "+pf.fieldName);
             pf.nullable = nullable;
 
             pf.dialectKind = dialectKind(pf.kind);
@@ -740,7 +783,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             List<String> physical=new ArrayList<String>();
             for(PersistedField key:entity.idFields) physical.add(relation.ownerColumn+(entity.idFields.size()==1?"":"_"+key.columnName));
             if(relation.element) {
-                physical.add(relation.targetColumn);physical.add(relation.orderColumn);if(relation.mapKey.length()>0) physical.add(relation.mapKey);
+                physical.add(relation.targetColumn);if(relation.orderColumn.length()>0) physical.add(relation.orderColumn);if(relation.mapKey.length()>0) physical.add(relation.mapKey);
             } else {
                 EntityClass target=accepted.get(relation.target);
                 if(target!=null) for(PersistedField key:target.idFields) physical.add(relation.targetColumn+(target.idFields.size()==1?"":"_"+key.columnName));
@@ -977,24 +1020,38 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(tooLongForAnEngine(name) || previous!=null) ctx.error("Invalid or duplicate index name: "+name);
     }
 
-    private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx) {
+    /// The callback candidates of an entity, inherited first; `owners` receives
+    /// the internal name of the class that declares each one.
+    private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx,Map<MethodInfo,String> owners) {
         List<MethodInfo> result=new ArrayList<MethodInfo>();
         String parent=cls.getSuperInternalName();
         if(parent!=null && !"java/lang/Object".equals(parent)) {
             AnnotatedClass base=findType(parent.replace('/','.'),ctx);
             if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/db/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
-                result.addAll(persistentMethods(base,ctx));
+                result.addAll(persistentMethods(base,ctx,owners));
         }
         Set<String> events=new LinkedHashSet<String>();
         for(MethodInfo method:cls.getMethods()) {
-            for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())) result.remove(i);
+            for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())
+                    && overridable(result.get(i),owners.get(result.get(i)),cls.getInternalName())) result.remove(i);
             for(String annotation:method.getAnnotations().keySet()) {
                 if(annotation.matches("Lcom/codename1/annotations/db/(PrePersist|PostPersist|PreUpdate|PostUpdate|PreRemove|PostRemove|PostLoad);"))
                     if(!events.add(annotation)) ctx.error(cls,"Duplicate lifecycle callback: "+annotation);
             }
             result.add(method);
+            owners.put(method,cls.getInternalName());
         }
         return result;
+    }
+
+    /// Whether a subclass method of the same name and descriptor overrides an
+    /// inherited one. A private method is never overridden, and a
+    /// package-private one only from its own package; such an inherited
+    /// callback still runs beside the subclass method.
+    private static boolean overridable(MethodInfo inherited,String declaringInternal,String subclassInternal) {
+        if(inherited.isPrivate()) return false;
+        if(inherited.isPublic() || inherited.isProtected()) return true;
+        return packageOf(declaringInternal.replace('/','.')).equals(packageOf(subclassInternal.replace('/','.')));
     }
 
     private List<FieldPath> persistentFields(AnnotatedClass cls,EntityClass entity,ProcessorContext ctx,
@@ -1078,6 +1135,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return out.toString().toLowerCase(java.util.Locale.ROOT);
     }
 
+    /// Whether a declared column type holds a @Temporal value of the given kind
+    /// (1 DATE, 2 TIMESTAMP). TEXT holds either: SQLite has no date type and
+    /// schemas written for it declare their dates as TEXT. Mirrors SessionImpl's
+    /// check of an existing column.
+    static boolean holdsTemporal(String type,int temporal) {
+        String token=type.trim().toLowerCase(java.util.Locale.ROOT).split("[\\s(]",2)[0];
+        if("text".equals(token)) return true;
+        if(temporal==1) return "date".equals(token);
+        return "timestamp".equals(token) || "timestamptz".equals(token) || "datetime".equals(token);
+    }
+
     private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
 
     /// THE JPA RULE: every field that is not static and not transient is
@@ -1112,6 +1180,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         hide(entity,declaring.getInternalName(),field);
     }
 
+    /// Records a non-public lifecycle callback for the accessor weaving; see
+    /// EntityClass#hiddenCallbacks.
+    private static void hideCallback(EntityClass entity,String declaringInternal,MethodInfo method) {
+        for(String[] existing:entity.hiddenCallbacks) {
+            if(existing[0].equals(declaringInternal) && existing[1].equals(method.getName())) return;
+        }
+        entity.hiddenCallbacks.add(new String[] {declaringInternal,method.getName(),
+                method.isPrivate()?"private":"virtual"});
+    }
+
     private static void hide(EntityClass entity,String declaringInternal,FieldInfo field) {
         if(field.isPublic()) return;
         for(String[] existing:entity.hiddenFields) {
@@ -1144,7 +1222,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(relation.element) {
             AnnotationValues keyColumn=field.getAnnotation(prefix+"MapKeyColumn;");
             if(map) { relation.mapKey=keyColumn==null?"map_key":keyColumn.getStringOrDefault("name","map_key");if(relation.mapKey.length()==0) relation.mapKey="map_key"; }
-            if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
+            Object position=annotation.get("positionColumn");
+            if(position instanceof String) {
+                if(orderColumn!=null) ctx.error("Choose OrderColumn or ElementCollection.positionColumn: "+relation.field);
+                relation.orderColumn=(String)position;
+                if(relation.orderColumn.length()==0 && !"Ljava/util/Set;".equals(field.getDescriptor()))
+                    ctx.error("Only a Set element collection can omit its position column: "+relation.field);
+            } else if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
             if(relation.orderBy.length()>0 || mapKey!=null) ctx.error("Scalar elements use OrderColumn/MapKeyColumn: "+relation.field);
         }
         if(map && relation.mapKey.length()==0) ctx.error("Map relationships require @MapKey(name=...): "+relation.field);
@@ -1187,6 +1271,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if(!"Ljava/util/List;".equals(field.getDescriptor()) && !"Ljava/util/Set;".equals(field.getDescriptor()) && !map)
                 ctx.error("Relationship collection must use List, Set or Map: "+owner.binaryName+"."+relation.field);
         }
+        // A positionless set keys its rows by the value. SQL compares floating
+        // point numerically, so 0.0 and -0.0 -- two members of a Java Set -- are
+        // one key and the second insert fails as a duplicate.
+        if(relation.element && relation.orderColumn.length()==0 && relation.mapKey.length()==0
+                && ("java.lang.Double".equals(relation.target) || "java.lang.Float".equals(relation.target)))
+            ctx.error("A Set of "+relation.target+" needs its position column, since its values cannot key the table: "+relation.field);
         AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
         String joinDefault=physical(relation.field)+"_id";
         relation.columnName=join==null?joinDefault:join.getStringOrDefault("name",joinDefault);
@@ -1403,7 +1493,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append("\", \"").append(escape(f.columnName)).append("\", ").append(kind)
               .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
               .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
-              .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"").append(")")
+              .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"")
+              .append(f.temporal==0?"":", "+f.temporal).append(")")
               .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
         }
         sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
@@ -1666,7 +1757,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("default:return false;} }\n");
         sb.append("  public void lifecycle(").append(ec.binaryName).append(" e,int event) { switch(event) {\n");
         for (int event=0;event<ec.callbacks.length;event++) if(ec.callbacks[event]!=null)
-            sb.append("case ").append(event).append(": e.").append(ec.callbacks[event]).append("(); return;\n");
+            sb.append("case ").append(event).append(": ").append(ec.callbacks[event]).append("; return;\n");
         sb.append("default: return; }}\n}\n");
         return sb.toString();
     }
@@ -3009,12 +3100,20 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         /// fields made public, and OrmEnhancer then routes each access through a
         /// static accessor it weaves into the declaring class.
         final List<String[]> hiddenFields = new ArrayList<String[]>();
+        /// Every non-public lifecycle callback, as {declaring class internal
+        /// name, method name, "private" or "virtual"}. Exposed to the generated
+        /// source the same way as #hiddenFields; the accessor OrmEnhancer weaves
+        /// calls a private method directly and any other one virtually, so an
+        /// override still runs.
+        final List<String[]> hiddenCallbacks = new ArrayList<String[]>();
     }
 
     static final class PersistedField {
         String fieldName;
         String embeddedParent;
         String converter,domainType,declaringType;
+        /// Attribute.TEMPORAL_DATE or TEMPORAL_TIMESTAMP for a @Temporal field, else 0.
+        int temporal;
         boolean discriminator,primitive;
         String javaType;
         String columnName;

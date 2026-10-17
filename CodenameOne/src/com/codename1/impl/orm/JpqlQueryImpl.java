@@ -342,9 +342,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean coalesce;
         Expr scalarProjection;
         QueryImpl projectionQuery;
+        /// A scalar subquery whose projection carries a field mapping.
+        boolean subqueryMapping;
         String projectionField;
         Object literalValue;
         LiteralBinding literalBinding;
+        /// A `@Temporal` column: text to bind and read, a date to the database.
+        /// See Attribute#sqlKind.
+        boolean temporal;
         Expr(String sql, int kind) {
             this(sql, kind, null);
         }
@@ -416,6 +421,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     expect("=");
                     Expr value = rowExpression();
                     Expr target = new Expr(session.q(attribute.column), attribute.kind);
+                    target.temporal = attribute.temporal != 0;
                     target.query = root;
                     target.field = field;
                     target.projectionQuery = root;
@@ -593,7 +599,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (ascending) {
                         take("ASC");
                     }
-                    String rendered = session.orderBy(term.sql, ascending, term.kind);
+                    String rendered = session.orderBy(term.sql, ascending, sqlKind(term));
                     out.append(rendered);
                 } while (take(","));
                 order = " ORDER BY " + out;
@@ -616,7 +622,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 // PostgreSQL requires the collated ORDER BY expression in a
                 // DISTINCT projection, even when the underlying column is selected.
                 projection.append(!distinct ? expr.sql : expr.entity != null ? root.rootColumns(true)
-                        : session.orderValue(expr.sql, expr.kind));
+                        : session.orderValue(expr.sql, sqlKind(expr)));
                 if (expr.entity != null) {
                     if (selections.size() != 1) {
                         throw error("Entity/scalar mixed projections are not supported");
@@ -770,13 +776,21 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 compatible(left, high);
                 bindType(left, low);
                 bindType(left, high);
-                return node(session.orderValue(left.sql, left.kind) + (not ? " NOT BETWEEN " : " BETWEEN ")
-                        + "(" + session.orderValue(low.sql, low.kind) + ") AND (" + session.orderValue(high.sql, high.kind) + ")",
+                // `:t BETWEEN e.from AND e.to` -- the bounds carry the mapping.
+                bindType(low, left);
+                bindType(high, left);
+                return node(session.orderValue(left.sql, sqlKind(left, low.temporal || high.temporal))
+                        + (not ? " NOT BETWEEN " : " BETWEEN ")
+                        + "(" + session.orderValue(low.sql, sqlKind(low, left.temporal)) + ") AND ("
+                        + session.orderValue(high.sql, sqlKind(high, left.temporal)) + ")",
                         Attribute.BOOLEAN, left, low, high);
             }
             if (take("LIKE")) {
                 int firstBinding = bindings.size();
                 Expr pattern = add();
+                if (left.temporal || pattern.temporal) {
+                    throw error("LIKE does not apply to a @Temporal field, which is a date column");
+                }
                 requireKind(left, Attribute.TEXT);
                 requireKind(pattern, Attribute.TEXT);
                 compatibleMappings(left, pattern);
@@ -821,8 +835,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             + session.numericOperand(right.sql, Attribute.REAL) + ")", Attribute.BOOLEAN, left, right);
                 }
                 if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
-                    return node("(" + session.orderValue(left.sql, left.kind) + " " + op + " "
-                            + session.orderValue(right.sql, right.kind) + ")", Attribute.BOOLEAN, left, right);
+                    return node("(" + session.orderValue(left.sql, sqlKind(left, right.temporal)) + " " + op + " "
+                            + session.orderValue(right.sql, sqlKind(right, left.temporal)) + ")", Attribute.BOOLEAN, left, right);
                 }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }
@@ -910,6 +924,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Expr result = new Expr(sql.append(" END").toString(), kind);
             result.resultBranches = branches;
+            for (Expr branch : branches) {
+                result.temporal |= branch.temporal;
+            }
             result.children.addAll(conditions);
             result.children.addAll(branches);
             if (mapping != null && mapping.projectionQuery != null && kind == mapping.kind) {
@@ -953,12 +970,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("Scalar subqueries require an aggregate without GROUP BY");
                     }
                     Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
+                    result.temporal = nested.projections.get(0).temporal;
                     result.children.addAll(nested.correlations);
                     if (nested.guaranteedRow) {
                         result.scalarProjection = nested.projections.get(0);
                     }
                     result.projectionQuery = nested.projections.get(0).projectionQuery;
                     result.projectionField = nested.projections.get(0).projectionField;
+                    // A parameter compared with the subquery binds through the
+                    // projected field's converter; see bindType.
+                    result.subqueryMapping = result.projectionQuery != null;
                     return result;
                 }
                 Expr value = expression();
@@ -1065,6 +1086,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (" MIN MAX COALESCE NULLIF ".contains(" " + function + " ")) {
                     for (Expr arg : args) {
                         result.association |= arg.association;
+                        // The value is one of the operands, so a date stays a date.
+                        result.temporal |= arg.temporal;
                     }
                 }
                 // These functions preserve their operands' domain representation.
@@ -1119,6 +1142,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             String field = alias.field(full.substring(dot + 1));
             Expr result = new Expr(alias.query.column(field), alias.query.kind(field));
+            result.temporal = alias.query.sqlKind(field) != alias.query.kind(field);
             result.query = alias.query;
             result.field = field;
             result.association = alias.query.association(field);
@@ -1175,7 +1199,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 } else if (arg.kind >= 0) {
                     boolean number = arg.kind == Attribute.INTEGER || arg.kind == Attribute.BIGINT
                             || arg.kind == Attribute.REAL;
-                    if (text && arg.kind != Attribute.TEXT || numeric && !number) {
+                    if (text && (arg.kind != Attribute.TEXT || arg.temporal) || numeric && !number) {
                         throw error("Invalid operand type for " + function);
                     }
                     if (("MIN".equals(function) || "MAX".equals(function))
@@ -1209,6 +1233,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private Expr wrap(String sql, Expr value) {
             Expr result = new Expr(sql, value.kind, value.entity);
+            result.temporal = value.temporal;
             result.children.add(value);
             result.nullPreserving = true;
             result.numericOperands = true;
@@ -1363,6 +1388,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private void bindType(Expr attribute, Expr value) {
             if (attribute.query == null) {
+                if (attribute.subqueryMapping) {
+                    Expr mapping = new Expr(attribute.sql, attribute.kind);
+                    mapping.query = attribute.projectionQuery;
+                    mapping.field = attribute.projectionField;
+                    bindType(mapping, value);
+                }
                 return;
             }
             if (value.literalBinding != null && value.literalBinding.query == null) {
@@ -1445,6 +1476,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.children.add(left);
             result.children.add(right);
             return result;
+        }
+        private int sqlKind(Expr value) {
+            return sqlKind(value, false);
+        }
+        /// A parameter or literal compared with a @Temporal column takes the
+        /// column's semantics too: PostgreSQL types `? COLLATE "C"` as text, and
+        /// a timestamp does not compare with text.
+        private int sqlKind(Expr value, boolean otherTemporal) {
+            return value.temporal || otherTemporal ? Attribute.TIMESTAMP : value.kind;
         }
         private boolean numericKind(int kind) {
             return kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.REAL;
