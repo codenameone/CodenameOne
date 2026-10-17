@@ -240,13 +240,68 @@ class MavenLibraryInstallerTest {
         assertTrue(error.getMessage().contains("settings.log"));
     }
 
+    @Test void reusesDoctypePomsWithoutLoadingExternalSubsets() throws Exception {
+        ProjectBinding binding = project();
+        Path wrapper = wrapper(binding);
+        Path aggregator = wrapper.getParent().getParent().resolve("pom.xml");
+        String wrapperXml = Files.readString(wrapper);
+        String aggregatorXml = Files.readString(aggregator);
+        String missingDtd = root.resolve("must-not-read.dtd").toUri().toString();
+        MavenLibraryInstaller installer = new MavenLibraryInstaller() {
+            @Override void runMaven(List<String> command, File common) { fail("Reuse the existing wrapper"); }
+        };
+        for (String declaration : List.of("<!DOCTYPE project>",
+                "<!DOCTYPE project SYSTEM '" + missingDtd + "'>",
+                "<!DOCTYPE project PUBLIC '-//Example//DTD project//EN' '" + missingDtd + "'>",
+                "<!DOCTYPE project [<!ENTITY % remote SYSTEM '" + missingDtd + "'>%remote;]>")) {
+            Files.writeString(wrapper, declaration + wrapperXml);
+            Files.writeString(aggregator, declaration + aggregatorXml);
+            installer.install(binding, root.resolve("Example.cn1lib").toString());
+            assertEquals("example:example-lib:1:pom", installer.dependency(binding, "Example.cn1lib").coordinates());
+            assertEquals(declaration + wrapperXml, Files.readString(wrapper));
+            assertEquals(declaration + aggregatorXml, Files.readString(aggregator));
+        }
+    }
+
+    @Test void acceptsDoctypeAfterSuccessfulConversion() throws Exception {
+        ProjectBinding binding = project();
+        Path archive = root.resolve("Example.cn1lib");
+        Files.writeString(archive, "archive");
+        MavenLibraryInstaller installer = new MavenLibraryInstaller() {
+            @Override void runMaven(List<String> command, File common) throws IOException {
+                try {
+                    Path generated = wrapper(binding);
+                    Path aggregator = generated.getParent().getParent().resolve("pom.xml");
+                    Files.writeString(aggregator, "<!DOCTYPE project>" + Files.readString(aggregator));
+                } catch (Exception ex) { throw new IOException(ex); }
+            }
+        };
+        installer.install(binding, archive.toString());
+        assertTrue(PomEditor.containsDependency(Files.readString(Path.of(binding.pom())),
+                installer.dependency(binding, "Example.cn1lib")));
+    }
+
+    @Test void doesNotExpandExternalModuleEntityInAggregator() throws Exception {
+        ProjectBinding binding = project();
+        Path generated = wrapper(binding);
+        Path entity = root.resolve("module.txt");
+        Files.writeString(entity, "Example");
+        Files.writeString(generated.getParent().getParent().resolve("pom.xml"),
+                "<!DOCTYPE project [<!ENTITY module SYSTEM '" + entity.toUri() + "'>]>"
+                + "<project><modules><module>&module;</module></modules></project>");
+        assertThrows(IOException.class, () -> new MavenLibraryInstaller().dependency(binding, "Example.cn1lib"));
+    }
+
     @Test void rejectsPathsAndXmlExternalEntitiesInWrapper() throws Exception {
         ProjectBinding binding = project();
         MavenLibraryInstaller installer = new MavenLibraryInstaller();
         assertThrows(IOException.class, () -> installer.dependency(binding, "../Example.cn1lib"));
         Path wrapper = wrapper(binding);
-        Files.writeString(wrapper, "<!DOCTYPE project [<!ENTITY x SYSTEM 'file:///must-not-read'>]>"
-                + "<project><groupId>&x;</groupId></project>");
-        assertThrows(Exception.class, () -> installer.dependency(binding, "Example.cn1lib"));
+        Path entity = root.resolve("group.txt");
+        Files.writeString(entity, "example");
+        Files.writeString(wrapper, "<!DOCTYPE project [<!ENTITY x SYSTEM '" + entity.toUri() + "'>]>"
+                + "<project><groupId>&x;</groupId><artifactId>example-lib</artifactId><version>1</version></project>");
+        IOException failure = assertThrows(IOException.class, () -> installer.dependency(binding, "Example.cn1lib"));
+        assertTrue(failure.getMessage().contains("incomplete Maven coordinates"));
     }
 }
