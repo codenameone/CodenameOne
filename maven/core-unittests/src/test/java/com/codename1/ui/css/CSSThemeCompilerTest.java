@@ -793,6 +793,15 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("a !important", resource.getTheme("Theme").get("@msg"));
     }
 
+    @Test
+    public void testQuotedCustomPropertyIsNotAColorInAStyle() {
+        MutableResource resource = new MutableResource();
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{--accent:\"#f00\";} Label{color:var(--accent);}", resource, "Theme"));
+        new CSSThemeCompiler().compile("#Constants{--accent:\"#f00\";}", resource, "Theme");
+        assertEquals("#f00", resource.getTheme("Theme").get("@accent"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

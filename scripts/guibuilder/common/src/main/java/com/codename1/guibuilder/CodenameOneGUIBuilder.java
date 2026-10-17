@@ -5515,7 +5515,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                             }
                             if (image == null) {
                                 for (String file : fs.listFiles(folder)) {
-                                    if (file.endsWith(".png")) {
+                                    // Any case, as CSSTheme.getResourceImage() accepts medium.PNG.
+                                    if (file.regionMatches(true, file.length() - 4, ".png", 0, 4)) {
                                         image = load(folder + "/" + file);
                                         if (image != null) break;
                                     }
@@ -5546,7 +5547,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
          * project build stores every variant and the device picks its own, so the canvas shows
          * the one the running density would get. That is the rule of
          * {@code EditableResources.MultiImage.getBest()}: the largest variant not above the
-         * density, and only when there is none, the nearest larger one.
+         * density. When every variant is denser, getBest() takes whichever file
+         * {@code File.listFiles()} happened to return first, an order the file system does not
+         * define; that is not reproducible, so the canvas takes the nearest larger one.
          */
         static String[] densityOrder(int density) {
             int at = 0;

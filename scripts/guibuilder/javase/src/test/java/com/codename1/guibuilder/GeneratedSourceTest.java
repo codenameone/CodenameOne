@@ -1829,6 +1829,17 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void anUpperCaseVariantNameIsAccepted() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("custom.PNG").toFile());
+        assertNotNull(new CodenameOneGUIBuilder.ProjectImageResource(dir.resolve("theme.css").toString())
+                .getImage("play.png"));
+    }
+
+    @Test
     void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,

@@ -101,6 +101,11 @@ public class CSSThemeCompiler {
     /// order: the build-time compiler sets every such derive on the owning UIID, so the last one wins.
     private Hashtable<String, String> ownerDerives = new Hashtable<String, String>();
 
+    /// The quoted source of each string constant this compile declared. A style property that
+    /// uses one gets the string token, not its text: the build-time compiler keeps the token's
+    /// type, so `color: var(--accent)` with `--accent: "#f00"` is not a color there either.
+    private Hashtable<String, String> literalTokens = new Hashtable<String, String>();
+
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
         if (theme == null) {
@@ -116,6 +121,7 @@ public class CSSThemeCompiler {
         // the same theme are never re-resolved without the typing they were declared with.
         Hashtable<String, String> deferred = new Hashtable<String, String>();
         deferredConstants = deferred;
+        literalTokens = new Hashtable<String, String>();
         // #Constants entries first, wherever their block sits, so every rule sees their final
         // values -- the build-time compiler reads that block before it compiles any rule.
         Hashtable<String, Declaration> finalConstants = new Hashtable<String, Declaration>();
@@ -324,10 +330,12 @@ public class CSSThemeCompiler {
             String raw = declaration.value.trim();
             String value = unquote(raw);
             deferred.put(key, DEFERRED_PLAIN);
+            literalTokens.remove(key);
             if (name.endsWith("Image")) {
                 deferred.put(key, DEFERRED_IMAGE);
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);
+                literalTokens.put(key, raw);
             } else if (isColorLiteral(value)) {
                 // Stored as plain hex, as the build-time compiler stores it: color constants
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
@@ -461,7 +469,7 @@ public class CSSThemeCompiler {
             if (applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred)) {
                 continue;
             }
-            String value = resolveVars(theme, declaration.value);
+            String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
             if ("cn1-derive".equals(property) && statePrefix.length() > 0) {
                 ownerDerives.put(uiid, value.trim());
             }
@@ -496,8 +504,10 @@ public class CSSThemeCompiler {
         // A later custom property replaces a #Constants entry outright, deferred handling included.
         // An unquoted var() in it is resolved where it is used, against the final values.
         deferred.put(key, DEFERRED_PLAIN);
+        literalTokens.remove(key);
         if (!raw.equals(unquoted)) {
             deferred.put(key, DEFERRED_LITERAL);
+            literalTokens.put(key, raw);
         }
         theme.put(key, unquoted);
         return true;
@@ -949,13 +959,13 @@ public class CSSThemeCompiler {
     }
 
     private String resolveVars(Hashtable theme, String value) {
-        return resolveVars(theme, value, new ArrayList<String>());
+        return resolveVars(theme, value, new ArrayList<String>(), false);
     }
 
     /// Expands every `var(--x)`, including those inside the values it substitutes. `resolving`
     /// holds the names being expanded, so `a: var(--b); b: var(--a)` is an error instead of a
     /// compile that never returns.
-    private String resolveVars(Hashtable theme, String value, ArrayList<String> resolving) {
+    private String resolveVars(Hashtable theme, String value, ArrayList<String> resolving, boolean tokens) {
         int varPos = value.indexOf("var(--");
         if (varPos < 0) {
             return value;
@@ -973,13 +983,17 @@ public class CSSThemeCompiler {
             }
             Object replacement = theme.get("@" + key);
             String replaceValue = replacement == null ? "" : replacement.toString();
+            String token = tokens ? literalTokens.get("@" + key) : null;
+            if (token != null) {
+                replaceValue = token;
+            }
             // A quoted constant is text, also when it is reached through another constant. So
             // is one a previous compile into the same theme left: it is already resolved, and
             // any var() still in it was quoted text there.
             String kind = deferredConstants.get("@" + key);
             if (kind != null && !DEFERRED_LITERAL.equals(kind)) {
                 resolving.add(key);
-                replaceValue = resolveVars(theme, replaceValue, resolving);
+                replaceValue = resolveVars(theme, replaceValue, resolving, tokens);
                 resolving.remove(resolving.size() - 1);
             }
             out.append(value.substring(pos, varPos)).append(replaceValue);
