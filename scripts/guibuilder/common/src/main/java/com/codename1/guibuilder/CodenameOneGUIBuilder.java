@@ -5783,6 +5783,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             boolean padding = key.endsWith("." + Style.PADDING);
             boolean margin = key.endsWith("." + Style.MARGIN);
             if ((!padding && !margin) || !(raw instanceof String)) continue;
+            String unitKey = key.substring(0, key.length() - (padding ? Style.PADDING : Style.MARGIN).length())
+                    + (padding ? Style.PADDING_UNIT : Style.MARGIN_UNIT);
+            // CSSThemeCompiler already stores plain numbers with their units beside them, per
+            // state; re-deriving the units from the now suffix-free text would reset them to px.
+            if (theme.get(unitKey) instanceof byte[]) continue;
             String[] values = ((String) raw).split(",");
             if (values.length != 4) continue;
             byte[] units = new byte[4];
@@ -5798,7 +5803,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 normalized.append(item.length() == 0 ? "0" : item);
             }
             theme.put(keyObject, normalized.toString());
-            String unitKey = key.substring(0, key.lastIndexOf('.') + 1) + (padding ? Style.PADDING_UNIT : Style.MARGIN_UNIT);
             theme.put(unitKey, units);
         }
     }

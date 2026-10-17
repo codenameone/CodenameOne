@@ -86,6 +86,9 @@ public class CSSThemeCompiler {
         }
     }
 
+    private static final String DEFERRED_IMAGE = "image";
+    private static final String DEFERRED_VAR = "var";
+
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
         if (theme == null) {
@@ -94,11 +97,14 @@ public class CSSThemeCompiler {
 
         String strippedCss = stripComments(css);
         Rule[] rules = parseRulesWithMedia(strippedCss);
-        ArrayList<String> varConstants = new ArrayList<String>();
+        // Constants whose final value is only known after every rule ran: an image constant,
+        // whose image a rule may still create (cn1-mutable-image), and one written as var(--x).
+        // Keyed by "@name"; only the declaration that wins for a name decides its entry.
+        Hashtable<String, String> deferred = new Hashtable<String, String>();
         // Constants first, wherever their block sits, so a var() in any rule can see them...
         for (Rule rule : rules) {
             if (rule.constants) {
-                compileConstants(rule.declarations, theme, resources, varConstants);
+                compileConstants(rule.declarations, theme, deferred);
             }
         }
         // ...and then again in source order, so the last declaration of a name still wins
@@ -106,24 +112,25 @@ public class CSSThemeCompiler {
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
         for (Rule rule : rules) {
             if (rule.constants) {
-                compileConstants(rule.declarations, theme, resources, varConstants);
+                compileConstants(rule.declarations, theme, deferred);
             } else {
-                applyRule(theme, resources, rule, fonts);
+                applyRule(theme, resources, rule, fonts, deferred);
             }
         }
         compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
-        // A constant written as var(--x) is only an image or a color once x is resolved.
-        for (String key : varConstants) {
+        for (Map.Entry<String, String> entry : deferred.entrySet()) {
+            String key = entry.getKey();
             Object value = theme.get(key);
             if (!(value instanceof String)) {
                 continue;
             }
             String resolved = unquote((String) value);
-            if (key.endsWith("Image")) {
+            if (DEFERRED_IMAGE.equals(entry.getValue())) {
                 theme.put(key, imageConstant(resources, key.substring(1), resolved));
             } else if (isColorLiteral(resolved)) {
+                // A constant written as var(--x) is only a color once x is resolved.
                 theme.put(key, normalizeHexColor(resolved));
             }
         }
@@ -235,8 +242,8 @@ public class CSSThemeCompiler {
         }
     }
 
-    private void compileConstants(Declaration[] declarations, Hashtable theme, MutableResource resources,
-                                  ArrayList<String> varConstants) {
+    private void compileConstants(Declaration[] declarations, Hashtable theme,
+                                  Hashtable<String, String> deferred) {
         for (Declaration declaration : declarations) {
             String name = declaration.name;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
@@ -244,22 +251,22 @@ public class CSSThemeCompiler {
             if (name.startsWith("--")) {
                 name = name.substring(2);
             }
+            String key = "@" + name;
             String raw = declaration.value.trim();
             String value = unquote(raw);
-            if (name.endsWith("Image") && value.indexOf("var(--") < 0) {
-                theme.put("@" + name, imageConstant(resources, name, value));
-                continue;
-            }
-            if (raw.equals(value)) {
+            deferred.remove(key);
+            if (name.endsWith("Image")) {
+                deferred.put(key, DEFERRED_IMAGE);
+            } else if (raw.equals(value)) {
                 if (isColorLiteral(value)) {
                     // Stored as plain hex, as the build-time compiler stores it: color constants
                     // are read with Integer.parseInt(value, 16), which a leading '#' would break.
                     value = normalizeHexColor(value);
                 } else if (value.indexOf("var(--") > -1) {
-                    varConstants.add("@" + name);
+                    deferred.put(key, DEFERRED_VAR);
                 }
             }
-            theme.put("@" + name, value);
+            theme.put(key, value);
         }
     }
 
@@ -310,9 +317,10 @@ public class CSSThemeCompiler {
         return out.toString();
     }
 
-    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts) {
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts,
+                           Hashtable<String, String> deferred) {
         if (":root".equals(rule.selector)) {
-            applyRootDeclarations(theme, rule.declarations);
+            applyRootDeclarations(theme, rule.declarations, deferred);
             return;
         }
 
@@ -326,7 +334,7 @@ public class CSSThemeCompiler {
             String property = declaration.property;
             String value = resolveVars(theme, declaration.value);
 
-            if (applyThemeConstantProperty(theme, declaration.name, value)) {
+            if (applyThemeConstantProperty(theme, declaration.name, value, deferred)) {
                 continue;
             }
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
@@ -349,20 +357,21 @@ public class CSSThemeCompiler {
         theme.put(uiid + "." + statePrefix + "border", new CSSBorder(null, borderCss.toString()));
     }
 
-    private void applyRootDeclarations(Hashtable theme, Declaration[] declarations) {
+    private void applyRootDeclarations(Hashtable theme, Declaration[] declarations, Hashtable<String, String> deferred) {
         for (Declaration declaration : declarations) {
-            if (!declaration.name.startsWith("--")) {
-                continue;
-            }
-            theme.put("@" + declaration.name.substring(2), unquote(resolveVars(theme, declaration.value)));
+            applyThemeConstantProperty(theme, declaration.name, resolveVars(theme, declaration.value), deferred);
         }
     }
 
-    private boolean applyThemeConstantProperty(Hashtable theme, String property, String value) {
+    private boolean applyThemeConstantProperty(Hashtable theme, String property, String value,
+                                               Hashtable<String, String> deferred) {
         if (!property.startsWith("--")) {
             return false;
         }
-        theme.put("@" + property.substring(2), unquote(value));
+        String key = "@" + property.substring(2);
+        // A later custom property replaces a #Constants entry outright, deferred handling included.
+        deferred.remove(key);
+        theme.put(key, unquote(value));
         return true;
     }
 
@@ -391,9 +400,9 @@ public class CSSThemeCompiler {
 
     /// Builds the font of every UIID state that declared a font property. A state that sets only
     /// one of family and size takes the other from what applies in that state, as the build-time
-    /// compiler's flattening does: the UIID's unselected style, then each `cn1-derive` parent's
-    /// matching state and unselected style in turn. A dark style looks at the dark keys of each
-    /// UIID before the light ones.
+    /// compiler's flattening does: the matching state of the UIID and each `cn1-derive` parent in
+    /// turn, then their unselected styles in the same order. A dark style looks at the dark keys
+    /// of each UIID before the light ones.
     private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
         // A font is a live platform object, so it can only be made with a running Display.
         // Without one -- a tool that only checks that a stylesheet compiles -- every
@@ -410,21 +419,30 @@ public class CSSThemeCompiler {
             String uiid = keyPrefix.substring(0, dot);
             String state = keyPrefix.substring(dot + 1);
             boolean dark = uiid.startsWith("$Dark");
-            String id = dark ? uiid.substring(5) : uiid;
-            ArrayList<String> seen = new ArrayList<String>();
-            while (id != null && !seen.contains(id) && (family == null || size == null)) {
-                seen.add(id);
-                String[] fallbacks = dark
-                        ? new String[]{"$Dark" + id + "." + state, "$Dark" + id + ".", id + "." + state, id + "."}
-                        : new String[]{id + "." + state, id + "."};
-                for (String fallback : fallbacks) {
-                    String[] other = fonts.get(fallback);
-                    if (other != null) {
-                        family = family == null ? other[0] : family;
-                        size = size == null ? other[1] : size;
-                    }
+            // The matching state along the whole derive chain comes before any unselected
+            // style: the build-time flattener lays a parent's selected style over the child's
+            // unselected one, so `Base:selected` beats `Child`.
+            for (int pass = 0; pass < 2 && (family == null || size == null); pass++) {
+                String lookup = pass == 0 ? state : "";
+                if (pass == 1 && state.length() == 0) {
+                    break;
                 }
-                id = hoverBase(theme, id, dark);
+                String id = dark ? uiid.substring(5) : uiid;
+                ArrayList<String> seen = new ArrayList<String>();
+                while (id != null && !seen.contains(id) && (family == null || size == null)) {
+                    seen.add(id);
+                    String[] fallbacks = dark
+                            ? new String[]{"$Dark" + id + "." + lookup, id + "." + lookup}
+                            : new String[]{id + "." + lookup};
+                    for (String fallback : fallbacks) {
+                        String[] other = fonts.get(fallback);
+                        if (other != null) {
+                            family = family == null ? other[0] : family;
+                            size = size == null ? other[1] : size;
+                        }
+                    }
+                    id = hoverBase(theme, id, dark);
+                }
             }
             theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
         }
@@ -1032,9 +1050,19 @@ public class CSSThemeCompiler {
     private int findMatchingBrace(String css, int openPos) {
         int depth = 0;
         int len = css.length();
+        char quote = 0;
         for (int i = openPos; i < len; i++) {
             char c = css.charAt(i);
-            if (c == '{') {
+            // A brace inside a quoted value, such as a #Constants string, is text.
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '{') {
                 depth++;
             } else if (c == '}') {
                 depth--;

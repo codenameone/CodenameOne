@@ -508,6 +508,44 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("native:MainRegular", fontName(cyclic));
     }
 
+    @Test
+    public void testImageConstantMaySeeAnImageARuleCreates() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Maker{cn1-mutable-image:spinner #ffffff;}"
+                + "#Constants{infiniteImage:spinner;}", resource, "Theme");
+        assertTrue(resource.getTheme("Theme").get("@infiniteImage") == resource.getImage("spinner"));
+    }
+
+    @Test
+    public void testOnlyTheWinningConstantDeclarationIsReinterpreted() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--x:#00ff00;}"
+                + "#Constants{token:var(--x);} #Constants{token:\"#abc\";}", resource, "Theme");
+        assertEquals("#abc", resource.getTheme("Theme").get("@token"));
+    }
+
+    @Test
+    public void testQuotedBraceDoesNotEndTheConstantsBlock() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{customMessage:\"a}b\"; enabled:true;}"
+                + "Label{color:#ff0000;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("a}b", theme.get("@customMessage"));
+        assertEquals("true", theme.get("@enabled"));
+        assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testDerivedStateFontBeatsTheChildsUnselectedFont() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Child{cn1-derive:Base;font-family:'native:MainLight';}"
+                + "Base:selected{font-family:'native:MainBold';}"
+                + "Child:selected{font-size:20px;}", resource, "Theme");
+        Font selected = (Font) resource.getTheme("Theme").get("Child.sel#font");
+        assertEquals(20f, selected.getPixelSize(), 0.001f);
+        assertEquals("native:MainBold", fontName(selected));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");
