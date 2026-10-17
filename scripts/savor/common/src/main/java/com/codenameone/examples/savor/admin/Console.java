@@ -64,13 +64,13 @@ final class Console {
 
     /// The places, in the order they are listed: an id, and what it is called.
     private static final String[][] PLACES = {
-        {HOME, "Dashboard"}, {"applications", "Applications"}, {"users", "People"},
-        {"deliveries", "Deliveries"}, {"payments", "Payments"}, {FLEET, "Live map"},
-        {"pricing", "Pricing"}};
+        {HOME, "Dashboard"}, {"restaurants", "Restaurants"}, {"applications", "Couriers"},
+        {"users", "People"}, {"deliveries", "Orders"}, {"payments", "Payments"},
+        {FLEET, "Live map"}, {"promos", "Promos"}, {"pricing", "Pricing"}};
     private static final char[] ICONS = {FontImage.MATERIAL_INSIGHTS,
-        FontImage.MATERIAL_ASSIGNMENT_IND, FontImage.MATERIAL_GROUP,
+        FontImage.MATERIAL_STOREFRONT, FontImage.MATERIAL_ASSIGNMENT_IND, FontImage.MATERIAL_GROUP,
         FontImage.MATERIAL_RECEIPT_LONG, FontImage.MATERIAL_PAYMENTS, FontImage.MATERIAL_MAP,
-        FontImage.MATERIAL_SELL};
+        FontImage.MATERIAL_LOCAL_OFFER, FontImage.MATERIAL_SELL};
 
     /// The place that was open when the window stopped being wide, or the
     /// device was turned: where the console opens when it is wide again.
@@ -170,7 +170,11 @@ final class Console {
             return;
         }
         mark(id);
-        if ("applications".equals(id)) {
+        if ("restaurants".equals(id)) {
+            RestaurantsForm.show(panes);
+        } else if ("promos".equals(id)) {
+            PromosForm.show(panes);
+        } else if ("applications".equals(id)) {
             ApplicationsForm.show(panes);
         } else if ("users".equals(id)) {
             UsersForm.show(panes, "");
@@ -236,12 +240,12 @@ final class Console {
             items[iter] = entry(ICONS[iter], PLACES[iter][1], "nav-" + id, () -> go(id));
             list.add(items[iter]);
         }
-        // The other modes this account's roles open. Everyone may delivery.
+        // The other modes this account's roles open. Everyone may order.
         list.add(Ui.label("Switch to", "SvSideLabel"));
-        list.add(entry(FontImage.MATERIAL_HAIL, "Riding", "switch-" + Nav.CUSTOMER,
+        list.add(entry(FontImage.MATERIAL_RESTAURANT, "Ordering", "switch-" + Nav.CUSTOMER,
                 () -> Nav.switchTo(Nav.CUSTOMER)));
         if (user.courier()) {
-            list.add(entry(FontImage.MATERIAL_DIRECTIONS_CAR, "Onboarding", "switch-" + Nav.COURIER,
+            list.add(entry(FontImage.MATERIAL_TWO_WHEELER, "Delivering", "switch-" + Nav.COURIER,
                     () -> Nav.switchTo(Nav.COURIER)));
         }
 

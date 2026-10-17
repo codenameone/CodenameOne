@@ -65,11 +65,11 @@ public final class ApplicationForm {
     /// The documents asked for, in the order the server lists them.
     public static final String[] KINDS = {"photo_id", "licence", "selfie",
         "vehicle_registration", "insurance"};
-    private static final String[] KIND_NAMES = {"Photo ID", "Onboarding licence", "A photo of you",
+    private static final String[] KIND_NAMES = {"Photo ID", "Driving licence", "A photo of you",
         "Vehicle registration", "Insurance"};
     private static final String[] KIND_HINTS = {"A passport or an identity card",
         "The side with your photo on it", "Your face, in good light, no sunglasses",
-        "The paper that says the car is yours", "The page with the policy's dates on it"};
+        "The paper that says the vehicle is yours", "The page with the policy's dates on it"};
     private static final char[] KIND_ICONS = {FontImage.MATERIAL_BADGE,
         FontImage.MATERIAL_CREDIT_CARD, FontImage.MATERIAL_FACE,
         FontImage.MATERIAL_DESCRIPTION, FontImage.MATERIAL_VERIFIED_USER};
@@ -292,7 +292,7 @@ public final class ApplicationForm {
         body.add(Ui.fact("Date of birth", application.dateOfBirth()));
         body.add(Ui.fact("Licence", application.licenceNumber()));
         body.add(Ui.fact("Licence expires", application.licenceExpiry()));
-        Ui.section(body, "Your car");
+        Ui.section(body, "Your vehicle");
         body.add(Ui.fact("Vehicle", ApplyForm.car(application)));
         body.add(Ui.fact("Licence plate", application.vehiclePlate()));
         Ui.section(body, "Documents");

@@ -41,7 +41,7 @@ import com.codenameone.examples.savor.ui.StatRow;
 import com.codenameone.examples.savor.ui.Ui;
 import java.util.List;
 
-/// What onboarding has paid: what is waiting to be cashed out, the last
+/// What delivering has paid: what is waiting to be cashed out, the last
 /// fortnight a day at a time, and the payouts already sent.
 ///
 /// The sums are the server's. It works them out from the deliveries it recorded,

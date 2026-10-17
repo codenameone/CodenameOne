@@ -45,9 +45,9 @@ public class AdminTest extends E2e {
 
         click("fleet");
         waitForForm("Fleet");
-        untilText("fleetCount", "1 car online");
+        untilText("fleetCount", "1 courier online");
         courier.online(false, 0, 0);
-        untilText("fleetCount", "No cars online");
+        untilText("fleetCount", "No couriers online");
         back();
         waitForForm("Admin");
 
@@ -131,8 +131,8 @@ public class AdminTest extends E2e {
         waitForForm("Admin");
         click("pricing");
         waitForForm("Pricing");
-        until(() -> text("baseFare").length() > 0, 20000, "the prices");
-        final String base = text("baseFare");
+        until(() -> text("baseCents").length() > 0, 20000, "the prices");
+        final String base = text("baseCents");
         type("commissionPercent", "95");
         click("submit");
         until(() -> text("error").length() > 0, 20000, "a commission of 95% to be refused");
@@ -140,7 +140,7 @@ public class AdminTest extends E2e {
         waitForForm("Admin");
         click("pricing");
         waitForForm("Pricing");
-        untilText("baseFare", base);
+        untilText("baseCents", base);
         return true;
     }
 

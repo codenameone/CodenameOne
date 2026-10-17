@@ -123,16 +123,16 @@ public class ApplyForm implements Nav.Home {
                 started ? "Finish your application" : "Earn on your own schedule",
                 started ? Lang.tr("{0} of 5 documents added. Pick up where you left off.",
                         String.valueOf(5 - missing(application)))
-                        : "Tell us about you and your car, add five photos, and we take it "
+                        : "Tell us about you and your vehicle, add five photos, and we take it "
                         + "from there.", "SvBannerIcon");
         page.add(banner);
         Label state = Ui.label(started ? "Draft" : "Not started", "SvBadge");
         state.setName("applicationStatus");
         page.add(FlowLayout.encloseCenter(state));
         Ui.section(page, "What you will need");
-        page.add(Ui.row(FontImage.MATERIAL_BADGE, "A onboarding licence",
+        page.add(Ui.row(FontImage.MATERIAL_BADGE, "A driving licence",
                 "Its number, its expiry date and a photo of it", null));
-        page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "A car with four doors",
+        page.add(Ui.row(FontImage.MATERIAL_TWO_WHEELER, "A bike, a scooter or a car",
                 "Registered and insured, with the papers to show it", null));
         page.add(Ui.row(FontImage.MATERIAL_PHOTO_CAMERA, "About ten minutes",
                 "Most of it is taking five photos", null));
@@ -160,7 +160,7 @@ public class ApplyForm implements Nav.Home {
                 "Usually within two working days", null));
         page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "You go online",
                 "This screen becomes your courier's home the moment you are approved", null));
-        Ui.section(page, "Your car");
+        Ui.section(page, "Your vehicle");
         page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, car(application),
                 application.vehiclePlate(), null));
     }

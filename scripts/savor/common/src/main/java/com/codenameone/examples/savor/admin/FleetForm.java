@@ -39,7 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// Every car online, on one map, moving as the couriers report in.
+/// Every courier online, on one map, moving as the couriers report in.
 public class FleetForm extends LiveChannel.Adapter {
     private static final int POLL_MILLIS = 10000;
 
@@ -60,7 +60,7 @@ public class FleetForm extends LiveChannel.Adapter {
         stage.addRound(FontImage.MATERIAL_ZOOM_OUT_MAP, "recentre", this::frame);
         count.setName("fleetCount");
         stage.sheet().peek().add(count);
-        stage.sheet().peek().add(Ui.label("Cars move as their couriers report in.", "SvMuted"));
+        stage.sheet().peek().add(Ui.label("Couriers move as they report in.", "SvMuted"));
         stage.sheet().ready(false);
         form.add(stage.layers());
         form.addShowListener(e -> {
@@ -136,8 +136,8 @@ public class FleetForm extends LiveChannel.Adapter {
 
     private void counted() {
         int size = cars.size();
-        count.setText(size == 0 ? Lang.tr("No cars online") : size == 1
-                ? Lang.tr("1 car online") : Lang.tr("{0} cars online", String.valueOf(size)));
+        count.setText(size == 0 ? Lang.tr("No couriers online") : size == 1
+                ? Lang.tr("1 courier online") : Lang.tr("{0} couriers online", String.valueOf(size)));
         stage.map.repaint();
         Ui.refresh(form);
     }

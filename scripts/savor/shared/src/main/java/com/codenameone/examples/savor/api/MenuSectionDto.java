@@ -18,9 +18,12 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// A heading on a menu and the dishes under it.
+@Mapped
 public record MenuSectionDto(
         String id,
         String name,

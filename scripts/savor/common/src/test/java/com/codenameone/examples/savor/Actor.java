@@ -119,7 +119,8 @@ final class Actor {
         NetworkManager.getInstance().addToQueueAndWait(request);
         status = request.getResponseCode();
         byte[] body = request.getResponseData();
-        if (body == null || body.length == 0 || body[0] != '{') {
+        // A list comes back as the parser gives it: under "root".
+        if (body == null || body.length == 0 || body[0] != '{' && body[0] != '[') {
             return new HashMap<String, Object>();
         }
         try {
@@ -128,6 +129,13 @@ final class Actor {
         } catch (IOException malformed) {
             return new HashMap<String, Object>();
         }
+    }
+
+    /// What `path` answers when it answers a list.
+    java.util.List<Object> list(String path) {
+        Object root = get(path).get("root");
+        return root instanceof java.util.List ? (java.util.List<Object>) root
+                : new java.util.ArrayList<Object>();
     }
 
     /// A courier's position report.

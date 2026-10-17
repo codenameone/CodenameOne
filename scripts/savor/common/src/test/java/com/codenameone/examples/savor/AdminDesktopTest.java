@@ -158,7 +158,7 @@ public class AdminDesktopTest extends E2e {
         until(() -> findByName("Payments") != null, 20000, "the payments");
         shot("admin-desktop-payments");
         click("nav-pricing");
-        until(() -> findByName("Pricing") != null && text("baseFare").length() > 0, 20000,
+        until(() -> findByName("Pricing") != null && text("baseCents").length() > 0, 20000,
                 "the prices");
         shot("admin-desktop-pricing");
         click("nav-home");

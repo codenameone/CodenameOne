@@ -382,6 +382,18 @@ public final class Ui {
         label.setMinAutoSize(Math.min(smallest, styled));
     }
 
+    /// Lays out the screen `changed` is on, after its content changed. Laying
+    /// out `changed` alone keeps the height it had before: a list that grew
+    /// from a placeholder to a dozen cards stays clipped to the placeholder.
+    public static void relayout(Container changed) {
+        Form form = changed.getComponentForm();
+        if (form != null) {
+            form.revalidateLater();
+        } else {
+            changed.revalidateLater();
+        }
+    }
+
     /// Lays `form` out again after its content changed while it was showing.
     ///
     /// Twice, the second time after the first has been drawn: text that wraps
@@ -581,6 +593,10 @@ public final class Ui {
         lead.setName(name);
         lead.setHidden(true);
         lead.addActionListener(onClick);
+        if (!(row.getLayout() instanceof BorderLayout)) {
+            // The lead goes in a border's south; any other layout is wrapped.
+            row = BorderLayout.center(row);
+        }
         row.add(BorderLayout.SOUTH, lead);
         row.setLeadComponent(lead);
         return row;

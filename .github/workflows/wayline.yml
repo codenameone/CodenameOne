@@ -40,6 +40,8 @@ on:
       - 'CodenameOne/src/com/codename1/maps/**'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/rest/**'
+      # The REST client maps its responses through the mapper registry.
+      - 'CodenameOne/src/com/codename1/mapping/**'
       # What the hosted web app runs on: the JavaScript port, both the
       # browser side and the Java the app is compiled with (its network
       # connection, its implementation class). The `web` job is the only

@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A restaurant taking an order, and how long it will take to make.
+@Mapped
 public record AcceptDto(
         int prepMinutes) {
 }

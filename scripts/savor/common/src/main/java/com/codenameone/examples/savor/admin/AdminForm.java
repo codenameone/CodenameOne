@@ -74,18 +74,21 @@ public class AdminForm implements Nav.Home {
             }
         });
         menu.item(FontImage.MATERIAL_INSIGHTS, "Dashboard", "home", () -> { });
-        menu.item(FontImage.MATERIAL_ASSIGNMENT_IND, "Applications", "applications",
+        menu.item(FontImage.MATERIAL_STOREFRONT, "Restaurants", "restaurants",
+                () -> RestaurantsForm.show(form));
+        menu.item(FontImage.MATERIAL_ASSIGNMENT_IND, "Couriers", "applications",
                 () -> ApplicationsForm.show(form));
         menu.item(FontImage.MATERIAL_GROUP, "People", "users", () -> UsersForm.show(form, ""));
-        menu.item(FontImage.MATERIAL_RECEIPT_LONG, "Deliveries", "deliveries",
+        menu.item(FontImage.MATERIAL_RECEIPT_LONG, "Orders", "deliveries",
                 () -> AdminDeliveriesForm.show(form));
         menu.item(FontImage.MATERIAL_PAYMENTS, "Payments", "payments",
                 () -> PaymentsForm.show(form));
         menu.item(FontImage.MATERIAL_MAP, "Live map", "fleet", this::fleet);
+        menu.item(FontImage.MATERIAL_LOCAL_OFFER, "Promos", "promos", () -> PromosForm.show(form));
         menu.item(FontImage.MATERIAL_SELL, "Pricing", "pricing", () -> PricingForm.show(form));
 
         // The bar a title bar would be, with the menu where the map screens
-        // have it, and the mode said beside the title: an admin who also deliveries
+        // have it, and the mode said beside the title: an admin who also delivers
         // should never have to wonder which app this is.
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvHomeBar");
@@ -101,20 +104,26 @@ public class AdminForm implements Nav.Home {
         Container page = dashboard.page();
         Ui.section(page, "Manage");
         Container manage = new Container(BoxLayout.y());
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_ASSIGNMENT_IND, "Applications",
-                "People who asked to drive, and their papers", null), "applications",
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_STOREFRONT, "Restaurants",
+                "Restaurants asking to join, and the ones selling", null), "restaurants",
+                e -> RestaurantsForm.show(form)));
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_ASSIGNMENT_IND, "Couriers",
+                "People who asked to deliver, and their papers", null), "applications",
                 e -> ApplicationsForm.show(form)));
         manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_GROUP, "People",
                 "Roles, flags, and blocking an account", null), "users",
                 e -> UsersForm.show(form, "")));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, "Deliveries",
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, "Orders",
                 "The most recent, in every state", null), "deliveries",
                 e -> AdminDeliveriesForm.show(form)));
         manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_PAYMENTS, "Payments",
                 "What was charged, and refunds", null), "payments",
                 e -> PaymentsForm.show(form)));
         manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_MAP, "Live map",
-                "Where every car online is", null), "fleet", e -> fleet()));
+                "Where every courier on line is", null), "fleet", e -> fleet()));
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOCAL_OFFER, "Promos",
+                "Codes customers type at checkout", null), "promos",
+                e -> PromosForm.show(form)));
         manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_SELL, "Pricing",
                 "What a delivery costs, and the service's share", null), "pricing",
                 e -> PricingForm.show(form)));
@@ -169,7 +178,11 @@ public class AdminForm implements Nav.Home {
     }
 
     private void open(String place) {
-        if ("applications".equals(place)) {
+        if ("restaurants".equals(place)) {
+            RestaurantsForm.show(form);
+        } else if ("promos".equals(place)) {
+            PromosForm.show(form);
+        } else if ("applications".equals(place)) {
             ApplicationsForm.show(form);
         } else if ("users".equals(place)) {
             UsersForm.show(form, "");

@@ -63,7 +63,10 @@ const browser = await chromium.launch({
   args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--disable-features=IntensiveWakeUpThrottling']
 });
-const page = await browser.newPage({ viewport: { width: 420, height: 860 } });
+// A browser reports where it is, and the restaurants listed are the ones that
+// deliver there: this one is by the seeded restaurants, near Pier 39.
+const page = await browser.newPage({ viewport: { width: 420, height: 860 },
+  geolocation: { latitude: 37.8080, longitude: -122.4120 }, permissions: ['geolocation'] });
 page.on('console', message => {
   const text = message.text();
   if (text.startsWith('LF-SHIM')) {
@@ -85,7 +88,9 @@ page.on('response', response => {
   }
   const line = `${response.status()} ${response.request().method()} ${at.pathname}`;
   requests.push(line);
-  note('NET ' + line);
+  // The query says where a list was asked for; it holds no secrets (a token
+  // travels in a header).
+  note('NET ' + line + (at.pathname.startsWith('/api/') ? at.search : ''));
 });
 page.on('websocket', socket => {
   const seen = { url: socket.url(), frames: [] };
@@ -232,7 +237,15 @@ try {
 
   // 3. The home screen.
   await waitFor('the home screen', stepSeconds, async () =>
-      (await screenText()).includes('Where to?'));
+      (await screenText()).includes('Deliver to'));
+  // The restaurants near the address, read from the server: the seeded ones.
+  const seeded = ['Ember & Crust', 'Harbor Burger Co.', 'Kumo Omakase', 'The Gilded Hen', 'Saffron Grill', 'Jade Bowl', 'Prime & Pepper', 'Luz Taqueria', 'Verde Table', 'Glaze Donut Atelier', 'Velvet Spoon', 'Morning Ritual'];
+  await waitFor('a restaurant near the address', stepSeconds, async () => {
+    const text = await screenText();
+    return seeded.some(name => text.includes(name));
+  });
+  // The cards are laid out on the next frame; let the photos and words land.
+  await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(out, '3-home.png') });
   say('signed in: the home screen is up');
 
@@ -296,7 +309,7 @@ try {
     // wide one. The figures are the same.
     const text = await screenText();
     // A caption goes onto two lines where its tile is narrow.
-    return /Operations|Dashboard/.test(text) && /Fares\s+collected/.test(text);
+    return /Operations|Dashboard/.test(text) && /Orders\s+paid/.test(text);
   });
   await waitFor('the console to ask the server for its figures', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/admin\//.test(r)));

@@ -53,7 +53,9 @@ import com.codenameone.examples.savor.ui.Photos;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 
 /// What the end-to-end tests share. Each of them drives the real app, through
@@ -69,6 +71,7 @@ public abstract class E2e extends AbstractTest {
     public static final String CUSTOMER = "customer@savor.example";
     public static final String COURIER = "courier@savor.example";
     public static final String ADMIN = "admin@savor.example";
+    public static final String MERCHANT = "merchant@savor.example";
     /// Where the device stands: the middle of the bundled tiles.
     public static final LatLng HERE = new LatLng(37.8080, -122.4120);
 
@@ -310,15 +313,57 @@ public abstract class E2e extends AbstractTest {
         });
     }
 
-    /// Books the delivery to the Ferry Building as far as the sheet that prices
-    /// it, which is where a test chooses what to do next.
-    protected void quote() {
-        click("whereTo");
-        waitForForm("PlaceSearch");
-        type("query", "Ferry");
-        click("place-0");
-        waitForForm("Customer");
-        until(() -> text("fare").startsWith("$"), 20000, "the fare");
+    /// The restaurant the demo merchant runs, and where its kitchen is.
+    protected static final String KITCHEN = "r-ember";
+    protected static final LatLng KITCHEN_AT = new LatLng(37.7952, -122.3934);
+
+    /// The first dish of the demo kitchen's menu that is on sale and has
+    /// nothing to choose, read from the server: dish ids are made at seeding.
+    protected static String dish(Actor customer) {
+        Map<String, Object> restaurant = customer.get("/api/restaurants/" + KITCHEN + "?lat="
+                + HERE.getLatitude() + "&lng=" + HERE.getLongitude());
+        Object menu = restaurant.get("menu");
+        for (Object section : menu instanceof List ? (List<?>) menu : new ArrayList<Object>()) {
+            Object dishes = section instanceof Map ? ((Map<?, ?>) section).get("dishes") : null;
+            for (Object dish : dishes instanceof List ? (List<?>) dishes : new ArrayList<Object>()) {
+                if (!(dish instanceof Map)) {
+                    continue;
+                }
+                Map<?, ?> found = (Map<?, ?>) dish;
+                Object options = found.get("options");
+                // The parser reads a JSON boolean as the string "true".
+                if ("true".equals(String.valueOf(found.get("available")))
+                        && (!(options instanceof List) || ((List<?>) options).isEmpty())) {
+                    return String.valueOf(found.get("id"));
+                }
+            }
+        }
+        throw new IllegalStateException("the demo kitchen has no plain dish on sale");
+    }
+
+    /// Puts a dish from the demo kitchen in the cart and opens the checkout,
+    /// as far as the server's price for it, which is where a test chooses
+    /// what to do next.
+    protected void cart() {
+        String dish = dish(Actor.signIn(CUSTOMER));
+        reveal("restaurant-" + KITCHEN);
+        click("restaurant-" + KITCHEN);
+        waitForForm("restaurant");
+        reveal("dish-" + dish);
+        click("dish-" + dish);
+        waitForForm("dish");
+        click("add-to-order");
+        waitForForm("restaurant");
+        click("restaurant-cart");
+        waitForForm("checkout");
+        until(() -> text("place").indexOf("$") >= 0, 20000, "the order to be priced");
+    }
+
+    /// The id of the order the customer has on its way.
+    protected static String placed(Actor customer) {
+        List<Object> active = customer.list("/api/orders/active");
+        return active.isEmpty() || !(active.get(0) instanceof Map) ? null
+                : Actor.text((Map<String, Object>) active.get(0), "id");
     }
 
     /// Waits for a delivery to be offered to `courier` and returns its id.

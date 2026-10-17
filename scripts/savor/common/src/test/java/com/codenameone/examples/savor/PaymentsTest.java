@@ -20,13 +20,13 @@ package com.codenameone.examples.savor;
 
 import java.util.Map;
 
-/// Paying: a card that is refused, a card that is added, a delivery charged to it,
-/// a tip on top, and the receipt that says all of it.
+/// Paying: a card that is refused, a card that is added, an order held on it
+/// and charged when it arrives, a tip on top, and the receipt that says all of it.
 public class PaymentsTest extends E2e {
     @Override
     protected boolean run() throws Exception {
         Actor courier = Actor.signIn(COURIER);
-        courier.online(true, HERE.getLatitude() + 0.004, HERE.getLongitude() + 0.003);
+        courier.online(true, KITCHEN_AT.getLatitude() + 0.002, KITCHEN_AT.getLongitude() + 0.001);
         signIn(CUSTOMER, "Customer");
 
         click("menu-open");
@@ -64,42 +64,54 @@ public class PaymentsTest extends E2e {
         back();
         waitForForm("Customer");
 
-        quote();
+        cart();
         until(() -> text("payWith").indexOf("4242") >= 0, 20000,
-                "the delivery to be paid by the new card (it says \"" + text("payWith") + "\")");
-        click("request");
-        untilText("deliveryState", "Finding a courier");
-        final String id = offered(courier);
+                "the order to be paid by the new card (it says \"" + text("payWith") + "\")");
+        click("place");
+        waitForForm("track");
+        final String id = placed(customer);
+        assertTrue(id != null, "the order is on its way");
+        // Held, not taken, until the food arrives.
+        assertEqual("authorized", Actor.text(customer.get("/api/payments/receipts/" + id),
+                "status"), "the card held at placing");
+        Actor kitchen = Actor.signIn(MERCHANT);
+        kitchen.post("/api/merchant/orders/" + id + "/accept", "{\"prepMinutes\":10}");
+        assertEqual(id, offered(courier), "the courier is offered this order");
         courier.post("/api/courier/offers/" + id + "/accept", null);
         courier.post("/api/courier/deliveries/" + id + "/arrived", null);
+        kitchen.post("/api/merchant/orders/" + id + "/ready", null);
         courier.post("/api/courier/deliveries/" + id + "/start", null);
         courier.post("/api/courier/deliveries/" + id + "/complete", null);
-        assertEqual(200, courier.status, "completing the delivery");
-        untilText("deliveryState", "You have arrived");
-        until(() -> text("paidWith").indexOf("4242") >= 0, 20000, "what the delivery was paid with");
+        assertEqual(200, courier.status, "delivering the order");
+        untilText("orderState", "Delivered");
         Map<String, Object> receipt = customer.get("/api/payments/receipts/" + id);
         assertEqual("paid", Actor.text(receipt, "status"), "the charge");
         assertEqual(0, ((Number) receipt.get("tip")).intValue(), "no tip before one is given");
 
-        click("star-5");
-        click("tip-15");
-        click("done");
-        until(() -> findByName("whereTo") != null, 20000, "the customer's screen to reset");
+        // A tip afterwards, from the receipt, charged on its own.
+        click("receipt");
+        waitForForm("Receipt");
+        type("tipCustom", "3.00");
+        click("sendTip");
         until(() -> ((Number) customer.get("/api/payments/receipts/" + id).get("tip")).intValue()
                 > 0, 20000, "the tip to be charged");
+        // The app answers with the receipt again, tipped. Going back before it
+        // arrives would leave that receipt to open over the order afterwards.
+        until(() -> !has("sendTip") && findByName("tipPaid") != null, 20000,
+                "the tipped receipt");
+        back();
+        waitForForm("track");
+        back();
+        waitForForm("Customer");
 
-        // The delivery is first in the history, and opens as its receipt.
-        click("menu-open");
-        click("menu-history");
-        waitForForm("Deliveries");
-        click("delivery-0");
+        // The order is first in the history, and opens as its receipt.
+        click("tab-orders");
+        click("order-" + id);
         waitForForm("Receipt");
         untilText("paymentStatus", "Paid");
         assertTrue(text("tipPaid").startsWith("$"), "the receipt shows the tip");
         assertFalse(has("sendTip"), "a delivery can be tipped once");
         shot("receipt");
-        back();
-        waitForForm("Deliveries");
         back();
         waitForForm("Customer");
         courier.online(false, 0, 0);

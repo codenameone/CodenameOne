@@ -64,9 +64,9 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
     /// down. With it up, a frame says when to ask.
     private static final int POLL_MILLIS = 15000;
     private static final String[] SORTS = {"distance", "rating", "fee", "time"};
-    private static final String[] SORT_NAMES = {"Nearest", "Top rated", "Lowest fee", "Fastest"};
+    private static final String[] SORT_NAMES = {"Nearest", "Rating", "Fee", "Fastest"};
 
-    private final Form form = Ui.home("customer");
+    private final Form form = Ui.home("Customer");
     private final Menu menu = new Menu(form, Nav.CUSTOMER);
     private final Container body = new Container(new BorderLayout());
     private final Container tabs = new Container(new GridLayout(1, 4));
@@ -178,7 +178,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
     private void where() {
         String name = destinationName();
         deliverTo.setText(name == null ? Lang.tr("Current location") : name);
-        deliverTo.getParent().revalidateLater();
+        Ui.relayout(deliverTo.getParent());
     }
 
     private void tab(char icon, String text, String name, final int index) {
@@ -291,7 +291,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
                 into.add(Ui.tap(banner, "active-" + order.id(),
                         e -> TrackForm.show(form, order.id())));
             }
-            into.revalidateLater();
+            form.revalidateLater();
         }, QUIET));
     }
 
@@ -314,7 +314,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             into.add(Food.card(restaurant, null, "restaurant-" + restaurant.id(),
                     e -> RestaurantForm.show(form, restaurant.id(), null)));
         }
-        into.revalidateLater();
+        Ui.refresh(form);
     }
 
     private Container search() {
@@ -369,7 +369,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             for (final OrderDto order : found) {
                 list.add(orderRow(order));
             }
-            list.revalidateLater();
+            Ui.refresh(form);
         }, Ui.failed(list, () -> load[0].run())));
         Ui.pull(list, load[0]);
         load[0].run();

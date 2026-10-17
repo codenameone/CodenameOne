@@ -51,7 +51,16 @@ public enum Template {
             "com.codenameone.examples.wayline", "Wayline", "/wayline-preview.jpg",
             "The ride-hailing template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/wayline-modules.zip", "/wayline-settings.properties");
+            new String[0], "/wayline-modules.zip", "/wayline-settings.properties"),
+    // The same kind of template as WAYLINE: a food-delivery app with a customer,
+    // a courier, a restaurant and an admin mode, and its server. It is the project
+    // in scripts/savor, and its resources come from
+    // `scripts/sync-initializr-template.py savor`.
+    SAVOR(false, "/savor-src.zip", "/savor-css.zip", "/savor-pom.xml",
+            "com.codenameone.examples.savor", "Savor", "/savor-preview.jpg",
+            "The food-delivery template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/savor-modules.zip", "/savor-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.

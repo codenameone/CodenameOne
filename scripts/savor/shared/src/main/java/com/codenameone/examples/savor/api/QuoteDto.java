@@ -18,11 +18,14 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// What a cart would cost, line by line and in total.
 ///
 /// @param promoMessage Why a promo code did not apply; empty when it did, or none was given.
+@Mapped
 public record QuoteDto(
         String currency,
         List<OrderLineDto> lines,

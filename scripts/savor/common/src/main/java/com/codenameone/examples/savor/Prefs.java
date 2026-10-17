@@ -206,7 +206,7 @@ public final class Prefs {
     /// last one is dropped and not shown to the next: the recent
     /// destinations, which are kept here only and say where a person goes,
     /// and the copy of everything the account keeps on the server -- home,
-    /// work, the emergency contact, the card paid with, the delivery options.
+    /// work, the card paid with, the delivery options.
     /// That copy is replaced when the new account's values arrive, but they
     /// may not arrive, and then the last person's would be on screen and go
     /// out with the next save as the new person's own. How the app looks

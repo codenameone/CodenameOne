@@ -18,11 +18,14 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// Something on a menu.
 ///
 /// @param available False while sold out: listed, and not orderable.
+@Mapped
 public record DishDto(
         String id,
         String sectionId,

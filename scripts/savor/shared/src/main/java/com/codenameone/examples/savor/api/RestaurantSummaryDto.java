@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A restaurant as a list shows it: enough to choose one.
 ///
 /// @param photoId Empty for none; fetched with `CatalogApi.photo`.
@@ -25,6 +27,7 @@ package com.codenameone.examples.savor.api;
 /// @param priceLevel One to four.
 /// @param etaMinutes From ordering to the door, as the server estimates it now.
 /// @param open Taking orders now: within its hours and not paused.
+@Mapped
 public record RestaurantSummaryDto(
         String id,
         String name,

@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// A restaurant with its menu, as its page shows it.
@@ -25,6 +27,7 @@ import java.util.List;
 /// @param opensAt Minutes after local midnight.
 /// @param status `pending`, `approved`, `rejected` or `suspended`.
 /// @param reason Why an admin rejected or suspended it.
+@Mapped
 public record RestaurantDto(
         String id,
         String name,

@@ -108,7 +108,9 @@ public final class TrackForm extends LiveChannel.Adapter {
         markers();
         sheet.reset();
         Container peek = sheet.peek();
-        peek.add(Ui.plain(Food.state(found.state()), "SvSheetTitle"));
+        Label title = Ui.plain(Food.state(found.state()), "SvSheetTitle");
+        title.setName("orderState");
+        peek.add(title);
         if (Food.active(found.state())) {
             peek.add(Ui.plain(eta(found), "SvMuted"));
         }

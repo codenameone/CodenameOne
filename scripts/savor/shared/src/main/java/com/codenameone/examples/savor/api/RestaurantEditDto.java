@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A restaurant's details as its applicant or its staff send them.
+@Mapped
 public record RestaurantEditDto(
         String name,
         String cuisine,

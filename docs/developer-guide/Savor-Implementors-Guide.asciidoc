@@ -1,0 +1,269 @@
+[[savor-implementors-guide]]
+== Savor: Building on the sample
+
+Savor began as a copy of <<wayline-implementors-guide,Wayline>> and kept most of
+what isn't about rides: the module layout, the accounts and sign-in, the cards and
+the payment provider, text messages, push notifications, the live channel, the map,
+the operations console and hosting the app in a browser. This chapter covers what a
+food-delivery service changes. For the parts the two share, it points at the Wayline
+chapter, which is true of Savor with the names swapped.
+
+[[savor-launch]]
+=== Running it
+
+The project is in `scripts/savor`, and the Initializr generates it under your own
+package and name. Start the server on the development profile, which seeds the demo
+accounts and restaurants and simulates the cards, the kitchens and a courier:
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the app in the simulator, from the project's directory:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+`backend/server.sh run --web` builds the app for a browser as well and serves it at
+`http://localhost:8080/`. Running on a device, and the compiled server, work as
+<<wayline-launch>> describes.
+
+=== The modules
+
+The three modules are Wayline's: `shared` holds the contract, the data transfer
+objects and the `@RestClient` interfaces both sides compile against; `common` is
+the app; `backend` is the server. The backend's packages follow the domain:
+
+[cols="1,3"]
+|===
+| Package | What it holds
+
+| `catalog`
+| Restaurants, their menus and photographs, the search that lists the restaurants
+  that deliver to a point, and applications to list a restaurant.
+
+| `order`
+| Carts priced into quotes, orders and their state machine, promo codes, saved
+  addresses, the order history and the simulated kitchen.
+
+| `delivery`
+| Deliveries and their state machine, offers to couriers and the simulated
+  courier.
+
+| `courier`, `onboarding`
+| Couriers' shifts and earnings, and applications to deliver with their documents.
+  Wayline's driver code under new names.
+
+| `pay`, `sms`, `push`, `live`, `account`, `geo`, `admin`
+| Taken from Wayline and adapted where an order differs from a ride.
+|===
+
+=== An order and its delivery
+
+A ride is one thing that moves from requested to finished. An order is two. The
+order is what the customer bought and the kitchen cooks, the delivery is what a
+courier carries, and each has its own states:
+
+[cols="1,3"]
+|===
+| Order | Delivery
+
+| `PLACED`, then `ACCEPTED` or `REJECTED` by the kitchen, `READY`, `PICKED_UP`,
+  `DELIVERED`; or cancelled by the customer or an administrator, or `NO_COURIERS`
+| `REQUESTED`, `OFFERED` to a courier, `ACCEPTED`, `ARRIVED` at the restaurant,
+  `IN_PROGRESS` to the door, `COMPLETED`; or cancelled, or `NO_COURIERS`
+|===
+
+The delivery is Wayline's ride, almost unchanged: the pickup is the restaurant and
+the drop-off is the door. Keeping it so let the whole courier side -- offers,
+shifts, the moving marker, earnings, the guards on two answers at once -- come
+across without being rewritten.
+
+What couples the two is when a delivery starts. A customer places an order, and
+the card is held:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/order/Orders.java[tag=savor-place,indent=0]
+----
+
+No courier is looked for yet. A courier sent to a restaurant that then turns the
+order down has wasted a trip, so the delivery is created when the kitchen accepts,
+in the same transaction:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/order/Orders.java[tag=savor-accept,indent=0]
+----
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/delivery/Deliveries.java[tag=savor-dispatch,indent=0]
+----
+
+The delivery shares the order's id, so either side can find the other without a
+join table. From then on the couriers are asked while the kitchen cooks, and the
+order follows its delivery: the courier collecting the food moves the order to
+`PICKED_UP`, and only from `READY`, so nobody leaves with an order the kitchen has
+not finished; the delivery completing moves the order to `DELIVERED`. A delivery
+that finds no courier ends the order with `NO_COURIERS` and lets the hold go.
+
+Every move of either state is a conditional update that names the states it may
+come from, so two answers at the same moment can't both win -- a customer
+cancelling while the kitchen accepts, or two couriers taking one offer. It's the
+pattern <<wayline-ride-atomic>> explains:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/delivery/Deliveries.java[tag=savor-delivery-trymove,indent=0]
+----
+
+=== Hold now, charge on arrival
+
+A rider pays at the end of a ride, for a fare known by then. A customer pays for
+food before anyone cooks it, but shouldn't be charged for an order that never
+arrives. The card is therefore authorized for the total when the order is placed and
+captured when it's delivered:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/pay/Payments.java[tag=savor-authorize,indent=0]
+----
+
+The provider interface Wayline's billing chapter describes gained the two calls
+that make it possible, `authorize` and `capture`, and a `release` for a hold that
+is let go:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/pay/PaymentProvider.java[tag=savor-payment-provider,indent=0]
+----
+
+* **Placed:** `Payments.authorize` holds the total. A refused card answers 402 and
+  nothing is written. An order that couldn't be written lets its hold go at once.
+* **Rejected or cancelled:** `Payments.release` lets the hold go. Nothing was taken,
+  so there is nothing to refund.
+* **Delivered:** `Payments.settle` captures the hold. A capture can still fail -- a
+  hold expires, or a bank declines then -- and the receipt then says so, for an
+  administrator to follow up.
+* **After delivery:** a tip is a charge of its own; a refund, full or partial, is
+  made against the captured payment.
+
+The receipt is kept with the delivery. Before a delivery exists, a customer's
+receipt is built from the order itself and shows the hold.
+
+With Stripe, a hold is a PaymentIntent created with manual capture. Card holds
+expire after about seven days, far longer than any meal takes. Turning Stripe on,
+and the hosted page that keeps a card number away from the server, are exactly as
+<<wayline-billing>> describes.
+
+=== Restaurants near the door
+
+A rider is matched to the nearest driver. A customer chooses a restaurant, from the
+ones that deliver to their door. The search takes a box around the point from the
+database and then measures each restaurant in it, as Wayline does to find the
+drivers near a pickup:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/catalog/Catalog.java[tag=savor-nearby,indent=0]
+----
+
+Couriers are found the same way, near the restaurant rather than the customer,
+because the restaurant is where they go first.
+
+=== Prices
+
+`order/Quotes` prices a cart, and does so on the server alone: the app shows the
+quote it's given and sends only the dishes, their choices, the promo code and the
+tip. The total is:
+
+* The food, from the menu as it's when the order is placed, with each dish's
+  choices checked against its groups' minimum and maximum.
+* The delivery fee, a base plus a price per kilometer by road from the restaurant,
+  times a surge an administrator can raise.
+* A service fee, a percentage of the food.
+* A flat small-order fee for food under a threshold.
+* Tax, a percentage of the food after the discount.
+* A promo code's discount, once per account.
+* The tip.
+
+An administrator sets the fees, the commission and the tax under **Pricing**. The
+commission is what the service keeps of the food; the merchant's sales show the rest.
+
+=== Merchants
+
+Applying to list a restaurant creates it waiting for approval, owned by the account
+that asked:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/catalog/Restaurants.java[tag=savor-apply,indent=0]
+----
+
+Approving it grants the account the `merchant` role. Everything a merchant does is
+under `/api/merchant/restaurants/{id}/...`, and each request checks that the account
+is a merchant of that restaurant, so one restaurant's staff can't read another's
+orders. The rules are in the same table as the rest of the server's:
+
+[source,java]
+----
+include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/SecurityConfig.java[tag=savor-api-rules,indent=0]
+----
+
+The merchant's screen is built on the operations console's `Console`, so it's a
+list beside a detail on a wide screen and a list that opens a screen per order on a
+phone. A new order reaches it as a frame on the live channel, which makes it read
+the queue again: the frames say what changed, never the data, as in Wayline.
+
+Menu photographs are uploaded the way couriers' documents are, stored by the server
+and served from it, so the seed data carries its own photographs rather than
+pointing at someone else's site.
+
+=== Simulated kitchens and couriers
+
+A development server simulates the two people a customer would otherwise wait for.
+`order/DemoKitchen` accepts, cooks and readies the orders of each restaurant that has
+no merchant, and `delivery/DemoFleet` takes deliveries while no real courier
+is online. Both are on only for the development profile, the way the simulated cards
+are: the test profile turns them off, because the tests play the kitchen and the
+courier themselves. A restaurant with a merchant is left to its staff, and the
+simulated courier stands aside while a real one is online.
+
+=== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true
+./run-e2e.sh
+./run-web-e2e.sh
+----
+
+The backend tests run the server on the JVM and then compiled, against the order
+and delivery state machines, the holds and captures, the quotes and promo codes and
+who may call what. `run-e2e.sh` starts a server on the test profile and drives the
+app in the simulator through every role -- an order placed, accepted, collected and
+delivered, a card held and charged, a tip and a refund -- taking the screenshots in
+the user's guide. `run-web-e2e.sh` does the same for the app in a browser.
+
+=== Making it yours
+
+The ways to make Wayline your own carry over: the name, icon and colors, the
+languages, the text-message and push providers, the database, hosting. A few apply
+to food in particular:
+
+* **One restaurant.** A restaurant's own ordering app is Savor with the catalog cut
+  to one row: open the app on its menu instead of the list, and keep the merchant
+  and courier modes for the staff.
+* **Pickup.** An order with no delivery is one the kitchen hands over itself. Mark
+  the order as collected, skip `dispatch` when the kitchen accepts it, and let the
+  merchant move it from `READY` to `DELIVERED`, which captures the hold.
+* **Scheduled orders.** Store the time the customer wants the food, and accept the
+  order for the kitchen only when its preparation time before that's reached.
+* **Before it's a product.** A real service needs restaurant payouts, tax rules for
+  the places it sells in, menus that change by the hour, allergens and age checks.
+  None of them are in the sample.

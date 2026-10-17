@@ -1235,9 +1235,9 @@ SvSegment {
     background-color: transparent;
     border-radius: 1.9mm;
     font-family: "native:MainBold";
-    font-size: 2.5mm;
+    font-size: 2.3mm;
     text-align: center;
-    padding: 2mm 0.8mm 2mm 0.8mm;
+    padding: 2mm 0.2mm 2mm 0.2mm;
     margin: 0.3mm;
 }
 
@@ -1507,14 +1507,14 @@ SvCuisine.pressed { background-color: var(--surface-press); }
 SvCuisineSelected { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 1.6mm 2.2mm 1.6mm 2.2mm; margin: 0 1.6mm 0 0; }
 SvRestaurantCard { background-color: var(--surface); border-radius: var(--radius); padding: 0; margin: 0 0 3mm 0; }
 SvRestaurantCard.pressed { background-color: var(--surface-alt); }
-SvRestaurantPhoto { color: var(--brand); background-color: var(--brand-tint); border-radius: var(--radius); padding: 0; margin: 0; }
+SvRestaurantPhoto { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
 SvRestaurantWords { padding: 1.4mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
 SvRestaurantName { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; padding: 0; margin: 0; background-color: transparent; }
 SvRestaurantTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; padding: 2mm 0 0.5mm 0; margin: 0; background-color: transparent; }
 SvPhotoBadge { color: var(--brand); background: cn1-pill-border; background-color: var(--surface); padding: 1mm; margin: 0; }
 SvClosedBadge { color: var(--surface); background: cn1-pill-border; background-color: var(--text); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.7mm 2mm 0.7mm 2mm; margin: 0; }
 SvPopularBadge { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.5mm 1.6mm 0.5mm 1.6mm; margin: 0 0 0 1.6mm; }
-SvHeroPhoto { color: var(--brand); background-color: var(--brand-tint); padding: 0; margin: 0; }
+SvHeroPhoto { color: #f3e7d3; background-color: transparent; padding: 0; margin: 0; }
 SvSectionChips { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
 SvSectionChip { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 1.6mm 0 0; }
 SvSectionChip.pressed { background-color: var(--surface-press); }
@@ -1524,8 +1524,8 @@ SvDishRow.pressed { background-color: var(--surface-alt); }
 SvDishRowOff { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 0 2.6mm 0; margin: 0; opacity: 0.5; }
 SvDishName { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
 SvDishPrice { color: var(--text); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.6mm 0 0 0; margin: 0; background-color: transparent; }
-SvDishPhoto { color: var(--brand); background-color: var(--brand-tint); border-radius: var(--radius); padding: 0; margin: 0 0 0 2mm; }
-SvOrderThumb { color: var(--brand); background-color: var(--brand-tint); border-radius: var(--radius); padding: 0; margin: 0 2.4mm 0 0; }
+SvDishPhoto { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0 0 0 2mm; }
+SvOrderThumb { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0 2.4mm 0 0; }
 SvOrderRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
 SvOrderRow.pressed { background-color: var(--surface-alt); }
 SvActiveOrder { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2mm 3mm 2mm 3mm; margin: 2mm 0 0 0; }
@@ -1765,13 +1765,13 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvCuisineSelected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     SvRestaurantCard { background-color: var(--surface-dark); }
     SvRestaurantCard.pressed { background-color: var(--surface-alt-dark); }
-    SvRestaurantPhoto { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvRestaurantPhoto { color: #f3e7d3; background-color: transparent; }
     SvRestaurantName { color: var(--text-dark); }
     SvRestaurantTitle { color: var(--text-dark); }
     SvPhotoBadge { color: var(--brand-dark); background-color: var(--surface-dark); }
     SvClosedBadge { color: var(--surface-dark); background-color: var(--text-dark); }
     SvPopularBadge { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
-    SvHeroPhoto { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvHeroPhoto { color: #f3e7d3; background-color: transparent; }
     SvSectionChip { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvSectionChip.pressed { background-color: var(--surface-press-dark); }
     SvMenuSection { color: var(--text-dark); }
@@ -1780,8 +1780,8 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvDishRowOff { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvDishName { color: var(--text-dark); }
     SvDishPrice { color: var(--text-dark); }
-    SvDishPhoto { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
-    SvOrderThumb { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvDishPhoto { color: #f3e7d3; background-color: transparent; }
+    SvOrderThumb { color: #f3e7d3; background-color: transparent; }
     SvOrderRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvOrderRow.pressed { background-color: var(--surface-alt-dark); }
     SvActiveOrder { background-color: var(--brand-tint-dark); }

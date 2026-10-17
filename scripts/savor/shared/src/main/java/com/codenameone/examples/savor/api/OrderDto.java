@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// An order, for its customer, its restaurant, its courier or an admin.
@@ -25,6 +27,7 @@ import java.util.List;
 /// @param etaMinutes Until it is at the door, as the server estimates it now; 0 once it has ended.
 /// @param reason Why it was rejected or cancelled.
 /// @param delivery Its courier's leg, or one whose state is NONE before the restaurant accepts.
+@Mapped
 public record OrderDto(
         String id,
         OrderState state,

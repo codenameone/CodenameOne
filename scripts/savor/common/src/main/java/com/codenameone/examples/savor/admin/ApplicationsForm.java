@@ -50,7 +50,7 @@ import java.util.List;
 public final class ApplicationsForm {
     private static final String[] KINDS = {"photo_id", "licence", "selfie",
         "vehicle_registration", "insurance"};
-    private static final String[] KIND_NAMES = {"Photo ID", "Onboarding licence", "A photo of you",
+    private static final String[] KIND_NAMES = {"Photo ID", "Driving licence", "A photo of you",
         "Vehicle registration", "Insurance"};
 
     private final Panes panes;
@@ -162,7 +162,7 @@ public final class ApplicationsForm {
             page.add(Ui.primary("Approve", "approve", e -> Api.admin().approve(
                     application.username(), Net.to(approved -> {
                         Telemetry.applicationReviewed(true);
-                        Ui.say(Lang.tr("{0} can now drive", application.name()));
+                        Ui.say(Lang.tr("{0} can now deliver", application.name()));
                         panes.home();
                     }, Ui::fail))));
             page.add(Ui.danger("Send back", "reject", e -> panes.reason("Send back",

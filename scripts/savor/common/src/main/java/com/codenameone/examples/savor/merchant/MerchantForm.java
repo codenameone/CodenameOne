@@ -63,6 +63,7 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
     private final Menu menu = new Menu(form, Nav.MERCHANT);
     private final Container body = new Container(new BorderLayout());
     private final Label title = Ui.label("Your restaurant", "SvHeading");
+    private final Label status = Ui.label("Taking orders", "SvMutedSmall");
     private final Switch open = new Switch();
     private RestaurantDto restaurant;
     private Container queue;
@@ -80,12 +81,14 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
-        bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(title));
+        // The name over whether it is taking orders, so that a long name and
+        // the switch share a phone's width without running into each other.
+        Container named = new Container(BoxLayout.y());
+        named.add(title).add(status);
+        bar.add(BorderLayout.CENTER, BorderLayout.centerAbsolute(named));
         open.setName("accepting");
         open.addActionListener(e -> pause(!open.isValue()));
-        Container accepting = new Container(BoxLayout.x());
-        accepting.add(Ui.plain(Lang.tr("Taking orders"), "SvMutedSmall")).add(open);
-        bar.add(BorderLayout.EAST, FlowLayout.encloseRightMiddle(accepting));
+        bar.add(BorderLayout.EAST, FlowLayout.encloseRightMiddle(open));
         Container screen = new Container(new BorderLayout());
         screen.setUIID("SvForm");
         screen.setSafeArea(true);
@@ -126,7 +129,8 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
         restaurant = found;
         title.setText(found.name());
         open.setValue(!found.paused());
-        title.getParent().revalidateLater();
+        status.setText(Lang.tr(found.paused() ? "Paused" : "Taking orders"));
+        form.revalidateLater();
     }
 
     private void pause(final boolean paused) {
@@ -209,7 +213,7 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
             Ui.say("New order");
         }
         waiting = placed;
-        into.revalidateLater();
+        Ui.relayout(into);
         if (detail != null) {
             if (again != null) {
                 open(again);
@@ -218,7 +222,7 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
                 detail.removeAll();
                 detail.add(BorderLayout.CENTER, Ui.empty(FontImage.MATERIAL_RECEIPT_LONG,
                         Lang.tr("Pick an order"), null));
-                detail.revalidateLater();
+                Ui.relayout(detail);
             }
         }
     }
@@ -227,10 +231,10 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
         Container row = new Container(new BorderLayout());
         row.setUIID(order.id().equals(picked) ? "SvQueueRowPicked" : "SvQueueRow");
         Container words = new Container(BoxLayout.y());
-        words.add(Ui.plain(order.customerName() + Ui.DOT + "#" + Orders.shortId(order.id()),
-                "SvRowTitle"));
+        words.add(Ui.plain(order.customerName(), "SvRowTitle"));
         words.add(Ui.plain(Orders.summary(order), "SvMutedSmall"));
-        words.add(Ui.plain(Ui.when(order.placedAt()), "SvMutedSmall"));
+        words.add(Ui.plain("#" + Orders.shortId(order.id()) + Ui.DOT + Ui.when(order.placedAt()),
+                "SvMutedSmall"));
         row.add(BorderLayout.CENTER, words);
         row.add(BorderLayout.EAST, Ui.badge(Orders.state(order.state()),
                 Orders.badge(order.state())));
@@ -249,7 +253,7 @@ public class MerchantForm extends LiveChannel.Adapter implements Nav.Home {
     private void open(OrderDto order) {
         detail.removeAll();
         detail.add(BorderLayout.CENTER, OrderPane.page(order, changed -> loadQueue()));
-        detail.revalidateLater();
+        Ui.relayout(detail);
     }
 
     @Override

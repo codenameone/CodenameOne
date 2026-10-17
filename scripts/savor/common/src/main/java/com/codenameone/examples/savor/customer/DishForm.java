@@ -115,6 +115,6 @@ public final class DishForm {
             unit += picked.get(iter).priceCents();
         }
         add.setText(Lang.tr("Add to order") + Ui.DOT + Ui.money(unit * quantity, null));
-        add.getParent().revalidateLater();
+        Ui.relayout(add.getParent());
     }
 }

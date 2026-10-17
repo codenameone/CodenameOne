@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A place the customer keeps to be delivered to.
+@Mapped
 public record SavedAddressDto(
         String id,
         String label,

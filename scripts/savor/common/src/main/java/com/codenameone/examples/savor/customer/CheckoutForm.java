@@ -77,7 +77,7 @@ public final class CheckoutForm {
         page.add(note);
 
         Ui.section(page, Lang.tr("Payment"));
-        method.setName("method");
+        method.setName("payWith");
         method.addActionListener(e -> WalletForm.pick(form, methodId, picked -> {
             pick(picked);
             form.showBack();
@@ -234,7 +234,7 @@ public final class CheckoutForm {
         }
         totals.add(Ui.plain(Lang.tr("Arrives in about {0} min", String.valueOf(quote.etaMinutes())),
                 "SvMutedSmall"));
-        Telemetry.orderQuoted(Cart.lines().size(), 0);
+        Telemetry.orderQuoted(Cart.lines().size());
         place.setText(Lang.tr("Place order") + Ui.DOT + Ui.money(quote.totalCents(), currency));
         form.revalidateLater();
     }
@@ -254,8 +254,11 @@ public final class CheckoutForm {
             placing = false;
             Telemetry.orderPlaced("cash".equals(methodId), promoCode != null);
             Cart.clear();
-            Nav.home();
-            TrackForm.show(com.codename1.ui.CN.getCurrentForm(), order.id());
+            // The checkout is done with: back from the order goes home.
+            Form home = Nav.build();
+            if (home != null) {
+                TrackForm.show(home, order.id());
+            }
         }, (status, message) -> {
             placing = false;
             place.setEnabled(true);

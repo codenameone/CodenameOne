@@ -20,52 +20,66 @@ package com.codenameone.examples.savor;
 
 import java.util.Map;
 
-/// A whole delivery, from the customer's side of the app: the courier is the other
-/// actor, and everything the customer sees change is the server telling the app.
+/// A whole order, from the customer's side of the app: the kitchen and the
+/// courier are the other actors, and everything the customer sees change is
+/// the server telling the app.
 public class DeliveryFlowTest extends E2e {
     @Override
     protected boolean run() throws Exception {
-        // A car near the customer, online.
+        // A courier by the kitchen, online, and the kitchen's own account.
         Actor courier = Actor.signIn(COURIER);
-        courier.online(true, HERE.getLatitude() + 0.004, HERE.getLongitude() + 0.003);
+        courier.online(true, KITCHEN_AT.getLatitude() + 0.002, KITCHEN_AT.getLongitude() + 0.001);
         assertEqual(200, courier.status, "the courier going online");
+        Actor kitchen = Actor.signIn(MERCHANT);
+        Actor customer = Actor.signIn(CUSTOMER);
 
         signIn(CUSTOMER, "Customer");
-        quote();
-        assertTrue(text("price-standard").startsWith("$"), "each kind of delivery has its price");
-        shot("delivery-quote");
-        click("request");
-        untilText("deliveryState", "Finding a courier");
+        shot("customer-home");
+        cart();
+        shot("checkout");
+        click("place");
+        waitForForm("track");
+        untilText("orderState", "Waiting for the restaurant");
+        final String id = placed(customer);
+        assertTrue(id != null, "the order is on its way");
+        shot("order-placed");
 
-        // The offer reaches the courier, who takes it.
-        String id = offered(courier);
+        // The kitchen takes it; the courier is asked once it is cooking.
+        kitchen.post("/api/merchant/orders/" + id + "/accept", "{\"prepMinutes\":10}");
+        assertEqual(200, kitchen.status, "the kitchen accepting the order");
+        untilText("orderState", "Being prepared");
+        assertEqual(id, offered(courier), "the courier is offered this order");
         courier.post("/api/courier/offers/" + id + "/accept", null);
         assertEqual(200, courier.status, "accepting the offer");
-        untilText("deliveryState", "Courier on the way");
-        courier.online(true, HERE.getLatitude() + 0.002, HERE.getLongitude() + 0.001);
-        shot("delivery-courier-on-the-way");
-
         courier.post("/api/courier/deliveries/" + id + "/arrived", null);
-        untilText("deliveryState", "Courier at pickup");
+        assertEqual(200, courier.status, "reaching the restaurant");
+
+        // Not before the kitchen says it is ready.
         courier.post("/api/courier/deliveries/" + id + "/start", null);
-        untilText("deliveryState", "On the trip");
+        assertEqual(409, courier.status, "collecting food the kitchen has not finished");
+        kitchen.post("/api/merchant/orders/" + id + "/ready", null);
+        assertEqual(200, kitchen.status, "the kitchen marking it ready");
+        untilText("orderState", "Ready, waiting for the courier");
+        courier.post("/api/courier/deliveries/" + id + "/start", null);
+        assertEqual(200, courier.status, "collecting the order");
+        untilText("orderState", "On its way");
+        courier.online(true, HERE.getLatitude() + 0.001, HERE.getLongitude());
+        shot("order-on-its-way");
+
         courier.post("/api/courier/deliveries/" + id + "/complete", null);
-        assertEqual(200, courier.status, "completing the delivery");
-        untilText("deliveryState", "You have arrived");
-        assertTrue(text("fare").startsWith("$"), "the receipt shows what was charged");
-        shot("delivery-receipt");
+        assertEqual(200, courier.status, "delivering the order");
+        untilText("orderState", "Delivered");
+        shot("order-delivered");
 
-        // The stars are sent as they are tapped, and the sheet stays for the
-        // rest of what a customer may want to say about the delivery.
+        // Rated once: the server holds the order as the customer left it.
         click("star-5");
-        click("done");
-        until(() -> findByName("whereTo") != null, 20000, "the customer's screen to reset");
-
-        // Rated once: the server holds the delivery as the customer left it.
-        Actor customer = Actor.signIn(CUSTOMER);
-        Map<String, Object> delivery = customer.get("/api/deliveries/" + id);
-        assertEqual("COMPLETED", Actor.text(delivery, "state"));
-        assertEqual(5, ((Number) delivery.get("rating")).intValue());
+        until(() -> findByName("stars") == null, 20000, "the rating to be taken");
+        Map<String, Object> order = customer.get("/api/orders/" + id);
+        assertEqual("DELIVERED", Actor.text(order, "state"));
+        assertEqual(5, ((Number) order.get("stars")).intValue());
+        Map<String, Object> receipt = customer.get("/api/payments/receipts/" + id);
+        // The demo customer pays in cash; PaymentsTest follows a card's hold.
+        assertEqual("cash", Actor.text(receipt, "status"), "the cash paid on delivery");
         courier.online(false, 0, 0);
         return true;
     }

@@ -208,7 +208,7 @@ public final class UsersForm {
         page.add(numbers);
         StatRow money = Ui.stats(2);
         money.stat(Ui.money(detail.spent(), null), "Spent riding", "userSpent");
-        money.stat(Ui.money(detail.earned(), null), "Earned onboarding", "userEarned");
+        money.stat(Ui.money(detail.earned(), null), "Earned delivering", "userEarned");
         page.add(money);
 
         Ui.section(page, "Contact");

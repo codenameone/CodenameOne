@@ -64,7 +64,7 @@ public final class SettingsForm {
         Ui.section(page, "Account");
         Container account = group();
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_PERSON, "Profile",
-                "Name, emergency contact, home and work", chevron()), "profile",
+                "Your name and saved addresses", chevron()), "profile",
                 e -> ProfileForm.show(form, () -> show(previous))));
         account.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
                 user.phoneVerified() ? null : "Needed before your first delivery",
@@ -167,9 +167,9 @@ public final class SettingsForm {
                         + "sent and no money changes hands.", null)));
         about.add(Ui.tap(Ui.row(FontImage.MATERIAL_POLICY, "Privacy policy", null, chevron()),
                 "privacy", e -> legal(form, "Privacy policy",
-                        "Your position is sent to the server you signed in to while you "
-                        + "delivery or drive, and to nobody else. Your settings are kept with "
-                        + "your account on that server.",
+                        "Your position is sent only to the server you signed in to: to show "
+                        + "what delivers to you and, while you deliver, to offer you orders. "
+                        + "Your settings are kept with your account on that server.",
                         "With usage statistics turned on, the app also counts which screens "
                         + "are opened and which features are used, and reports that to "
                         + "Codename One's analytics service under a made-up id for this "

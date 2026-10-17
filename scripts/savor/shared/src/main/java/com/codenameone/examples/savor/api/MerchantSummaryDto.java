@@ -18,10 +18,13 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// How a restaurant's day is going.
 ///
 /// @param salesTodayCents The food, less the service's commission.
 /// @param waiting Orders not answered yet.
+@Mapped
 public record MerchantSummaryDto(
         long ordersToday,
         long salesTodayCents,

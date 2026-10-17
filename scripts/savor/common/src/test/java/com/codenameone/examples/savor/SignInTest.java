@@ -70,8 +70,8 @@ public class SignInTest extends E2e {
 
         // The menu offers no mode to switch to -- only the way to apply for
         // one -- and leads to the settings.
-        assertTrue(has("menu-drive"), "a customer is shown how to become a courier");
-        assertFalse(findByName("switch-courier") instanceof Button, "a customer is offered onboarding");
+        assertTrue(has("menu-deliver"), "a customer is shown how to become a courier");
+        assertFalse(findByName("switch-courier") instanceof Button, "a customer is offered courier mode");
         assertFalse(findByName("switch-admin") instanceof Button, "a customer is offered admin");
         click("menu-open");
         click("menu-settings");

@@ -393,7 +393,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             peek.add(Ui.text(Lang.tr("Delivered: {0} earned", lastFare), "SvNotice"));
         }
         if (online) {
-            peek.add(Ui.label("Stay close to busy streets; requests come to the nearest car.",
+            peek.add(Ui.label("Stay close to busy streets; orders go to the nearest courier.",
                     "SvMuted"));
             peek.add(FlowLayout.encloseCenter(new Pulse()));
         } else {

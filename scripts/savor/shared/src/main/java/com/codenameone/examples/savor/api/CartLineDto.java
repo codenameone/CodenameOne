@@ -18,9 +18,12 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// A dish in the cart, with the extras chosen for it.
+@Mapped
 public record CartLineDto(
         String dishId,
         int quantity,

@@ -22,9 +22,11 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -64,7 +66,9 @@ public final class Food {
     /// comes, and for good when there is none.
     public static Label photo(String photoId, String cuisine, String uiid, float widthMM,
             float heightMM) {
-        Label photo = new Label("", uiid);
+        Label photo = new Cover(uiid, cover(cuisine));
+        // Light on the cover's dark ground, in either theme.
+        photo.getAllStyles().setFgColor(COVER_INK);
         Ui.icon(photo, icon(cuisine), Math.min(heightMM, widthMM) * 0.42f);
         photo.setAlignment(Component.CENTER);
         int width = CN.convertToPixels(widthMM);
@@ -73,6 +77,68 @@ public final class Food {
         photo.setPreferredH(height);
         Pictures.into(photo, photoId, width, height);
         return photo;
+    }
+
+    /// Two deep tones per cuisine, top to bottom, for the cover a restaurant
+    /// or a dish has until it has a photograph: dark and warm, the way a
+    /// menu's own photography is lit, rather than a pale tint behind an icon.
+    private static final int[][] COVERS = {
+        {0x7a2e1d, 0x2b1410}, {0x6b3f1f, 0x24160d}, {0x1f3d4a, 0x0e1a20},
+        {0x6e4a1c, 0x251a0c}, {0x5c2a2a, 0x1f0f10}, {0x3d4a2a, 0x151a0f},
+        {0x4a2418, 0x170c09}, {0x6b5317, 0x241c08}, {0x2f4f35, 0x0f1c12},
+        {0x6a3350, 0x22111b}, {0x4d2e4a, 0x1a0f19}, {0x4a3424, 0x1a120c}};
+
+    private static final int COVER_INK = 0xf3e7d3;
+
+    private static int[] cover(String cuisine) {
+        for (int iter = 0; iter < CUISINES.length; iter++) {
+            if (CUISINES[iter].equalsIgnoreCase(cuisine)) {
+                return COVERS[iter % COVERS.length];
+            }
+        }
+        return new int[] {0x33302c, 0x121110};
+    }
+
+    /// A photo's place that paints its cover itself while it shows an icon,
+    /// and steps aside once [Pictures] has given it the photograph.
+    private static final class Cover extends Label {
+        private final int[] tones;
+
+        Cover(String uiid, int[] tones) {
+            super("", uiid);
+            this.tones = tones;
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if (getIcon() instanceof FontImage) {
+                int x = getX();
+                int y = getY();
+                int w = getWidth();
+                int h = getHeight();
+                int[] clip = g.getClip();
+                // A hero runs edge to edge; everything else is a card.
+                boolean rounded = !"SvHeroPhoto".equals(getUIID()) && g.isShapeClipSupported();
+                if (rounded) {
+                    float r = CN.convertToPixels(2f);
+                    GeneralPath shape = new GeneralPath();
+                    shape.moveTo(x + r, y);
+                    shape.lineTo(x + w - r, y);
+                    shape.quadTo(x + w, y, x + w, y + r);
+                    shape.lineTo(x + w, y + h - r);
+                    shape.quadTo(x + w, y + h, x + w - r, y + h);
+                    shape.lineTo(x + r, y + h);
+                    shape.quadTo(x, y + h, x, y + h - r);
+                    shape.lineTo(x, y + r);
+                    shape.quadTo(x, y, x + r, y);
+                    shape.closePath();
+                    g.setClip(shape);
+                }
+                g.fillLinearGradient(tones[0], tones[1], x, y, w, h, false);
+                g.setClip(clip);
+            }
+            super.paint(g);
+        }
     }
 
     /// `$`, `$$` or `$$$`.
@@ -123,7 +189,7 @@ public final class Food {
         words.add(title);
         words.add(Ui.plain(restaurant.cuisine() + Ui.DOT + Ui.distance(restaurant.distanceMeters()),
                 "SvMutedSmall"));
-        words.add(Ui.plain(meta(restaurant.rating(), restaurant.ratingCount(),
+        words.add(Ui.text(meta(restaurant.rating(), restaurant.ratingCount(),
                 restaurant.etaMinutes(), restaurant.deliveryFeeCents(), currency), "SvMetaLine"));
         card.add(BorderLayout.CENTER, words);
         return Ui.tap(card, name, open);

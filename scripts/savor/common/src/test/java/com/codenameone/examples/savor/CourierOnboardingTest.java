@@ -62,7 +62,6 @@ public class CourierOnboardingTest extends E2e {
         untilText("step", "Step 1 of 5");
         type("legalName", "Dana Morgan Courier");
         date("dateOfBirth", 1990, 5, 17);
-        click("gender-female");
         click("next");
         untilText("step", "Step 2 of 5");
         type("licenceNumber", "D7781204");

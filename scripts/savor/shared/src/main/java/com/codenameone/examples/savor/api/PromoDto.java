@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A promotion code, as the admin sees and sets it.
+@Mapped
 public record PromoDto(
         String code,
         int percentOff,

@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 import java.util.List;
 
 /// What the customer is about to order: from one restaurant, to one place.
@@ -26,6 +28,7 @@ import java.util.List;
 /// @param note For the courier: a gate code, which door.
 /// @param tipCents For the courier, charged with the order.
 /// @param paymentMethodId Empty for the account's default.
+@Mapped
 public record CartDto(
         String restaurantId,
         List<CartLineDto> lines,

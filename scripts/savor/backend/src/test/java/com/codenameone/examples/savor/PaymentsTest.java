@@ -221,6 +221,22 @@ class PaymentsTest {
     }
 
     @Test
+    void aPlacedOrdersReceiptShowsTheHoldBeforeAnyDelivery() throws Exception {
+        // Vienna. Nobody has answered the order, so there is no delivery yet.
+        String customer = People.customer(accounts, "vie-customer");
+        Trips.addCard(mvc, customer, Trips.VISA);
+        String id = (String) Trips.place(mvc, customer, Trips.trip(48.2082, 16.3738, 48.2150,
+                16.3800)).get("id");
+        Map receipt = Trips.receipt(mvc, customer, id);
+        assertEquals("authorized", receipt.get("status"));
+        assertEquals("Visa 4242", receipt.get("methodLabel"));
+        // Another customer still cannot read it.
+        String stranger = People.customer(accounts, "vie-stranger");
+        mvc.perform(People.asCustomer(get("/api/payments/receipts/" + id), stranger))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void aDeliveryIsChargedTippedAndRefundedAndTheCourierIsPaid() throws Exception {
         // Berlin.
         String customer = People.customer(accounts, "ber-customer");

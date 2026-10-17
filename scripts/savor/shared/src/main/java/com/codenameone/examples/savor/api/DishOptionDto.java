@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// An extra a dish can be ordered with.
+@Mapped
 public record DishOptionDto(
         String id,
         String name,

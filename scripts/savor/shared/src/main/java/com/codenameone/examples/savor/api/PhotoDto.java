@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// A picture, as base64 text. Sent without `id` to upload one.
+@Mapped
 public record PhotoDto(
         String id,
         String contentType,

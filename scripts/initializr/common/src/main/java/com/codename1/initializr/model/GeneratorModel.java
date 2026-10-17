@@ -83,6 +83,15 @@ public class GeneratorModel {
     /// colour is chosen. GeneratorModelMatrixTest holds the two together.
     public static final int FULL_STACK_BRAND = 0x1f5eff;
 
+    /// The food-delivery template's `--brand`, held to its theme.css the same way.
+    public static final int SAVOR_BRAND = 0x7ac943;
+
+    /// The brand colour `template` ships with: the one its icon is painted with
+    /// when the developer keeps the template's own scheme.
+    public static int brandOf(Template template) {
+        return template == Template.SAVOR ? SAVOR_BRAND : FULL_STACK_BRAND;
+    }
+
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {

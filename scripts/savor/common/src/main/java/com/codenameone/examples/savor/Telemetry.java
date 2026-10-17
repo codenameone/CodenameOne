@@ -220,9 +220,8 @@ public final class Telemetry {
     // ------------------------------------------------------------------ deliveries
 
     /// @param lines how many dishes the cart holds
-    public static void orderQuoted(int lines, double meters) {
-        send(DELIVERY, "order_quoted", "lines", Integer.valueOf(lines), "distance",
-                distance(meters));
+    public static void orderQuoted(int lines) {
+        send(DELIVERY, "order_quoted", "lines", Integer.valueOf(lines));
     }
 
     public static void orderPlaced(boolean cash, boolean promo) {
@@ -341,12 +340,6 @@ public final class Telemetry {
         long units = cents / 100;
         return units < 5 ? "under_5" : units < 10 ? "5_to_10" : units < 20 ? "10_to_20"
                 : units < 35 ? "20_to_35" : units < 50 ? "35_to_50" : "50_or_more";
-    }
-
-    /// How far, as a bracket in kilometres.
-    static String distance(double meters) {
-        return meters < 2000 ? "under_2km" : meters < 5000 ? "2_to_5km"
-                : meters < 10000 ? "5_to_10km" : meters < 25000 ? "10_to_25km" : "25km_or_more";
     }
 
     /// Reports `name` with `pairs`: a parameter's name, then its value.

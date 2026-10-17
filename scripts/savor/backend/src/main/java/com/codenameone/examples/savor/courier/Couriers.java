@@ -99,7 +99,7 @@ public class Couriers {
     /// read it.
     public CourierDto report(String courier, CourierStatusDto status) throws IOException {
         if (status == null || (status.online() && !Geo.isPoint(status.lat(), status.lng()))) {
-            throw new ResponseStatusException(400, "Going on line needs the car's position");
+            throw new ResponseStatusException(400, "Going online needs your position");
         }
         Report made = store(courier, status);
         CourierDto dto = made.courier;

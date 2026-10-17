@@ -50,10 +50,13 @@ public class AnalyticsTest extends E2e {
         waitForForm("Customer");
         assertTrue(Telemetry.asked() && !Telemetry.allowed(), "the answer was no");
 
-        // A no is a no: screens are shown, a fare is worked out, and nothing
+        // A no is a no: screens are shown, an order is priced, and nothing
         // is reported.
-        quote();
-        click("back");
+        cart();
+        back();
+        waitForForm("restaurant");
+        back();
+        waitForForm("Customer");
         click("menu-open");
         click("menu-settings");
         waitForForm("Settings");
@@ -78,25 +81,24 @@ public class AnalyticsTest extends E2e {
         back();
         waitForForm("Customer");
         until(() -> recorder.has("screen:Customer<Settings"), 5000, "the Customer screen view");
-        quote();
-        assertTrue(recorder.has("screen:PlaceSearch<Customer"), "the search: " + recorder.seen);
-        until(() -> recorder.event("delivery_quoted") != null, 5000, "the quote to be reported");
-        assertTrue(recorder.event("delivery_quoted").startsWith("delivery_quoted[delivery] {products="),
-                "the quote: " + recorder.event("delivery_quoted"));
+        Actor customer = Actor.signIn(CUSTOMER);
+        cart();
+        assertTrue(recorder.has("screen:restaurant<Customer"), "the restaurant: " + recorder.seen);
+        until(() -> recorder.event("order_quoted") != null, 5000, "the quote to be reported");
+        assertEqual("order_quoted[delivery] {lines=1}", recorder.event("order_quoted"));
 
-        // Asking for the delivery, with what an operator would chart about it.
-        click("request");
-        until(() -> recorder.event("delivery_requested") != null, 20000,
-                "the request to be reported");
-        assertEqual("delivery_requested[delivery] {product=standard, payment=cash}",
-                recorder.event("delivery_requested"));
-        // Nobody is onboarding, so the server may give the delivery up before the
-        // customer does; either way the screen ends where it began.
-        until(() -> {
-            clickIfThere("dismiss");
-            clickIfThere("cancel");
-            return findByName("whereTo") != null;
-        }, 30000, "the delivery to be cancelled");
+        // Placing the order, with what an operator would chart about it.
+        click("place");
+        until(() -> recorder.event("order_placed") != null, 20000, "the order to be reported");
+        assertTrue(recorder.event("order_placed").startsWith("order_placed[delivery] {payment="),
+                "the order: " + recorder.event("order_placed"));
+        waitForForm("track");
+        // Called off from the server's side, and the screen left by its button.
+        customer.post("/api/orders/" + placed(customer) + "/cancel", null);
+        assertEqual(200, customer.status, "cancelling the order");
+        untilText("orderState", "You cancelled it");
+        click("back");
+        waitForForm("Customer");
 
         // Signing out, and in again: both are reported now.
         signOut();

@@ -18,9 +18,12 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// One line of an order, priced.
 ///
 /// @param options The extras chosen, as one line of text.
+@Mapped
 public record OrderLineDto(
         String dishId,
         String name,

@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.api;
 
+import com.codename1.annotations.Mapped;
+
 /// What an order costs on top of its food, and what the service keeps of it.
 ///
 /// @param baseCents The delivery fee's base.
@@ -26,6 +28,7 @@ package com.codenameone.examples.savor.api;
 /// @param smallOrderCents Food worth less than this pays the difference ...
 /// @param smallOrderFeeCents ... up to this much.
 /// @param commissionPercent Kept of the food; the restaurant is paid the rest.
+@Mapped
 public record PricingDto(
         String currency,
         long baseCents,

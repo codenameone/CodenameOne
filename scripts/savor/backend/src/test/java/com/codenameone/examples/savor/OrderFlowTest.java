@@ -53,6 +53,15 @@ class OrderFlowTest {
     private DataSource db;
 
     @Test
+    void theSeededRestaurantsDeliverToTheDemoAddress() throws Exception {
+        // Pier 39, where the app sends a browser that has no location of its own.
+        String found = mvc.perform(People.asCustomer(get("/api/restaurants?lat=37.8087"
+                + "&lng=-122.4098&sort=distance"), DemoAccounts.CUSTOMER))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(found.contains("Ember & Crust"), found);
+    }
+
+    @Test
     void anOrderFromTheCartToTheStars() throws Exception {
         // Lisbon. Each test has a city to itself.
         String customer = People.customer(accounts, "lis-customer");

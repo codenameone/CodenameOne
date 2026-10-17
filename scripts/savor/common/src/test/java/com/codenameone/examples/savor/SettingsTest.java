@@ -18,11 +18,11 @@
  */
 package com.codenameone.examples.savor;
 
-import com.codenameone.examples.savor.net.Account;
+import com.codename1.ui.RadioButton;
 import java.util.Map;
 
 /// The settings: a language and a theme that change the app on the spot, and
-/// a delivery preference that reaches the server and the next delivery asked for.
+/// a default tip that reaches the server and the next checkout.
 public class SettingsTest extends E2e {
     @Override
     protected boolean run() throws Exception {
@@ -57,39 +57,38 @@ public class SettingsTest extends E2e {
         waitForForm("Settings");
         click("theme-system");
 
-        // A woman at the wheel: kept with the account, and sent with the delivery.
-        click("courierGender-women");
-        until(() -> Account.lastSent() != null
-                && "women".equals(Account.lastSent().courierGender()), 20000,
-                "the preference to be sent");
+        // A tip chosen here is the one the next checkout starts from, and is
+        // kept with the account.
+        click("tip-15");
+        until(() -> {
+            Object kept = customer.get("/api/account/preferences").get("defaultTipPercent");
+            return kept instanceof Number && ((Number) kept).intValue() == 15;
+        }, 20000, "the tip to be kept with the account");
         until(() -> {
             Map<String, Object> kept = customer.get("/api/account/preferences");
-            return "women".equals(Actor.text(kept, "courierGender"))
-                    && "system".equals(Actor.text(kept, "theme"))
+            return "system".equals(Actor.text(kept, "theme"))
                     && "en".equals(Actor.text(kept, "language"));
         }, 20000, "the account to hold what was chosen");
         back();
         waitForForm("Customer");
-        quote();
-        click("request");
-        untilText("deliveryState", "Finding a courier");
-        Map<String, Object> delivery = customer.get("/api/deliveries/active");
-        assertEqual("women", Actor.text(delivery, "courierGender"), "the delivery asks for a woman");
-        // With no woman onboarding nearby the server may give the delivery up before
-        // the customer does; either way the screen ends where it began.
-        until(() -> {
-            clickIfThere("dismiss");
-            clickIfThere("cancel");
-            return findByName("whereTo") != null;
-        }, 30000, "the delivery to be cancelled");
+        cart();
+        assertTrue(findByName("tip-15") instanceof RadioButton
+                && ((RadioButton) findByName("tip-15")).isSelected(),
+                "the checkout starts from the chosen tip");
+        back();
+        waitForForm("restaurant");
+        back();
+        waitForForm("Customer");
 
         // Back as it was, for whoever uses the account next.
         click("menu-open");
         click("menu-settings");
         waitForForm("Settings");
-        click("courierGender-any");
-        until(() -> "any".equals(Actor.text(customer.get("/api/account/preferences"),
-                "courierGender")), 20000, "the preference to be put back");
+        click("tip-0");
+        until(() -> {
+            Object kept = customer.get("/api/account/preferences").get("defaultTipPercent");
+            return kept instanceof Number && ((Number) kept).intValue() == 0;
+        }, 20000, "the tip to be put back");
         click("signOut");
         waitForForm("Welcome");
         return true;

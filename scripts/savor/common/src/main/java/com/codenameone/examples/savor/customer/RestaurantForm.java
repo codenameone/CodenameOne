@@ -95,7 +95,7 @@ public final class RestaurantForm implements Cart.Listener {
         page.add(title);
         page.add(Ui.plain(found.cuisine() + Ui.DOT + Food.priceLevel(found.priceLevel())
                 + Ui.DOT + found.address(), "SvMutedSmall"));
-        page.add(Ui.plain(Food.meta(found.rating(), found.ratingCount(), found.etaMinutes(),
+        page.add(Ui.text(Food.meta(found.rating(), found.ratingCount(), found.etaMinutes(),
                 found.deliveryFeeCents(), null), "SvMetaLine"));
         if (found.description() != null && found.description().length() > 0) {
             page.add(Ui.text(found.description(), "SvMuted"));

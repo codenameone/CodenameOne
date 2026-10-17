@@ -49,6 +49,7 @@ import com.codenameone.examples.savor.repository.DeliveryRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1028,8 +1029,13 @@ public class Payments {
     @Transactional(readOnly = true)
     public ReceiptDto receipt(String viewer, boolean admin, String deliveryId) throws IOException {
         Delivery delivery = delivery(deliveryId);
-        DeliveryState state = delivery == null ? DeliveryState.NONE : delivery.getState();
-        if (delivery == null || !(admin || viewer.equals(delivery.getCustomer()))
+        if (delivery == null) {
+            // Until the kitchen accepts there is no delivery, only the order and
+            // the hold on its card.
+            return held(viewer, admin, deliveryId);
+        }
+        DeliveryState state = delivery.getState();
+        if (!(admin || viewer.equals(delivery.getCustomer()))
                 || DeliveryState.CANCELLED_BY_CUSTOMER == state || DeliveryState.CANCELLED_BY_COURIER == state
                 || DeliveryState.CANCELLED_BY_ADMIN == state || DeliveryState.NO_COURIERS == state) {
             throw new ResponseStatusException(404, "No such receipt");
@@ -1086,7 +1092,7 @@ public class Payments {
         } else if (REFUND_FAILED.equals(paid)) {
             status = "refund_failed";
         } else {
-            status = "pending";
+            status = held(order);
         }
         // Every refund state follows a payment that was made.
         long paidOn = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
@@ -1120,6 +1126,27 @@ public class Payments {
                 order.getTipCents() + extraTip, order.getTotalCents() + extraTip,
                 order.getMethodLabel(), status, paidOn, order.getDropoffAddress(), courierName,
                 vehicle, admin ? order.getCustomer() : "");
+    }
+
+    /// The receipt of an order no delivery has been made for yet: what it
+    /// costs, and the card held for it.
+    private ReceiptDto held(String viewer, boolean admin, String id) {
+        CustomerOrder order = order(id == null || id.length() > 32 ? null : id);
+        if (order == null || !(admin || viewer.equals(order.getCustomer()))
+                || !Arrays.asList(ORDER_UNDER_WAY).contains(order.getState())) {
+            throw new ResponseStatusException(404, "No such receipt");
+        }
+        return new ReceiptDto(order.getId(), order.getCurrency(), order.getRestaurantName(),
+                order.getSubtotalCents(), order.getDeliveryFeeCents(), order.getServiceFeeCents(),
+                order.getSmallOrderCents(), order.getTaxCents(), order.getDiscountCents(),
+                order.getTipCents(), order.getTotalCents(), order.getMethodLabel(), held(order),
+                0L, order.getDropoffAddress(), "", "", admin ? order.getCustomer() : "");
+    }
+
+    /// `authorized` while a card is held and not yet charged, `pending` otherwise.
+    private static String held(CustomerOrder order) {
+        return order != null && AUTHORIZED.equals(order.getPaymentStatus()) ? "authorized"
+                : "pending";
     }
 
     // ------------------------------------------------------------- internals

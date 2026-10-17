@@ -14,6 +14,8 @@ on:
       # sample itself is compiled and tested by wayline.yml, so the demo build
       # and the figure render have nothing to add for it.
       - 'scripts/wayline/**'
+      # The Savor chapters, the same way; savor.yml compiles and tests the sample.
+      - 'scripts/savor/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one

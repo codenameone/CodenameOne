@@ -50,7 +50,7 @@ final class SalesPage {
                     Lang.tr("Last 7 days"), "sales-week");
             stats.stat(String.valueOf(summary.waiting()), Lang.tr("Waiting now"), "waiting");
             numbers.add(stats);
-            page.revalidateLater();
+            Ui.relayout(page);
         }, Ui::fail));
         Api.merchant().history(Net.to(found -> {
             Ui.section(past, Lang.tr("Finished orders"));
@@ -64,7 +64,7 @@ final class SalesPage {
                         Ui.when(order.placedAt()) + Ui.DOT + Orders.summary(order),
                         Ui.badge(Orders.state(order.state()), Orders.badge(order.state()))));
             }
-            page.revalidateLater();
+            Ui.relayout(page);
         }, Ui::fail));
         return page;
     }
