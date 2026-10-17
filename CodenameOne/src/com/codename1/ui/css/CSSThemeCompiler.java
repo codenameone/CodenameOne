@@ -102,20 +102,23 @@ public class CSSThemeCompiler {
         // whose image a rule may still create (cn1-mutable-image), and one written as var(--x).
         // Keyed by "@name"; only the declaration that wins for a name decides its entry.
         Hashtable<String, String> deferred = new Hashtable<String, String>();
-        // Constants first, wherever their block sits, so a var() in any rule can see them...
-        for (Rule rule : rules) {
-            if (rule.constants) {
-                compileConstants(rule.declarations, theme, deferred);
-            }
-        }
-        // ...and then again in source order, so the last declaration of a name still wins
-        // against a `:root` or in-rule custom property, as it does in the build-time compiler.
-        Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
+        // Every constant first, in source order, so the last declaration of a name wins -- a
+        // #Constants entry, a `:root` or an in-rule custom property alike -- and every rule then
+        // resolves var() against those final values, wherever it sits, as the build-time
+        // compiler does.
         for (Rule rule : rules) {
             if (rule.constants) {
                 compileConstants(rule.declarations, theme, deferred);
             } else {
-                applyRule(theme, resources, rule, fonts, deferred);
+                for (Declaration declaration : rule.declarations) {
+                    applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
+                }
+            }
+        }
+        Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
+        for (Rule rule : rules) {
+            if (!rule.constants) {
+                applyRule(theme, resources, rule, fonts);
             }
         }
         compileFonts(theme, fonts);
@@ -332,10 +335,9 @@ public class CSSThemeCompiler {
         return out.toString();
     }
 
-    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts,
-                           Hashtable<String, String> deferred) {
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts) {
         if (":root".equals(rule.selector)) {
-            applyRootDeclarations(theme, rule.declarations, deferred);
+            // Its custom properties were all stored before any rule ran.
             return;
         }
 
@@ -347,7 +349,7 @@ public class CSSThemeCompiler {
         for (int i = 0; i < rule.declarations.length; i++) {
             Declaration declaration = rule.declarations[i];
             String property = declaration.property;
-            if (applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred)) {
+            if (declaration.name.startsWith("--")) {
                 continue;
             }
             String value = resolveVars(theme, declaration.value);
@@ -371,12 +373,6 @@ public class CSSThemeCompiler {
         theme.put(uiid + "." + statePrefix + "border", new CSSBorder(null, borderCss.toString()));
     }
 
-    private void applyRootDeclarations(Hashtable theme, Declaration[] declarations, Hashtable<String, String> deferred) {
-        for (Declaration declaration : declarations) {
-            applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
-        }
-    }
-
     private boolean applyThemeConstantProperty(Hashtable theme, String property, String value,
                                                Hashtable<String, String> deferred) {
         if (!property.startsWith("--")) {
@@ -386,10 +382,9 @@ public class CSSThemeCompiler {
         String raw = value.trim();
         String unquoted = unquote(raw);
         // A later custom property replaces a #Constants entry outright, deferred handling included.
+        // An unquoted var() in it is resolved where it is used, against the final values.
         deferred.remove(key);
-        if (raw.equals(unquoted)) {
-            unquoted = resolveVars(theme, unquoted);
-        } else {
+        if (!raw.equals(unquoted)) {
             deferred.put(key, DEFERRED_LITERAL);
         }
         theme.put(key, unquoted);

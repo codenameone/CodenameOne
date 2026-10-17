@@ -604,6 +604,19 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("world", theme.get("@plain"));
     }
 
+    @Test
+    public void testRulesSeeTheFinalValueOfARedeclaredConstant() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} Label{color:var(--accent);}"
+                + " #Constants{--accent:#0000ff;}"
+                + ":root{--bg:#ff0000;} Button{background-color:var(--bg);} :root{--bg:#00ff00;}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("0000ff", theme.get("@accent"));
+        assertEquals("0000ff", theme.get("Label.fgColor"));
+        assertEquals("00ff00", theme.get("Button.bgColor"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");
