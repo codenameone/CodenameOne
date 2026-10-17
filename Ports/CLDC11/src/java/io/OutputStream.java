@@ -25,7 +25,7 @@ package java.io;
 /// This abstract class is the superclass of all classes representing an output stream of bytes. An output stream accepts output bytes and sends them to some sink.
 /// Applications that need to define a subclass of OutputStream must always provide at least a method that writes one byte of output.
 /// Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, DataOutputStream, InputStream, write(int)
-public abstract class OutputStream  implements AutoCloseable {
+public abstract class OutputStream implements Closeable, Flushable {
     public OutputStream(){
          //TODO codavaj!!
     }

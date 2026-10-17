@@ -192,4 +192,61 @@ public final class Float extends Number implements Comparable<Float> {
     public int compareTo(Float f) {
         return compare(this, f);
     }
+
+    public static final Class<Float> TYPE = null;
+
+    public static int floatToRawIntBits(float value) {
+        return 0;
+    }
+
+    public static float sum(float a, float b) {
+        return 0;
+    }
+
+    public static float max(float a, float b) {
+        return 0;
+    }
+
+    public static float min(float a, float b) {
+        return 0;
+    }
+
+    /// The size of a float in bytes.
+    public static final int BYTES = 4;
+
+    /// The size of a float in bits.
+    public static final int SIZE = 32;
+
+    /// The bits of precision of a float's significand.
+    public static final int PRECISION = 24;
+
+    /// The largest exponent of a finite float.
+    public static final int MAX_EXPONENT = 127;
+
+    /// The smallest exponent of a normal float.
+    public static final int MIN_EXPONENT = -126;
+
+    /// The smallest positive normal float, 2 to the power -126.
+    public static final float MIN_NORMAL = 0x1.0p-126f;
+
+    /// A Float of `parseFloat(s)`.
+    @Deprecated
+    public Float(String s) throws NumberFormatException {
+    }
+
+    /// Whether `f` is neither infinite nor NaN.
+    public static boolean isFinite(float f) {
+        return false;
+    }
+
+    /// The hash the JDK gives `value`: its bits.
+    public static int hashCode(float value) {
+        return 0;
+    }
+
+    /// The value as a hexadecimal floating point literal, as the JDK writes
+    /// it.
+    public static String toHexString(float f) {
+        return null;
+    }
 }

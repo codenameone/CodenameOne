@@ -5309,7 +5309,7 @@ final class JavascriptMethodGenerator {
             return true;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
-            out.append("  ").append(ctx.push(value.toString())).append(";\n");
+            out.append("  ").append(ctx.push(numericLiteral(value))).append(";\n");
             return true;
         }
         if (value instanceof Type) {
@@ -5505,6 +5505,19 @@ final class JavascriptMethodGenerator {
      * depth of the call's value; consumption by a store / return / putfield
      * / array-store / jump-condition / further composition ends the window.
      */
+    /// The JavaScript literal for an int, float or double LDC constant. A float is
+    /// a double in JavaScript, so it is written at its exact double value:
+    /// ``Float.toString`` is only the shortest string that rounds back to the
+    /// FLOAT, and read as a double it is a different number -- Float.MIN_VALUE
+    /// printed as ``1.4E-45`` is not 2^-149, and every arithmetic result built on
+    /// it was wrong.
+    static String numericLiteral(Object value) {
+        if (value instanceof Float) {
+            return Double.toString(((Float) value).doubleValue());
+        }
+        return value.toString();
+    }
+
     private static boolean canDeferInvokeResult(List<Instruction> instructions, int index) {
         int depth = 0; // our value sits at relative depth 0 from the top
         for (int i = index + 1; i < instructions.size() && i < index + 10; i++) {
@@ -5853,11 +5866,38 @@ final class JavascriptMethodGenerator {
                 return "";
             }
             pendingExpr[sp] = null;
+            // A deferred invoke (pushComposite from the call sites that
+            // canDeferInvokeResult admits) can name slots ABOVE its own as
+            // arguments: ``s0 = call(s0, s1)`` is held as pending s0 and s1 is
+            // free again. A materialised push into that slot would then
+            // overwrite an argument before the call reads it -- as in
+            // ``Long.divideUnsigned(a, b) == 14L``, where the long literal is
+            // not deferrable and became ``s1 = _Llit(14, 0)`` ahead of the
+            // call. Evaluate any such pending first; nothing between the call
+            // and here has side effects, so this is the order the bytecode has.
+            String prelude = flushPendingReading("s" + sp);
             String slot = "s" + sp++;
             if (sp > maxObservedStack) {
                 maxObservedStack = sp;
             }
-            return slot + " = " + expression;
+            return prelude + slot + " = " + expression;
+        }
+
+        /// Materialise every pending below the top whose expression reads
+        /// ``slot``. Returns the statements to emit, each ending in a newline.
+        private String flushPendingReading(String slot) {
+            StringBuilder prelude = null;
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null && containsWord(pendingExpr[i], slot)) {
+                    if (prelude == null) {
+                        prelude = new StringBuilder();
+                    }
+                    prelude.append("s").append(i).append(" = ").append(pendingExpr[i]).append(";\n  ");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude == null ? "" : prelude.toString();
         }
 
         private String pop() {
@@ -7315,7 +7355,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
-            out.append("        stack.p(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
+            out.append("        stack.p(").append(numericLiteral(value)).append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Type) {

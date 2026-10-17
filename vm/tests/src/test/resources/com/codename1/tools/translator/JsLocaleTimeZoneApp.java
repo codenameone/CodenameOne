@@ -81,6 +81,16 @@ public class JsLocaleTimeZoneApp {
             score |= 1024;
         }
 
+        // Math.round answers a long built by 64-bit bit arithmetic, which this
+        // runtime holds as a hi/lo record rather than a plain number; the
+        // formatter read that as NaN and printed "Invalid Date" (TimeChart's
+        // axis labels).
+        String rounded = DateFormat.getDateInstance(DateFormat.MEDIUM).format(
+                new Date(Math.round(1709337600000.0)));
+        if (rounded != null && rounded.length() > 0 && rounded.indexOf("Invalid") < 0) {
+            score |= 2048;
+        }
+
         result = score;
     }
 }

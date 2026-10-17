@@ -300,6 +300,9 @@ public class URI {
             authority = authority.substring(AUTHORITY_MARKER.length());
             newAuthority = authority;
         }
+        if (!encode) {
+            checkLegal(newAuthority, AUTHORITY_LEGAL, "authority");
+        }
         int index = newAuthority.indexOf(USERINFO_SEPARATOR);
         if (index != -1) {
             this.userInfo = newAuthority.substring(0, index);
@@ -345,6 +348,7 @@ public class URI {
                 this.query = URIHelper.encodeString(this.query);
             } else {
                 // validate
+                checkLegal(this.query, URIC_LEGAL, "query");
                 URIHelper.decodeString(this.query);
             }
         }
@@ -367,6 +371,7 @@ public class URI {
                 this.path = URIHelper.encodeString(this.path);
             } else {
                 // validate
+                checkLegal(this.path, PATH_LEGAL, "path");
                 URIHelper.decodeString(this.path);
             }
         }
@@ -492,6 +497,9 @@ public class URI {
         String s = uriString;
         int index = s.indexOf(FRAGMENT_SEPARATOR);
         if (index != -1) {
+            // setFragment cannot declare the exception, so the fragment is
+            // checked here, where the single-string constructor reads it.
+            checkLegal(s.substring(index + 1), URIC_LEGAL, "fragment");
             setFragment(s.substring(index + 1), false);
             s = s.substring(0, index);
         }
@@ -523,7 +531,14 @@ public class URI {
         if (ssp == null) {
             throw new URISyntaxException(ssp, "Invalid scheme specific part");
         }
+        if (scheme != null && ssp.length() == 0) {
+            // "http:" -- the JDK reports this rather than reading past the end.
+            throw new URISyntaxException(scheme + SCHEME_SEPARATOR, "Expected scheme-specific part");
+        }
         if (scheme != null && ssp.charAt(0) != PATH_SEPARATOR) {
+            if (!encode) {
+                checkLegal(ssp, URIC_LEGAL, "opaque part");
+            }
             this.opaque = true;
             this.schemeSpecificPart = ssp;
             return;
@@ -539,13 +554,70 @@ public class URI {
             s = s.substring(0, index);
         }
 
-        index = (s.startsWith(AUTHORITY_MARKER)) ? 2 : 0;
-        index = s.indexOf(PATH_SEPARATOR, index);
+        // Only a "//" opens an authority. Without one the remainder is all
+        // path: "file:/tmp/x" has no authority at all (not an empty one, which
+        // would print back as "file:///tmp/x"), and a relative "a/b" is a
+        // path, not host "a" with path "/b". An empty remainder ("#f", "?q")
+        // leaves the path null, which resolve() reads as "no path given".
+        if (!s.startsWith(AUTHORITY_MARKER)) {
+            if (s.length() > 0) {
+                setPath(s, encode);
+            }
+            return;
+        }
+        index = s.indexOf(PATH_SEPARATOR, AUTHORITY_MARKER.length());
         if (index != -1) {
             setPath(s.substring(index), encode);
             s = s.substring(0, index);
         }
         setAuthority(s, encode);
+    }
+
+    /// Characters, beyond the unreserved ones, that may appear unescaped in a
+    /// path: `pchar` plus the segment separator, from the RFC 2396 grammar
+    /// `java.net.URI` parses. `?` and `#` never reach a path, they split it.
+    private static final String PATH_LEGAL = ",;:$&+=/@";
+
+    /// The same for an authority, server or registry based; the brackets are
+    /// RFC 2732's IPv6 literal.
+    private static final String AUTHORITY_LEGAL = ",;:$&+=@[]";
+
+    /// The same for a query, a fragment and an opaque part (`uric`, with the
+    /// RFC 2732 brackets the JDK also accepts there).
+    private static final String URIC_LEGAL = ",;:$&+=/@?[]";
+
+    /// Throws `URISyntaxException` for the first character of `component` the
+    /// JDK's parser would reject: anything that is not unreserved, listed in
+    /// `legal`, a `%` followed by two hex digits, or a non-ASCII character
+    /// other than a control or space character. A space is the common case --
+    /// `new URI("http://h/a b")` must fail, as it does on the JVM, rather than
+    /// build a URI no server would accept.
+    ///
+    /// The checks only run on text the caller claimed was already encoded:
+    /// the single-string constructor. The multi-argument constructors encode
+    /// their arguments instead.
+    private static void checkLegal(String component, String legal, String name) throws URISyntaxException {
+        int len = component.length();
+        for (int i = 0; i < len; i++) {
+            char ch = component.charAt(i);
+            if (ch < 128) {
+                if (URIHelper.isAlphaNum(ch) || UNRESERVED_EXTRAS.indexOf(ch) != -1 || legal.indexOf(ch) != -1) {
+                    continue;
+                }
+                if (ch == QUOTE_MARKER && i + 2 < len && isHexDigit(component.charAt(i + 1))
+                        && isHexDigit(component.charAt(i + 2))) {
+                    i += 2;
+                    continue;
+                }
+            } else if (!Character.isISOControl(ch) && !Character.isSpaceChar(ch)) {
+                continue;
+            }
+            throw new URISyntaxException(component, "Illegal character in " + name, i);
+        }
+    }
+
+    private static boolean isHexDigit(char ch) {
+        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
     }
 
     /**

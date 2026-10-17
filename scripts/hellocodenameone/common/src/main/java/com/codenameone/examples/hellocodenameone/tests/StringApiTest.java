@@ -44,7 +44,7 @@ public class StringApiTest extends BaseTest {
             CharSequence repl = new StringBuilder("XY");
             assertEqual("XYbXY", "aba".replace(target, repl), "non-String CharSequence overload failed");
 
-            // String.replaceAll - regex-driven substitution via JdkApiRewriteHelper -> RE
+            // String.replaceAll - rewritten in every build to StringRegex (one engine on every port)
             assertEqual("XbXcX", "aabacaa".replaceAll("a+", "X"), "replaceAll greedy + quantifier failed");
             assertEqual("xBxB", "aBaB".replaceAll("a", "x"), "replaceAll literal token failed");
             assertEqual("ABC", "abc".replaceAll("[a-z]", "$0").toUpperCase(),
@@ -60,6 +60,22 @@ public class StringApiTest extends BaseTest {
                     "replaceFirst literal token failed");
             assertEqual("nochange", "nochange".replaceFirst("zzz", "X"),
                     "replaceFirst with no match should return original");
+
+            // String.matches and split - the members that were rewritten only
+            // when a desktop compatibility layer was active. These must hold
+            // on EVERY port, with no layer at all.
+            assertEqual("true", String.valueOf("2024-02-29".matches("\\d{4}-\\d{2}-\\d{2}")),
+                    "matches with \\d{n} failed");
+            assertEqual("false", String.valueOf("abc".matches("ab")), "matches must match the whole string");
+            assertEqual("a|b||c", String.join("|", "a,b,,c,,".split(",")),
+                    "split must drop trailing empty strings");
+            assertEqual("a|b|,c", String.join("|", "a,b,,c".split(",", 3)), "split with a limit failed");
+            assertEqual("x|y|z", String.join("|", "x1y22z".split("\\d+")), "split on a regex failed");
+            // Through method references, which compile to a handle, not a call.
+            java.util.function.BiFunction<String, String, Boolean> m = String::matches;
+            assertEqual("true", String.valueOf(m.apply("aaa", "a+")), "String::matches failed");
+            java.util.function.BiFunction<String, String, String[]> sp = String::split;
+            assertEqual("2", String.valueOf(sp.apply("a;b", ";").length), "String::split failed");
 
             // A ParparVM String can be fused with its backing array. A slice must
             // therefore own its backing storage: sharing the parent's inline array

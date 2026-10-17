@@ -79,4 +79,12 @@ public class InputStreamReader extends java.io.Reader{
         return 0l; //TODO codavaj!!
     }
 
+    /// An InputStreamReader that decodes with `cs`.
+    public InputStreamReader(java.io.InputStream is, java.nio.charset.Charset cs) {
+    }
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    public String getEncoding() {
+        return null;
+    }
 }

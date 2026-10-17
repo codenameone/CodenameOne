@@ -156,8 +156,12 @@ public final class System {
      * This method calls the exit method in class Runtime. This method never returns normally.
      * The call System.exit(n) is effectively equivalent to the call:
      * Runtime.getRuntime().exit(n)
+     * The shutdown hooks run first, then the platform is asked to close the
+     * application (see Runtime.exit), then the process ends.
      */
-    public static native void exit(int status);
+    public static void exit(int status) {
+        Runtime.getRuntime().exit(status);
+    }
 
     /**
      * Runs the garbage collector.
@@ -184,13 +188,62 @@ public final class System {
 
     /**
      * Gets the system property indicated by the specified key.
+     *
+     * A property set with setProperty wins, and one removed with
+     * clearProperty stays removed. Otherwise the class library answers the
+     * properties every program reads the same way on every platform --
+     * line.separator, file.separator and path.separator; user.name,
+     * java.version and os.arch, which a device does not expose and which get
+     * fixed answers. Any other property is null until something sets it.
      */
-    public static synchronized java.lang.String getProperty(java.lang.String key){
+    public static java.lang.String getProperty(java.lang.String key){
         checkPropertyKey(key);
-        return properties == null ? null : properties.get(key);
+        synchronized (System.class) {
+            if (properties != null && properties.containsKey(key)) {
+                return properties.get(key);
+            }
+        }
+        return builtInProperty(key);
     }
 
-    private static java.util.Hashtable<String, String> properties;
+    /**
+     * Set and cleared properties; a cleared one maps to null, which hides the
+     * built-in answer as the JDK's removal does.
+     */
+    private static java.util.HashMap<String, String> properties;
+
+    /**
+     * The answer for a property nobody set.
+     */
+    private static String builtInProperty(String key) {
+        if ("line.separator".equals(key)) {
+            return "\n";
+        }
+        if ("file.separator".equals(key)) {
+            return "/";
+        }
+        if ("path.separator".equals(key)) {
+            return ":";
+        }
+        if ("user.name".equals(key)) {
+            return "user";
+        }
+        if ("java.version".equals(key)) {
+            return "1.8.0";
+        }
+        if ("os.arch".equals(key)) {
+            return "unknown";
+        }
+        return null;
+    }
+
+    /**
+     * The system-dependent line separator, always a single line feed: the
+     * line.separator property, as it stood when the program started.
+     */
+    public static String lineSeparator() {
+        return "\n";
+    }
 
     private static void checkPropertyKey(String key) {
         if (key == null) throw new NullPointerException();
@@ -202,16 +255,29 @@ public final class System {
         return value == null ? defaultValue : value;
     }
 
-    public static synchronized String setProperty(String key, String value) {
+    public static String setProperty(String key, String value) {
         checkPropertyKey(key);
         if (value == null) throw new NullPointerException();
-        if (properties == null) properties = new java.util.Hashtable<String, String>();
-        return properties.put(key, value);
+        String previous;
+        boolean known;
+        synchronized (System.class) {
+            if (properties == null) properties = new java.util.HashMap<String, String>();
+            known = properties.containsKey(key);
+            previous = properties.put(key, value);
+        }
+        return known ? previous : builtInProperty(key);
     }
 
-    public static synchronized String clearProperty(String key) {
+    public static String clearProperty(String key) {
         checkPropertyKey(key);
-        return properties == null ? null : properties.remove(key);
+        String previous;
+        boolean known;
+        synchronized (System.class) {
+            if (properties == null) properties = new java.util.HashMap<String, String>();
+            known = properties.containsKey(key);
+            previous = properties.put(key, null);
+        }
+        return known ? previous : builtInProperty(key);
     }
 
     /**
@@ -246,6 +312,15 @@ public final class System {
     }
 
     private static native java.lang.String getenvImpl(java.lang.String name);
+
+    /**
+     * The environment as a map. The class library cannot list the process
+     * environment, so the map is empty; getenv(String) still reads each
+     * variable by name.
+     */
+    public static java.util.Map<String, String> getenv() {
+        return java.util.Collections.emptyMap();
+    }
 
     /**
      * Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.

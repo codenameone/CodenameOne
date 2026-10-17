@@ -1305,7 +1305,26 @@ void cn1MarkDeadNow(JAVA_OBJECT o) {
      * liveness decision that outranks any static proof. */
     signed char expected = (signed char)cn1GcMarkEncode(CN1_GC_MARK_FRESH);
     int floorv = atomic_load_explicit(&cn1GcReclaimedBefore, memory_order_acquire);
+    /* ONLY BETWEEN CYCLES, and this is what makes "a wrong proof is not fatal" true.
+     *
+     * The floor moves at the END of a sweep. A value chosen while that sweep was still
+     * running was clamped to the OLD floor, and one store later sat below the new one:
+     * cn1GcWasReclaimed then answered TRUE for an object nobody had reclaimed, so
+     * cn1ConservativeResolve refused it and gcMarkObject's resolve guard dropped every
+     * root that named it. The mark could no longer reach it, which is the one thing the
+     * paragraph above depends on. Measured on a JavaFX application built for Linux,
+     * where the translator had wrongly proved a started Thread frame-local: the Thread
+     * was stamped epoch 11 during the sweep of cycle 12, was the registered
+     * currentThreadObject of a parked thread when cycle 13 marked, did not resolve, and
+     * was swept; its finalizer unmapped the live thread's shadow stack and the next
+     * root scan of that thread faulted (2-4% of launches).
+     *
+     * The floor equals the current epoch less the slack exactly when the last full
+     * sweep has finished and no later cycle has begun, and then the clamp below
+     * yields the floor itself -- the lowest value that still resolves. Anywhere else
+     * the object simply keeps its fresh mark and the ordinary grace. */
     int stale = currentGcMarkValue - cn1GcAgingSlack() - 1;
+    if(floorv != stale + 1) { return; }
     if(stale < floorv) { stale = floorv; }
     // The word holds the ENCODED epoch (see CN1_GC_EPOCH_WINDOW); both sides of the swap
     // are encoded values.
@@ -20826,7 +20845,7 @@ JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exc
 // retained when -Dcn1.checkedCasts is on -- an unresolved symbol at link time for
 // everyone else. Keeping the reference in generated code, which only exists under
 // the same flag that retains the class, makes the two impossible to desynchronize.
-// (That is exactly how the first cut of this broke FileClassIntegrationTest.)
+// (That is exactly how the first cut of this broke FileClassIntegrationTest, now part of HostLocksIntegrationTest.)
 //
 // No detail message on the exception: the no-arg constructor is the shape proven
 // to survive dead-code elimination (it is how NullPointerException is thrown from

@@ -130,6 +130,11 @@ public final class Optional<T> {
         return r;
     }
 
+    /// A stream of the value, or an empty stream when there is none.
+    public java.util.stream.Stream<T> stream() {
+        return value == null ? java.util.stream.Stream.<T>empty() : java.util.stream.Stream.of(value);
+    }
+
     public T orElse(T other) {
         return value != null ? value : other;
     }

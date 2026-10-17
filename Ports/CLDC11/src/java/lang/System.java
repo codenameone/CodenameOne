@@ -92,6 +92,22 @@ public final class System{
         throw new RuntimeException("Compile-time stub");
     }
 
+    /// The value of the environment variable `name`, or null when it is not
+    /// set.
+    public static String getenv(String name) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// The environment as a map; empty, since the runtime cannot list it.
+    public static java.util.Map<String, String> getenv() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// The line separator, a single line feed.
+    public static String lineSeparator() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
     /// Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.
     public static int identityHashCode(java.lang.Object x){
         return 0; //TODO codavaj!!
