@@ -90,6 +90,9 @@ public class CSSThemeCompiler {
     private static final String DEFERRED_VAR = "var";
     private static final String DEFERRED_LITERAL = "literal";
 
+    /// The `deferred` table of the compile in progress; resolveVars reads which constants are literal.
+    private Hashtable<String, String> deferredConstants = new Hashtable<String, String>();
+
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
         if (theme == null) {
@@ -102,6 +105,7 @@ public class CSSThemeCompiler {
         // whose image a rule may still create (cn1-mutable-image), and one written as var(--x).
         // Keyed by "@name"; only the declaration that wins for a name decides its entry.
         Hashtable<String, String> deferred = new Hashtable<String, String>();
+        deferredConstants = deferred;
         // Every constant first, in source order, so the last declaration of a name wins -- a
         // #Constants entry, a `:root` or an in-rule custom property alike -- and every rule then
         // resolves var() against those final values, wherever it sits, as the build-time
@@ -287,7 +291,8 @@ public class CSSThemeCompiler {
     }
 
     private boolean isColorLiteral(String value) {
-        if (value.regionMatches(true, 0, "rgb(", 0, 4) || value.regionMatches(true, 0, "rgba(", 0, 5)) {
+        String v = cssColorFunction(value);
+        if (v.regionMatches(true, 0, "rgb(", 0, 4) || v.regionMatches(true, 0, "rgba(", 0, 5)) {
             return true;
         }
         int len = value.length();
@@ -297,6 +302,7 @@ public class CSSThemeCompiler {
     /// A color constant as plain hex. A color constant has no alpha, so `rgba()` keeps its RGB
     /// part, as the build-time compiler stores it.
     private String constantColor(String value) {
+        value = cssColorFunction(value);
         if (value.regionMatches(true, 0, "rgba(", 0, 5) && value.endsWith(")")) {
             String[] parts = splitOnComma(value.substring(5, value.length() - 1));
             if (parts.length != 4) {
@@ -305,6 +311,11 @@ public class CSSThemeCompiler {
             return normalizeHexColor("rgb(" + parts[0] + "," + parts[1] + "," + parts[2] + ")");
         }
         return normalizeHexColor(value);
+    }
+
+    /// `cn1rgb()` and `cn1rgba()` are the build-time compiler's spellings of `rgb()` and `rgba()`.
+    private static String cssColorFunction(String value) {
+        return value.regionMatches(true, 0, "cn1rgb", 0, 6) ? value.substring(3) : value;
     }
 
     private static boolean isConstantsSelector(String selector) {
@@ -324,13 +335,43 @@ public class CSSThemeCompiler {
             return v;
         }
         StringBuilder out = new StringBuilder(len - 2);
-        for (int i = 1; i < len - 1; i++) {
+        int end = len - 1;
+        for (int i = 1; i < end; i++) {
             char c = v.charAt(i);
-            if (c == '\\' && i + 1 < len - 1) {
-                i++;
-                c = v.charAt(i);
+            if (c != '\\' || i + 1 >= end) {
+                out.append(c);
+                continue;
             }
-            out.append(c);
+            i++;
+            c = v.charAt(i);
+            if (c == '\n') {
+                // An escaped newline continues the string.
+                continue;
+            }
+            int digits = 0;
+            int code = 0;
+            while (digits < 6 && i + digits < end && Character.digit(v.charAt(i + digits), 16) > -1) {
+                code = code * 16 + Character.digit(v.charAt(i + digits), 16);
+                digits++;
+            }
+            if (digits == 0) {
+                out.append(c);
+                continue;
+            }
+            // CSS: one to six hex digits name a code point, and one whitespace after them ends it.
+            i += digits - 1;
+            if (i + 1 < end && Character.isWhitespace(v.charAt(i + 1))) {
+                i++;
+            }
+            if (code == 0 || code > 0x10FFFF || code >= 0xD800 && code <= 0xDFFF) {
+                code = 0xFFFD;
+            }
+            if (code >= 0x10000) {
+                code -= 0x10000;
+                out.append((char) (0xD800 + (code >> 10))).append((char) (0xDC00 + (code & 0x3FF)));
+            } else {
+                out.append((char) code);
+            }
         }
         return out.toString();
     }
@@ -440,22 +481,17 @@ public class CSSThemeCompiler {
             // unselected one, so `Base:selected` beats `Child`.
             // `*` compiles to Component, the implicit parent of every UIID in the build-time
             // compiler, so it comes after the explicit derive chain.
-            ArrayList<String> chain = new ArrayList<String>();
-            String id = dark ? uiid.substring(5) : uiid;
-            while (id != null && !chain.contains(id)) {
-                chain.add(id);
-                id = hoverBase(theme, id, dark);
-            }
-            if (!chain.contains("Component")) {
-                chain.add("Component");
-            }
+            String own = dark ? uiid.substring(5) : uiid;
             for (int pass = 0; pass < 2 && (family == null || size == null); pass++) {
                 String lookup = pass == 0 ? state : "";
                 if (pass == 1 && state.length() == 0) {
                     break;
                 }
+                // The state's own derive applies in both passes: its parent's unselected style
+                // is what a state derived from it falls back to.
+                ArrayList<String> chain = fontChain(theme, own, state, dark);
                 for (int i = 0; i < chain.size() && (family == null || size == null); i++) {
-                    id = chain.get(i);
+                    String id = chain.get(i);
                     String[] fallbacks = dark
                             ? new String[]{"$Dark" + id + "." + lookup, id + "." + lookup}
                             : new String[]{id + "." + lookup};
@@ -470,6 +506,33 @@ public class CSSThemeCompiler {
             }
             theme.put(keyPrefix + Style.FONT, createFont(family, size == null ? null : parseFontSize(size)));
         }
+    }
+
+    /// The UIIDs a font in `state` inherits from, nearest first. A state that declares its own
+    /// `cn1-derive` (`Child:selected{cn1-derive:Base}`) follows that instead of the UIID's.
+    private ArrayList<String> fontChain(Hashtable theme, String id, String state, boolean dark) {
+        Object stateDerive = null;
+        if (state.length() > 0) {
+            stateDerive = dark ? theme.get("$Dark" + id + "." + state + "derive") : null;
+            if (stateDerive == null) {
+                stateDerive = theme.get(id + "." + state + "derive");
+            }
+        }
+        String next = stateDerive instanceof String ? (String) stateDerive : null;
+        ArrayList<String> chain = new ArrayList<String>();
+        while (id != null && !chain.contains(id)) {
+            chain.add(id);
+            if (next != null) {
+                id = next;
+                next = null;
+            } else {
+                id = hoverBase(theme, id, dark);
+            }
+        }
+        if (!chain.contains("Component")) {
+            chain.add("Component");
+        }
+        return chain;
     }
 
     private Font createFont(String familyList, FontSize size) {
@@ -780,9 +843,12 @@ public class CSSThemeCompiler {
             }
             Object replacement = theme.get("@" + key);
             String replaceValue = replacement == null ? "" : replacement.toString();
-            resolving.add(key);
-            replaceValue = resolveVars(theme, replaceValue, resolving);
-            resolving.remove(resolving.size() - 1);
+            // A quoted constant is text, also when it is reached through another constant.
+            if (!DEFERRED_LITERAL.equals(deferredConstants.get("@" + key))) {
+                resolving.add(key);
+                replaceValue = resolveVars(theme, replaceValue, resolving);
+                resolving.remove(resolving.size() - 1);
+            }
             out.append(value.substring(pos, varPos)).append(replaceValue);
             pos = end + 1;
             varPos = value.indexOf("var(--", pos);

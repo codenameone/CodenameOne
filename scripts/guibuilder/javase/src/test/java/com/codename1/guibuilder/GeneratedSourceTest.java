@@ -1789,6 +1789,11 @@ class GeneratedSourceTest {
         java.util.List<Object> commented = (java.util.List<Object>) unsupported.invoke(builder,
                 "Label {\n  /* font-style: italic; */\n  color: #ff0000;\n}\n");
         assertTrue(commented.isEmpty(), "a commented-out declaration is not reported: " + commented);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> constants = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants {\n  includeNativeBool: true;\n}\nLabel { color: #ff0000; }\n");
+        assertTrue(constants.isEmpty(), "a #Constants entry is not a dropped declaration: " + constants);
     }
 
     private static String describe(Object diagnostic) throws Exception {

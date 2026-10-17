@@ -5330,6 +5330,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String property = css.substring(nameStart, nameEnd).trim();
             String value = css.substring(at + 1, valueEnd).trim();
             if (property.length() == 0 || value.length() == 0 || property.startsWith("@")) continue;
+            // A #Constants entry is a theme constant, not a style property a probe rule could show.
+            if (isInConstantsBlock(masked, at)) continue;
             Boolean supported = judged.get(property);
             if (supported == null) {
                 Set<String> withProperty = compiledKeys(property + ": " + value + ";");
@@ -5343,6 +5345,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         }
         return out;
+    }
+
+    /** True when {@code at} sits inside a {@code #Constants} or {@code @constants} block. */
+    private static boolean isInConstantsBlock(String masked, int at) {
+        int open = masked.lastIndexOf('{', at);
+        if (open < 0 || masked.lastIndexOf('}', at) > open) return false;
+        int selectorStart = Math.max(masked.lastIndexOf('}', open), masked.lastIndexOf('{', open - 1)) + 1;
+        String selector = masked.substring(selectorStart, open).trim();
+        return "#Constants".equalsIgnoreCase(selector) || "@constants".equalsIgnoreCase(selector);
     }
 
     /** True for the characters a CSS property name is made of. */
