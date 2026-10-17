@@ -106,6 +106,14 @@ public final class UtilClassesChecks {
 
     /// Runs the group.
     public static void run() {
+        Bulk.check("Util.anEmptyKeysValueMayStartWithAHashOrABang", () -> {
+            Properties hash = new Properties();
+            hash.load(new StringReader("=#token\n"));
+            Properties bang = new Properties();
+            bang.load(new StringReader(":!bang\n"));
+            Bulk.p("hash", hash.getProperty(""));
+            Bulk.p("bang", bang.getProperty(""));
+        });
         Bulk.check("UtilClasses.stringJoinerMatchesTheJdk", () -> {
             String[][] parts = {{}, {"a"}, {"a", "b"}, {"", ""}, {"x", "", "z"}, {"null", "1"}};
             for (int p = 0; p < parts.length; p++) {

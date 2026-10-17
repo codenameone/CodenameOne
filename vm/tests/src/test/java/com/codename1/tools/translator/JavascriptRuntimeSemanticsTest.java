@@ -272,7 +272,7 @@ class JavascriptRuntimeSemanticsTest {
     void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
 
-        assertEquals(2047, result.result, "Translated runtime should preserve browser-safe Locale/TimeZone/DateFormat semantics, including fixed GMT offsets");
+        assertEquals(4095, result.result, "Translated runtime should preserve browser-safe Locale/TimeZone/DateFormat semantics, including fixed GMT offsets and a date from Math.round");
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 

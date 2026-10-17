@@ -253,8 +253,11 @@ public final class Instant implements Temporal, Comparable<Instant> {
                 throw TimeArithmetic.unsupported(unit);
             }
             if (u == ChronoUnit.NANOS || u == ChronoUnit.MICROS) {
-                // Counted in nanoseconds first, as the JDK does: more than
-                // 292 years apart is an overflow in either unit.
+                // Counted in nanoseconds first, as Java 17 does: more than
+                // 292 years apart is an overflow in either unit. Later JDKs count
+                // microseconds in their own unit instead, which also truncates
+                // differently for a negative span; Codename One targets Java 17,
+                // and Time.instantUntilMillisAndMicrosAsJava17 holds it to that.
                 long secsDiff = TimeArithmetic.subtractExact(end.epochSecond, epochSecond);
                 long nanos = TimeArithmetic.addExact(TimeArithmetic.multiplyExact(secsDiff,
                         TimeArithmetic.NANOS_PER_SECOND), end.nano - nano);

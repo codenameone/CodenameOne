@@ -152,6 +152,10 @@ public final class TimeChecks {
 
     /// Runs the group.
     public static void run() {
+        Bulk.check("Time.datesUntilWiderThanAnIntIsLazy", () -> {
+            Bulk.p("first", java.time.LocalDate.MIN.datesUntil(java.time.LocalDate.MAX).limit(2)
+                    .collect(java.util.stream.Collectors.toList()));
+        });
         Bulk.check("Time.datesAreTheJdks", TimeChecks::datesAreTheJdks);
         Bulk.check("Time.datesWithTimesAreTheJdks", TimeChecks::datesWithTimesAreTheJdks);
         Bulk.check("Time.momentsAndZonesAreTheJdks", TimeChecks::momentsAndZonesAreTheJdks);

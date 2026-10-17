@@ -167,6 +167,9 @@ public final class Spliterators {
             return null;
         }
 
+        /// The size given, not what is left: as in the JDK's IteratorSpliterator,
+        /// handing elements out does not count it down (only a split would), so a
+        /// caller that needs what remains has to count it itself.
         @Override
         public long estimateSize() {
             if (it == null) {

@@ -75,6 +75,8 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         private final AtomicReference<Delays.Handle> wait = new AtomicReference<Delays.Handle>();
         private final AtomicLong due;
         private final AtomicBoolean running = new AtomicBoolean();
+        /// The worker inside the work right now, for cancel(true) to interrupt.
+        private final AtomicReference<Thread> runner = new AtomicReference<Thread>();
         /// A fixed rate's firings that have come and not yet run, counting
         /// the one running now. See [#run].
         private final AtomicInteger owed = new AtomicInteger();
@@ -131,7 +133,19 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             Delays.Handle next = Delays.after(millis, this);
             Delays.Handle before = wait.getAndSet(next);
             if (before != null) {
-                before.cancel();
+                if (before.dueAt() > next.dueAt()) {
+                    // The wait armed here fired and re-armed before this thread
+                    // stored it: the first arm, from the scheduling thread, with
+                    // a delay of zero is the case. The later wait is the live one,
+                    // and cancelling it would stop a fixed rate after one run.
+                    // A failed swap means it was re-armed or disarmed meanwhile,
+                    // and what is stored now is newer still. Either way the
+                    // left-over wait, when it fires, finds the run done or re-arms
+                    // as the live chain would.
+                    wait.compareAndSet(next, before);
+                } else {
+                    before.cancel();
+                }
             }
             if (outcome.isDone() || stopped.get()) {
                 // Cancelled, or stopped, while this was being armed.
@@ -172,6 +186,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             boolean rearm = false;
             try {
                 V value;
+                runner.set(Thread.currentThread());
                 try {
                     value = work.call();
                 } catch (Throwable t) {
@@ -186,6 +201,12 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                     rearm = true;
                 }
             } finally {
+                runner.set(null);
+                if (outcome.isCancelled()) {
+                    // An interrupt cancel(true) aimed at this work is not handed on
+                    // to whatever task the worker runs next.
+                    Thread.interrupted();
+                }
                 running.set(false);
             }
             if (rearm) {
@@ -222,7 +243,17 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             disarm();
-            return outcome.cancel(mayInterruptIfRunning);
+            boolean cancelled = outcome.cancel(mayInterruptIfRunning);
+            if (cancelled && mayInterruptIfRunning) {
+                // The future cannot reach the work on its own: interrupt the worker
+                // running it, as FutureTask does. The worker clears that interrupt
+                // when the cancelled work returns.
+                Thread t = runner.get();
+                if (t != null) {
+                    t.interrupt();
+                }
+            }
+            return cancelled;
         }
 
         @Override

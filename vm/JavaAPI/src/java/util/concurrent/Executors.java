@@ -219,7 +219,18 @@ public class Executors {
                 }
                 queue.add(command);
                 if (queue.size() > idle && workers.size() < maxWorkers) {
-                    Thread t = factory.newThread(new Worker());
+                    Thread t;
+                    try {
+                        t = factory.newThread(new Worker());
+                    } catch (RuntimeException e) {
+                        // The submission failed, so it must not stay queued for a
+                        // later worker to run.
+                        queue.removeLast();
+                        throw e;
+                    } catch (Error e) {
+                        queue.removeLast();
+                        throw e;
+                    }
                     if (t == null) {
                         if (workers.isEmpty()) {
                             queue.removeLast();

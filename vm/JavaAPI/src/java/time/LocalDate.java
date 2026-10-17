@@ -29,6 +29,8 @@ import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalUnit;
+import java.util.function.LongFunction;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 /// A date of the ISO calendar with no time and no zone, such as 2007-12-03.
@@ -478,12 +480,14 @@ public final class LocalDate implements ChronoLocalDate {
         if (end < start) {
             throw new IllegalArgumentException(endExclusive + " < " + this);
         }
-        // Made in full: the class library has no lazy stream source yet.
-        LocalDate[] all = new LocalDate[TimeArithmetic.toIntExact(end - start)];
-        for (int i = 0; i < all.length; i++) {
-            all[i] = ofEpochDay(start + i);
-        }
-        return Stream.of(all);
+        // Lazy, so a range wider than an int, or a long one that is cut short, never
+        // makes the dates it does not hand out.
+        return LongStream.range(start, end).mapToObj(new LongFunction<LocalDate>() {
+            @Override
+            public LocalDate apply(long epochDay) {
+                return ofEpochDay(epochDay);
+            }
+        });
     }
 
     public LocalDateTime atTime(int hour, int minute) {

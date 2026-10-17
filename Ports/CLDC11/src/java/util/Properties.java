@@ -213,6 +213,9 @@ public class Properties extends Hashtable<Object, Object> {
                     if (keyLength == -1) { // if parsing the key
                         mode = NONE;
                         keyLength = offset;
+                        // Past the separator nothing starts a comment, not even
+                        // for an empty key ("=#token" is the value "#token").
+                        firstChar = false;
                         continue;
                     }
                     break;

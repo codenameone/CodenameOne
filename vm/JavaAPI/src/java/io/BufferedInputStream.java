@@ -181,7 +181,9 @@ public class BufferedInputStream extends FilterInputStream {
     @Override
     public int available() throws IOException {
         ensureOpen();
-        return (count - pos) + in.available();
+        // Saturate: an underlying stream may report Integer.MAX_VALUE on its own.
+        long avail = (long) (count - pos) + in.available();
+        return avail > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) avail;
     }
 
     @Override

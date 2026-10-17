@@ -5535,7 +5535,9 @@ function formatStyleOptions(style, type) {
   }
 }
 function formatJavaDate(dateFormat, dateObject) {
-  const millis = dateObject == null ? Date.now() : Number(dateObject[CN1_DATE_VALUE] || 0);
+  // The field is a Java long, which is a plain number or a hi/lo record depending on
+  // the arithmetic that produced it; Number() of a record is NaN ("Invalid Date").
+  const millis = dateObject == null ? Date.now() : _LtoNum(dateObject[CN1_DATE_VALUE] || 0);
   const date = new Date(millis);
   const dateOptions = formatStyleOptions(dateFormat[CN1_DATEFORMAT_DATE_STYLE] | 0, "date");
   const timeOptions = formatStyleOptions(dateFormat[CN1_DATEFORMAT_TIME_STYLE] | 0, "time");

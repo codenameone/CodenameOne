@@ -45,6 +45,10 @@ public final class FileTime implements Comparable<FileTime> {
     }
 
     public static FileTime from(Instant instant) {
+        // Cut to the millisecond on purpose, unlike the JDK's: no device file system
+        // this runs on stores a finer stamp, so keeping nanoseconds would only make two
+        // stamps of the same file compare unequal before and after a round trip
+        // through the disk.
         return new FileTime(instant.toEpochMilli());
     }
 

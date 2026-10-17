@@ -1942,6 +1942,16 @@ public class BytecodeCompliance {
             if (SUPPORTED_BOOTSTRAPS.contains(owner)) {
                 return true;
             }
+            if ("java/lang/runtime/ObjectMethods".equals(owner) && "bootstrap".equals(bootstrap.getName())) {
+                // What javac emits for a record. This module's own records were
+                // rewritten above; a record left here is in a class that is not
+                // rewritten in place -- a sibling module's, through
+                // checkedDependencyRoots -- and the translator lowers that call
+                // itself (Parser's recordMethod), for the C and the JavaScript
+                // backends alike. Any other ObjectMethods bootstrap is still a
+                // finding.
+                return false;
+            }
             String name = owner.replace('/', '.');
             String feature;
             String advice;

@@ -264,6 +264,57 @@ public final class ExecutorsChecks {
 
     /// Runs the group.
     public static void run() {
+        Bulk.check("Executors.aFactoryThatThrowsLeavesNoSubmissionBehind", () -> {
+            final java.util.concurrent.atomic.AtomicInteger made = new java.util.concurrent.atomic.AtomicInteger();
+            final AtomicInteger ran = new AtomicInteger();
+            ExecutorService pool = Executors.newFixedThreadPool(2, r -> {
+                if (made.incrementAndGet() == 1) {
+                    throw new IllegalStateException("no thread");
+                }
+                return new Thread(r);
+            });
+            try {
+                try {
+                    pool.execute(() -> ran.addAndGet(1));
+                    Bulk.p("threw", false);
+                } catch (IllegalStateException expected) {
+                    Bulk.p("threw", expected.getMessage());
+                }
+                CountDownLatch second = new CountDownLatch(1);
+                pool.execute(() -> {
+                    ran.addAndGet(10);
+                    second.countDown();
+                });
+                Bulk.p("secondRan", second.await(20, TimeUnit.SECONDS));
+                pool.shutdown();
+                Bulk.p("ended", pool.awaitTermination(20, TimeUnit.SECONDS));
+                Bulk.p("ran", ran.get());
+            } finally {
+                stop(pool);
+            }
+        });
+        Bulk.check("Executors.cancelTrueInterruptsARunningScheduledCallable", () -> {
+            ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+            try {
+                final CountDownLatch started = new CountDownLatch(1);
+                final CountDownLatch interrupted = new CountDownLatch(1);
+                ScheduledFuture<String> f = pool.schedule(() -> {
+                    started.countDown();
+                    try {
+                        Thread.sleep(20000);
+                        return "slept";
+                    } catch (InterruptedException e) {
+                        interrupted.countDown();
+                        return "interrupted";
+                    }
+                }, 0, TimeUnit.MILLISECONDS);
+                Bulk.p("started", started.await(20, TimeUnit.SECONDS));
+                Bulk.p("cancelled", f.cancel(true));
+                Bulk.p("interrupted", interrupted.await(20, TimeUnit.SECONDS));
+            } finally {
+                stop(pool);
+            }
+        });
         // Was ExecutorIntegrationTest, disabled for a crash in the one-off
         // harness it ran in; the two programs it never ran are this check.
         Bulk.check("Executors.aSubclassOfAbstractExecutorServiceRunsWhatItIsSubmitted", () -> {

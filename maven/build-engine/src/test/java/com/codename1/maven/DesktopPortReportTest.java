@@ -339,6 +339,17 @@ public class DesktopPortReportTest {
         assertFalse("The record's toString is a plain method now", dynamic[0]);
     }
 
+    /// A sibling module's record is checked where it lies and not rewritten
+    /// there, and the translator lowers its methods, so it is no finding.
+    @Test
+    public void aSiblingModulesRecordIsNoFinding() throws Exception {
+        TestProjectHost host = application();
+        File shared = tmp.newFolder("shared-classes");
+        put(shared, "com/acme/shared/Point", indy(Opcodes.V17, "com/acme/shared/Point",
+                "java/lang/runtime/ObjectMethods", "bootstrap"));
+        new BytecodeCompliance(host).checkedDependencyRoots(java.util.Collections.singletonList(shared)).execute();
+    }
+
     /// A bootstrap nobody implements fails every project, with a layer or
     /// without, and the failure says where it is.
     @Test

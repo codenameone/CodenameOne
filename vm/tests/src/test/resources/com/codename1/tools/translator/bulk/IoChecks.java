@@ -83,6 +83,58 @@ public final class IoChecks {
 
     /// Runs the group.
     public static void run() {
+        Bulk.check("Io.aPendingCrlfLfDoesNotMakeAReaderReady", () -> {
+            // readLine stops at the CR; the LF it still owes is buffered but is never
+            // returned, so it cannot make the reader ready over a source that is not.
+            BufferedReader r = new BufferedReader(new java.io.Reader() {
+                private boolean given;
+
+                @Override
+                public int read(char[] b, int off, int len) {
+                    if (given) {
+                        return -1;
+                    }
+                    given = true;
+                    b[off] = 'a';
+                    b[off + 1] = '\r';
+                    b[off + 2] = '\n';
+                    return 3;
+                }
+
+                @Override
+                public boolean ready() {
+                    return false;
+                }
+
+                @Override
+                public void close() {
+                }
+            });
+            Bulk.p("line", r.readLine());
+            Bulk.p("ready", r.ready());
+        });
+        Bulk.check("Io.aBufferedInputStreamsAvailableSaturates", () -> {
+            BufferedInputStream in = new BufferedInputStream(new java.io.InputStream() {
+                @Override
+                public int read() {
+                    return 'x';
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) {
+                    b[off] = 'x';
+                    b[off + 1] = 'y';
+                    return 2;
+                }
+
+                @Override
+                public int available() {
+                    return Integer.MAX_VALUE;
+                }
+            }, 16);
+            Bulk.p("first", in.read());
+            Bulk.p("available", in.available());
+        });
         Bulk.check("Io.readLineSplitsAsTheJdkDoes", () -> {
             for (int t = 0; t < TEXTS.length; t++) {
                 for (int size : new int[] {1, 2, 3, 8192}) {

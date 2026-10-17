@@ -186,6 +186,19 @@ public class BufferedReader extends Reader {
     @Override
     public boolean ready() throws IOException {
         ensureOpen();
+        // A pending CRLF's LF is buffered but never returned, so it cannot make this
+        // reader ready: consume it first, refilling only when that cannot block.
+        if (skipLf) {
+            if (pos >= count && in.ready()) {
+                fill();
+            }
+            if (pos < count) {
+                if (buf[pos] == '\n') {
+                    pos++;
+                }
+                skipLf = false;
+            }
+        }
         return pos < count || in.ready();
     }
 

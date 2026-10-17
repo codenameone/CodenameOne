@@ -56,6 +56,11 @@ final class Delays {
             this.action = action;
         }
 
+        /// When the wait is due, in the clock's milliseconds.
+        long dueAt() {
+            return due;
+        }
+
         /// Gives the wait up. Does nothing once the action has started.
         void cancel() {
             synchronized (LOCK) {
