@@ -63,11 +63,44 @@ class MavenLibraryInstallerTest {
         return wrapper;
     }
 
+    @Test void restoresExactCommonPomAfterConverterEditAndFailure() throws Exception {
+        for (int scenario = 0; scenario < 3; scenario++) {
+            final int failure = scenario;
+            ProjectBinding binding = project();
+            Path pom = Path.of(binding.pom());
+            byte[] original = ("<project>\r\n<!-- café -->\r\n<dependencies>"
+                    + "<!-- INJECT DEPENDENCIES --></dependencies></project>\r\n")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            Files.write(pom, original);
+            Path archive = root.resolve("Example.cn1lib");
+            Files.writeString(archive, "archive");
+            Path wrapper = Path.of(binding.projectDir()).getParent().resolve("cn1libs/Example/pom.xml");
+            Files.deleteIfExists(wrapper);
+            MavenLibraryInstaller installer = new MavenLibraryInstaller() {
+                @Override void runMaven(List<String> command, File common) throws IOException, InterruptedException {
+                    try {
+                        Path generated = wrapper(binding);
+                        Files.writeString(pom, "<project><dependencies><dependency><groupId>example</groupId>"
+                                + "<artifactId>example-lib</artifactId><version>1</version>"
+                                + "</dependency></dependencies></project>");
+                        Files.delete(generated.getParent().getParent().resolve("pom.xml"));
+                    } catch (Exception ex) { throw new IOException(ex); }
+                    if (failure == 0) throw new IOException("Failed to register module");
+                    if (failure == 1) throw new InterruptedException("Timed out while registering module");
+                    // Even exit zero must roll back if wrapper validation fails.
+                }
+            };
+            assertThrows(Exception.class, () -> installer.install(binding, archive.toString()));
+            assertArrayEquals(original, Files.readAllBytes(pom));
+            assertTrue(Files.isRegularFile(wrapper), "Preserve wrapper for recovery");
+        }
+    }
+
     @Test void retainsLaunchingMavenOptionsWithoutShellSplitting() throws Exception {
         ProjectBinding original = project();
         List<String> options = List.of("--settings", root.resolve("alternate settings.xml").toString(),
                 "--global-settings", root.resolve("global settings.xml").toString(),
-                "--offline", "-Pprivate", "-P!public", "-Dmaven.repo.local=" + root.resolve("local repo"),
+                "--offline", "--no-snapshot-updates", "-Pprivate", "-P!public", "-Dmaven.repo.local=" + root.resolve("local repo"),
                 "-Dcustom=spaces & equals=and\nnewlines Ω ", "-Dfile=old.cn1lib");
         StringBuilder content = new StringBuilder("projectDir=" + original.projectDir()
                 + "\nmavenHome=" + original.mavenHome() + "\n");

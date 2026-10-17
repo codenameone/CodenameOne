@@ -255,6 +255,7 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         }
         if (request.isOffline()) args.add("--offline");
         if (request.isUpdateSnapshots()) args.add("--update-snapshots");
+        if (request.isNoSnapshotUpdates()) args.add("--no-snapshot-updates");
         for (String profile : request.getActiveProfiles()) args.add("-P" + profile);
         for (String profile : request.getInactiveProfiles()) args.add("-P!" + profile);
         java.util.Properties user = session.getUserProperties();

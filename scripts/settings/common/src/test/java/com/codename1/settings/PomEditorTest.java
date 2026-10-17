@@ -32,6 +32,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class PomEditorTest {
     @Test
+    public void preservesDoctypeWithoutResolvingExternalResources() {
+        String[] declarations = {"<!DOCTYPE project>",
+            "<!DOCTYPE project SYSTEM 'file:///must-not-read.dtd'>",
+            "<!DOCTYPE project PUBLIC '-//Example//DTD project//EN' 'https://must-not-fetch.invalid/project.dtd'>",
+            "<!DOCTYPE project [<!ELEMENT project ANY><!ENTITY text 'quoted > [ ]'>"
+                    + "<!-- brackets ] > [ and quotes \" --><?example ] > ?><!ENTITY external SYSTEM 'file:///must-not-read'>]>",
+        };
+        MavenDependency dep = new MavenDependency("example", "target", "1");
+        for (String declaration : declarations) {
+            String pom = "<?xml version=\"1.0\"?>\n" + declaration
+                    + "\n<project><dependencies></dependencies></project>";
+            assertFalse(PomEditor.containsDependency(pom, dep));
+            String installed = PomEditor.addDependency(pom, dep);
+            assertTrue(installed.contains(declaration));
+            assertTrue(PomEditor.containsDependency(installed, dep));
+            assertEquals(pom, PomEditor.removeDependency(installed, dep));
+        }
+    }
+
+    @Test
     public void ignoresPluginManagedProfileAndCommentDependencies() throws Exception {
         MavenDependency dep = new MavenDependency("example", "target", "1");
         String dependency = "<dependency><groupId>example</groupId><artifactId>target</artifactId></dependency>";

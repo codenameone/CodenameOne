@@ -45,6 +45,26 @@ public class OpenSettingsMojoTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void forwardsSnapshotUpdateSuppressionIndependentlyOfForcedUpdates() throws Exception {
+        for (boolean suppress : new boolean[]{false, true}) {
+            org.apache.maven.execution.MavenExecutionRequest request =
+                    new org.apache.maven.execution.DefaultMavenExecutionRequest();
+            request.setNoSnapshotUpdates(suppress);
+            final org.apache.maven.execution.MavenSession session = new org.apache.maven.execution.MavenSession(
+                    null, null, request, new org.apache.maven.execution.DefaultMavenExecutionResult());
+            OpenSettingsMojo mojo = new OpenSettingsMojo() {
+                @Override protected org.apache.maven.execution.MavenSession getSession() { return session; }
+            };
+            File input = tmp.newFile("snapshot-" + suppress + ".input");
+            mojo.writeBinding(input, tmp.newFolder("common-" + suppress));
+            String content = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+            String flag = java.util.Base64.getEncoder().encodeToString(
+                    "--no-snapshot-updates".getBytes(StandardCharsets.UTF_8));
+            assertEquals(suppress, content.contains("mavenArgument=" + flag + "\n"));
+        }
+    }
+
+    @Test
     public void forwardsMavenSessionOptionsInPrivateBinding() throws Exception {
         org.apache.maven.execution.MavenExecutionRequest request =
                 new org.apache.maven.execution.DefaultMavenExecutionRequest();

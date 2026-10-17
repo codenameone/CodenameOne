@@ -166,6 +166,11 @@ public final class PomEditor implements DependencyEditor {
                 pos = end + terminator.length();
                 continue;
             }
+            if (text.startsWith("<!DOCTYPE", pos) && pos + 9 < text.length()
+                    && Character.isWhitespace(text.charAt(pos + 9))) {
+                pos = doctypeEnd(text, pos + 9);
+                continue;
+            }
             if (text.startsWith("<!", pos)) {
                 throw new IllegalArgumentException("Unsupported XML declaration in POM");
             }
@@ -217,6 +222,33 @@ public final class PomEditor implements DependencyEditor {
         }
         if (!stack.isEmpty()) throw new IllegalArgumentException("Unclosed XML element");
         return root;
+    }
+
+    // Lexically skip the declaration, including any internal subset. Never
+    // resolve a SYSTEM/PUBLIC identifier or expand a declared entity.
+    private static int doctypeEnd(String text, int pos) {
+        int subset = 0;
+        char quote = 0;
+        for (; pos < text.length(); pos++) {
+            char ch = text.charAt(pos);
+            if (quote != 0) {
+                if (ch == quote) quote = 0;
+            } else if (text.startsWith("<!--", pos) || text.startsWith("<?", pos)) {
+                String terminator = text.startsWith("<!--", pos) ? "-->" : "?>";
+                int end = text.indexOf(terminator, pos + 2);
+                if (end < 0) throw new IllegalArgumentException("Incomplete POM DOCTYPE");
+                pos = end + terminator.length() - 1;
+            } else if (ch == '\'' || ch == '"') {
+                quote = ch;
+            } else if (ch == '[') {
+                subset++;
+            } else if (ch == ']') {
+                subset--;
+            } else if (ch == '>' && subset == 0) {
+                return pos + 1;
+            }
+        }
+        throw new IllegalArgumentException("Incomplete POM DOCTYPE");
     }
 
     private static String xml(String value) {

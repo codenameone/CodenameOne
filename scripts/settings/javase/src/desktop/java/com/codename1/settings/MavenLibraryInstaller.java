@@ -46,26 +46,39 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
     public void install(ProjectBinding binding, String libraryPath) throws Exception {
         File library = new File(libraryPath);
         File common = new File(binding.projectDir());
-        MavenDependency dependency = dependency(binding, library.getName());
-        if (dependency == null) {
-            if (!library.isFile()) {
-                throw new IOException("Library download is missing: " + library);
-            }
-            runMaven(command(binding, library), common);
-            dependency = dependency(binding, library.getName());
-            if (dependency == null) {
-                throw new IOException("Maven did not create the library wrapper. See settings.log.");
-            }
-        }
-        // The old converter requires an INJECT DEPENDENCIES comment. Projects
-        // without that marker still need a real dependency, not a success toast
-        // alongside a warning in the Maven output. Also supports reinstalling a
-        // dependency removed in Settings without overwriting its wrapper.
         File pom = new File(binding.pom());
-        String original = Files.readString(pom.toPath(), StandardCharsets.UTF_8);
-        String updated = PomEditor.addDependency(original, dependency);
-        if (!original.equals(updated)) {
-            Files.writeString(pom.toPath(), updated, StandardCharsets.UTF_8);
+        byte[] original = Files.readAllBytes(pom.toPath());
+        try {
+            MavenDependency dependency = dependency(binding, library.getName());
+            if (dependency == null) {
+                if (!library.isFile()) {
+                    throw new IOException("Library download is missing: " + library);
+                }
+                runMaven(command(binding, library), common);
+                dependency = dependency(binding, library.getName());
+                if (dependency == null) {
+                    throw new IOException("Maven did not create the library wrapper. See settings.log.");
+                }
+            }
+            // The converter may already have injected a dependency. For POMs
+            // without its marker (and reinstalls), add the direct dependency.
+            String converted = Files.readString(pom.toPath(), StandardCharsets.UTF_8);
+            String updated = PomEditor.addDependency(converted, dependency);
+            if (!converted.equals(updated)) {
+                Files.writeString(pom.toPath(), updated, StandardCharsets.UTF_8);
+            }
+        } catch (Exception failure) {
+            // The converter edits common before registering the wrapper. A
+            // failure or missing registration must not leave an unresolved
+            // dependency behind. runMaven has reaped its child before returning.
+            try {
+                if (!Files.exists(pom.toPath()) || !Arrays.equals(original, Files.readAllBytes(pom.toPath()))) {
+                    Files.write(pom.toPath(), original);
+                }
+            } catch (IOException restoreFailure) {
+                failure.addSuppressed(restoreFailure);
+            }
+            throw failure;
         }
     }
 
@@ -198,8 +211,8 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
         System.out.println("Running cn1:install-cn1lib in " + common);
         Process process = new ProcessBuilder(command).directory(common)
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.INHERIT).start();
-        process.getOutputStream().close();
         try {
+            process.getOutputStream().close();
             if (!process.waitFor(5, TimeUnit.MINUTES)) {
                 throw new IOException("Maven library installation timed out. See settings.log.");
             }
@@ -210,6 +223,15 @@ public class MavenLibraryInstaller implements LegacyMavenInstaller {
         } finally {
             if (process.isAlive()) {
                 process.destroyForcibly();
+                boolean interrupted = false;
+                while (process.isAlive()) {
+                    try {
+                        process.waitFor();
+                    } catch (InterruptedException ex) {
+                        interrupted = true;
+                    }
+                }
+                if (interrupted) Thread.currentThread().interrupt();
             }
         }
     }
