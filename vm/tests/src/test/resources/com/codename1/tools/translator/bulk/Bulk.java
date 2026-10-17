@@ -129,7 +129,6 @@ public final class Bulk {
         Thread.interrupted();
         if (!HOTSPOT) {
             BulkHost.installDefault();
-            JdkHost.setRegistry(null);
         }
         System.out.flush();
     }

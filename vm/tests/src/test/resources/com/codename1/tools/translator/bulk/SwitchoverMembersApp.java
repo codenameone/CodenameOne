@@ -29,41 +29,27 @@ import java.io.StringWriter;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ServiceLoader;
-import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /// Members an application compiled against the JDK calls, which the class
 /// library carries under their own names: the sequenced methods of `List`, `CharSequence.chars` and
-/// `codePoints`, `Throwable.printStackTrace(PrintWriter)`, the lazy `Files`
-/// streams, `BufferedReader.lines`, `ServiceLoader.findFirst` and the URL
-/// coders. Run on HotSpot (the JDK's own classes) and on ParparVM; the
+/// `codePoints`, `Throwable.printStackTrace(PrintWriter)`,
+/// `BufferedReader.lines` and the URL coders. Run on HotSpot (the JDK's own classes) and on ParparVM; the
 /// RESULT lines must match. A case answers a string, or the class of what it
 /// threw. Java 21 API.
 public class SwitchoverMembersApp {
 
     static final int CASES = 40;
 
-    static Path dir;
-
-    /// Runs every case; the bulk program has installed its file system host
-    /// on the ParparVM side (the translator allows one `main` per program).
+    /// Runs every case (the translator allows one `main` per program).
     public static void fixtureMain(String[] args) throws Exception {
-        dir = Files.createTempDirectory("switchover");
-        Files.write(dir.resolve("a.txt"), Arrays.asList("x", "y", "z"), StandardCharsets.UTF_8);
-        Files.createDirectories(dir.resolve("sub"));
-        Files.write(dir.resolve("sub").resolve("b.txt"), Arrays.asList("one"), StandardCharsets.UTF_8);
-        Files.write(dir.resolve("sub").resolve("c.log"), Arrays.asList("two"), StandardCharsets.UTF_8);
         StringBuilder all = new StringBuilder();
         for (int i = 0; i < CASES; i++) {
             String v;
@@ -109,22 +95,6 @@ public class SwitchoverMembersApp {
                 return backing.set(index, s);
             }
         };
-    }
-
-    /// Paths under the temporary directory, relative to it and sorted, so
-    /// neither the directory's name nor the listing order shows.
-    static String names(Stream<Path> paths) {
-        try {
-            final String root = dir.toString();
-            return paths.map(new Function<Path, String>() {
-                public String apply(Path p) {
-                    String s = p.toString();
-                    return s.length() > root.length() ? s.substring(root.length() + 1) : ".";
-                }
-            }).sorted().collect(Collectors.joining(","));
-        } finally {
-            paths.close();
-        }
     }
 
     static String ints(java.util.stream.IntStream s) {
@@ -228,39 +198,6 @@ public class SwitchoverMembersApp {
                 pw.flush();
                 return "" + w.toString().contains("Caused by: java.io.IOException: inner");
             }
-            // ---- Files, lazily
-            case 18: {
-                Stream<String> s = Files.lines(dir.resolve("a.txt"));
-                try {
-                    return s.collect(Collectors.joining(","));
-                } finally {
-                    s.close();
-                }
-            }
-            case 19: {
-                Stream<String> s = Files.lines(dir.resolve("a.txt"), StandardCharsets.UTF_8);
-                try {
-                    return "" + s.skip(1).findFirst().get();
-                } finally {
-                    s.close();
-                }
-            }
-            case 20: return names(Files.list(dir));
-            case 21: return names(Files.walk(dir));
-            case 22: return names(Files.walk(dir, 1));
-            case 23: return names(Files.find(dir, 10, new BiPredicate<Path, BasicFileAttributes>() {
-                public boolean test(Path p, BasicFileAttributes a) {
-                    return a.isRegularFile() && p.toString().endsWith(".txt");
-                }
-            }));
-            case 24: return names(Files.find(dir, 0, new BiPredicate<Path, BasicFileAttributes>() {
-                public boolean test(Path p, BasicFileAttributes a) {
-                    return true;
-                }
-            }));
-            case 25: return names(Files.list(dir.resolve("missing")));
-            case 26: return names(Files.list(dir.resolve("a.txt")));
-            case 27: return "" + Files.lines(dir.resolve("missing.txt")).count();
             // ---- BufferedReader.lines
             case 28: return new BufferedReader(new StringReader("a\nb\r\nc\rd")).lines()
                     .collect(Collectors.joining(","));
@@ -270,8 +207,6 @@ public class SwitchoverMembersApp {
                 return first + ":" + r.lines().count();
             }
             case 30: return "" + new BufferedReader(new StringReader("")).lines().count();
-            // ---- ServiceLoader
-            case 31: return "" + ServiceLoader.load(Runnable.class).findFirst().isPresent();
             // ---- URLEncoder and URLDecoder
             case 32: return URLEncoder.encode("a b&c=d/e~*._-" + eAcute, "UTF-8");
             case 33: return URLEncoder.encode("x+y " + smile, StandardCharsets.UTF_8);

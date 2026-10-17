@@ -20845,7 +20845,7 @@ JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exc
 // retained when -Dcn1.checkedCasts is on -- an unresolved symbol at link time for
 // everyone else. Keeping the reference in generated code, which only exists under
 // the same flag that retains the class, makes the two impossible to desynchronize.
-// (That is exactly how the first cut of this broke FileClassIntegrationTest, now part of HostLocksIntegrationTest.)
+// (That is exactly how the first cut of this broke FileClassIntegrationTest.)
 //
 // No detail message on the exception: the no-arg constructor is the shape proven
 // to survive dead-code elimination (it is how NullPointerException is thrown from

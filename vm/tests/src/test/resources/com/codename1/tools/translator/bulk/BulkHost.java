@@ -22,27 +22,25 @@
  */
 
 import com.codename1.impl.JdkHost;
-import com.codename1.impl.PosixJdkHost;
 import com.codename1.security.Hash;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-
 /// The host the ParparVM run of the bulk program installs before every check:
-/// the POSIX file system, plus the files under `bulk/res`, which the HotSpot
-/// run reads from its class path, served as application resources the way a
-/// built application's host serves the ones the build packaged. Never loaded
-/// on HotSpot, where the JDK answers and no host is consulted.
-public class BulkHost extends PosixJdkHost {
+/// the digests and random bytes a built application's host offers. Never
+/// loaded on HotSpot, where the JDK answers and no host is consulted.
+public class BulkHost extends JdkHost {
+    private static long seed = System.currentTimeMillis();
+
     /// Installs a fresh instance; [Bulk] calls it after every check.
     static void installDefault() {
         JdkHost.install(new BulkHost());
     }
 
+    /// Test entropy only: a check compares shapes and lengths, never the
+    /// values, and a production host draws these from the platform.
     @Override
-    public InputStream resource(String name) {
-        byte[] data = BulkResources.get(name);
-        return data == null ? null : new ByteArrayInputStream(data);
+    public void randomBytes(byte[] out) {
+        java.util.Random r = new java.util.Random(seed++ ^ System.nanoTime());
+        r.nextBytes(out);
     }
 
     /// The digests a built application's host offers, by the names

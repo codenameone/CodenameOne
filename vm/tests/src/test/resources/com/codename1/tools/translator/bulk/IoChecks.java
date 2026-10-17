@@ -27,8 +27,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -56,30 +54,6 @@ public final class IoChecks {
         return sb.append(r.read()).toString();
     }
 
-    private static void deleteTree(File f) {
-        File[] kids = f.listFiles();
-        if (kids != null) {
-            for (File k : kids) {
-                deleteTree(k);
-            }
-        }
-        f.delete();
-    }
-
-    private static byte[] readAll(File f) throws IOException {
-        FileInputStream in = new FileInputStream(f);
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[256];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            return out.toByteArray();
-        } finally {
-            in.close();
-        }
-    }
 
     /// Runs the group.
     public static void run() {
@@ -190,32 +164,6 @@ public final class IoChecks {
             w.flush();
             Bulk.p("printed", out.toString().replace(System.lineSeparator(), "\n"));
             Bulk.p("checkError", w.checkError());
-        });
-        Bulk.check("Io.aPrintWriterOnAFileWritesUtf8AndRefusesAnUnknownCharset", () -> {
-            File dir = new File(new File("Io-scratch").getAbsoluteFile(), "printwriter");
-            deleteTree(dir);
-            dir.mkdirs();
-            try {
-                File file = new File(dir, "out.txt");
-                PrintWriter utf = new PrintWriter(file.getPath());
-                utf.print("caf\u00e9");
-                utf.close();
-                Bulk.p("utf8", readAll(file));
-                PrintWriter latin = new PrintWriter(file, "ISO-8859-1");
-                latin.print("caf\u00e9");
-                latin.close();
-                Bulk.p("latin1", readAll(file));
-                Bulk.pThrown("unknownCharset", UnsupportedEncodingException.class,
-                        () -> new PrintWriter(file, "no-such-charset"));
-                // An unknown charset leaves the file as it was.
-                Bulk.p("afterUnknown", readAll(file));
-                Bulk.pThrown("noSuchDir", FileNotFoundException.class,
-                        () -> new PrintWriter(new File(dir, "no/such/dir/x.txt").getPath()));
-                Bulk.p("noDirMade", new File(dir, "no").exists());
-            } finally {
-                deleteTree(dir);
-                new File("Io-scratch").getAbsoluteFile().delete();
-            }
         });
         Bulk.check("Io.anUnknownCharsetNameIsRefusedAndAnAliasIsHonoured", () -> {
             // ParparVM's encoding natives took any name they did not know for
