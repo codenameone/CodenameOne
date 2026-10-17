@@ -1792,7 +1792,7 @@ class GeneratedSourceTest {
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> constants = (java.util.List<Object>) unsupported.invoke(builder,
-                "#Constants {\n  includeNativeBool: true;\n}\nLabel { color: #ff0000; }\n");
+                "#Constants {\n  message: \"a}b\";\n  includeNativeBool: true;\n}\nLabel { color: #ff0000; }\n");
         assertTrue(constants.isEmpty(), "a #Constants entry is not a dropped declaration: " + constants);
     }
 

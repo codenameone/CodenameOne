@@ -54,8 +54,8 @@ import java.util.Map;
 /// - `padding`, `margin`: one to four values in CSS top/right/bottom/left order, stored in the
 ///   theme's top/bottom/left/right order together with per-side `padUnit`/`marUnit` metadata.
 ///   `px`, `pt` and unitless values are pixels (rounded, as the build-time compiler does), `mm`
-///   and `cm` are millimetres, `%` is a percentage of the screen, and `rem`, `vw`, `vh`,
-///   `vmin`, `vmax` keep their own unit.
+///   and `cm` are millimetres, and `rem`, `vw`, `vh`, `vmin`, `vmax` keep their own unit. A
+///   percentage is rejected, as the build-time compiler rejects it.
 /// - `font-family` and `font-size`: resolved to a {@link Font} with the build-time compiler's
 ///   semantics. The family defaults to `native:MainRegular` and the size to the medium system
 ///   font; `font-size` accepts `px`, `pt`, `mm`, `cm`, `in`, `rem`, `vw`, `vh`, `vmin`, `vmax`,
@@ -89,6 +89,8 @@ public class CSSThemeCompiler {
     private static final String DEFERRED_IMAGE = "image";
     private static final String DEFERRED_VAR = "var";
     private static final String DEFERRED_LITERAL = "literal";
+    /// Resolved like any var() constant, but kept as text: it aliases a quoted constant.
+    private static final String DEFERRED_TEXT = "text";
 
     /// The `deferred` table of the compile in progress; resolveVars reads which constants are literal.
     private Hashtable<String, String> deferredConstants = new Hashtable<String, String>();
@@ -106,25 +108,39 @@ public class CSSThemeCompiler {
         // Keyed by "@name"; only the declaration that wins for a name decides its entry.
         Hashtable<String, String> deferred = new Hashtable<String, String>();
         deferredConstants = deferred;
-        // Every constant first, in source order, so the last declaration of a name wins -- a
-        // #Constants entry, a `:root` or an in-rule custom property alike -- and every rule then
-        // resolves var() against those final values, wherever it sits, as the build-time
-        // compiler does.
+        // #Constants entries first, wherever their block sits, so every rule sees their final
+        // values -- the build-time compiler reads that block before it compiles any rule.
+        Hashtable<String, Declaration> finalConstants = new Hashtable<String, Declaration>();
         for (Rule rule : rules) {
             if (rule.constants) {
                 compileConstants(rule.declarations, theme, deferred);
-            } else {
                 for (Declaration declaration : rule.declarations) {
-                    applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
+                    finalConstants.put(declaration.name, declaration);
                 }
             }
         }
+        // Then source order. A `:root` or in-rule custom property takes effect where it is
+        // declared, as the build-time parser's callbacks do: a rule above it does not see it.
+        // Only the winning declaration of a #Constants name is applied again here, so it still
+        // overrides a custom property declared before it.
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
         for (Rule rule : rules) {
-            if (!rule.constants) {
-                applyRule(theme, resources, rule, fonts);
+            if (rule.constants) {
+                ArrayList<Declaration> winners = new ArrayList<Declaration>();
+                for (Declaration declaration : rule.declarations) {
+                    if (finalConstants.get(declaration.name) == declaration) {
+                        winners.add(declaration);
+                    }
+                }
+                compileConstants(winners.toArray(new Declaration[winners.size()]), theme, deferred);
+                continue;
             }
+            for (Declaration declaration : rule.declarations) {
+                applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
+            }
+            applyRule(theme, resources, rule, fonts);
         }
+        markLiteralAliases(theme, deferred);
         compileFonts(theme, fonts);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme, deferred);
@@ -143,6 +159,35 @@ public class CSSThemeCompiler {
             }
         }
         resources.setTheme(themeName, theme);
+    }
+
+    /// `alias: var(--literal)` where `literal` is quoted resolves to that text, not to a color:
+    /// such an alias, followed through any chain of plain aliases, is not reclassified.
+    private void markLiteralAliases(Hashtable theme, Hashtable<String, String> deferred) {
+        ArrayList<String> aliases = new ArrayList<String>();
+        for (Map.Entry<String, String> entry : deferred.entrySet()) {
+            if (DEFERRED_VAR.equals(entry.getValue())) {
+                aliases.add(entry.getKey());
+            }
+        }
+        for (String key : aliases) {
+            ArrayList<String> seen = new ArrayList<String>();
+            Object value = theme.get(key);
+            String target = key;
+            while (value instanceof String && !seen.contains(target)) {
+                seen.add(target);
+                String v = ((String) value).trim();
+                if (!v.startsWith("var(--") || v.indexOf(')') != v.length() - 1) {
+                    break;
+                }
+                target = "@" + v.substring("var(--".length(), v.length() - 1).trim();
+                if (DEFERRED_LITERAL.equals(deferred.get(target))) {
+                    deferred.put(key, DEFERRED_TEXT);
+                    break;
+                }
+                value = theme.get(target);
+            }
+        }
     }
 
     private void inheritHoverDerivations(Hashtable theme) {
@@ -378,7 +423,7 @@ public class CSSThemeCompiler {
 
     private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts) {
         if (":root".equals(rule.selector)) {
-            // Its custom properties were all stored before any rule ran.
+            // Its custom properties were stored just before this call.
             return;
         }
 
@@ -508,29 +553,21 @@ public class CSSThemeCompiler {
         }
     }
 
-    /// The UIIDs a font in `state` inherits from, nearest first. A state that declares its own
-    /// `cn1-derive` (`Child:selected{cn1-derive:Base}`) follows that instead of the UIID's.
+    /// The UIIDs a font in `state` inherits from, nearest first. At every hop a state that
+    /// declares its own `cn1-derive` (`Child:selected{cn1-derive:Base}`) follows that instead of
+    /// the UIID's. `*` is not part of it: the build-time compiler ignores universal rules.
     private ArrayList<String> fontChain(Hashtable theme, String id, String state, boolean dark) {
-        Object stateDerive = null;
-        if (state.length() > 0) {
-            stateDerive = dark ? theme.get("$Dark" + id + "." + state + "derive") : null;
-            if (stateDerive == null) {
-                stateDerive = theme.get(id + "." + state + "derive");
-            }
-        }
-        String next = stateDerive instanceof String ? (String) stateDerive : null;
         ArrayList<String> chain = new ArrayList<String>();
         while (id != null && !chain.contains(id)) {
             chain.add(id);
-            if (next != null) {
-                id = next;
-                next = null;
-            } else {
-                id = hoverBase(theme, id, dark);
+            Object stateDerive = null;
+            if (state.length() > 0) {
+                stateDerive = dark ? theme.get("$Dark" + id + "." + state + "derive") : null;
+                if (stateDerive == null) {
+                    stateDerive = theme.get(id + "." + state + "derive");
+                }
             }
-        }
-        if (!chain.contains("Component")) {
-            chain.add("Component");
+            id = stateDerive instanceof String ? (String) stateDerive : hoverBase(theme, id, dark);
         }
         return chain;
     }
@@ -609,11 +646,13 @@ public class CSSThemeCompiler {
     private FontSize parseFontSize(String value) {
         String v = value.trim();
         FontSize out = new FontSize();
-        if (endsWithIgnoreCase(v, "small") || "smaller".equalsIgnoreCase(v)) {
+        if ("small".equalsIgnoreCase(v) || "x-small".equalsIgnoreCase(v) || "xx-small".equalsIgnoreCase(v)
+                || "smaller".equalsIgnoreCase(v)) {
             out.systemSize = Font.SIZE_SMALL;
             return out;
         }
-        if (endsWithIgnoreCase(v, "large") || "larger".equalsIgnoreCase(v)) {
+        if ("large".equalsIgnoreCase(v) || "x-large".equalsIgnoreCase(v) || "xx-large".equalsIgnoreCase(v)
+                || "larger".equalsIgnoreCase(v)) {
             out.systemSize = Font.SIZE_LARGE;
             return out;
         }
@@ -1071,7 +1110,11 @@ public class CSSThemeCompiler {
     private Length length(String value) {
         String v = value.trim();
         Length out = new Length();
-        String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "%", "rem", "vw", "vh", "vmin", "vmax"});
+        // No `%`: the build-time compiler rejects a percentage inset, so the preview must too.
+        if (v.endsWith("%")) {
+            throw new CSSSyntaxException("Unsupported unit for padding or margin: " + value);
+        }
+        String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "rem", "vw", "vh", "vmin", "vmax"});
         float n = number(unit == null ? v : v.substring(0, v.length() - unit.length()), value);
         if (unit == null || "px".equals(unit) || "pt".equals(unit)) {
             out.unit = Style.UNIT_TYPE_PIXELS;
@@ -1081,8 +1124,6 @@ public class CSSThemeCompiler {
         } else if ("cm".equals(unit)) {
             out.unit = Style.UNIT_TYPE_DIPS;
             n = n * 10f;
-        } else if ("%".equals(unit)) {
-            out.unit = Style.UNIT_TYPE_SCREEN_PERCENTAGE;
         } else {
             out.unit = viewportUnit(unit);
         }

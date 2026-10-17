@@ -5347,12 +5347,33 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return out;
     }
 
-    /** True when {@code at} sits inside a {@code #Constants} or {@code @constants} block. */
+    /**
+     * True when {@code at} sits inside a {@code #Constants} or {@code @constants} block. Braces
+     * inside a quoted value are text, so the scan tracks quotes and escapes.
+     */
     private static boolean isInConstantsBlock(String masked, int at) {
-        int open = masked.lastIndexOf('{', at);
-        if (open < 0 || masked.lastIndexOf('}', at) > open) return false;
-        int selectorStart = Math.max(masked.lastIndexOf('}', open), masked.lastIndexOf('{', open - 1)) + 1;
-        String selector = masked.substring(selectorStart, open).trim();
+        List<String> open = new ArrayList<>();
+        int selectorStart = 0;
+        char quote = 0;
+        for (int i = 0; i < at && i < masked.length(); i++) {
+            char c = masked.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') i++;
+                else if (c == quote) quote = 0;
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '{') {
+                open.add(masked.substring(selectorStart, i).trim());
+                selectorStart = i + 1;
+            } else if (c == '}') {
+                if (!open.isEmpty()) open.remove(open.size() - 1);
+                selectorStart = i + 1;
+            } else if (c == ';') {
+                selectorStart = i + 1;
+            }
+        }
+        if (open.isEmpty()) return false;
+        String selector = open.get(open.size() - 1);
         return "#Constants".equalsIgnoreCase(selector) || "@constants".equalsIgnoreCase(selector);
     }
 

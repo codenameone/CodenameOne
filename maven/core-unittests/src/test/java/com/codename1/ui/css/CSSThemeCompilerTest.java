@@ -341,13 +341,13 @@ public class CSSThemeCompilerTest extends UITestBase {
     @Test
     public void testMixedUnitsKeepEachSidesUnit() {
         MutableResource resource = new MutableResource();
-        new CSSThemeCompiler().compile("Mixed{padding:1mm 10% 2.5pt 3px;}"
+        new CSSThemeCompiler().compile("Mixed{padding:1mm 2vw 2.5pt 3px;}"
                 + "Mixed:pressed{margin:1.5mm 2cm;}", resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
-        // top=1mm, bottom=2.5pt (a density independent pixel, rounded), left=3px, right=10%.
-        assertEquals("1,3,3,10", theme.get("Mixed.padding"));
+        // top=1mm, bottom=2.5pt (a density independent pixel, rounded), left=3px, right=2vw.
+        assertEquals("1,3,3,2", theme.get("Mixed.padding"));
         assertArrayEquals(new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS,
-                        Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_SCREEN_PERCENTAGE},
+                        Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_VW},
                 (byte[]) theme.get("Mixed.padUnit"));
         assertEquals("1.5,1.5,20,20", theme.get("Mixed.press#margin"));
         byte mm = Style.UNIT_TYPE_DIPS;
@@ -365,6 +365,11 @@ public class CSSThemeCompilerTest extends UITestBase {
                 compiler.compile("Label{margin:wide;}", resource, "Theme"));
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 compiler.compile("Label{font-size:huge;}", resource, "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{font-size:not-small;}", resource, "Theme"));
+        // The build-time compiler has no percentage inset.
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Label{padding:10%;}", resource, "Theme"));
     }
 
     @Test
@@ -569,13 +574,14 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
-    public void testStateFontFallsBackToTheUniversalStyle() {
+    public void testStateFontIgnoresTheUniversalStyle() {
         MutableResource resource = new MutableResource();
         new CSSThemeCompiler().compile("* { font-family: 'native:MainBold'; } Label:selected { font-size: 20px; }",
                 resource, "Theme");
         Font selected = (Font) resource.getTheme("Theme").get("Label.sel#font");
         assertEquals(20f, selected.getPixelSize(), 0.001f);
-        assertEquals("native:MainBold", fontName(selected));
+        // The build-time compiler ignores `*` rules, so nothing is inherited from it.
+        assertEquals("native:MainRegular", fontName(selected));
     }
 
     @Test
@@ -614,7 +620,31 @@ public class CSSThemeCompilerTest extends UITestBase {
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("0000ff", theme.get("@accent"));
         assertEquals("0000ff", theme.get("Label.fgColor"));
-        assertEquals("00ff00", theme.get("Button.bgColor"));
+        // A :root property takes effect where it is declared, as in the build-time parser.
+        assertEquals("ff0000", theme.get("Button.bgColor"));
+        assertEquals("#00ff00", theme.get("@bg"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{color:var(--late);} :root{--late:#ff0000;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testStateDeriveIsFollowedAtEveryHop() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:'native:MainBold';}"
+                + "Middle:selected{cn1-derive:Base;}"
+                + "Child:selected{cn1-derive:Middle;font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Child.sel#font")));
+    }
+
+    @Test
+    public void testAliasOfAQuotedConstantStaysText() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{literal:\"#abc\"; alias:var(--literal); twice:var(--alias);"
+                + " color:#abc; colorAlias:var(--color);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("#abc", theme.get("@alias"));
+        assertEquals("#abc", theme.get("@twice"));
+        assertEquals("aabbcc", theme.get("@colorAlias"));
     }
 
     @Test
