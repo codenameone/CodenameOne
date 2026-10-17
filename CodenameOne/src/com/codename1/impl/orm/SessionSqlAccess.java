@@ -55,7 +55,9 @@ public final class SessionSqlAccess implements SqlAccess {
         List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0],
                 new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
                         Attribute.INTEGER});
-        return SessionImpl.sqliteColumns(raw);
+        List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                new Object[] {table}, new int[] {Attribute.TEXT});
+        return SessionImpl.sqliteColumns(raw, definition.isEmpty() ? null : (String) definition.get(0)[0]);
     }
     @Override
     public String quote(String name) {

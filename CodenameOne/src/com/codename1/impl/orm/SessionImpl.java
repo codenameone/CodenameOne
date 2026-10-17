@@ -1179,6 +1179,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // would be rejected or coerced. DATETIME is what the mapping needs.
             return false;
         }
+        if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)) {
+            // A long over a 32-bit column fails writes, and an int over a
+            // 64-bit column cannot load what is already there.
+            int width = integerWidth(found);
+            if (width != 0 && width != (attr.kind == Attribute.BIGINT ? 8 : 4)) {
+                return false;
+            }
+        }
         return family == typeFamily(expected) && (attr.temporal == 0 || family != 5 || temporalKind(found) == attr.temporal);
     }
 
@@ -1497,22 +1505,52 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// Shapes `PRAGMA table_info` rows as [SqlAccess#describe] answers them. A
     /// literal NULL default fills nothing, and the one INTEGER primary key
     /// column is the rowid, which SQLite assigns.
-    static List<Object[]> sqliteColumns(List<Object[]> raw) {
+    static List<Object[]> sqliteColumns(List<Object[]> raw, String createSql) {
         int keys = 0;
         for (Object[] row : raw) {
             if (row[5] instanceof Number && ((Number) row[5]).intValue() != 0) {
                 keys++;
             }
         }
+        // A WITHOUT ROWID table has no rowid, and a column declared
+        // INTEGER PRIMARY KEY DESC is an ordinary column, not its alias.
+        String definition = squeeze(createSql == null ? "" : asciiLower(createSql));
+        boolean rowidTable = definition.indexOf("without rowid") < 0 && definition.indexOf("primary key desc") < 0;
         List<Object[]> result = new ArrayList<Object[]>();
         for (Object[] row : raw) {
-            boolean filled = row[4] != null && !"NULL".equalsIgnoreCase(String.valueOf(row[4]).trim());
-            boolean rowid = keys == 1 && row[5] instanceof Number && ((Number) row[5]).intValue() != 0
+            boolean filled = row[4] != null && !"null".equals(unparenthesized(asciiLower(String.valueOf(row[4]))));
+            boolean rowid = rowidTable && keys == 1 && row[5] instanceof Number && ((Number) row[5]).intValue() != 0
                     && "INTEGER".equalsIgnoreCase(String.valueOf(row[2]).trim());
             result.add(new Object[] {row[1], row[2], row[3], row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
                     Integer.valueOf(rowid ? 1 : 0), Integer.valueOf(0)});
         }
         return result;
+    }
+    /// `((NULL))` is NULL: SQLite keeps a default's redundant parentheses.
+    private static String unparenthesized(String value) {
+        String text = value.trim();
+        while (text.length() >= 2 && text.charAt(0) == '(' && text.charAt(text.length() - 1) == ')') {
+            text = text.substring(1, text.length() - 1).trim();
+        }
+        return text;
+    }
+    /// Collapses whitespace runs to one space.
+    private static String squeeze(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        boolean space = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c <= ' ') {
+                space = true;
+                continue;
+            }
+            if (space && out.length() > 0) {
+                out.append(' ');
+            }
+            space = false;
+            out.append(c);
+        }
+        return out.toString();
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();
@@ -1536,6 +1574,27 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             lower.append(ch >= 'A' && ch <= 'Z' ? (char) (ch + 32) : ch);
         }
         return lower.toString();
+    }
+    /// The byte width of an integer column type off SQLite, whose integers are
+    /// all 64-bit, or 0 when the type does not say.
+    private static int integerWidth(String type) {
+        String token = firstTypeToken(type);
+        if (" tinyint ".contains(" " + token + " ")) {
+            return 1;
+        }
+        if (" smallint int2 smallserial serial2 ".contains(" " + token + " ")) {
+            return 2;
+        }
+        if (" mediumint ".contains(" " + token + " ")) {
+            return 3;
+        }
+        if (" int integer int4 serial serial4 ".contains(" " + token + " ")) {
+            return 4;
+        }
+        if (" bigint int8 bigserial serial8 ".contains(" " + token + " ")) {
+            return 8;
+        }
+        return 0;
     }
     private static String firstTypeToken(String type) {
         String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');

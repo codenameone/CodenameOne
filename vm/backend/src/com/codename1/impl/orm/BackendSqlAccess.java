@@ -59,7 +59,11 @@ public final class BackendSqlAccess implements SqlAccess {
     @Override
     public List<Object[]> describe(String table) throws IOException {
         if ("sqlite".equals(dialect())) {
-            return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]));
+            List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                    new Object[]{table}, new int[1]);
+            Object createSql = definition.isEmpty() ? null : definition.get(0)[0];
+            return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
+                    createSql instanceof String ? (String) createSql : null);
         }
         boolean mysql = "mysql".equals(dialect());
         // PostgreSQL: the schema an unqualified name resolves to through the
