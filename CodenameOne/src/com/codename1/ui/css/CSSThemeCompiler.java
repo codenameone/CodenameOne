@@ -89,6 +89,8 @@ public class CSSThemeCompiler {
     private static final String DEFERRED_IMAGE = "image";
     private static final String DEFERRED_VAR = "var";
     private static final String DEFERRED_LITERAL = "literal";
+    /// Declared by this compile and needing no further handling beyond var() resolution.
+    private static final String DEFERRED_PLAIN = "plain";
     /// Resolved like any var() constant, but kept as text: it aliases a quoted constant.
     private static final String DEFERRED_TEXT = "text";
 
@@ -105,7 +107,9 @@ public class CSSThemeCompiler {
         Rule[] rules = parseRulesWithMedia(strippedCss);
         // Constants whose final value is only known after every rule ran: an image constant,
         // whose image a rule may still create (cn1-mutable-image), and one written as var(--x).
-        // Keyed by "@name"; only the declaration that wins for a name decides its entry.
+        // Keyed by "@name"; only the declaration that wins for a name decides its entry. Every
+        // constant this compile declares has an entry, so constants a previous compile left in
+        // the same theme are never re-resolved without the typing they were declared with.
         Hashtable<String, String> deferred = new Hashtable<String, String>();
         deferredConstants = deferred;
         // #Constants entries first, wherever their block sits, so every rule sees their final
@@ -282,10 +286,10 @@ public class CSSThemeCompiler {
     }
 
     private void resolveThemeConstantVars(Hashtable theme, Hashtable<String, String> deferred) {
-        for (Object keyObj : theme.keySet()) {
-            String key = String.valueOf(keyObj);
+        for (Map.Entry<String, String> entry : deferred.entrySet()) {
+            String key = entry.getKey();
             // A quoted value is a string: `"var(--name)"` is text, not a reference.
-            if (!key.startsWith("@") || DEFERRED_LITERAL.equals(deferred.get(key))) {
+            if (DEFERRED_LITERAL.equals(entry.getValue())) {
                 continue;
             }
             Object value = theme.get(key);
@@ -308,7 +312,7 @@ public class CSSThemeCompiler {
             String key = "@" + name;
             String raw = declaration.value.trim();
             String value = unquote(raw);
-            deferred.remove(key);
+            deferred.put(key, DEFERRED_PLAIN);
             if (name.endsWith("Image")) {
                 deferred.put(key, DEFERRED_IMAGE);
             } else if (!raw.equals(value)) {
@@ -469,7 +473,7 @@ public class CSSThemeCompiler {
         String unquoted = unquote(raw);
         // A later custom property replaces a #Constants entry outright, deferred handling included.
         // An unquoted var() in it is resolved where it is used, against the final values.
-        deferred.remove(key);
+        deferred.put(key, DEFERRED_PLAIN);
         if (!raw.equals(unquoted)) {
             deferred.put(key, DEFERRED_LITERAL);
         }
@@ -567,9 +571,32 @@ public class CSSThemeCompiler {
                     stateDerive = theme.get(id + "." + state + "derive");
                 }
             }
-            id = stateDerive instanceof String ? (String) stateDerive : hoverBase(theme, id, dark);
+            if (stateDerive instanceof String) {
+                id = (String) stateDerive;
+            } else {
+                id = hoverBase(theme, id, dark);
+                if (id == null) {
+                    id = anyStateDerive(theme, chain.get(chain.size() - 1), dark);
+                }
+            }
         }
         return chain;
+    }
+
+    /// The build-time compiler applies a `cn1-derive` declared in any state to the owning UIID,
+    /// so `Child:selected{cn1-derive:Base}` is also where `Child:pressed` inherits from.
+    private String anyStateDerive(Hashtable theme, String id, boolean dark) {
+        String[] states = {"sel#", "press#", "dis#", "hover#"};
+        for (int pass = dark ? 0 : 1; pass < 2; pass++) {
+            String prefix = pass == 0 ? "$Dark" + id + "." : id + ".";
+            for (String state : states) {
+                Object derive = theme.get(prefix + state + "derive");
+                if (derive instanceof String) {
+                    return (String) derive;
+                }
+            }
+        }
+        return null;
     }
 
     private Font createFont(String familyList, FontSize size) {
@@ -646,13 +673,13 @@ public class CSSThemeCompiler {
     private FontSize parseFontSize(String value) {
         String v = value.trim();
         FontSize out = new FontSize();
-        if ("small".equalsIgnoreCase(v) || "x-small".equalsIgnoreCase(v) || "xx-small".equalsIgnoreCase(v)
-                || "smaller".equalsIgnoreCase(v)) {
+        // `smaller` and `larger` are relative to the inherited size, which the build-time
+        // compiler does not implement; they fall through to the unsupported-size error.
+        if ("small".equalsIgnoreCase(v) || "x-small".equalsIgnoreCase(v) || "xx-small".equalsIgnoreCase(v)) {
             out.systemSize = Font.SIZE_SMALL;
             return out;
         }
-        if ("large".equalsIgnoreCase(v) || "x-large".equalsIgnoreCase(v) || "xx-large".equalsIgnoreCase(v)
-                || "larger".equalsIgnoreCase(v)) {
+        if ("large".equalsIgnoreCase(v) || "x-large".equalsIgnoreCase(v) || "xx-large".equalsIgnoreCase(v)) {
             out.systemSize = Font.SIZE_LARGE;
             return out;
         }

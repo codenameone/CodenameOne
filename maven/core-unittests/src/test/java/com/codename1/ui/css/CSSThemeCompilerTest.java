@@ -686,6 +686,31 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("x\"y", theme.get("@d"));
     }
 
+    @Test
+    public void testSecondCompileKeepsEarlierLiteralConstants() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{message:\"var(--name)\";}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{color:#ff0000;}", resource, "Theme");
+        assertEquals("var(--name)", resource.getTheme("Theme").get("@message"));
+    }
+
+    @Test
+    public void testSiblingStateFontUsesADeriveDeclaredInAnotherState() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:'native:MainBold';}"
+                + "Child:selected{cn1-derive:Base;}"
+                + "Child:pressed{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
+    public void testRelativeFontSizeKeywordsAreRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{font-size:smaller;}", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{font-size:larger;}", new MutableResource(), "Theme"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

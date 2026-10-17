@@ -5269,7 +5269,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private boolean applyProjectCss(String css, CodeEditor editor) {
         try {
-            MutableResource resources = new MutableResource();
+            MutableResource resources = new ProjectImageResource(binding == null ? null : binding.cssFile());
             new CSSThemeCompiler().compile(css, resources, "ProjectTheme");
             projectTheme = resources.getTheme("ProjectTheme");
             normalizeCompiledTheme(projectTheme);
@@ -5464,13 +5464,85 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private void loadProjectTheme() {
         if (binding == null || binding.cssFile() == null) return;
         try {
-            MutableResource resources = new MutableResource();
+            MutableResource resources = new ProjectImageResource(binding.cssFile());
             new CSSThemeCompiler().compile(ProjectIO.read(binding.cssFile()), resources, "ProjectTheme");
             projectTheme = resources.getTheme("ProjectTheme");
             normalizeCompiledTheme(projectTheme);
         } catch (Exception ex) {
             projectTheme = null;
             setStatus("Project CSS has errors: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * The canvas compiles into an empty resource, so an image constant such as
+     * {@code #Constants{mediaPlayImage:play.png}} found nothing and the stylesheet was rejected,
+     * although the project build resolves it. This looks an image up where the build-time
+     * compiler does: {@code res/<theme>/<name>/<density>.png} beside the stylesheet, or a file of
+     * that name there. Images added to the project's own resource file in the designer are not
+     * visible here.
+     */
+    static final class ProjectImageResource extends MutableResource {
+        private final String cssDir;
+
+        ProjectImageResource(String cssFile) {
+            int slash = cssFile == null ? -1 : cssFile.replace('\\', '/').lastIndexOf('/');
+            cssDir = slash < 0 ? null : cssFile.substring(0, slash);
+        }
+
+        @Override
+        public com.codename1.ui.Image getImage(String id) {
+            com.codename1.ui.Image image = super.getImage(id);
+            if (image != null || cssDir == null || id == null) return image;
+            image = load(cssDir + "/" + id);
+            if (image == null) {
+                com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+                String res = ProjectIO.fsUrl(cssDir + "/res");
+                try {
+                    if (fs.isDirectory(res)) {
+                        for (String theme : fs.listFiles(res)) {
+                            String folder = res + "/" + stripSlash(theme) + "/" + id;
+                            if (!fs.isDirectory(folder)) continue;
+                            for (String density : new String[]{"veryhigh.png", "high.png", "medium.png"}) {
+                                image = load(folder + "/" + density);
+                                if (image != null) break;
+                            }
+                            if (image == null) {
+                                for (String file : fs.listFiles(folder)) {
+                                    if (file.endsWith(".png")) {
+                                        image = load(folder + "/" + file);
+                                        if (image != null) break;
+                                    }
+                                }
+                            }
+                            if (image != null) break;
+                        }
+                    }
+                } catch (IOException ignored) {
+                    // An unreadable folder is an image that is not there.
+                }
+            }
+            if (image != null) setImage(id, image);
+            return image;
+        }
+
+        private static String stripSlash(String name) {
+            return name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+        }
+
+        private static com.codename1.ui.Image load(String path) {
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            String url = ProjectIO.fsUrl(path);
+            if (!fs.exists(url) || fs.isDirectory(url)) return null;
+            java.io.InputStream in = null;
+            try {
+                in = fs.openInputStream(url);
+                return com.codename1.ui.Image.createImage(in);
+            } catch (IOException ex) {
+                return null;
+            } finally {
+                com.codename1.io.Util.cleanup(in);
+            }
         }
     }
 

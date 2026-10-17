@@ -1796,6 +1796,23 @@ class GeneratedSourceTest {
         assertTrue(constants.isEmpty(), "a #Constants entry is not a dropped declaration: " + constants);
     }
 
+    @Test
+    void anImageConstantResolvesFromTheProjectsResFolder() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        java.awt.image.BufferedImage png = new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        javax.imageio.ImageIO.write(png, "png", folder.resolve("medium.png").toFile());
+        String css = dir.resolve("theme.css").toString();
+        com.codename1.ui.util.MutableResource resources =
+                new CodenameOneGUIBuilder.ProjectImageResource(css);
+        new com.codename1.ui.css.CSSThemeCompiler().compile("#Constants{mediaPlayImage:play.png;}",
+                resources, "ProjectTheme");
+        assertTrue(resources.getTheme("ProjectTheme").get("@mediaPlayImage") instanceof com.codename1.ui.Image,
+                "the image comes from res/<theme>/play.png/medium.png");
+    }
+
     private static String describe(Object diagnostic) throws Exception {
         for (String getter : new String[]{"getMessage", "getDescription", "getText"}) {
             try {

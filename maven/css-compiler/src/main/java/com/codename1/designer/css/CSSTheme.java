@@ -3246,6 +3246,12 @@ public class CSSTheme {
                     }
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
                     res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
+                } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_REAL) {
+                    // A decimal such as `switchTrackScaleY: 1.5` was silently dropped, so the
+                    // built theme fell back to the default the runtime compiler did not.
+                    String real = String.valueOf(lu.getFloatValue());
+                    res.setThemeProperty(themeName, "@"+constantKey,
+                            real.endsWith(".0") ? real.substring(0, real.length() - 2) : real);
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_RGBCOLOR
                         || (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION
                                 && ("rgb".equals(lu.getFunctionName())
