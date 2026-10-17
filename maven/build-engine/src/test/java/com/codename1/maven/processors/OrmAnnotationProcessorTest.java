@@ -244,6 +244,7 @@ public class OrmAnnotationProcessorTest {
             // text collation on one, and LIKE is not offered on it.
             + "Date before=new Date(1709214306000L), dayBefore=new Date(-14256000000L-86400000L), day=new Date(-14256000000L); "
             + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE (SELECT MAX(v.signedUp) FROM adopt.Customer v) > :t\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"subquery parameter\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE :t BETWEEN c.birthday AND c.signedUp\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"reversed BETWEEN\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
             + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "
@@ -290,14 +291,14 @@ public class OrmAnnotationProcessorTest {
     public void backendRefusesToStartOnASchemaItCannotServe() throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("startup.Visit","package startup; import com.codename1.annotations.*; import java.util.Date; @Entity(table=\"startup_visit\") public class Visit { @Id public long id; public Date happened; }");
+        sources.put("startup.Visit","package startup; import com.codename1.annotations.*; import java.util.Date; @Entity(table=\"startup_visit\") public class Visit { @Id public long id; public Date happened; public long hits; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
         try {
             loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
             String path=new File(tmp.newFolder(),"existing.db").getAbsolutePath();
-            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened TIMESTAMP)");
+            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened TIMESTAMP, hits BIGINT NOT NULL)");
             try {
                 startBackend(path,true).stop();
                 fail("a plain Date over a TIMESTAMP column must not start");
@@ -307,8 +308,16 @@ public class OrmAnnotationProcessorTest {
             }
             startBackend(path,false).stop();
             // Stricter than the mapping: tolerated, and logged.
-            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT NOT NULL)");
+            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT NOT NULL, hits BIGINT NOT NULL)");
             startBackend(path,true).stop();
+            // Looser than the mapping: a NULL in hits could never load into a long.
+            schema(path,"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT)");
+            try {
+                startBackend(path,true).stop();
+                fail("a primitive over a nullable column must not start");
+            } catch(java.io.IOException expected) {
+                assertTrue(expected.getMessage(),expected.getMessage().contains("Missing NOT NULL on startup_visit.hits"));
+            }
         } finally { loader.close(); }
     }
     private static void schema(String path,String create) throws Exception {
@@ -1264,6 +1273,22 @@ public class OrmAnnotationProcessorTest {
 
     /// A keyed-by-value set's key ends in the value, sized by the value's kind: three
     /// text key columns (3060 bytes) leave room for a numeric value, not a text one.
+    @Test
+    public void temporalIndexColumnsAreSizedAsDates() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package temporalkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.*; ";
+        // Three 1020-byte text columns and an 8-byte timestamp: 3068 bytes, under the limit.
+        sources.put("temporalkey.Entry",imports+"@Entity(indexes=@Index(fields={\"a\",\"b\",\"c\",\"at\"})) public class Entry { @Id public long id; public String a,b,c; @Temporal(TemporalType.TIMESTAMP) public Date at; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+            models.put("temporalkey.Entry",(com.codename1.impl.orm.EntityModel)loader.loadClass("temporalkey.EntryCn1BackendModel").newInstance());
+            com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+            com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+            try { session.createTables(); } finally { session.close(); db.close(); }
+        }
+    }
+
     @Test
     public void keyedByValueSetsAreSizedByTheirValue() throws Exception {
         for(String type:Arrays.asList("Long","String")) {

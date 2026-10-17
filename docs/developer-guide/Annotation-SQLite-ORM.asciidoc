@@ -404,9 +404,11 @@ issue has one of three kinds:
                           as a plain `Date` field over a `TIMESTAMP` column, or a
                           primary key that differs from the mapping. Change the
                           mapping, or convert the column.
-| `CONSTRAINT_MISMATCH` | The column's `NOT NULL` differs from the mapping. Reading and
-                          writing still work; a column stricter than its mapping
-                          is a legitimate design.
+| `CONSTRAINT_MISMATCH` | The column's `NOT NULL` differs from the mapping, or a
+                          `NOT NULL` column the mapping doesn't write has no
+                          default. A column stricter than its mapping is a
+                          legitimate design. A missing `NOT NULL` lets a row hold
+                          a null that a primitive field can't load.
 |===
 
 `session.validateSchema()` runs the same checks and throws a
@@ -420,8 +422,10 @@ to a managed schema.
 A backend server validates the schema at startup, after migrations and
 `cn1.orm.createTables`, and refuses to start on a `MIGRATION_REQUIRED` or
 `UNSUPPORTED` issue, so a mapping the database can't serve fails before the
-first request rather than on the requests that touch it. A
-`CONSTRAINT_MISMATCH` is logged and tolerated. Set `cn1.orm.validateSchema=false` to start
+first request rather than on the requests that touch it. It also refuses a
+`CONSTRAINT_MISMATCH` that would fail at runtime: a missing `NOT NULL`, or a
+required column the mapping doesn't fill. A column that is only stricter than
+its mapping is logged and tolerated. Set `cn1.orm.validateSchema=false` to start
 anyway.
 
 [[orm-native-dates]]

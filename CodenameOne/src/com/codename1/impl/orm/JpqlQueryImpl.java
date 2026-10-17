@@ -342,6 +342,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean coalesce;
         Expr scalarProjection;
         QueryImpl projectionQuery;
+        /// A scalar subquery whose projection carries a field mapping.
+        boolean subqueryMapping;
         String projectionField;
         Object literalValue;
         LiteralBinding literalBinding;
@@ -975,6 +977,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     result.projectionQuery = nested.projections.get(0).projectionQuery;
                     result.projectionField = nested.projections.get(0).projectionField;
+                    // A parameter compared with the subquery binds through the
+                    // projected field's converter; see bindType.
+                    result.subqueryMapping = result.projectionQuery != null;
                     return result;
                 }
                 Expr value = expression();
@@ -1383,6 +1388,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private void bindType(Expr attribute, Expr value) {
             if (attribute.query == null) {
+                if (attribute.subqueryMapping) {
+                    Expr mapping = new Expr(attribute.sql, attribute.kind);
+                    mapping.query = attribute.projectionQuery;
+                    mapping.field = attribute.projectionField;
+                    bindType(mapping, value);
+                }
                 return;
             }
             if (value.literalBinding != null && value.literalBinding.query == null) {

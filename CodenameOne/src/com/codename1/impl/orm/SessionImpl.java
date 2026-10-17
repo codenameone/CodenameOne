@@ -1122,7 +1122,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     throw new PersistenceException("MySQL/MariaDB binary keys and indexes require an explicit " +
                             "bounded column declaration: " + model.table() + "." + attribute.column);
                 }
-                width += attribute.kind == Attribute.TEXT ? 255 * 4
+                // A @Temporal field is a native DATE/DATETIME column, not its TEXT storage.
+                width += attribute.temporal != 0 ? 8 : attribute.kind == Attribute.TEXT ? 255 * 4
                         : attribute.kind == Attribute.INTEGER ? 4 : attribute.kind == Attribute.BOOLEAN ? 2 : 8;
             }
         }
@@ -1422,7 +1423,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             if (attr.nullable == required) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, attr.column,
-                        "Nullability mismatch on collection " + name));
+                        "Nullability mismatch on collection " + name
+                        + (required ? ": unexpected NOT NULL" : ": missing NOT NULL")));
             }
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
             if (typeFamily((String) found[1]) != typeFamily(type)) {
