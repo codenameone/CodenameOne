@@ -58,6 +58,11 @@ public class PrintWriter extends Writer {
         if (out != null) {
             flush();
         }
+        // A wrapped PrintWriter never throws, so its own failures are only
+        // visible by asking it.
+        if (out instanceof PrintWriter) {
+            return ((PrintWriter) out).checkError() || trouble;
+        }
         return trouble;
     }
 

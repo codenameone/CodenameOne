@@ -31,6 +31,20 @@ public final class LangMembersChecks {
 
     /// Runs the group.
     public static void run() {
+        // scalb by a huge negative factor underflows to a signed zero;
+        // cbrt of a subnormal keeps the JDK's one-ulp accuracy.
+        Bulk.check("Lang.scalbUnderflowsAndCbrtOfSubnormals", () -> {
+            Bulk.p("scalb.max.minInt", Double.doubleToRawLongBits(Math.scalb(Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.-max.minInt", Double.doubleToRawLongBits(Math.scalb(-Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalbf.max.minInt", Float.floatToRawIntBits(Math.scalb(Float.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.min.2098", Double.doubleToRawLongBits(Math.scalb(Double.MIN_VALUE, 2098)));
+            double[] tiny = {Double.MIN_VALUE, -Double.MIN_VALUE, 3 * Double.MIN_VALUE, 0x1.0p-1030, Double.MIN_NORMAL / 3};
+            for (double t : tiny) {
+                long got = Double.doubleToRawLongBits(Math.cbrt(t));
+                long want = Double.doubleToRawLongBits(StrictMath.cbrt(t));
+                Bulk.p("cbrt " + t, Math.abs(got - want) <= 1);
+            }
+        });
         Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
     }
 }

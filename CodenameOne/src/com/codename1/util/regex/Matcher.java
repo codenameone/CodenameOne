@@ -216,7 +216,11 @@ public final class Matcher implements MatchResult {
             next = from;
         }
         if (next > to) {
+            // Exhausted, and it stays so: left at the end, the next find()
+            // would search the end again and hand back a zero-width match
+            // at the end ("$") once more.
             first = -1;
+            last = to + 1;
             clearGroups();
             return false;
         }

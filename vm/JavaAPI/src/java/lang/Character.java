@@ -1555,7 +1555,7 @@ public final class Character implements Comparable<Character>{
                 || c >= 0x3041 && c <= 0x3096 || c >= 0x30a1 && c <= 0x30fa // Kana
                 || c >= 0x3400 && c <= 0x4dbf || c >= 0x4e00 && c <= 0x9fff // CJK
                 || c >= 0xac00 && c <= 0xd7a3 // Hangul
-                || c >= 0xf900 && c <= 0xfaff // CJK compatibility ideographs
+                || c >= 0xf900 && c <= 0xfa6d || c >= 0xfa70 && c <= 0xfad9 // CJK compatibility ideographs, less the unassigned
                 || c >= 0xff21 && c <= 0xff3a || c >= 0xff41 && c <= 0xff5a // fullwidth Latin
                 || c >= 0x20000 && c <= 0x3134a; // CJK extensions B-G
     }

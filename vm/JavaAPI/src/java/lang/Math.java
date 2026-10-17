@@ -441,7 +441,9 @@ public final class Math{
 
     /// `d` times 2 to the power `scaleFactor`, rounded once.
     public static double scalb(double d, int scaleFactor) {
-        final int maxScale = 1023 + 1022 + 52 + 1;
+        // Past this every finite input under- or overflows; the significand
+        // counts all 53 bits, or the largest value stops one step short of 0.
+        final int maxScale = 1023 + 1022 + 53 + 1;
         int scaleIncrement;
         double expDelta;
         if (scaleFactor < 0) {
@@ -468,7 +470,7 @@ public final class Math{
 
     /// `f` times 2 to the power `scaleFactor`, rounded once.
     public static float scalb(float f, int scaleFactor) {
-        final int maxScale = 127 + 126 + 23 + 1;
+        final int maxScale = 127 + 126 + 24 + 1;
         scaleFactor = Math.max(Math.min(scaleFactor, maxScale), -maxScale);
         return (float) ((double) f * powerOfTwoD(scaleFactor));
     }
@@ -498,9 +500,18 @@ public final class Math{
             return a;
         }
         double magnitude = Math.abs(a);
+        // A subnormal has too few significant bits for the estimate below:
+        // scale it by 2 to the 54 (a cube, so the root scales by 2 to the 18).
+        boolean subnormal = magnitude < Double.MIN_NORMAL;
+        if (subnormal) {
+            magnitude *= 0x1.0p54;
+        }
         double root = Math.pow(magnitude, 1.0 / 3.0);
         // One Newton step takes out the error of the inexact exponent.
         root = root - (root * root * root - magnitude) / (3 * root * root);
+        if (subnormal) {
+            root *= 0x1.0p-18;
+        }
         return a < 0 ? -root : root;
     }
 

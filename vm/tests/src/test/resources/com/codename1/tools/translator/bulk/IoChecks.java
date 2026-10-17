@@ -57,6 +57,21 @@ public final class IoChecks {
 
     /// Runs the group.
     public static void run() {
+        // A PrintWriter over a PrintWriter reports the inner one's failure.
+        Bulk.check("Io.aNestedPrintWritersErrorIsReported", () -> {
+            java.io.Writer failing = new java.io.Writer() {
+                public void write(char[] b, int o, int l) throws java.io.IOException {
+                    throw new java.io.IOException("refused");
+                }
+                public void flush() {
+                }
+                public void close() {
+                }
+            };
+            java.io.PrintWriter outer = new java.io.PrintWriter(new java.io.PrintWriter(failing));
+            outer.print("x");
+            Bulk.p("checkError", outer.checkError());
+        });
         Bulk.check("Io.aPendingCrlfLfDoesNotMakeAReaderReady", () -> {
             // readLine stops at the CR; the LF it still owes is buffered but is never
             // returned, so it cannot make the reader ready over a source that is not.

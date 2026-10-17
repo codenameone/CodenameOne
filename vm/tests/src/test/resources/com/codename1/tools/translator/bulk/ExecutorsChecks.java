@@ -353,6 +353,45 @@ public final class ExecutorsChecks {
             runner.join(20000);
             Bulk.p("stillInterrupted", stillInterrupted.get());
         });
+        // A scheduled task's own interrupt survives cancel(false).
+        Bulk.check("Executors.aScheduledCancelFalseLeavesTheWorkersInterrupt", () -> {
+            ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+            try {
+                final CountDownLatch started = new CountDownLatch(1);
+                final CountDownLatch cancelled = new CountDownLatch(1);
+                final AtomicBoolean seen = new AtomicBoolean();
+                final CountDownLatch next = new CountDownLatch(1);
+                ScheduledFuture<String> f = pool.schedule(() -> {
+                    started.countDown();
+                    cancelled.await(20, TimeUnit.SECONDS);
+                    Thread.currentThread().interrupt();
+                    return "ran";
+                }, 0, TimeUnit.MILLISECONDS);
+                Bulk.p("started", started.await(20, TimeUnit.SECONDS));
+                Bulk.p("cancel", f.cancel(false));
+                cancelled.countDown();
+                pool.execute(() -> {
+                    seen.set(Thread.interrupted());
+                    next.countDown();
+                });
+                Bulk.p("ran", next.await(20, TimeUnit.SECONDS));
+                Bulk.p("interruptReachedTheNextTask", seen.get());
+            } finally {
+                stop(pool);
+            }
+        });
+        // A fixed rate whose next deadline would overflow never fires again.
+        Bulk.check("Executors.aHugeFixedRateFiresOnce", () -> {
+            ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
+            try {
+                final java.util.concurrent.atomic.AtomicInteger runs = new java.util.concurrent.atomic.AtomicInteger();
+                pool.scheduleAtFixedRate(runs::incrementAndGet, 0, Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+                Thread.sleep(300);
+                Bulk.p("runs", runs.get());
+            } finally {
+                stop(pool);
+            }
+        });
         // Was ExecutorIntegrationTest, disabled for a crash in the one-off
         // harness it ran in; the two programs it never ran are this check.
         Bulk.check("Executors.aSubclassOfAbstractExecutorServiceRunsWhatItIsSubmitted", () -> {

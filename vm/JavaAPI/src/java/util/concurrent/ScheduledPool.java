@@ -77,6 +77,9 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         private final AtomicBoolean running = new AtomicBoolean();
         /// The worker inside the work right now, for cancel(true) to interrupt.
         private final AtomicReference<Thread> runner = new AtomicReference<Thread>();
+        /// Whether cancel(true) interrupted [#runner], so the run consumes
+        /// that interrupt and no other.
+        private final AtomicBoolean interruptedRunner = new AtomicBoolean();
         /// A fixed rate's firings that have come and not yet run, counting
         /// the one running now. See [#run].
         private final AtomicInteger owed = new AtomicInteger();
@@ -100,7 +103,10 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             }
             if (rate > 0) {
                 // A fixed rate keeps its beat whatever a run takes.
-                due.set(due.get() + rate);
+                // Saturating: a period near Long.MAX_VALUE is "never again",
+                // not a wrapped deadline in the past.
+                long current = due.get();
+                due.set(rate > Long.MAX_VALUE - current ? Long.MAX_VALUE : current + rate);
                 arm(due.get() - BlockingWait.now());
                 // A firing that comes while a run is under way is owed, not
                 // dropped: as with the JDK's scheduleAtFixedRate, an overrun
@@ -202,9 +208,10 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                 }
             } finally {
                 runner.set(null);
-                if (outcome.isCancelled()) {
+                if (interruptedRunner.getAndSet(false)) {
                     // An interrupt cancel(true) aimed at this work is not handed on
-                    // to whatever task the worker runs next.
+                    // to whatever task the worker runs next. Only that one: after
+                    // cancel(false) the thread's status is its own.
                     Thread.interrupted();
                 }
                 running.set(false);
@@ -250,6 +257,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                 // when the cancelled work returns.
                 Thread t = runner.get();
                 if (t != null) {
+                    interruptedRunner.set(true);
                     t.interrupt();
                 }
             }

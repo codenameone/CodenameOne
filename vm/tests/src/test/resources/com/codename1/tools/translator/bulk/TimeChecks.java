@@ -152,6 +152,21 @@ public final class TimeChecks {
 
     /// Runs the group.
     public static void run() {
+        // Past 292 years the nanosecond count overflows a long; the quotient
+        // still has to be exact.
+        Bulk.check("Time.aLongDurationDividesExactly", () -> {
+            Bulk.p("max/max", java.time.Duration.ofSeconds(Long.MAX_VALUE).dividedBy(Long.MAX_VALUE));
+            Bulk.p("max/2", java.time.Duration.ofSeconds(Long.MAX_VALUE, 999999999).dividedBy(2));
+            Bulk.p("min/3", java.time.Duration.ofSeconds(Long.MIN_VALUE).dividedBy(3));
+            Bulk.p("min/-7", java.time.Duration.ofSeconds(Long.MIN_VALUE, 1).dividedBy(-7));
+            Bulk.p("max/minLong", java.time.Duration.ofSeconds(Long.MAX_VALUE).dividedBy(Long.MIN_VALUE));
+            Bulk.p("big/1e9", java.time.Duration.ofSeconds(123456789012345L, 6789).dividedBy(1000000000L));
+            try {
+                Bulk.p("min/-1", java.time.Duration.ofSeconds(Long.MIN_VALUE).dividedBy(-1));
+            } catch (ArithmeticException e) {
+                Bulk.p("min/-1", "ArithmeticException");
+            }
+        });
         Bulk.check("Time.datesUntilWiderThanAnIntIsLazy", () -> {
             Bulk.p("first", java.time.LocalDate.MIN.datesUntil(java.time.LocalDate.MAX).limit(2)
                     .collect(java.util.stream.Collectors.toList()));

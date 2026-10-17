@@ -496,8 +496,8 @@ public final class Duration implements TemporalAmount, Comparable<Duration> {
     }
 
     /// This duration divided by `divisor`, the fraction of a nanosecond
-    /// dropped towards zero. Exact for anything shorter than 292 years; a
-    /// longer one throws `ArithmeticException`.
+    /// dropped towards zero. Exact for every duration; only a quotient
+    /// that is not a duration throws `ArithmeticException`.
     public Duration dividedBy(long divisor) {
         if (divisor == 0) {
             throw new ArithmeticException("Cannot divide by zero");
@@ -505,7 +505,69 @@ public final class Duration implements TemporalAmount, Comparable<Duration> {
         if (divisor == 1) {
             return this;
         }
-        return ofNanos(toNanos() / divisor);
+        if (seconds > -9000000000L && seconds < 9000000000L) {
+            return ofNanos(toNanos() / divisor);
+        }
+        // Past 292 years the nanosecond count no longer fits a long, so the
+        // magnitude is divided as an unsigned 128-bit number instead.
+        boolean negative = seconds < 0;
+        long magSeconds = negative ? -seconds - (nanos > 0 ? 1 : 0) : seconds;
+        long magNanos = negative && nanos > 0 ? NANOS_PER_SECOND - nanos : nanos;
+        long[] value = mulAdd(magSeconds, NANOS_PER_SECOND, magNanos);
+        long d = divisor < 0 ? -divisor : divisor;
+        divideUnsigned(value, d);
+        long rest = divideUnsigned(value, NANOS_PER_SECOND);
+        boolean resultNegative = negative != divisor < 0;
+        if (value[0] != 0 || value[1] < 0) {
+            if (resultNegative && value[0] == 0 && value[1] == Long.MIN_VALUE && rest == 0) {
+                return ofSeconds(Long.MIN_VALUE, 0);
+            }
+            throw new ArithmeticException("Exceeds capacity of Duration");
+        }
+        return resultNegative ? ofSeconds(-value[1], -rest) : ofSeconds(value[1], rest);
+    }
+
+    /// `a * b + c` as an unsigned 128-bit {high, low}; `a` is unsigned, `b`
+    /// and `c` are below 2 to the 32.
+    private static long[] mulAdd(long a, long b, long c) {
+        long lowPart = (a & 0xFFFFFFFFL) * b;
+        long highPart = (a >>> 32) * b;
+        long hi = highPart >>> 32;
+        long lo = highPart << 32;
+        long sum = lo + lowPart;
+        if (Long.compare(sum ^ Long.MIN_VALUE, lo ^ Long.MIN_VALUE) < 0) {
+            hi++;
+        }
+        long total = sum + c;
+        if (Long.compare(total ^ Long.MIN_VALUE, sum ^ Long.MIN_VALUE) < 0) {
+            hi++;
+        }
+        return new long[] {hi, total};
+    }
+
+    /// Divides the unsigned 128-bit {high, low} `value` in place by the
+    /// unsigned `divisor` (at most 2 to the 63) and answers the remainder.
+    private static long divideUnsigned(long[] value, long divisor) {
+        long hi = value[0];
+        long lo = value[1];
+        long qHi = 0;
+        long qLo = 0;
+        long rem = 0;
+        for (int i = 127; i >= 0; i--) {
+            long bit = i >= 64 ? (hi >>> (i - 64)) & 1 : (lo >>> i) & 1;
+            rem = rem << 1 | bit;
+            if (Long.compare(rem ^ Long.MIN_VALUE, divisor ^ Long.MIN_VALUE) >= 0) {
+                rem -= divisor;
+                if (i >= 64) {
+                    qHi |= 1L << (i - 64);
+                } else {
+                    qLo |= 1L << i;
+                }
+            }
+        }
+        value[0] = qHi;
+        value[1] = qLo;
+        return rem;
     }
 
     /// This duration with its sign reversed. The most negative duration has
