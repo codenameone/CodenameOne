@@ -374,7 +374,8 @@ A List or Set table has an `element_position` column by default.
 `@ElementCollection(positionColumn="")` maps a Set to a table with no position
 column, keyed by owner and value, which is the usual shape of an existing tag
 table. Such a Set rejects null values, and its text values accept at most 255
-Unicode code points.
+Unicode code points. A Set of `Double` or `Float` keeps its position column:
+SQL treats `0.0` and `-0.0` as one key, while a Java Set holds both.
 Element-map keys accept at most 255 Unicode code points on every database.
 `query.containsElement("tags", "important")` tests membership without loading
 the collection. Changing a mutable Date value is detected during flush.

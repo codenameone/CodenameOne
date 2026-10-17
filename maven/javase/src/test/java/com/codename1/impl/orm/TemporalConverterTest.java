@@ -62,6 +62,7 @@ class TemporalConverterTest {
                 "2024-02-29 13:45:06.789+00",       // PostgreSQL timestamptz under TimeZone=UTC
                 "2024-02-29 15:45:06.789+02:00",
                 "2024-02-29 08:15:06.789-0530",
+                "2024-03-01 07:45:06.789+18:00",    // the widest offset java.time accepts
                 "2024-02-29 13:45:06.789999",       // microseconds truncate, never round up
                 " 2024-02-29 13:45:06.789 "}) {
             assertEquals(expected, TemporalConverter.parse(form), form);
@@ -78,7 +79,8 @@ class TemporalConverterTest {
 
     @Test void refusesWhatItCannotReadExactly() {
         for (String bad : new String[]{"", "1709214306789", "0000-00-00 00:00:00", "2023-02-29", "2024-13-01", "2024-02-29 24:00:00",
-                "2024-02-29 13:60", "2024-02-29 13:45:06.", "2024-02-29 13:45:06.789 PST", "infinity", "2024-2-29", "2024-02-29X13:45"}) {
+                "2024-02-29 13:60", "2024-02-29 13:45:06.", "2024-02-29 13:45:06.789 PST", "infinity", "2024-2-29", "2024-02-29X13:45",
+                "2024-01-01T00:00+12:60", "2024-01-01T00:00+99:00", "2024-01-01T00:00-18:01", "2024-01-01T00:00+01:00:60"}) {
             IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> TemporalConverter.parse(bad), bad);
             assertTrue(e.getMessage().startsWith("Not a @Temporal value"), e.getMessage());
         }

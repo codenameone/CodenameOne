@@ -1101,7 +1101,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             for (Relationship relation : model.relationships()) {
                 if (relation.many && relation.mappedBy.length() == 0) {
-                    int suffix = relation.element ? (relation.mapKey.length() > 0 || keyedByValue(relation) ? 1020 : 4)
+                    // A map key is text; a keyed-by-value set's key ends in the
+                    // value itself, sized by its kind like any other key column.
+                    int suffix = relation.element ? (relation.mapKey.length() > 0 ? 1020
+                            : keyedByValue(relation) ? (Elements.kind(relation.target) == Attribute.TEXT ? 1020 : 8) : 4)
                             : relation.orderColumn.length() > 0 ? 4
                             : keyWidth(model(relation.target), model(relation.target).idIndexes());
                     checkKeyWidth(relation.joinTable, primary + suffix);

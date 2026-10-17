@@ -783,6 +783,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("LIKE")) {
                 int firstBinding = bindings.size();
                 Expr pattern = add();
+                if (left.temporal || pattern.temporal) {
+                    throw error("LIKE does not apply to a @Temporal field, which is a date column");
+                }
                 requireKind(left, Attribute.TEXT);
                 requireKind(pattern, Attribute.TEXT);
                 compatibleMappings(left, pattern);
@@ -916,6 +919,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Expr result = new Expr(sql.append(" END").toString(), kind);
             result.resultBranches = branches;
+            for (Expr branch : branches) {
+                result.temporal |= branch.temporal;
+            }
             result.children.addAll(conditions);
             result.children.addAll(branches);
             if (mapping != null && mapping.projectionQuery != null && kind == mapping.kind) {
@@ -959,6 +965,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("Scalar subqueries require an aggregate without GROUP BY");
                     }
                     Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
+                    result.temporal = nested.projections.get(0).temporal;
                     result.children.addAll(nested.correlations);
                     if (nested.guaranteedRow) {
                         result.scalarProjection = nested.projections.get(0);
@@ -1071,6 +1078,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (" MIN MAX COALESCE NULLIF ".contains(" " + function + " ")) {
                     for (Expr arg : args) {
                         result.association |= arg.association;
+                        // The value is one of the operands, so a date stays a date.
+                        result.temporal |= arg.temporal;
                     }
                 }
                 // These functions preserve their operands' domain representation.
@@ -1467,9 +1476,6 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.REAL;
         }
         private void requireKind(Expr value, int kind) {
-            if (kind == Attribute.TEXT && value.temporal) {
-                throw error("A @Temporal field is a date column, not text");
-            }
             if (value.entity != null || value.kind >= 0 && value.kind != kind
                     && !(numericKind(value.kind) && numericKind(kind))) {
                 throw error("Incompatible expression storage types");

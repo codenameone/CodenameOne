@@ -245,6 +245,8 @@ public class OrmAnnotationProcessorTest {
             + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
             + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "
+            // Through expressions whose value is one of their operands.
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE COALESCE(c.signedUp, :t) > :t AND c.signedUp >= (SELECT MAX(d.signedUp) FROM adopt.Customer d) ORDER BY COALESCE(c.signedUp, :t) DESC, CASE WHEN c.id > 0 THEN c.birthday ELSE c.birthday END\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"derived\"); "
             + "try { s.query(Customer.class).like(\"signedUp\",\"2024%\").list(); throw new AssertionError(\"builder LIKE on a date\"); } catch(IllegalArgumentException expected) {} "
             + "try { s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp LIKE '2024%'\",Customer.class).list(); throw new AssertionError(\"JPQL LIKE on a date\"); } catch(IllegalArgumentException expected) {} "
             + "s.beginTransaction(); back.tags().remove(\"beta\"); back.tags().add(\"gamma\"); back.signedUp(new Date(1709214306790L)); s.commitTransaction(); "
@@ -1253,6 +1255,46 @@ public class OrmAnnotationProcessorTest {
                     session.commitTransaction();session.clear();org.junit.Assert.assertEquals(closed,type.getField("state").get(session.find(type,id)));
                 } finally { session.close();db.close(); }
             }
+        }
+    }
+
+    /// A keyed-by-value set's key ends in the value, sized by the value's kind: three
+    /// text key columns (3060 bytes) leave room for a numeric value, not a text one.
+    @Test
+    public void keyedByValueSetsAreSizedByTheirValue() throws Exception {
+        for(String type:Arrays.asList("Long","String")) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package widekey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.*; ";
+            sources.put("widekey.Key",imports+"@Embeddable public class Key { public String a=\"a\"; public String b=\"b\"; public String c=\"c\"; }");
+            sources.put("widekey.Entry",imports+"@Entity public class Entry { @EmbeddedId public Key key=new Key(); @ElementCollection(positionColumn=\"\") public Set<"+type+"> values=new HashSet<"+type+">(); }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+                models.put("widekey.Entry",(com.codename1.impl.orm.EntityModel)loader.loadClass("widekey.EntryCn1BackendModel").newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+                com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    if("Long".equals(type)) session.createTables();
+                    else {
+                        com.codename1.orm.session.PersistenceException e=org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,session::createTables);
+                        assertTrue(e.getMessage(),e.getMessage().contains("exceeds the portable limit of 3072 bytes"));
+                    }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void floatingPointSetsKeepTheirPositionColumn() throws Exception {
+        for(String type:Arrays.asList("Double","Float","Long")) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("floatset.Entry","package floatset; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.*; "
+                + "@Entity public class Entry { @Id public long id; @ElementCollection(positionColumn=\"\") public Set<"+type+"> values=new HashSet<"+type+">(); }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,Collections.<String>emptyList());
+            String errors=ctx.getErrors().toString();
+            if("Long".equals(type)) assertFalse(errors,ctx.hasErrors());
+            else assertTrue(type+": "+errors,errors.contains("A Set of java.lang."+type+" needs its position column"));
         }
     }
 

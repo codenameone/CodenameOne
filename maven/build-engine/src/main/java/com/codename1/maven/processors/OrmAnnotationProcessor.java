@@ -1268,6 +1268,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if(!"Ljava/util/List;".equals(field.getDescriptor()) && !"Ljava/util/Set;".equals(field.getDescriptor()) && !map)
                 ctx.error("Relationship collection must use List, Set or Map: "+owner.binaryName+"."+relation.field);
         }
+        // A positionless set keys its rows by the value. SQL compares floating
+        // point numerically, so 0.0 and -0.0 -- two members of a Java Set -- are
+        // one key and the second insert fails as a duplicate.
+        if(relation.element && relation.orderColumn.length()==0 && relation.mapKey.length()==0
+                && ("java.lang.Double".equals(relation.target) || "java.lang.Float".equals(relation.target)))
+            ctx.error("A Set of "+relation.target+" needs its position column, since its values cannot key the table: "+relation.field);
         AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
         String joinDefault=physical(relation.field)+"_id";
         relation.columnName=join==null?joinDefault:join.getStringOrDefault("name",joinDefault);

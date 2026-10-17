@@ -159,18 +159,26 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
         if (c.more()) {
             char sign = c.next();
             if (sign == '+' || sign == '-') {
-                long offset = c.digits(2) * 3600;
+                long offsetHours = c.digits(2);
+                long offsetMinutes = 0;
+                long offsetSeconds = 0;
                 if (c.more() && c.peek() == ':') {
                     c.next();
                 }
                 if (c.more()) {
-                    offset += c.digits(2) * 60;
+                    offsetMinutes = c.digits(2);
                     if (c.more() && c.peek() == ':') {
                         c.next();
                     }
                     if (c.more()) {
-                        offset += c.digits(2);
+                        offsetSeconds = c.digits(2);
                     }
+                }
+                // The range java.time accepts. Beyond it the text is malformed,
+                // and applying it would read a plausible but wrong instant.
+                long offset = (offsetHours * 60 + offsetMinutes) * 60 + offsetSeconds;
+                if (offsetMinutes > 59 || offsetSeconds > 59 || offset > 18 * 3600) {
+                    throw c.invalid();
                 }
                 millis -= (sign == '+' ? offset : -offset) * 1000;
             } else if (sign != 'Z' && sign != 'z') {
