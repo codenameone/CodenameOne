@@ -42,7 +42,6 @@ import com.codenameone.examples.savor.domain.Profile;
 import com.codenameone.examples.savor.repository.CourierApplicationRepository;
 import com.codenameone.examples.savor.repository.CourierDocumentRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
-import com.codenameone.examples.savor.delivery.Fares;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,7 +50,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-/// Applications to drive, from the first field filled in to an admin's answer.
+/// Applications to deliver, from the first field filled in to an admin's answer.
 ///
 /// ```
 /// (none) -> draft -> pending -> approved
@@ -167,9 +166,8 @@ public class Applications {
         CourierApplication application = editable(username);
         String birth = date(form.dateOfBirth(), "your date of birth");
         String expiry = date(form.licenceExpiry(), "the licence's expiry date");
-        if (form.vehicleYear() < 0 || form.vehicleYear() > 2200 || form.vehicleSeats() < 0
-                || form.vehicleSeats() > 20) {
-            throw new ResponseStatusException(400, "Check the vehicle's year and seats");
+        if (form.vehicleYear() < 0 || form.vehicleYear() > 2200) {
+            throw new ResponseStatusException(400, "Check the vehicle's year");
         }
         // Every field is checked before the first is assigned: the application
         // is a managed entity, and a field assigned ahead of a refusal would be
@@ -180,7 +178,6 @@ public class Applications {
         String model = Text.optional(form.vehicleModel(), 40, "the vehicle's model");
         String color = Text.optional(form.vehicleColor(), 24, "the vehicle's colour");
         String plate = Text.optional(form.vehiclePlate(), 32, "the vehicle's plate");
-        String product = Fares.product(form.product());
         application.setLegalName(legalName);
         application.setDateOfBirth(birth);
         application.setLicenceNumber(licenceNumber);
@@ -190,10 +187,6 @@ public class Applications {
         application.setVehicleYear(form.vehicleYear());
         application.setVehicleColor(color);
         application.setVehiclePlate(plate);
-        application.setVehicleSeats(form.vehicleSeats());
-        application.setProduct(product);
-        application.setWheelchair(form.accessible());
-        application.setPets(form.petFriendly());
         return get(username);
     }
 
@@ -312,8 +305,6 @@ public class Applications {
         need(missing, form.vehicleYear() >= 1990, "the vehicle's year");
         need(missing, form.vehicleColor().length() > 0, "the vehicle's colour");
         need(missing, form.vehiclePlate().length() > 0, "the vehicle's plate");
-        need(missing, form.vehicleSeats() >= (Fares.XL.equals(form.product()) ? 6 : 4),
-                Fares.XL.equals(form.product()) ? "six seats for XL" : "the number of seats");
         for (int iter = 0; iter < form.documents().size(); iter++) {
             need(missing, !"missing".equals(form.documents().get(iter).status()), KIND_NAMES[iter]);
         }
@@ -549,8 +540,6 @@ public class Applications {
         application.setStatus(status);
         application.setVehicleModel(vehicle.length() > 40 ? vehicle.substring(0, 40) : vehicle);
         application.setVehiclePlate(plate);
-        application.setVehicleSeats(4);
-        application.setProduct(Fares.STANDARD);
         application.setCreatedAt(now);
         application.setReviewedAt(APPROVED.equals(status) ? now : 0L);
         return application;
@@ -592,13 +581,12 @@ public class Applications {
         if (row == null) {
             // Nobody has applied: an empty form, on the defaults it opens with.
             return new CourierApplicationDto(username, name, NONE, "", "", "", "", "", "", 0, "",
-                    "", 4, Fares.STANDARD, false, false, listed, "", 0L, 0L, "");
+                    "", listed, "", 0L, 0L, "");
         }
         return new CourierApplicationDto(username, name, row.getStatus(), row.getLegalName(),
                 row.getDateOfBirth(), row.getLicenceNumber(), row.getLicenceExpiry(),
                 row.getVehicleMake(), row.getVehicleModel(), row.getVehicleYear(),
-                row.getVehicleColor(), row.getVehiclePlate(), row.getVehicleSeats(),
-                row.getProduct(), row.isWheelchair(), row.isPets(), listed,
+                row.getVehicleColor(), row.getVehiclePlate(), listed,
                 row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
                 row.getReviewedBy());
     }

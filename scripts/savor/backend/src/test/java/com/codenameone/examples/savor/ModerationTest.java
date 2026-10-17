@@ -75,14 +75,14 @@ class ModerationTest {
         Map after = Trips.json(mvc, admin(get("/api/admin/stats/series?days=7")));
         assertEquals(Trips.number(before, "flaggedUsers") + 1, Trips.number(after, "flaggedUsers"));
 
-        // Not in the middle of a delivery: nobody could end it. Waiting for a
-        // courier is in the middle of one.
-        String delivery = (String) Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries"),
-                People.delivery(41.3874, 2.1686, 41.3974, 2.1786)), who)).get("id");
+        // Not in the middle of an order: nobody could cancel it. Waiting for
+        // the kitchen is in the middle of one.
+        String order = (String) Trips.place(mvc, who,
+                Trips.trip(41.3874, 2.1686, 41.3974, 2.1786)).get("id");
         mvc.perform(admin(Trips.body(post("/api/admin/users/" + who + "/suspend"),
                         "{\"suspended\":true}")))
                 .andExpect(status().isConflict());
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + delivery + "/cancel"), who))
+        mvc.perform(People.asCustomer(post("/api/orders/" + order + "/cancel"), who))
                 .andExpect(status().isOk());
 
         // A block is what stops it: the token in hand, and signing in again.
@@ -96,9 +96,9 @@ class ModerationTest {
         mvc.perform(get("/api/payments/methods").header("Host", SignIn.HOST)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(Trips.body(post("/api/deliveries").header("Host", SignIn.HOST)
+        mvc.perform(Trips.body(post("/api/orders").header("Host", SignIn.HOST)
                         .header("Authorization", "Bearer " + token),
-                        People.delivery(60.1699, 24.9384, 60.1800, 24.9500)))
+                        Trips.cart(mvc, Trips.trip(41.3874, 2.1686, 41.3974, 2.1786))))
                 .andExpect(status().isUnauthorized());
         assertEquals(null, SignIn.session(mvc, who, People.PASSWORD));
 
@@ -165,38 +165,38 @@ class ModerationTest {
         Map detail = Trips.json(mvc, admin(get("/api/admin/users/" + DemoAccounts.FLAGGED_CUSTOMER)));
         Map user = (Map) detail.get("user");
         assertEquals(Boolean.TRUE, user.get("flagged"));
-        assertTrue(Trips.number(detail, "deliveries") > 0L, "the fortnight gave it deliveries");
+        assertTrue(Trips.number(detail, "orders") > 0L, "the fortnight gave it orders");
         assertEquals("flag", ((Map) ((List) detail.get("events")).get(0)).get("action"));
     }
 
     @Test
-    void anAdminCancelsADeliveryThatIsUnderWay() throws Exception {
-        // Helsinki, where nobody drives: the delivery waits.
+    void anAdminCancelsAnOrderThatIsUnderWay() throws Exception {
+        // Helsinki, where nobody delivers: the order waits for a courier.
         String customer = People.customer(accounts, "hel-customer");
-        String id = (String) Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries"),
-                People.delivery(60.1699, 24.9384, 60.1800, 24.9500)), customer)).get("id");
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/cancel"), "{}")))
+        String id = Trips.ask(mvc, customer, Trips.trip(60.1699, 24.9384, 60.1800, 24.9500));
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/cancel"), "{}")))
                 .andExpect(status().isBadRequest());
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/cancel"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/cancel"),
                         "{\"reason\":\"Reported as a prank\"}")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.state").value("CANCELLED_BY_ADMIN"));
-        mvc.perform(People.asCustomer(get("/api/deliveries/active"), customer))
-                .andExpect(jsonPath("$.state").value("NONE"));
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
-                .andExpect(jsonPath("$.state").value("CANCELLED_BY_ADMIN"));
-        // Over is over, and a delivery that never was is not found.
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/cancel"),
+                .andExpect(jsonPath("$.state").value("CANCELLED_BY_ADMIN"))
+                .andExpect(jsonPath("$.delivery.state").value("CANCELLED_BY_ADMIN"));
+        assertEquals(0, Trips.list(mvc, People.asCustomer(get("/api/orders/active"), customer)).size());
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
+                .andExpect(jsonPath("$.state").value("CANCELLED_BY_ADMIN"))
+                .andExpect(jsonPath("$.paymentStatus").value("RELEASED"));
+        // Over is over, and an order that never was is not found.
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/cancel"),
                         "{\"reason\":\"Again\"}")))
                 .andExpect(status().isConflict());
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/nosuchdelivery/cancel"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/nosuchorder/cancel"),
                         "{\"reason\":\"Again\"}")))
                 .andExpect(status().isNotFound());
-        // A delivery that ended this way cost nothing, so it has no receipt.
+        // An order that ended this way cost nothing, so it has no receipt.
         mvc.perform(People.asCustomer(get("/api/payments/receipts/" + id), customer))
                 .andExpect(status().isNotFound());
         mvc.perform(admin(get("/api/admin/users/" + customer)))
-                .andExpect(jsonPath("$.events[0].action").value("cancel_delivery"))
+                .andExpect(jsonPath("$.events[0].action").value("cancel_order"))
                 .andExpect(jsonPath("$.events[0].reason").value("Reported as a prank"));
     }
 
@@ -206,8 +206,7 @@ class ModerationTest {
         String customer = People.customer(accounts, "tll-customer");
         String courier = People.courier(accounts, "tll-courier");
         Trips.online(mvc, courier, 59.4370, 24.7536);
-        String id = (String) Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries"),
-                People.delivery(59.4370, 24.7536, 59.4470, 24.7636)), customer)).get("id");
+        String id = Trips.ask(mvc, customer, Trips.trip(59.4370, 24.7536, 59.4470, 24.7636));
         mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
                 .andExpect(status().isOk());
 
@@ -218,7 +217,7 @@ class ModerationTest {
         mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/arrived"), courier))
                 .andExpect(status().isOk());
 
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/cancel"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/cancel"),
                         "{\"reason\":\"Courier is leaving\"}")))
                 .andExpect(status().isOk());
         mvc.perform(admin(Trips.body(post("/api/admin/users/" + courier + "/roles"),

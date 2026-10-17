@@ -1,3 +1,5 @@
+-- The courier's leg of an order: from the restaurant to the customer's door.
+-- It has the id of the order it carries.
 CREATE TABLE delivery (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
     state VARCHAR(24) NOT NULL,
@@ -22,25 +24,16 @@ CREATE TABLE delivery (
     search_until BIGINT NOT NULL,
     stars SMALLINT NOT NULL,
     payment_status VARCHAR(16) NOT NULL,
-    -- What the customer asked for beyond two points, how the delivery is paid for, and
-    -- the parts its price is made of. Every amount is cents, fixed when the delivery is
-    -- asked for; the tip and the courier's share are written when they are known.
-    product VARCHAR(16) NOT NULL,
+    -- How the order it carries is paid for. The courier is paid the order's
+    -- delivery fee (`fare_cents`) and its tip, as `courier_cents` and
+    -- `tip_cents`; the customer's charge is the order's, not this row's.
     method_id VARCHAR(32) NOT NULL,
     method_label VARCHAR(64) NOT NULL,
-    base_cents BIGINT NOT NULL,
-    distance_cents BIGINT NOT NULL,
-    time_cents BIGINT NOT NULL,
     fee_cents BIGINT NOT NULL,
     tip_cents BIGINT NOT NULL,
     courier_cents BIGINT NOT NULL,
-    women_only SMALLINT NOT NULL,
-    quiet SMALLINT NOT NULL,
-    wheelchair SMALLINT NOT NULL,
-    note VARCHAR(255) NOT NULL,
-    -- A customer may ask for a car their pet is welcome in, and a courier says whether
-    -- theirs is one. Neither is, until someone says so.
-    pets SMALLINT NOT NULL
+    -- For the courier: a gate code, which door.
+    note VARCHAR(255) NOT NULL
 );
 CREATE INDEX delivery_customer ON delivery (customer, requested_at);
 CREATE INDEX delivery_courier ON delivery (courier, requested_at);

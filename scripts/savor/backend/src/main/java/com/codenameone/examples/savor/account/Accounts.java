@@ -55,12 +55,11 @@ import java.util.Map;
 /// -- display name, phone, car -- is this application's table. The name is the
 /// e-mail address, in lower case.
 ///
-/// Onboarding is not something an account is opened with. Asking to drive opens
+/// Onboarding is not something an account is opened with. Asking to deliver opens
 /// an application ([Applications]), and the COURIER role arrives when an admin
 /// approves it.
 @Component
 public class Accounts {
-    public static final String[] GENDERS = {"unspecified", "female", "male", "nonbinary"};
 
     private final ProfileRepository profiles;
     private final AccountCleanup cleanup;
@@ -129,14 +128,13 @@ public class Accounts {
         }
         String username = email(request.email());
         password(request.password());
-        String gender = Text.oneOf(request.gender(), GENDERS, GENDERS[0], "gender");
         String displayName = required(request.displayName(), 120, "your name");
         String phone = phone(request.phone());
         String vehicle = "";
         String plate = "";
-        if (request.courier()) {
-            vehicle = required(request.vehicle(), 120, "the car you drive");
-            plate = required(request.plate(), 32, "its plate");
+        if (request.wantsToDeliver()) {
+            vehicle = Text.optional(request.vehicle(), 120, "what you deliver with");
+            plate = Text.optional(request.plate(), 32, "its plate");
         }
         if (users.userExists(username)) {
             throw new ResponseStatusException(409, "That e-mail already has an account");
@@ -148,12 +146,11 @@ public class Accounts {
             throw new ResponseStatusException(409,
                     "That e-mail belonged to an account that was closed. Use another");
         }
-        // Every account opens as a customer. Asking to drive -- `courier` is how an
-        // older app asks -- begins an application, and the role waits for an
-        // admin to approve it.
+        // Every account opens as a customer. Asking to deliver begins an
+        // application, and the role waits for an admin to approve it.
         create(username, request.password(), displayName, phone, false, vehicle, plate, false,
-                false, gender, System.currentTimeMillis());
-        if (request.courier() || request.wantsToDrive()) {
+                false, System.currentTimeMillis());
+        if (request.wantsToDeliver()) {
             applications.open(username, vehicle, plate);
         }
         return describe(username);
@@ -167,17 +164,17 @@ public class Accounts {
             boolean phoneVerified, String vehicle, String plate, boolean courier, boolean admin)
             throws IOException {
         create(username, password, displayName, phone, phoneVerified, vehicle, plate, courier,
-                admin, GENDERS[0], System.currentTimeMillis());
+                admin, System.currentTimeMillis());
     }
 
-    /// As the method above, for a caller that also knows the gender and when
-    /// the account was opened; the demo data is the one caller with a past to
+    /// As the method above, for a caller that also knows when the account was
+    /// opened; the demo data is the one caller with a past to
     /// write. The profile is stored whole, in one go, and not corrected
     /// afterwards.
     @Transactional(rollbackFor = IOException.class)
     void create(String username, String password, String displayName, String phone,
             boolean phoneVerified, String vehicle, String plate, boolean courier, boolean admin,
-            String gender, long openedAt) throws IOException {
+            long openedAt) throws IOException {
         users.createUser(User.withUsername(username).password(encoder.encode(password))
                 .roles(roles(courier, admin)).build());
         Profile profile = new Profile();
@@ -188,7 +185,6 @@ public class Accounts {
         profile.setVehicle(vehicle);
         profile.setPlate(plate);
         profile.setCreatedAt(openedAt);
-        profile.setGender(gender);
         profiles.insert(profile);
         if (courier) {
             applications.grant(username, username);
@@ -284,6 +280,18 @@ public class Accounts {
         return describe(username);
     }
 
+    /// Gives or takes the merchant role, which goes with a place on a
+    /// restaurant's staff: `Restaurants` calls this in the transaction that
+    /// adds or removes the place. Every other role is left as it is.
+    public void setMerchant(String username, boolean merchant) throws IOException {
+        UserDetails signIn = load(username);
+        List<String> held = authorities(signIn);
+        boolean courier = held.contains("ROLE_" + Roles.COURIER);
+        boolean admin = held.contains("ROLE_" + Roles.ADMIN);
+        users.updateUser(User.withUserDetails(signIn).roles(roles(courier, admin, merchant))
+                .build());
+    }
+
     /// Blocks an account or lifts the block. A blocked account cannot sign in,
     /// and a token it already holds stops working at once, because the API
     /// reads the account on every request.
@@ -350,8 +358,7 @@ public class Accounts {
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
         }
-        return new ProfileDto(row.getDisplayName(), row.getGender(), row.getEmergencyName(),
-                row.getEmergencyPhone(), row.getHomeAddress(), row.getWorkAddress());
+        return new ProfileDto(row.getDisplayName());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -359,27 +366,12 @@ public class Accounts {
         if (profile == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
-        String contact = profile.emergencyContactPhone() == null ? ""
-                : profile.emergencyContactPhone().trim();
-        // Everything is checked before anything is assigned: the row is written
-        // from what it holds when the transaction commits.
         String name = required(profile.name(), 120, "your name");
-        String gender = Text.oneOf(profile.gender(), GENDERS, GENDERS[0], "gender");
-        String emergencyName = Text.optional(profile.emergencyContactName(), 120,
-                "the contact's name");
-        String emergencyPhone = contact.length() == 0 ? "" : phone(contact);
-        String home = Text.optional(profile.homeAddress(), 255, "an address");
-        String work = Text.optional(profile.workAddress(), 255, "an address");
         Profile row = profiles.findById(username);
         if (row == null) {
             throw new ResponseStatusException(404, "No such account");
         }
         row.setDisplayName(name);
-        row.setGender(gender);
-        row.setEmergencyName(emergencyName);
-        row.setEmergencyPhone(emergencyPhone);
-        row.setHomeAddress(home);
-        row.setWorkAddress(work);
         return describe(username);
     }
 
@@ -429,7 +421,7 @@ public class Accounts {
         // The account as it was, answered as what it now is: unable to sign in.
         return new UserDto(was.username(), was.displayName(), was.phone(), was.phoneVerified(),
                 was.customer(), was.courier(), was.admin(), was.merchant(), true, was.vehicle(), was.plate(),
-                was.gender(), was.courierStatus(), was.flagged(), was.flagReason(),
+                was.courierStatus(), was.flagged(), was.flagReason(),
                 was.language());
     }
 
@@ -601,7 +593,7 @@ public class Accounts {
         boolean merchant = authorities.contains("ROLE_" + Roles.MERCHANT);
         return new UserDto(profile.getUsername(), profile.getDisplayName(), profile.getPhone(),
                 profile.isPhoneVerified(), customer, courier, admin, merchant, !enabled, profile.getVehicle(),
-                profile.getPlate(), profile.getGender(), courierStatus, profile.isFlagged(),
+                profile.getPlate(), courierStatus, profile.isFlagged(),
                 profile.getFlagReason(), profile.getLanguage());
     }
 

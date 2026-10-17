@@ -23,20 +23,15 @@ import com.codename1.annotations.Mapped;
 /// What opening an account takes. The password travels once, in the body of a
 /// request over TLS, and the server keeps only its hash.
 ///
-/// @param courier The older spelling of [#wantsToDrive()], kept for apps built before it. It no
-///     longer grants anything: it opens a onboarding application like the newer flag.
-/// @param wantsToDrive Opens a onboarding application with the account. The account is a customer until
-///     an admin approves the application.
-/// @param gender `unspecified`, `female`, `male` or `nonbinary`; empty reads as unspecified.
+/// @param wantsToDeliver Opens a courier application with the account. The account is a
+///     customer until an admin approves the application.
 @Mapped
 public record RegisterDto(
         String email,
         String password,
         String displayName,
         String phone,
-        boolean courier,
         String vehicle,
         String plate,
-        boolean wantsToDrive,
-        String gender) {
+        boolean wantsToDeliver) {
 }

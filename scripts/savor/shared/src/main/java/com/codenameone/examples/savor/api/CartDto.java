@@ -18,10 +18,22 @@
  */
 package com.codenameone.examples.savor.api;
 
-import com.codename1.annotations.Mapped;
+import java.util.List;
 
-/// A free courier near a point, for the cars on the customer's map. Says where and
-/// what, and not who.
-@Mapped
-public record NearbyCourierDto(double lat, double lng, double heading, String product) {
+/// What the customer is about to order: from one restaurant, to one place.
+/// The server prices it itself; nothing the app worked out is believed.
+///
+/// @param note For the courier: a gate code, which door.
+/// @param tipCents For the courier, charged with the order.
+/// @param paymentMethodId Empty for the account's default.
+public record CartDto(
+        String restaurantId,
+        List<CartLineDto> lines,
+        double dropoffLat,
+        double dropoffLng,
+        String dropoffAddress,
+        String note,
+        String promoCode,
+        long tipCents,
+        String paymentMethodId) {
 }

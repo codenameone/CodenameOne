@@ -20,7 +20,7 @@ package com.codenameone.examples.savor.api;
 
 import com.codename1.annotations.Mapped;
 
-/// The modes an admin grants a user beyond riding.
+/// The modes an admin grants a user beyond ordering.
 @Mapped
 public record RoleChangeDto(boolean courier, boolean admin) {
 }

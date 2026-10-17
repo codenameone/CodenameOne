@@ -19,6 +19,7 @@
 package com.codenameone.examples.savor;
 
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
 
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +47,21 @@ public final class Rows {
     }
 
     /// A column holding a delivery's state, or null for one that names none.
+    /// An order's state as a query answers it: the enum, or its name.
+    public static OrderState orderState(Object value) {
+        if (value instanceof OrderState) {
+            return (OrderState) value;
+        }
+        String name = text(value);
+        OrderState[] all = OrderState.values();
+        for (int iter = 0; iter < all.length; iter++) {
+            if (all[iter].name().equals(name)) {
+                return all[iter];
+            }
+        }
+        return null;
+    }
+
     public static DeliveryState state(Object value) {
         if (value instanceof DeliveryState) {
             return (DeliveryState) value;

@@ -28,7 +28,7 @@ import com.codenameone.examples.savor.domain.CourierDocument;
 
 import java.util.List;
 
-/// The documents of applications to drive, keyed by
+/// The documents of applications to deliver, keyed by
 /// `Identifier.of(username, kind)`.
 ///
 /// A document's row carries the picture, as Base64 text that can run to a

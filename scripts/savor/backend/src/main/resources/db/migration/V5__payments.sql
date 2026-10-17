@@ -68,15 +68,20 @@ CREATE INDEX payout_courier ON payout (courier, created_at);
 -- there is one the prices are the fare settings of the server.
 CREATE TABLE pricing (
     id INTEGER NOT NULL PRIMARY KEY,
+    -- The delivery fee: a base, and an amount per kilometre from the
+    -- restaurant to the door, times `surge` while couriers are scarce.
     base_cents BIGINT NOT NULL,
     per_km_cents BIGINT NOT NULL,
-    per_minute_cents BIGINT NOT NULL,
-    minimum_cents BIGINT NOT NULL,
-    fee_percent DOUBLE PRECISION NOT NULL,
-    commission_percent DOUBLE PRECISION NOT NULL,
     surge DOUBLE PRECISION NOT NULL,
-    comfort DOUBLE PRECISION NOT NULL,
-    xl DOUBLE PRECISION NOT NULL,
+    -- An order whose food comes to less than `small_order_cents` pays the
+    -- difference, up to `small_order_fee_cents`.
+    small_order_cents BIGINT NOT NULL,
+    small_order_fee_cents BIGINT NOT NULL,
+    -- The customer's service fee and the tax, as percentages of the food.
+    fee_percent DOUBLE PRECISION NOT NULL,
+    tax_percent DOUBLE PRECISION NOT NULL,
+    -- What the service keeps of the food; the restaurant is paid the rest.
+    commission_percent DOUBLE PRECISION NOT NULL,
     updated_at BIGINT NOT NULL,
     updated_by VARCHAR(190) NOT NULL
 );

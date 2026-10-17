@@ -27,8 +27,8 @@ import com.codename1.annotations.Mapped;
 @Mapped
 public record DayStatsDto(
         String date,
-        int deliveries,
-        int completed,
+        int orders,
+        int delivered,
         int cancelled,
         long revenue,
         int newUsers) {

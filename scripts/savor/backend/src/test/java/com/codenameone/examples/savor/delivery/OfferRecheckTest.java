@@ -21,14 +21,16 @@ package com.codenameone.examples.savor.delivery;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
+import com.codename1.backend.test.MockMvc;
+import com.codenameone.examples.savor.People;
+import com.codenameone.examples.savor.Trips;
 import com.codenameone.examples.savor.account.Accounts;
 import com.codenameone.examples.savor.account.DemoAccounts;
 import com.codenameone.examples.savor.api.CourierStatusDto;
-import com.codenameone.examples.savor.api.RegisterDto;
 import com.codenameone.examples.savor.api.DeliveryDto;
-import com.codenameone.examples.savor.api.DeliveryRequestDto;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.courier.Couriers;
+import com.codenameone.examples.savor.order.Orders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,18 +40,22 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /// search chose them.
 ///
 /// Choosing and offering are two transactions, and a courier can go off line,
-/// drive away, lose their approval or be blocked in between. Each of those is
+/// ride away, lose their approval or be blocked in between. Each of those is
 /// set up here and the offer made to them anyway, which is the second
 /// transaction running after the first read them as they were. It sits in
 /// this package because the offer is not part of the service's public face.
 @BackendTest
 class OfferRecheckTest {
-    // Porto.
-    private static final double LAT = 41.1579;
-    private static final double LNG = -8.6291;
+    // Bologna.
+    private static final double LAT = 44.4949;
+    private static final double LNG = 11.3426;
 
     @Autowired
+    private MockMvc mvc;
+    @Autowired
     private Accounts accounts;
+    @Autowired
+    private Orders orders;
     @Autowired
     private Deliveries deliveries;
     @Autowired
@@ -57,36 +63,24 @@ class OfferRecheckTest {
     @Autowired
     private DataSource db;
 
-    private String open(String name, boolean courier) throws Exception {
-        String username = accounts.register(new RegisterDto(name + "@test.example",
-                "a-long-password", name, "+15550111", courier, "Green Fiat 500", "T " + name,
-                false, null)).username();
-        accounts.markPhoneVerified(username);
-        if (courier) {
-            accounts.setRoles(DemoAccounts.ADMIN, username, true, false);
-        }
-        return username;
-    }
-
     private void at(String courier, boolean online, double lat, double lng) throws Exception {
         couriers.report(courier, new CourierStatusDto(online, lat, lng, 90d));
     }
 
     private void notOffered(String id, String courier, String why) throws Exception {
         assertNull(deliveries.offer(id, courier), why);
-        assertEquals(DeliveryState.REQUESTED, deliveries.get("", true, id).state(), why);
+        assertEquals(DeliveryState.REQUESTED, deliveries.forOrder(id, "", false).state(), why);
     }
 
     @Test
     void aCourierNoLongerFitForTheDeliveryIsNotOfferedIt() throws Exception {
-        String customer = open("opo-customer", false);
-        String courier = open("opo-courier", true);
-        // Asked for with nobody on line, so it waits. The courier is kept unfit
+        String customer = People.customer(accounts, "blq-customer");
+        String courier = People.courier(accounts, "blq-courier");
+        // Cooked with nobody on line, so it waits. The courier is kept unfit
         // from here until the end, so the scheduled search, which runs
         // alongside, has nobody to offer it to either.
-        String id = deliveries.request(customer, new DeliveryRequestDto(LAT, LNG, "Here", LAT + 0.02,
-                LNG + 0.02, "There", 0d, 0d, null, null, null, false, false, false, null)).id();
-        assertEquals(DeliveryState.REQUESTED, deliveries.get("", true, id).state());
+        String id = Trips.ask(mvc, customer, Trips.trip(LAT, LNG, LAT + 0.02, LNG + 0.02));
+        assertEquals(DeliveryState.REQUESTED, deliveries.forOrder(id, "", false).state());
 
         // On line, a hundred kilometres away.
         at(courier, true, LAT + 1d, LNG);
@@ -118,10 +112,10 @@ class OfferRecheckTest {
         // scheduled search if it got there first.
         at(courier, true, LAT, LNG);
         deliveries.offer(id, courier);
-        DeliveryDto now = deliveries.get("", true, id);
+        DeliveryDto now = deliveries.forOrder(id, courier, true);
         assertEquals(DeliveryState.OFFERED, now.state());
         assertEquals(courier, now.courierUsername());
-        deliveries.cancelByAdmin(DemoAccounts.ADMIN, id, "the test is over");
+        orders.cancelByAdmin(DemoAccounts.ADMIN, id, "the test is over");
         at(courier, false, 0d, 0d);
     }
 }

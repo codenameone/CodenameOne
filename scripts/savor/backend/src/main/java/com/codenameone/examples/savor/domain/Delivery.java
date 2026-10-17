@@ -93,22 +93,10 @@ public class Delivery {
     private String paymentStatus = "";
 
     @Column(nullable = false)
-    private String product = "standard";
-
-    @Column(nullable = false)
     private String methodId = "cash";
 
     @Column(nullable = false)
     private String methodLabel = "Cash";
-
-    @Column(nullable = false)
-    private long baseCents;
-
-    @Column(nullable = false)
-    private long distanceCents;
-
-    @Column(nullable = false)
-    private long timeCents;
 
     @Column(nullable = false)
     private long feeCents;
@@ -118,20 +106,6 @@ public class Delivery {
 
     @Column(nullable = false)
     private long courierCents;
-
-    @Column(nullable = false)
-    private boolean womenOnly;
-
-    @Column(nullable = false)
-    private boolean quiet;
-
-    @Column(nullable = false)
-    private boolean wheelchair;
-
-    // tag::savor-column-entity[]
-    @Column(nullable = false)
-    private boolean pets;
-    // end::savor-column-entity[]
 
     @Column(nullable = false)
     private String note = "";
@@ -299,14 +273,6 @@ public class Delivery {
         this.paymentStatus = paymentStatus;
     }
 
-    public String getProduct() {
-        return product;
-    }
-
-    public void setProduct(String product) {
-        this.product = product;
-    }
-
     public String getMethodId() {
         return methodId;
     }
@@ -321,30 +287,6 @@ public class Delivery {
 
     public void setMethodLabel(String methodLabel) {
         this.methodLabel = methodLabel;
-    }
-
-    public long getBaseCents() {
-        return baseCents;
-    }
-
-    public void setBaseCents(long baseCents) {
-        this.baseCents = baseCents;
-    }
-
-    public long getDistanceCents() {
-        return distanceCents;
-    }
-
-    public void setDistanceCents(long distanceCents) {
-        this.distanceCents = distanceCents;
-    }
-
-    public long getTimeCents() {
-        return timeCents;
-    }
-
-    public void setTimeCents(long timeCents) {
-        this.timeCents = timeCents;
     }
 
     public long getFeeCents() {
@@ -369,38 +311,6 @@ public class Delivery {
 
     public void setCourierCents(long courierCents) {
         this.courierCents = courierCents;
-    }
-
-    public boolean isWomenOnly() {
-        return womenOnly;
-    }
-
-    public void setWomenOnly(boolean womenOnly) {
-        this.womenOnly = womenOnly;
-    }
-
-    public boolean isQuiet() {
-        return quiet;
-    }
-
-    public void setQuiet(boolean quiet) {
-        this.quiet = quiet;
-    }
-
-    public boolean isWheelchair() {
-        return wheelchair;
-    }
-
-    public void setWheelchair(boolean wheelchair) {
-        this.wheelchair = wheelchair;
-    }
-
-    public boolean isPets() {
-        return pets;
-    }
-
-    public void setPets(boolean pets) {
-        this.pets = pets;
     }
 
     public String getNote() {

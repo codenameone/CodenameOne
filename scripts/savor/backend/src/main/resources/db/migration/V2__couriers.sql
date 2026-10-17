@@ -12,9 +12,8 @@ CREATE TABLE courier_state (
 -- Matching asks for the couriers on line inside a latitude band.
 CREATE INDEX courier_online ON courier_state (online, lat);
 
--- An application to drive: one per account, edited as a draft, handed in, and
--- then approved or rejected by an admin. The COURIER role follows `approved`,
--- and matching reads the car's product from here.
+-- An application to deliver: one per account, edited as a draft, handed in, and
+-- then approved or rejected by an admin. The COURIER role follows `approved`.
 CREATE TABLE courier_application (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     status VARCHAR(16) NOT NULL,
@@ -27,17 +26,11 @@ CREATE TABLE courier_application (
     vehicle_year INTEGER NOT NULL,
     vehicle_color VARCHAR(24) NOT NULL,
     vehicle_plate VARCHAR(32) NOT NULL,
-    vehicle_seats INTEGER NOT NULL,
-    product VARCHAR(16) NOT NULL,
-    -- Whether the car takes a wheelchair. Not called "accessible", which MySQL
-    -- reserves.
-    wheelchair SMALLINT NOT NULL,
     rejection_reason VARCHAR(255) NOT NULL,
     created_at BIGINT NOT NULL,
     submitted_at BIGINT NOT NULL,
     reviewed_at BIGINT NOT NULL,
-    reviewed_by VARCHAR(190) NOT NULL,
-    pets SMALLINT NOT NULL
+    reviewed_by VARCHAR(190) NOT NULL
 );
 CREATE INDEX courier_application_status ON courier_application (status, submitted_at);
 

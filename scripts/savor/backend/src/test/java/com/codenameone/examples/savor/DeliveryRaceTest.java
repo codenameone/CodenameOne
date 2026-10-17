@@ -24,6 +24,7 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.savor.account.Accounts;
+import com.codenameone.examples.savor.account.DemoAccounts;
 import com.codenameone.examples.savor.api.DeliveryDto;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.delivery.Deliveries;
@@ -145,13 +146,19 @@ class DeliveryRaceTest {
         return ((Number) row.get("n")).longValue();
     }
 
+    /// The state of the delivery of the customer's order `id`.
+    private String deliveryState(String customer, String id) throws Exception {
+        Map order = Trips.json(mvc, People.asCustomer(get("/api/orders/" + id), customer));
+        Object delivery = order.get("delivery");
+        return delivery instanceof Map ? (String) ((Map) delivery).get("state") : null;
+    }
+
     /// A delivery offered to `courier`, who is on line beside the pickup.
     private String offered(String customer, String courier, double lat, double lng) throws Exception {
         Trips.online(mvc, courier, lat, lng);
-        Map asked = Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries"),
-                People.delivery(lat + 0.0002, lng + 0.0002, lat + 0.02, lng + 0.02)), customer));
-        assertEquals("OFFERED", asked.get("state"));
-        String id = (String) asked.get("id");
+        String id = Trips.ask(mvc, customer,
+                Trips.trip(lat + 0.0002, lng + 0.0002, lat + 0.02, lng + 0.02));
+        assertEquals("OFFERED", deliveryState(customer, id));
         assertEquals(id, Trips.json(mvc, People.asCourier(get("/api/courier/active"), courier))
                 .get("id"));
         return id;
@@ -177,8 +184,7 @@ class DeliveryRaceTest {
         assertEquals(THREADS - 1, count(outcomes, 409), "and every other was told it was taken");
         // What happened is on record once, too.
         assertEquals(1L, events(id, "ACCEPTED"));
-        assertEquals("ACCEPTED", Trips.json(mvc, People.asCustomer(get("/api/deliveries/" + id), customer))
-                .get("state"));
+        assertEquals("ACCEPTED", deliveryState(customer, id));
     }
 
     @Test
@@ -226,11 +232,11 @@ class DeliveryRaceTest {
         assertEquals(THREADS, count(outcomes, 409) + count(outcomes, 404));
         assertEquals(0L, events(id, "ACCEPTED"));
         // The only courier in reach has let it go by, so it waits.
-        assertEquals("REQUESTED", Trips.json(mvc, People.asCustomer(get("/api/deliveries/" + id), customer))
-                .get("state"));
+        assertEquals("REQUESTED", deliveryState(customer, id));
         assertEquals("NONE", Trips.json(mvc, People.asCourier(get("/api/courier/active"), courier))
                 .get("state"));
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + id + "/cancel"), customer));
+        mvc.perform(People.asAdmin(Trips.body(post("/api/admin/orders/" + id + "/cancel"),
+                "{\"reason\":\"Test\"}"), DemoAccounts.ADMIN));
     }
 
     @Test
@@ -251,8 +257,8 @@ class DeliveryRaceTest {
         noneUnexpected(none);
         assertEquals(404, outcome[0]);
         assertEquals(0L, events(id, "ACCEPTED"));
-        assertEquals("REQUESTED", Trips.json(mvc, People.asCustomer(get("/api/deliveries/" + id), customer))
-                .get("state"));
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + id + "/cancel"), customer));
+        assertEquals("REQUESTED", deliveryState(customer, id));
+        mvc.perform(People.asAdmin(Trips.body(post("/api/admin/orders/" + id + "/cancel"),
+                "{\"reason\":\"Test\"}"), DemoAccounts.ADMIN));
     }
 }

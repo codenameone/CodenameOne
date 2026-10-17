@@ -45,7 +45,7 @@ import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.DeliveryEventRepository;
 import com.codenameone.examples.savor.repository.DeliveryPassedRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.order.Quotes;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -77,12 +77,12 @@ public class Earnings {
     private final CourierStateRepository couriers;
     private final CourierHoursRepository hours;
     private final ProfileRepository profiles;
-    private final Fares fares;
+    private final Quotes fares;
 
     public Earnings(PayoutRepository payouts, PayoutAccountRepository accounts,
             DeliveryRepository deliveries, DeliveryEventRepository events, DeliveryPassedRepository passes,
             CourierStateRepository couriers, CourierHoursRepository hours,
-            ProfileRepository profiles, Fares fares) {
+            ProfileRepository profiles, Quotes fares) {
         this.payouts = payouts;
         this.accounts = accounts;
         this.deliveries = deliveries;

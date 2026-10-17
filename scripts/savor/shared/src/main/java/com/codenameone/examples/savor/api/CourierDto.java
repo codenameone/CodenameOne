@@ -22,9 +22,8 @@ import com.codename1.annotations.Mapped;
 
 /// A courier, for the admin's fleet view and for the courier's own status.
 ///
-/// @param approved Whether the onboarding application was approved. Only an approved courier can go on
+/// @param approved Whether the courier application was approved. Only an approved courier can go on
 ///     line.
-/// @param product `standard`, `comfort` or `xl`: the kind of delivery this car is offered.
 /// @param acceptanceRate The share of the offers this courier was sent that they took, 0 to 1; 1
 ///     before any was sent.
 @Mapped
@@ -41,9 +40,6 @@ public record CourierDto(
         long lastSeen,
         int deliveries,
         boolean approved,
-        String product,
-        String gender,
-        boolean accessible,
         double acceptanceRate,
         boolean flagged) {
 }

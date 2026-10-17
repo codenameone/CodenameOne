@@ -27,7 +27,7 @@ import com.codename1.annotations.rest.RestClient;
 import com.codename1.io.rest.Response;
 import com.codename1.util.OnComplete;
 
-/// Applying to drive. Open to anyone signed in, and only ever about the
+/// Applying to deliver. Open to anyone signed in, and only ever about the
 /// caller's own application: the COURIER role, and `CourierApi` with it, comes
 /// once an admin approves.
 @RestClient

@@ -59,6 +59,8 @@ public class SimulatedPayments implements PaymentProvider {
     private static final String LOST_REFUND_TOKEN = "sim_pm_lost_";
     private static final String SLOW_REFUND_CHARGE = "sim_ch_slow_";
     private static final String LOST_REFUND_CHARGE = "sim_ch_lost_";
+    private static final String FAILING_HOLD = "sim_hold_fail_";
+    private static final String FAULTY_HOLD = "sim_hold_fault_";
     private static final String REFUND = "sim_re_";
 
     @Override
@@ -133,6 +135,39 @@ public class SimulatedPayments implements PaymentProvider {
         // has only the charge to go by.
         return (token.startsWith(SLOW_REFUND_TOKEN) ? SLOW_REFUND_CHARGE
                 : token.startsWith(LOST_REFUND_TOKEN) ? LOST_REFUND_CHARGE : "sim_ch_") + key;
+    }
+
+    /// A hold is a charge that has not been taken yet, and its reference
+    /// refunds the way the charge's would. A card that fails when charged is
+    /// held without complaint and fails when the hold is taken, as a hold that
+    /// lapsed while the order was on its way does: that is the failure an
+    /// order meets after checkout, and the one the tests have to reach.
+    @Override
+    public String authorize(String key, String customer, String token, long amountCents,
+            String currency, String description) throws IOException {
+        if (token.startsWith(FAILING_TOKEN)) {
+            return FAILING_HOLD + key;
+        }
+        if (token.startsWith(FAULTY_TOKEN)) {
+            return FAULTY_HOLD + key;
+        }
+        return charge(key, customer, token, amountCents, currency, description);
+    }
+
+    @Override
+    public void capture(String reference, long amountCents) throws IOException {
+        // Otherwise nothing to take: the simulated card holds no money.
+        if (reference.startsWith(FAILING_HOLD)) {
+            throw new PaymentDeclinedException("Your card was declined");
+        }
+        if (reference.startsWith(FAULTY_HOLD)) {
+            throw new IOException("The simulated processor did not answer");
+        }
+    }
+
+    @Override
+    public void release(String reference) {
+        // Nothing to let go.
     }
 
     @Override

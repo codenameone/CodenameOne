@@ -58,10 +58,10 @@ public interface PaymentApi {
     @GET("/api/payments/receipts")
     void receipts(OnComplete<Response<List<ReceiptDto>>> callback);
 
-    @GET("/api/payments/receipts/{deliveryId}")
-    void receipt(@Path("deliveryId") String deliveryId, OnComplete<Response<ReceiptDto>> callback);
+    @GET("/api/payments/receipts/{orderId}")
+    void receipt(@Path("orderId") String orderId, OnComplete<Response<ReceiptDto>> callback);
 
-    /// Tips the courier of a completed delivery, once.
-    @POST("/api/deliveries/{id}/tip")
+    /// Tips the courier of a delivered order, once.
+    @POST("/api/orders/{id}/tip")
     void tip(@Path("id") String id, @Body TipDto tip, OnComplete<Response<ReceiptDto>> callback);
 }

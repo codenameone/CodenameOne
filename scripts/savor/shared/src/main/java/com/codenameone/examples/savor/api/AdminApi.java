@@ -30,7 +30,7 @@ import com.codename1.util.OnComplete;
 
 import java.util.List;
 
-/// Admin mode: the numbers, the fleet, who may drive, and who may do what.
+/// Admin mode: the numbers, the fleet, who may deliver, and who may do what.
 @RestClient
 public interface AdminApi {
     @GET("/api/admin/stats")
@@ -88,15 +88,46 @@ public interface AdminApi {
     void reject(@Path("username") String username, @Body ReasonDto reason,
             OnComplete<Response<CourierApplicationDto>> callback);
 
-    @POST("/api/admin/deliveries/{id}/cancel")
-    void cancelDelivery(@Path("id") String id, @Body ReasonDto reason,
-            OnComplete<Response<DeliveryDto>> callback);
+    /// The most recent orders, newest first.
+    @GET("/api/admin/orders")
+    void orders(OnComplete<Response<List<OrderDto>>> callback);
 
-    @POST("/api/admin/deliveries/{id}/refund")
-    void refundDelivery(@Path("id") String id, @Body ReasonDto reason,
+    /// Ends an order that has not arrived, lets the card hold go and takes its
+    /// delivery off the road.
+    @POST("/api/admin/orders/{id}/cancel")
+    void cancelOrder(@Path("id") String id, @Body ReasonDto reason,
+            OnComplete<Response<OrderDto>> callback);
+
+    /// Returns what a delivered order cost to the card that paid for it.
+    @POST("/api/admin/orders/{id}/refund")
+    void refundOrder(@Path("id") String id, @Body ReasonDto reason,
             OnComplete<Response<ReceiptDto>> callback);
 
-    /// Every receipt, newest first.
+    /// Restaurants in one status: `PENDING` (applications), `APPROVED`,
+    /// `REJECTED` or `SUSPENDED`.
+    @GET("/api/admin/restaurants")
+    void restaurants(@Query("status") String status,
+            OnComplete<Response<List<RestaurantDto>>> callback);
+
+    @POST("/api/admin/restaurants/{id}/approve")
+    void approveRestaurant(@Path("id") String id, OnComplete<Response<RestaurantDto>> callback);
+
+    @POST("/api/admin/restaurants/{id}/reject")
+    void rejectRestaurant(@Path("id") String id, @Body ReasonDto reason,
+            OnComplete<Response<RestaurantDto>> callback);
+
+    /// Takes a listed restaurant off the app, or puts it back.
+    @POST("/api/admin/restaurants/{id}/suspend")
+    void suspendRestaurant(@Path("id") String id, @Body SuspendDto suspend,
+            OnComplete<Response<RestaurantDto>> callback);
+
+    @GET("/api/admin/promos")
+    void promos(OnComplete<Response<List<PromoDto>>> callback);
+
+    /// Creates a promotion code or changes one, by its code.
+    @PUT("/api/admin/promos")
+    void savePromo(@Body PromoDto promo, OnComplete<Response<PromoDto>> callback);
+
     @GET("/api/admin/payments")
     void payments(OnComplete<Response<List<ReceiptDto>>> callback);
 

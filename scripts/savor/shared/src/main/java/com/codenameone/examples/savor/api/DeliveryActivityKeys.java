@@ -25,25 +25,27 @@ package com.codenameone.examples.savor.api;
 /// server sends later states with the same keys.
 public final class DeliveryActivityKeys {
     /// The kind of activity.
-    public static final String KIND = "delivery";
-    /// What is happening, in words: "On the way", "Your courier is here".
+    public static final String KIND = "order";
+    /// What is happening, in words: "Preparing your order", "On its way".
     public static final String STATUS = "status";
-    /// The courier's name.
+    /// The restaurant's name.
+    public static final String RESTAURANT = "restaurant";
+    /// The courier's name, once one has the order.
     public static final String COURIER = "courier";
-    /// The car, as the courier described it.
+    /// The courier's vehicle, as they described it.
     public static final String CAR = "car";
-    /// The car's license plate.
+    /// The vehicle's plate.
     public static final String PLATE = "plate";
-    /// When the car gets where it is going next, in words: "4 min", or empty
-    /// once it is there.
+    /// When the order reaches the door, in words: "12 min", or empty once it
+    /// is there.
     public static final String ETA = "eta";
-    /// How far along the delivery is, a number from 0 to 1 for the progress bar.
+    /// How far along the order is, a number from 0 to 1 for the progress bar.
     public static final String PROGRESS = "progress";
-
     /// The values of [#PROGRESS] at each step.
-    public static final double ON_THE_WAY = 0.25d;
-    public static final double ARRIVED = 0.5d;
-    public static final double IN_TRIP = 0.75d;
+    public static final double PLACED = 0.1d;
+    public static final double PREPARING = 0.35d;
+    public static final double READY = 0.55d;
+    public static final double ON_THE_WAY = 0.8d;
     public static final double DONE = 1d;
 
     private DeliveryActivityKeys() {

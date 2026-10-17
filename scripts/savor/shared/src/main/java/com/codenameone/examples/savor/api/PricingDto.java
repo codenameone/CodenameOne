@@ -18,23 +18,22 @@
  */
 package com.codenameone.examples.savor.api;
 
-import com.codename1.annotations.Mapped;
-
-/// What deliveries cost. Amounts are cents; the percentages are of the fare.
+/// What an order costs on top of its food, and what the service keeps of it.
 ///
-/// @param serviceFeePercent Added to the fare and paid by the customer.
-/// @param commissionPercent Kept from the fare; the rest is the courier's.
-/// @param surgeMultiplier Multiplies every fare while demand is high; 1 otherwise.
-@Mapped
+/// @param baseCents The delivery fee's base.
+/// @param perKmCents Added to it for each kilometre from the restaurant to the door.
+/// @param surge The delivery fee is multiplied by it.
+/// @param smallOrderCents Food worth less than this pays the difference ...
+/// @param smallOrderFeeCents ... up to this much.
+/// @param commissionPercent Kept of the food; the restaurant is paid the rest.
 public record PricingDto(
         String currency,
-        long baseFare,
-        long perKm,
-        long perMinute,
-        long minimumFare,
+        long baseCents,
+        long perKmCents,
+        double surge,
+        long smallOrderCents,
+        long smallOrderFeeCents,
         double serviceFeePercent,
-        double commissionPercent,
-        double surgeMultiplier,
-        double comfortMultiplier,
-        double xlMultiplier) {
+        double taxPercent,
+        double commissionPercent) {
 }

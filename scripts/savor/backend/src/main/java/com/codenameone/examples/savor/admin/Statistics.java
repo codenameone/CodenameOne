@@ -29,6 +29,7 @@ import com.codenameone.examples.savor.api.DayStatsDto;
 import com.codenameone.examples.savor.api.CourierDto;
 import com.codenameone.examples.savor.api.NameCountDto;
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.api.StatsSeriesDto;
 import com.codenameone.examples.savor.api.UserDetailDto;
 import com.codenameone.examples.savor.api.UserDto;
@@ -38,13 +39,15 @@ import com.codenameone.examples.savor.courier.Earnings;
 import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.repository.CourierStateRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
+import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DeliveryEventRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.order.Quotes;
 import com.codenameone.examples.savor.delivery.Matcher;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +59,7 @@ import java.util.Map;
 /// state, by product and by courier, and every sum of money. The charts by day
 /// and by hour of the day are counted here instead, from one row per delivery of
 /// the period. Times are stored as milliseconds and a day is a division
-/// ([Days]); [DeliveryRepository#timeline] says why that division is not left
+/// ([Days]); [CustomerOrderRepository#timeline] says why that division is not left
 /// to a query. A sample's ninety days fit in memory. A service whose do not
 /// keeps a table of daily totals, and this class is where it would be read.
 @Component
@@ -64,34 +67,34 @@ public class Statistics {
     static final int DEFAULT_DAYS = 14;
     static final int MAX_DAYS = 90;
     private static final int TOP_COURIERS = 5;
-    private static final DeliveryState[] STATES = {DeliveryState.REQUESTED, DeliveryState.OFFERED,
-        DeliveryState.ACCEPTED, DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS, DeliveryState.COMPLETED,
-        DeliveryState.CANCELLED_BY_CUSTOMER, DeliveryState.CANCELLED_BY_COURIER,
-        DeliveryState.CANCELLED_BY_ADMIN, DeliveryState.NO_COURIERS};
+    private static final OrderState[] STATES = OrderState.values();
 
     private static final String PAID = "PAID";
-    private static final DeliveryState[] ACTIVE = {DeliveryState.REQUESTED, DeliveryState.OFFERED,
-        DeliveryState.ACCEPTED, DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
+    private static final OrderState[] ACTIVE = {OrderState.PLACED, OrderState.ACCEPTED,
+        OrderState.READY, OrderState.PICKED_UP};
 
     private final ProfileRepository profiles;
     private final CourierStateRepository cars;
     private final DeliveryRepository deliveries;
+    private final CustomerOrderRepository orders;
     private final DeliveryEventRepository events;
     private final Accounts accounts;
     private final Couriers couriers;
     private final Moderation moderation;
-    private final Fares fares;
+    private final Quotes fares;
     private final Applications applications;
     private final Earnings earnings;
 
     public Statistics(ProfileRepository profiles, CourierStateRepository cars,
-            DeliveryRepository deliveries, DeliveryEventRepository events, Accounts accounts,
-            Couriers couriers, Moderation moderation, Fares fares, Applications applications,
+            DeliveryRepository deliveries, CustomerOrderRepository orders,
+            DeliveryEventRepository events, Accounts accounts,
+            Couriers couriers, Moderation moderation, Quotes fares, Applications applications,
             Earnings earnings) {
         this.earnings = earnings;
         this.profiles = profiles;
         this.cars = cars;
         this.deliveries = deliveries;
+        this.orders = orders;
         this.events = events;
         this.applications = applications;
         this.accounts = accounts;
@@ -117,10 +120,10 @@ public class Statistics {
         }
         int online = (int) cars.countByOnlineTrueAndLastSeenGreaterThanEqual(
                 now - Matcher.FRESH_MILLIS);
-        int today = (int) deliveries.countByRequestedAtGreaterThanEqual(Days.start(now));
-        int active = (int) deliveries.countByStateIn(ACTIVE);
-        int done = (int) deliveries.countByStateIn(new DeliveryState[] {DeliveryState.COMPLETED});
-        long revenue = Rows.number(deliveries.fares(DeliveryState.COMPLETED, PAID));
+        int today = (int) orders.countByPlacedAtGreaterThanEqual(Days.start(now));
+        int active = (int) orders.countByStateIn(ACTIVE);
+        int done = (int) orders.countByStateIn(new OrderState[] {OrderState.DELIVERED});
+        long revenue = Rows.number(orders.totals(OrderState.DELIVERED, PAID));
         return new AdminStatsDto(users, onboarding, online, today, active, done, revenue,
                 fares.currency());
     }
@@ -133,62 +136,49 @@ public class Statistics {
         long today = Days.start(System.currentTimeMillis());
         long since = today - (span - 1) * Days.MILLIS;
         // Each day's figures, added up here and made into a DayStatsDto at the end.
-        int[] dayDeliveries = new int[span];
-        int[] dayCompleted = new int[span];
+        int[] dayOrders = new int[span];
+        int[] dayDelivered = new int[span];
         int[] dayCancelled = new int[span];
         long[] dayRevenue = new long[span];
         int[] dayNewUsers = new int[span];
         int[] byHour = new int[24];
-        // By day and by hour, counted here from one row per delivery.
-        Map<String, Long> requestedAt = new HashMap<String, Long>();
-        List<Object[]> timeline = deliveries.timeline(since);
+        // By day, by hour and by state, counted here from one row per order;
+        // and the time from placing to the door, of each one that got there.
+        int[] byState = new int[STATES.length];
+        long delivered = 0L;
+        long finished = 0L;
+        long totalSum = 0L;
+        long tookMillis = 0L;
+        List<Object[]> timeline = orders.timeline(since);
         for (int iter = 0; iter < timeline.size(); iter++) {
-            Object[] delivery = timeline.get(iter);
-            long at = whole(delivery[1]);
-            DeliveryState state = Rows.state(delivery[2]);
-            requestedAt.put(Rows.text(delivery[0]), Long.valueOf(at));
-            int index = (int) ((at - since) / Days.MILLIS);
+            Object[] order = timeline.get(iter);
+            long at = whole(order[1]);
+            OrderState state = Rows.orderState(order[2]);
             byHour[(int) (at % Days.MILLIS / 3600000L)]++;
+            if (state != null) {
+                byState[state.ordinal()]++;
+            }
+            int index = (int) ((at - since) / Days.MILLIS);
+            boolean arrived = OrderState.DELIVERED == state;
+            if (arrived) {
+                delivered++;
+                finished++;
+                totalSum += whole(order[3]);
+                tookMillis += Math.max(0L, whole(order[5]) - at);
+            } else if (ended(state)) {
+                finished++;
+            }
             if (index < 0 || index >= span) {
                 continue;
             }
-            dayDeliveries[index]++;
-            if (DeliveryState.COMPLETED == state) {
-                dayCompleted[index]++;
-                if (PAID.equals(delivery[4])) {
-                    dayRevenue[index] += whole(delivery[3]);
+            dayOrders[index]++;
+            if (arrived) {
+                dayDelivered[index]++;
+                if (PAID.equals(order[4])) {
+                    dayRevenue[index] += whole(order[3]);
                 }
-            } else if (cancelled(state)) {
+            } else if (ended(state)) {
                 dayCancelled[index]++;
-            }
-        }
-        // By state, by product and by courier, counted by the database.
-        int[] byState = new int[STATES.length];
-        long completed = 0L;
-        long finished = 0L;
-        List<Object[]> states = deliveries.countByState(since);
-        for (int iter = 0; iter < states.size(); iter++) {
-            DeliveryState state = Rows.state(states.get(iter)[0]);
-            long count = whole(states.get(iter)[1]);
-            for (int s = 0; s < STATES.length; s++) {
-                if (STATES[s] == state) {
-                    byState[s] += (int) count;
-                }
-            }
-            if (DeliveryState.COMPLETED == state) {
-                completed += count;
-                finished += count;
-            } else if (cancelled(state) || DeliveryState.NO_COURIERS == state) {
-                finished += count;
-            }
-        }
-        int[] byProduct = new int[Fares.PRODUCTS.length];
-        List<Object[]> products = deliveries.countByProduct(since);
-        for (int iter = 0; iter < products.size(); iter++) {
-            for (int p = 0; p < Fares.PRODUCTS.length; p++) {
-                if (Fares.PRODUCTS[p].equals(products.get(iter)[0])) {
-                    byProduct[p] += (int) whole(products.get(iter)[1]);
-                }
             }
         }
         Map<String, int[]> completedBy = new HashMap<String, int[]>();
@@ -197,27 +187,31 @@ public class Statistics {
             completedBy.put(Rows.text(perCourier.get(iter)[0]),
                     new int[] {(int) whole(perCourier.get(iter)[1])});
         }
-        long fareSum = Rows.number(deliveries.faresSince(since, DeliveryState.COMPLETED));
         List<Integer> hours = new ArrayList<Integer>();
         for (int iter = 0; iter < byHour.length; iter++) {
             hours.add(Integer.valueOf(byHour[iter]));
         }
         List<NameCountDto> statesSeen = new ArrayList<NameCountDto>();
         for (int iter = 0; iter < STATES.length; iter++) {
-            // A state no delivery is in is left out; a chart has no slice for it.
+            // A state no order is in is left out; a chart has no slice for it.
             if (byState[iter] > 0) {
                 statesSeen.add(new NameCountDto(STATES[iter].name(), byState[iter]));
             }
         }
-        List<NameCountDto> productsSold = new ArrayList<NameCountDto>();
-        for (int iter = 0; iter < Fares.PRODUCTS.length; iter++) {
-            productsSold.add(new NameCountDto(Fares.PRODUCTS[iter], byProduct[iter]));
+        List<NameCountDto> byRestaurant = new ArrayList<NameCountDto>();
+        List<Object[]> kitchens = orders.countByRestaurant(since);
+        for (int iter = 0; iter < kitchens.size(); iter++) {
+            byRestaurant.add(new NameCountDto(Rows.text(kitchens.get(iter)[0]),
+                    (int) whole(kitchens.get(iter)[1])));
         }
+        Collections.sort(byRestaurant, (a, b) -> Integer.compare(b.count(), a.count()));
         // Tested before dividing, and not left to an exception: dividing a
         // whole number by zero does not raise one on every runtime this runs on.
-        long averageFare = completed == 0L ? 0L : fareSum / completed;
+        long averageOrder = delivered == 0L ? 0L : totalSum / delivered;
+        double averageDeliveryMinutes = delivered == 0L ? 0d
+                : Math.round(tookMillis / 6000d / delivered) / 10d;
         double completionRate = finished == 0L ? 0d
-                : Math.round(completed * 100d / finished) / 100d;
+                : Math.round(delivered * 100d / finished) / 100d;
 
         List<Long> signUps = profiles.signUps(since);
         for (int iter = 0; iter < signUps.size(); iter++) {
@@ -228,25 +222,10 @@ public class Statistics {
         }
         List<DayStatsDto> daily = new ArrayList<DayStatsDto>();
         for (int iter = 0; iter < span; iter++) {
-            daily.add(new DayStatsDto(Days.iso(since + iter * Days.MILLIS), dayDeliveries[iter],
-                    dayCompleted[iter], dayCancelled[iter], dayRevenue[iter],
+            daily.add(new DayStatsDto(Days.iso(since + iter * Days.MILLIS), dayOrders[iter],
+                    dayDelivered[iter], dayCancelled[iter], dayRevenue[iter],
                     dayNewUsers[iter]));
         }
-
-        // How long a customer waited for a courier to take the delivery: each time one
-        // was accepted, set against when it was asked for.
-        List<Object[]> waits = events.reached(since, DeliveryState.ACCEPTED);
-        long waited = 0L;
-        int answered = 0;
-        for (int iter = 0; iter < waits.size(); iter++) {
-            Long asked = requestedAt.get(Rows.text(waits.get(iter)[0]));
-            if (asked != null) {
-                waited += Math.max(0L, whole(waits.get(iter)[1]) - asked.longValue());
-                answered++;
-            }
-        }
-        double averageWaitSeconds = answered == 0 ? 0d
-                : Math.round(waited / 100d / answered) / 10d;
 
         List<CourierDto> topCouriers = new ArrayList<CourierDto>();
         for (int place = 0; place < TOP_COURIERS && !completedBy.isEmpty(); place++) {
@@ -266,8 +245,8 @@ public class Statistics {
                 topCouriers.add(couriers.describe(best, rode));
             }
         }
-        return new StatsSeriesDto(daily, hours, statesSeen, productsSold, topCouriers,
-                averageFare, averageWaitSeconds, completionRate, applications.waiting(),
+        return new StatsSeriesDto(daily, hours, statesSeen, byRestaurant, topCouriers,
+                averageOrder, averageDeliveryMinutes, completionRate, applications.waiting(),
                 (int) profiles.countByFlaggedTrue(), fares.currency());
     }
 
@@ -275,26 +254,30 @@ public class Statistics {
     @Transactional(readOnly = true)
     public UserDetailDto user(String username) throws IOException {
         UserDto user = accounts.describe(username);
-        int taken = (int) deliveries.countByCustomerOrCourier(username, username);
-        int cancellations = (int) deliveries.countByCustomerAndStateOrCourierAndState(username,
-                DeliveryState.CANCELLED_BY_CUSTOMER, username, DeliveryState.CANCELLED_BY_COURIER);
+        int ordered = (int) orders.countByCustomer(username);
+        int carried = (int) deliveries.countByCourier(username);
+        // Called off by this account: as a customer, and as a courier who
+        // gave a delivery back.
+        int cancellations = (int) (orders.countByCustomerAndState(username,
+                OrderState.CANCELLED_BY_CUSTOMER) + events.countByActorAndState(username,
+                DeliveryState.CANCELLED_BY_COURIER));
         CourierState car = username == null || username.length() == 0
                 || username.length() > 190 ? null : cars.findById(username);
-        // A rating is a courier's; an account that has never driven has none.
+        // A rating is a courier's; an account that has never delivered has none.
         double rating = car == null ? 0d : car.rating();
-        long spent = sum(deliveries.spent(username, DeliveryState.COMPLETED, PAID));
+        long spent = Rows.number(orders.spent(username, OrderState.DELIVERED, PAID));
         // What the courier's own screens call earned, from the same sum: a
         // card delivery whose charge failed, is pending or was refunded, and a
         // tip whose charge has not come back, are not money the courier has.
         long earned = earnings.earned(username);
-        return new UserDetailDto(user, taken, cancellations, rating, spent, earned,
+        return new UserDetailDto(user, ordered, carried, cancellations, rating, spent, earned,
                 moderation.events(username));
     }
 
-    /// Whether a delivery in `state` was called off, by whoever did it.
-    private static boolean cancelled(DeliveryState state) {
-        return DeliveryState.CANCELLED_BY_CUSTOMER == state || DeliveryState.CANCELLED_BY_COURIER == state
-                || DeliveryState.CANCELLED_BY_ADMIN == state;
+    /// Whether an order in `state` ended without reaching the door.
+    private static boolean ended(OrderState state) {
+        return OrderState.REJECTED == state || OrderState.CANCELLED_BY_CUSTOMER == state
+                || OrderState.CANCELLED_BY_ADMIN == state || OrderState.NO_COURIERS == state;
     }
 
     /// A count or a sum as a query answers it.
@@ -302,11 +285,4 @@ public class Statistics {
         return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
 
-    private static long sum(Object[] values) {
-        long total = 0L;
-        for (int iter = 0; values != null && iter < values.length; iter++) {
-            total += whole(values[iter]);
-        }
-        return total;
-    }
 }

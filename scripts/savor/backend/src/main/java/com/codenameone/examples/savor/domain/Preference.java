@@ -45,22 +45,7 @@ public class Preference {
     private boolean notifyPromotions;
 
     @Column(nullable = false)
-    private String courierGender = "";
-
-    @Column(nullable = false)
-    private boolean quietDelivery;
-
-    @Column(nullable = false)
-    private boolean wheelchair;
-
-    @Column(nullable = false)
-    private boolean petFriendly;
-
-    @Column(nullable = false)
     private int defaultTip;
-
-    @Column(nullable = false)
-    private String shareTripsWith = "";
 
     public Preference() {
     }
@@ -113,38 +98,6 @@ public class Preference {
         this.notifyPromotions = notifyPromotions;
     }
 
-    public String getCourierGender() {
-        return courierGender;
-    }
-
-    public void setCourierGender(String courierGender) {
-        this.courierGender = courierGender;
-    }
-
-    public boolean isQuietDelivery() {
-        return quietDelivery;
-    }
-
-    public void setQuietDelivery(boolean quietDelivery) {
-        this.quietDelivery = quietDelivery;
-    }
-
-    public boolean isWheelchair() {
-        return wheelchair;
-    }
-
-    public void setWheelchair(boolean wheelchair) {
-        this.wheelchair = wheelchair;
-    }
-
-    public boolean isPetFriendly() {
-        return petFriendly;
-    }
-
-    public void setPetFriendly(boolean petFriendly) {
-        this.petFriendly = petFriendly;
-    }
-
     public int getDefaultTip() {
         return defaultTip;
     }
@@ -153,11 +106,4 @@ public class Preference {
         this.defaultTip = defaultTip;
     }
 
-    public String getShareTripsWith() {
-        return shareTripsWith;
-    }
-
-    public void setShareTripsWith(String shareTripsWith) {
-        this.shareTripsWith = shareTripsWith;
-    }
 }

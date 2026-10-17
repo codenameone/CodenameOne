@@ -45,7 +45,6 @@ public class Preferences {
     private static final String[] LANGUAGES = {"en", "es", "fr", "de", "he"};
     private static final String[] THEMES = {"system", "light", "dark"};
     private static final String[] UNITS = {"km", "mi"};
-    private static final String[] COURIER_GENDERS = {"any", "women"};
 
     private final ProfileRepository profiles;
     private final PreferenceRepository preferences;
@@ -69,13 +68,11 @@ public class Preferences {
         String method = payments.defaultMethod(username);
         if (row == null) {
             // What someone who never opened the settings gets.
-            return new PreferencesDto(language, THEMES[0], UNITS[0], true, true, false,
-                    COURIER_GENDERS[0], false, false, false, method, 0, "");
+            return new PreferencesDto(language, THEMES[0], UNITS[0], true, true, false, method,
+                    0);
         }
         return new PreferencesDto(language, row.getTheme(), row.getUnits(), row.isNotifyDeliveries(),
-                row.isNotifyReceipts(), row.isNotifyPromotions(), row.getCourierGender(),
-                row.isQuietDelivery(), row.isWheelchair(), row.isPetFriendly(), method,
-                row.getDefaultTip(), row.getShareTripsWith());
+                row.isNotifyReceipts(), row.isNotifyPromotions(), method, row.getDefaultTip());
     }
 
     /// Saves all of them. Each is checked against the values it can take: these
@@ -96,12 +93,8 @@ public class Preferences {
         if (tip != 0 && tip != 10 && tip != 15 && tip != 20) {
             throw new ResponseStatusException(400, "A default tip is 0, 10, 15 or 20 percent");
         }
-        String share = wanted.shareTripsWith() == null ? "" : wanted.shareTripsWith().trim();
         String theme = Text.oneOf(wanted.theme(), THEMES, THEMES[0], "the theme");
         String units = Text.oneOf(wanted.units(), UNITS, UNITS[0], "the units");
-        String courierGender = Text.oneOf(wanted.courierGender(), COURIER_GENDERS, COURIER_GENDERS[0],
-                "the courier");
-        String shareWith = share.length() == 0 ? "" : Accounts.phone(share);
         String language = Text.oneOf(wanted.language(), LANGUAGES, LANGUAGES[0], "the language");
         String method = wanted.defaultPaymentMethodId() == null ? ""
                 : wanted.defaultPaymentMethodId().trim();
@@ -129,12 +122,7 @@ public class Preferences {
         row.setNotifyDeliveries(wanted.notifyDeliveryUpdates());
         row.setNotifyReceipts(wanted.notifyReceipts());
         row.setNotifyPromotions(wanted.notifyPromotions());
-        row.setCourierGender(courierGender);
-        row.setQuietDelivery(wanted.quietDelivery());
-        row.setWheelchair(wanted.accessibleVehicle());
-        row.setPetFriendly(wanted.petFriendly());
         row.setDefaultTip(tip);
-        row.setShareTripsWith(shareWith);
         if (unsaved) {
             preferences.insert(row);
         }

@@ -28,7 +28,7 @@ import com.codenameone.examples.savor.domain.CourierApplication;
 
 import java.util.List;
 
-/// Applications to drive, one per account at most, keyed by the account.
+/// Applications to deliver, one per account at most, keyed by the account.
 ///
 /// Every move of an application from one status to another is one conditional
 /// statement answering how many rows it changed, so that of two callers moving

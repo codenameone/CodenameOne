@@ -51,9 +51,6 @@ public class Profile {
     private long createdAt;
 
     @Column(nullable = false)
-    private String gender = "unspecified";
-
-    @Column(nullable = false)
     private String language = "en";
 
     @Column(nullable = false)
@@ -61,18 +58,6 @@ public class Profile {
 
     @Column(nullable = false)
     private String flagReason = "";
-
-    @Column(nullable = false)
-    private String emergencyName = "";
-
-    @Column(nullable = false)
-    private String emergencyPhone = "";
-
-    @Column(nullable = false)
-    private String homeAddress = "";
-
-    @Column(nullable = false)
-    private String workAddress = "";
 
     public Profile() {
     }
@@ -133,14 +118,6 @@ public class Profile {
         this.createdAt = createdAt;
     }
 
-    public String getGender() {
-        return gender;
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
-
     public String getLanguage() {
         return language;
     }
@@ -165,35 +142,4 @@ public class Profile {
         this.flagReason = flagReason;
     }
 
-    public String getEmergencyName() {
-        return emergencyName;
-    }
-
-    public void setEmergencyName(String emergencyName) {
-        this.emergencyName = emergencyName;
-    }
-
-    public String getEmergencyPhone() {
-        return emergencyPhone;
-    }
-
-    public void setEmergencyPhone(String emergencyPhone) {
-        this.emergencyPhone = emergencyPhone;
-    }
-
-    public String getHomeAddress() {
-        return homeAddress;
-    }
-
-    public void setHomeAddress(String homeAddress) {
-        this.homeAddress = homeAddress;
-    }
-
-    public String getWorkAddress() {
-        return workAddress;
-    }
-
-    public void setWorkAddress(String workAddress) {
-        this.workAddress = workAddress;
-    }
 }

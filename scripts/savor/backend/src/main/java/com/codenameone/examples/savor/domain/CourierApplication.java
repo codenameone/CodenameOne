@@ -22,7 +22,7 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
-/// An account's application to drive, and what became of it.
+/// An account's application to deliver, and what became of it.
 @Entity
 public class CourierApplication {
     @Id(autoIncrement = false)
@@ -58,18 +58,6 @@ public class CourierApplication {
 
     @Column(nullable = false)
     private String vehiclePlate = "";
-
-    @Column(nullable = false)
-    private int vehicleSeats;
-
-    @Column(nullable = false)
-    private String product = "";
-
-    @Column(nullable = false)
-    private boolean wheelchair;
-
-    @Column(nullable = false)
-    private boolean pets;
 
     @Column(nullable = false)
     private String rejectionReason = "";
@@ -175,38 +163,6 @@ public class CourierApplication {
 
     public void setVehiclePlate(String vehiclePlate) {
         this.vehiclePlate = vehiclePlate;
-    }
-
-    public int getVehicleSeats() {
-        return vehicleSeats;
-    }
-
-    public void setVehicleSeats(int vehicleSeats) {
-        this.vehicleSeats = vehicleSeats;
-    }
-
-    public String getProduct() {
-        return product;
-    }
-
-    public void setProduct(String product) {
-        this.product = product;
-    }
-
-    public boolean isWheelchair() {
-        return wheelchair;
-    }
-
-    public void setWheelchair(boolean wheelchair) {
-        this.wheelchair = wheelchair;
-    }
-
-    public boolean isPets() {
-        return pets;
-    }
-
-    public void setPets(boolean pets) {
-        this.pets = pets;
     }
 
     public String getRejectionReason() {

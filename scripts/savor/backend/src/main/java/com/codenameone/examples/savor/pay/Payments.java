@@ -30,11 +30,13 @@ import com.codenameone.examples.savor.api.PaymentMethodDto;
 import com.codenameone.examples.savor.api.PaymentSetupDto;
 import com.codenameone.examples.savor.api.ReceiptDto;
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.domain.Payment;
 import com.codenameone.examples.savor.domain.PaymentCustomer;
 import com.codenameone.examples.savor.domain.PaymentMethod;
 import com.codenameone.examples.savor.domain.PaymentSetup;
 import com.codenameone.examples.savor.domain.Profile;
+import com.codenameone.examples.savor.domain.CustomerOrder;
 import com.codenameone.examples.savor.domain.Delivery;
 import com.codenameone.examples.savor.live.LiveHub;
 import com.codenameone.examples.savor.repository.PaymentCustomerRepository;
@@ -42,6 +44,7 @@ import com.codenameone.examples.savor.repository.PaymentMethodRepository;
 import com.codenameone.examples.savor.repository.PaymentRepository;
 import com.codenameone.examples.savor.repository.PaymentSetupRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
+import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
 
 import java.io.IOException;
@@ -68,6 +71,10 @@ import java.util.Map;
 @Component
 public class Payments {
     public static final String PENDING = "PENDING";
+    /// An order whose money is held on the card and not yet taken.
+    public static final String AUTHORIZED = "AUTHORIZED";
+    /// An order that never arrived, whose hold was let go.
+    public static final String RELEASED = "RELEASED";
     /// How long a completed delivery's charge goes on being asked for. Short of
     /// the day a processor remembers the key a charge was first sent under.
     public static final long RETRY_MILLIS = 23L * 60L * 60L * 1000L;
@@ -94,25 +101,32 @@ public class Payments {
     /// The states of a delivery that has not ended.
     private static final DeliveryState[] UNDER_WAY = {DeliveryState.REQUESTED, DeliveryState.OFFERED,
         DeliveryState.ACCEPTED, DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
+    /// An order in one of these holds money on its card, to be taken when it
+    /// arrives -- including while the kitchen has not answered, before any
+    /// delivery exists to see.
+    private static final OrderState[] ORDER_UNDER_WAY = {OrderState.PLACED, OrderState.ACCEPTED,
+        OrderState.READY, OrderState.PICKED_UP};
 
     private final PaymentMethodRepository cards;
     private final PaymentSetupRepository setups;
     private final PaymentCustomerRepository customers;
     private final PaymentRepository payments;
     private final DeliveryRepository deliveries;
+    private final CustomerOrderRepository orders;
     private final ProfileRepository profiles;
     private final PaymentProvider provider;
     private final LiveHub live;
 
     public Payments(PaymentMethodRepository cards, PaymentSetupRepository setups,
             PaymentCustomerRepository customers, PaymentRepository payments,
-            DeliveryRepository deliveries, ProfileRepository profiles, PaymentProvider provider,
-            LiveHub live) {
+            DeliveryRepository deliveries, CustomerOrderRepository orders,
+            ProfileRepository profiles, PaymentProvider provider, LiveHub live) {
         this.cards = cards;
         this.setups = setups;
         this.customers = customers;
         this.payments = payments;
         this.deliveries = deliveries;
+        this.orders = orders;
         this.profiles = profiles;
         this.provider = provider;
         this.live = live;
@@ -406,13 +420,16 @@ public class Payments {
         if (CASH.equals(id)) {
             throw new ResponseStatusException(400, "Cash is always available");
         }
-        // Asking for a delivery holds the same row before it picks its card. So a
-        // delivery and a removal sent together take turns: either the delivery is
+        // Placing an order holds the same row before it picks its card. So an
+        // order and a removal sent together take turns: either the order is
         // there to be seen below, or it no longer finds the card.
         profiles.hold(username);
         PaymentMethod row = owned(username, id);
         // What is answered is the card as it was, no longer anyone's default.
         PaymentMethodDto dto = card(row, false);
+        if (orders.existsByCustomerAndMethodIdAndStateIn(username, id, ORDER_UNDER_WAY)) {
+            throw new ResponseStatusException(409, "That card is paying for an order under way");
+        }
         if (deliveries.existsByCustomerAndMethodIdAndStateIn(username, id, UNDER_WAY)) {
             throw new ResponseStatusException(409, "That card is paying for a delivery under way");
         }
@@ -497,6 +514,94 @@ public class Payments {
 
     // --------------------------------------------------------------- charges
 
+    // tag::savor-authorize[]
+    /// Holds an order's total on the customer's card as the order is placed,
+    /// with no transaction open. Nothing is taken until the order arrives
+    /// ([#settle]); an order that never does lets the hold go ([#release]).
+    ///
+    /// @return the hold's reference, or [#CASH] for an order paid in cash
+    /// - `ResponseStatusException` 402: when the card was refused
+    public String authorize(String orderId, String username, String methodId, long amountCents,
+            String currency) throws IOException {
+        if (CASH.equals(methodId)) {
+            return CASH;
+        }
+        String[] references = chargeable(username, methodId);
+        if (references == null) {
+            throw new ResponseStatusException(402, "The card is no longer on the account");
+        }
+        try {
+            return cut(provider.authorize("order-" + orderId, references[0], references[1],
+                    amountCents, currency, "Savor order"), 64);
+        } catch (PaymentDeclinedException declined) {
+            throw new ResponseStatusException(402, declined.getMessage());
+        } catch (IOException unknown) {
+            throw unavailable("card check", unknown);
+        }
+    }
+    // end::savor-authorize[]
+
+    /// Lets go of the money held for an order that will not arrive. Safe to
+    /// repeat. A hold the processor could not be asked about is left for the
+    /// processor to expire, as every card hold does within days; the order
+    /// says so.
+    public void release(String orderId) throws IOException {
+        CustomerOrder order = order(orderId);
+        if (order == null) {
+            return;
+        }
+        // A cash order holds nothing, and is PENDING until the courier is
+        // paid at the door; one that will not arrive is released all the same.
+        boolean cash = CASH.equals(order.getAuthorizationRef());
+        if (!AUTHORIZED.equals(order.getPaymentStatus())
+                && !(cash && PENDING.equals(order.getPaymentStatus()))) {
+            return;
+        }
+        if (!cash && !releaseHold(orderId, order.getAuthorizationRef())) {
+            return;
+        }
+        orderPaymentStatus(orderId, RELEASED);
+    }
+
+    /// Lets go of a hold by its reference, for an order that was never
+    /// written: the hold is made before the order's row, and a row that
+    /// failed to commit leaves nothing for [#release] to find it by.
+    ///
+    /// @return false when the processor could not be asked, and the hold is
+    /// left for it to expire
+    public boolean releaseHold(String orderId, String reference) {
+        if (reference == null || reference.length() == 0 || CASH.equals(reference)) {
+            return true;
+        }
+        try {
+            provider.release(reference);
+            return true;
+        } catch (IOException failed) {
+            System.err.println("the hold for order " + orderId + " was not released: "
+                    + failed.getMessage());
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private CustomerOrder order(String id) {
+        return id == null ? null : orders.findById(id);
+    }
+
+    @Transactional
+    private void orderPaymentStatus(String id, String status) {
+        orders.paymentStatus(id, status, System.currentTimeMillis());
+    }
+
+    /// Writes what came of a delivery's payment to the delivery and to its
+    /// order, which share the id: the customer reads the order, the courier
+    /// the delivery, and both must say the same thing. Called inside the
+    /// caller's transaction.
+    private void paymentStatus(String deliveryId, String status) {
+        deliveries.paymentStatus(deliveryId, status);
+        orders.paymentStatus(deliveryId, status, System.currentTimeMillis());
+    }
+
     /// Settles a delivery that has just completed and returns [#PAID], [#FAILED],
     /// or [#PENDING] when nobody can say yet.
     /// A delivery is settled once: its payment is keyed by the delivery, and a delivery
@@ -520,13 +625,23 @@ public class Payments {
         if (kept != null) {
             return kept.getStatus();
         }
-        long amount = delivery.getFareCents() + delivery.getFeeCents();
+        // A delivery is an order's last leg, under the order's id: what is
+        // taken is the order's total, from the hold made when it was placed.
+        CustomerOrder order = order(delivery.getId());
+        long amount = order == null ? delivery.getFareCents() + delivery.getTipCents()
+                : order.getTotalCents();
         String status = PAID;
         String reference = CASH;
         if (!CASH.equals(delivery.getMethodId())) {
             try {
-                reference = charge("delivery-" + delivery.getId(), delivery.getCustomer(), delivery.getMethodId(), amount,
-                        delivery.getCurrency(), "Savor delivery");
+                String hold = order == null ? "" : order.getAuthorizationRef();
+                if (hold != null && hold.length() > 0 && !CASH.equals(hold)) {
+                    provider.capture(hold, amount);
+                    reference = hold;
+                } else {
+                    reference = charge("delivery-" + delivery.getId(), delivery.getCustomer(),
+                            delivery.getMethodId(), amount, delivery.getCurrency(), "Savor order");
+                }
             } catch (PaymentDeclinedException declined) {
                 // The delivery and the amount, never the card.
                 System.err.println("payment for delivery " + delivery.getId() + " failed: "
@@ -540,6 +655,9 @@ public class Payments {
             }
         }
         keepPayment(delivery.getId(), amount, delivery.getCurrency(), status, reference);
+        if (order != null) {
+            orderPaymentStatus(order.getId(), status);
+        }
         return status;
     }
 
@@ -753,7 +871,7 @@ public class Payments {
                 REFUNDED.equals(outcome) ? System.currentTimeMillis() : 0L) != 1) {
             return null;
         }
-        deliveries.paymentStatus(deliveryId, outcome);
+        paymentStatus(deliveryId, outcome);
         return delivery(deliveryId);
     }
 
@@ -851,7 +969,7 @@ public class Payments {
         }
         Payment payment = payments.findById(deliveryId);
         if (payment != null && !PAID.equals(payment.getStatus())) {
-            deliveries.paymentStatus(deliveryId, payment.getStatus());
+            paymentStatus(deliveryId, payment.getStatus());
         }
     }
 
@@ -866,7 +984,7 @@ public class Payments {
     private void keepRefund(String deliveryId, PaymentProvider.Refund fare,
             PaymentProvider.Refund tip, String reason) {
         boolean pending = fare.pending || (tip != null && tip.pending);
-        deliveries.paymentStatus(deliveryId, pending ? REFUND_PENDING : REFUNDED);
+        paymentStatus(deliveryId, pending ? REFUND_PENDING : REFUNDED);
         Payment payment = payments.findById(deliveryId);
         payment.setStatus(pending ? REFUND_PENDING : REFUNDED);
         payment.setRefundRef(cut(fare.reference, 64));
@@ -879,7 +997,7 @@ public class Payments {
     /// and its payment are [#REFUND_FAILED], with the fare's refund kept.
     @Transactional
     private void keepPartialRefund(String deliveryId, PaymentProvider.Refund fare, String reason) {
-        deliveries.paymentStatus(deliveryId, REFUND_FAILED);
+        paymentStatus(deliveryId, REFUND_FAILED);
         Payment payment = payments.findById(deliveryId);
         payment.setStatus(REFUND_FAILED);
         payment.setRefundRef(cut(fare.reference, 64));
@@ -949,15 +1067,11 @@ public class Payments {
 
     private ReceiptDto receipt(Delivery delivery, long paidAt, boolean admin,
             Map<String, Profile> couriers) {
-        long fare = delivery.getFareCents();
-        long distanceFare = delivery.getDistanceCents();
-        long timeFare = delivery.getTimeCents();
-        // Whatever of the fare the other two parts do not account for, which
-        // for a delivery asked for before the parts were kept is all of it.
-        long baseFare = fare - distanceFare - timeFare;
-        long serviceFee = delivery.getFeeCents();
+        // A delivery is its order's last leg, under the same id; what was paid
+        // is the order's breakdown. A tip given after the order arrived is on
+        // the delivery, and counts on top.
+        CustomerOrder order = orders.findById(delivery.getId());
         long tip = delivery.getTipCents();
-        long discount = 0L;
         String paid = delivery.getPaymentStatus();
         boolean cash = CASH.equals(delivery.getMethodId());
         String status;
@@ -991,11 +1105,21 @@ public class Payments {
                 vehicle = who.getVehicle();
             }
         }
-        return new ReceiptDto(delivery.getId(), delivery.getCurrency(), baseFare, distanceFare,
-                timeFare, serviceFee, tip, discount, fare + serviceFee + tip - discount,
-                delivery.getMethodLabel(), status, paidOn, delivery.getPickupAddress(),
-                delivery.getDropoffAddress(), delivery.getDistanceMeters(), delivery.getDurationSeconds(),
-                courierName, vehicle, admin ? delivery.getCustomer() : "");
+        if (order == null) {
+            return new ReceiptDto(delivery.getId(), delivery.getCurrency(), "", 0L,
+                    delivery.getFareCents(), 0L, 0L, 0L, 0L, tip, delivery.getFareCents() + tip,
+                    delivery.getMethodLabel(), status, paidOn, delivery.getDropoffAddress(),
+                    courierName, vehicle, admin ? delivery.getCustomer() : "");
+        }
+        // The delivery's tip is the one given after the order arrived; the
+        // checkout tip is already in the order's total.
+        long extraTip = tip;
+        return new ReceiptDto(order.getId(), order.getCurrency(), order.getRestaurantName(),
+                order.getSubtotalCents(), order.getDeliveryFeeCents(), order.getServiceFeeCents(),
+                order.getSmallOrderCents(), order.getTaxCents(), order.getDiscountCents(),
+                order.getTipCents() + extraTip, order.getTotalCents() + extraTip,
+                order.getMethodLabel(), status, paidOn, order.getDropoffAddress(), courierName,
+                vehicle, admin ? order.getCustomer() : "");
     }
 
     // ------------------------------------------------------------- internals

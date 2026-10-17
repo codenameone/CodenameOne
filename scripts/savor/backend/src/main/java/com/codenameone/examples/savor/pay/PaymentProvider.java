@@ -90,6 +90,20 @@ public interface PaymentProvider {
     /// [#REFUND_PENDING] while the processor still does not know, or
     /// [#REFUND_FAILED] when the money did not go back.
     String refundStatus(String refundReference) throws IOException;
+    /// Holds `amountCents` on a saved card without taking it, for an order
+    /// that is paid for only once it arrives. Keyed as [#charge] is.
+    ///
+    /// @return the processor's reference for the hold, for [#capture] or [#release]
+    /// - `PaymentDeclinedException`: when the card was refused
+    String authorize(String key, String customer, String token, long amountCents,
+            String currency, String description) throws IOException;
+    /// Takes `amountCents`, at most what was held, from a hold. A hold that was
+    /// already captured is captured: this is asked again when the first answer
+    /// was lost.
+    void capture(String reference, long amountCents) throws IOException;
+    /// Lets a hold go, so the money is the cardholder's again. A hold that is
+    /// already let go is released.
+    void release(String reference) throws IOException;
     // end::savor-payment-provider[]
 
     String REFUND_SUCCEEDED = "succeeded";

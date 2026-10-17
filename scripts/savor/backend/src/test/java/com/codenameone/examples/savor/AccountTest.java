@@ -47,8 +47,8 @@ class AccountTest {
 
     private static String registration(String email, String password, boolean courier) {
         return "{\"email\":\"" + email + "\",\"password\":\"" + password
-                + "\",\"displayName\":\"Test Person\",\"phone\":\"+1 (555) 010-9999\",\"courier\":"
-                + courier + ",\"vehicle\":\"Grey Honda Civic\",\"plate\":\"TST 1\"}";
+                + "\",\"displayName\":\"Test Person\",\"phone\":\"+1 (555) 010-9999\",\"wantsToDeliver\":"
+                + courier + ",\"vehicle\":\"Grey Vespa\",\"plate\":\"TST 1\"}";
     }
 
     private String bearer(String username, String password) throws Exception {
@@ -112,7 +112,7 @@ class AccountTest {
         mvc.perform(post("/api/account/register").contentType("application/json")
                         .content(registration("phone@example.com", "a-long-password", true)))
                 .andExpect(status().isOk())
-                // Asking to drive opens an application. It does not make a courier.
+                // Asking to deliver opens an application. It does not make a courier.
                 .andExpect(jsonPath("$.courier").value(false))
                 .andExpect(jsonPath("$.courierStatus").value("draft"));
         String bearer = bearer("phone@example.com", "a-long-password");

@@ -39,13 +39,13 @@ public interface PricingRepository extends CrudRepository<Pricing, Integer> {
     /// @return 1, or 0 when the row is missing
     @Modifying
     @Query("update Pricing p set p.baseCents = :base, p.perKmCents = :perKm, "
-            + "p.perMinuteCents = :perMinute, p.minimumCents = :minimum, "
-            + "p.feePercent = :fee, p.commissionPercent = :commission, p.surge = :surge, "
-            + "p.comfort = :comfort, p.xl = :xl, p.updatedAt = :at, p.updatedBy = :by "
-            + "where p.id = :id")
+            + "p.surge = :surge, p.smallOrderCents = :smallOrder, "
+            + "p.smallOrderFeeCents = :smallOrderFee, p.feePercent = :fee, "
+            + "p.taxPercent = :tax, p.commissionPercent = :commission, "
+            + "p.updatedAt = :at, p.updatedBy = :by where p.id = :id")
     int change(@Param("id") int id, @Param("base") long base, @Param("perKm") long perKm,
-            @Param("perMinute") long perMinute, @Param("minimum") long minimum,
-            @Param("fee") double fee, @Param("commission") double commission,
-            @Param("surge") double surge, @Param("comfort") double comfort,
-            @Param("xl") double xl, @Param("at") long at, @Param("by") String by);
+            @Param("surge") double surge, @Param("smallOrder") long smallOrder,
+            @Param("smallOrderFee") long smallOrderFee, @Param("fee") double fee,
+            @Param("tax") double tax, @Param("commission") double commission,
+            @Param("at") long at, @Param("by") String by);
 }

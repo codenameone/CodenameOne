@@ -30,13 +30,15 @@ import com.codename1.orm.session.PersistenceException;
 import com.codenameone.examples.savor.Ids;
 import com.codenameone.examples.savor.Text;
 import com.codenameone.examples.savor.account.Moderation;
-import com.codenameone.examples.savor.api.FareOptionDto;
-import com.codenameone.examples.savor.api.FareQuoteDto;
-import com.codenameone.examples.savor.api.NearbyCourierDto;
-import com.codenameone.examples.savor.api.PricingDto;
 import com.codenameone.examples.savor.api.DeliveryDto;
-import com.codenameone.examples.savor.api.DeliveryRequestDto;
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
+import com.codenameone.examples.savor.domain.CustomerOrder;
+import com.codenameone.examples.savor.domain.Restaurant;
+import com.codenameone.examples.savor.order.OrderEvents;
+import com.codenameone.examples.savor.order.OrderStateMachine;
+import com.codenameone.examples.savor.order.Quotes;
+import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.domain.CourierState;
 import com.codenameone.examples.savor.domain.Profile;
 import com.codenameone.examples.savor.domain.Delivery;
@@ -45,7 +47,8 @@ import com.codenameone.examples.savor.domain.DeliveryPassed;
 import com.codenameone.examples.savor.geo.Geo;
 import com.codenameone.examples.savor.live.LiveHub;
 import com.codenameone.examples.savor.pay.Payments;
-import com.codenameone.examples.savor.push.DeliveryPushes;
+import com.codenameone.examples.savor.order.OrderNews;
+import com.codenameone.examples.savor.push.OrderPushes;
 import com.codenameone.examples.savor.repository.CourierStateRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.DeliveryEventRepository;
@@ -77,14 +80,6 @@ public class Deliveries {
     /// service's.
     static final double MIN_METERS = 100d;
     static final double MAX_METERS = 150000d;
-    private static final String[] COURIER_GENDERS = {"any", "women"};
-    private static final String WOMEN = "women";
-    /// What a customer is told about each kind of delivery: its name, a line about
-    /// it, and how many it seats. In the order of [Fares#PRODUCTS].
-    private static final String[][] PRODUCT_TEXT = {
-        {"Savor", "Affordable everyday deliveries", "4"},
-        {"Comfort", "Newer cars with extra legroom", "4"},
-        {"XL", "Room for up to six", "6"}};
     /// How many couriers one search may choose before it leaves the delivery to the
     /// next tick; see [#search].
     private static final int SEARCH_TRIES = 3;
@@ -95,6 +90,8 @@ public class Deliveries {
         DeliveryState.ACCEPTED, DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
     private static final DeliveryState[] WITH_COURIER = {DeliveryState.OFFERED, DeliveryState.ACCEPTED,
         DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
+    private static final DeliveryState[] TAKEN_NOT_STARTED = {DeliveryState.ACCEPTED,
+        DeliveryState.ARRIVED};
     private static final DeliveryState[] ENDED_WITH_COURIER = {DeliveryState.COMPLETED,
         DeliveryState.CANCELLED_BY_CUSTOMER, DeliveryState.CANCELLED_BY_COURIER,
         DeliveryState.CANCELLED_BY_ADMIN};
@@ -105,10 +102,12 @@ public class Deliveries {
     private final CourierStateRepository couriers;
     private final ProfileRepository profiles;
     private final Matcher matcher;
-    private final Fares fares;
+    private final CustomerOrderRepository orders;
+    private final OrderEvents orderEvents;
     private final Payments payments;
     private final LiveHub live;
-    private final DeliveryPushes pushes;
+    private final OrderPushes pushes;
+    private final OrderNews news;
     private final Moderation moderation;
     private final long offerMillis;
     private final long searchMillis;
@@ -116,10 +115,11 @@ public class Deliveries {
     /// @param offerSeconds how long a courier has to answer an offer
     /// @param searchSeconds how long a delivery looks for a courier before giving up
     public Deliveries(DeliveryRepository deliveries, DeliveryEventRepository events, DeliveryPassedRepository passes,
-            CourierStateRepository couriers, ProfileRepository profiles, Matcher matcher, Fares fares, Payments payments, LiveHub live, DeliveryPushes pushes,
-            Moderation moderation,
+            CourierStateRepository couriers, ProfileRepository profiles, Matcher matcher,
+            CustomerOrderRepository orders, OrderEvents orderEvents, Payments payments, LiveHub live,
+            OrderPushes pushes, OrderNews news, Moderation moderation,
             @Value("${savor.offer.seconds:15}") int offerSeconds,
-            @Value("${savor.search.seconds:90}") int searchSeconds) {
+            @Value("${savor.search.seconds:900}") int searchSeconds) {
         this.deliveries = deliveries;
         this.events = events;
         this.passes = passes;
@@ -127,199 +127,81 @@ public class Deliveries {
         this.profiles = profiles;
         this.moderation = moderation;
         this.matcher = matcher;
-        this.fares = fares;
+        this.orders = orders;
+        this.orderEvents = orderEvents;
         this.payments = payments;
         this.live = live;
         this.pushes = pushes;
+        this.news = news;
         offerMillis = offerSeconds * 1000L;
         searchMillis = searchSeconds * 1000L;
     }
 
-    // ---------------------------------------------------------------- customers
+    // ---------------------------------------------------------------- orders
 
-    @Transactional(readOnly = true)
-    public FareQuoteDto quote(DeliveryRequestDto request) throws IOException {
-        validate(request);
-        double distanceMeters = fares.distanceMeters(request);
-        double durationSeconds = fares.durationSeconds(request, distanceMeters);
-        String wanted = Fares.product(request.product());
-        PricingDto pricing = fares.pricing();
-        // The couriers who could take it as the customer asked for it, of every
-        // kind of car, nearest first; each kind then counts its own.
-        List<Matcher.Candidate> near = matcher.nearby(request.pickupLat(), request.pickupLng(),
-                Matcher.FAR_METERS, null, WOMEN.equals(courierGender(request)),
-                request.accessibleVehicle(), request.petFriendly());
-        List<FareOptionDto> options = new ArrayList<FareOptionDto>();
-        long amountCents = 0L;
-        int couriersNearby = 0;
-        int etaSeconds = 0;
-        for (int iter = 0; iter < Fares.PRODUCTS.length; iter++) {
-            String product = Fares.PRODUCTS[iter];
-            Fares.Price price = Fares.price(pricing, distanceMeters, durationSeconds, product);
-            int nearby = 0;
-            double nearest = -1d;
-            for (int d = 0; d < near.size(); d++) {
-                if (product.equals(near.get(d).product)) {
-                    nearby++;
-                    if (nearest < 0d) {
-                        nearest = near.get(d).meters;
-                    }
-                }
-            }
-            int eta = nearest < 0d ? 0 : (int) Math.max(60d, nearest * Fares.ROAD_FACTOR
-                    / Fares.METERS_PER_SECOND);
-            options.add(new FareOptionDto(product, PRODUCT_TEXT[iter][0], PRODUCT_TEXT[iter][1],
-                    Integer.parseInt(PRODUCT_TEXT[iter][2]), price.fare, price.fee,
-                    price.fare + price.fee, nearby, (eta + 59) / 60));
-            if (product.equals(wanted)) {
-                // The quote's own fields are the kind of delivery that was asked
-                // about, which is the standard one for an app that names none.
-                amountCents = price.fare;
-                couriersNearby = nearby;
-                etaSeconds = eta;
-            }
-        }
-        return new FareQuoteDto(amountCents, fares.currency(), distanceMeters, durationSeconds,
-                couriersNearby, etaSeconds, options);
-    }
-
-    /// The cars near a point, for the map a customer looks at before asking:
-    /// where they are and what kind, and nothing about who drives them. The
-    /// positions are rounded to about ten metres, and there are at most twenty.
-    @Transactional(readOnly = true)
-    public List<NearbyCourierDto> nearbyCouriers(double lat, double lng) throws IOException {
-        if (!Geo.isPoint(lat, lng)) {
-            throw new ResponseStatusException(400, "That is not a place");
-        }
-        List<Matcher.Candidate> near = matcher.nearby(lat, lng, Matcher.FAR_METERS);
-        List<NearbyCourierDto> out = new ArrayList<NearbyCourierDto>();
-        for (int iter = 0; iter < near.size() && iter < 20; iter++) {
-            Matcher.Candidate car = near.get(iter);
-            out.add(new NearbyCourierDto(Math.round(car.lat * 10000d) / 10000d,
-                    Math.round(car.lng * 10000d) / 10000d, car.heading, car.product));
-        }
-        return out;
-    }
-
-    /// Asks for a delivery and offers it to the nearest courier straight away.
-    public DeliveryDto request(String customer, DeliveryRequestDto request) throws IOException {
-        validate(request);
-        String id = attempt(() -> open(customer, request));
-        live.deliveryChanged(id, DeliveryState.REQUESTED, customer, "", "");
-        search(id);
-        return read(id, customer);
-    }
-
-    @Transactional
-    private String open(String customer, DeliveryRequestDto request) throws IOException {
-        // Before anything is read: two requests from one customer take turns
-        // here, so the second looks for a delivery under way only once the first
-        // has committed its own. Without it both look, both find none, and
-        // the customer has two deliveries.
-        profiles.hold(customer);
-        Profile profile = profiles.findById(customer);
-        if (profile == null || !profile.isPhoneVerified()) {
-            throw new ResponseStatusException(403, "Verify your phone number before you delivery");
-        }
-        if (deliveries.findFirstByCustomerAndStateIn(customer, ACTIVE) != null) {
-            throw new ResponseStatusException(409, "You already have a delivery under way");
-        }
-        String product = Fares.product(request.product());
-        boolean womenOnly = WOMEN.equals(courierGender(request));
-        // Refused here, before there is a delivery, when the card named is not the
-        // customer's. With none named it is their default, which is cash until
-        // they save a card.
-        String[] method = payments.choose(customer, request.paymentMethodId());
-        double meters = fares.distanceMeters(request);
-        double seconds = fares.durationSeconds(request, meters);
-        PricingDto pricing = fares.pricing();
-        Fares.Price price = Fares.price(pricing, meters, seconds, product);
+    // tag::savor-dispatch[]
+    /// Creates the delivery for an order the kitchen has just accepted, with the
+    /// order's id, from the restaurant to the order's door. Runs inside the
+    /// transaction that accepts the order, so the two commit together; [#tick]
+    /// finds the delivery a courier from then on, while the kitchen cooks.
+    ///
+    /// The courier is paid the delivery fee and the tip, so that is the fare a
+    /// courier is offered.
+    public void dispatch(CustomerOrder order, Restaurant restaurant) throws IOException {
         long now = System.currentTimeMillis();
-        // The fare is fixed here, from the server's own arithmetic, and so is
-        // the courier's share of it: a change of prices or of commission made
-        // while the delivery is under way is for the deliveries after it. The quote the
-        // customer was shown is not sent back and would not be believed.
         Delivery delivery = new Delivery();
-        delivery.setId(Ids.next());
+        delivery.setId(order.getId());
         delivery.setState(DeliveryState.REQUESTED);
-        delivery.setCustomer(customer);
-        delivery.setPickupLat(request.pickupLat());
-        delivery.setPickupLng(request.pickupLng());
-        delivery.setPickupAddress(address(request.pickupAddress()));
-        delivery.setDropoffLat(request.dropoffLat());
-        delivery.setDropoffLng(request.dropoffLng());
-        delivery.setDropoffAddress(address(request.dropoffAddress()));
-        delivery.setFareCents(price.fare);
-        delivery.setCurrency(fares.currency());
+        delivery.setCustomer(order.getCustomer());
+        delivery.setCourier("");
+        delivery.setPickupLat(restaurant.getLat());
+        delivery.setPickupLng(restaurant.getLng());
+        delivery.setPickupAddress(address(restaurant.getName() + ", " + restaurant.getAddress()));
+        delivery.setDropoffLat(order.getDropoffLat());
+        delivery.setDropoffLng(order.getDropoffLng());
+        delivery.setDropoffAddress(address(order.getDropoffAddress()));
+        double meters = Quotes.roadMeters(restaurant.getLat(), restaurant.getLng(),
+                order.getDropoffLat(), order.getDropoffLng());
         delivery.setDistanceMeters(meters);
-        delivery.setDurationSeconds(seconds);
+        delivery.setDurationSeconds(meters / Quotes.METERS_PER_SECOND);
+        delivery.setFareCents(order.getDeliveryFeeCents());
+        delivery.setFeeCents(order.getDeliveryFeeCents());
+        // A tip given at checkout is part of the order's total, taken with it,
+        // so it is in the courier's share. The delivery's own tip is the one
+        // given after it arrives, charged on its own: counting the checkout
+        // tip there too would pay it to the courier twice.
+        delivery.setTipCents(0L);
+        delivery.setCourierCents(order.getDeliveryFeeCents() + order.getTipCents());
+        delivery.setCurrency(order.getCurrency());
+        delivery.setMethodId(order.getMethodId());
+        delivery.setMethodLabel(order.getMethodLabel());
+        delivery.setPaymentStatus(order.getPaymentStatus());
+        delivery.setNote(order.getNote());
         delivery.setRequestedAt(now);
         delivery.setUpdatedAt(now);
         delivery.setSearchUntil(now + searchMillis);
-        delivery.setPaymentStatus(Payments.PENDING);
-        delivery.setProduct(product);
-        delivery.setMethodId(method[0]);
-        delivery.setMethodLabel(method[1]);
-        delivery.setBaseCents(price.base);
-        delivery.setDistanceCents(price.distance);
-        delivery.setTimeCents(price.time);
-        delivery.setFeeCents(price.fee);
-        delivery.setCourierCents(price.fare - Fares.commission(pricing, price.fare));
-        delivery.setWomenOnly(womenOnly);
-        delivery.setQuiet(request.quietDelivery());
-        delivery.setWheelchair(request.accessibleVehicle());
-        delivery.setNote(address(request.note()));
-        delivery.setPets(request.petFriendly());
         deliveries.insert(delivery);
-        event(delivery.getId(), DeliveryState.REQUESTED, customer);
-        return delivery.getId();
+        event(order.getId(), DeliveryState.REQUESTED, "");
     }
+    // end::savor-dispatch[]
 
-    // tag::savor-service-readonly[]
-    @Transactional(readOnly = true)
-    public DeliveryDto activeForCustomer(String customer) throws IOException {
-        Delivery delivery = deliveries.findFirstByCustomerAndStateIn(customer, ACTIVE);
-        return delivery == null ? none() : toDto(delivery, customer, new HashMap<String, Profile>());
-    }
-    // end::savor-service-readonly[]
-
-    @Transactional(readOnly = true)
-    public List<DeliveryDto> historyForCustomer(String customer) throws IOException {
-        return list(deliveries.findTop50ByCustomerOrderByRequestedAtDesc(customer), customer);
-    }
-
-    // tag::savor-service-transaction[]
-    public DeliveryDto cancelByCustomer(String customer, String id) throws IOException {
-        Change change = attempt(() -> cancelAsCustomer(customer, id));
-        // The courier it was offered to or who had taken it is told as well.
-        return tell(change);
-    }
-
-    @Transactional
-    private Change cancelAsCustomer(String customer, String id) throws IOException {
-        Delivery before = owned(id, CUSTOMER, customer);
-        move(id, DeliveryState.CANCELLED_BY_CUSTOMER, customer, CUSTOMER, null, null);
-        return new Change(id, DeliveryState.CANCELLED_BY_CUSTOMER, customer, before.getCourier(), "",
-                view(id, customer));
-    }
-    // end::savor-service-transaction[]
-
-    /// Rates a completed delivery, once, and counts it toward the courier's rating.
-    public DeliveryDto rate(String customer, String id, int stars) throws IOException {
-        if (stars < 1 || stars > 5) {
-            throw new ResponseStatusException(400, "A rating is 1 to 5 stars");
+    /// Ends the delivery of an order an admin cancelled, inside that
+    /// transaction, and answers what changed for [#told], or null when the
+    /// order had no delivery under way.
+    public Change endForOrder(String id, String by) throws IOException {
+        Delivery before = find(id);
+        if (before == null || !tryMove(id, DeliveryState.CANCELLED_BY_ADMIN, by, null, null,
+                null)) {
+            return null;
         }
-        return attempt(() -> rated(customer, id, stars));
+        return new Change(id, DeliveryState.CANCELLED_BY_ADMIN, before.getCustomer(),
+                before.getCourier(), "", null);
     }
 
-    @Transactional
-    private DeliveryDto rated(String customer, String id, int stars) throws IOException {
-        String courier = owned(id, CUSTOMER, customer).getCourier();
-        if (deliveries.rate(id, customer, stars) != 1) {
-            throw new ResponseStatusException(409, "That delivery cannot be rated now");
-        }
-        couriers.addRating(courier, stars);
-        return view(id, customer);
+    /// Tells the people concerned about a change made by another class's
+    /// transaction, once it has committed.
+    public void told(Change change) {
+        tell(change);
     }
 
     // --------------------------------------------------------------- couriers
@@ -383,6 +265,10 @@ public class Deliveries {
     private Delivery finish(String courier, String id) throws IOException {
         Delivery delivery = owned(id, COURIER, courier);
         move(id, DeliveryState.COMPLETED, courier, COURIER, null, null);
+        if (orders.deliver(id, OrderStateMachine.sources(OrderState.DELIVERED),
+                OrderState.DELIVERED, System.currentTimeMillis()) == 1) {
+            orderEvents.record(id, OrderState.DELIVERED, courier);
+        }
         return delivery;
     }
 
@@ -441,13 +327,35 @@ public class Deliveries {
     @Transactional
     private Change settled(String courier, String id, String status) throws IOException {
         deliveries.paymentStatus(id, status);
+        orders.paymentStatus(id, status, System.currentTimeMillis());
         Delivery delivery = find(id);
         return new Change(id, delivery.getState(), delivery.getCustomer(), delivery.getCourier(), "",
                 toDto(delivery, courier, new HashMap<String, Profile>()));
     }
 
+    /// Gives back a delivery a courier took and cannot finish, before they have
+    /// the food. The order still has to reach its door, so the delivery goes
+    /// back to looking, and not at this courier again.
     public DeliveryDto cancelByCourier(String courier, String id) throws IOException {
-        return tell(attempt(() -> step(courier, id, DeliveryState.CANCELLED_BY_COURIER)));
+        tell(attempt(() -> giveUp(courier, id)));
+        search(id);
+        return none();
+    }
+
+    @Transactional
+    private Change giveUp(String courier, String id) throws IOException {
+        Delivery delivery = owned(id, COURIER, courier);
+        if (deliveries.giveBack(id, TAKEN_NOT_STARTED, DeliveryState.REQUESTED,
+                System.currentTimeMillis(), courier, "") != 1) {
+            throw new ResponseStatusException(409, "That delivery is "
+                    + describe(find(id).getState()));
+        }
+        // Recorded as what the courier did, though the delivery itself is
+        // looking again: the admin's count of a courier's cancellations is
+        // read from these.
+        event(id, DeliveryState.CANCELLED_BY_COURIER, courier);
+        passed(id, courier);
+        return new Change(id, DeliveryState.REQUESTED, delivery.getCustomer(), "", courier, null);
     }
 
     /// One of a courier's own moves of a delivery that is theirs, and the delivery as
@@ -461,13 +369,22 @@ public class Deliveries {
             // allowed: a block that committed meanwhile is seen here, and a
             // block that comes after this commits sees the accepted delivery.
             // Either way no delivery is left with a courier who can no longer
-            // drive it.
+            // carry it.
             profiles.hold(courier);
             if (!matcher.enabled(courier)) {
                 throw new ResponseStatusException(403, "This account has been blocked");
             }
         }
         owned(id, COURIER, courier);
+        if (DeliveryState.IN_PROGRESS == to) {
+            // The courier has the food: the order is picked up in the same
+            // transaction, and only once the kitchen said it is ready.
+            if (orders.move(id, OrderStateMachine.sources(OrderState.PICKED_UP),
+                    OrderState.PICKED_UP, System.currentTimeMillis()) != 1) {
+                throw new ResponseStatusException(409, "The kitchen has not marked it ready yet");
+            }
+            orderEvents.record(id, OrderState.PICKED_UP, courier);
+        }
         move(id, to, courier, COURIER, null, null);
         Delivery delivery = find(id);
         return new Change(id, delivery.getState(), delivery.getCustomer(), delivery.getCourier(), "",
@@ -475,28 +392,6 @@ public class Deliveries {
     }
 
     // ----------------------------------------------------------------- admin
-
-    /// Ends a delivery that has not ended, whoever has it and whatever it was
-    /// doing. Nothing is charged: a delivery pays when it completes, and this one
-    /// does not. The reason is kept with the customer's account.
-    public DeliveryDto cancelByAdmin(String by, String id, String reason) throws IOException {
-        String why = Text.required(reason, 255, "why the delivery is cancelled");
-        return tell(attempt(() -> cancelAsAdmin(by, id, why)));
-    }
-
-    @Transactional
-    private Change cancelAsAdmin(String by, String id, String why) throws IOException {
-        Delivery before = find(id);
-        if (before == null) {
-            throw new ResponseStatusException(404, "No such delivery");
-        }
-        String customer = before.getCustomer();
-        String courier = before.getCourier();
-        move(id, DeliveryState.CANCELLED_BY_ADMIN, by, null, null, null);
-        moderation.record(customer, by, "cancel_delivery", why);
-        return new Change(id, DeliveryState.CANCELLED_BY_ADMIN, customer, courier, "",
-                toDto(find(id), courier, new HashMap<String, Profile>(), false));
-    }
 
     // ---------------------------------------------------------------- anyone
 
@@ -512,6 +407,16 @@ public class Deliveries {
         }
         return toDto(delivery, admin ? delivery.getCourier() : viewer, new HashMap<String, Profile>(),
                 !admin);
+    }
+
+    /// The delivery of an order, for showing inside the order, or null when the
+    /// kitchen has not accepted it yet. The caller has already decided that
+    /// `viewer` may see the order; `party` is whether they are its customer.
+    @Transactional(readOnly = true)
+    public DeliveryDto forOrder(String id, String viewer, boolean party) throws IOException {
+        Delivery delivery = find(id);
+        return delivery == null ? null : toDto(delivery, viewer, new HashMap<String, Profile>(),
+                party);
     }
 
     /// The most recent deliveries, for the admin.
@@ -543,7 +448,7 @@ public class Deliveries {
     /// next tick: choosing again reads them as they now are, and does not pick
     /// them. Bounded, so couriers changing faster than this can choose cost the
     /// delivery a tick and no more.
-    void search(String id) throws IOException {
+    public void search(String id) throws IOException {
         String[] chosen = new String[1];
         Change change = null;
         for (int tries = 0; tries < SEARCH_TRIES; tries++) {
@@ -557,6 +462,10 @@ public class Deliveries {
             }
         }
         tell(change);
+        if (change != null && DeliveryState.NO_COURIERS == change.state) {
+            // The order will not come, so the money held for it is let go.
+            payments.release(id);
+        }
     }
 
     /// Gives up on a delivery that has waited too long, or names the courier to
@@ -570,8 +479,14 @@ public class Deliveries {
         }
         long now = System.currentTimeMillis();
         if (now > delivery.getSearchUntil()) {
-            return tryMove(id, DeliveryState.NO_COURIERS, "", null, null, null)
-                    ? new Change(id, DeliveryState.NO_COURIERS, delivery.getCustomer(), "", "", null) : null;
+            if (!tryMove(id, DeliveryState.NO_COURIERS, "", null, null, null)) {
+                return null;
+            }
+            if (orders.end(id, OrderStateMachine.sources(OrderState.NO_COURIERS),
+                    OrderState.NO_COURIERS, "No courier was free to bring it", now) == 1) {
+                orderEvents.record(id, OrderState.NO_COURIERS, "");
+            }
+            return new Change(id, DeliveryState.NO_COURIERS, delivery.getCustomer(), "", "", null);
         }
         chosen[0] = matcher.pick(delivery, now - delivery.getRequestedAt());
         return null;
@@ -680,7 +595,7 @@ public class Deliveries {
     /// it has committed, and the delivery as the caller is to see it. Not private:
     /// the transactional methods answer it, and the class the build writes to
     /// begin and commit their transactions has to be able to name it.
-    static final class Change {
+    public static final class Change {
         final String id;
         final DeliveryState state;
         final String customer;
@@ -708,7 +623,13 @@ public class Deliveries {
         live.deliveryChanged(change.id, change.state, change.customer, change.courier, change.also);
         // The same moment, and for the same reason: a phone told of a change
         // must find it made.
-        pushes.deliveryChanged(change.id, change.state, change.customer, change.courier);
+        pushes.deliveryChanged(change.id, change.state, change.courier);
+        // The steps that move the order too: the customer and the kitchen
+        // hear of those as the order's.
+        if (DeliveryState.IN_PROGRESS == change.state || DeliveryState.COMPLETED == change.state
+                || DeliveryState.NO_COURIERS == change.state) {
+            news.told(change.id);
+        }
         return change.view;
     }
 
@@ -850,12 +771,6 @@ public class Deliveries {
         return deliveries.findById(id);
     }
 
-    /// The delivery as `viewer` sees it, read in a transaction of its own.
-    @Transactional(readOnly = true)
-    private DeliveryDto read(String id, String viewer) throws IOException {
-        return view(id, viewer);
-    }
-
     private DeliveryDto view(String id, String viewer) throws IOException {
         return toDto(find(id), viewer, new HashMap<String, Profile>());
     }
@@ -946,7 +861,7 @@ public class Deliveries {
                 courierHeading = car.getHeading();
                 // How long until the car is where it is going next: the pickup
                 // until the customer is in it, the destination after.
-                if (DeliveryState.ACCEPTED == state) {
+                if (DeliveryState.ACCEPTED == state || DeliveryState.ARRIVED == state) {
                     etaMinutes = etaMinutes(courierLat, courierLng, delivery.getPickupLat(),
                             delivery.getPickupLng());
                 } else if (DeliveryState.IN_PROGRESS == state) {
@@ -960,7 +875,6 @@ public class Deliveries {
                     (delivery.getOfferExpiresAt() - System.currentTimeMillis()) / 1000L);
         }
         long fareCents = delivery.getFareCents();
-        long serviceFee = delivery.getFeeCents();
         long tip = delivery.getTipCents();
         return new DeliveryDto(
                 delivery.getId(),
@@ -990,33 +904,24 @@ public class Deliveries {
                 delivery.getStars(),
                 delivery.getPaymentStatus(),
                 offerExpiresInSeconds,
-                delivery.getProduct(),
                 delivery.getMethodLabel(),
                 Payments.CASH.equals(delivery.getMethodId()),
-                serviceFee,
+                0L,
                 tip,
-                fareCents + serviceFee + tip,
+                fareCents + tip,
                 courierPhotoInitials,
                 etaMinutes,
-                delivery.isWomenOnly() ? WOMEN : COURIER_GENDERS[0],
-                delivery.isQuiet(),
-                delivery.isWheelchair(),
-                delivery.isPets(),
                 delivery.getNote(),
                 courierPhone,
                 customerPhone);
     }
 
-    /// Minutes for a car to drive from one point to another, by the same
+    /// Minutes for a courier to travel from one point to another, by the same
     /// estimate the fares are made with. Never less than one.
     public static int etaMinutes(double fromLat, double fromLng, double toLat, double toLng) {
-        double seconds = Geo.meters(fromLat, fromLng, toLat, toLng) * Fares.ROAD_FACTOR
-                / Fares.METERS_PER_SECOND;
+        double seconds = Geo.meters(fromLat, fromLng, toLat, toLng) * Quotes.ROAD_FACTOR
+                / Quotes.METERS_PER_SECOND;
         return Math.max(1, (int) Math.ceil(seconds / 60d));
-    }
-
-    private static String courierGender(DeliveryRequestDto request) {
-        return Text.oneOf(request.courierGender(), COURIER_GENDERS, COURIER_GENDERS[0], "the courier");
     }
 
     private Profile profile(String username, Map<String, Profile> cache) {
@@ -1026,21 +931,6 @@ public class Deliveries {
         Profile row = profiles.findById(username);
         cache.put(username, row);
         return row;
-    }
-
-    private static void validate(DeliveryRequestDto request) {
-        if (request == null || !Geo.isPoint(request.pickupLat(), request.pickupLng())
-                || !Geo.isPoint(request.dropoffLat(), request.dropoffLng())) {
-            throw new ResponseStatusException(400, "Choose where the delivery starts and ends");
-        }
-        double meters = Geo.meters(request.pickupLat(), request.pickupLng(), request.dropoffLat(),
-                request.dropoffLng());
-        if (meters < MIN_METERS) {
-            throw new ResponseStatusException(400, "That is too close to need a delivery");
-        }
-        if (meters > MAX_METERS) {
-            throw new ResponseStatusException(400, "That is further than we go");
-        }
     }
 
     private static String address(String value) {

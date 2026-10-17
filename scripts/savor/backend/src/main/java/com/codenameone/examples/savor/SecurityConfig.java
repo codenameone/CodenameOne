@@ -78,7 +78,7 @@ import java.util.Collection;
 /// couriers and `/api/admin` for admins; the rest is for anyone signed in, and
 /// acts on the caller's own account, cards, receipts and onboarding application.
 /// `/api/onboarding` is that last one, and is deliberately not under
-/// `/api/courier`: applying to drive is what someone does before they may.
+/// `/api/courier`: applying to deliver is what someone does before they may.
 @Configuration
 public class SecurityConfig {
     /// The id the app signs in as. A public client: it holds no secret, since

@@ -67,6 +67,14 @@ class PaymentsTest {
         return ((Number) row.get("n")).longValue();
     }
 
+    /// Sets what the delivery `id` and its order say of their payment, as a
+    /// write the server lost would leave them.
+    private void paymentStatus(String id, String status) throws Exception {
+        db.execute("UPDATE delivery SET payment_status = ? WHERE id = ?", new Object[] {status, id});
+        db.execute("UPDATE customer_order SET payment_status = ? WHERE id = ?",
+                new Object[] {status, id});
+    }
+
     @Test
     void openSetupsAreCappedAndTheFinishedAndAbandonedAreSwept() throws Exception {
         String customer = People.customer(accounts, "setup-looper");
@@ -113,9 +121,9 @@ class PaymentsTest {
         String customer = People.customer(accounts, "tll-pay-customer");
         String courier = People.courier(accounts, "tll-pay-courier");
         Trips.online(mvc, courier, 59.4370, 24.7536);
-        String yesterday = (String) Trips.complete(mvc, customer, courier, People.delivery(59.4370,
+        String yesterday = (String) Trips.complete(mvc, customer, courier, Trips.trip(59.4370,
                 24.7536, 59.4470, 24.7636)).get("id");
-        Trips.complete(mvc, customer, courier, People.delivery(59.4370, 24.7536, 59.4470, 24.7636));
+        Trips.complete(mvc, customer, courier, Trips.trip(59.4370, 24.7536, 59.4470, 24.7636));
         long now = System.currentTimeMillis();
         db.execute("UPDATE delivery SET updated_at = ? WHERE id = ?", new Object[] {
             Long.valueOf(now - now % (24L * 60L * 60L * 1000L) - 60L * 60L * 1000L), yesterday});
@@ -193,8 +201,8 @@ class PaymentsTest {
                 .andExpect(status().isNotFound());
         mvc.perform(People.asCustomer(post("/api/payments/methods/" + visaId + "/remove"), other))
                 .andExpect(status().isNotFound());
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries"), Trips.delivery(52.52, 13.405,
-                        52.53, 13.42, "\"paymentMethodId\":\"" + visaId + "\"")), other))
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders"), Trips.cart(mvc, Trips.trip(52.52,
+                        13.405, 52.53, 13.42, "\"paymentMethodId\":\"" + visaId + "\""))), other))
                 .andExpect(status().isBadRequest());
 
         // Removing the default leaves cash as the default; cash stays.
@@ -222,32 +230,35 @@ class PaymentsTest {
         Trips.online(mvc, courier, 52.5200, 13.4050);
 
         // No method named: the default, which is now the card.
-        Map done = Trips.complete(mvc, customer, courier, People.delivery(52.5200, 13.4050, 52.5300,
+        Map done = Trips.complete(mvc, customer, courier, Trips.trip(52.5200, 13.4050, 52.5300,
                 13.4200));
         String id = (String) done.get("id");
+        // The courier is shown the delivery fee, which is theirs; the
+        // customer paid the order's total, held at checkout and taken now.
         long fare = Trips.number(done, "fareCents");
-        long fee = Trips.number(done, "serviceFee");
+        Map order = Trips.json(mvc, People.asCustomer(get("/api/orders/" + id), customer));
+        long total = Trips.number(order, "totalCents");
+        assertEquals(fare, Trips.number(order, "deliveryFeeCents"));
         assertEquals("PAID", done.get("paymentStatus"));
+        assertEquals("PAID", order.get("paymentStatus"));
         assertEquals("Visa 4242", done.get("paymentMethodLabel"));
         assertEquals(Boolean.FALSE, done.get("cash"));
-        assertEquals("standard", done.get("product"));
-        assertEquals(Math.round(fare * 10d / 100d), fee);
-        assertEquals(fare + fee, Trips.number(done, "total"));
         assertEquals("B", done.get("courierPhotoInitials"));
 
         // The receipt adds up, part by part.
         Map receipt = Trips.receipt(mvc, customer, id);
         assertEquals("paid", receipt.get("status"));
         assertEquals("Visa 4242", receipt.get("methodLabel"));
-        assertEquals(fare, Trips.number(receipt, "baseFare") + Trips.number(receipt,
-                "distanceFare") + Trips.number(receipt, "timeFare"));
-        assertEquals(fee, Trips.number(receipt, "serviceFee"));
+        assertEquals(Trips.DISH_CENTS, Trips.number(receipt, "subtotal"));
+        assertEquals(fare, Trips.number(receipt, "deliveryFee"));
         assertEquals(0L, Trips.number(receipt, "tip"));
-        assertEquals(fare + fee, Trips.number(receipt, "total"));
+        assertEquals(total, Trips.number(receipt, "subtotal") + Trips.number(receipt, "deliveryFee")
+                + Trips.number(receipt, "serviceFee") + Trips.number(receipt, "smallOrderFee")
+                + Trips.number(receipt, "tax") - Trips.number(receipt, "discount"));
+        assertEquals(total, Trips.number(receipt, "total"));
         assertTrue(Trips.number(receipt, "paidAt") > 0L);
-        assertEquals("Here", receipt.get("pickupName"));
+        assertEquals("There", receipt.get("dropoffName"));
         assertEquals("ber-courier", receipt.get("courierName"));
-        assertEquals("Green Fiat 500", receipt.get("vehicle"));
         // It is the customer's, and nobody else's -- the courier's included.
         mvc.perform(People.asCustomer(get("/api/payments/receipts/" + id), stranger))
                 .andExpect(status().isNotFound());
@@ -257,27 +268,28 @@ class PaymentsTest {
                 .andExpect(jsonPath("$.length()").value(0));
         mvc.perform(People.asCustomer(get("/api/payments/receipts"), customer))
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].deliveryId").value(id));
+                .andExpect(jsonPath("$[0].orderId").value(id));
 
         // A tip, once, by the customer.
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                         "{\"amount\":300}"), stranger))
                 .andExpect(status().isNotFound());
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                         "{\"amount\":0}"), customer))
                 .andExpect(status().isBadRequest());
-        Map tipped = Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        Map tipped = Trips.json(mvc, People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                 "{\"amount\":300}"), customer));
         assertEquals(300L, Trips.number(tipped, "tip"));
-        assertEquals(fare + fee + 300L, Trips.number(tipped, "total"));
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        assertEquals(total + 300L, Trips.number(tipped, "total"));
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                         "{\"amount\":300}"), customer))
                 .andExpect(status().isConflict());
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
-                .andExpect(jsonPath("$.tip").value(300));
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
+                .andExpect(jsonPath("$.delivery.tip").value(300));
 
-        // The courier earns the fare less the service's fifth, and all the tip.
-        long earned = fare - Math.round(fare * 20d / 100d) + 300L;
+        // The courier earns the delivery fee and all the tip: the service's
+        // commission is taken from the kitchen's side of the order.
+        long earned = fare + 300L;
         Map summary = Trips.json(mvc, People.asCourier(get("/api/courier/earnings/summary"),
                 courier));
         assertEquals("USD", summary.get("currency"));
@@ -340,23 +352,23 @@ class PaymentsTest {
         boolean listed = false;
         for (int iter = 0; iter < all.size(); iter++) {
             Map row = (Map) all.get(iter);
-            if (id.equals(row.get("deliveryId"))) {
+            if (id.equals(row.get("orderId"))) {
                 listed = true;
                 assertEquals(customer, row.get("customerUsername"));
             }
         }
-        assertTrue(listed, "the admin's list has the delivery");
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"), "{}")))
+        assertTrue(listed, "the admin's list has the order");
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"), "{}")))
                 .andExpect(status().isBadRequest());
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
-                        "{\"reason\":\"The car broke down\"}")))
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
+                        "{\"reason\":\"It arrived cold\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refunded"));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Twice\"}")))
                 .andExpect(status().isConflict());
         assertEquals("refunded", Trips.receipt(mvc, customer, id).get("status"));
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
 
         // The refund took the fare and the tip back, so neither is earned any
@@ -384,7 +396,7 @@ class PaymentsTest {
         String courier = People.courier(accounts, "bgo-tip-courier");
         String card = (String) Trips.addCard(mvc, customer, Trips.VISA).get("id");
         Trips.online(mvc, courier, 60.3913, 5.3221);
-        String id = (String) Trips.complete(mvc, customer, courier, People.delivery(60.3913, 5.3221,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(60.3913, 5.3221,
                 60.4013, 5.3321)).get("id");
         Trips.offline(mvc, courier);
         db.execute("UPDATE delivery SET tip_cents = 300 WHERE id = ?", new Object[] {id});
@@ -408,18 +420,18 @@ class PaymentsTest {
         String courier = People.courier(accounts, "osl-courier");
         Trips.addCard(mvc, customer, Trips.VISA);
         Trips.online(mvc, courier, 59.9139, 10.7522);
-        String id = (String) Trips.complete(mvc, customer, courier, People.delivery(59.9139, 10.7522,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(59.9139, 10.7522,
                 59.9239, 10.7622)).get("id");
 
         // A tip as it stands between being claimed and its charge coming back:
         // on the delivery, and with no charge recorded for it.
         db.execute("UPDATE delivery SET tip_cents = 300 WHERE id = ?", new Object[] {id});
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Too soon\"}")))
                 .andExpect(status().isConflict());
         // Refused whole: the delivery is still paid, so the refund can be asked
         // for again and the tip's charge has a paid delivery to land on.
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
         // Nor is it the courier's to cash out: nobody knows it was charged.
         Map before = Trips.json(mvc, People.asCourier(get("/api/courier/earnings/summary"),
@@ -438,7 +450,7 @@ class PaymentsTest {
         assertEquals(300L, Trips.number(after, "tips"));
         assertEquals(fareOnly + 300L, Trips.number(after, "balance"));
         assertEquals(fareOnly + 300L, Trips.number(after, "today"));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Now\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refunded"));
@@ -452,17 +464,16 @@ class PaymentsTest {
         String courier = People.courier(accounts, "vno-courier");
         Trips.addCard(mvc, customer, Trips.VISA);
         Trips.online(mvc, courier, 54.6872, 25.2797);
-        String paid = (String) Trips.complete(mvc, customer, courier, People.delivery(54.6872, 25.2797,
+        String paid = (String) Trips.complete(mvc, customer, courier, Trips.trip(54.6872, 25.2797,
                 54.6972, 25.2897)).get("id");
-        String pending = (String) Trips.complete(mvc, customer, courier, People.delivery(54.6872,
+        String pending = (String) Trips.complete(mvc, customer, courier, Trips.trip(54.6872,
                 25.2797, 54.6972, 25.2897)).get("id");
-        String refunded = (String) Trips.complete(mvc, customer, courier, People.delivery(54.6872,
+        String refunded = (String) Trips.complete(mvc, customer, courier, Trips.trip(54.6872,
                 25.2797, 54.6972, 25.2897)).get("id");
         // A charge nobody has answered yet, a delivery refunded, and a tip on the
         // paid delivery whose charge has not come back.
-        db.execute("UPDATE delivery SET payment_status = 'PENDING' WHERE id = ?",
-                new Object[] {pending});
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + refunded + "/refund"),
+        paymentStatus(pending, "PENDING");
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + refunded + "/refund"),
                         "{\"reason\":\"Wrong address\"}")))
                 .andExpect(status().isOk());
         db.execute("UPDATE delivery SET tip_cents = 300 WHERE id = ?", new Object[] {paid});
@@ -494,19 +505,18 @@ class PaymentsTest {
         String courier = People.courier(accounts, "bgo-courier");
         Trips.addCard(mvc, customer, Trips.VISA);
         Trips.online(mvc, courier, 60.3913, 5.3221);
-        String id = (String) Trips.complete(mvc, customer, courier, People.delivery(60.3913, 5.3221,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(60.3913, 5.3221,
                 60.4013, 5.3321)).get("id");
 
         // A refund as a server that stopped half way leaves it: the delivery
         // marked, the processor perhaps asked, and nothing written down.
-        db.execute("UPDATE delivery SET payment_status = 'REFUNDED' WHERE id = ?",
-                new Object[] {id});
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        paymentStatus(id, "REFUNDED");
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Again\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refunded"));
         // And once it is recorded, it is refunded once like any other.
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Twice\"}")))
                 .andExpect(status().isConflict());
         Trips.offline(mvc, courier);
@@ -520,17 +530,17 @@ class PaymentsTest {
         String card = (String) Trips.addCard(mvc, customer, Trips.SLOW_REFUND).get("id");
         String method = "\"paymentMethodId\":\"" + card + "\"";
         Trips.online(mvc, courier, 57.7089, 11.9746);
-        String id = (String) Trips.complete(mvc, customer, courier, Trips.delivery(57.7089, 11.9746,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(57.7089, 11.9746,
                 57.7189, 11.9846, method)).get("id");
 
         // Taken, and not yet money back: pending, and not to be asked for twice.
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Slow\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refund_pending"));
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUND_PENDING"));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Again\"}")))
                 .andExpect(status().isConflict());
         // The processor has finished it by the time it is asked.
@@ -541,17 +551,17 @@ class PaymentsTest {
         // refunded, and is not tried again from here.
         db.execute("UPDATE payment_method SET token = 'sim_pm_lost_card' WHERE id = ?",
                 new Object[] {card});
-        String lost = (String) Trips.complete(mvc, customer, courier, Trips.delivery(57.7089, 11.9746,
+        String lost = (String) Trips.complete(mvc, customer, courier, Trips.trip(57.7089, 11.9746,
                 57.7189, 11.9846, method)).get("id");
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + lost + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + lost + "/refund"),
                         "{\"reason\":\"Lost\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refund_pending"));
         payments.settleRefunds();
         assertEquals("refund_failed", Trips.receipt(mvc, customer, lost).get("status"));
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + lost), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + lost), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUND_FAILED"));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + lost + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + lost + "/refund"),
                         "{\"reason\":\"Again\"}")))
                 .andExpect(status().isConflict());
         Trips.offline(mvc, courier);
@@ -564,26 +574,26 @@ class PaymentsTest {
         String courier = People.courier(accounts, "lis-pay-courier");
         Trips.addCard(mvc, customer, Trips.VISA);
         Trips.online(mvc, courier, 38.7223, -9.1393);
-        Map done = Trips.complete(mvc, customer, courier, People.delivery(38.7223, -9.1393, 38.7323,
+        Map done = Trips.complete(mvc, customer, courier, Trips.trip(38.7223, -9.1393, 38.7323,
                 -9.1293));
         String id = (String) done.get("id");
-        long total = Trips.number(done, "fareCents") + Trips.number(done, "serviceFee");
+        long total = Trips.number(Trips.json(mvc, People.asCustomer(get("/api/orders/" + id),
+                customer)), "totalCents");
 
         // The server stopped after the delivery completed and before its payment
         // was written.
         db.execute("DELETE FROM payment WHERE delivery_id = ?", new Object[] {id});
-        db.execute("UPDATE delivery SET payment_status = 'PENDING' WHERE id = ?",
-                new Object[] {id});
+        paymentStatus(id, "PENDING");
 
         // Completed a moment ago, it may still be at the processor: left alone.
         deliveries.settleLeftBehind();
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
 
         db.execute("UPDATE delivery SET updated_at = ? WHERE id = ?",
                 new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         deliveries.settleLeftBehind();
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
         Map receipt = Trips.receipt(mvc, customer, id);
         assertEquals("paid", receipt.get("status"));
@@ -602,10 +612,11 @@ class PaymentsTest {
         String courier = People.courier(accounts, "prg-pay-courier");
         String card = (String) Trips.addCard(mvc, customer, Trips.NO_ANSWER_WHEN_CHARGED).get("id");
         Trips.online(mvc, courier, 50.0755, 14.4378);
-        Map done = Trips.complete(mvc, customer, courier, Trips.delivery(50.0755, 14.4378, 50.0855,
+        Map done = Trips.complete(mvc, customer, courier, Trips.trip(50.0755, 14.4378, 50.0855,
                 14.4478, "\"paymentMethodId\":\"" + card + "\""));
         String id = (String) done.get("id");
-        long total = Trips.number(done, "fareCents") + Trips.number(done, "serviceFee");
+        long total = Trips.number(Trips.json(mvc, People.asCustomer(get("/api/orders/" + id),
+                customer)), "totalCents");
 
         // The processor failed without saying whether it took the money: not
         // paid, and not failed either.
@@ -624,19 +635,20 @@ class PaymentsTest {
         db.execute("UPDATE delivery SET updated_at = ? WHERE id = ?",
                 new Object[] {Long.valueOf(System.currentTimeMillis() - 5L * 60L * 1000L), id});
         deliveries.settleLeftBehind();
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("PENDING"));
 
         // The processor answers again, and the same delivery is asked about.
-        db.execute("UPDATE payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
-                new Object[] {card});
+        // The order is taken from the hold made at checkout, so the hold is
+        // what answers now.
+        db.execute("UPDATE customer_order SET authorization_ref = ? WHERE id = ?",
+                new Object[] {"sim_ch_" + id, id});
         deliveries.settleLeftBehind();
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("PAID"));
         assertEquals(total, Trips.number(Trips.receipt(mvc, customer, id), "total"));
         // Paid now, and the courier's share is in the balance.
-        assertEquals(Trips.number(done, "fareCents") - Math.round(
-                Trips.number(done, "fareCents") * 20d / 100d), Trips.number(Trips.json(mvc,
+        assertEquals(Trips.number(done, "fareCents"), Trips.number(Trips.json(mvc,
                 People.asCourier(get("/api/courier/earnings/summary"), courier)), "balance"));
         // Settled, and the card can go.
         mvc.perform(People.asCustomer(post("/api/payments/methods/" + card + "/remove"), customer))
@@ -651,32 +663,32 @@ class PaymentsTest {
         String courier = People.courier(accounts, "vie-pay-courier");
         String card = (String) Trips.addCard(mvc, customer, Trips.VISA).get("id");
         Trips.online(mvc, courier, 48.2082, 16.3738);
-        String id = (String) Trips.complete(mvc, customer, courier, People.delivery(48.2082, 16.3738,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(48.2082, 16.3738,
                 48.2182, 16.3838)).get("id");
 
         // The processor stops answering, and a tip is asked for.
         db.execute("UPDATE payment_method SET token = 'sim_pm_fault_now' WHERE id = ?",
                 new Object[] {card});
         assertEquals(502, Trips.statusOf(mvc, People.asCustomer(Trips.body(
-                post("/api/deliveries/" + id + "/tip"), "{\"amount\":300}"), customer)));
+                post("/api/orders/" + id + "/tip"), "{\"amount\":300}"), customer)));
         // It may have been charged, so it stays on the delivery, which cannot be
         // refunded around it, and cannot be swapped for another amount.
         assertEquals(300L, Trips.number(Trips.receipt(mvc, customer, id), "tip"));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Too soon\"}")))
                 .andExpect(status().isConflict());
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                         "{\"amount\":500}"), customer))
                 .andExpect(status().isConflict());
 
         // Asked for again with the same amount once the processor is back.
         db.execute("UPDATE payment_method SET token = 'sim_pm_recovered' WHERE id = ?",
                 new Object[] {card});
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + id + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + id + "/tip"),
                         "{\"amount\":300}"), customer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tip").value(300));
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + id + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + id + "/refund"),
                         "{\"reason\":\"Now\"}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("refunded"));
@@ -712,20 +724,19 @@ class PaymentsTest {
         Trips.online(mvc, courier, 53.3498, -6.2603);
 
         // Cash, asked for by name although a card is the default.
-        Map cash = Trips.complete(mvc, customer, courier, Trips.delivery(53.3498, -6.2603, 53.3600,
-                -6.2500, "\"paymentMethodId\":\"cash\",\"note\":\"Blue door\",\"quietDelivery\":true"));
+        Map cash = Trips.complete(mvc, customer, courier, Trips.trip(53.3498, -6.2603, 53.3600,
+                -6.2500, "\"paymentMethodId\":\"cash\",\"note\":\"Blue door\""));
         String cashId = (String) cash.get("id");
         assertEquals("PAID", cash.get("paymentStatus"));
         assertEquals("Cash", cash.get("paymentMethodLabel"));
         assertEquals(Boolean.TRUE, cash.get("cash"));
         assertEquals("Blue door", cash.get("note"));
-        assertEquals(Boolean.TRUE, cash.get("quietDelivery"));
         assertEquals("cash", Trips.receipt(mvc, customer, cashId).get("status"));
         // Nothing went to a card, so there is nothing to send back to one.
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + cashId + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + cashId + "/refund"),
                         "{\"reason\":\"Asked nicely\"}")))
                 .andExpect(status().isConflict());
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + cashId + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + cashId + "/tip"),
                         "{\"amount\":150}"), customer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tip").value(150))
@@ -733,25 +744,26 @@ class PaymentsTest {
 
         // The card that is refused when charged: the delivery still ends, and
         // says it was not paid for.
-        Map unpaid = Trips.complete(mvc, customer, courier, Trips.delivery(53.3498, -6.2603, 53.3600,
+        Map unpaid = Trips.complete(mvc, customer, courier, Trips.trip(53.3498, -6.2603, 53.3600,
                 -6.2500, "\"paymentMethodId\":\"" + failing + "\""));
         String unpaidId = (String) unpaid.get("id");
         assertEquals("COMPLETED", unpaid.get("state"));
         assertEquals("FAILED", unpaid.get("paymentStatus"));
         assertEquals("failed", Trips.receipt(mvc, customer, unpaidId).get("status"));
-        mvc.perform(People.asCustomer(Trips.body(post("/api/deliveries/" + unpaidId + "/tip"),
+        mvc.perform(People.asCustomer(Trips.body(post("/api/orders/" + unpaidId + "/tip"),
                         "{\"amount\":150}"), customer))
                 .andExpect(status().isConflict());
-        mvc.perform(admin(Trips.body(post("/api/admin/deliveries/" + unpaidId + "/refund"),
+        mvc.perform(admin(Trips.body(post("/api/admin/orders/" + unpaidId + "/refund"),
                         "{\"reason\":\"Nothing to return\"}")))
                 .andExpect(status().isConflict());
-        // A card with a delivery riding on it is not removed until the delivery ends.
-        String waiting = (String) Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries"),
-                Trips.delivery(53.3498, -6.2603, 53.3600, -6.2500, "\"paymentMethodId\":\"" + failing
-                        + "\"")), customer)).get("id");
+        // A card an order is held on is not removed until the order ends. It
+        // is called off before the kitchen takes it: once cooking, only an
+        // admin can.
+        String waiting = (String) Trips.place(mvc, customer, Trips.trip(53.3498, -6.2603, 53.3600,
+                -6.2500, "\"paymentMethodId\":\"" + failing + "\"")).get("id");
         mvc.perform(People.asCustomer(post("/api/payments/methods/" + failing + "/remove"), customer))
                 .andExpect(status().isConflict());
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + waiting + "/cancel"), customer))
+        mvc.perform(People.asCustomer(post("/api/orders/" + waiting + "/cancel"), customer))
                 .andExpect(status().isOk());
         mvc.perform(People.asCustomer(post("/api/payments/methods/" + failing + "/remove"), customer))
                 .andExpect(status().isOk());

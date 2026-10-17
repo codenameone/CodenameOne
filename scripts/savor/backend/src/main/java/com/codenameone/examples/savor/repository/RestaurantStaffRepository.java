@@ -16,26 +16,21 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-package com.codenameone.examples.savor.api;
+package com.codenameone.examples.savor.repository;
 
-import com.codename1.annotations.Mapped;
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Repository;
+import com.codename1.orm.session.Identifier;
+import com.codenameone.examples.savor.domain.RestaurantStaff;
 
-/// One product a delivery can be taken as, priced for the delivery being quoted.
-///
-/// @param product `standard`, `comfort` or `xl`.
-/// @param fare Cents, like every amount here.
-/// @param total What the customer would pay: [#fare()] plus [#serviceFee()].
-/// @param couriersNearby Couriers of this product in reach; 0 when there is none.
-/// @param etaMinutes Minutes for the nearest of them to arrive; 0 when there is none.
-@Mapped
-public record FareOptionDto(
-        String product,
-        String name,
-        String description,
-        int seats,
-        long fare,
-        long serviceFee,
-        long total,
-        int couriersNearby,
-        int etaMinutes) {
+import java.util.List;
+
+/// Who works for which restaurant, keyed by `Identifier.of(restaurantId, username)`.
+@Repository(entity = RestaurantStaff.class, key = Identifier.class)
+public interface RestaurantStaffRepository extends CrudRepository<RestaurantStaff, Identifier> {
+    List<RestaurantStaff> findByUsername(String username);
+
+    List<RestaurantStaff> findByRestaurantId(String restaurantId);
+
+    int deleteByUsername(String username);
 }

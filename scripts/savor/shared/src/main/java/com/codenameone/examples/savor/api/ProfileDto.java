@@ -22,13 +22,7 @@ import com.codename1.annotations.Mapped;
 
 /// The parts of an account its owner edits.
 ///
-/// @param gender `unspecified`, `female`, `male` or `nonbinary`.
 @Mapped
 public record ProfileDto(
-        String name,
-        String gender,
-        String emergencyContactName,
-        String emergencyContactPhone,
-        String homeAddress,
-        String workAddress) {
+        String name) {
 }

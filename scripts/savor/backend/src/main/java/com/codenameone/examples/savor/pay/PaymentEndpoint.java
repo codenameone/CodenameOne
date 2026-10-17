@@ -28,7 +28,7 @@ import com.codenameone.examples.savor.api.PaymentMethodDto;
 import com.codenameone.examples.savor.api.PaymentSetupDto;
 import com.codenameone.examples.savor.api.ReceiptDto;
 import com.codenameone.examples.savor.api.TipDto;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.order.Quotes;
 
 import java.util.List;
 
@@ -39,9 +39,9 @@ import java.util.List;
 public class PaymentEndpoint implements PaymentApiServer {
     private final Payments payments;
     private final Accounts accounts;
-    private final Fares fares;
+    private final Quotes fares;
 
-    public PaymentEndpoint(Payments payments, Accounts accounts, Fares fares) {
+    public PaymentEndpoint(Payments payments, Accounts accounts, Quotes fares) {
         this.payments = payments;
         this.accounts = accounts;
         this.fares = fares;

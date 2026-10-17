@@ -176,7 +176,7 @@ class ProcessorFaultsTest {
         String courier = People.courier(accounts, "rix-courier");
         Trips.addCard(mvc, customer, Trips.VISA);
         Trips.online(mvc, courier, 56.9496, 24.1052);
-        String id = (String) Trips.complete(mvc, customer, courier, People.delivery(56.9496, 24.1052,
+        String id = (String) Trips.complete(mvc, customer, courier, Trips.trip(56.9496, 24.1052,
                 56.9596, 24.1152)).get("id");
 
         // A refund whose processor fails, and while it is at the processor a
@@ -188,7 +188,7 @@ class ProcessorFaultsTest {
         assertEquals(502, refusal(refund(id)));
         // The failure gives back nothing: the payment was refunded, so the
         // delivery is, and its fare is not the courier's to cash out.
-        mvc.perform(People.asCustomer(get("/api/deliveries/" + id), customer))
+        mvc.perform(People.asCustomer(get("/api/orders/" + id), customer))
                 .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
         assertEquals("refunded", Trips.receipt(mvc, customer, id).get("status"));
         assertEquals(0L, balance(courier));
@@ -196,7 +196,7 @@ class ProcessorFaultsTest {
         // The other way round: the overlapping refund fails and gives its
         // claim back while the first is still at the processor, and the first
         // then succeeds.
-        final String next = (String) Trips.complete(mvc, customer, courier, People.delivery(56.9496,
+        final String next = (String) Trips.complete(mvc, customer, courier, Trips.trip(56.9496,
                 24.1052, 56.9596, 24.1152)).get("id");
         processor.duringRefund = new Runnable() {
             @Override
@@ -207,7 +207,7 @@ class ProcessorFaultsTest {
         processor.refundFailures.add(Boolean.TRUE);
         processor.refundFailures.add(Boolean.FALSE);
         assertEquals(200, refusal(refund(next)));
-        Map delivery = Trips.json(mvc, People.asCustomer(get("/api/deliveries/" + next), customer));
+        Map delivery = Trips.json(mvc, People.asCustomer(get("/api/orders/" + next), customer));
         assertEquals("REFUNDED", delivery.get("paymentStatus"));
         assertEquals(0L, balance(courier));
         Trips.offline(mvc, courier);

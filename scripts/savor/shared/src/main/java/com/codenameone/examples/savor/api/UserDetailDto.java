@@ -33,6 +33,7 @@ import java.util.List;
 @Mapped
 public record UserDetailDto(
         UserDto user,
+        int orders,
         int deliveries,
         int cancellations,
         double rating,

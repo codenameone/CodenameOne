@@ -22,7 +22,8 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
-/// The prices an admin set. One row, with the id 1, once they have set any.
+/// What an order costs on top of its food, and what the service keeps of it.
+/// There is one row; see V6.
 @Entity
 public class Pricing {
     @Id(autoIncrement = false)
@@ -36,25 +37,22 @@ public class Pricing {
     private long perKmCents;
 
     @Column(nullable = false)
-    private long perMinuteCents;
+    private double surge;
 
     @Column(nullable = false)
-    private long minimumCents;
+    private long smallOrderCents;
+
+    @Column(nullable = false)
+    private long smallOrderFeeCents;
 
     @Column(nullable = false)
     private double feePercent;
 
     @Column(nullable = false)
+    private double taxPercent;
+
+    @Column(nullable = false)
     private double commissionPercent;
-
-    @Column(nullable = false)
-    private double surge;
-
-    @Column(nullable = false)
-    private double comfort;
-
-    @Column(nullable = false)
-    private double xl;
 
     @Column(nullable = false)
     private long updatedAt;
@@ -89,20 +87,28 @@ public class Pricing {
         this.perKmCents = perKmCents;
     }
 
-    public long getPerMinuteCents() {
-        return perMinuteCents;
+    public double getSurge() {
+        return surge;
     }
 
-    public void setPerMinuteCents(long perMinuteCents) {
-        this.perMinuteCents = perMinuteCents;
+    public void setSurge(double surge) {
+        this.surge = surge;
     }
 
-    public long getMinimumCents() {
-        return minimumCents;
+    public long getSmallOrderCents() {
+        return smallOrderCents;
     }
 
-    public void setMinimumCents(long minimumCents) {
-        this.minimumCents = minimumCents;
+    public void setSmallOrderCents(long smallOrderCents) {
+        this.smallOrderCents = smallOrderCents;
+    }
+
+    public long getSmallOrderFeeCents() {
+        return smallOrderFeeCents;
+    }
+
+    public void setSmallOrderFeeCents(long smallOrderFeeCents) {
+        this.smallOrderFeeCents = smallOrderFeeCents;
     }
 
     public double getFeePercent() {
@@ -113,36 +119,20 @@ public class Pricing {
         this.feePercent = feePercent;
     }
 
+    public double getTaxPercent() {
+        return taxPercent;
+    }
+
+    public void setTaxPercent(double taxPercent) {
+        this.taxPercent = taxPercent;
+    }
+
     public double getCommissionPercent() {
         return commissionPercent;
     }
 
     public void setCommissionPercent(double commissionPercent) {
         this.commissionPercent = commissionPercent;
-    }
-
-    public double getSurge() {
-        return surge;
-    }
-
-    public void setSurge(double surge) {
-        this.surge = surge;
-    }
-
-    public double getComfort() {
-        return comfort;
-    }
-
-    public void setComfort(double comfort) {
-        this.comfort = comfort;
-    }
-
-    public double getXl() {
-        return xl;
-    }
-
-    public void setXl(double xl) {
-        this.xl = xl;
     }
 
     public long getUpdatedAt() {

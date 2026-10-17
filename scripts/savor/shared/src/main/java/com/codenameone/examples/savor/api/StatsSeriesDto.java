@@ -26,6 +26,7 @@ import java.util.List;
 ///
 /// @param days Oldest first, every day present.
 /// @param byHour Deliveries asked for in each hour of the day (UTC), 24 numbers.
+/// @param byRestaurant Orders placed in the period at each restaurant, the busiest first.
 /// @param topCouriers The couriers who completed the most deliveries in the period; `deliveries` is that count.
 /// @param averageFare Cents.
 /// @param averageWaitSeconds From a delivery being asked for to a courier taking it.
@@ -35,10 +36,10 @@ public record StatsSeriesDto(
         List<DayStatsDto> days,
         List<Integer> byHour,
         List<NameCountDto> byState,
-        List<NameCountDto> byProduct,
+        List<NameCountDto> byRestaurant,
         List<CourierDto> topCouriers,
-        long averageFare,
-        double averageWaitSeconds,
+        long averageOrder,
+        double averageDeliveryMinutes,
         double completionRate,
         int pendingApplications,
         int flaggedUsers,

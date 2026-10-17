@@ -20,6 +20,11 @@ package com.codenameone.examples.savor.account;
 
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
+import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
+import com.codenameone.examples.savor.repository.SavedAddressRepository;
+import com.codenameone.examples.savor.repository.FavoriteRepository;
+import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.CourierHoursRepository;
 import com.codenameone.examples.savor.repository.CourierStateRepository;
 import com.codenameone.examples.savor.repository.LiveTicketRepository;
@@ -44,6 +49,9 @@ public class AccountCleanup {
     /// The states of a delivery that somebody is still waiting on.
     private static final DeliveryState[] UNDER_WAY = {DeliveryState.REQUESTED, DeliveryState.OFFERED,
         DeliveryState.ACCEPTED, DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
+    /// The states of an order that has not reached the door or ended.
+    private static final OrderState[] ORDERED = {OrderState.PLACED, OrderState.ACCEPTED,
+        OrderState.READY, OrderState.PICKED_UP};
     /// The states of a delivery a courier has taken and has yet to finish.
     private static final DeliveryState[] TAKEN = {DeliveryState.ACCEPTED, DeliveryState.ARRIVED,
         DeliveryState.IN_PROGRESS};
@@ -57,12 +65,18 @@ public class AccountCleanup {
     private final LiveTicketRepository tickets;
     private final PushDeviceRepository pushDevices;
     private final DeliveryActivityRepository activities;
+    private final CustomerOrderRepository orders;
+    private final FavoriteRepository favorites;
+    private final SavedAddressRepository addresses;
+    private final RestaurantStaffRepository staff;
 
     public AccountCleanup(DeliveryRepository deliveries, CourierStateRepository couriers,
             CourierHoursRepository hours, PreferenceRepository preferences,
             PayoutAccountRepository payoutAccounts, PhoneCodeRepository codes,
             LiveTicketRepository tickets, PushDeviceRepository pushDevices,
-            DeliveryActivityRepository activities) {
+            DeliveryActivityRepository activities, CustomerOrderRepository orders,
+            FavoriteRepository favorites, SavedAddressRepository addresses,
+            RestaurantStaffRepository staff) {
         this.deliveries = deliveries;
         this.couriers = couriers;
         this.hours = hours;
@@ -72,13 +86,20 @@ public class AccountCleanup {
         this.tickets = tickets;
         this.pushDevices = pushDevices;
         this.activities = activities;
+        this.orders = orders;
+        this.favorites = favorites;
+        this.addresses = addresses;
+        this.staff = staff;
     }
 
     /// Whether the account is the customer or the courier of a delivery that has not
     /// ended.
+    /// An order not yet delivered counts too: one the kitchen has not
+    /// answered has no delivery yet, and the card is held for it.
     public boolean hasDeliveryUnderWay(String username) {
-        return deliveries.existsByCustomerAndStateInOrCourierAndStateIn(username, UNDER_WAY, username,
-                UNDER_WAY);
+        return orders.countByCustomerAndStateIn(username, ORDERED) > 0
+                || deliveries.existsByCustomerAndStateInOrCourierAndStateIn(username, UNDER_WAY,
+                        username, UNDER_WAY);
     }
 
     /// Whether the account is onboarding a delivery it has taken and not finished. An
@@ -91,11 +112,12 @@ public class AccountCleanup {
     /// the moment it is asked for, or as its courier, once taken. An offer the
     /// courier has not answered is not one; it passes to the next courier.
     public boolean inDeliveryUnderWay(String username) {
-        return deliveries.existsByCustomerAndStateInOrCourierAndStateIn(username, UNDER_WAY, username,
-                TAKEN);
+        return orders.countByCustomerAndStateIn(username, ORDERED) > 0
+                || deliveries.existsByCustomerAndStateInOrCourierAndStateIn(username, UNDER_WAY,
+                        username, TAKEN);
     }
 
-    /// Takes a courier off line, when the account stops being allowed to drive.
+    /// Takes a courier off line, when the account stops being allowed to deliver.
     /// Does nothing for an account that never drove.
     public void takeOffLine(String username) {
         couriers.takeOffLine(username);
@@ -115,5 +137,10 @@ public class AccountCleanup {
         tickets.deleteByUsername(username);
         pushDevices.deleteByUsername(username);
         activities.deleteByUsername(username);
+        favorites.deleteByUsername(username);
+        addresses.deleteByUsername(username);
+        // A merchant's restaurant stays listed, as its orders and its menu do;
+        // an admin hands it to somebody else from the restaurants pane.
+        staff.deleteByUsername(username);
     }
 }

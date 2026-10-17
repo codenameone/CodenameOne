@@ -14,18 +14,9 @@ CREATE TABLE profile (
     vehicle VARCHAR(120) NOT NULL,
     plate VARCHAR(32) NOT NULL,
     created_at BIGINT NOT NULL,
-    -- What an account says about itself beyond its name and phone, and what an
-    -- admin has said about it. Added to the profile one column at a time, each with
-    -- a default: that is the one form of ALTER TABLE all three engines accept, and
-    -- the default is what the accounts opened before this script read as.
-    gender VARCHAR(16) NOT NULL,
     language VARCHAR(8) NOT NULL,
     flagged SMALLINT NOT NULL,
-    flag_reason VARCHAR(255) NOT NULL,
-    emergency_name VARCHAR(120) NOT NULL,
-    emergency_phone VARCHAR(32) NOT NULL,
-    home_address VARCHAR(255) NOT NULL,
-    work_address VARCHAR(255) NOT NULL
+    flag_reason VARCHAR(255) NOT NULL
 );
 
 -- How one person wants the app and their deliveries. A row exists once they have
@@ -37,12 +28,7 @@ CREATE TABLE preference (
     notify_deliveries SMALLINT NOT NULL,
     notify_receipts SMALLINT NOT NULL,
     notify_promotions SMALLINT NOT NULL,
-    courier_gender VARCHAR(8) NOT NULL,
-    quiet_delivery SMALLINT NOT NULL,
-    wheelchair SMALLINT NOT NULL,
-    pet_friendly SMALLINT NOT NULL,
-    default_tip INTEGER NOT NULL,
-    share_trips_with VARCHAR(32) NOT NULL
+    default_tip INTEGER NOT NULL
 );
 
 -- The e-mails of accounts that were closed, as hashes. A closed account's deliveries

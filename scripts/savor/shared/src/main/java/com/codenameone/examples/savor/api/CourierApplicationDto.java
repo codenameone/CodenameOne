@@ -22,14 +22,11 @@ import com.codename1.annotations.Mapped;
 
 import java.util.List;
 
-/// An application to drive: who, which car, and the papers that prove both.
+/// An application to deliver: who, which car, and the papers that prove both.
 ///
 /// @param status `none`, `draft`, `pending`, `approved` or `rejected`.
 /// @param dateOfBirth `yyyy-MM-dd`.
 /// @param licenceExpiry `yyyy-MM-dd`.
-/// @param product `standard`, `comfort` or `xl`.
-/// @param accessible Whether the car takes a wheelchair.
-/// @param petFriendly Whether a customer's pet is welcome in the car.
 /// @param documents One entry for each kind of document asked for, uploaded or not.
 /// @param submittedAt Milliseconds since the epoch; 0 until it is handed in.
 /// @param reviewedAt Milliseconds since the epoch; 0 until an admin decides.
@@ -48,10 +45,6 @@ public record CourierApplicationDto(
         int vehicleYear,
         String vehicleColor,
         String vehiclePlate,
-        int vehicleSeats,
-        String product,
-        boolean accessible,
-        boolean petFriendly,
         List<DocumentDto> documents,
         String rejectionReason,
         long submittedAt,

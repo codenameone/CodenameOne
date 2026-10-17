@@ -22,6 +22,7 @@ import com.codename1.backend.Json;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -114,6 +115,31 @@ public class LiveHub {
             collect(to, customer);
             collect(to, courier);
             collect(to, also);
+            for (int iter = 0; iter < admins.size(); iter++) {
+                if (!to.contains(admins.get(iter))) {
+                    to.add(admins.get(iter));
+                }
+            }
+        }
+        send(to, text);
+    }
+
+    /// Tells an order's customer, its restaurant's staff, its courier and the
+    /// admins that it changed. They read the order itself over REST.
+    public void orderChanged(String id, OrderState state, String customer, List<String> staff,
+            String courier) {
+        Map<String, Object> frame = new LinkedHashMap<String, Object>();
+        frame.put("type", "order");
+        frame.put("id", id);
+        frame.put("state", state.name());
+        String text = Json.write(frame);
+        List<WebSocketSession> to = new ArrayList<WebSocketSession>();
+        synchronized (this) {
+            collect(to, customer);
+            collect(to, courier);
+            for (int iter = 0; staff != null && iter < staff.size(); iter++) {
+                collect(to, staff.get(iter));
+            }
             for (int iter = 0; iter < admins.size(); iter++) {
                 if (!to.contains(admins.get(iter))) {
                     to.add(admins.get(iter));

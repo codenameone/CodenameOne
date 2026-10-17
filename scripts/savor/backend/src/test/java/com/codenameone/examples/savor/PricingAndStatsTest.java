@@ -26,7 +26,7 @@ import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.savor.account.Accounts;
 import com.codenameone.examples.savor.account.DemoAccounts;
 import com.codenameone.examples.savor.api.PricingDto;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.order.Quotes;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -52,7 +52,7 @@ class PricingAndStatsTest {
     @Autowired
     private Accounts accounts;
     @Autowired
-    private Fares fares;
+    private Quotes fares;
     @Autowired
     private DataSource db;
 
@@ -60,9 +60,18 @@ class PricingAndStatsTest {
         return People.asAdmin(request, DemoAccounts.ADMIN);
     }
 
+    /// The delivery fee of the same order, quoted now.
     private long quoted(String customer) throws Exception {
-        return Trips.number(Trips.json(mvc, People.asCustomer(Trips.body(post("/api/deliveries/quote"),
-                People.delivery(50.0755, 14.4378, 50.0900, 14.4600)), customer)), "amountCents");
+        return Trips.number(Trips.json(mvc, People.asCustomer(Trips.body(post("/api/orders/quote"),
+                Trips.cart(mvc, Trips.trip(50.0755, 14.4378, 50.0900, 14.4600))), customer)),
+                "deliveryFeeCents");
+    }
+
+    private static String prices(long base, double surge, double commission) {
+        return "{\"baseCents\":" + base + ",\"perKmCents\":60,\"surge\":" + surge
+                + ",\"smallOrderCents\":1200,\"smallOrderFeeCents\":200,"
+                + "\"serviceFeePercent\":10,\"taxPercent\":8,\"commissionPercent\":"
+                + commission + "}";
     }
 
     @Test
@@ -71,45 +80,28 @@ class PricingAndStatsTest {
         String customer = People.customer(accounts, "prg-customer");
         String before = mvc.perform(admin(get("/api/admin/pricing"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.baseFare").value(250))
-                .andExpect(jsonPath("$.perKm").value(120))
-                .andExpect(jsonPath("$.minimumFare").value(500))
-                .andExpect(jsonPath("$.surgeMultiplier").value(1.0))
+                .andExpect(jsonPath("$.baseCents").value(199))
+                .andExpect(jsonPath("$.perKmCents").value(60))
+                .andExpect(jsonPath("$.smallOrderCents").value(1200))
+                .andExpect(jsonPath("$.surge").value(1.0))
                 .andReturn().getResponse().getContentAsString();
         long was = quoted(customer);
         // The other tests share these prices, so they are put back whatever
         // happens here.
         try {
-            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), "{\"baseFare\":1250,"
-                            + "\"perKm\":120,\"perMinute\":30,\"minimumFare\":500,"
-                            + "\"serviceFeePercent\":10,\"commissionPercent\":20,"
-                            + "\"surgeMultiplier\":1,\"comfortMultiplier\":1.35,"
-                            + "\"xlMultiplier\":1.7}")))
+            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), prices(1199, 1, 20))))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.baseFare").value(1250));
+                    .andExpect(jsonPath("$.baseCents").value(1199));
             assertEquals(was + 1000L, quoted(customer));
-            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), "{\"baseFare\":250,"
-                            + "\"perKm\":120,\"perMinute\":30,\"minimumFare\":500,"
-                            + "\"serviceFeePercent\":10,\"commissionPercent\":20,"
-                            + "\"surgeMultiplier\":2,\"comfortMultiplier\":1.35,"
-                            + "\"xlMultiplier\":1.7}")))
+            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), prices(199, 2, 20))))
                     .andExpect(status().isOk());
-            // Part by part, each rounded, so twice the fare to within a cent
-            // or two.
+            // Rounded once, so twice the fee to within a cent.
             long surged = quoted(customer);
-            assertTrue(Math.abs(surged - was * 2L) <= 2L, "surged to " + surged);
+            assertTrue(Math.abs(surged - was * 2L) <= 1L, "surged to " + surged);
             // Prices that could only be a mistake change nothing.
-            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), "{\"baseFare\":-1,"
-                            + "\"perKm\":120,\"perMinute\":30,\"minimumFare\":500,"
-                            + "\"serviceFeePercent\":10,\"commissionPercent\":20,"
-                            + "\"surgeMultiplier\":1,\"comfortMultiplier\":1.35,"
-                            + "\"xlMultiplier\":1.7}")))
+            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), prices(-1, 1, 20))))
                     .andExpect(status().isBadRequest());
-            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), "{\"baseFare\":250,"
-                            + "\"perKm\":120,\"perMinute\":30,\"minimumFare\":500,"
-                            + "\"serviceFeePercent\":10,\"commissionPercent\":95,"
-                            + "\"surgeMultiplier\":1,\"comfortMultiplier\":1.35,"
-                            + "\"xlMultiplier\":1.7}")))
+            mvc.perform(admin(Trips.body(put("/api/admin/pricing"), prices(199, 1, 95))))
                     .andExpect(status().isBadRequest());
             assertEquals(surged, quoted(customer));
             // And they are an admin's to change.
@@ -128,7 +120,7 @@ class PricingAndStatsTest {
         // has saved over. The prices are the settings' until somebody does.
         PricingDto before = fares.pricing();
         db.execute("UPDATE pricing SET updated_at = 0 WHERE id = 1", new Object[0]);
-        assertEquals(250L, fares.pricing().baseFare());
+        assertEquals(199L, fares.pricing().baseCents());
         Map rows = db.queryOne("SELECT COUNT(*) AS n FROM pricing", new Object[0]);
         assertEquals(1L, ((Number) rows.get("n")).longValue());
 
@@ -153,7 +145,7 @@ class PricingAndStatsTest {
                         }
                         try {
                             fares.save(DemoAccounts.ADMIN, new PricingDto("USD", 300L + slot,
-                                    120L, 30L, 500L, 10d, 20d, 1d, 1.35d, 1.7d));
+                                    60L, 1d, 1200L, 200L, 10d, 8d, 20d));
                             saved.incrementAndGet();
                         } catch (Throwable err) {
                             failed[slot] = err;
@@ -175,7 +167,7 @@ class PricingAndStatsTest {
                 }
             }
             assertEquals(admins, saved.get(), "every save was saved");
-            long base = fares.pricing().baseFare();
+            long base = fares.pricing().baseCents();
             assertTrue(base >= 300L && base < 300L + admins, "one of them is in force: " + base);
             rows = db.queryOne("SELECT COUNT(*) AS n FROM pricing", new Object[0]);
             assertEquals(1L, ((Number) rows.get("n")).longValue(), "and there is one row");
@@ -197,32 +189,35 @@ class PricingAndStatsTest {
                 ((Map) days.get(0)).get("date"));
         for (int iter = 0; iter < days.size(); iter++) {
             Map day = (Map) days.get(iter);
-            assertTrue(Trips.number(day, "deliveries") >= Trips.number(day, "completed")
+            assertTrue(Trips.number(day, "orders") >= Trips.number(day, "delivered")
                     + Trips.number(day, "cancelled"), "day " + iter);
             assertTrue(Trips.number(day, "revenue") >= 0L);
             assertNotNull(day.get("newUsers"));
         }
         assertEquals(24, ((List) week.get("byHour")).size());
-        List products = (List) week.get("byProduct");
-        assertEquals(3, products.size());
-        assertEquals("standard", ((Map) products.get(0)).get("name"));
-        assertEquals("comfort", ((Map) products.get(1)).get("name"));
-        assertEquals("xl", ((Map) products.get(2)).get("name"));
+        // Busiest first.
+        List kitchens = (List) week.get("byRestaurant");
+        assertTrue(kitchens.size() >= 1);
+        for (int iter = 1; iter < kitchens.size(); iter++) {
+            assertTrue(Trips.number((Map) kitchens.get(iter - 1), "count")
+                    >= Trips.number((Map) kitchens.get(iter), "count"));
+        }
         assertEquals("USD", week.get("currency"));
         assertNotNull(week.get("byState"));
         assertTrue(((List) week.get("topCouriers")).size() <= 5);
         // The demo data has somebody waiting to be reviewed and somebody
-        // flagged, and a fortnight of deliveries behind them.
+        // flagged, and a fortnight of orders behind them.
         assertTrue(Trips.number(week, "pendingApplications") >= 1L);
         assertTrue(Trips.number(week, "flaggedUsers") >= 1L);
-        assertTrue(Trips.number(week, "averageFare") > 0L);
+        assertTrue(Trips.number(week, "averageOrder") > 0L);
+        assertTrue(((Number) week.get("averageDeliveryMinutes")).doubleValue() > 0d);
         double rate = ((Number) week.get("completionRate")).doubleValue();
         assertTrue(rate > 0d && rate <= 1d, "completion rate " + rate);
-        long deliveries = 0L;
+        long placed = 0L;
         for (int iter = 0; iter < days.size(); iter++) {
-            deliveries += Trips.number((Map) days.get(iter), "deliveries");
+            placed += Trips.number((Map) days.get(iter), "orders");
         }
-        assertTrue(deliveries > 0L, "the week has deliveries in it");
+        assertTrue(placed > 0L, "the week has orders in it");
 
         // A silly number is the fortnight; and there is a most.
         mvc.perform(admin(get("/api/admin/stats/series?days=0")))

@@ -215,6 +215,45 @@ public class StripePayments implements PaymentProvider {
         return id(intent);
     }
 
+    /// A PaymentIntent with `capture_method=manual`: confirmed now, it ends in
+    /// `requires_capture` with the money held on the card.
+    @Override
+    public String authorize(String key, String customer, String token, long amountCents,
+            String currency, String description) throws IOException {
+        Map intent = ask("POST", "/v1/payment_intents", form("amount", String.valueOf(amountCents),
+                "currency", asciiLower(currency), "customer", customer, "payment_method", token,
+                "off_session", "true", "confirm", "true", "capture_method", "manual",
+                "description", description, "metadata[savor_charge]", key), key);
+        if (!"requires_capture".equals(text(intent, "status"))) {
+            throw new PaymentDeclinedException("The card needs its owner's approval");
+        }
+        return id(intent);
+    }
+
+    /// Asked again after a lost answer, Stripe refuses to capture an intent
+    /// twice; so the intent is read first and one already `succeeded` is done.
+    @Override
+    public void capture(String reference, long amountCents) throws IOException {
+        String path = "/v1/payment_intents/" + URLEncoder.encode(reference, "UTF-8");
+        if ("succeeded".equals(text(ask("GET", path, null, null), "status"))) {
+            return;
+        }
+        Map intent = ask("POST", path + "/capture", form("amount_to_capture",
+                String.valueOf(amountCents)), "capture-" + reference);
+        if (!"succeeded".equals(text(intent, "status"))) {
+            throw new IOException("The hold was not captured: " + text(intent, "status"));
+        }
+    }
+
+    @Override
+    public void release(String reference) throws IOException {
+        String path = "/v1/payment_intents/" + URLEncoder.encode(reference, "UTF-8");
+        if ("canceled".equals(text(ask("GET", path, null, null), "status"))) {
+            return;
+        }
+        ask("POST", path + "/cancel", form(), "release-" + reference);
+    }
+
     @Override
     public Refund refund(String chargeReference, long amountCents) throws IOException {
         Map answer = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,

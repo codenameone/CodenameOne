@@ -80,6 +80,22 @@ public class MisconfiguredPayments implements PaymentProvider {
     }
 
     @Override
+    public String authorize(String key, String customer, String token, long amountCents,
+            String currency, String description) throws IOException {
+        throw fail();
+    }
+
+    @Override
+    public void capture(String reference, long amountCents) throws IOException {
+        throw fail();
+    }
+
+    @Override
+    public void release(String reference) throws IOException {
+        throw fail();
+    }
+
+    @Override
     public Refund refund(String chargeReference, long amountCents) throws IOException {
         throw fail();
     }

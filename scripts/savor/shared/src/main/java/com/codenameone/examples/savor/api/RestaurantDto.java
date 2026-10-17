@@ -18,23 +18,35 @@
  */
 package com.codenameone.examples.savor.api;
 
-import com.codename1.annotations.Mapped;
-
 import java.util.List;
 
-/// What a delivery would cost and how soon a courier could be there.
+/// A restaurant with its menu, as its page shows it.
 ///
-/// @param amountCents The fare of the product asked for, before the service fee.
-/// @param couriersNearby Couriers online within reach of the pickup right now.
-/// @param etaSeconds A rough time for the nearest of them to arrive, or 0 when there is none.
-/// @param options The same delivery priced as each product, cheapest first.
-@Mapped
-public record FareQuoteDto(
-        long amountCents,
-        String currency,
-        double distanceMeters,
-        double durationSeconds,
-        int couriersNearby,
-        int etaSeconds,
-        List<FareOptionDto> options) {
+/// @param opensAt Minutes after local midnight.
+/// @param status `pending`, `approved`, `rejected` or `suspended`.
+/// @param reason Why an admin rejected or suspended it.
+public record RestaurantDto(
+        String id,
+        String name,
+        String cuisine,
+        String description,
+        String address,
+        double lat,
+        double lng,
+        String photoId,
+        double rating,
+        long ratingCount,
+        int priceLevel,
+        int etaMinutes,
+        long deliveryFeeCents,
+        long minimumCents,
+        boolean open,
+        boolean paused,
+        int opensAt,
+        int closesAt,
+        int prepMinutes,
+        boolean favorite,
+        String status,
+        String reason,
+        List<MenuSectionDto> menu) {
 }

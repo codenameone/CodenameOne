@@ -35,8 +35,8 @@ import com.codenameone.examples.savor.domain.Delivery;
 import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.geo.Geo;
 import com.codenameone.examples.savor.live.LiveHub;
-import com.codenameone.examples.savor.push.DeliveryPushes;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.push.OrderPushes;
+import com.codenameone.examples.savor.order.Quotes;
 import com.codenameone.examples.savor.repository.CourierApplicationRepository;
 import com.codenameone.examples.savor.repository.CourierHoursRepository;
 import com.codenameone.examples.savor.repository.CourierStateRepository;
@@ -69,14 +69,14 @@ public class Couriers {
     private final DeliveryPassedRepository passes;
     private final ProfileRepository profiles;
     private final LiveHub live;
-    private final DeliveryPushes pushes;
-    private final Fares fares;
+    private final OrderPushes pushes;
+    private final Quotes fares;
     private final Applications applications;
 
     public Couriers(CourierStateRepository couriers, CourierHoursRepository hours,
             CourierApplicationRepository made, DeliveryRepository deliveries, DeliveryEventRepository events,
-            DeliveryPassedRepository passes, ProfileRepository profiles, LiveHub live, DeliveryPushes pushes,
-            Fares fares, Applications applications) {
+            DeliveryPassedRepository passes, ProfileRepository profiles, LiveHub live, OrderPushes pushes,
+            Quotes fares, Applications applications) {
         this.couriers = couriers;
         this.hours = hours;
         this.made = made;
@@ -141,7 +141,7 @@ public class Couriers {
         // what lets them take deliveries. They are granted together, but they are
         // kept apart, and it is the approval that is asked for here.
         if (status.online() && !applications.approved(courier)) {
-            throw new ResponseStatusException(403, "Your application to drive is not approved");
+            throw new ResponseStatusException(403, "Your application to deliver is not approved");
         }
         Delivery delivery = deliveries.findFirstByCourierAndStateIn(courier, TAKEN);
         if (!status.online() && delivery != null) {
@@ -292,16 +292,12 @@ public class Couriers {
         return new EarningsDto(today, week, all, count, todayCount, fares.currency());
     }
 
-    /// @param application the account's application to drive, or null
+    /// @param application the account's application to deliver, or null
     /// @param car the account's state, or null when it has never gone on line
     private static CourierDto toDto(Profile profile, CourierApplication application,
             CourierState car, int deliveries, double acceptanceRate) {
         boolean approved = application != null
                 && Applications.APPROVED.equals(application.getStatus());
-        // An account with no application has no product; the app is told the
-        // standard one so that it always has a word it knows.
-        String product = application == null ? "" : application.getProduct();
-        boolean accessible = application != null && application.isWheelchair();
         boolean online = false;
         double lat = 0d;
         double lng = 0d;
@@ -320,7 +316,6 @@ public class Couriers {
         }
         return new CourierDto(profile.getUsername(), profile.getDisplayName(),
                 profile.getVehicle(), profile.getPlate(), online, lat, lng, heading, rating,
-                lastSeen, deliveries, approved, product.length() == 0 ? Fares.STANDARD : product,
-                profile.getGender(), accessible, acceptanceRate, profile.isFlagged());
+                lastSeen, deliveries, approved, acceptanceRate, profile.isFlagged());
     }
 }

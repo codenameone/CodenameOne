@@ -32,7 +32,6 @@ import com.codename1.annotations.Mapped;
 /// @param suspended Blocked by an admin: the account cannot sign in or call the API.
 /// @param vehicle A courier's car, as customers see it. Empty for anyone else.
 /// @param plate The car's licence plate. Empty for anyone else.
-/// @param gender `unspecified`, `female`, `male` or `nonbinary`.
 /// @param courierStatus Where the account stands on onboarding: `none`, `draft`, `pending`, `approved`
 ///     or `rejected`. The COURIER role follows `approved`.
 /// @param flagged Marked by an admin for a closer look. The account still works; `suspended` is
@@ -52,7 +51,6 @@ public record UserDto(
         boolean suspended,
         String vehicle,
         String plate,
-        String gender,
         String courierStatus,
         boolean flagged,
         String flagReason,

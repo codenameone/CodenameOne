@@ -20,12 +20,12 @@ package com.codenameone.examples.savor.api;
 
 import com.codename1.annotations.Mapped;
 
-/// What a delivery cost and how it was paid. Every amount is in cents.
+/// What an order cost and how it was paid. Every amount is in cents.
 ///
-/// @param baseFare The part of the fare that does not depend on the trip.
-/// @param distanceFare The part of the fare charged by distance.
-/// @param timeFare The part of the fare charged by time.
-/// @param total The fare, the service fee and the tip, less the discount.
+/// @param subtotal The food, extras included, before the discount.
+/// @param smallOrderFee Charged when the subtotal is under the small-order threshold.
+/// @param total Everything the card was charged: the subtotal less the discount, the fees,
+///     the tax and the tip.
 /// @param status `pending`, `paid`, `failed`, `refunded` or `cash`; while a refund the processor
 ///     took has not finished, `refund_pending`, and `refund_failed` when it then did not return the
 ///     money.
@@ -33,22 +33,21 @@ import com.codename1.annotations.Mapped;
 /// @param customerUsername Who paid. Filled for an admin; a customer's own receipts leave it empty.
 @Mapped
 public record ReceiptDto(
-        String deliveryId,
+        String orderId,
         String currency,
-        long baseFare,
-        long distanceFare,
-        long timeFare,
+        String restaurantName,
+        long subtotal,
+        long deliveryFee,
         long serviceFee,
-        long tip,
+        long smallOrderFee,
+        long tax,
         long discount,
+        long tip,
         long total,
         String methodLabel,
         String status,
         long paidAt,
-        String pickupName,
         String dropoffName,
-        double distanceMeters,
-        double durationSeconds,
         String courierName,
         String vehicle,
         String customerUsername) {

@@ -108,8 +108,6 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     List<Delivery> findByCourierAndStateAndUpdatedAtGreaterThanEqual(String courier,
             DeliveryState state, long since);
 
-    long countByCourierAndState(String courier, DeliveryState state);
-
     long countByRequestedAtGreaterThanEqual(long since);
 
     long countByStateIn(DeliveryState[] states);
@@ -311,11 +309,6 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("select r.state, count(r) from Delivery r where r.requestedAt >= :since group by r.state")
     List<Object[]> countByState(@Param("since") long since);
 
-    /// The same by product: `{product, count}`.
-    @Query("select r.product, count(r) from Delivery r where r.requestedAt >= :since "
-            + "group by r.product")
-    List<Object[]> countByProduct(@Param("since") long since);
-
     /// The deliveries in `state` asked for since `since`, counted by courier:
     /// `{courier, count}`.
     @Query("select r.courier, count(r) from Delivery r where r.requestedAt >= :since "
@@ -342,4 +335,8 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
             + "where r.customer = :who and r.state = :state and r.paymentStatus = :paid")
     Object[] spent(@Param("who") String username, @Param("state") DeliveryState state,
             @Param("paid") String paid);
+
+    long countByCourier(String courier);
+
+    long countByCourierAndState(String courier, DeliveryState state);
 }

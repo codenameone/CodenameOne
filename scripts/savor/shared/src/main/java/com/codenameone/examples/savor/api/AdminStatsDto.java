@@ -26,9 +26,9 @@ public record AdminStatsDto(
         int users,
         int couriers,
         int couriersOnline,
-        int deliveriesToday,
-        int deliveriesActive,
-        int deliveriesCompleted,
+        int ordersToday,
+        int ordersActive,
+        int ordersDelivered,
         long revenueCents,
         String currency) {
 }

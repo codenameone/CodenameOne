@@ -26,12 +26,13 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.savor.account.Accounts;
+import com.codenameone.examples.savor.account.DemoAccounts;
 import com.codenameone.examples.savor.api.PushDeviceDto;
-import com.codenameone.examples.savor.api.DeliveryState;
+import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.push.PushDevices;
 import com.codenameone.examples.savor.push.PushSender;
 import com.codenameone.examples.savor.push.RecordingPushSender;
-import com.codenameone.examples.savor.push.DeliveryPushes;
+import com.codenameone.examples.savor.push.OrderPushes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-/// The push notifications a delivery sends, the devices they go to, and the Live
-/// Activity a customer follows the courier in.
+/// The push notifications an order sends, the devices they go to, and the Live
+/// Activity a customer follows it in.
 ///
 /// The `test` profile keeps every notification instead of sending it, so each
 /// test reads what each phone would have been sent.
@@ -65,7 +66,7 @@ class PushTest {
     @Autowired
     private PushDevices pushDevices;
     @Autowired
-    private DeliveryPushes pushes;
+    private OrderPushes pushes;
 
     private RecordingPushSender sent;
 
@@ -134,104 +135,152 @@ class PushTest {
                 device("apns", " ")), customer)).andExpect(status().isBadRequest());
     }
 
+    private void accept(Trips.Trip trip, String id) throws Exception {
+        Trips.Kitchen at = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
+        mvc.perform(People.asMerchant(body(post("/api/merchant/orders/" + id + "/accept"),
+                "{\"prepMinutes\":15}"), at.merchant)).andExpect(status().isOk());
+    }
+
+    private void ready(Trips.Trip trip, String id) throws Exception {
+        Trips.Kitchen at = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
+        mvc.perform(People.asMerchant(post("/api/merchant/orders/" + id + "/ready"), at.merchant))
+                .andExpect(status().isOk());
+    }
+
+    private void courier(String courier, String id, String step) throws Exception {
+        mvc.perform(People.asCourier(post(("accept".equals(step) ? "/api/courier/offers/"
+                : "/api/courier/deliveries/") + id + "/" + step), courier)).andExpect(status().isOk());
+    }
+
+    private void follow(String customer, String id, String activity, int expected) throws Exception {
+        mvc.perform(People.asCustomer(body(post("/api/orders/" + id + "/activity"),
+                "{\"activityId\":\"" + activity + "\"}"), customer))
+                .andExpect(status().is(expected));
+    }
+
     @Test
-    void customersAndCouriersAreToldOfEveryStepOfADelivery() throws Exception {
+    void theCustomerTheKitchenAndTheCourierAreEachToldTheirPart() throws Exception {
         // Reykjavik. Each test has a city to itself.
         String customer = People.customer(accounts, "push-rkv-customer");
         String courier = People.courier(accounts, "push-rkv-courier");
+        Trips.Trip trip = Trips.trip(64.1467, -21.9428, 64.1597, -21.9548);
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
         register(customer, "apns", "rkv-customer-phone");
         register(courier, "fcm", "rkv-courier-phone");
+        register(kitchen.merchant, "fcm", "rkv-kitchen-tablet");
         Trips.online(mvc, courier, 64.1466, -21.9426);
 
-        Map asked = Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(64.1467, -21.9428, 64.1597, -21.9548)), customer));
-        String id = (String) asked.get("id");
-        // The offer goes to the courier, who has a few seconds to answer it.
+        // The kitchen hears of the order, and nobody else does yet.
+        String id = (String) Trips.place(mvc, customer, trip).get("id");
+        List<RecordingPushSender.Sent> toKitchen = sent.sentTo("rkv-kitchen-tablet");
+        assertEquals("New order", titles("rkv-kitchen-tablet"));
+        assertEquals(id, data(toKitchen.get(0)).get("orderId"));
+        assertEquals("merchant", data(toKitchen.get(0)).get("role"));
+        assertTrue(((String) toKitchen.get(0).message().get("body")).contains("push-rkv-customer"));
+        assertEquals("", titles("rkv-customer-phone"));
+
+        // Accepting it sends for a courier, who has a few seconds to answer.
+        accept(trip, id);
+        assertEquals("Kitchen " + kitchenNumber(kitchen) + " is preparing your order",
+                titles("rkv-customer-phone"));
         List<RecordingPushSender.Sent> toCourier = sent.sentTo("rkv-courier-phone");
-        assertEquals("New delivery request", titles("rkv-courier-phone"));
-        assertEquals(id, data(toCourier.get(0)).get("deliveryId"));
+        assertEquals("New delivery", titles("rkv-courier-phone"));
         assertEquals("OFFERED", data(toCourier.get(0)).get("state"));
         assertEquals("courier", data(toCourier.get(0)).get("role"));
         assertEquals("fcm", toCourier.get(0).provider());
         assertTrue(((Number) toCourier.get(0).message().get("ttl")).intValue() > 0);
-        assertEquals("", titles("rkv-customer-phone"));
 
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        List<RecordingPushSender.Sent> toCustomer = sent.sentTo("rkv-customer-phone");
-        assertEquals("Your courier is on the way", titles("rkv-customer-phone"));
-        String body = (String) toCustomer.get(0).message().get("body");
-        assertTrue(body.contains("push-rkv-courier") && body.contains("Green Fiat 500"), body);
-        assertEquals("apns", toCustomer.get(0).provider());
-        assertEquals("customer", data(toCustomer.get(0)).get("role"));
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/arrived"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/start"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/complete"), courier))
-                .andExpect(status().isOk());
-        assertEquals("Your courier is on the way|Your courier is here|Your trip has started"
-                + "|You've arrived", titles("rkv-customer-phone"));
+        courier(courier, id, "accept");
+        courier(courier, id, "arrived");
+        // The courier is told the food is ready; the customer is not bothered.
+        ready(trip, id);
+        assertEquals("New delivery|Order ready", titles("rkv-courier-phone"));
+        courier(courier, id, "start");
+        courier(courier, id, "complete");
+        assertEquals("Kitchen " + kitchenNumber(kitchen) + " is preparing your order"
+                + "|Your order is on its way|Your order has arrived", titles("rkv-customer-phone"));
+        String body = (String) sent.sentTo("rkv-customer-phone").get(1).message().get("body");
+        assertTrue(body.contains("push-rkv-courier"), body);
         // Without a Live Activity there is nothing to move on.
         for (RecordingPushSender.Sent each : sent.sentTo("rkv-customer-phone")) {
             assertNull(surface(each));
-            assertEquals(id, data(each).get("deliveryId"));
+            assertEquals(id, data(each).get("orderId"));
+            assertEquals("customer", data(each).get("role"));
         }
-        assertEquals("New delivery request", titles("rkv-courier-phone"));
+        assertEquals("New order", titles("rkv-kitchen-tablet"));
+    }
+
+    private static String kitchenNumber(Trips.Kitchen kitchen) {
+        return kitchen.merchant.substring("kitchen".length(), kitchen.merchant.indexOf('@'));
     }
 
     @Test
-    void cancellingTellsTheOtherSide() throws Exception {
-        // Ljubljana: the courier gives up on the way to the pickup.
+    void anOrderThatEndsEarlyTellsWhoeverWasWaiting() throws Exception {
+        // Ljubljana: the customer changes their mind; the kitchen is told.
         String customer = People.customer(accounts, "push-lju-customer");
-        String courier = People.courier(accounts, "push-lju-courier");
+        Trips.Trip trip = Trips.trip(46.0570, 14.5054, 46.0670, 14.5174);
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
         register(customer, "fcm", "lju-customer-phone");
-        register(courier, "fcm", "lju-courier-phone");
-        Trips.online(mvc, courier, 46.0569, 14.5058);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(46.0570, 14.5054, 46.0670, 14.5174)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
+        register(kitchen.merchant, "fcm", "lju-kitchen-tablet");
+        String id = (String) Trips.place(mvc, customer, trip).get("id");
+        mvc.perform(People.asCustomer(post("/api/orders/" + id + "/cancel"), customer))
                 .andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/cancel"), courier))
-                .andExpect(status().isOk());
-        assertEquals("Your courier is on the way|Your courier canceled", titles("lju-customer-phone"));
+        assertEquals("New order|Order canceled", titles("lju-kitchen-tablet"));
+        assertEquals("", titles("lju-customer-phone"));
 
-
-        // Bratislava: the customer changes their mind while the offer is out.
-        String bratislavaCustomer = People.customer(accounts, "push-bts-customer");
-        String bratislavaCourier = People.courier(accounts, "push-bts-courier");
-        register(bratislavaCourier, "fcm", "bts-courier-phone");
-        Trips.online(mvc, bratislavaCourier, 48.1486, 17.1077);
-        String offered = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(48.1487, 17.1076, 48.1601, 17.0909)), bratislavaCustomer)).get("id");
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + offered + "/cancel"), bratislavaCustomer))
-                .andExpect(status().isOk());
-        assertEquals("New delivery request|Delivery canceled", titles("bts-courier-phone"));
+        // Bratislava: an admin calls off an order a courier has; the customer,
+        // the kitchen and the courier are each told.
+        String btsCustomer = People.customer(accounts, "push-bts-customer");
+        String btsCourier = People.courier(accounts, "push-bts-courier");
+        Trips.Trip bts = Trips.trip(48.1487, 17.1076, 48.1601, 17.0909);
+        register(btsCustomer, "fcm", "bts-customer-phone");
+        register(btsCourier, "fcm", "bts-courier-phone");
+        Trips.online(mvc, btsCourier, 48.1486, 17.1077);
+        String taken = Trips.ask(mvc, btsCustomer, bts);
+        courier(btsCourier, taken, "accept");
+        mvc.perform(People.asAdmin(body(post("/api/admin/orders/" + taken + "/cancel"),
+                "{\"reason\":\"Test\"}"), DemoAccounts.ADMIN)).andExpect(status().isOk());
+        assertTrue(titles("bts-courier-phone").endsWith("|Delivery canceled"),
+                titles("bts-courier-phone"));
+        assertTrue(titles("bts-customer-phone").endsWith("|Your order was canceled"),
+                titles("bts-customer-phone"));
     }
 
     @Test
-    void theLiveActivityFollowsTheCarAndEndsWithTheDelivery() throws Exception {
+    void theLiveActivityFollowsTheOrderToTheDoor() throws Exception {
         String customer = People.customer(accounts, "push-cph-customer");
         String courier = People.courier(accounts, "push-cph-courier");
         String other = People.customer(accounts, "push-cph-other");
         register(customer, "apns", "cph-customer-phone");
         Trips.online(mvc, courier, 55.6761, 12.5683);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(55.6762, 12.5680, 55.6900, 12.5900)), customer)).get("id");
-        // No activity before there is a courier on the way, and none on
-        // somebody else's delivery.
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-1\"}"), customer)).andExpect(status().isConflict());
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-1\"}"), other)).andExpect(status().isNotFound());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-1\"}"), customer))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.activityId").value("act-1"));
+        Trips.Trip trip = Trips.trip(55.6762, 12.5680, 55.6900, 12.5900);
+        String id = (String) Trips.place(mvc, customer, trip).get("id");
+        // Followed from the moment it is placed, and never somebody else's.
+        follow(other, id, "act-1", 404);
+        follow(customer, id, "act-1", 200);
 
-        // The car moves. The phone has just drawn the activity, so the first
+        accept(trip, id);
+        Map command = surface(last(sent.sentTo("cph-customer-phone")));
+        assertEquals("live-update", command.get("operation"));
+        assertEquals("act-1", command.get("id"));
+        Map state = Json.parseObject((String) command.get("state"));
+        assertEquals("Preparing your order", state.get("status"));
+        assertEquals(0.35d, ((Number) state.get("progress")).doubleValue(), 0.001d);
+        assertTrue(((String) state.get("restaurant")).startsWith("Kitchen "));
+        courier(courier, id, "accept");
+        ready(trip, id);
+        assertEquals(0.55d, progress(surface(last(sent.sentTo("cph-customer-phone")))), 0.001d);
+        courier(courier, id, "arrived");
+        courier(courier, id, "start");
+        command = surface(last(sent.sentTo("cph-customer-phone")));
+        assertEquals(0.8d, progress(command), 0.001d);
+        state = Json.parseObject((String) command.get("state"));
+        assertEquals("On its way", state.get("status"));
+        assertEquals("push-cph-courier", state.get("courier"));
+        assertEquals("Green Vespa", state.get("car"));
+        assertEquals("T push-cph-courier", state.get("plate"));
+
+        // The courier rides. The phone has just been updated, so the next
         // update waits its turn...
         int before = sent.sentTo("cph-customer-phone").size();
         Trips.online(mvc, courier, 55.6765, 12.5682);
@@ -244,33 +293,16 @@ class PushTest {
         assertEquals(before + 1, toCustomer.size());
         RecordingPushSender.Sent update = last(toCustomer);
         assertEquals(Boolean.TRUE, update.message().get("silent"));
-        Map command = surface(update);
-        assertEquals("live-update", command.get("operation"));
-        assertEquals("act-1", command.get("id"));
-        Map state = Json.parseObject((String) command.get("state"));
-        assertEquals("On the way", state.get("status"));
-        assertEquals("push-cph-courier", state.get("courier"));
-        assertEquals("Green Fiat 500", state.get("car"));
-        assertEquals("T push-cph-courier", state.get("plate"));
-        assertEquals(0.25d, ((Number) state.get("progress")).doubleValue(), 0.001d);
+        state = Json.parseObject((String) surface(update).get("state"));
         assertTrue(((String) state.get("eta")).endsWith(" min"), state.toString());
 
-        // A change of state moves it on at once, with the notification.
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/arrived"), courier))
-                .andExpect(status().isOk());
-        command = surface(last(sent.sentTo("cph-customer-phone")));
-        assertEquals("live-update", command.get("operation"));
-        assertEquals(0.5d, progress(command), 0.001d);
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/start"), courier))
-                .andExpect(status().isOk());
-        assertEquals(0.75d, progress(surface(last(sent.sentTo("cph-customer-phone")))), 0.001d);
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/complete"), courier))
-                .andExpect(status().isOk());
+        courier(courier, id, "complete");
         RecordingPushSender.Sent done = last(sent.sentTo("cph-customer-phone"));
-        assertEquals("You've arrived", done.message().get("title"));
+        assertEquals("Your order has arrived", done.message().get("title"));
         assertEquals("live-end", surface(done).get("operation"));
         assertEquals("act-1", surface(done).get("id"));
-        // And it is forgotten: the car goes on reporting, the customer hears no more.
+        // And it is forgotten: the courier goes on reporting, the customer
+        // hears no more.
         int after = sent.sentTo("cph-customer-phone").size();
         Trips.online(mvc, courier, 55.6800, 12.5700);
         assertEquals(after, sent.sentTo("cph-customer-phone").size());
@@ -278,33 +310,31 @@ class PushTest {
 
     @Test
     void theSettingsDecideWhatIsSaidButNotWhatIsShown() throws Exception {
-        // Sofia: a customer who turned delivery updates off hears nothing of the
-        // courier, while the lock screen still lets go of the cancelled delivery.
+        // Sofia: a customer who turned order updates off hears nothing of the
+        // kitchen, while the lock screen still lets go of the order when an
+        // admin calls it off.
         String customer = People.customer(accounts, "push-sof-customer");
-        String courier = People.courier(accounts, "push-sof-courier");
         String quiet = "{\"language\":\"en\",\"theme\":\"system\",\"units\":\"km\","
                 + "\"notifyDeliveryUpdates\":false,\"notifyReceipts\":true,"
-                + "\"notifyPromotions\":false,\"courierGender\":\"\",\"quietDelivery\":false,"
-                + "\"accessibleVehicle\":false,\"petFriendly\":false,"
-                + "\"defaultPaymentMethodId\":\"cash\",\"defaultTipPercent\":0,"
-                + "\"shareTripsWith\":\"\"}";
+                + "\"notifyPromotions\":false,\"defaultPaymentMethodId\":\"cash\","
+                + "\"defaultTipPercent\":0}";
         mvc.perform(People.asCustomer(body(put("/api/account/preferences"), quiet), customer))
                 .andExpect(status().isOk());
         register(customer, "apns", "sof-customer-phone");
-        Trips.online(mvc, courier, 42.6977, 23.3219);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(42.6978, 23.3220, 42.7054, 23.3112)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-sof\"}"), customer)).andExpect(status().isOk());
-        assertEquals("", titles("sof-customer-phone"));
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/cancel"), courier))
-                .andExpect(status().isOk());
+        Trips.Trip trip = Trips.trip(42.6978, 23.3220, 42.7054, 23.3112);
+        String id = (String) Trips.place(mvc, customer, trip).get("id");
+        follow(customer, id, "act-sof", 200);
+        accept(trip, id);
         List<RecordingPushSender.Sent> toCustomer = sent.sentTo("sof-customer-phone");
         assertEquals(1, toCustomer.size());
         assertEquals(Boolean.TRUE, toCustomer.get(0).message().get("silent"));
-        assertEquals("live-end", surface(toCustomer.get(0)).get("operation"));
+        assertEquals("live-update", surface(toCustomer.get(0)).get("operation"));
+        mvc.perform(People.asAdmin(body(post("/api/admin/orders/" + id + "/cancel"),
+                "{\"reason\":\"Test\"}"), DemoAccounts.ADMIN)).andExpect(status().isOk());
+        toCustomer = sent.sentTo("sof-customer-phone");
+        assertEquals(2, toCustomer.size());
+        assertEquals(Boolean.TRUE, toCustomer.get(1).message().get("silent"));
+        assertEquals("live-end", surface(toCustomer.get(1)).get("operation"));
     }
 
     @Test
@@ -316,21 +346,23 @@ class PushTest {
         register(second, "fcm", "ams-shared-phone");
         register(first, "fcm", "ams-first-tablet");
         Trips.online(mvc, courier, 52.3676, 4.9041);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(52.3677, 4.9040, 52.3800, 4.9100)), first)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
+        Trips.Trip trip = Trips.trip(52.3677, 4.9040, 52.3800, 4.9100);
+        String id = (String) Trips.place(mvc, first, trip).get("id");
+        accept(trip, id);
+        String preparing = titles("ams-first-tablet");
         assertEquals("", titles("ams-shared-phone"));
-        assertEquals("Your courier is on the way", titles("ams-first-tablet"));
+        assertTrue(preparing.endsWith(" is preparing your order"), preparing);
 
         // Signing out forgets the device, and only one's own.
         mvc.perform(People.asCustomer(body(post("/api/account/push/remove"),
                 device("fcm", "ams-shared-phone")), first)).andExpect(status().isOk());
         mvc.perform(People.asCustomer(body(post("/api/account/push/remove"),
                 device("fcm", "ams-first-tablet")), first)).andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/arrived"), courier))
-                .andExpect(status().isOk());
-        assertEquals("Your courier is on the way", titles("ams-first-tablet"));
+        courier(courier, id, "accept");
+        ready(trip, id);
+        courier(courier, id, "arrived");
+        courier(courier, id, "start");
+        assertEquals(preparing, titles("ams-first-tablet"));
 
         // Closing the account forgets every device it had.
         String customer = People.customer(accounts, "push-ams-closing");
@@ -341,38 +373,27 @@ class PushTest {
     }
 
     @Test
-    void anActivityIsRefusedOnceTheDeliveryHasEnded() throws Exception {
-        // Helsinki: the delivery is completed. Oslo: the courier cancels it.
+    void anActivityIsRefusedOnceTheOrderHasEnded() throws Exception {
+        // Helsinki: the order is delivered. Oslo: the kitchen turns it down.
         String customer = People.customer(accounts, "push-hel-customer");
         String courier = People.courier(accounts, "push-hel-courier");
         Trips.online(mvc, courier, 60.1699, 24.9384);
-        String done = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(60.1700, 24.9383, 60.1800, 24.9500)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + done + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + done + "/arrived"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + done + "/start"), courier))
-                .andExpect(status().isOk());
+        String done = Trips.ask(mvc, customer, Trips.trip(60.1700, 24.9383, 60.1800, 24.9500));
+        courier(courier, done, "accept");
+        courier(courier, done, "arrived");
+        courier(courier, done, "start");
         // Still on the road: the activity is taken.
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + done + "/activity"),
-                "{\"activityId\":\"act-hel\"}"), customer)).andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + done + "/complete"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + done + "/activity"),
-                "{\"activityId\":\"act-hel-2\"}"), customer)).andExpect(status().isConflict());
+        follow(customer, done, "act-hel", 200);
+        courier(courier, done, "complete");
+        follow(customer, done, "act-hel-2", 409);
 
         String oslo = People.customer(accounts, "push-osl-customer");
-        String oslocourier = People.courier(accounts, "push-osl-courier");
-        Trips.online(mvc, oslocourier, 59.9139, 10.7522);
-        String canceled = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(59.9140, 10.7521, 59.9250, 10.7600)), oslo)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + canceled + "/accept"),
-                oslocourier)).andExpect(status().isOk());
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + canceled + "/cancel"),
-                oslocourier)).andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + canceled + "/activity"),
-                "{\"activityId\":\"act-osl\"}"), oslo)).andExpect(status().isConflict());
+        Trips.Trip trip = Trips.trip(59.9140, 10.7521, 59.9250, 10.7600);
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
+        String rejected = (String) Trips.place(mvc, oslo, trip).get("id");
+        mvc.perform(People.asMerchant(body(post("/api/merchant/orders/" + rejected + "/reject"),
+                "{\"reason\":\"Out of dough\"}"), kitchen.merchant)).andExpect(status().isOk());
+        follow(oslo, rejected, "act-osl", 409);
     }
 
     /// An end the push provider refused is not lost with the activity: the
@@ -383,20 +404,17 @@ class PushTest {
         String courier = People.courier(accounts, "push-rey-courier");
         register(customer, "apns", "rey-customer-phone");
         Trips.online(mvc, courier, 64.1466, -21.9426);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(64.1467, -21.9425, 64.1500, -21.9000)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-rey\"}"), customer)).andExpect(status().isOk());
+        String id = Trips.ask(mvc, customer, Trips.trip(64.1467, -21.9425, 64.1500, -21.9000));
+        courier(courier, id, "accept");
+        follow(customer, id, "act-rey", 200);
 
         sent.refuse(1);
-        mvc.perform(People.asCourier(post("/api/courier/deliveries/" + id + "/cancel"), courier))
-                .andExpect(status().isOk());
+        mvc.perform(People.asAdmin(body(post("/api/admin/orders/" + id + "/cancel"),
+                "{\"reason\":\"Test\"}"), DemoAccounts.ADMIN)).andExpect(status().isOk());
         assertEquals(1L, activities(id), "the refused end keeps its activity");
         int before = sent.sentTo("rey-customer-phone").size();
 
-        // Not while the call that ended the delivery may still be sending it...
+        // Not while the call that ended the order may still be sending it...
         pushes.endLeftBehind();
         assertEquals(before, sent.sentTo("rey-customer-phone").size());
         // ...and once that is past, once.
@@ -421,16 +439,12 @@ class PushTest {
         String customer = People.customer(accounts, "push-tll-customer");
         String courier = People.courier(accounts, "push-tll-courier");
         register(customer, "apns", "tll-customer-phone");
-        Trips.online(mvc, courier, 59.4370, 24.7536);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(59.4371, 24.7535, 59.4400, 24.7700)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-tll\"}"), customer)).andExpect(status().isOk());
+        String id = (String) Trips.place(mvc, customer,
+                Trips.trip(59.4371, 24.7535, 59.4400, 24.7700)).get("id");
+        follow(customer, id, "act-tll", 200);
 
         sent.leaveUnconfirmed(1);
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + id + "/cancel"), customer))
+        mvc.perform(People.asCustomer(post("/api/orders/" + id + "/cancel"), customer))
                 .andExpect(status().isOk());
         assertEquals("live-end", surface(last(sent.sentTo("tll-customer-phone"))).get("operation"));
         assertEquals(1L, activities(id), "sent, but never confirmed");
@@ -513,51 +527,41 @@ class PushTest {
         assertEquals(1L, tokens("cap2-new-b"));
     }
 
-    /// The notification of a change that is no longer the delivery's latest says
-    /// nothing, in either order: composed after the delivery was cancelled it does
-    /// not tell the customer a courier is coming, and composed before the
+    /// The notification of a change that is no longer the order's latest says
+    /// nothing, in either order: composed after the order was cancelled it does
+    /// not tell the customer their food is cooking, and composed before the
     /// cancellation's own it leaves the Live Activity for that one to end.
     @Test
     void aStaleChangeSaysNothingAndLeavesTheActivityToTheLaterOne() throws Exception {
         // Valletta: the acceptance is composed after the cancellation was.
         String customer = People.customer(accounts, "push-mla-customer");
-        String courier = People.courier(accounts, "push-mla-courier");
         register(customer, "apns", "mla-customer-phone");
-        Trips.online(mvc, courier, 35.8989, 14.5146);
-        String id = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(35.8990, 14.5145, 35.9100, 14.5000)), customer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + id + "/accept"), courier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + id + "/activity"),
-                "{\"activityId\":\"act-mla\"}"), customer)).andExpect(status().isOk());
-        mvc.perform(People.asCustomer(post("/api/deliveries/" + id + "/cancel"), customer))
+        String id = (String) Trips.place(mvc, customer,
+                Trips.trip(35.8990, 14.5145, 35.9100, 14.5000)).get("id");
+        follow(customer, id, "act-mla", 200);
+        mvc.perform(People.asCustomer(post("/api/orders/" + id + "/cancel"), customer))
                 .andExpect(status().isOk());
         int told = sent.sentTo("mla-customer-phone").size();
         assertEquals("live-end", surface(last(sent.sentTo("mla-customer-phone")))
                 .get("operation"));
-        pushes.deliveryChanged(id, DeliveryState.ACCEPTED, customer, courier);
+        pushes.orderChanged(id, OrderState.ACCEPTED);
         assertEquals(told, sent.sentTo("mla-customer-phone").size());
 
-        // Gdansk: the acceptance is composed after the delivery was cancelled but
+        // Gdansk: the acceptance is composed after the order was cancelled but
         // before the cancellation is. It neither speaks nor forgets the
         // activity, and the cancellation then ends it.
         String gdnCustomer = People.customer(accounts, "push-gdn-customer");
-        String gdnCourier = People.courier(accounts, "push-gdn-courier");
         register(gdnCustomer, "apns", "gdn-customer-phone");
-        Trips.online(mvc, gdnCourier, 54.3520, 18.6466);
-        String gdn = (String) Trips.json(mvc, People.asCustomer(body(post("/api/deliveries"),
-                People.delivery(54.3521, 18.6465, 54.3650, 18.6300)), gdnCustomer)).get("id");
-        mvc.perform(People.asCourier(post("/api/courier/offers/" + gdn + "/accept"), gdnCourier))
-                .andExpect(status().isOk());
-        mvc.perform(People.asCustomer(body(post("/api/deliveries/" + gdn + "/activity"),
-                "{\"activityId\":\"act-gdn\"}"), gdnCustomer)).andExpect(status().isOk());
+        String gdn = (String) Trips.place(mvc, gdnCustomer,
+                Trips.trip(54.3521, 18.6465, 54.3650, 18.6300)).get("id");
+        follow(gdnCustomer, gdn, "act-gdn", 200);
         int before = sent.sentTo("gdn-customer-phone").size();
-        db.execute("UPDATE delivery SET state = 'CANCELLED_BY_CUSTOMER' WHERE id = ?",
+        db.execute("UPDATE customer_order SET state = 'CANCELLED_BY_CUSTOMER' WHERE id = ?",
                 new Object[] {gdn});
-        pushes.deliveryChanged(gdn, DeliveryState.ACCEPTED, gdnCustomer, gdnCourier);
+        pushes.orderChanged(gdn, OrderState.ACCEPTED);
         assertEquals(before, sent.sentTo("gdn-customer-phone").size());
         assertEquals(1L, activities(gdn));
-        pushes.deliveryChanged(gdn, DeliveryState.CANCELLED_BY_CUSTOMER, gdnCustomer, gdnCourier);
+        pushes.orderChanged(gdn, OrderState.CANCELLED_BY_CUSTOMER);
         RecordingPushSender.Sent ended = last(sent.sentTo("gdn-customer-phone"));
         assertEquals("live-end", surface(ended).get("operation"));
         assertEquals("act-gdn", surface(ended).get("id"));

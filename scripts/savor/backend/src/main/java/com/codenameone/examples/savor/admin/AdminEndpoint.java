@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.savor.admin;
 
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
 import com.codenameone.examples.savor.Caller;
@@ -42,8 +43,16 @@ import com.codenameone.examples.savor.courier.Couriers;
 import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.live.LiveHub;
 import com.codenameone.examples.savor.pay.Payments;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.order.Quotes;
+import com.codenameone.examples.savor.api.OrderDto;
+import com.codenameone.examples.savor.api.PromoDto;
+import com.codenameone.examples.savor.api.RestaurantDto;
+import com.codenameone.examples.savor.api.SuspendDto;
+import com.codenameone.examples.savor.catalog.Catalog;
+import com.codenameone.examples.savor.catalog.Restaurants;
 import com.codenameone.examples.savor.delivery.Deliveries;
+import com.codenameone.examples.savor.order.Orders;
+import com.codenameone.examples.savor.order.Promos;
 
 import java.util.List;
 
@@ -58,21 +67,28 @@ import java.util.List;
 public class AdminEndpoint implements AdminApiServer {
     private final Accounts accounts;
     private final Deliveries deliveries;
+    private final Orders orders;
+    private final Restaurants restaurants;
+    private final Promos promos;
     private final Couriers couriers;
-    private final Fares fares;
+    private final Quotes fares;
     private final LiveHub live;
     private final Applications applications;
     private final Payments payments;
     private final Statistics statistics;
 
-    public AdminEndpoint(Accounts accounts, Deliveries deliveries, Couriers couriers,
-            Fares fares, LiveHub live, Applications applications, Payments payments,
+    public AdminEndpoint(Accounts accounts, Deliveries deliveries, Orders orders,
+            Restaurants restaurants, Promos promos, Couriers couriers,
+            Quotes fares, LiveHub live, Applications applications, Payments payments,
             Statistics statistics) {
         this.applications = applications;
         this.payments = payments;
         this.statistics = statistics;
         this.accounts = accounts;
         this.deliveries = deliveries;
+        this.orders = orders;
+        this.restaurants = restaurants;
+        this.promos = promos;
         this.couriers = couriers;
         this.fares = fares;
         this.live = live;
@@ -166,14 +182,55 @@ public class AdminEndpoint implements AdminApiServer {
     }
 
     @Override
-    public DeliveryDto cancelDelivery(String id, ReasonDto reason) throws Exception {
-        return deliveries.cancelByAdmin(Caller.name(), id, reason == null ? "" : reason.reason());
+    public List<OrderDto> orders() throws Exception {
+        return orders.recent();
     }
 
     @Override
-    public ReceiptDto refundDelivery(String id, ReasonDto reason) throws Exception {
+    public OrderDto cancelOrder(String id, ReasonDto reason) throws Exception {
+        return orders.cancelByAdmin(Caller.name(), id, reason == null ? "" : reason.reason());
+    }
+
+    @Override
+    public ReceiptDto refundOrder(String id, ReasonDto reason) throws Exception {
         return payments.refund(id, Text.required(reason == null ? "" : reason.reason(), 255,
                 "why it is refunded"));
+    }
+
+    @Override
+    public List<RestaurantDto> restaurants(String status) throws Exception {
+        return restaurants.byStatus(status == null || status.length() == 0 ? Catalog.PENDING
+                : status);
+    }
+
+    @Override
+    public RestaurantDto approveRestaurant(String id) throws Exception {
+        return restaurants.approve(Caller.name(), id);
+    }
+
+    @Override
+    public RestaurantDto rejectRestaurant(String id, ReasonDto reason) throws Exception {
+        return restaurants.reject(Caller.name(), id, reason == null ? "" : reason.reason());
+    }
+
+    @Override
+    public RestaurantDto suspendRestaurant(String id, SuspendDto suspend) throws Exception {
+        if (suspend == null) {
+            throw new ResponseStatusException(400, "Say whether to suspend it");
+        }
+        return restaurants.suspend(Caller.name(), id, suspend.suspended(), suspend.reason());
+    }
+
+    @Override
+    public List<PromoDto> promos() throws Exception {
+        Caller.name();
+        return promos.all();
+    }
+
+    @Override
+    public PromoDto savePromo(PromoDto promo) throws Exception {
+        Caller.name();
+        return promos.save(promo);
     }
 
     @Override

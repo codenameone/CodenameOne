@@ -37,7 +37,7 @@ import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Applying to drive: a draft, its documents, handing it in, and an admin's
+/// Applying to deliver: a draft, its documents, handing it in, and an admin's
 /// answer either way.
 @BackendTest
 class OnboardingApplicationTest {
@@ -52,7 +52,7 @@ class OnboardingApplicationTest {
             + "\"dateOfBirth\":\"1990-05-17\",\"licenceNumber\":\"L-1234\","
             + "\"licenceExpiry\":\"2999-01-31\",\"vehicleMake\":\"Honda\","
             + "\"vehicleModel\":\"Civic\",\"vehicleYear\":2020,\"vehicleColor\":\"Grey\","
-            + "\"vehiclePlate\":\"APP 1\",\"vehicleSeats\":4,\"product\":\"standard\"}";
+            + "\"vehiclePlate\":\"APP 1\"}";
 
     @Autowired
     private MockMvc mvc;
@@ -222,15 +222,14 @@ class OnboardingApplicationTest {
         mvc.perform(admin(post("/api/admin/applications/" + who + "/approve")))
                 .andExpect(status().isConflict());
 
-        // Approval is what grants the role: the same token now drives, in the
-        // car the application named.
+        // Approval is what grants the role: the same token now delivers, on
+        // the vehicle the application named.
         mvc.perform(get("/api/courier/me").header("Host", SignIn.HOST)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approved").value(true))
                 .andExpect(jsonPath("$.vehicle").value("Grey Honda Civic"))
-                .andExpect(jsonPath("$.plate").value("APP 1"))
-                .andExpect(jsonPath("$.product").value("standard"));
+                .andExpect(jsonPath("$.plate").value("APP 1"));
         mvc.perform(People.asCustomer(get("/api/me"), who))
                 .andExpect(jsonPath("$.courier").value(true))
                 .andExpect(jsonPath("$.customer").value(true))
@@ -329,18 +328,14 @@ class OnboardingApplicationTest {
                 .andExpect(jsonPath("$.documents[2].status").value("uploaded"));
         mvc.perform(admin(get("/api/admin/applications/" + DemoAccounts.COURIER)))
                 .andExpect(jsonPath("$.status").value("approved"))
-                .andExpect(jsonPath("$.vehicleMake").value("Toyota"));
-        mvc.perform(admin(get("/api/admin/applications/" + DemoAccounts.XL_COURIER)))
-                .andExpect(jsonPath("$.product").value("xl"))
-                .andExpect(jsonPath("$.accessible").value(true));
-        // Registering to drive, the way the app asks, opens a draft.
+                .andExpect(jsonPath("$.vehicleMake").value("Vespa"));
+        // Registering to deliver, the way the app asks, opens a draft.
         mvc.perform(post("/api/account/register").contentType("application/json")
                         .content("{\"email\":\"wants@test.example\",\"password\":\"a-long-password\","
                                 + "\"displayName\":\"Wants\",\"phone\":\"+15550113\","
-                                + "\"wantsToDrive\":true,\"gender\":\"female\"}"))
+                                + "\"wantsToDeliver\":true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courier").value(false))
-                .andExpect(jsonPath("$.gender").value("female"))
                 .andExpect(jsonPath("$.courierStatus").value("draft"));
     }
 }

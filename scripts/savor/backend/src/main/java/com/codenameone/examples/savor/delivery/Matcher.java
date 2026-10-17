@@ -25,14 +25,12 @@ import com.codename1.backend.security.core.userdetails.UsernameNotFoundException
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.domain.CourierApplication;
 import com.codenameone.examples.savor.domain.CourierState;
-import com.codenameone.examples.savor.domain.Profile;
 import com.codenameone.examples.savor.domain.Delivery;
 import com.codenameone.examples.savor.domain.DeliveryPassed;
 import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.geo.Geo;
 import com.codenameone.examples.savor.repository.CourierApplicationRepository;
 import com.codenameone.examples.savor.repository.CourierStateRepository;
-import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.DeliveryPassedRepository;
 
 import java.io.IOException;
@@ -67,20 +65,17 @@ public class Matcher {
     /// The states of a delivery that keep its courier from being offered another.
     private static final DeliveryState[] WITH_DELIVERY = {DeliveryState.OFFERED, DeliveryState.ACCEPTED,
         DeliveryState.ARRIVED, DeliveryState.IN_PROGRESS};
-    private static final String FEMALE = "female";
 
     private final CourierStateRepository couriers;
     private final CourierApplicationRepository applications;
-    private final ProfileRepository profiles;
     private final DeliveryPassedRepository passes;
     private final JdbcUserDetailsManager users;
 
     public Matcher(CourierStateRepository couriers, CourierApplicationRepository applications,
-            ProfileRepository profiles, DeliveryPassedRepository passes,
+            DeliveryPassedRepository passes,
             JdbcUserDetailsManager users) {
         this.couriers = couriers;
         this.applications = applications;
-        this.profiles = profiles;
         this.passes = passes;
         this.users = users;
     }
@@ -92,19 +87,16 @@ public class Matcher {
         public final double lat;
         public final double lng;
         public final double heading;
-        /// The kind of car, as the courier's application has it.
-        public final String product;
         public final double meters;
         /// The courier's state as it was read, for whoever wants more of it.
         public final CourierState state;
 
-        Candidate(CourierState state, String product, double meters) {
+        Candidate(CourierState state, double meters) {
             this.state = state;
             this.username = state.getUsername();
             this.lat = state.getLat();
             this.lng = state.getLng();
             this.heading = state.getHeading();
-            this.product = product;
             this.meters = meters;
         }
     }
@@ -119,29 +111,21 @@ public class Matcher {
     @Transactional(readOnly = true)
     public List<Candidate> nearby(double lat, double lng, double radiusMeters)
             throws IOException {
-        return nearby(lat, lng, radiusMeters, null, false, false, false);
+        return free(lat, lng, radiusMeters);
     }
 
-    /// The couriers a delivery could be offered to: on line, free, in reach, and
-    /// fit for it.
+    /// The couriers a delivery could be offered to: on line, free, and in reach
+    /// of the restaurant.
     ///
     /// A courier is offered deliveries only while their application stands approved
     /// and their account is not blocked. Both are read here, each time, and
     /// not trusted to have been put right elsewhere: an approval withdrawn or
     /// an account blocked takes a courier out of matching at once, whatever
-    /// their state still says. The approval is part of the query. What the
-    /// customer asked of the car and the courier is read from the applications
-    /// and profiles of the handful the query answers. Whether the account is
-    /// blocked is the sign-in's to say, and its tables are its own, so each
-    /// courier still fit for the delivery is asked about there.
-    ///
-    /// @param product the kind of car the delivery asks for, or null for any
-    /// @param womenOnly whether the customer asked for a woman courier
-    /// @param wheelchair whether the delivery needs a car that takes a wheelchair
-    /// @param pets whether the delivery needs a courier who takes pets
+    /// their state still says. The approval is part of the query. Whether the
+    /// account is blocked is the sign-in's to say, and its tables are its own,
+    /// so each courier in reach is asked about there.
     @Transactional(readOnly = true)
-    public List<Candidate> nearby(double lat, double lng, double radiusMeters, String product,
-            boolean womenOnly, boolean wheelchair, boolean pets) throws IOException {
+    private List<Candidate> free(double lat, double lng, double radiusMeters) throws IOException {
         double dLat = radiusMeters / Geo.METERS_PER_DEGREE;
         double shrink = Math.max(0.01d, Math.cos(Math.toRadians(lat)));
         double dLng = radiusMeters / (Geo.METERS_PER_DEGREE * shrink);
@@ -166,31 +150,13 @@ public class Matcher {
         for (int iter = 0; iter < rows.size(); iter++) {
             cars.put(rows.get(iter).getUsername(), rows.get(iter));
         }
-        Map<String, Profile> people = new HashMap<String, Profile>();
-        if (womenOnly) {
-            List<Profile> found = profiles.findByUsernameIn(names);
-            for (int iter = 0; iter < found.size(); iter++) {
-                people.put(found.get(iter).getUsername(), found.get(iter));
-            }
-        }
         List<Candidate> near = new ArrayList<Candidate>();
         for (int iter = 0; iter < inReach.size(); iter++) {
             CourierState state = inReach.get(iter);
-            CourierApplication car = cars.get(state.getUsername());
-            if (car == null) {
+            if (cars.get(state.getUsername()) == null) {
                 // The application went between the two queries, and the
                 // approval with it.
                 continue;
-            }
-            if (product != null && !product.equals(car.getProduct())
-                    || wheelchair && !car.isWheelchair() || pets && !car.isPets()) {
-                continue;
-            }
-            if (womenOnly) {
-                Profile who = people.get(state.getUsername());
-                if (who == null || !FEMALE.equals(who.getGender())) {
-                    continue;
-                }
             }
             if (!enabled(state.getUsername())) {
                 continue;
@@ -200,21 +166,20 @@ public class Matcher {
             while (at < near.size() && near.get(at).meters <= meters) {
                 at++;
             }
-            near.add(at, new Candidate(state, car.getProduct(), meters));
+            near.add(at, new Candidate(state, meters));
         }
         return near;
     }
 
     /// Whether `courier` is still one a delivery could be offered to: on line and
     /// heard from lately, free, in reach, approved, not blocked, and fit for
-    /// what the customer asked. [#pick] read all of that in a transaction of its
+    /// still approved. [#pick] read all of that in a transaction of its
     /// own, and any of it can have changed before the offer is made; the
     /// offer asks again once it holds the courier.
     @Transactional(readOnly = true)
     public boolean fits(Delivery delivery, String courier, long waitedMillis) throws IOException {
-        List<Candidate> near = nearby(delivery.getPickupLat(), delivery.getPickupLng(),
-                radius(waitedMillis), delivery.getProduct(), delivery.isWomenOnly(),
-                delivery.isWheelchair(), delivery.isPets());
+        List<Candidate> near = free(delivery.getPickupLat(), delivery.getPickupLng(),
+                radius(waitedMillis));
         for (int iter = 0; iter < near.size(); iter++) {
             if (courier.equals(near.get(iter).username)) {
                 return true;
@@ -240,8 +205,8 @@ public class Matcher {
     /// or null when there is none in reach.
     @Transactional(readOnly = true)
     public String pick(Delivery delivery, long waitedMillis) throws IOException {
-        List<Candidate> near = nearby(delivery.getPickupLat(), delivery.getPickupLng(), radius(waitedMillis),
-                delivery.getProduct(), delivery.isWomenOnly(), delivery.isWheelchair(), delivery.isPets());
+        List<Candidate> near = free(delivery.getPickupLat(), delivery.getPickupLng(),
+                radius(waitedMillis));
         if (near.isEmpty()) {
             return null;
         }

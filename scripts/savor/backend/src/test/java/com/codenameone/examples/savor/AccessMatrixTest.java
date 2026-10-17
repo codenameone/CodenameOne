@@ -62,7 +62,7 @@ class AccessMatrixTest {
         "POST /api/payments/methods/setup/none/complete",
         "POST /api/payments/methods/none/default",
         "POST /api/payments/methods/none/remove",
-        "POST /api/deliveries/no-such-delivery/tip",
+        "POST /api/orders/no-such-order/tip",
         "PUT /api/onboarding/application",
         "POST /api/onboarding/application/documents",
         "POST /api/onboarding/application/submit",

@@ -37,7 +37,6 @@ import com.codename1.annotations.Mapped;
 ///     has not finished is REFUND_PENDING until it ends REFUNDED, or REFUND_FAILED when the money
 ///     did not go back.
 /// @param offerExpiresInSeconds For a courier looking at an offer: how long is left to answer it.
-/// @param product `standard`, `comfort` or `xl`.
 /// @param paymentMethodLabel How the delivery is paid for, as the customer would recognise it: "Cash",
 ///     "Visa 4242".
 /// @param cash True when the customer pays the courier in cash, so that the courier's screen can say to
@@ -47,8 +46,6 @@ import com.codename1.annotations.Mapped;
 /// @param courierPhotoInitials The courier's initials, for a badge where a photo would go.
 /// @param etaMinutes Minutes until the courier reaches the pickup, or the drop-off once the trip has
 ///     started; 0 when there is nothing to estimate.
-/// @param courierGender What the customer asked for, for the courier to read: this and the four that
-///     follow.
 /// @param courierPhone The number to call or text the courier at, given to the customer. Filled only
 ///     while a courier has the delivery and it is not over, and never for anyone else.
 /// @param customerPhone The number to call or text the customer at, given to the courier, on the same
@@ -82,7 +79,6 @@ public record DeliveryDto(
         int rating,
         String paymentStatus,
         int offerExpiresInSeconds,
-        String product,
         String paymentMethodLabel,
         boolean cash,
         long serviceFee,
@@ -90,10 +86,6 @@ public record DeliveryDto(
         long total,
         String courierPhotoInitials,
         int etaMinutes,
-        String courierGender,
-        boolean quietDelivery,
-        boolean accessibleVehicle,
-        boolean petFriendly,
         String note,
         String courierPhone,
         String customerPhone) {
@@ -103,7 +95,7 @@ public record DeliveryDto(
     /// [DeliveryState#NONE] and every other component is empty.
     public static DeliveryDto none() {
         return new DeliveryDto(null, DeliveryState.NONE, null, null, null, null, null, null, 0d, 0d, 0d,
-                null, 0d, 0d, null, 0d, 0d, 0d, 0L, null, 0d, 0d, 0L, 0L, 0, null, 0, null, null,
-                false, 0L, 0L, 0L, null, 0, null, false, false, false, null, null, null);
+                null, 0d, 0d, null, 0d, 0d, 0d, 0L, null, 0d, 0d, 0L, 0L, 0, null, 0, null,
+                false, 0L, 0L, 0L, null, 0, null, null, null);
     }
 }

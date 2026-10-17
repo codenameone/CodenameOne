@@ -36,18 +36,18 @@ import com.codenameone.examples.savor.pay.Payments;
 import com.codenameone.examples.savor.repository.CourierApplicationRepository;
 import com.codenameone.examples.savor.repository.CourierDocumentRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
-import com.codenameone.examples.savor.delivery.DemoDeliveries;
-import com.codenameone.examples.savor.delivery.Fares;
+import com.codenameone.examples.savor.catalog.DemoRestaurants;
+import com.codenameone.examples.savor.order.DemoOrders;
 
 import java.io.IOException;
 
 /// The accounts a server starts with.
 ///
 /// On a development profile, enough of each kind that every screen of the app
-/// has something to show straight after a checkout: customers, approved couriers of
-/// each kind of car, an admin, someone whose application to drive is waiting
-/// for an answer, an account the admins have flagged, and a fortnight of deliveries
-/// between them ([DemoDeliveries]).
+/// has something to show straight after a checkout: customers, approved couriers,
+/// a merchant who runs one of the restaurants ([DemoRestaurants]), an admin,
+/// someone whose application to deliver is waiting for an answer, an account the
+/// admins have flagged, and a fortnight of orders between them ([DemoOrders]).
 ///
 /// Anywhere else, at most one: the admin named by `savor.admin.email` and
 /// `savor.admin.password` (or the same two names in the environment, in upper
@@ -60,14 +60,15 @@ public class DemoAccounts {
     public static final String COURIER = "courier@savor.example";
     public static final String SECOND_COURIER = "courier2@savor.example";
     public static final String ADMIN = "admin@savor.example";
-    /// A courier of each of the larger kinds of car; the second takes a
-    /// wheelchair. That one and the first courier of all take pets.
-    public static final String COMFORT_COURIER = "courier3@savor.example";
-    public static final String XL_COURIER = "courier4@savor.example";
+    /// Two more couriers, who carry the fortnight of past orders.
+    public static final String THIRD_COURIER = "courier3@savor.example";
+    public static final String FOURTH_COURIER = "courier4@savor.example";
+    /// Runs the first demo restaurant's kitchen.
+    public static final String MERCHANT = "merchant@savor.example";
     public static final String SECOND_CUSTOMER = "customer2@savor.example";
     /// A customer the admins have flagged.
     public static final String FLAGGED_CUSTOMER = "customer3@savor.example";
-    /// Someone whose application to drive is complete and waiting for an admin.
+    /// Someone whose application to deliver is complete and waiting for an admin.
     public static final String APPLICANT = "applicant@savor.example";
     /// The password of every demo account. Not a secret: these accounts exist
     /// only where the profile says the server is not a real one.
@@ -82,7 +83,8 @@ public class DemoAccounts {
     private final Applications applications;
     private final Moderation moderation;
     private final Payments payments;
-    private final DemoDeliveries deliveries;
+    private final DemoRestaurants restaurants;
+    private final DemoOrders orders;
     private final ProfileRepository profiles;
     private final CourierApplicationRepository forms;
     private final CourierDocumentRepository documents;
@@ -91,7 +93,8 @@ public class DemoAccounts {
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Applications applications, Moderation moderation,
-            Payments payments, DemoDeliveries deliveries, ProfileRepository profiles,
+            Payments payments, DemoRestaurants restaurants, DemoOrders orders,
+            ProfileRepository profiles,
             CourierApplicationRepository forms, CourierDocumentRepository documents, Config config,
             @Value("${savor.admin.email:}") String adminEmail,
             @Value("${savor.admin.password:}") String adminPassword) {
@@ -99,7 +102,8 @@ public class DemoAccounts {
         this.applications = applications;
         this.moderation = moderation;
         this.payments = payments;
-        this.deliveries = deliveries;
+        this.restaurants = restaurants;
+        this.orders = orders;
         this.profiles = profiles;
         this.forms = forms;
         this.documents = documents;
@@ -123,41 +127,38 @@ public class DemoAccounts {
         }
         // The fortnight is written once, with the accounts it is shared among,
         // and not again when a server with a database that persists restarts.
-        // The marker is an account made before the deliveries, so a start-up that
+        // The marker is an account made before the orders, so a start-up that
         // failed between the two leaves a development database with the
-        // accounts and no fortnight. That is demonstration data on a
-        // developer's machine, where the answer is to drop the database and
-        // start again; a marker written with the deliveries would be one more
-        // table for the sample to carry.
-        boolean first = !accounts.exists(COMFORT_COURIER);
-        // The tests sign in as the first three and expect to find them as new
-        // accounts are: no deliveries behind them, no card saved, cash by default.
-        // Under the `test` profile the fortnight is therefore the other
-        // accounts' alone.
+        // accounts and no fortnight; the answer there is to drop the database.
+        boolean first = !accounts.exists(THIRD_COURIER);
+        // The tests sign in as the first accounts and expect to find them as
+        // new accounts are: no orders behind them, no card saved, cash by
+        // default. Under the `test` profile the fortnight is the others' alone.
         boolean everyone = !"test".equals(config.getProfile());
 
-        customer(CUSTOMER, "Riley Customer", "+15550100", "unspecified", 0, everyone);
-        courier(COURIER, "Dana Courier", "+15550101", "female", Fares.STANDARD, "Blue", "Toyota",
-                "Prius", "WAY 101", 4, false, true, 0);
-        courier(SECOND_COURIER, "Devon Courier", "+15550102", "male", Fares.STANDARD, "White", "Kia",
-                "Niro", "WAY 102", 4, false, false, 0);
+        customer(CUSTOMER, "Riley Customer", "+15550100", 0, everyone);
+        courier(COURIER, "Dana Courier", "+15550101", "Blue", "Vespa", "Primavera", "SAV 101", 0);
+        courier(SECOND_COURIER, "Devon Courier", "+15550102", "Black", "Trek", "Allant+",
+                "SAV 102", 0);
         add(ADMIN, PASSWORD, "Alex Admin", "+15550103", "", "");
-        courier(COMFORT_COURIER, "Carmen Courier", "+15550104", "female", Fares.COMFORT, "Black",
-                "Tesla", "Model 3", "WAY 103", 4, false, false, 12);
-        courier(XL_COURIER, "Dmitri Courier", "+15550105", "male", Fares.XL, "Silver", "Toyota",
-                "Sienna", "WAY 104", 6, true, true, 9);
-        customer(SECOND_CUSTOMER, "Robin Customer", "+15550106", "nonbinary", 11, true);
+        courier(THIRD_COURIER, "Carmen Courier", "+15550104", "Red", "Honda", "PCX", "SAV 103",
+                12);
+        courier(FOURTH_COURIER, "Dmitri Courier", "+15550105", "Silver", "Toyota", "Yaris",
+                "SAV 104", 9);
+        customer(SECOND_CUSTOMER, "Robin Customer", "+15550106", 11, true);
         boolean flag = !accounts.exists(FLAGGED_CUSTOMER);
-        customer(FLAGGED_CUSTOMER, "Rae Customer", "+15550107", "female", 6, false);
+        customer(FLAGGED_CUSTOMER, "Rae Customer", "+15550107", 6, false);
         if (flag) {
-            flag(FLAGGED_CUSTOMER, "Three no-shows at the pickup in one week", 3);
+            flag(FLAGGED_CUSTOMER, "Three orders refused at the door in one week", 3);
         }
+        customer(MERCHANT, "Morgan Merchant", "+15550109", 20, false);
         applicant();
+        restaurants.seed(MERCHANT);
         if (first) {
-            deliveries.seed(everyone ? new String[] {CUSTOMER, SECOND_CUSTOMER, FLAGGED_CUSTOMER}
+            orders.seed(everyone ? new String[] {CUSTOMER, SECOND_CUSTOMER, FLAGGED_CUSTOMER}
                             : new String[] {SECOND_CUSTOMER, FLAGGED_CUSTOMER},
-                    everyone ? new String[] {COURIER, SECOND_COURIER, COMFORT_COURIER, XL_COURIER}
-                            : new String[] {COMFORT_COURIER, XL_COURIER}, everyone);
+                    everyone ? new String[] {COURIER, SECOND_COURIER, THIRD_COURIER,
+                        FOURTH_COURIER} : new String[] {THIRD_COURIER, FOURTH_COURIER});
         }
     }
 
@@ -193,12 +194,12 @@ public class DemoAccounts {
         }
     }
 
-    private void customer(String username, String name, String phone, String gender, int daysAgo,
+    private void customer(String username, String name, String phone, int daysAgo,
             boolean card) throws IOException {
         if (accounts.exists(username)) {
             return;
         }
-        accounts.create(username, PASSWORD, name, phone, true, "", "", false, false, gender,
+        accounts.create(username, PASSWORD, name, phone, true, "", "", false, false,
                 opened(daysAgo));
         if (card) {
             PaymentSetupDto setup = payments.startSetup(username, name);
@@ -213,24 +214,21 @@ public class DemoAccounts {
 
     /// An approved courier, with the application an approval implies: filled
     /// in, its documents accepted.
-    private void courier(String username, String name, String phone, String gender, String product,
-            String colour, String make, String model, String plate, int seats,
-            boolean wheelchair, boolean pets, int daysAgo) throws IOException {
+    private void courier(String username, String name, String phone, String colour, String make,
+            String model, String plate, int daysAgo) throws IOException {
         if (accounts.exists(username)) {
             return;
         }
         accounts.create(username, PASSWORD, name, phone, true, colour + " " + make + " " + model,
-                plate, true, false, gender, opened(daysAgo));
-        approved(username, name, product, colour, make, model, plate, seats, wheelchair, pets,
-                daysAgo);
+                plate, true, false, opened(daysAgo));
+        approved(username, name, colour, make, model, plate, daysAgo);
     }
 
     /// Fills in the application an account created as a courier was given, and
     /// adds its documents, already accepted.
     @Transactional(rollbackFor = IOException.class)
-    void approved(String username, String name, String product, String colour, String make,
-            String model, String plate, int seats, boolean wheelchair, boolean pets, int daysAgo)
-            throws IOException {
+    void approved(String username, String name, String colour, String make, String model,
+            String plate, int daysAgo) throws IOException {
         long handedIn = System.currentTimeMillis() - (daysAgo + 1) * Days.MILLIS;
         CourierApplication form = forms.findById(username);
         form.setLegalName(name);
@@ -242,10 +240,6 @@ public class DemoAccounts {
         form.setVehicleYear(year() - 3);
         form.setVehicleColor(colour);
         form.setVehiclePlate(plate);
-        form.setVehicleSeats(seats);
-        form.setProduct(product);
-        form.setWheelchair(wheelchair);
-        form.setPets(pets);
         form.setSubmittedAt(handedIn);
         form.setReviewedBy(ADMIN);
         for (int iter = 0; iter < Applications.KINDS.length; iter++) {
@@ -268,14 +262,13 @@ public class DemoAccounts {
             return;
         }
         accounts.create(APPLICANT, PASSWORD, "Avery Applicant", "+15550108", true, "", "", false,
-                false, "male", opened(4));
+                false, opened(4));
         applications.open(APPLICANT, "", "");
         // What an applicant fills in. The rest (who, the status, the documents,
         // the dates) is the server's to say and is not read from a form.
         CourierApplicationDto form = new CourierApplicationDto(null, null, null,
                 "Avery Jordan Applicant", "1992-09-03", "D4471902", (year() + 3) + "-03-31",
-                "Honda", "Civic", year() - 2, "Grey", "WAY 207", 4, Fares.STANDARD, false,
-                false, null, null, 0L, 0L, null);
+                "Honda", "Civic", year() - 2, "Grey", "SAV 207", null, null, 0L, 0L, null);
         applications.save(APPLICANT, form);
         for (int iter = 0; iter < Applications.KINDS.length; iter++) {
             DocumentUploadDto picture = new DocumentUploadDto(Applications.KINDS[iter],

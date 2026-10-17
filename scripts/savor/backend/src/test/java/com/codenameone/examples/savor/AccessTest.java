@@ -61,17 +61,17 @@ class AccessTest {
         mvc.perform(as(get("/api/admin/stats"), customer)).andExpect(status().isForbidden());
 
         mvc.perform(as(get("/api/courier/me"), courier)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.vehicle").value("Blue Toyota Prius"));
+                .andExpect(jsonPath("$.vehicle").value("Blue Vespa Primavera"));
         mvc.perform(as(get("/api/admin/users"), courier)).andExpect(status().isForbidden());
         // A courier is a customer too.
-        mvc.perform(as(get("/api/deliveries/active"), courier)).andExpect(status().isOk());
+        mvc.perform(as(get("/api/orders/active"), courier)).andExpect(status().isOk());
 
         mvc.perform(as(get("/api/admin/stats"), admin)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.currency").value("USD"));
         mvc.perform(as(get("/api/admin/users"), admin)).andExpect(status().isOk());
         mvc.perform(as(get("/api/admin/couriers"), admin)).andExpect(status().isOk());
         mvc.perform(as(get("/api/admin/deliveries"), admin)).andExpect(status().isOk());
-        // An admin who does not drive is not a courier.
+        // An admin who does not deliver is not a courier.
         mvc.perform(as(get("/api/courier/me"), admin)).andExpect(status().isForbidden());
     }
 

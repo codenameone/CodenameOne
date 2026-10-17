@@ -26,10 +26,8 @@ import com.codename1.annotations.Mapped;
 /// @param language `en`, `es`, `fr`, `de` or `he`.
 /// @param theme `system`, `light` or `dark`.
 /// @param units `km` or `mi`.
-/// @param courierGender `any` or `women`: whom a delivery may be offered to.
 /// @param defaultPaymentMethodId A saved method's id, or `cash`.
 /// @param defaultTipPercent 0, 10, 15 or 20.
-/// @param shareTripsWith The phone number trips are shared with, or empty.
 @Mapped
 public record PreferencesDto(
         String language,
@@ -38,11 +36,6 @@ public record PreferencesDto(
         boolean notifyDeliveryUpdates,
         boolean notifyReceipts,
         boolean notifyPromotions,
-        String courierGender,
-        boolean quietDelivery,
-        boolean accessibleVehicle,
-        boolean petFriendly,
         String defaultPaymentMethodId,
-        int defaultTipPercent,
-        String shareTripsWith) {
+        int defaultTipPercent) {
 }

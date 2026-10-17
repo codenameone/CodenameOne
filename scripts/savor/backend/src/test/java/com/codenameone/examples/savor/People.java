@@ -31,30 +31,30 @@ import static com.codename1.backend.test.SecurityMockMvcRequestPostProcessors.jw
 /// borrowed a demo account would meet whatever the test before it left behind:
 /// a delivery under way, a courier still on line. Each test makes its own people and
 /// works in its own city instead.
-final class People {
-    static final String PASSWORD = "a-long-password";
+public final class People {
+    public static final String PASSWORD = "a-long-password";
 
     private People() {
     }
 
     /// Opens an account whose phone number is already proved, and returns its
     /// name.
-    static String customer(Accounts accounts, String name) throws Exception {
+    public static String customer(Accounts accounts, String name) throws Exception {
         return open(accounts, name, false);
     }
 
-    static String courier(Accounts accounts, String name) throws Exception {
+    public static String courier(Accounts accounts, String name) throws Exception {
         return open(accounts, name, true);
     }
 
     private static String open(Accounts accounts, String name, boolean courier) throws Exception {
         RegisterDto request = new RegisterDto(name + "@test.example", PASSWORD, name, "+15550111",
-                courier, "Green Fiat 500", "T " + name, false, null);
+                "Green Vespa", "T " + name, courier);
         String username = accounts.register(request).username();
         accounts.markPhoneVerified(username);
         if (courier) {
-            // Registering asks to drive and no more. An admin's grant is what
-            // makes the account an approved courier, of a standard car.
+            // Registering asks to deliver and no more. An admin's grant is
+            // what makes the account an approved courier.
             accounts.setRoles(DemoAccounts.ADMIN, username, true, false);
         }
         return username;
@@ -63,26 +63,23 @@ final class People {
     /// The request, made as a customer. The authorities are stated here and not
     /// read from the account: these are the tests of what a role may do, and
     /// `AccessTest` is the one that signs in for real.
-    static MockRequestBuilder asCustomer(MockRequestBuilder request, String username) {
+    public static MockRequestBuilder asCustomer(MockRequestBuilder request, String username) {
         return request.with(jwt().subject(username).authorities("ROLE_CUSTOMER"));
     }
 
-    static MockRequestBuilder asCourier(MockRequestBuilder request, String username) {
+    public static MockRequestBuilder asCourier(MockRequestBuilder request, String username) {
         return request.with(jwt().subject(username).authorities("ROLE_CUSTOMER", "ROLE_COURIER"));
     }
 
-    static MockRequestBuilder asAdmin(MockRequestBuilder request, String username) {
+    public static MockRequestBuilder asAdmin(MockRequestBuilder request, String username) {
         return request.with(jwt().subject(username).authorities("ROLE_CUSTOMER", "ROLE_ADMIN"));
     }
 
-    /// The JSON of a delivery request between two points.
-    static String delivery(double fromLat, double fromLng, double toLat, double toLng) {
-        return "{\"pickupLat\":" + fromLat + ",\"pickupLng\":" + fromLng
-                + ",\"pickupAddress\":\"Here\",\"dropoffLat\":" + toLat + ",\"dropoffLng\":" + toLng
-                + ",\"dropoffAddress\":\"There\"}";
+    public static MockRequestBuilder asMerchant(MockRequestBuilder request, String username) {
+        return request.with(jwt().subject(username).authorities("ROLE_CUSTOMER", "ROLE_MERCHANT"));
     }
 
-    static String position(boolean online, double lat, double lng) {
+    public static String position(boolean online, double lat, double lng) {
         return "{\"online\":" + online + ",\"lat\":" + lat + ",\"lng\":" + lng + ",\"heading\":90}";
     }
 }
