@@ -31,7 +31,13 @@ import UnityEngine.Vector2;
 /// on every target, though: the generator is integer arithmetic, a float is
 /// made from 24 of its bits by one exact division, and nothing here calls a
 /// trigonometric function. A host that wants a repeatable run seeds it with
-/// [#$seed] before the scene is built; the seed is otherwise fixed.
+/// [#$seed] before the scene is built.
+///
+/// An application is seeded from the clock at every launch, as Unity seeds
+/// from the operating system's entropy: `UnityApplication` calls `InitState`
+/// before the first scene unless the `unity.seed` display property names a
+/// seed. The fixed seed below is only what a host that skips
+/// `UnityApplication` gets -- the trace harnesses, which compare runs.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class Random {
     private static int sx;

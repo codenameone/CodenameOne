@@ -269,8 +269,14 @@ public final class Rigidbody2D extends Component {
         return mass;
     }
 
-    /// The mass of the whole body, whatever the size of its colliders.
+    /// The mass of the whole body, whatever the size of its colliders. A
+    /// value that is not positive (NaN included) is refused and the mass kept:
+    /// Box2D cannot simulate one, and storing it would have the property
+    /// report a mass the simulation never used.
     public void set_mass(float value) {
+        if (!(value > 0f)) { // NOPMD LogicInversion: NaN is refused too
+            return;
+        }
         mass = value;
         if (gameObject != null && gameObject.body != null && !gameObject.physicsDirty) {
             PhysicsWorld.applyMass(gameObject, this);

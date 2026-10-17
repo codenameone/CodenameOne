@@ -69,9 +69,8 @@ public final class Math {
 
     /// The smallest `int` has no positive counterpart, and .NET documents
     /// an `OverflowException` for it where Java answers the same negative
-    /// number. `UnityEngine.Mathf.Abs(int)` is another method, written in C#
-    /// among the value types, and is not held to this: Unity's documentation
-    /// promises no exception for it.
+    /// number. `UnityEngine.Mathf.Abs(int)` calls this one: Unity documents a
+    /// non-negative result, which wrapping cannot give either.
     public static int Abs(int v) {
         if (v >= 0) {
             return v;

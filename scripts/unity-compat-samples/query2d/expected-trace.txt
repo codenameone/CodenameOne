@@ -31,6 +31,8 @@ nonalloc 2 Log@113 Pill@950
 filter 1 Box@300 filtering=True
 filter list 2 2 first=Zone
 filter angle kept 0
+filter angle trigger 1
+abs 7 min overflow
 inside Box d=0 p=400,300 n=-100,0 f=0
 inside off none
 inside off down Disc d=150 p=400,150 n=0,100 f=0
@@ -146,6 +148,7 @@ body cast up 2 Log@73 Ell@448
 body cast right 1 Ramp@50
 collider cast short 0
 body point True False
+mass negative kept True
 moved stale Disc d=351 p=351,90 n=-98,-20 f=35
 moved synced Disc d=370 p=370,90 n=-60,80 f=37
 stopped ticks=9 fixed clock dt=200 unscaled=200 fixedUnscaled=200 ahead=TrueTrue

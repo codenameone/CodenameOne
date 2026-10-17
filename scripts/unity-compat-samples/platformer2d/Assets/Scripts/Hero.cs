@@ -56,6 +56,7 @@ public class Hero : MonoBehaviour
     private bool ran;
     private bool blocked;
     private int dustFrame = -100;
+    private ParticleSystem ticker;
     private int hurtFrames;
     private string idled;
 
@@ -106,6 +107,16 @@ public class Hero : MonoBehaviour
         Debug.Log("particle children play=" + played + " pause=" + paused + " stop=" + stopped + " clear="
             + child.particleCount);
         DestroyImmediate(puff);
+        // A looping system whose cycle is not a whole number of frames: the
+        // time a step runs past the end belongs to the next cycle.
+        ticker = gameObject.AddComponent<ParticleSystem>();
+        ParticleSystem.MainModule tickerMain = ticker.main;
+        tickerMain.duration = 0.07f;
+        tickerMain.loop = true;
+        ParticleSystem.EmissionModule tickerEmission = ticker.emission;
+        tickerEmission.enabled = false;
+        // Not its children: the dust is one, and must wait for its landing.
+        ticker.Play(false);
         // A copy of a camera rig whose camera follows an object inside the
         // rig follows the copy of that object; one it looks at outside the
         // rig is the same object in the copy.
@@ -200,6 +211,10 @@ public class Hero : MonoBehaviour
                 Debug.Log("hurt " + hurtFrames + " green=" + Cm(shown.color.g) + " red=" + Cm(shown.color.r)
                     + " hat=" + Cm(hat.localScale.y));
             }
+        }
+        if (Time.frameCount == 61)
+        {
+            Debug.Log("frame 61 ticker time=" + Mathf.RoundToInt(ticker.time * 10000f));
         }
         if (Time.frameCount == dustFrame + 4 || Time.frameCount == dustFrame + 40)
         {

@@ -330,4 +330,29 @@ class GameViewTest extends UITestBase {
         assertFalse(v.getInput().isPointerDown(), "a gesture let go of off the view is still down");
         assertTrue(v.getInput().wasPointerReleased(), "a gesture let go of off the view was not released");
     }
+
+    /// A view taken off its form in the middle of a touch never hears that
+    /// touch's release, so it lets go of the controls and the pointer itself;
+    /// shown again, it used to come back with the button held.
+    @Test
+    void aViewDetachedMidTouchLetsGo() {
+        CountingView v = new CountingView();
+        Form f = new Form("Game", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.start();
+        v.getComponentAt(0).setIgnorePointerEvents(false);
+        f.revalidate();
+        VirtualButton fire = v.getControls().addButton(1001, 20, 20, 10);
+        implementation.dispatchPointerPress(v.getAbsoluteX() + 20, v.getAbsoluteY() + 20);
+        flushSerialCalls();
+        assertTrue(fire.isPressed(), "the press did not reach the button");
+        assertTrue(v.getInput().isPointerDown());
+
+        f.removeComponent(v);
+        assertFalse(fire.isPressed(), "a view detached mid-touch kept its button held");
+        assertFalse(v.getInput().isPointerDown(), "a view detached mid-touch kept the pointer down");
+        assertTrue(v.getInput().wasPointerReleased(), "a view detached mid-touch released nothing");
+    }
 }

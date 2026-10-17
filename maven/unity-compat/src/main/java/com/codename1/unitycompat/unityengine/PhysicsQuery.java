@@ -684,7 +684,9 @@ final class PhysicsQuery {
     }
 
     private static void record(Collider2D c, double t, double nx, double ny, double px, double py) {
-        if (rule.useNormalAngle) {
+        // Unity documents (ContactFilter2D.useTriggers) that a contact involving
+        // a trigger is never filtered by the normal angle; only solid colliders are.
+        if (rule.useNormalAngle && !c.trigger) {
             double degrees = com.codename1.unitycompat.system.Math.Atan2(ny, nx) * Transform.RAD2DEG;
             if (rule.IsFilteringNormalAngle((float) degrees)) {
                 return;

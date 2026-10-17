@@ -35,6 +35,7 @@ frame 28 Pebble met Ground at 150
 Pebble turned back at 150
 frame 59 run at 253 sprite=hero_3
 frame 60 objects=15 drawn=17 text="Start" text="Steps 3"
+frame 61 ticker time=200
 frame 61 hero -428,-149 camera -524,-50 size=400
 frame 62 run at 273 sprite=hero_3
 Ball turned back at 254

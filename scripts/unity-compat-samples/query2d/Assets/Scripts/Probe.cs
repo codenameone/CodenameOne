@@ -345,11 +345,32 @@ public class Probe : MonoBehaviour
         n = Physics2D.Raycast(from, Vector2.right, filter, list);
         Debug.Log("filter list " + n + " " + list.Count + " first=" + list[0].collider.name);
         // Clearing a filter turns it off and keeps its bounds: set again by
-        // hand, it filters by them. Both hits face 180 degrees.
+        // hand, it filters by them. Both hits face 180 degrees; the trigger
+        // is left out, since no normal angle ever filters one.
+        filter.useTriggers = false;
         filter.SetNormalAngle(0f, 90f);
         filter.ClearNormalAngle();
         filter.useNormalAngle = true;
         Debug.Log("filter angle kept " + Physics2D.Raycast(from, Vector2.right, filter, three, 10f));
+        // A trigger is never filtered by the normal angle: the Zone faces 180
+        // degrees, outside the range, and is still found.
+        filter = new ContactFilter2D();
+        filter.useTriggers = true;
+        filter.SetLayerMask(sensors);
+        filter.SetNormalAngle(0f, 90f);
+        filter.useNormalAngle = true;
+        Debug.Log("filter angle trigger " + Physics2D.Raycast(new Vector2(0f, 3f), Vector2.right, filter, three, 10f));
+        // The smallest int has no non-negative value, so Mathf.Abs throws for it.
+        string absMin;
+        try
+        {
+            absMin = Mathf.Abs(int.MinValue).ToString();
+        }
+        catch (System.OverflowException)
+        {
+            absMin = "overflow";
+        }
+        Debug.Log("abs " + Mathf.Abs(-7) + " min " + absMin);
 
         Vector2 inside = new Vector2(4f, 3f);
         Debug.Log("inside " + Hit(Physics2D.Raycast(inside, Vector2.right)));
@@ -499,6 +520,11 @@ public class Probe : MonoBehaviour
         n = crate.Cast(Vector2.up, buffer, 0.5f);
         Debug.Log("collider cast short " + Names(buffer, n));
         Debug.Log("body point " + body.OverlapPoint(new Vector2(-4f, -3f)) + " " + body.OverlapPoint(new Vector2(-4f, 0f)));
+        // A mass that is not positive is refused, so the property and the
+        // simulation keep agreeing.
+        float mass = body.mass;
+        body.mass = -2f;
+        Debug.Log("mass negative kept " + (body.mass == mass));
 
         // A collider moved through its transform is found where physics last
         // put it until the transforms are synchronised.

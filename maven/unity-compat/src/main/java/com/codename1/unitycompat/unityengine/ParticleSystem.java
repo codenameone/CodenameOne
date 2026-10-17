@@ -768,35 +768,7 @@ public final class ParticleSystem extends Component {
                 owed -= 1f;
                 bear(along);
             }
-            // Bursts whose time this step reaches. A looping system that
-            // wraps has its early bursts again in the next cycle.
-            for (int b = 0; b + 5 < bursts.length; b += 6) {
-                int cycles = (int) bursts[b + 3];
-                if (cycles <= 0) {
-                    // Zero is Unity's "for ever".
-                    cycles = 1 + (int) ((duration - bursts[b]) / (bursts[b + 4] > 0.0001f ? bursts[b + 4] : 0.0001f));
-                }
-                for (int c = 0; c < cycles; c++) {
-                    float gap = bursts[b + 4] * c;
-                    float when = bursts[b] + gap;
-                    if (when > duration) {
-                        break;
-                    }
-                    boolean due = before == 0f ? when >= 0f && when <= after && when <= before + step
-                            : when > before && when <= after;
-                    if (!due) {
-                        continue;
-                    }
-                    if (bursts[b + 5] < 1f && next() >= bursts[b + 5]) {
-                        continue;
-                    }
-                    float span = (bursts[b + 2] - bursts[b + 1]) * next();
-                    int n = (int) (bursts[b + 1] + span + 0.5f);
-                    for (int k = 0; k < n; k++) {
-                        bear(along);
-                    }
-                }
-            }
+            fireBursts(before, after, along);
         }
         lastX = t.wx;
         lastY = t.wy;
@@ -804,13 +776,59 @@ public final class ParticleSystem extends Component {
         clock = after;
         if (clock >= duration) {
             if (looping) {
-                // The next cycle starts on this frame's edge, so that a
-                // burst is never stepped over by the wrap.
-                clock = 0f;
+                // The time past the end belongs to the next cycle, which
+                // starts inside this step and has its bursts fired by it; a
+                // step longer than a cycle passes whole cycles. Dropping that
+                // remainder made the system drift by it every cycle. Landing
+                // on the edge exactly leaves the next cycle's bursts at time
+                // zero to the next step, which includes its start.
+                float rest = clock - duration;
+                boolean bursting = emitting && (modules & EMISSION) != 0;
+                while (duration > 0f && rest > 0f) {
+                    if (bursting) {
+                        fireBursts(0f, rest < duration ? rest : duration, 0f);
+                    }
+                    if (rest < duration) {
+                        break;
+                    }
+                    rest -= duration;
+                }
+                clock = duration > 0f ? rest : 0f;
             } else {
                 emitting = false;
                 if (count == 0) {
                     playing = false;
+                }
+            }
+        }
+    }
+
+    /// Fires the bursts whose time lies in `(from, to]` of the cycle, or in
+    /// `[0, to]` when `from` is the cycle's start.
+    private void fireBursts(float from, float to, float along) {
+        for (int b = 0; b + 5 < bursts.length; b += 6) {
+            int cycles = (int) bursts[b + 3];
+            if (cycles <= 0) {
+                // Zero is Unity's "for ever".
+                cycles = 1 + (int) ((duration - bursts[b]) / (bursts[b + 4] > 0.0001f ? bursts[b + 4] : 0.0001f));
+            }
+            for (int c = 0; c < cycles; c++) {
+                float gap = bursts[b + 4] * c;
+                float when = bursts[b] + gap;
+                if (when > duration) {
+                    break;
+                }
+                boolean due = from == 0f ? when >= 0f && when <= to : when > from && when <= to;
+                if (!due) {
+                    continue;
+                }
+                if (bursts[b + 5] < 1f && next() >= bursts[b + 5]) {
+                    continue;
+                }
+                float span = (bursts[b + 2] - bursts[b + 1]) * next();
+                int n = (int) (bursts[b + 1] + span + 0.5f);
+                for (int k = 0; k < n; k++) {
+                    bear(along);
                 }
             }
         }

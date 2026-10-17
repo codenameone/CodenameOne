@@ -219,7 +219,12 @@ public final class String_ {
         return split(s, new char[] {separator}, null, count, options);
     }
 
-    /// One string to split at: a null or empty one splits nowhere.
+    /// One string to split at: a null or empty one splits nowhere. This is
+    /// not the white-space rule of the `String[]` overloads, and measured so on
+    /// .NET: `"red  green".Split((string)null, StringSplitOptions.None)` answers
+    /// the whole string, with or without `RemoveEmptyEntries` and a count, as
+    /// does `Split(new string[] {"", null}, ...)`. Only a null or empty array
+    /// means white space.
     public static String[] Split$StringSplitOptions(String s, String separator, int options) {
         return Split$StringSplitOptions(s, separator, Integer.MAX_VALUE, options);
     }

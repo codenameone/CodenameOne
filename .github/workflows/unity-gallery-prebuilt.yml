@@ -64,13 +64,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Everything below this step but the upload is skipped on a hit.
+      # Everything below this step but the upload is skipped on a hit, and
+      # state.txt names the jars it was built with, not the builder that ran:
+      # so the key hashes every module the compile-unity goal executes --
+      # the plugin, build-engine and project-model whole, not only their
+      # Unity-named classes, since AbstractCN1Mojo and the poms decide what
+      # CompileUnityMojo resolves and runs. The plugin's other dependencies
+      # (css-cli, the transcoders, the hint catalogs) are not on that path.
       - name: Cache the Unity gallery prebuilt
         id: pack
         uses: actions/cache@v5
         with:
           path: artifacts/unity-gallery-prebuilt/unity-gallery-prebuilt.tgz
-          key: unity-gallery-prebuilt-v1-${{ hashFiles('maven/pom.xml', 'maven/cil-translator/**', 'maven/unity-compat/**', 'maven/build-engine/src/main/java/com/codename1/maven/Unity*', 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*', 'CodenameOne/src/**', 'Ports/CLDC11/src/**', 'scripts/unity-compat-samples/gallery/**', 'scripts/hellocodenameone/pom.xml', 'scripts/hellocodenameone/common/pom.xml', 'scripts/unity-gallery-prebuilt.sh', '.github/workflows/unity-gallery-prebuilt.yml') }}
+          key: unity-gallery-prebuilt-v1-${{ hashFiles('maven/pom.xml', 'maven/cil-translator/**', 'maven/unity-compat/**', 'maven/build-engine/**', 'maven/codenameone-maven-plugin/**', 'maven/project-model/**', 'CodenameOne/src/**', 'Ports/CLDC11/src/**', 'scripts/unity-compat-samples/gallery/**', 'scripts/hellocodenameone/pom.xml', 'scripts/hellocodenameone/common/pom.xml', 'scripts/unity-gallery-prebuilt.sh', '.github/workflows/unity-gallery-prebuilt.yml') }}
 
       # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
       - name: Set up JDK 17 for the application build

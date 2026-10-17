@@ -699,10 +699,11 @@ namespace UnityEngine
         public static float Pow(float f, float p) { return (float)Math.Pow(f, p); }
         public static float Exp(float power) { return (float)Math.Exp(power); }
         public static float Log(float f) { return (float)Math.Log(f); }
-        // Not System.Math.Abs, which throws an OverflowException for the smallest
-        // int: Unity's documentation of Mathf.Abs(int) promises no exception, so
-        // this one wraps and answers the smallest int again.
-        public static int Abs(int value) { return value < 0 ? -value : value; }
+        // System.Math.Abs, which throws an OverflowException for the smallest
+        // int. Unity documents Mathf.Abs(int) as answering the non-negative value;
+        // the smallest int has none, and wrapping would hand back a negative
+        // number to code that indexes or branches on the documented promise.
+        public static int Abs(int value) { return Math.Abs(value); }
         public static int Min(int a, int b) { return a < b ? a : b; }
         public static int Max(int a, int b) { return a > b ? a : b; }
         public static int Clamp(int value, int min, int max) { return value < min ? min : value > max ? max : value; }

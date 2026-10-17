@@ -1411,6 +1411,11 @@ namespace Spike
             Log("strings " + Show("a::b:c".Split(new[] { "::", ":" }, StringSplitOptions.None)) + " "
                 + Show("a--b--".Split(new[] { "--" }, StringSplitOptions.RemoveEmptyEntries)) + " "
                 + Show("one and two and three".Split(new[] { " and " }, 2, StringSplitOptions.None)));
+            // One null or empty string separator splits nowhere; only a null array means white space.
+            Log("nosep " + Show("a b".Split((string)null, StringSplitOptions.None)) + " "
+                + Show("a b".Split("", StringSplitOptions.RemoveEmptyEntries)) + " "
+                + Show("a b".Split(new string[] { "", null }, StringSplitOptions.None)) + " "
+                + Show("a b".Split((string[])null, StringSplitOptions.None)));
 
             Log("parse " + Parsed("42") + " " + Parsed("-7") + " " + Parsed(" +19 ") + " " + Parsed("1-") + " "
                 + Parsed("") + " " + Parsed(null) + " " + Parsed("2147483647") + " " + Parsed("2147483648") + " "

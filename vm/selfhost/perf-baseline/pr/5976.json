@@ -83,6 +83,26 @@
      }
     }
    },
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 1.15,
+      "time": 1.106,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.5
+      }
+     },
+     "memory": 0.724,
+     "reason": "objectAllocation's peak RAM on the M1 runners is noisy (one master run's rounds span 0.61-1.18x); #5984 recorded 1.15x from one run, master measures 1.02x and this branch 0.72x, rounds 0.50-0.80x",
+     "runs": 1,
+     "time": 1.106,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   },
    "recursion": {
     "all": {
      "from": {

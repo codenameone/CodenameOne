@@ -275,8 +275,15 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     protected void deinitialize() {
         removeFormPointerListeners();
         // A gesture cut off by the view leaving its form is not resumed by the
-        // first release on the form it is shown on next.
-        gesture = false;
+        // first release on the form it is shown on next. That release would
+        // have been the only thing to let go of the on-screen controls and the
+        // pointer, so they are let go of here: shown again, the view must not
+        // come back with a button held or the pointer down.
+        if (gesture) {
+            gesture = false;
+            controls.onTouches(new int[0], new int[0], false);
+            input.pointer(input.getPointerX(), input.getPointerY(), false, false, true);
+        }
         super.deinitialize();
     }
 
