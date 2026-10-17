@@ -1417,6 +1417,37 @@ namespace Spike
                 + Show("a b".Split(new string[] { "", null }, StringSplitOptions.None)) + " "
                 + Show("a b".Split((string[])null, StringSplitOptions.None)));
 
+            // A method that hides a base one is bound by the static type, and a
+            // private helper of the same name does not override the base's.
+            HideDerived hd = new HideDerived();
+            HideBase hb = hd;
+            Log("hiding " + hb.Name() + " " + hd.Name() + " " + hb.Virt() + " " + hd.Virt() + " " + hb.Ask() + " "
+                + hd.AskMine() + " " + ((HideBase)new HideLeaf()).Virt() + " " + new HideLeaf().Virt());
+            string ftn = "none";
+            try
+            {
+                HideBase gone = null;
+                Func<string> f = gone.Virt;
+                // Read, never called: an unread delegate is dropped by the compiler.
+                ftn = f != null ? "built" : "null";
+            }
+            catch (NullReferenceException)
+            {
+                ftn = "NullReference";
+            }
+            string unboxed = "none";
+            try
+            {
+                object boxed = null;
+                HidePoint pt = (HidePoint)boxed;
+                unboxed = "unboxed " + pt.X;
+            }
+            catch (NullReferenceException)
+            {
+                unboxed = "NullReference";
+            }
+            Log("null receiver " + ftn + " " + unboxed);
+
             Log("parse " + Parsed("42") + " " + Parsed("-7") + " " + Parsed(" +19 ") + " " + Parsed("1-") + " "
                 + Parsed("") + " " + Parsed(null) + " " + Parsed("2147483647") + " " + Parsed("2147483648") + " "
                 + Parsed("-2147483648") + " " + Parsed("99999999999999999999") + " " + Parsed("1.5") + " "
@@ -3241,5 +3272,31 @@ namespace Spike
             ArgumentChecks();
             Console.WriteLine("done");
         }
+    }
+
+    public struct HidePoint
+    {
+        public int X;
+    }
+
+    public class HideBase
+    {
+        public string Name() { return "base"; }
+        public virtual string Virt() { return "base-virt"; }
+        private string Helper() { return "base-helper"; }
+        public string Ask() { return Helper(); }
+    }
+
+    public class HideDerived : HideBase
+    {
+        public new string Name() { return "derived"; }
+        public new virtual string Virt() { return "derived-virt"; }
+        private string Helper() { return "derived-helper"; }
+        public string AskMine() { return Helper(); }
+    }
+
+    public class HideLeaf : HideDerived
+    {
+        public override string Virt() { return "leaf-virt"; }
     }
 }

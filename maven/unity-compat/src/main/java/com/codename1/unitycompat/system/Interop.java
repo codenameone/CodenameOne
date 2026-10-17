@@ -156,6 +156,16 @@ public final class Interop {
         return 0;
     }
 
+    /// A NullReferenceException for a null value, where .NET throws one
+    /// without a member access the JVM would fail on: a virtual method
+    /// group taken from a null receiver (`ldvirtftn`), and a null unboxed
+    /// as a struct.
+    public static void requireNonNull(Object o) {
+        if (o == null) {
+            throw new NullReferenceException();
+        }
+    }
+
     // -------------------------------------------------------------- unboxing
 
     private static Object boxed(Object o) {

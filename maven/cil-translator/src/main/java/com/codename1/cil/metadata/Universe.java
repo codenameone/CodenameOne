@@ -139,6 +139,22 @@ public final class Universe {
         return null;
     }
 
+    /// The nearest instance method above `m`'s type with its name and
+    /// signature, a virtual one only when `virtualOnly`.
+    public CilAssembly.MethodDef inherited(CilAssembly.MethodDef m, boolean virtualOnly) {
+        CilAssembly.TypeDef type = m.owner.baseType == null ? null : definitionOf(m.owner.baseType);
+        while (type != null) {
+            for (CilAssembly.MethodDef b : type.methods) {
+                if (!b.isStatic() && b.name.equals(m.name) && b.sig.sameShape(m.sig)
+                        && (!virtualOnly || b.isVirtual())) {
+                    return b;
+                }
+            }
+            type = type.baseType == null ? null : definitionOf(type.baseType);
+        }
+        return null;
+    }
+
     /// True when `type` is `ancestor` or derives from it, through base
     /// classes or implemented interfaces.
     public boolean derivesFrom(String type, String ancestor) {

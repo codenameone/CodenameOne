@@ -1625,6 +1625,12 @@ public final class UnityRuntime {
     /// active event system, as in Unity.
     private static void routePointer() {
         if (eventSystems.isEmpty()) {
+            // The last event system gone leaves nothing routed: a pointer
+            // that was over a canvas then must not keep the world's
+            // colliders from the mouse until another one appears.
+            pressedControl = null;
+            overControl = null;
+            overInterface = false;
             return;
         }
         Selectable wasPressed = pressedControl;

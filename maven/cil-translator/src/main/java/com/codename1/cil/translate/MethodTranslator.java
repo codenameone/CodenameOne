@@ -1662,6 +1662,7 @@ final class MethodTranslator implements Opcodes {
                 push(Val.token(ins.operand, false));
                 return;
             case "ldvirtftn":
+                // The receiver's copy; newObject checks the one it keeps.
                 popJvm(pop());
                 push(Val.token(ins.operand, true));
                 return;
@@ -1793,6 +1794,12 @@ final class MethodTranslator implements Opcodes {
                     maskIfUnsignedByte(n);
                     result = Val.of(names.kind(n), n);
                 } else {
+                    if (names.isStruct(n) && !"System.Nullable`1".equals(n.typeName())) {
+                        // A cast lets null through, and a struct has no null:
+                        // .NET throws at the unboxing itself.
+                        mv.visitInsn(DUP);
+                        invoke(INVOKESTATIC, Names.INTEROP, "requireNonNull", "(Ljava/lang/Object;)V", false);
+                    }
                     checkedCast(n);
                     result = Val.ref(n, Val.HEAP);
                 }
@@ -2746,6 +2753,10 @@ final class MethodTranslator implements Opcodes {
             }
             boolean targetIsStruct = names.isStruct(ref.declaringType);
             name = names.methodName(ref.name, sig, targetIsStruct);
+            MethodDef resolvedDef = host.universe.resolve(ref);
+            if (resolvedDef != null) {
+                name += names.hidingSuffix(resolvedDef);
+            }
             descriptor = names.methodDescriptor(sig);
             target = names.classRef(ref.declaringType);
             typeContext = host.generics.typeUse(ref);
@@ -2879,6 +2890,12 @@ final class MethodTranslator implements Opcodes {
                 loadContext(typeContext != null ? typeContext : methodContext);
             }
             String c = host.delegateClass(owner, ref.declaringType, to, function.virtualToken);
+            if (function.virtualToken) {
+                // `ldvirtftn` reads the receiver's method table, so .NET
+                // throws for a null one now, not when the delegate is called.
+                mv.visitInsn(DUP);
+                invoke(INVOKESTATIC, Names.INTEROP, "requireNonNull", "(Ljava/lang/Object;)V", false);
+            }
             // target -> delegate, delegate, target
             typeInsn(NEW, c);
             mv.visitInsn(DUP_X1);

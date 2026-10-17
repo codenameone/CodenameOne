@@ -148,6 +148,13 @@ public class Object {
     }
 
     /// A destroyed object compares equal to null, as in Unity.
+    ///
+    /// Only through the operators: `equals` stays identity. Unity documents
+    /// the custom null comparison for `==` and `!=` and says nothing of
+    /// `Equals`, and Java's `equals` is what the runtime's own lists use --
+    /// a destroyed object equal to null would be found by `indexOf(null)`
+    /// and taken out by `remove(null)`, and two destroyed objects would be
+    /// equal with different hash codes.
     public static boolean op_Equality(Object x, Object y) {
         boolean xGone = x == null || x.destroyed;
         boolean yGone = y == null || y.destroyed;

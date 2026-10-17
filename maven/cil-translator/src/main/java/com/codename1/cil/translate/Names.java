@@ -63,6 +63,36 @@ final class Names {
         return def != null && translated.contains(def.assembly);
     }
 
+    /// What a method's JVM name adds to its C# name so that it does not take
+    /// over a method it hides: "" for nearly every method, and `$` plus the
+    /// declaring type for an instance method that starts a slot of its own
+    /// -- not virtual, or `new virtual` -- while a base class declares an
+    /// instance method of the same name and signature.
+    ///
+    /// C# binds a call to such a pair by the static type: `b.M()` on a
+    /// `Base` reaches `Base.M` even when the object is a `Derived` with an
+    /// unrelated `M` of its own, private helpers included. Both are public
+    /// JVM methods with one name and descriptor, so without the suffix the
+    /// JVM dispatched every call to `Derived.M`. An override takes the name
+    /// of the method it overrides, so it stays in that method's slot.
+    ///
+    /// A method of a hand-written runtime class keeps its C# name: the
+    /// Java class declares it under that name, and nothing renames it there.
+    String hidingSuffix(CilAssembly.MethodDef m) {
+        if (!translated.contains(m.owner.assembly) || m.isStatic() || m.name.startsWith(".")
+                || m.owner.isInterface() || m.owner.isValueType()) {
+            return "";
+        }
+        if (m.isVirtual() && !m.isNewSlot()) {
+            CilAssembly.MethodDef overridden = universe.inherited(m, true);
+            return overridden == null ? "" : hidingSuffix(overridden);
+        }
+        if (universe.inherited(m, false) == null) {
+            return "";
+        }
+        return "$" + sanitize(m.owner.fullName().replace('.', '_').replace('/', '_'));
+    }
+
     static String sanitize(String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (int i = 0; i < name.length(); i++) {

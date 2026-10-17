@@ -303,7 +303,7 @@ public final class Translator implements Opcodes {
         boolean hasStaticConstructor = false;
         boolean[] objectVirtuals = new boolean[3];
         for (MethodDef m : type.methods) {
-            String methodName = names.methodName(m.name, m.sig, struct);
+            String methodName = names.methodName(m.name, m.sig, struct) + names.hidingSuffix(m);
             String descriptor = GenericStatics.withHidden(names.methodDescriptor(m.sig),
                     generics.hiddenParameters(m));
             if (generics.hasContext(m)) {
@@ -887,7 +887,7 @@ public final class Translator implements Opcodes {
             mv.visitMethodInsn(INVOKEVIRTUAL, Names.STRING, "equals", "(Ljava/lang/Object;)Z", false);
             mv.visitJumpInsn(IFEQ, next);
             mv.visitVarInsn(ALOAD, 0);
-            mv.visitMethodInsn(INVOKEVIRTUAL, name, names.methodName(m.name, m.sig, false),
+            mv.visitMethodInsn(INVOKEVIRTUAL, name, names.methodName(m.name, m.sig, false) + names.hidingSuffix(m),
                     names.methodDescriptor(m.sig), false);
             mv.visitInsn(ICONST_1);
             mv.visitInsn(IRETURN);
@@ -1588,7 +1588,7 @@ public final class Translator implements Opcodes {
                 }
                 String slotName = names.methodName(im.name, im.sig, false);
                 String slotDescriptor = names.methodDescriptor(im.sig);
-                String implName = names.methodName(impl.name, impl.sig, struct);
+                String implName = names.methodName(impl.name, impl.sig, struct) + names.hidingSuffix(impl);
                 String implDescriptor = names.methodDescriptor(impl.sig);
                 if ((slotName.equals(implName) && slotDescriptor.equals(implDescriptor))
                         || !members.add(slotName + slotDescriptor)) {
@@ -1864,6 +1864,9 @@ public final class Translator implements Opcodes {
             targetName = names.methodName(target.name, sig, names.isStruct(target.declaringType));
             descriptor = names.methodDescriptor(sig);
             MethodDef resolved = universe.resolve(target);
+            if (resolved != null) {
+                targetName += names.hidingSuffix(resolved);
+            }
             String hidden = resolved == null ? "" : generics.hiddenParameters(resolved);
             if (hidden.length() > 0) {
                 // The one context such a method takes is the delegate's

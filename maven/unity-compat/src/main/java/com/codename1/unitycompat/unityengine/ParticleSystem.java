@@ -1030,11 +1030,19 @@ public final class ParticleSystem extends Component {
     }
 
     private void children(int what) {
-        Transform t = gameObject.transform;
+        children(gameObject.transform, what);
+    }
+
+    /// Every particle system below `t`, through objects that have none: a
+    /// system below such an object is a child system as well. One that has
+    /// one is handed the operation with its children, which goes on below.
+    private static void children(Transform t, int what) {
         int n = t.get_childCount();
         for (int i = 0; i < n; i++) {
-            java.lang.Object c = t.GetChild(i).gameObject.GetComponent(ParticleSystem.class);
+            Transform child = t.GetChild(i);
+            java.lang.Object c = child.gameObject.GetComponent(ParticleSystem.class);
             if (!(c instanceof ParticleSystem)) {
+                children(child, what);
                 continue;
             }
             ParticleSystem p = (ParticleSystem) c;
