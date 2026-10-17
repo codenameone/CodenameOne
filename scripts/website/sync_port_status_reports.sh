@@ -121,6 +121,11 @@ if git -C "${REPO_ROOT}" show "FETCH_HEAD:benchmarks/flutter.json" > "${benchmar
       .schema_version == 1 and
       (.generated_at | type == "string") and
       (.platforms | type == "object") and
+      # The page lays the matrix out from these; a document written before
+      # port_status.py emitted them renders no columns, so it is not used.
+      (.platform_order | type == "array") and
+      (.metric_order | type == "array") and
+      (.workload_order | type == "array") and
       any(.platforms[]; .status == "measured")
    ' "${benchmark_candidate}" >/dev/null; then
   cp "${benchmark_candidate}" "${benchmark_target}"

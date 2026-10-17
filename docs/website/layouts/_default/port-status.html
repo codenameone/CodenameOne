@@ -417,6 +417,13 @@
         <tbody>
           {{- range $bench.metric_order }}
           {{- $metric := . -}}
+          {{- /* A row states ratios; one no shown platform measured has nothing to state. */ -}}
+          {{- $anyMetric := false -}}
+          {{- range $platformIds -}}
+            {{- $p := index $bench.platforms . -}}
+            {{- if eq $p.status "measured" -}}{{- with index $p.metrics $metric.id -}}{{- if .ratio -}}{{- $anyMetric = true -}}{{- end -}}{{- end -}}{{- end -}}
+          {{- end -}}
+          {{- if $anyMetric }}
           <tr data-flutter-benchmark-row="{{ .id }}">
             <th scope="row"><strong>{{ .label }}</strong><small>Flutter / Codename One</small></th>
             {{- range $platformIds }}
@@ -438,6 +445,12 @@
             {{- end }}
           </tr>
           {{- end }}
+          {{- end }}
+          {{- $anyGeomean := false -}}
+          {{- range $platformIds -}}
+            {{- with (index $bench.platforms .).compute -}}{{- if and (eq .status "measured") .geomean -}}{{- $anyGeomean = true -}}{{- end -}}{{- end -}}
+          {{- end -}}
+          {{- if $anyGeomean }}
           <tr data-flutter-benchmark-row="compute-geomean">
             <th scope="row"><strong>Compute</strong><p>Geometric mean of the workloads below</p><small>Flutter time / Codename One time</small></th>
             {{- range $platformIds }}
@@ -451,6 +464,7 @@
               </td>
             {{- end }}
           </tr>
+          {{- end }}
           {{- range $bench.workload_order }}
           {{- $workload := . -}}
           {{- /* A workload no shown platform could compare has nothing to state. */ -}}
