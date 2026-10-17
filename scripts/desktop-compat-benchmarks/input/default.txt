@@ -1,0 +1,34 @@
+# The input every application gets unless input/<name>.txt exists.
+#
+# Coordinates are fractions of the application window, so the same script
+# drives the JVM build and the Codename One build although their windows are
+# not the same size. Nothing here touches the top fifth of the window: a menu
+# bar lives there, and a script that happened to pick "Exit" would measure
+# nothing.
+#
+# sleep SECONDS | move FX FY | click FX FY | key NAME | type TEXT
+sleep 0.5
+move 0.50 0.50
+click 0.30 0.35
+click 0.50 0.45
+click 0.70 0.35
+key Tab
+key Tab
+type hello
+key Down
+key Down
+key Right
+key Up
+key Left
+click 0.30 0.65
+click 0.50 0.75
+click 0.70 0.65
+key space
+move 0.20 0.30
+move 0.80 0.30
+move 0.80 0.80
+move 0.20 0.80
+click 0.50 0.55
+type codename one
+key Return
+sleep 0.5

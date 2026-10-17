@@ -18,11 +18,30 @@
         <Or>
             <Class name="com.codename1.gradle.tasks.ComplianceAction"/>
             <Class name="com.codename1.gradle.tasks.ProcessAnnotationsAction"/>
-            <Class name="com.codename1.gradle.tasks.RemapAndroidAction"/>
+            <Class name="com.codename1.gradle.tasks.RemapCompatAction"/>
         </Or>
         <Method name="&lt;init&gt;"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Field name="compileClasspath"/>
+    </Match>
+    <!-- javac's source files, the same kind of lazy, deliberately shared
+         FileCollection: whether the module has any Java source is only known
+         when the action runs, after the source generators have. -->
+    <Match>
+        <Class name="com.codename1.gradle.tasks.RemapCompatAction"/>
+        <Method name="shippingWhenEmpty"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Field name="shipWhenEmpty"/>
+    </Match>
+    <!-- The runtime classpath, the jars the application ships: lazy and shared
+         for the same reason. Resolving it when the action is configured would
+         resolve the configuration before the build script has finished
+         declaring its dependencies. -->
+    <Match>
+        <Class name="com.codename1.gradle.tasks.RemapCompatAction"/>
+        <Method name="withApplicationLibraries"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Field name="libraries"/>
     </Match>
     <!-- The same lazy, deliberately shared FileCollections: the test compile's
          classpath, the main source set's class directories, and the other test
@@ -53,10 +72,10 @@
                 <Method name="&lt;init&gt;"/>
                 <Field name="classesDirs"/>
             </And>
-            <!-- The directories RemapAndroidAction scans for onClick handlers: the
+            <!-- The directories RemapCompatAction scans for onClick handlers and layer references: the
                  same source-set view, Kotlin's output included once it exists. -->
             <And>
-                <Class name="com.codename1.gradle.tasks.RemapAndroidAction"/>
+                <Class name="com.codename1.gradle.tasks.RemapCompatAction"/>
                 <Method name="&lt;init&gt;"/>
                 <Field name="handlerDirs"/>
             </And>

@@ -22,130 +22,119 @@
  */
 package java.io;
 
-/**
- * Writes bytes to a file. Backed by C stdio through a native handle rather than by
- * any Codename One implementation, so it is available to a translated program that
- * has no platform layer at all - a server-side binary, for example.
- */
+import com.codename1.impl.JdkHost;
+
+/// Writes the bytes of a file, to the platform's file system through
+/// `com.codename1.impl.JdkHost`. The file is created when it is not there.
+///
+/// Like most streams, it is for one thread at a time; closing it twice, or
+/// from another thread, is safe.
 public class FileOutputStream extends OutputStream {
-    private long handle;
-    /* volatile + synchronized close: two threads closing concurrently could both
-       read closed == false and hand the SAME FILE* to fclose twice, which is
-       undefined and crashes the translated process rather than merely erroring.
-       Idempotent now.
 
-       NOT a claim of thread safety. A read racing a close on the same stream can
-       still reach the native call with a handle this method is closing -- the JDK
-       buys that with a lock on every operation, and these streams are not worth
-       that cost. Like most java.io streams they are for one thread at a time; what
-       is guaranteed here is that closing twice, or closing from another thread, is
-       safe rather than fatal. */
-    private volatile boolean closed;
+    private final OutputStream out;
+    private boolean closed;
 
+    /// Opens the file at `name`, emptying it.
+    ///
+    /// #### Throws
+    ///
+    /// - `FileNotFoundException`: when it is a directory or cannot be written
     public FileOutputStream(String name) throws FileNotFoundException {
-        this(name, false);
+        this(new File(name), false);
     }
 
+    /// Opens the file at `name`, at its end when `append` is true and emptied
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `FileNotFoundException`: when it is a directory or cannot be written
     public FileOutputStream(String name, boolean append) throws FileNotFoundException {
-        if(name == null) {
-            throw new NullPointerException();
-        }
-        handle = openImpl(name, append);
-        if(handle == 0) {
-            throw new FileNotFoundException(name);
-        }
+        this(new File(name), append);
     }
 
+    /// Opens `file`, emptying it.
+    ///
+    /// #### Throws
+    ///
+    /// - `FileNotFoundException`: when it is a directory or cannot be written
     public FileOutputStream(File file) throws FileNotFoundException {
-        this(file == null ? null : file.getPath(), false);
+        this(file, false);
     }
 
+    /// Opens `file`, at its end when `append` is true and emptied otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `FileNotFoundException`: when it is a directory or cannot be written
     public FileOutputStream(File file, boolean append) throws FileNotFoundException {
-        this(file == null ? null : file.getPath(), append);
-    }
-
-    public void write(int b) throws IOException {
-        byte[] one = new byte[1];
-        one[0] = (byte)b;
-        write(one, 0, 1);
-    }
-
-    public void write(byte[] b) throws IOException {
-        write(b, 0, b == null ? 0 : b.length);
-    }
-
-    public void write(byte[] b, int off, int len) throws IOException {
-        if(b == null) {
+        if (file == null) {
             throw new NullPointerException();
         }
-        if(off < 0 || len < 0 || len > b.length - off) {
-            throw new IndexOutOfBoundsException();
+        try {
+            out = JdkHost.get().fileWrite(file.hostPath(), append);
+        } catch (FileNotFoundException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new FileNotFoundException(file.getPath() + " (" + e.getMessage() + ")");
         }
-        checkOpen();
-        if(len == 0) {
-            return;
-        }
-        // A short write is a failure, not a partial success: OutputStream.write has
-        // no way to report how much it managed, so the caller would silently lose
-        // the tail.
-        if(writeImpl(handle, b, off, len) != len) {
-            throw new IOException("Write failed");
-        }
-    }
-
-    public void flush() throws IOException {
-        checkOpen();
-        if(flushImpl(handle) != 0) {
-            throw new IOException("Flush failed");
-        }
-    }
-
-    public synchronized void close() throws IOException {
-        if(closed) {
-            return;
-        }
-        closed = true;
-        long h = handle;
-        handle = 0;
-        if(closeImpl(h) != 0) {
-            throw new IOException("Close failed");
-        }
-    }
-
-    /**
-     * Releases the native FILE* if the caller never closed the stream.
-     *
-     * This VM runs finalizers for exactly this purpose (java.lang.Thread does the
-     * same for its thread state), and without one a stream that goes unreachable
-     * unclosed holds its descriptor until the process exits. On a desktop app that
-     * is untidy; on a long-running clean-target server it ends in EMFILE. Buffered output is flushed by the C runtime as part of closing the
-     * stream, so this also stops unwritten bytes being dropped.
-     *
-     * Deliberately silent: a finalizer has nobody to report to, and throwing from
-     * one is worse than the leak it is cleaning up. close() remains the way to learn
-     * that a close failed.
-     */
-    protected void finalize() {
-        // Same lock as close(): a finalizer running while another thread closes
-        // would otherwise be the two-fclose case this synchronization exists for.
-        synchronized(this) {
-            if(!closed && handle != 0) {
-                closed = true;
-                long h = handle;
-                handle = 0;
-                closeImpl(h);
-            }
+        if (out == null) {
+            throw new FileNotFoundException(file.getPath());
         }
     }
 
     private void checkOpen() throws IOException {
-        if(closed) {
+        if (closed) {
             throw new IOException("Stream closed");
         }
     }
 
-    private static native long openImpl(String name, boolean append);
-    private static native int writeImpl(long handle, byte[] buffer, int offset, int length);
-    private static native int flushImpl(long handle);
-    private static native int closeImpl(long handle);
+    @Override
+    public void write(int b) throws IOException {
+        checkOpen();
+        out.write(b);
+    }
+
+    @Override
+    public void write(byte[] b) throws IOException {
+        write(b, 0, b.length);
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        }
+        checkOpen();
+        if (len == 0) {
+            return;
+        }
+        out.write(b, off, len);
+    }
+
+    @Override
+    public void flush() throws IOException {
+        checkOpen();
+        out.flush();
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        out.close();
+    }
+
+    // The C stdio natives behind PosixFileAccess.openWrite; see
+    // NativeFileOutputStream. Their names and signatures are what the C
+    // runtime and the JavaScript bindings implement.
+    static native long openImpl(String name, boolean append);
+
+    static native int writeImpl(long handle, byte[] buffer, int offset, int length);
+
+    static native int flushImpl(long handle);
+
+    static native int closeImpl(long handle);
 }

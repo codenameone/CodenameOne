@@ -66,9 +66,83 @@ public class OutputStreamWriter extends java.io.Writer {
      * - If the named encoding is not supported
      */
     public OutputStreamWriter(java.io.OutputStream os, java.lang.String enc) throws java.io.UnsupportedEncodingException{
+         if (enc == null) {
+             throw new NullPointerException("charsetName");
+         }
          this.os = os;
-         this.enc = enc;
-         utf8 = isUtf8Name(enc);
+         this.enc = knownEncoding(enc);
+         utf8 = isUtf8Name(this.enc);
+    }
+
+    /// The name the encoding natives know `enc` by: the canonical name of a
+    /// charset, so an alias or another case reaches them as the name they
+    /// compare with. `null` stays `null`, which they read as UTF-8.
+    ///
+    /// UTF-16 and ISO-8859-2 have no `Charset` here but the natives encode them
+    /// on Apple platforms, so they are names this runtime knows.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedEncodingException`: for a name this runtime has no
+    ///   encoding for, as the JDK throws. The natives used to encode such a
+    ///   name as UTF-8 without a word.
+    static String knownEncoding(String enc) throws UnsupportedEncodingException {
+        if (enc == null || "UTF-8".equals(enc)) {
+            return enc;
+        }
+        if (enc.equalsIgnoreCase("UTF-16") || enc.equalsIgnoreCase("UTF16")) {
+            return "UTF-16";
+        }
+        if (enc.equalsIgnoreCase("ISO-8859-2") || enc.equalsIgnoreCase("ISO8859-2")
+                || enc.equalsIgnoreCase("ISO8859_2") || enc.equalsIgnoreCase("LATIN2")) {
+            return "ISO-8859-2";
+        }
+        try {
+            return java.nio.charset.Charset.forName(enc).name();
+        } catch (IllegalArgumentException e) {
+            // UnsupportedCharsetException and IllegalCharsetNameException
+            throw new UnsupportedEncodingException(enc);
+        }
+    }
+
+    /// An OutputStreamWriter that encodes with `cs`.
+    public OutputStreamWriter(java.io.OutputStream os, java.nio.charset.Charset cs) {
+        if (cs == null) {
+            throw new NullPointerException("charset");
+        }
+        this.os = os;
+        this.enc = cs.name();
+        utf8 = isUtf8Name(enc);
+    }
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    public String getEncoding() {
+        return historicalName(enc);
+    }
+
+    /// The historical name the JDK's `getEncoding` answers for the standard
+    /// charsets: `UTF8`, `ASCII`, `ISO8859_1`. Any other name is answered
+    /// as it was given.
+    private static String historicalName(String name) {
+        StringBuilder folded = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '-' || c == '_') {
+                continue;
+            }
+            folded.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        String key = folded.toString();
+        if ("UTF8".equals(key)) {
+            return "UTF8";
+        }
+        if ("USASCII".equals(key) || "ASCII".equals(key)) {
+            return "ASCII";
+        }
+        if ("ISO88591".equals(key) || "LATIN1".equals(key)) {
+            return "ISO8859_1";
+        }
+        return name;
     }
 
     /* The encoding name is ASCII by specification, so it is folded by hand.

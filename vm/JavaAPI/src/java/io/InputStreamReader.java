@@ -70,8 +70,50 @@ public class InputStreamReader extends java.io.Reader{
      * - If the named encoding is not supported
      */
     public InputStreamReader(java.io.InputStream is, java.lang.String enc) throws java.io.UnsupportedEncodingException{
+         if (enc == null) {
+             throw new NullPointerException("charsetName");
+         }
          internal = is;
-         this.enc = enc.intern();
+         this.enc = OutputStreamWriter.knownEncoding(enc);
+    }
+
+    /// An InputStreamReader that decodes with `cs`.
+    public InputStreamReader(java.io.InputStream is, java.nio.charset.Charset cs) {
+        if (cs == null) {
+            throw new NullPointerException("charset");
+        }
+        internal = is;
+        this.enc = cs.name();
+    }
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    public String getEncoding() {
+        return historicalName(enc);
+    }
+
+    /// The historical name the JDK's `getEncoding` answers for the standard
+    /// charsets: `UTF8`, `ASCII`, `ISO8859_1`. Any other name is answered
+    /// as it was given.
+    private static String historicalName(String name) {
+        StringBuilder folded = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '-' || c == '_') {
+                continue;
+            }
+            folded.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        String key = folded.toString();
+        if ("UTF8".equals(key)) {
+            return "UTF8";
+        }
+        if ("USASCII".equals(key) || "ASCII".equals(key)) {
+            return "ASCII";
+        }
+        if ("ISO88591".equals(key) || "LATIN1".equals(key)) {
+            return "ISO8859_1";
+        }
+        return name;
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 

@@ -90,7 +90,7 @@ public final class Byte extends Number implements Comparable<Byte> {
         if (result == intValue) {
             return result;
         }
-        throw new NumberFormatException("Value out of range for byte: \"" + s + "\"");
+        throw new NumberFormatException("Value out of range. Value:\"" + s + "\" Radix:" + radix);
     }
 
     /**
@@ -135,5 +135,62 @@ public final class Byte extends Number implements Comparable<Byte> {
 
     public int compareTo(Byte another) {
         return value < another.value ? -1 : value > another.value ? 1 : 0;
+    }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of a byte in bytes.
+    public static final int BYTES = 1;
+
+    /// A Byte of `parseByte(s)`.
+    @Deprecated
+    public Byte(String s) throws NumberFormatException {
+        this(parseByte(s, 10));
+    }
+
+    /// The decimal string of `b`.
+    public static String toString(byte b) {
+        return Integer.toString(b);
+    }
+
+    /// A Byte of `parseByte(s)`.
+    public static Byte valueOf(String s) throws NumberFormatException {
+        return valueOf(parseByte(s, 10));
+    }
+
+    /// A Byte of `parseByte(s, radix)`.
+    public static Byte valueOf(String s, int radix) throws NumberFormatException {
+        return valueOf(parseByte(s, radix));
+    }
+
+    /// Decodes a decimal, hexadecimal or octal byte, as `Integer.decode`.
+    public static Byte decode(String nm) throws NumberFormatException {
+        int value = Integer.decode(nm).intValue();
+        if (value < MIN_VALUE || value > MAX_VALUE) {
+            throw new NumberFormatException("Value " + value + " out of range from input " + nm);
+        }
+        return valueOf((byte) value);
+    }
+
+    /// The value itself.
+    public static int hashCode(byte value) {
+        return value;
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(byte x, byte y) {
+        return toUnsignedInt(x) - toUnsignedInt(y);
+    }
+
+    /// The value as an unsigned int.
+    public static int toUnsignedInt(byte x) {
+        return x & 0xff;
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(byte x) {
+        return x & 0xffL;
     }
 }

@@ -91,6 +91,28 @@ public class AndroidGradleBuilder extends Executor {
     private static final String GRADLE_8_VERSION = "8.13";
     private static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
     private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
+    // The nio flavour of the desugared library: java.time, the streams and
+    // the rest of the default flavour, plus java.nio.file, which the Android
+    // port's java.io.File and Files users need below API 26.
+    private static final String DESUGAR_JDK_LIBS_ARTIFACT = "com.android.tools:desugar_jdk_libs_nio";
+    // Any flavour (desugar_jdk_libs, _minimal, _nio) the project already
+    // declares wins: two of them on one classpath fail the build.
+    private static final String DESUGAR_JDK_LIBS_PREFIX = "com.android.tools:desugar_jdk_libs";
+
+    /// The `coreLibraryDesugaring` dependency line the generated app module
+    /// declares, or "" when there is none to add: on the legacy
+    /// (`android.useGradle8=false`) scaffolding, which enables no desugaring
+    /// at all, and when the project's own dependencies already name a
+    /// desugared library.
+    static String coreLibraryDesugaringDependency(boolean useGradle8, String additionalDependencies,
+            String gradleDep) {
+        if (!useGradle8
+                || (additionalDependencies != null && additionalDependencies.contains(DESUGAR_JDK_LIBS_PREFIX))
+                || (gradleDep != null && gradleDep.contains(DESUGAR_JDK_LIBS_PREFIX))) {
+            return "";
+        }
+        return "    coreLibraryDesugaring '" + DESUGAR_JDK_LIBS_ARTIFACT + ":" + DESUGAR_JDK_LIBS_VERSION + "'\n";
+    }
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
 
@@ -8127,14 +8149,8 @@ public class AndroidGradleBuilder extends Executor {
                     "    }\n";
         }
 
-        String coreLibraryDesugaringDependency = "";
-        if (useGradle8
-                && !additionalDependencies.contains("com.android.tools:desugar_jdk_libs")
-                && !request.getArg("android.gradleDep", "").contains("com.android.tools:desugar_jdk_libs")) {
-            coreLibraryDesugaringDependency =
-                    "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:" +
-                            DESUGAR_JDK_LIBS_VERSION + "'\n";
-        }
+        String coreLibraryDesugaringDependency = coreLibraryDesugaringDependency(useGradle8,
+                additionalDependencies, request.getArg("android.gradleDep", ""));
 
         String mavenCentral = "";
         if(request.getArg("android.includeMavenCentral", "false").equals("true")) {

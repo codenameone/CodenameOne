@@ -476,7 +476,7 @@ class NativeSignatureVerifierTest {
      * check runs -- on the clean target {@code java_io_File.m} is conditional on a
      * header {@code writeOutput} generates -- so the index has to read those off
      * the classpath. Missing this reported all 23 {@code java.io.File} natives as
-     * unimplemented and failed FileClassIntegrationTest.
+     * unimplemented and failed FileClassIntegrationTest (now HostLocksIntegrationTest).
      */
     @Test
     void theTranslatorsOwnRuntimeCIsIndexedEvenBeforeItIsCopiedOut() throws IOException {

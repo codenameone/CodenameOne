@@ -1,0 +1,10 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::desktop-interop-xml-001[]
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>swing-widgets</artifactId>
+    <version>1.0</version>
+    <scope>compile</scope>
+</dependency>
+// end::desktop-interop-xml-001[]

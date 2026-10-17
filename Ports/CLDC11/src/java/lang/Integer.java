@@ -235,4 +235,155 @@ public final class Integer extends Number implements Comparable<Integer> {
         }
         return 32 - n - 1;
     }
+
+    public static int rotateLeft(int i, int distance) {
+        return 0;
+    }
+
+    public static int sum(int a, int b) {
+        return 0;
+    }
+
+    public static int max(int a, int b) {
+        return 0;
+    }
+
+    public static int min(int a, int b) {
+        return 0;
+    }
+
+    /// The size of an int in bytes.
+    public static final int BYTES = 4;
+
+    /// The size of an int in bits.
+    public static final int SIZE = 32;
+
+    /// An Integer of `parseInt(s)`.
+    @Deprecated
+    public Integer(String s) throws NumberFormatException {
+    }
+
+    /// The value itself.
+    public static int hashCode(int value) {
+        return 0;
+    }
+
+    /// The number of one bits.
+    public static int bitCount(int i) {
+        return 0;
+    }
+
+    /// The highest one bit alone, or 0.
+    public static int highestOneBit(int i) {
+        return 0;
+    }
+
+    /// The lowest one bit alone, or 0.
+    public static int lowestOneBit(int i) {
+        return 0;
+    }
+
+    /// The number of zero bits below the lowest one bit; 32 for zero.
+    public static int numberOfTrailingZeros(int i) {
+        return 0;
+    }
+
+    /// The bits in reverse order.
+    public static int reverse(int i) {
+        return 0;
+    }
+
+    /// The bytes in reverse order.
+    public static int reverseBytes(int i) {
+        return 0;
+    }
+
+    /// The bits rotated right by `distance`.
+    public static int rotateRight(int i, int distance) {
+        return 0;
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(int x, int y) {
+        return 0;
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(int x) {
+        return 0;
+    }
+
+    /// The unsigned quotient.
+    public static int divideUnsigned(int dividend, int divisor) {
+        return 0;
+    }
+
+    /// The unsigned remainder.
+    public static int remainderUnsigned(int dividend, int divisor) {
+        return 0;
+    }
+
+    /// The value as an unsigned decimal string.
+    public static String toUnsignedString(int i) {
+        return null;
+    }
+
+    /// The value as an unsigned string in `radix`.
+    public static String toUnsignedString(int i, int radix) {
+        return null;
+    }
+
+    /// Parses an unsigned decimal int.
+    public static int parseUnsignedInt(String s) throws NumberFormatException {
+        return 0;
+    }
+
+    /// Parses an unsigned int in `radix`.
+    public static int parseUnsignedInt(String s, int radix) throws NumberFormatException {
+        return 0;
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as a signed int.
+    public static int parseInt(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        return 0;
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as an unsigned int.
+    public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        return 0;
+    }
+
+    /// Decodes a decimal, `0x`, `0X`, `#` or leading-zero octal int, with an
+    /// optional sign.
+    public static Integer decode(String nm) throws NumberFormatException {
+        return null;
+    }
+
+    /// The system property `nm` as an Integer, or null.
+    public static Integer getInteger(String nm) {
+        return null;
+    }
+
+    /// The system property `nm` as an Integer, or `val`.
+    public static Integer getInteger(String nm, int val) {
+        return null;
+    }
+
+    /// The system property `nm` decoded as an Integer, or `val` when it is
+    /// unset or not a number.
+    public static Integer getInteger(String nm, Integer val) {
+        return null;
+    }
+
+    /// The bits of `i` selected by `mask`, packed to the low end.
+    public static int compress(int i, int mask) {
+        return 0;
+    }
+
+    /// The low bits of `i` spread to the positions of the one bits of `mask`.
+    public static int expand(int i, int mask) {
+        return 0;
+    }
 }

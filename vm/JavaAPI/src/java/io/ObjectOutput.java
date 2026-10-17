@@ -20,12 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package java.io;
 
-/**
- * Here to simplify porting, won't actually work...
- *
- */
+/// Writes objects as well as primitive values. Codename One has no object
+/// serialization of its own; this type exists so code written against it
+/// compiles, and an implementation supplies the writing.
 public interface ObjectOutput extends DataOutput, AutoCloseable {
+
+    /// Writes `obj`.
+    void writeObject(Object obj) throws IOException;
+
+    /// Writes any buffered output.
+    void flush() throws IOException;
+
+    /// Closes the output.
+    @Override
+    void close() throws IOException;
 }

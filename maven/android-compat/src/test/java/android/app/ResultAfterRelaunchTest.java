@@ -27,7 +27,7 @@ import android.content.Intent;
 
 import com.codename1.androidcompat.runtime.ResourceManager;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.HeadlessImplementation;
 import com.codename1.ui.Display;
 
 import org.junit.Test;

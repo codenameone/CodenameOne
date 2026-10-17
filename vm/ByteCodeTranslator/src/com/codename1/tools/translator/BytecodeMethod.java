@@ -4753,7 +4753,7 @@ public class BytecodeMethod implements SignatureSet {
 
     private boolean retireCandidatesFrozen;
 
-    private void collectRetireCandidates() {
+    void collectRetireCandidates() {
         if (DISABLE_FRAME_RETIRE || isNative() || abstractMethod) {
             return;
         }

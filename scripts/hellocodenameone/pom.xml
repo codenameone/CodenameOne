@@ -56,6 +56,20 @@
         <version>${cn1.version}</version>
         <scope>provided</scope>
       </dependency>
+      <!-- The desktop compatibility layers, which common/src/main/desktop is
+           compiled against; the build ships the one its classes use, relocated. -->
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-swing-compat</artifactId>
+        <version>${cn1.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javafx-compat</artifactId>
+        <version>${cn1.version}</version>
+        <scope>provided</scope>
+      </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone-buildclient</artifactId>

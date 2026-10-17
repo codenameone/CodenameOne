@@ -173,6 +173,11 @@ public class ByteArrayOutputStream extends OutputStream {
         return new String(buf, 0, count, charsetName);
     }
 
+    /// The contents decoded with `charset`.
+    public synchronized String toString(java.nio.charset.Charset charset) {
+        return new String(buf, 0, count, charset);
+    }
+
     /**
      * Writes {@code count} bytes from the byte array {@code buffer} starting at
      * offset {@code index} to this stream.

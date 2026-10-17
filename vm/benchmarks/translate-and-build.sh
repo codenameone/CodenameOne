@@ -92,6 +92,10 @@ SOURCES=("src/com/bench/$MAIN.java")
 if [ "$MAIN" = "Bench" ]; then
     SOURCES+=("common/src/main/java/com/bench/CommonWorkloads.java")
 fi
+if [ "$MAIN" = "IoBench" ]; then
+    # Installs the POSIX file system host; the host arm uses host/com/bench.
+    SOURCES+=("src/com/bench/PosixHost.java")
+fi
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" -source 1.8 -target 1.8 \
     -d "$WORK/classes" "${SOURCES[@]}"
 

@@ -395,4 +395,64 @@ public final class Double extends Number implements Comparable<Double> {
     public static double min(double a, double b) {
         return Math.min(a, b);
     }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of a double in bytes.
+    public static final int BYTES = 8;
+
+    /// The bits of precision of a double's significand.
+    public static final int PRECISION = 53;
+
+    /// The smallest positive normal double, 2 to the power -1022.
+    public static final double MIN_NORMAL = 0x1.0p-1022;
+
+    /// A Double of `parseDouble(s)`.
+    @Deprecated
+    public Double(String s) throws NumberFormatException {
+        this(parseDouble(s));
+    }
+
+    /// Whether `d` is neither infinite nor NaN.
+    public static boolean isFinite(double d) {
+        return d - d == 0.0;
+    }
+
+    /// The hash the JDK gives `value`: its bits folded to an int.
+    public static int hashCode(double value) {
+        long bits = doubleToLongBits(value);
+        return (int) (bits ^ (bits >>> 32));
+    }
+
+    /// The value as a hexadecimal floating point literal, as the JDK writes
+    /// it: `0x1.8p1` for 3.0, `0x0.0p0` for zero.
+    public static String toHexString(double d) {
+        if (isNaN(d)) {
+            return "NaN";
+        }
+        if (isInfinite(d)) {
+            return d > 0 ? "Infinity" : "-Infinity";
+        }
+        long bits = doubleToRawLongBits(d);
+        StringBuilder out = new StringBuilder(24);
+        if (bits < 0) {
+            out.append('-');
+        }
+        long exponentBits = (bits >>> 52) & 0x7ff;
+        long significand = bits & 0x000fffffffffffffL;
+        if (exponentBits == 0 && significand == 0) {
+            return out.append("0x0.0p0").toString();
+        }
+        out.append(exponentBits == 0 ? "0x0." : "0x1.");
+        String digits = Long.toHexString(significand | 0x0010000000000000L).substring(1);
+        int end = digits.length();
+        while (end > 1 && digits.charAt(end - 1) == '0') {
+            end--;
+        }
+        out.append(digits, 0, end).append('p');
+        out.append(exponentBits == 0 ? MIN_EXPONENT : (int) exponentBits - 1023);
+        return out.toString();
+    }
 }

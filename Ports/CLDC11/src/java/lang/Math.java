@@ -231,6 +231,314 @@ public final class Math{
     public static float nextAfter(float start, double direction) {
         return 0;
     }
- 
-    
+
+    /// Twice pi, the ratio of a circle's circumference to its radius.
+    public static final double TAU = 2.0 * PI;
+
+    /// A pseudo-random double in `[0, 1)`.
+    public static double random() {
+        return 0;
+    }
+
+    /// -1.0, 0.0 or 1.0 by the sign of `d`; a zero or NaN is returned as it is.
+    public static double signum(double d) {
+        return 0;
+    }
+
+    /// -1.0f, 0.0f or 1.0f by the sign of `f`; a zero or NaN is returned as it is.
+    public static float signum(float f) {
+        return 0;
+    }
+
+    /// `magnitude` with the sign bit of `sign`.
+    public static double copySign(double magnitude, double sign) {
+        return 0;
+    }
+
+    /// `magnitude` with the sign bit of `sign`.
+    public static float copySign(float magnitude, float sign) {
+        return 0;
+    }
+
+    /// The unbiased exponent of `d`: 1024 for NaN and the infinities, -1023
+    /// for zero and the subnormals.
+    public static int getExponent(double d) {
+        return 0;
+    }
+
+    /// The unbiased exponent of `f`: 128 for NaN and the infinities, -127 for
+    /// zero and the subnormals.
+    public static int getExponent(float f) {
+        return 0;
+    }
+
+    /// The distance from `d` to the next double of larger magnitude.
+    public static double ulp(double d) {
+        return 0;
+    }
+
+    /// The distance from `f` to the next float of larger magnitude.
+    public static float ulp(float f) {
+        return 0;
+    }
+
+    /// The double next to `d` towards positive infinity.
+    public static double nextUp(double d) {
+        return 0;
+    }
+
+    /// The float next to `f` towards positive infinity.
+    public static float nextUp(float f) {
+        return 0;
+    }
+
+    /// The float next to `f` towards negative infinity.
+    public static float nextDown(float f) {
+        return 0;
+    }
+
+    /// `d` times 2 to the power `scaleFactor`, rounded once.
+    public static double scalb(double d, int scaleFactor) {
+        return 0;
+    }
+
+    /// `f` times 2 to the power `scaleFactor`, rounded once.
+    public static float scalb(float f, int scaleFactor) {
+        return 0;
+    }
+
+    /// The square root of `x * x + y * y`, without overflow in between.
+    public static double hypot(double x, double y) {
+        return 0;
+    }
+
+    /// The cube root of `a`.
+    public static double cbrt(double a) {
+        return 0;
+    }
+
+    /// The whole number nearest `a`; a tie goes to the even one.
+    public static double rint(double a) {
+        return 0;
+    }
+
+    /// The hyperbolic sine of `x`.
+    public static double sinh(double x) {
+        return 0;
+    }
+
+    /// The hyperbolic cosine of `x`.
+    public static double cosh(double x) {
+        return 0;
+    }
+
+    /// The hyperbolic tangent of `x`.
+    public static double tanh(double x) {
+        return 0;
+    }
+
+    /// The largest int not greater than `x / y`.
+    public static int floorDiv(int x, int y) {
+        return 0;
+    }
+
+    /// The largest long not greater than `x / y`.
+    public static long floorDiv(long x, int y) {
+        return 0;
+    }
+
+    /// The largest long not greater than `x / y`.
+    public static long floorDiv(long x, long y) {
+        return 0;
+    }
+
+    /// `x - floorDiv(x, y) * y`: the remainder with the sign of `y`.
+    public static int floorMod(int x, int y) {
+        return 0;
+    }
+
+    /// `x - floorDiv(x, y) * y`: the remainder with the sign of `y`.
+    public static int floorMod(long x, int y) {
+        return 0;
+    }
+
+    /// `x - floorDiv(x, y) * y`: the remainder with the sign of `y`.
+    public static long floorMod(long x, long y) {
+        return 0;
+    }
+
+    /// The smallest int not less than `x / y`.
+    public static int ceilDiv(int x, int y) {
+        return 0;
+    }
+
+    /// The smallest long not less than `x / y`.
+    public static long ceilDiv(long x, int y) {
+        return 0;
+    }
+
+    /// The smallest long not less than `x / y`.
+    public static long ceilDiv(long x, long y) {
+        return 0;
+    }
+
+    /// `x - ceilDiv(x, y) * y`.
+    public static int ceilMod(int x, int y) {
+        return 0;
+    }
+
+    /// `x - ceilDiv(x, y) * y`.
+    public static int ceilMod(long x, int y) {
+        return 0;
+    }
+
+    /// `x - ceilDiv(x, y) * y`.
+    public static long ceilMod(long x, long y) {
+        return 0;
+    }
+
+    /// `x / y`, throwing on the one quotient that overflows.
+    public static int divideExact(int x, int y) {
+        return 0;
+    }
+
+    /// `x / y`, throwing on the one quotient that overflows.
+    public static long divideExact(long x, long y) {
+        return 0;
+    }
+
+    /// `floorDiv(x, y)`, throwing on the one quotient that overflows.
+    public static int floorDivExact(int x, int y) {
+        return 0;
+    }
+
+    /// `floorDiv(x, y)`, throwing on the one quotient that overflows.
+    public static long floorDivExact(long x, long y) {
+        return 0;
+    }
+
+    /// `ceilDiv(x, y)`, throwing on the one quotient that overflows.
+    public static int ceilDivExact(int x, int y) {
+        return 0;
+    }
+
+    /// `ceilDiv(x, y)`, throwing on the one quotient that overflows.
+    public static long ceilDivExact(long x, long y) {
+        return 0;
+    }
+
+    /// `x + y`, throwing when it overflows.
+    public static int addExact(int x, int y) {
+        return 0;
+    }
+
+    /// `x + y`, throwing when it overflows.
+    public static long addExact(long x, long y) {
+        return 0;
+    }
+
+    /// `x - y`, throwing when it overflows.
+    public static int subtractExact(int x, int y) {
+        return 0;
+    }
+
+    /// `x - y`, throwing when it overflows.
+    public static long subtractExact(long x, long y) {
+        return 0;
+    }
+
+    /// `x * y`, throwing when it overflows.
+    public static int multiplyExact(int x, int y) {
+        return 0;
+    }
+
+    /// `x * y`, throwing when it overflows.
+    public static long multiplyExact(long x, int y) {
+        return 0;
+    }
+
+    /// `x * y`, throwing when it overflows.
+    public static long multiplyExact(long x, long y) {
+        return 0;
+    }
+
+    /// The exact product of two ints.
+    public static long multiplyFull(int x, int y) {
+        return 0;
+    }
+
+    /// The high 64 bits of the 128-bit product of two signed longs.
+    public static long multiplyHigh(long x, long y) {
+        return 0;
+    }
+
+    /// The high 64 bits of the 128-bit product of two unsigned longs.
+    public static long unsignedMultiplyHigh(long x, long y) {
+        return 0;
+    }
+
+    /// `a + 1`, throwing when it overflows.
+    public static int incrementExact(int a) {
+        return 0;
+    }
+
+    /// `a + 1`, throwing when it overflows.
+    public static long incrementExact(long a) {
+        return 0;
+    }
+
+    /// `a - 1`, throwing when it overflows.
+    public static int decrementExact(int a) {
+        return 0;
+    }
+
+    /// `a - 1`, throwing when it overflows.
+    public static long decrementExact(long a) {
+        return 0;
+    }
+
+    /// `-a`, throwing when it overflows.
+    public static int negateExact(int a) {
+        return 0;
+    }
+
+    /// `-a`, throwing when it overflows.
+    public static long negateExact(long a) {
+        return 0;
+    }
+
+    /// The value as an int, throwing when it does not fit.
+    public static int toIntExact(long value) {
+        return 0;
+    }
+
+    /// The absolute value, throwing for `Integer.MIN_VALUE`, which has none.
+    public static int absExact(int a) {
+        return 0;
+    }
+
+    /// The absolute value, throwing for `Long.MIN_VALUE`, which has none.
+    public static long absExact(long a) {
+        return 0;
+    }
+
+    /// `value` clamped to `[min, max]`, as an int.
+    public static int clamp(long value, int min, int max) {
+        return 0;
+    }
+
+    /// `value` clamped to `[min, max]`.
+    public static long clamp(long value, long min, long max) {
+        return 0;
+    }
+
+    /// `value` clamped to `[min, max]`.
+    public static double clamp(double value, double min, double max) {
+        return 0;
+    }
+
+    /// `value` clamped to `[min, max]`.
+    public static float clamp(float value, float min, float max) {
+        return 0;
+    }
 }

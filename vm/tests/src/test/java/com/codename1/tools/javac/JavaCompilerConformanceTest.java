@@ -131,7 +131,11 @@ class JavaCompilerConformanceTest {
     void noPrefixOfAProgramMakesTheCompilerThrowOrHang() throws Exception {
         final List<Path> corpus = javaFiles(TESTS.resolve("corpus"));
         assertFalse(corpus.isEmpty());
-        assertTimeoutPreemptively(Duration.ofMinutes(10), () -> {
+        // A hang never ends, so the limit only has to clear the slowest runner with
+        // room to spare. On CI runners this class took 328s to 701s for the same
+        // code, master and branch alike, and this test is most of it: 10 minutes
+        // failed a healthy run.
+        assertTimeoutPreemptively(Duration.ofMinutes(20), () -> {
             for (Path src : corpus) {
                 String text = new String(Files.readAllBytes(src), StandardCharsets.UTF_8);
                 // Every 7th prefix: each one cuts a token, a string or a block in a

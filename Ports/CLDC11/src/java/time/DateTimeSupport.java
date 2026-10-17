@@ -1,225 +1,71 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package java.time;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
 import java.util.TimeZone;
 
+/// Where `java.time` meets the platform's time zone rules.
 final class DateTimeSupport {
-    static final long MILLIS_PER_SECOND = 1000L;
-    static final long MILLIS_PER_DAY = 86400000L;
-    static final long SECONDS_PER_DAY = 86400L;
-    static final long NANOS_PER_SECOND = 1000000000L;
-    static final long NANOS_PER_MILLI = 1000000L;
-    static final long NANOS_PER_DAY = 86400000000000L;
-
-    private static final long DAYS_0000_TO_1970 = 719528L;
-
     private DateTimeSupport() {
-    }
-
-    static int floorDiv(int x, int y) {
-        int r = x / y;
-        if ((x ^ y) < 0 && (r * y != x)) {
-            r--;
-        }
-        return r;
-    }
-
-    static long floorDiv(long x, long y) {
-        long r = x / y;
-        if ((x ^ y) < 0 && (r * y != x)) {
-            r--;
-        }
-        return r;
-    }
-
-    static int floorMod(int x, int y) {
-        return x - floorDiv(x, y) * y;
-    }
-
-    static long floorMod(long x, long y) {
-        return x - floorDiv(x, y) * y;
-    }
-
-    static boolean isLeapYear(int year) {
-        return ((year & 3) == 0) && ((year % 100) != 0 || (year % 400) == 0);
-    }
-
-    static int lengthOfMonth(int year, int month) {
-        switch (month) {
-            case 2:
-                return isLeapYear(year) ? 29 : 28;
-            case 4:
-            case 6:
-            case 9:
-            case 11:
-                return 30;
-            default:
-                return 31;
-        }
-    }
-
-    static long toEpochDay(int year, int month, int dayOfMonth) {
-        long y = year;
-        long m = month;
-        long total = 365L * y;
-        if (y >= 0) {
-            total += (y + 3) / 4 - (y + 99) / 100 + (y + 399) / 400;
-        } else {
-            total -= y / -4 - y / -100 + y / -400;
-        }
-        total += ((367 * m - 362) / 12);
-        total += dayOfMonth - 1;
-        if (m > 2) {
-            total--;
-            if (!isLeapYear(year)) {
-                total--;
-            }
-        }
-        return total - DAYS_0000_TO_1970;
-    }
-
-    static int[] epochDayToDate(long epochDay) {
-        long zeroDay = epochDay + DAYS_0000_TO_1970;
-        zeroDay -= 60;
-        long adjust = 0;
-        if (zeroDay < 0) {
-            long adjustCycles = (zeroDay + 1) / 146097 - 1;
-            adjust = adjustCycles * 400;
-            zeroDay += -adjustCycles * 146097;
-        }
-        long yearEst = (400 * zeroDay + 591) / 146097;
-        long doyEst = zeroDay - (365 * yearEst + yearEst / 4 - yearEst / 100 + yearEst / 400);
-        if (doyEst < 0) {
-            yearEst--;
-            doyEst = zeroDay - (365 * yearEst + yearEst / 4 - yearEst / 100 + yearEst / 400);
-        }
-        yearEst += adjust;
-        int marchDoy0 = (int) doyEst;
-        int marchMonth0 = (marchDoy0 * 5 + 2) / 153;
-        int month = (marchMonth0 + 2) % 12 + 1;
-        int day = marchDoy0 - (marchMonth0 * 306 + 5) / 10 + 1;
-        yearEst += marchMonth0 / 10;
-        return new int[] { (int) yearEst, month, day };
-    }
-
-    static void checkDate(int year, int month, int day) {
-        if (month < 1 || month > 12) {
-            throw new IllegalArgumentException("Invalid month: " + month);
-        }
-        int maxDay = lengthOfMonth(year, month);
-        if (day < 1 || day > maxDay) {
-            throw new IllegalArgumentException("Invalid day: " + day);
-        }
-    }
-
-    static void checkTime(int hour, int minute, int second, int nano) {
-        if (hour < 0 || hour > 23) {
-            throw new IllegalArgumentException("Invalid hour: " + hour);
-        }
-        if (minute < 0 || minute > 59) {
-            throw new IllegalArgumentException("Invalid minute: " + minute);
-        }
-        if (second < 0 || second > 59) {
-            throw new IllegalArgumentException("Invalid second: " + second);
-        }
-        if (nano < 0 || nano >= NANOS_PER_SECOND) {
-            throw new IllegalArgumentException("Invalid nano: " + nano);
-        }
-    }
-
-    static long toEpochSecond(LocalDate date, LocalTime time, ZoneOffset offset) {
-        long days = date.toEpochDay();
-        long secs = days * SECONDS_PER_DAY + time.toSecondOfDay();
-        return secs - offset.getTotalSeconds();
-    }
-
-    static int millisOfSecond(int nano) {
-        return nano / 1000000;
-    }
-
-    static Calendar newCalendar(TimeZone tz) {
-        Calendar out = Calendar.getInstance(tz);
-        return out;
     }
 
     static LocalDateTime localDateTimeFromInstant(Instant instant, ZoneId zone) {
         ZoneOffset offset = offsetFromInstant(instant, zone);
-        long localSecond = instant.getEpochSecond() + offset.getTotalSeconds();
-        long epochDay = floorDiv(localSecond, SECONDS_PER_DAY);
-        int secondOfDay = (int) floorMod(localSecond, SECONDS_PER_DAY);
-        LocalDate date = LocalDate.ofEpochDay(epochDay);
-        LocalTime time = LocalTime.ofNanoOfDay(secondOfDay * NANOS_PER_SECOND + instant.getNano());
-        return LocalDateTime.of(date, time);
+        return LocalDateTime.ofEpochSecond(instant.getEpochSecond(), instant.getNano(), offset);
     }
 
+    /// The offset `zone` has at `instant`.
     static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {
+        ZoneOffset fixed = zone.fixedOffset();
+        if (fixed != null) {
+            // A fixed offset already is the answer; round-tripping it through
+            // the host time zone database can only lose or invert it.
+            return fixed;
+        }
         TimeZone tz = zone.toTimeZone();
-        Calendar cal = newCalendar(TimeZone.getTimeZone("GMT"));
-        cal.setTime(new Date(instant.toEpochMilli()));
-        int offsetMillis = tz.getOffset(
-                1,
-                cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH),
-                cal.get(Calendar.DAY_OF_MONTH),
-                cal.get(Calendar.DAY_OF_WEEK),
-                ((cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)) * 60 + cal.get(Calendar.SECOND)) * 1000
-                        + cal.get(Calendar.MILLISECOND));
+        // Ask the zone for its offset at this instant rather than reading the
+        // fields back out of a Calendar. Calendar reconstructs the local time
+        // from a raw offset plus a fixed one-hour daylight guess, which loses
+        // the saving on the desktop ports (Europe/Berlin in June came back as
+        // UTC), while TimeZone.getOffset consults the platform's own rules.
+        // getOffset takes LOCAL STANDARD time fields, so the instant is
+        // turned into local standard time first by adding the raw offset.
+        // Worked in seconds, not milliseconds: the instants java.time accepts
+        // reach past what a long counts in milliseconds.
+        long localStandard = instant.getEpochSecond() + tz.getRawOffset() / 1000;
+        long epochDay = TimeArithmetic.floorDiv(localStandard, 86400L);
+        int millisOfDay = (int) TimeArithmetic.floorMod(localStandard, 86400L) * 1000
+                + instant.getNano() / 1000000;
+        LocalDate utcDate = LocalDate.ofEpochDay(epochDay);
+        // Calendar.SUNDAY is 1 and epoch day 0 was a Thursday.
+        int dayOfWeek = (int) TimeArithmetic.floorMod(epochDay + 4, 7) + 1;
+        // getOffset takes an era plus a year *of that era*, not a proleptic ISO
+        // year: ISO 0 is 1 BC, ISO -1 is 2 BC, hence 1 - isoYear.
+        int isoYear = utcDate.getYear();
+        int era = isoYear > 0 ? 1 /* GregorianCalendar.AD */ : 0 /* GregorianCalendar.BC */;
+        int yearOfEra = isoYear > 0 ? isoYear : 1 - isoYear;
+        int offsetMillis = tz.getOffset(era, yearOfEra,
+                utcDate.getMonthValue() - 1, utcDate.getDayOfMonth(), dayOfWeek, millisOfDay);
         return ZoneOffset.ofTotalSeconds(offsetMillis / 1000);
-    }
-
-    static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {
-        SimpleDateFormat sdf = new SimpleDateFormat(pattern);
-        return sdf;
-    }
-
-    static String formatPattern(String pattern, TemporalCarrier carrier, Locale locale) {
-        ZoneId zone = carrier.getZoneForFormatting();
-        SimpleDateFormat sdf = newFormat(pattern, zone, locale);
-        TimeZone original = TimeZone.getDefault();
-        try {
-            if (zone != null) {
-                TimeZone.setDefault(zone.toTimeZone());
-            }
-            return sdf.format(new Date(carrier.toInstant().toEpochMilli()));
-        } finally {
-            TimeZone.setDefault(original);
-        }
-    }
-
-    static ParsedPatternResult parsePattern(String text, String pattern, ZoneId defaultZone, Locale locale) {
-        TimeZone original = TimeZone.getDefault();
-        try {
-            if (defaultZone != null) {
-                TimeZone.setDefault(defaultZone.toTimeZone());
-            }
-            SimpleDateFormat sdf = newFormat(pattern, defaultZone, locale);
-            Date date = sdf.parse(text);
-            Instant instant = Instant.ofEpochMilli(date.getTime());
-            ZoneId zone = defaultZone == null ? ZoneOffset.UTC : defaultZone;
-            return new ParsedPatternResult(instant, zone);
-        } catch (ParseException err) {
-            throw new java.time.format.DateTimeParseException(err.getMessage(), text, 0);
-        } finally {
-            TimeZone.setDefault(original);
-        }
-    }
-
-    interface TemporalCarrier {
-        Instant toInstant();
-        ZoneId getZoneForFormatting();
-    }
-
-    static final class ParsedPatternResult {
-        public final Instant instant;
-        public final ZoneId zone;
-
-        ParsedPatternResult(Instant instant, ZoneId zone) {
-            this.instant = instant;
-            this.zone = zone;
-        }
     }
 }

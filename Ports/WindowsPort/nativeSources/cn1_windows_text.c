@@ -324,13 +324,19 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
 /*
  * deriveTrueTypeFont produces a new peer at the requested pixel size and weight,
  * reusing the base font's family. weight carries the CN1 STYLE_* bits.
+ *
+ * The base font's own bold and slant are kept. A "native:MainBold" font is
+ * bold by its name, and every caller that only wants another size of it asks
+ * with a plain weight: taking the weight alone gave back regular Segoe UI, so
+ * no sized native font was ever bold or italic.
  */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_deriveTrueTypeFont___long_float_int_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_FLOAT __cn1Arg2, JAVA_INT __cn1Arg3) {
     CN1Font* base = (CN1Font*) (intptr_t) __cn1Arg1;
     const wchar_t* family = (base != NULL && base->family != NULL) ? base->family : L"Segoe UI";
     float px = __cn1Arg2 > 0.0f ? __cn1Arg2 : 15.0f;
-    CN1Font* font = cn1WinMakeFont(family, px, 0, __cn1Arg3);
+    int style = __cn1Arg3 | (base != NULL ? base->style : 0);
+    CN1Font* font = cn1WinMakeFont(family, px, 0, style);
     return (JAVA_LONG) (intptr_t) font;
 }
 

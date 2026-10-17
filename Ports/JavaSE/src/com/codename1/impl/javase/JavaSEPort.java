@@ -11343,6 +11343,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         installGeneratedSvgRegistry();
+        // cn1res: URLs and flattened resources for applications built from
+        // desktop sources, which this JDK cannot resolve on its own.
+        CompatResourceSupport.install();
 
         // Make the desktop stdio and loopback socket MCP transports available to
         // com.codename1.mcp.MCP.
@@ -12472,7 +12475,60 @@ public class JavaSEPort extends CodenameOneImplementation {
         //}
         
         checkEDT();
-        
+
+        // The editor is a Swing component, so it is built, added and focused on the
+        // AWT event thread and nowhere else. Built here, on the Codename One EDT, it
+        // raced the AWT thread that was already painting it: setCaretPosition off the
+        // AWT thread makes DefaultCaret queue its repaint there, and that repaint read
+        // the text view while setFont on this thread was replacing it -- an
+        // intermittent NullPointerException under DefaultCaret.repaintNewCaret.
+        //
+        // The hop waits, as flushGraphics and requestFullScreen do, so the editor is
+        // in place and isEditingText() answers true by the time this method returns,
+        // exactly as before. Nothing in the body waits for this thread in return:
+        // what the editor sends back goes through callSerially.
+        //
+        // One line of the body is not Swing's: the field's own text is set from the
+        // editor's when editing starts with a key. That fires the application's
+        // listeners, so it is handed back and done here, on the thread they expect.
+        final String[] initialText = new String[1];
+        if (EventQueue.isDispatchThread()) {
+            editStringOnAwtThread(cmp, constraint, text, keyCode, initialText);
+        } else {
+            final String fText = text;
+            try {
+                EventQueue.invokeAndWait(new Runnable() {
+                    public void run() {
+                        editStringOnAwtThread(cmp, constraint, fText, keyCode, initialText);
+                    }
+                });
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.lang.reflect.InvocationTargetException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof RuntimeException) {
+                    throw (RuntimeException) cause;
+                }
+                if (cause instanceof Error) {
+                    throw (Error) cause;
+                }
+                throw new RuntimeException(cause);
+            }
+        }
+        if (initialText[0] != null) {
+            ((com.codename1.ui.TextField) cmp).setText(initialText[0]);
+        }
+    }
+
+    /**
+     * The Swing half of editString: builds the native editor over the field and
+     * starts editing. Runs on the AWT event thread only.
+     *
+     * @param initialText receives the text the field itself is to be given, when
+     * editing starts with a key; the caller sets it on the Codename One EDT
+     */
+    private void editStringOnAwtThread(final Component cmp, final int constraint, String text, final int keyCode, String[] initialText) {
         class Repainter {
             JComponent jcmp;
             javax.swing.border.Border origBorder;
@@ -12683,7 +12739,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             setText(tf, text);
             setCaretPosition(tf, text.length());
             if(cmp instanceof com.codename1.ui.TextField) {
-                ((com.codename1.ui.TextField) cmp).setText(getText(tf));
+                initialText[0] = getText(tf);
             }
         } else {
             setText(tf, text);

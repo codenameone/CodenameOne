@@ -80,5 +80,29 @@ public final class JavaSEProcessSupport extends ProcessSupport {
             child.destroyForcibly();
             return this;
         }
+        @Override
+        public long pid() {
+            // Process.pid() is Java 9 API and this class compiles against
+            // Java 8. A Java 8 runtime has no id to give, and answers as
+            // JavaSE's own default does.
+            Object id;
+            try {
+                id = java.lang.Process.class.getMethod("pid").invoke(child);
+            } catch (NoSuchMethodException ex) {
+                throw new UnsupportedOperationException("pid() needs Java 9 or newer");
+            } catch (IllegalAccessException ex) {
+                throw new UnsupportedOperationException(ex.toString());
+            } catch (java.lang.reflect.InvocationTargetException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof RuntimeException) {
+                    throw (RuntimeException) cause;
+                }
+                throw new UnsupportedOperationException(String.valueOf(cause));
+            }
+            if (id instanceof Long) {
+                return ((Long) id).longValue();
+            }
+            throw new UnsupportedOperationException("pid() answered " + id);
+        }
     }
 }

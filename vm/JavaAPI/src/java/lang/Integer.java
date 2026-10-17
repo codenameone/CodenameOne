@@ -134,23 +134,21 @@ public final class Integer extends Number implements Comparable<Integer> {
      * parseInt("0", 10) returns 0 parseInt("473", 10) returns 473 parseInt("-0", 10) returns 0 parseInt("-FF", 16) returns -255 parseInt("1100110", 2) returns 102 parseInt("2147483647", 10) returns 2147483647 parseInt("-2147483648", 10) returns -2147483648 parseInt("2147483648", 10) throws a NumberFormatException parseInt("99", 8) throws a NumberFormatException parseInt("Kona", 10) throws a NumberFormatException parseInt("Kona", 27) returns 411787
      */
     public static int parseInt(String string, int radix) throws NumberFormatException {
-        if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
-            throw new NumberFormatException("Invalid radix");
-        }
         if (string == null) {
-            throw invalidInt(string);
+            throw new NumberFormatException("Cannot parse null string");
         }
+        checkRadix(radix);
         int length = string.length(), i = 0;
         if (length == 0) {
-            throw invalidInt(string);
+            throw invalidInt(string, radix);
         }
         boolean negative = string.charAt(i) == '-';
         if (negative && ++i == length) {
-            throw invalidInt(string);
+            throw invalidInt(string, radix);
         }
-        boolean positive = string.charAt(i) == '+';
+        boolean positive = !negative && string.charAt(i) == '+';
         if (positive && ++i == length) {
-            throw invalidInt(string);
+            throw invalidInt(string, radix);
         }
 
         return parse(string, i, radix, negative);
@@ -162,28 +160,39 @@ public final class Integer extends Number implements Comparable<Integer> {
         while (offset < length) {
             int digit = Character.digit(string.charAt(offset++), radix);
             if (digit == -1) {
-                throw invalidInt(string);
+                throw invalidInt(string, radix);
             }
             if (max > result) {
-                throw invalidInt(string);
+                throw invalidInt(string, radix);
             }
             int next = result * radix - digit;
             if (next > result) {
-                throw invalidInt(string);
+                throw invalidInt(string, radix);
             }
             result = next;
         }
         if (!negative) {
             result = -result;
             if (result < 0) {
-                throw invalidInt(string);
+                throw invalidInt(string, radix);
             }
         }
         return result;
     }
 
-    private static NumberFormatException invalidInt(String s) {
-        throw new NumberFormatException("Invalid int");
+    private static NumberFormatException invalidInt(String s, int radix) {
+        return new NumberFormatException("For input string: \"" + s + "\""
+                + (radix == 10 ? "" : " under radix " + radix));
+    }
+
+    // The JDK's messages for a radix outside [MIN_RADIX, MAX_RADIX].
+    static void checkRadix(int radix) {
+        if (radix < Character.MIN_RADIX) {
+            throw new NumberFormatException("radix " + radix + " less than Character.MIN_RADIX");
+        }
+        if (radix > Character.MAX_RADIX) {
+            throw new NumberFormatException("radix " + radix + " greater than Character.MAX_RADIX");
+        }
     }
 
 
@@ -443,5 +452,217 @@ public final class Integer extends Number implements Comparable<Integer> {
      */
     public static int min(int a, int b) {
         return Math.min(a, b);
+    }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of an int in bytes.
+    public static final int BYTES = 4;
+
+    /// The size of an int in bits.
+    public static final int SIZE = 32;
+
+    /// An Integer of `parseInt(s)`.
+    @Deprecated
+    public Integer(String s) throws NumberFormatException {
+        this(parseInt(s));
+    }
+
+    /// The value itself.
+    public static int hashCode(int value) {
+        return value;
+    }
+
+    /// The number of one bits.
+    public static int bitCount(int i) {
+        i = i - ((i >>> 1) & 0x55555555);
+        i = (i & 0x33333333) + ((i >>> 2) & 0x33333333);
+        i = (i + (i >>> 4)) & 0x0f0f0f0f;
+        i = i + (i >>> 8);
+        i = i + (i >>> 16);
+        return i & 0x3f;
+    }
+
+    /// The highest one bit alone, or 0.
+    public static int highestOneBit(int i) {
+        return i == 0 ? 0 : 0x80000000 >>> numberOfLeadingZeros(i);
+    }
+
+    /// The lowest one bit alone, or 0.
+    public static int lowestOneBit(int i) {
+        return i & -i;
+    }
+
+    /// The number of zero bits below the lowest one bit; 32 for zero.
+    public static int numberOfTrailingZeros(int i) {
+        if (i == 0) {
+            return 32;
+        }
+        int n = 0;
+        while ((i & 1) == 0) {
+            i >>>= 1;
+            n++;
+        }
+        return n;
+    }
+
+    /// The bits in reverse order.
+    public static int reverse(int i) {
+        i = (i & 0x55555555) << 1 | (i >>> 1) & 0x55555555;
+        i = (i & 0x33333333) << 2 | (i >>> 2) & 0x33333333;
+        i = (i & 0x0f0f0f0f) << 4 | (i >>> 4) & 0x0f0f0f0f;
+        return reverseBytes(i);
+    }
+
+    /// The bytes in reverse order.
+    public static int reverseBytes(int i) {
+        return (i << 24) | ((i & 0xff00) << 8) | ((i >>> 8) & 0xff00) | (i >>> 24);
+    }
+
+    /// The bits rotated right by `distance`.
+    public static int rotateRight(int i, int distance) {
+        return (i >>> distance) | (i << -distance);
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(int x, int y) {
+        return compare(x + MIN_VALUE, y + MIN_VALUE);
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(int x) {
+        return ((long) x) & 0xffffffffL;
+    }
+
+    /// The unsigned quotient.
+    public static int divideUnsigned(int dividend, int divisor) {
+        if (divisor == 0) {
+            throw new ArithmeticException("/ by zero");
+        }
+        return (int) (toUnsignedLong(dividend) / toUnsignedLong(divisor));
+    }
+
+    /// The unsigned remainder.
+    public static int remainderUnsigned(int dividend, int divisor) {
+        if (divisor == 0) {
+            throw new ArithmeticException("/ by zero");
+        }
+        return (int) (toUnsignedLong(dividend) % toUnsignedLong(divisor));
+    }
+
+    /// The value as an unsigned decimal string.
+    public static String toUnsignedString(int i) {
+        return Long.toString(toUnsignedLong(i));
+    }
+
+    /// The value as an unsigned string in `radix`.
+    public static String toUnsignedString(int i, int radix) {
+        return Long.toString(toUnsignedLong(i), radix);
+    }
+
+    /// Parses an unsigned decimal int.
+    public static int parseUnsignedInt(String s) throws NumberFormatException {
+        return parseUnsignedInt(s, 10);
+    }
+
+    /// Parses an unsigned int in `radix`.
+    public static int parseUnsignedInt(String s, int radix) throws NumberFormatException {
+        if (s == null) {
+            throw new NumberFormatException("Cannot parse null string: null");
+        }
+        if (s.length() > 0 && s.charAt(0) == '-') {
+            throw new NumberFormatException("Illegal leading minus sign on unsigned string " + s + ".");
+        }
+        long value = Long.parseLong(s, radix);
+        if ((value & 0xffffffff00000000L) != 0) {
+            throw new NumberFormatException("String value " + s + " exceeds range of unsigned int.");
+        }
+        return (int) value;
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as a signed int.
+    public static int parseInt(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        if (beginIndex < 0 || beginIndex > endIndex || endIndex > s.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return parseInt(s.subSequence(beginIndex, endIndex).toString(), radix);
+    }
+
+    /// Parses `s` from `beginIndex` to `endIndex` as an unsigned int.
+    public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix)
+            throws NumberFormatException {
+        if (beginIndex < 0 || beginIndex > endIndex || endIndex > s.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return parseUnsignedInt(s.subSequence(beginIndex, endIndex).toString(), radix);
+    }
+
+    /// Decodes a decimal, `0x`, `0X`, `#` or leading-zero octal int, with an
+    /// optional sign.
+    public static Integer decode(String nm) throws NumberFormatException {
+        int[] radix = new int[1];
+        String digits = Long.decodeDigits(nm, radix);
+        return valueOf(parseInt(digits, radix[0]));
+    }
+
+    /// The system property `nm` as an Integer, or null.
+    public static Integer getInteger(String nm) {
+        return getInteger(nm, null);
+    }
+
+    /// The system property `nm` as an Integer, or `val`.
+    public static Integer getInteger(String nm, int val) {
+        Integer result = getInteger(nm, null);
+        return result == null ? valueOf(val) : result;
+    }
+
+    /// The system property `nm` decoded as an Integer, or `val` when it is
+    /// unset or not a number.
+    public static Integer getInteger(String nm, Integer val) {
+        String v = null;
+        if (nm != null && nm.length() > 0) {
+            v = System.getProperty(nm);
+        }
+        if (v != null) {
+            try {
+                return decode(v);
+            } catch (NumberFormatException e) {
+                // fall through to the default, as the JDK does
+            }
+        }
+        return val;
+    }
+
+    /// The bits of `i` selected by `mask`, packed to the low end.
+    public static int compress(int i, int mask) {
+        int result = 0;
+        int out = 0;
+        for (int bit = 0; bit < 32; bit++) {
+            if ((mask & (1 << bit)) != 0) {
+                if ((i & (1 << bit)) != 0) {
+                    result |= 1 << out;
+                }
+                out++;
+            }
+        }
+        return result;
+    }
+
+    /// The low bits of `i` spread to the positions of the one bits of `mask`.
+    public static int expand(int i, int mask) {
+        int result = 0;
+        int in = 0;
+        for (int bit = 0; bit < 32; bit++) {
+            if ((mask & (1 << bit)) != 0) {
+                if ((i & (1 << in)) != 0) {
+                    result |= 1 << bit;
+                }
+                in++;
+            }
+        }
+        return result;
     }
 }

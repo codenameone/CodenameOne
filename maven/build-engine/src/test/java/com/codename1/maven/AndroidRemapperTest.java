@@ -143,7 +143,7 @@ public class AndroidRemapperTest {
         List<String> app = refs(Files.readAllBytes(new File(classes, "com/x/Main.class").toPath()));
         assertTrue(app.toString(), app.contains("com/codename1/androidcompat/android/app/Activity"));
         assertTrue(app.toString(), app.contains("(Lcom/codename1/androidcompat/android/view/View;)V"));
-        assertTrue(app.toString(), app.contains("com/codename1/androidcompat/jdk/BufferedReader"));
+        assertTrue(app.toString(), app.contains("java/io/BufferedReader"));
         for (String r : app) {
             assertFalse(r, r != null && (r.startsWith("android/") || r.contains("Landroid/")));
         }
@@ -461,10 +461,11 @@ public class AndroidRemapperTest {
         assertEquals("com.squareup.retrofit2:retrofit", r.uncovered.get(0));
     }
 
-    /// The java.io classes the Codename One runtime lacks go to the shims,
-    /// Closeable becomes AutoCloseable, and a class that named both keeps one.
+    /// The device's class library has java.io under the JDK's names, so a
+    /// class naming it -- `Closeable` beside `AutoCloseable` included -- is
+    /// left as it was compiled.
     @Test
-    public void mapsJavaIoShimsAndKeepsInterfacesDistinct() {
+    public void javaIoKeepsItsNamesAndInterfacesStayDistinct() {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/x/Res", null, "java/lang/Object",
                 new String[] {"java/io/Closeable", "java/lang/AutoCloseable"});
@@ -485,11 +486,10 @@ public class AndroidRemapperTest {
                 itf.add(interfaces);
             }
         }, 0);
-        assertEquals(1, itf.get(0).length);
-        assertEquals("java/lang/AutoCloseable", itf.get(0)[0]);
+        assertArrayEquals(new String[] {"java/io/Closeable", "java/lang/AutoCloseable"}, itf.get(0));
         List<String> r = refs(out);
-        assertTrue(r.toString(), r.contains("(Lcom/codename1/androidcompat/jdk/File;)Ljava/io/InputStream;"));
-        assertTrue(r.toString(), r.contains("com/codename1/androidcompat/jdk/FileInputStream"));
+        assertTrue(r.toString(), r.contains("(Ljava/io/File;)Ljava/io/InputStream;"));
+        assertTrue(r.toString(), r.contains("java/io/FileInputStream"));
     }
 
     /// A public class `name` extending `superName` with public constructors
@@ -674,7 +674,9 @@ public class AndroidRemapperTest {
         for (String name : new String[]{"accept", "<init>"}) {
             ClassWriter cw = new ClassWriter(0);
             cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "example/Overloaded", null, "java/lang/Object", null);
-            for (String type : new String[]{"java/io/Closeable", "java/lang/AutoCloseable"}) {
+            // The device's regular expressions are the framework's, so a
+            // class overloading on both names collapses once relocated.
+            for (String type : new String[]{"java/util/regex/Pattern", "com/codename1/util/regex/Pattern"}) {
                 MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, name, "(L" + type + ";)V", null, null);
                 mv.visitCode(); mv.visitInsn(Opcodes.RETURN); mv.visitMaxs(0, 2); mv.visitEnd();
             }

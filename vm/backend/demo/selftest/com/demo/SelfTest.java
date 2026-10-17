@@ -5659,8 +5659,8 @@ public class SelfTest {
         // 3. BOTH IN ONE METHOD: the catch encloses a try/finally. This was skipped
         // by default as the case that killed the binary -- the finally's rethrow
         // escaped the enclosing catch -- until the translator's catch-depth fix.
-        // vm/tests CatchRethrowIntegrationTest now covers it on every compiler
-        // configuration, so it runs here as an ordinary check.
+        // vm/tests BulkConformanceIntegrationTest (CatchRethrowApp) now covers
+        // it, so it runs here as an ordinary check.
         String sameMethod;
         try {
             try {

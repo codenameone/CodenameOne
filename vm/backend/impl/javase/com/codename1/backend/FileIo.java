@@ -48,6 +48,11 @@ public final class FileIo {
     private FileIo() {
     }
 
+    /// Nothing to do: on Java SE the JDK is the class library and has its own
+    /// file system. The production twin installs the POSIX `JdkHost`.
+    static void installJdkHost() {
+    }
+
     private static final class OpenFile {
         final FileChannel channel;
         final Path path;

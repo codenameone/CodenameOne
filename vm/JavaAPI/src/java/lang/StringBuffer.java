@@ -33,7 +33,7 @@ package java.lang;
  * Every string buffer has a capacity. As long as the length of the character sequence contained in the string buffer does not exceed the capacity, it is not necessary to allocate a new internal buffer array. If the internal buffer overflows, it is automatically made larger.
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
  */
-public final class StringBuffer implements CharSequence, Appendable {
+public final class StringBuffer implements CharSequence, Appendable, Comparable<StringBuffer> {
     private StringBuilder internal;
     /**
      * Constructs a string buffer with no characters in it and an initial capacity of 16 characters.
@@ -334,8 +334,9 @@ public final class StringBuffer implements CharSequence, Appendable {
         return internal.toString();
     }
 
-    public synchronized StringBuffer StringBuffer(java.lang.CharSequence cs) {
-        return new StringBuffer(cs.toString());
+    /// A buffer holding the characters of `cs`.
+    public StringBuffer(java.lang.CharSequence cs) {
+        internal = new StringBuilder(cs.toString());
     }
 
     public synchronized void trimToSize() {
@@ -366,6 +367,97 @@ public final class StringBuffer implements CharSequence, Appendable {
 
     public synchronized CharSequence subSequence(int start, int end) {
         return internal.substring(start, end);
+    }
+
+    /// Appends the contents of `sb`, or `"null"`.
+    public synchronized StringBuffer append(StringBuffer sb) {
+        internal.append(sb == null ? "null" : sb.toString());
+        return this;
+    }
+
+    /// Inserts `len` chars of `str` from `offset` at `index`.
+    public synchronized StringBuffer insert(int index, char[] str, int offset, int len) {
+        internal.insert(index, str, offset, len);
+        return this;
+    }
+
+    /// Appends the code point, as one char or as a surrogate pair.
+    public synchronized StringBuffer appendCodePoint(int codePoint) {
+        internal.appendCodePoint(codePoint);
+        return this;
+    }
+
+    /// The code point at `index`.
+    public synchronized int codePointAt(int index) {
+        return internal.codePointAt(index);
+    }
+
+    /// The code point that ends just before `index`.
+    public synchronized int codePointBefore(int index) {
+        return internal.codePointBefore(index);
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public synchronized int codePointCount(int beginIndex, int endIndex) {
+        return internal.codePointCount(beginIndex, endIndex);
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public synchronized int offsetByCodePoints(int index, int codePointOffset) {
+        return internal.offsetByCodePoints(index, codePointOffset);
+    }
+
+    /// The first index of `str`, or -1.
+    public synchronized int indexOf(String str) {
+        return internal.indexOf(str);
+    }
+
+    /// The first index of `str` at or after `fromIndex`, or -1.
+    public synchronized int indexOf(String str, int fromIndex) {
+        return internal.indexOf(str, fromIndex);
+    }
+
+    /// The last index of `str`, or -1.
+    public synchronized int lastIndexOf(String str) {
+        return internal.lastIndexOf(str);
+    }
+
+    /// The last index of `str` at or before `fromIndex`, or -1.
+    public synchronized int lastIndexOf(String str, int fromIndex) {
+        return internal.lastIndexOf(str, fromIndex);
+    }
+
+    /// Replaces the characters from `start` to `end` with `str`.
+    public synchronized StringBuffer replace(int start, int end, String str) {
+        internal.replace(start, end, str);
+        return this;
+    }
+
+    /// The characters from `start` to the end.
+    public synchronized String substring(int start) {
+        return internal.substring(start);
+    }
+
+    /// The characters from `start` to `end`.
+    public synchronized String substring(int start, int end) {
+        return internal.substring(start, end);
+    }
+
+    /// Appends the code point `count` times.
+    public synchronized StringBuffer repeat(int codePoint, int count) {
+        internal.repeat(codePoint, count);
+        return this;
+    }
+
+    /// Appends `cs` `count` times.
+    public synchronized StringBuffer repeat(CharSequence cs, int count) {
+        internal.repeat(cs, count);
+        return this;
+    }
+
+    /// Compares the contents lexicographically.
+    public synchronized int compareTo(StringBuffer another) {
+        return CharSequence.compare(this, another);
     }
 
 

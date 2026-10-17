@@ -27,7 +27,8 @@ mkdir -p target
 
 J8="${JDK_8_HOME:?set JDK_8_HOME}"
 mkdir -p target/io-host-classes
-"$J8/bin/javac" -nowarn -encoding UTF-8 -d target/io-host-classes src/com/bench/IoBench.java
+"$J8/bin/javac" -nowarn -encoding UTF-8 -d target/io-host-classes src/com/bench/IoBench.java \
+    host/com/bench/PosixHost.java
 
 python3 - "$OUT" "$REF_JAVA" "$ROUNDS" <<'PY'
 import subprocess, re, sys, os, shutil, tempfile

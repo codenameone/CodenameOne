@@ -91,8 +91,12 @@
         <module>svg-transcoder</module>
         <!-- Android compatibility: the res/ compiler (used by the Maven and
              Gradle plugins) and the android.* runtime built on top of core. -->
+        <module>compat-testing</module>
         <module>android-res-compiler</module>
         <module>android-compat</module>
+        <module>swing-compat</module>
+        <module>javafx-compat</module>
+        <module>fxml-compiler</module>
         <module>lottie-transcoder</module>
         <!--
           dart-runtime and flutter-runtime are NOT here: they compile at

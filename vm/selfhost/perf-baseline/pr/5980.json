@@ -1,0 +1,113 @@
+{
+ "pr": 5980,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.932,
+      "time": 1.021,
+      "tolerance": {
+       "memory": 0.4
+      }
+     },
+     "memory": 1.103,
+     "reason": "The hello application now ships the Swing and JavaFX compatibility runtimes, so the translation this benchmark times reads about 9,600 classes instead of 7,350. ParparVM's peak grows with the larger live set and the garbage allocated while a concurrent cycle runs over it; the JVM's committed heap already had room, so its peak barely moves and the ratio rises. The fixed-input translator benchmark is unchanged.",
+     "runs": 1,
+     "time": 1.021,
+     "tolerance": {
+      "memory": 0.4
+     }
+    }
+   }
+  },
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.018,
+      "time": 0.847,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.783,
+     "reason": "The native Linux port hands the memory of freed images back to the system, so the hello application settles at a lower resident size.",
+     "runs": 1,
+     "time": 0.847,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "macos-arm64": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.34,
+      "time": 0.957,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 1.935,
+     "reason": "The hello application now ships the Swing and JavaFX compatibility runtimes, so the translation this benchmark times reads about 9,600 classes instead of 7,350. ParparVM's peak grows with the larger live set and the garbage allocated while a concurrent cycle runs over it; the JVM's committed heap already had room, so its peak barely moves and the ratio rises. The fixed-input translator benchmark is unchanged.",
+     "runs": 1,
+     "time": 0.957,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.999,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.5
+      }
+     },
+     "memory": 1.06,
+     "reason": "The hello application now ships the Swing and JavaFX compatibility runtimes, so the translation this benchmark times reads about 9,600 classes instead of 7,350. ParparVM's peak grows with the larger live set and the garbage allocated while a concurrent cycle runs over it; the JVM's committed heap already had room, so its peak barely moves and the ratio rises. The fixed-input translator benchmark is unchanged.",
+     "runs": 1,
+     "time": 1.41,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-x64@intel64-family-6-model-106-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.761,
+      "time": 1.212,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 1.082,
+     "reason": "The hello application now ships the Swing and JavaFX compatibility runtimes, so the translation this benchmark times reads about 9,600 classes instead of 7,350. ParparVM's peak grows with the larger live set and the garbage allocated while a concurrent cycle runs over it; the JVM's committed heap already had room, so its peak barely moves and the ratio rises. The fixed-input translator benchmark is unchanged.",
+     "runs": 1,
+     "time": 1.212,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}

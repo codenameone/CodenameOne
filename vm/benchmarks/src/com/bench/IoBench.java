@@ -180,6 +180,9 @@ public final class IoBench {
     }
 
     public static void main(String[] args) throws IOException {
+        // The translated arm brings its own file system (PosixHost in src/,
+        // compiled only by translate-and-build.sh); the host arm's is a no-op.
+        PosixHost.install();
         // No System.getProperty(String,String) in vm/JavaAPI -- the two-arg overload
         // does not exist there, so the directory is passed in or defaults literally.
         String base = args.length > 0 ? args[0] : "/tmp";

@@ -1,0 +1,26 @@
+# A keyboard-driven game: one click to take the focus, then play.
+sleep 0.5
+click 0.50 0.50
+key Left
+key Left
+key Up
+key Right
+key space
+key Right
+key Right
+key Up
+key Down
+key space
+key Left
+key Up
+key Up
+key Right
+key space
+key Left
+key Left
+key Left
+key space
+key Right
+key Up
+key space
+sleep 1.0

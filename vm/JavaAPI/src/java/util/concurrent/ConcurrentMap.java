@@ -24,9 +24,8 @@ package java.util.concurrent;
 
 import java.util.Map;
 
-/**
- * Added this for Kotlin
- */
+/// A map whose compound operations are atomic. The four methods it declares
+/// are default methods of `Map` as well; an implementation makes them atomic.
 public interface ConcurrentMap<K,V> extends Map<K,V> {
     public V putIfAbsent(K key, V value);
     public boolean remove(Object key, Object value);

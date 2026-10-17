@@ -397,6 +397,7 @@ public class ByteCodeTranslator {
     }
 
     public static void main(String[] args) throws Exception {
+        RuntimeHost.install();
         // Provenance describes ONE translation, and this is the start of one. It has to
         // be cleared here rather than in Parser.cleanup(): that runs from the `finally`
         // of Parser.writeOutput(), which is BEFORE the output handler writes the

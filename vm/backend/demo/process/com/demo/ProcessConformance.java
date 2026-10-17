@@ -25,6 +25,7 @@ package com.demo;
 import com.codename1.io.Process;
 import com.codename1.io.ProcessBuilder;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
@@ -74,12 +75,12 @@ public final class ProcessConformance {
         check("<absent>".equals(output(env)), "environment removal");
         env.environment().clear();
         check("<absent>".equals(output(env)), "empty environment");
-        check(output(new ProcessBuilder(fixture, "cwd").directory(args[1])).equals(args[1]), "working directory");
+        check(output(new ProcessBuilder(fixture, "cwd").directory(new File(args[1]))).equals(args[1]), "working directory");
         try { new ProcessBuilder(fixture + "-missing").start(); throw new AssertionError("missing executable accepted"); }
         catch (IOException expectedFailure) { }
         try { new ProcessBuilder(fixture, "bad\0argument").start(); throw new AssertionError("NUL accepted"); }
         catch (IllegalArgumentException expectedFailure) { }
-        try { new ProcessBuilder(fixture, "exit").directory(args[1] + "/missing-dir").start(); throw new AssertionError("bad cwd accepted"); }
+        try { new ProcessBuilder(fixture, "exit").directory(new File(args[1], "missing-dir")).start(); throw new AssertionError("bad cwd accepted"); }
         catch (IOException expectedFailure) { }
         for (int merged = 0; merged < 2; ++merged) {
             Process p = new ProcessBuilder(fixture, "duplex").redirectErrorStream(merged == 1).start();

@@ -23,6 +23,8 @@
 
 package java.lang;
 
+import com.codename1.impl.JdkHost;
+
 import java.util.HashMap;
 
 /**
@@ -70,7 +72,22 @@ public class Thread implements java.lang.Runnable{
     private int priority = NORM_PRIORITY;
     private long nativeThreadId;
     private boolean daemon;
+    private long id;
+    private UncaughtExceptionHandler uncaughtExceptionHandler;
     private static int activeThreads = 0;
+    private static long lastId;
+    private static UncaughtExceptionHandler defaultUncaughtExceptionHandler;
+
+    /**
+     * Handles what a thread's run method throws.
+     */
+    public interface UncaughtExceptionHandler {
+        /**
+         * Called with the thread and what its run method threw; anything
+         * this throws in turn is ignored.
+         */
+        void uncaughtException(Thread t, Throwable e);
+    }
     
     /**
      * Allocates a new Thread object.
@@ -140,6 +157,65 @@ public class Thread implements java.lang.Runnable{
      */
     public final java.lang.String getName(){
         return name; 
+    }
+
+    /**
+     * Changes this thread's name.
+     */
+    public final void setName(String name) {
+        if (name == null) {
+            throw new NullPointerException("name cannot be null");
+        }
+        this.name = name;
+    }
+
+    /**
+     * A number that identifies this thread for its lifetime, assigned the
+     * first time it is asked for; never reused while the program runs.
+     */
+    public long getId() {
+        synchronized (Thread.class) {
+            if (id == 0) {
+                id = ++lastId;
+            }
+            return id;
+        }
+    }
+
+    /**
+     * Sets the handler for what this thread's run method throws; null
+     * leaves it to the default handler.
+     */
+    public void setUncaughtExceptionHandler(UncaughtExceptionHandler handler) {
+        this.uncaughtExceptionHandler = handler;
+    }
+
+    /**
+     * This thread's handler, or the default handler when it has none.
+     */
+    public UncaughtExceptionHandler getUncaughtExceptionHandler() {
+        UncaughtExceptionHandler h = uncaughtExceptionHandler;
+        return h != null ? h : defaultUncaughtExceptionHandler;
+    }
+
+    /**
+     * Sets the handler for what any thread without its own handler throws.
+     * In a Codename One application it also receives what an event
+     * dispatch thread task throws, which then no longer reaches the
+     * platform's own error handling.
+     */
+    public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler handler) {
+        defaultUncaughtExceptionHandler = handler;
+        if (handler != null) {
+            JdkHost.get().watchUncaughtExceptions();
+        }
+    }
+
+    /**
+     * The handler setDefaultUncaughtExceptionHandler set, or null.
+     */
+    public static UncaughtExceptionHandler getDefaultUncaughtExceptionHandler() {
+        return defaultUncaughtExceptionHandler;
     }
 
     /**
@@ -230,7 +306,7 @@ public class Thread implements java.lang.Runnable{
         try {
             target.run();
         } catch(Throwable t) {
-            t.printStackTrace();
+            dispatchUncaught(t);
         }
         activeThreads--;
         // DROPPED HERE, because nothing else can ever drop it.
@@ -255,6 +331,24 @@ public class Thread implements java.lang.Runnable{
         }
     }
     
+    /**
+     * Hands what the run method threw to this thread's handler, else to the
+     * default one, else prints it. What a handler throws is ignored, as on
+     * the JDK.
+     */
+    private void dispatchUncaught(Throwable t) {
+        UncaughtExceptionHandler h = getUncaughtExceptionHandler();
+        if (h == null) {
+            t.printStackTrace();
+            return;
+        }
+        try {
+            h.uncaughtException(this, t);
+        } catch (Throwable ignored) {
+            // As the JDK: a handler's own failure goes nowhere.
+        }
+    }
+
     /**
      * If this thread was constructed using a separate Runnable run object, then that Runnable object's run method is called; otherwise, this method does nothing and returns.
      * Subclasses of Thread should override this method.
@@ -282,10 +376,27 @@ public class Thread implements java.lang.Runnable{
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
+        // An interrupt that is pending, or that arrives while the thread
+        // sleeps, ends the sleep with InterruptedException and clears the
+        // status, as the JDK does. The native returns early when the status
+        // is set; the JavaScript runtime's throws by itself.
+        if (interrupted()) {
+            throw new InterruptedException();
+        }
         sleepImpl(millis);
+        if (interrupted()) {
+            throw new InterruptedException();
+        }
     }
 
     private static native void sleepImpl(long millis);
+
+    /// The exception the native `Object.wait` throws when the waiting thread
+    /// is interrupted. Called from `nativeMethods.m`, which is what keeps it
+    /// (and the exception class) in a translated application.
+    private static InterruptedException newInterruptedException() {
+        return new InterruptedException();
+    }
 
     public static void sleep(long millis, int nanos) throws java.lang.InterruptedException {
         if (millis < 0) {

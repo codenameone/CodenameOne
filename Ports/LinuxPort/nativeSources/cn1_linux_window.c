@@ -715,7 +715,13 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
      * is torn down GTK clears the toplevel focus to NULL, so CN1 keys resume. */
     if (cn1Window != 0) {
         GtkWidget* focus = gtk_window_get_focus(GTK_WINDOW(cn1Window));
-        if (focus != 0 && focus != cn1DrawingArea && focus != cn1TitleCanvas) {
+        /* The accessibility mirror is not a peer. Its widgets describe Codename One
+         * components to an assistive technology and have no way to hand text back,
+         * so a keystroke that arrives while one of them holds the GTK focus is still
+         * Codename One's. Forwarding it typed into an entry drawn at 1% opacity:
+         * the text went nowhere the user could see. */
+        if (focus != 0 && focus != cn1DrawingArea && focus != cn1TitleCanvas
+                && !(cn1AccessibilityFixed != 0 && gtk_widget_is_ancestor(focus, cn1AccessibilityFixed))) {
             return FALSE;
         }
     }
@@ -1787,6 +1793,47 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityAction___long_java_l
     cn1A11yQueue(1, action);
 }
 
+/* Takes a window and everything under it out of pointer delivery.
+ *
+ * The mirror is made of real GTK widgets -- entries, toggle buttons, scales -- laid
+ * exactly over the Codename One components they describe, and each of them owns
+ * GdkWindows that take pointer input. gtk_overlay_set_overlay_pass_through only
+ * covers the overlay child's own window: GDK says in so many words that a
+ * pass-through window "can still have a subwindow without pass through". So a
+ * click on a text field landed on the invisible GtkEntry above it, which took the
+ * GTK focus, and everything typed afterwards went into that entry instead of the
+ * application. An assistive technology drives these widgets through ATK actions,
+ * never through the pointer, so nothing is lost by letting the pointer through. */
+static void cn1A11yPassPointerThrough(GdkWindow* window) {
+    GList* item;
+    if (window == 0) {
+        return;
+    }
+    gdk_window_set_pass_through(window, TRUE);
+    for (item = gdk_window_peek_children(window); item; item = item->next) {
+        cn1A11yPassPointerThrough((GdkWindow*) item->data);
+    }
+}
+
+static void cn1A11yEndMain(void* pointer) {
+    (void) pointer;
+    if (cn1AccessibilityFixed) {
+        gtk_widget_show_all(cn1AccessibilityFixed);
+        if (gtk_widget_get_realized(cn1AccessibilityFixed)) {
+            /* A GtkFixed has no window of its own: this is the child window the
+             * overlay made for it, and the mirror's windows are all below it. */
+            GdkWindow* mirror = gtk_widget_get_window(cn1AccessibilityFixed);
+            /* Never the window the drawing area lives in: passing THAT through
+             * would take the pointer away from the whole application. */
+            if (mirror != 0 && mirror != gtk_widget_get_window(cn1Overlay)
+                    && mirror != gtk_widget_get_window(cn1DrawingArea)
+                    && mirror != gtk_widget_get_window(cn1Window)) {
+                cn1A11yPassPointerThrough(mirror);
+            }
+        }
+    }
+}
+
 /* A complete publication, handed from the publishing thread to the GTK thread. */
 typedef struct {
     CN1A11yOp* ops;
@@ -1841,7 +1888,7 @@ static gboolean cn1A11yApplyIdle(gpointer ignored) {
      * closures they were applied to; only the array is ours. */
     free(batch->ops);
     free(batch);
-    if (cn1AccessibilityFixed) gtk_widget_show_all(cn1AccessibilityFixed);
+    cn1A11yEndMain(0);
     return G_SOURCE_REMOVE;
 }
 

@@ -574,4 +574,10 @@ public final class Class<T> implements java.lang.reflect.Type {
     public boolean isRecord() {
         return this != java.lang.Record.class && java.lang.Record.class.isAssignableFrom(this);
     }
+
+    /// The module this class is in: the unnamed module, for every class, as
+    /// for a class the JDK loaded from the class path.
+    public Module getModule() {
+        return Module.unnamed();
+    }
 }
