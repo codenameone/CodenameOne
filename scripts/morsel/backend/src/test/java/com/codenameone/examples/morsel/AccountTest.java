@@ -1,0 +1,245 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.morsel;
+
+import com.codename1.backend.DataSource;
+import com.codename1.backend.Json;
+import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.test.BackendTest;
+import com.codename1.backend.test.MockMvc;
+import com.codenameone.examples.morsel.account.DemoAccounts;
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static com.codename1.backend.test.MockMvcRequestBuilders.get;
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+/// Opening an account, signing in to it and proving its phone number, through
+/// the same requests the app makes.
+@BackendTest
+class AccountTest {
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private DataSource db;
+
+    private static String registration(String email, String password, boolean courier) {
+        return "{\"email\":\"" + email + "\",\"password\":\"" + password
+                + "\",\"displayName\":\"Test Person\",\"phone\":\"+1 (555) 010-9999\",\"courier\":"
+                + courier + ",\"vehicle\":\"Grey Honda Civic\",\"plate\":\"TST 1\"}";
+    }
+
+    private String bearer(String username, String password) throws Exception {
+        return "Bearer " + SignIn.token(mvc, username, password);
+    }
+
+    @Test
+    void anAccountIsOpenedThenSignedInTo() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("New.Customer@Example.com", "a-long-password", false)))
+                .andExpect(status().isOk())
+                // The name is the address in lower case, and the phone number is
+                // stored in one form however it was typed.
+                .andExpect(jsonPath("$.username").value("new.customer@example.com"))
+                .andExpect(jsonPath("$.phone").value("+15550109999"))
+                .andExpect(jsonPath("$.customer").value(true))
+                .andExpect(jsonPath("$.courier").value(false))
+                .andExpect(jsonPath("$.admin").value(false))
+                .andExpect(jsonPath("$.phoneVerified").value(false));
+
+        // Signing in is not case sensitive about the address either.
+        mvc.perform(get("/api/me").header("Host", SignIn.HOST).header("Authorization",
+                        bearer("NEW.CUSTOMER@example.com", "a-long-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("new.customer@example.com"))
+                .andExpect(jsonPath("$.displayName").value("Test Person"));
+    }
+
+    @Test
+    void anAccountThatCannotBeOpenedSaysWhy() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("short@example.com", "short", false)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("not-an-address", "a-long-password", false)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration(DemoAccounts.CUSTOMER, "a-long-password", false)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void aWrongPasswordSignsNobodyIn() throws Exception {
+        assertNull(SignIn.session(mvc, DemoAccounts.CUSTOMER, "not-the-password"));
+        assertNotNull(SignIn.session(mvc, DemoAccounts.CUSTOMER, DemoAccounts.PASSWORD));
+    }
+
+    @Test
+    void theApiWantsAToken() throws Exception {
+        mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/me").header("Authorization", "Bearer not-a-token"))
+                .andExpect(status().isUnauthorized());
+        // A session is for signing in. It is not a way into the API.
+        mvc.perform(get("/api/me").cookie("CN1SESSION",
+                        SignIn.session(mvc, DemoAccounts.CUSTOMER, DemoAccounts.PASSWORD)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aPhoneNumberIsProvedWithTheCodeThatWasSent() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("phone@example.com", "a-long-password", true)))
+                .andExpect(status().isOk())
+                // Asking to drive opens an application. It does not make a courier.
+                .andExpect(jsonPath("$.courier").value(false))
+                .andExpect(jsonPath("$.courierStatus").value("draft"));
+        String bearer = bearer("phone@example.com", "a-long-password");
+
+        String sent = mvc.perform(post("/api/account/phone/start").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Map challenge = Json.parseObject(sent);
+        // A test server sends no text message, so it says what the code was.
+        String code = (String) challenge.get("demoCode");
+        assertNotNull(code);
+        assertEquals(6, code.length());
+
+        // A second code straight away is refused: each is a text message.
+        mvc.perform(post("/api/account/phone/start").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer))
+                .andExpect(status().isTooManyRequests());
+
+        String wrong = "000000".equals(code) ? "000001" : "000000";
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + wrong + "\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phoneVerified").value(true));
+        // Used up: the same code is not good twice.
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /// A second code is asked for when the first is slow to arrive, and the
+    /// first may then arrive last. Both are good until the first one would
+    /// have expired, and using either uses up both.
+    @Test
+    void aCodeStaysGoodWhenAnotherIsSentAfterIt() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("resend@example.com", "a-long-password", false)))
+                .andExpect(status().isOk());
+        String bearer = bearer("resend@example.com", "a-long-password");
+        String first = code(bearer);
+        // The wait between codes has passed.
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        String second = code(bearer);
+
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + first + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phoneVerified").value(true));
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + second + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // Once the first has expired it is no longer good, though the second is.
+        String third = code(bearer);
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        String fourth = code(bearer);
+        db.execute("UPDATE phone_code SET previous_expires_at = 1 WHERE username = ?",
+                new Object[] {"resend@example.com"});
+        if (!third.equals(fourth)) {
+            mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                            .header("Authorization", bearer).contentType("application/json")
+                            .content("{\"code\":\"" + third + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content("{\"code\":\"" + fourth + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    /// Asking for another code does not give the one before a fresh set of
+    /// guesses: it keeps what it had left.
+    @Test
+    void theCodeBeforeKeepsTheGuessesItHadLeft() throws Exception {
+        mvc.perform(post("/api/account/register").contentType("application/json")
+                        .content(registration("budget@example.com", "a-long-password", false)))
+                .andExpect(status().isOk());
+        String bearer = bearer("budget@example.com", "a-long-password");
+        String first = code(bearer);
+        // Four of the five guesses (PhoneVerification.MAX_ATTEMPTS) spent.
+        for (int iter = 0; iter < 4; iter++) {
+            verify(bearer, other(first, first)).andExpect(status().isBadRequest());
+        }
+        db.execute("UPDATE phone_code SET sent_at = sent_at - 60000 WHERE username = ?",
+                new Object[] {"budget@example.com"});
+        String second = code(bearer);
+        // The first code's last guess, spent on a wrong one.
+        verify(bearer, other(first, second)).andExpect(status().isBadRequest());
+        // Now the first is out of guesses, though the second is not.
+        if (!first.equals(second)) {
+            verify(bearer, first).andExpect(status().isBadRequest());
+        }
+        verify(bearer, second).andExpect(status().isOk());
+    }
+
+    /// A six-digit code that is neither of these.
+    private static String other(String a, String b) {
+        for (int iter = 0; ; iter++) {
+            String candidate = String.valueOf(1000000 + iter).substring(1);
+            if (!candidate.equals(a) && !candidate.equals(b)) {
+                return candidate;
+            }
+        }
+    }
+
+    private com.codename1.backend.test.ResultActions verify(String bearer, String code)
+            throws Exception {
+        return mvc.perform(post("/api/account/phone/verify").header("Host", SignIn.HOST)
+                .header("Authorization", bearer).contentType("application/json")
+                .content("{\"code\":\"" + code + "\"}"));
+    }
+
+    private String code(String bearer) throws Exception {
+        String sent = mvc.perform(post("/api/account/phone/start").header("Host", SignIn.HOST)
+                        .header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return (String) Json.parseObject(sent).get("demoCode");
+    }
+}

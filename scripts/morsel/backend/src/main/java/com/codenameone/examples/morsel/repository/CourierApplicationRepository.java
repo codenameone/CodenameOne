@@ -1,0 +1,103 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.morsel.repository;
+
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.PageRequest;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Repository;
+import com.codenameone.examples.morsel.domain.CourierApplication;
+
+import java.util.List;
+
+/// Applications to drive, one per account at most, keyed by the account.
+///
+/// Every move of an application from one status to another is one conditional
+/// statement answering how many rows it changed, so that of two callers moving
+/// the same application out of the same status the count is 1 for one of them
+/// and 0 for the other. Each is marked `clearAutomatically`, which empties the
+/// session after it, so an application read before a move is read again after
+/// it, as the move left it.
+@Repository(entity = CourierApplication.class, key = String.class)
+public interface CourierApplicationRepository extends CrudRepository<CourierApplication, String> {
+    /// The applications of these accounts; none for a name that made none.
+    List<CourierApplication> findByUsernameIn(List<String> usernames);
+
+    /// The applications of every account that has a courier's state.
+    @Query("select a from CourierApplication a where a.username in "
+            + "(select d.username from CourierState d)")
+    List<CourierApplication> ofCouriers();
+
+    /// The name and status of every application, as `{username, status}`.
+    @Query("select a.username, a.status from CourierApplication a")
+    List<Object[]> statuses();
+
+    long countByStatus(String status);
+
+    /// Applications of every status, the latest handed in first. Only those
+    /// of accounts that still have a profile, as the list names the
+    /// applicant.
+    @Query("select a from CourierApplication a where a.username in "
+            + "(select p.username from Profile p) order by a.submittedAt desc, a.username asc")
+    List<CourierApplication> newest(PageRequest page);
+
+    /// Applications in one status, the longest waiting first; only those of
+    /// accounts that still have a profile.
+    @Query("select a from CourierApplication a where a.status = :status "
+            + "and a.username in (select p.username from Profile p) "
+            + "order by a.submittedAt asc, a.username asc")
+    List<CourierApplication> inStatus(@Param("status") String status, PageRequest page);
+
+    /// Moves an application from status `from` to `to`, recording the review.
+    @Modifying(clearAutomatically = true)
+    @Query("update CourierApplication a set a.status = :to, a.rejectionReason = :reason, "
+            + "a.reviewedAt = :at, a.reviewedBy = :by "
+            + "where a.username = :username and a.status = :from")
+    int move(@Param("username") String username, @Param("from") String from,
+            @Param("to") String to, @Param("reason") String reason, @Param("at") long at,
+            @Param("by") String by);
+
+    /// Marks an application `approved` unless it already is.
+    @Modifying(clearAutomatically = true)
+    @Query("update CourierApplication a set a.status = :to, a.rejectionReason = '', "
+            + "a.reviewedAt = :at, a.reviewedBy = :by "
+            + "where a.username = :username and a.status <> :to")
+    int approveUnlessApproved(@Param("username") String username,
+            @Param("to") String approved, @Param("at") long at, @Param("by") String by);
+
+    /// Hands an application in: from the status it was read in to `to`, with
+    /// the last rejection's reason cleared.
+    @Modifying(clearAutomatically = true)
+    @Query("update CourierApplication a set a.status = :to, a.submittedAt = :at, "
+            + "a.rejectionReason = '' where a.username = :username and a.status = :from")
+    int submit(@Param("username") String username, @Param("from") String from,
+            @Param("to") String to, @Param("at") long at);
+
+    /// Makes the rest of the transaction wait its turn behind any other that
+    /// holds, or moves, the same application.
+    ///
+    /// @return 1, or 0 for an account that has no application yet
+    @Modifying
+    @Query("update CourierApplication a set a.status = a.status where a.username = :username")
+    int hold(@Param("username") String username);
+
+    int deleteByUsername(String username);
+}
