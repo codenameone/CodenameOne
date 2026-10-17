@@ -2814,6 +2814,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-17T00:01:10+00:00"
+      },
+      "devto": {
+        "id": 4868310,
+        "url": "https://dev.to/codenameone/easy-full-stack-authentication-and-login-in-the-style-of-spring-455a",
+        "syndicated_at": "2026-10-17T16:27:04+00:00"
       }
     }
   }
