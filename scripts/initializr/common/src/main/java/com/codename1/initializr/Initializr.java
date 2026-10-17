@@ -1130,9 +1130,10 @@ public class Initializr extends Lifecycle {
         return "https://cloud.codenameone.com/ide/?new=" + kind
                 + "&name=" + com.codename1.io.Util.encodeUrl(appName)
                 + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
-                // Full-stack projects are Maven-only (ProjectOptions.forFullStack),
-                // whatever the hidden build-tool choice still holds.
-                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE && !"fullstack".equals(kind) ? "gradle" : "maven");
+                // Full-stack templates (Wayline) are Maven-only (ProjectOptions.forFullStack),
+                // whatever the hidden build-tool choice still holds; an ordinary
+                // App + backend project keeps the Gradle the user picked.
+                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE && !template.isFullStack() ? "gradle" : "maven");
     }
 
     /// Client property: the material icon a button carries, so a theme switch can redraw it.

@@ -9,7 +9,7 @@
       </p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-primary-project") }}
-        {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-primary-browser-ide" "variant" "secondary") }}
+        {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-primary-browser-ide" "variant" "secondary" "external" true) }}
         {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne?utm_source=codenameone&utm_medium=website&utm_campaign=homepage&utm_content=source" "event" "home-source" "variant" "secondary" "external" true) }}
       </div>
       <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
@@ -251,7 +251,7 @@ app.show();</code></pre>
     </div>
     <div class="cn1-action-row">
       {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-final-project") }}
-      {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-final-browser-ide" "variant" "secondary") }}
+      {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-final-browser-ide" "variant" "secondary" "external" true) }}
       {{ partial "cn1-cta.html" (dict "label" "Follow the build guide" "href" "/getting-started/" "variant" "secondary") }}
     </div>
   </section>
