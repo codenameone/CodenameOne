@@ -236,7 +236,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len){
-        this(bytesToChars(bytes, off, len, "UTF-8"));
+        this(bytesToChars(checkRange(bytes, off, len), off, len, "UTF-8"));
     }
 
     /**
@@ -246,7 +246,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, off, len, knownEncoding(enc)));
+        this(bytesToChars(checkRange(bytes, off, len), off, len, knownEncoding(enc)));
     }
     
     /// Decodes `bytes` with `charset`. Unlike the constructor taking a
@@ -263,6 +263,15 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public String(byte[] bytes, java.lang.String enc) throws java.io.UnsupportedEncodingException{
         this(bytesToChars(bytes, 0, bytes.length, knownEncoding(enc)));
+    }
+
+    // The native reads len bytes from b + off with no bounds check of its own.
+    private static byte[] checkRange(byte[] b, int off, int len) {
+        if (off < 0 || len < 0 || off > b.length - len) {
+            throw new StringIndexOutOfBoundsException("offset " + off + ", length " + len
+                    + ", array length " + b.length);
+        }
+        return b;
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 
@@ -1392,7 +1401,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     /// Decodes `length` bytes of `bytes` from `offset` with `charset`.
     public String(byte[] bytes, int offset, int length, Charset charset) {
-        this(bytesToChars(bytes, offset, length, charset.name()));
+        this(bytesToChars(checkRange(bytes, offset, length), offset, length, charset.name()));
     }
 
     private static char[] codePointsToChars(int[] codePoints, int offset, int count) {

@@ -245,7 +245,22 @@ public class Executors {
                 }
             }
             if (started != null) {
-                started.start();
+                boolean running = false;
+                try {
+                    started.start();
+                    running = true;
+                } finally {
+                    if (!running) {
+                        // A thread that cannot start (one the factory already
+                        // started) must not hold a worker slot it will never
+                        // serve, or the command it was made for waits forever.
+                        synchronized (queue) {
+                            workers.remove(started);
+                            queue.remove(command);
+                            queue.notifyAll();
+                        }
+                    }
+                }
             }
         }
 

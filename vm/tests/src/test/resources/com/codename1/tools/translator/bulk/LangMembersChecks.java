@@ -45,6 +45,30 @@ public final class LangMembersChecks {
                 Bulk.p("cbrt " + t, Math.abs(got - want) <= 1);
             }
         });
+        Bulk.check("Lang.tanhSmallInputsAreAccurate", () -> {
+            double[] xs = {-0.25444256546893085, 0.9900105052487167, -0.5414934855402953, 0.5, 1e-3, 1e-9, 0.999999};
+            for (double x : xs) {
+                Bulk.p("tanh " + x, Math.abs(Math.tanh(x) - StrictMath.tanh(x)) <= 2 * Math.ulp(StrictMath.tanh(x)));
+            }
+        });
+        Bulk.check("Lang.unassignedCjkExtensionGapsAreNotLetters", () -> {
+            int[] cps = {0x2a6f0, 0x2b73f, 0x2b81e, 0x2cea2, 0x2ee5e, 0x2f7ff, 0x2fa1e, 0x2ffff, 0x2f800, 0x2b740};
+            for (int cp : cps) {
+                Bulk.p(Integer.toHexString(cp), Character.isLetter(cp));
+            }
+        });
+        Bulk.check("Lang.aStringDecodedOutOfRangeThrows", () -> {
+            int[][] ranges = {{1, 1}, {-1, 1}, {0, -1}, {2, 0}};
+            for (int[] r : ranges) {
+                String got;
+                try {
+                    got = new String(new byte[1], r[0], r[1], java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IndexOutOfBoundsException e) {
+                    got = "IOOBE";
+                }
+                Bulk.p(r[0] + "," + r[1], got);
+            }
+        });
         Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
     }
 }

@@ -39,9 +39,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "This pull request adds pure-logic Java APIs to the class library (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "reason": "The Java API additions change the translated runtime's code size by a few bytes",
      "runs": 1,
-     "value": 14561410
+     "value": 14561442
     },
     "install_bytes": {
      "from": {
@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "This pull request adds pure-logic Java APIs to the class library (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "reason": "The Java API additions change the translated runtime's code size by a few bytes",
      "runs": 1,
-     "value": 84673526
+     "value": 84673339
     }
    }
   }

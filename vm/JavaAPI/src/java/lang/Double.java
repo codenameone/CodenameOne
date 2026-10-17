@@ -89,8 +89,9 @@ public final class Double extends Number implements Comparable<Double> {
      * In all cases, the result is a long integer that, when given to the longBitsToDouble(long) method, will produce a floating-point value equal to the argument to doubleToLongBits.
      */
     /**
-     * The raw IEEE 754 bits of {@code value}, without collapsing NaN to the
-     * canonical NaN. See {@link Float#floatToRawIntBits} for why this delegates.
+     * The raw IEEE 754 bits of {@code value}. A NaN comes back as the
+     * canonical NaN, its payload dropped. See {@link Float#floatToRawIntBits}
+     * for why this delegates instead of declaring a native of its own.
      */
     public static long doubleToRawLongBits(double value) {
         return doubleToLongBits(value);

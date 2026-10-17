@@ -1557,7 +1557,11 @@ public final class Character implements Comparable<Character>{
                 || c >= 0xac00 && c <= 0xd7a3 // Hangul
                 || c >= 0xf900 && c <= 0xfa6d || c >= 0xfa70 && c <= 0xfad9 // CJK compatibility ideographs, less the unassigned
                 || c >= 0xff21 && c <= 0xff3a || c >= 0xff41 && c <= 0xff5a // fullwidth Latin
-                || c >= 0x20000 && c <= 0x3134a; // CJK extensions B-G
+                || c >= 0x20000 && c <= 0x2a6df || c >= 0x2a700 && c <= 0x2b739 // CJK extensions B, C
+                || c >= 0x2b740 && c <= 0x2b81d || c >= 0x2b820 && c <= 0x2cea1 // CJK extensions D, E
+                || c >= 0x2ceb0 && c <= 0x2ebe0 || c >= 0x2ebf0 && c <= 0x2ee5d // CJK extensions F, I
+                || c >= 0x2f800 && c <= 0x2fa1d // CJK compatibility supplement
+                || c >= 0x30000 && c <= 0x3134a; // CJK extension G
     }
 
     // Greek Extended holds spacing accents (Sk) and unassigned holes between its letters.

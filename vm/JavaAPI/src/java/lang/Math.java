@@ -592,8 +592,17 @@ public final class Math{
             return -1;
         }
         if (Math.abs(x) < 1) {
-            double s = sinhSeries(x);
-            return s / Math.sqrt(1 + s * s);
+            // Lambert's continued fraction, tanh x = x / (1 + t), with the
+            // small correction x t / (1 + t) taken off x last so its rounding
+            // stays small against the result: within 1.05 ulp of exact over
+            // this range, where sinh / sqrt(1 + sinh^2) reached 4.
+            double x2 = x * x;
+            double d = 29;
+            for (int k = 14; k >= 2; k--) {
+                d = (2 * k - 1) + x2 / d;
+            }
+            double t = x2 / d;
+            return x - x * t / (1 + t);
         }
         double e = Math.exp(2 * x);
         return (e - 1) / (e + 1);

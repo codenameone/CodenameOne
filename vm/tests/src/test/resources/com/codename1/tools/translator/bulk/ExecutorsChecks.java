@@ -332,6 +332,32 @@ public final class ExecutorsChecks {
         });
         // Only the interrupt cancel(true) delivered is consumed when the run
         // ends; after cancel(false) the runner's own interrupt is its own.
+        // A worker whose thread will not start gives its slot back, so the
+        // pool's next submission still gets a worker and shutdown terminates.
+        Bulk.check("Executors.aThreadThatWillNotStartFreesItsSlot", () -> {
+            final AtomicInteger made = new AtomicInteger();
+            ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
+                if (made.getAndIncrement() == 0) {
+                    return new Thread(r) {
+                        @Override
+                        public synchronized void start() {
+                            throw new IllegalStateException("will not start");
+                        }
+                    };
+                }
+                return new Thread(r);
+            });
+            // Whether this submission reports the failure differs between JDK
+            // releases, so only what follows it is compared.
+            try {
+                pool.execute(() -> { });
+            } catch (IllegalStateException e) {
+                // ours propagates it
+            }
+            Bulk.p("second", pool.submit(() -> "ran").get(20, TimeUnit.SECONDS));
+            pool.shutdown();
+            Bulk.p("terminated", pool.awaitTermination(20, TimeUnit.SECONDS));
+        });
         Bulk.check("Executors.cancelFalseLeavesTheRunnersInterruptAlone", () -> {
             final CountDownLatch started = new CountDownLatch(1);
             final CountDownLatch cancelled = new CountDownLatch(1);
