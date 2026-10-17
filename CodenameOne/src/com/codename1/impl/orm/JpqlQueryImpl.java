@@ -774,6 +774,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 compatible(left, high);
                 bindType(left, low);
                 bindType(left, high);
+                // `:t BETWEEN e.from AND e.to` -- the bounds carry the mapping.
+                bindType(low, left);
+                bindType(high, left);
                 return node(session.orderValue(left.sql, sqlKind(left, low.temporal || high.temporal))
                         + (not ? " NOT BETWEEN " : " BETWEEN ")
                         + "(" + session.orderValue(low.sql, sqlKind(low, left.temporal)) + ") AND ("

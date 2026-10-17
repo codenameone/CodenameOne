@@ -458,6 +458,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             hide(ec,fieldPath.owner.replace('.','/'),f);
             RelationField relationship = relation(f, ec, ctx);
             if (relationship != null) {
+                // Element collections and relationships keep their own column
+                // format; a @Temporal there would be silently ignored.
+                if(f.getAnnotation("Lcom/codename1/annotations/db/Temporal;")!=null) { ctx.error(cls,"@Temporal applies to a single java.util.Date field, not a relationship or collection: "+fieldPath.path);continue; }
                 if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
                 relationship.declaringType=fieldPath.declaringType;relationship.index=ec.relations.size(); ec.relations.add(relationship); continue; }
             PersistedField pf = new PersistedField();

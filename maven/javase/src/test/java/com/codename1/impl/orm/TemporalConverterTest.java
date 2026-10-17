@@ -73,6 +73,10 @@ class TemporalConverterTest {
         assertEquals(Instant.parse("1969-07-20T00:00:00Z").toEpochMilli(),
                 new TemporalConverter.Day().fromDatabase("1969-07-20 18:00:00").getTime());
         assertNull(new TemporalConverter.Timestamp().fromDatabase(null));
+        // MySQL's DATE and DATETIME start at year 1000, so writes stop there.
+        long floor = Instant.parse("1000-01-01T00:00:00Z").toEpochMilli();
+        assertEquals("1000-01-01", new TemporalConverter.Day().toDatabase(new Date(floor)));
+        assertThrows(IllegalArgumentException.class, () -> new TemporalConverter.Timestamp().toDatabase(new Date(floor - 1)));
         assertNull(new TemporalConverter.Timestamp().toDatabase(null));
         assertEquals("2024-02-29", new TemporalConverter.Day().toDatabase(new Date(expected)));
     }

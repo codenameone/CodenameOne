@@ -68,7 +68,15 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
 
     @Override
     public String toDatabase(Date value) {
-        return value == null ? null : format(value.getTime(), day);
+        if (value == null) {
+            return null;
+        }
+        // MySQL and MariaDB DATE/DATETIME start at 1000-01-01, so that is the
+        // portable floor for a write. Reads still accept any four-digit year.
+        if (value.getTime() < FIRST_WRITABLE) {
+            throw new IllegalArgumentException("A @Temporal value must fall in the years 1000 to 9999: " + value.getTime());
+        }
+        return format(value.getTime(), day);
     }
 
     @Override
@@ -84,6 +92,9 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
 
     /// `2026-10-16 09:30:00.000` in UTC, or `2026-10-16` for a day. Fixed width,
     /// so on SQLite, where it is compared as text, text order is time order.
+    /// 1000-01-01 00:00:00 UTC.
+    static final long FIRST_WRITABLE = -30610224000000L;
+
     static String format(long millis, boolean dayOnly) {
         long days = floorDiv(millis, DAY);
         long rest = millis - days * DAY;

@@ -243,6 +243,7 @@ public class OrmAnnotationProcessorTest {
             // text collation on one, and LIKE is not offered on it.
             + "Date before=new Date(1709214306000L), dayBefore=new Date(-14256000000L-86400000L), day=new Date(-14256000000L); "
             + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE :t BETWEEN c.birthday AND c.signedUp\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"reversed BETWEEN\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
             + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "
             // Through expressions whose value is one of their operands.
@@ -1314,6 +1315,12 @@ public class OrmAnnotationProcessorTest {
             if(Boolean.parseBoolean(c[2])) assertFalse(c[0]+" over "+c[1]+": "+errors,ctx.hasErrors());
             else assertTrue(c[0]+" over "+c[1]+": "+errors,errors.contains("does not hold a @Temporal("+c[0]+") value: at"));
         }
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("temporaltype.Diary","package temporaltype; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.*; "
+            + "@Entity public class Diary { @Id public long id; @Temporal(TemporalType.DATE) @ElementCollection public List<Date> days=new ArrayList<Date>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        String errors=runProcessor(classes,Collections.<String>emptyList()).getErrors().toString();
+        assertTrue(errors,errors.contains("@Temporal applies to a single java.util.Date field, not a relationship or collection: days"));
     }
 
     @Test

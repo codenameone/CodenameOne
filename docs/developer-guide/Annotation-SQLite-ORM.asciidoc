@@ -445,7 +445,7 @@ which is all a `Date` carries; digits beyond that read from an existing column
 are dropped toward the earlier instant. A `DATE` column holds the UTC day, and
 reads back as midnight UTC. SQLite has no date type, so it stores
 `2024-02-29 13:45:06.789` and `2024-02-29` as text, which sorts in time order.
-Years outside 0000 to 9999, zero dates, and other values the column can't
+Writes outside the years 1000 to 9999 (MySQL's range), zero dates, and other values the column can't
 represent exactly are rejected rather than converted. A value whose text carries
 a time-zone offset, such as one read from a PostgreSQL `timestamptz` column,
 reads as the instant it names.
