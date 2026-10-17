@@ -990,6 +990,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (a.generated) {
                     statement.append(sql.generatedKeyColumn(a.kind, q(a.column)));
                 } else {
+                    if (a.temporal == Attribute.TEMPORAL_TIMESTAMP && a.declaredType != null
+                            && "mysql".equals(sql.dialect()) && "timestamp".equals(firstTypeToken(a.declaredType))) {
+                        // The schema report refuses it right after: MySQL's
+                        // TIMESTAMP ends in 2038.
+                        throw new PersistenceException("A @Temporal(TIMESTAMP) field needs DATETIME(3) on MySQL, "
+                                + "not " + a.declaredType + ": " + model.table() + "." + a.column);
+                    }
                     statement.append(columnType(model, i)).append(a.nullable && !a.id ? "" : " NOT NULL");
                 }
             }
@@ -1181,9 +1188,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)) {
             // A long over a 32-bit column fails writes, and an int over a
-            // 64-bit column cannot load what is already there.
+            // 64-bit column cannot load what is already there. An unsigned
+            // column has neither the negatives nor the range of a Java type.
             int width = integerWidth(found);
-            if (width != 0 && width != (attr.kind == Attribute.BIGINT ? 8 : 4)) {
+            if (width != 0 && width != (attr.kind == Attribute.BIGINT ? 8 : 4)
+                    || asciiLower(found).indexOf("unsigned") >= 0) {
                 return false;
             }
         }
@@ -1328,7 +1337,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     continue;
                 }
                 boolean primary = ((Number) found[3]).intValue() != 0;
-                boolean required = ((Number) found[2]).intValue() != 0 || primary;
+                boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
                 if (primary != attr.id) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             "Primary key mismatch on " + name));
@@ -1513,18 +1522,84 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         // A WITHOUT ROWID table has no rowid, and a column declared
-        // INTEGER PRIMARY KEY DESC is an ordinary column, not its alias.
-        String definition = squeeze(createSql == null ? "" : asciiLower(createSql));
-        boolean rowidTable = definition.indexOf("without rowid") < 0 && definition.indexOf("primary key desc") < 0;
+        // INTEGER PRIMARY KEY DESC is an ordinary column, not its alias. Read
+        // from the statement's tokens, so a name, string or comment that
+        // happens to spell either does not count.
+        List<String> tokens = sqlTokens(createSql == null ? "" : createSql);
+        int close = tokens.lastIndexOf(")");
+        boolean withoutRowid = false;
+        boolean descendingKey = false;
+        for (int i = 0; i + 1 < tokens.size(); i++) {
+            if (i > close && "without".equals(tokens.get(i)) && "rowid".equals(tokens.get(i + 1))) {
+                withoutRowid = true;
+            }
+            if (i + 2 < tokens.size() && "primary".equals(tokens.get(i)) && "key".equals(tokens.get(i + 1))
+                    && "desc".equals(tokens.get(i + 2))) {
+                descendingKey = true;
+            }
+        }
+        boolean rowidTable = !withoutRowid && !descendingKey;
         List<Object[]> result = new ArrayList<Object[]>();
         for (Object[] row : raw) {
             boolean filled = row[4] != null && !"null".equals(unparenthesized(asciiLower(String.valueOf(row[4]))));
             boolean rowid = rowidTable && keys == 1 && row[5] instanceof Number && ((Number) row[5]).intValue() != 0
                     && "INTEGER".equalsIgnoreCase(String.valueOf(row[2]).trim());
-            result.add(new Object[] {row[1], row[2], row[3], row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
+            // A key column holds NULL in SQLite unless it is the rowid, the
+            // table has none, or the column says NOT NULL.
+            boolean key = row[5] instanceof Number && ((Number) row[5]).intValue() != 0;
+            Object notNull = key && (rowid || withoutRowid) ? Integer.valueOf(1) : row[3];
+            result.add(new Object[] {row[1], row[2], notNull, row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
                     Integer.valueOf(rowid ? 1 : 0), Integer.valueOf(0)});
         }
         return result;
+    }
+    private static boolean wordChar(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$' || c > 127;
+    }
+    /// The keywords and punctuation of a statement, lower case, with string
+    /// literals, quoted identifiers and comments left out.
+    private static List<String> sqlTokens(String text) {
+        List<String> tokens = new ArrayList<String>();
+        int i = 0;
+        int n = text.length();
+        while (i < n) {
+            char c = text.charAt(i);
+            if (c == '\'' || c == '"' || c == '`' || c == '[') {
+                char end = c == '[' ? ']' : c;
+                i++;
+                while (i < n) {
+                    if (text.charAt(i) == end) {
+                        if (end != ']' && i + 1 < n && text.charAt(i + 1) == end) {
+                            i += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    i++;
+                }
+                i++;
+                tokens.add("?");
+            } else if (c == '-' && i + 1 < n && text.charAt(i + 1) == '-') {
+                while (i < n && text.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && i + 1 < n && text.charAt(i + 1) == '*') {
+                int stop = text.indexOf("*/", i + 2);
+                i = stop < 0 ? n : stop + 2;
+            } else if (wordChar(c)) {
+                int start = i;
+                while (i < n && wordChar(text.charAt(i))) {
+                    i++;
+                }
+                tokens.add(asciiLower(text.substring(start, i)));
+            } else {
+                if (c > ' ') {
+                    tokens.add(String.valueOf(c));
+                }
+                i++;
+            }
+        }
+        return tokens;
     }
     /// `((NULL))` is NULL: SQLite keeps a default's redundant parentheses.
     private static String unparenthesized(String value) {
@@ -1533,24 +1608,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             text = text.substring(1, text.length() - 1).trim();
         }
         return text;
-    }
-    /// Collapses whitespace runs to one space.
-    private static String squeeze(String text) {
-        StringBuilder out = new StringBuilder(text.length());
-        boolean space = false;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c <= ' ') {
-                space = true;
-                continue;
-            }
-            if (space && out.length() > 0) {
-                out.append(' ');
-            }
-            space = false;
-            out.append(c);
-        }
-        return out.toString();
     }
     private static String[] split(String text, char separator) {
         List<String> parts = new ArrayList<String>();

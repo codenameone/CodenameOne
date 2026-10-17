@@ -268,7 +268,7 @@ public class OrmAnnotationProcessorTest {
         String dialect=backend ? db.dialect().getName().toLowerCase(java.util.Locale.ROOT) : "sqlite";
         boolean postgres=dialect.startsWith("postgres"), mysql=dialect.startsWith("mysql") || dialect.startsWith("mariadb");
         String[] ddl={
-            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code","CREATE TABLE legacy_code (code VARCHAR(40)"+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : "")+" NOT NULL PRIMARY KEY, n INTEGER)","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
+            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code","CREATE TABLE legacy_code (code VARCHAR(40)"+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : "")+" NOT NULL PRIMARY KEY, n "+(mysql ? "BIGINT UNSIGNED" : "INTEGER")+")","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
             // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the
@@ -309,6 +309,9 @@ public class OrmAnnotationProcessorTest {
                         && expected.getMessage().contains("Unsupported mappings") && expected.getMessage().contains("startup_visit.happened"));
             }
             startBackend(path,false).stop();
+            // Text that merely spells the clauses is not the clauses.
+            schema(path,"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT DEFAULT 0, hits BIGINT NOT NULL DEFAULT 0, \"without rowid\" TEXT DEFAULT 'primary key desc') -- without rowid");
+            startBackend(path,true).stop();
             // Stricter than the mapping: tolerated, and logged.
             schema(path,"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT NOT NULL, hits BIGINT NOT NULL)");
             startBackend(path,true).stop();
@@ -325,7 +328,9 @@ public class OrmAnnotationProcessorTest {
                     {"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL)","The database does not generate startup_visit.id"},
                     {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL, note TEXT NOT NULL DEFAULT ((NULL)))","startup_visit.note"},
                     {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY DESC, happened BIGINT, hits BIGINT NOT NULL)","The database does not generate startup_visit.id"},
-                    {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL) WITHOUT ROWID","The database does not generate startup_visit.id"}}) {
+                    {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL) WITHOUT ROWID","The database does not generate startup_visit.id"},
+                    // A key that is not the rowid holds NULL unless it says NOT NULL.
+                    {"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL)","Missing NOT NULL on startup_visit.id"}}) {
                 schema(path,c[0]);
                 try { startBackend(path,true).stop(); fail(c[0]); }
                 catch(java.io.IOException expected) { assertTrue(expected.getMessage(),expected.getMessage().contains(c[1])); }

@@ -79,7 +79,7 @@ public final class BackendSqlAccess implements SqlAccess {
                 : "CASE WHEN c.is_identity='YES' OR c.column_default LIKE 'nextval(%' THEN 1 ELSE 0 END";
         String readOnly = mysql ? "CASE WHEN c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' THEN 1 ELSE 0 END"
                 : "CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' AND c.identity_generation='ALWAYS' THEN 1 ELSE 0 END";
-        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, c.collation_name, " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
+        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, c.collation_name, " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
                 + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
                 + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
         return query(statement, mysql ? new Object[]{table} : new Object[]{table, table}, new int[8]);
