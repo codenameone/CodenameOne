@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnimatedSprite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">AnimatedSprite.java</span></div><h1>AnimatedSprite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.ui.Image;
+
+/// A `Sprite` that cycles through a sequence of frames over time.
+///
+/// The animation advances in `#onUpdate(double)`, so adding it to a `Scene` whose
+/// `Scene#update(double)` is called every frame (or calling `#onUpdate(double)`
+/// directly) drives playback. By default it loops; set `#setLooping(boolean)` to
+/// false to stop on the last frame.
+public class AnimatedSprite extends Sprite {
+    private final Image[] frames;
+    private double frameDuration;
+    private double accumulator;
+    private int current;
+<span class="fc" id="L38">    private boolean looping = true;</span>
+<span class="fc" id="L39">    private boolean playing = true;</span>
+
+    /// Creates an animated sprite from an explicit array of frames.
+    ///
+    /// #### Parameters
+    ///
+    /// - `frames`: the frame images, played in order
+    ///
+    /// - `secondsPerFrame`: how long each frame is shown, in seconds
+<span class="fc" id="L48">    public AnimatedSprite(Image[] frames, double secondsPerFrame) {</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (frames == null || frames.length == 0) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;frames is empty&quot;);</span>
+        }
+<span class="fc" id="L52">        this.frames = frames;</span>
+<span class="fc" id="L53">        this.frameDuration = secondsPerFrame;</span>
+<span class="fc" id="L54">        setImage(frames[0]);</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Creates an animated sprite from frames pulled out of a `SpriteSheet`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sheet`: the source sprite sheet
+    ///
+    /// - `frameIndices`: the linear frame indices to play, in order
+    ///
+    /// - `secondsPerFrame`: how long each frame is shown, in seconds
+<span class="fc" id="L66">    public AnimatedSprite(SpriteSheet sheet, int[] frameIndices, double secondsPerFrame) {</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (frameIndices == null || frameIndices.length == 0) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(&quot;frameIndices is empty&quot;);</span>
+        }
+<span class="fc" id="L70">        Image[] f = new Image[frameIndices.length];</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 0; i &lt; f.length; i++) {</span>
+<span class="fc" id="L72">            f[i] = sheet.getFrame(frameIndices[i]);</span>
+        }
+<span class="fc" id="L74">        this.frames = f;</span>
+<span class="fc" id="L75">        this.frameDuration = secondsPerFrame;</span>
+<span class="fc" id="L76">        setImage(f[0]);</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    protected void onUpdate(double deltaSeconds) {
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (!playing || frameDuration &lt;= 0) {</span>
+<span class="fc" id="L82">            return;</span>
+        }
+<span class="fc" id="L84">        accumulator += deltaSeconds;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        while (accumulator &gt;= frameDuration) {</span>
+<span class="fc" id="L86">            accumulator -= frameDuration;</span>
+<span class="fc" id="L87">            current++;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (current &gt;= frames.length) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                if (looping) {</span>
+<span class="fc" id="L90">                    current = 0;</span>
+                } else {
+<span class="fc" id="L92">                    current = frames.length - 1;</span>
+<span class="fc" id="L93">                    playing = false;</span>
+<span class="fc" id="L94">                    break;</span>
+                }
+            }
+        }
+<span class="fc" id="L98">        setImage(frames[current]);</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Starts (or resumes) playback.
+    public void play() {
+<span class="fc" id="L103">        playing = true;</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Pauses playback, keeping the current frame.
+    public void pause() {
+<span class="fc" id="L108">        playing = false;</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Stops playback and rewinds to the first frame.
+    public void stop() {
+<span class="fc" id="L113">        playing = false;</span>
+<span class="fc" id="L114">        current = 0;</span>
+<span class="fc" id="L115">        accumulator = 0;</span>
+<span class="fc" id="L116">        setImage(frames[0]);</span>
+<span class="fc" id="L117">    }</span>
+
+    public boolean isPlaying() {
+<span class="fc" id="L120">        return playing;</span>
+    }
+
+    public boolean isLooping() {
+<span class="fc" id="L124">        return looping;</span>
+    }
+
+    public void setLooping(boolean looping) {
+<span class="fc" id="L128">        this.looping = looping;</span>
+<span class="fc" id="L129">    }</span>
+
+    public double getFrameDuration() {
+<span class="fc" id="L132">        return frameDuration;</span>
+    }
+
+    public void setFrameDuration(double secondsPerFrame) {
+<span class="fc" id="L136">        this.frameDuration = secondsPerFrame;</span>
+<span class="fc" id="L137">    }</span>
+
+    /// The index of the frame currently being shown.
+    public int getCurrentFrame() {
+<span class="fc" id="L141">        return current;</span>
+    }
+
+    /// Jumps to the given frame index.
+    public void setCurrentFrame(int index) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= frames.length) {</span>
+<span class="nc" id="L147">            throw new IndexOutOfBoundsException(&quot;frame index &quot; + index);</span>
+        }
+<span class="fc" id="L149">        current = index;</span>
+<span class="fc" id="L150">        accumulator = 0;</span>
+<span class="fc" id="L151">        setImage(frames[index]);</span>
+<span class="fc" id="L152">    }</span>
+
+    public int getFrameCount() {
+<span class="fc" id="L155">        return frames.length;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

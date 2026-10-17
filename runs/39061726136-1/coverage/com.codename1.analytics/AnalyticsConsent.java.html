@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsConsent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">AnalyticsConsent.java</span></div><h1>AnalyticsConsent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+/// An immutable snapshot of the consent the user has granted, broken down by
+/// category so that an application can honour granular choices (for example
+/// allowing crash reporting while declining behavioural analytics). Instances
+/// are created through {@link #all()}, {@link #none()} or {@link #builder()}
+/// and handed to {@link Analytics#setConsent(AnalyticsConsent)}. An application
+/// that has already collected consent elsewhere can unblock everything in one
+/// line: {@code Analytics.setConsent(AnalyticsConsent.all())}.
+public final class AnalyticsConsent {
+    private final boolean analytics;
+    private final boolean crashReporting;
+    private final boolean personalization;
+    private final boolean adStorage;
+
+    AnalyticsConsent(boolean analytics, boolean crashReporting,
+<span class="fc" id="L39">            boolean personalization, boolean adStorage) {</span>
+<span class="fc" id="L40">        this.analytics = analytics;</span>
+<span class="fc" id="L41">        this.crashReporting = crashReporting;</span>
+<span class="fc" id="L42">        this.personalization = personalization;</span>
+<span class="fc" id="L43">        this.adStorage = adStorage;</span>
+<span class="fc" id="L44">    }</span>
+
+    /// Consent for screen views, events and user properties.
+    ///
+    /// #### Returns
+    ///
+    /// true if behavioural analytics collection is permitted
+    public boolean isAnalytics() {
+<span class="fc" id="L52">        return analytics;</span>
+    }
+
+    /// Consent for crash and exception reporting.
+    ///
+    /// #### Returns
+    ///
+    /// true if crash reporting is permitted
+    public boolean isCrashReporting() {
+<span class="fc" id="L61">        return crashReporting;</span>
+    }
+
+    /// Consent for personalization (e.g. user-level identification).
+    ///
+    /// #### Returns
+    ///
+    /// true if personalization is permitted
+    public boolean isPersonalization() {
+<span class="fc" id="L70">        return personalization;</span>
+    }
+
+    /// Consent for advertising / ad storage.
+    ///
+    /// #### Returns
+    ///
+    /// true if ad storage is permitted
+    public boolean isAdStorage() {
+<span class="fc" id="L79">        return adStorage;</span>
+    }
+
+    /// A consent object granting every category. Use this when the application
+    /// has already obtained consent through its own mechanism (a custom prompt,
+    /// a third-party consent-management platform, an enterprise MDM policy, or
+    /// a jurisdiction where the integrator has determined consent is not
+    /// required) and simply wants reporting to flow:
+    ///
+    /// ```java
+    /// // app handled consent elsewhere -- unblock all categories at startup
+    /// Analytics.setConsent(AnalyticsConsent.all());
+    /// ```
+    ///
+    /// For apps that would rather not gate at all, see
+    /// {@link Analytics#setConsentMode(ConsentMode)} with
+    /// {@link ConsentMode#OPT_OUT}.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories granted
+    public static AnalyticsConsent all() {
+<span class="fc" id="L101">        return new AnalyticsConsent(true, true, true, true);</span>
+    }
+
+    /// A consent object denying every category. Equivalent to the implicit
+    /// state before consent is recorded in {@link ConsentMode#OPT_IN}.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories denied
+    public static AnalyticsConsent none() {
+<span class="fc" id="L111">        return new AnalyticsConsent(false, false, false, false);</span>
+    }
+
+    /// Alias for {@link #all()}; granting every category.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories granted
+    public static AnalyticsConsent granted() {
+<span class="fc" id="L120">        return all();</span>
+    }
+
+    /// Alias for {@link #none()}; denying every category.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories denied
+    public static AnalyticsConsent denied() {
+<span class="fc" id="L129">        return none();</span>
+    }
+
+    /// Creates a builder seeded with all categories denied.
+    ///
+    /// #### Returns
+    ///
+    /// a new builder
+    public static Builder builder() {
+<span class="fc" id="L138">        return new Builder();</span>
+    }
+
+    /// Returns a builder seeded with this object's current values so a single
+    /// category can be toggled without rebuilding from scratch.
+    ///
+    /// #### Returns
+    ///
+    /// a builder pre-populated from this instance
+    public Builder asBuilder() {
+<span class="fc" id="L148">        return new Builder()</span>
+<span class="fc" id="L149">                .analytics(analytics)</span>
+<span class="fc" id="L150">                .crashReporting(crashReporting)</span>
+<span class="fc" id="L151">                .personalization(personalization)</span>
+<span class="fc" id="L152">                .adStorage(adStorage);</span>
+    }
+
+    /// Mutable builder for {@link AnalyticsConsent}.
+<span class="fc" id="L156">    public static final class Builder {</span>
+        private boolean analytics;
+        private boolean crashReporting;
+        private boolean personalization;
+        private boolean adStorage;
+
+        /// Sets the analytics category.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: true to grant behavioural analytics
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder analytics(boolean value) {
+<span class="fc" id="L172">            this.analytics = value;</span>
+<span class="fc" id="L173">            return this;</span>
+        }
+
+        /// Sets the crash reporting category.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: true to grant crash reporting
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder crashReporting(boolean value) {
+<span class="fc" id="L186">            this.crashReporting = value;</span>
+<span class="fc" id="L187">            return this;</span>
+        }
+
+        /// Sets the personalization category.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: true to grant personalization
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder personalization(boolean value) {
+<span class="fc" id="L200">            this.personalization = value;</span>
+<span class="fc" id="L201">            return this;</span>
+        }
+
+        /// Sets the ad storage category.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: true to grant ad storage
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder adStorage(boolean value) {
+<span class="fc" id="L214">            this.adStorage = value;</span>
+<span class="fc" id="L215">            return this;</span>
+        }
+
+        /// Grants every category. Handy as a base before selectively
+        /// revoking one, e.g. {@code builder().all().adStorage(false)}.
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder all() {
+<span class="fc" id="L225">            this.analytics = true;</span>
+<span class="fc" id="L226">            this.crashReporting = true;</span>
+<span class="fc" id="L227">            this.personalization = true;</span>
+<span class="fc" id="L228">            this.adStorage = true;</span>
+<span class="fc" id="L229">            return this;</span>
+        }
+
+        /// Denies every category.
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder none() {
+<span class="nc" id="L238">            this.analytics = false;</span>
+<span class="nc" id="L239">            this.crashReporting = false;</span>
+<span class="nc" id="L240">            this.personalization = false;</span>
+<span class="nc" id="L241">            this.adStorage = false;</span>
+<span class="nc" id="L242">            return this;</span>
+        }
+
+        /// Builds the immutable consent object.
+        ///
+        /// #### Returns
+        ///
+        /// a new {@link AnalyticsConsent}
+        public AnalyticsConsent build() {
+<span class="fc" id="L251">            return new AnalyticsConsent(analytics, crashReporting, personalization, adStorage);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

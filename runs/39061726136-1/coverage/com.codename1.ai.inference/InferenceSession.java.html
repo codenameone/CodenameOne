@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InferenceSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.inference</a> &gt; <span class="el_source">InferenceSession.java</span></div><h1>InferenceSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+import com.codename1.impl.InferenceImpl;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+/// Reusable, native on-device session for a TensorFlow Lite model.
+///
+/// Opening and execution are asynchronous because model allocation and
+/// delegates can be expensive. Metadata and resize operations are synchronous.
+/// A session is not usable after {@link #close()}; applications should retain
+/// and reuse one session instead of reopening the model for every input.
+public final class InferenceSession implements AutoCloseable {
+    private final InferenceImpl implementation;
+    private final Object handle;
+    private boolean closed;
+    private int activeRuns;
+    private boolean closePending;
+
+<span class="fc" id="L43">    private InferenceSession(InferenceImpl implementation, Object handle) {</span>
+<span class="fc" id="L44">        this.implementation = implementation;</span>
+<span class="fc" id="L45">        this.handle = handle;</span>
+<span class="fc" id="L46">    }</span>
+
+    /// Tests whether the current port includes a native LiteRT runtime.
+    ///
+    /// @return {@code true} when sessions can be opened on this target
+    public static boolean isSupported() {
+<span class="nc" id="L52">        InferenceImpl impl = Display.getInstance().getInferenceBackend();</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        return impl != null &amp;&amp; impl.isSupported();</span>
+    }
+
+    /// Opens and allocates a model session off the EDT.
+    ///
+    /// The option values are copied before asynchronous backend work is
+    /// scheduled. Reusing or changing the supplied {@link InferenceOptions}
+    /// after this method returns therefore cannot alter the pending open.
+    /// Canceling the returned resource prevents session publication; if the
+    /// native backend finishes opening afterward, its handle is closed
+    /// automatically.
+    ///
+    /// @param source bytes, resource, or file containing a `.tflite` model
+    /// @param options execution options; {@code null} uses defaults
+    /// @return an asynchronous session, failed with {@link InferenceException}
+    ///         when the model or requested accelerator cannot be used
+    public static AsyncResource&lt;InferenceSession&gt; open(ModelSource source,
+                                                       InferenceOptions options) {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L72">            throw new NullPointerException(&quot;source&quot;);</span>
+        }
+<span class="fc" id="L74">        final SessionOpenResource out = new SessionOpenResource();</span>
+<span class="fc" id="L75">        final InferenceImpl impl = Display.getInstance().getInferenceBackend();</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        if (impl == null || !impl.isSupported()) {</span>
+<span class="nc" id="L77">            out.error(new InferenceException(&quot;LiteRT inference is not supported&quot;));</span>
+<span class="nc" id="L78">            return out;</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        InferenceOptions requested = options == null</span>
+                ? new InferenceOptions() : options;
+<span class="fc" id="L82">        impl.open(source, requested.snapshot())</span>
+<span class="fc" id="L83">                .ready(new SuccessCallback&lt;Object&gt;() {</span>
+                    @Override
+                    public void onSucess(Object value) {
+<span class="fc" id="L86">                        out.publish(impl, value);</span>
+<span class="fc" id="L87">                    }</span>
+<span class="fc" id="L88">                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable error) {
+<span class="nc" id="L91">                        out.fail(error);</span>
+<span class="nc" id="L92">                    }</span>
+                });
+<span class="fc" id="L94">        return out;</span>
+    }
+
+    private static final class SessionOpenResource
+            extends AsyncResource&lt;InferenceSession&gt; {
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+<span class="fc" id="L101">            return super.cancel(mayInterruptIfRunning);</span>
+        }
+
+        synchronized void publish(InferenceImpl implementation,
+                                  Object nativeHandle) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (isCancelled()) {</span>
+<span class="fc" id="L107">                implementation.close(nativeHandle);</span>
+<span class="fc" id="L108">                return;</span>
+            }
+<span class="fc" id="L110">            complete(new InferenceSession(implementation, nativeHandle));</span>
+<span class="fc" id="L111">        }</span>
+
+        synchronized void fail(Throwable error) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (!isCancelled()) {</span>
+<span class="nc" id="L115">                error(error);</span>
+            }
+<span class="nc" id="L117">        }</span>
+    }
+
+    /// Returns the model's current input metadata. Shapes reflect the most
+    /// recent successful {@link #resizeInput(String, int[])} call. Metadata
+    /// cannot be queried while {@link #run(Tensor[])} is pending because the
+    /// native interpreter is mutable and may be updating tensor state.
+    ///
+    /// @return a defensive copy of the input metadata array
+    /// @throws IllegalStateException if the session is closed or a run is pending
+    public TensorInfo[] getInputs() {
+<span class="fc" id="L128">        synchronized (this) {</span>
+<span class="fc" id="L129">            ensureOpen();</span>
+<span class="fc" id="L130">            ensureNotRunning(&quot;read input metadata&quot;);</span>
+<span class="fc" id="L131">            return copyMetadata(implementation.getInputs(handle));</span>
+        }
+    }
+
+    /// Returns the model's current output metadata. Backends refresh this
+    /// information after an invocation so models with dynamically resolved
+    /// output dimensions report the shape used to decode the returned tensor.
+    /// Metadata cannot be queried while {@link #run(Tensor[])} is pending
+    /// because the native interpreter is mutable and may be updating tensor
+    /// state.
+    ///
+    /// @return a defensive copy of the output metadata array
+    /// @throws IllegalStateException if the session is closed or a run is pending
+    public TensorInfo[] getOutputs() {
+<span class="fc" id="L145">        synchronized (this) {</span>
+<span class="fc" id="L146">            ensureOpen();</span>
+<span class="nc" id="L147">            ensureNotRunning(&quot;read output metadata&quot;);</span>
+<span class="nc" id="L148">            return copyMetadata(implementation.getOutputs(handle));</span>
+        }
+    }
+
+    private static TensorInfo[] copyMetadata(TensorInfo[] metadata) {
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        if (metadata == null || metadata.length == 0) {</span>
+<span class="nc" id="L154">            return new TensorInfo[0];</span>
+        }
+<span class="fc" id="L156">        TensorInfo[] copy = new TensorInfo[metadata.length];</span>
+<span class="fc" id="L157">        System.arraycopy(metadata, 0, copy, 0, metadata.length);</span>
+<span class="fc" id="L158">        return copy;</span>
+    }
+
+    /// Copies input tensors to native memory, invokes the model, and returns
+    /// every output tensor. Named tensors are matched by name; unnamed tensors
+    /// are matched by position. Calling {@link #close()} while this operation
+    /// is pending prevents new work immediately but defers native release until
+    /// the returned resource succeeds or fails. A session accepts one run at a
+    /// time because the underlying native interpreter is mutable. The array
+    /// container is defensively copied before it is handed to the asynchronous
+    /// backend, so replacing an element after this method returns cannot change
+    /// the pending invocation. Each {@link Tensor} is itself immutable.
+    /// Canceling the returned resource suppresses result publication but does
+    /// not interrupt an invocation that has already entered LiteRT. The
+    /// session remains busy, and a pending {@link #close()} remains deferred,
+    /// until the native operation actually succeeds or fails.
+    ///
+    /// @param inputs one tensor for each model input; {@code null} is treated
+    /// as an empty input array
+    /// @return asynchronous output tensors in model output order
+    /// @throws IllegalStateException if the session is closed or already running
+    /// @throws IllegalArgumentException if an input name, count, or shape does
+    ///         not match the model's current input metadata
+    public AsyncResource&lt;Tensor[]&gt; run(Tensor[] inputs) {
+        final AsyncResource&lt;Tensor[]&gt; backendResult;
+<span class="fc" id="L183">        synchronized (this) {</span>
+<span class="fc" id="L184">            ensureOpen();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (activeRuns &gt; 0) {</span>
+<span class="fc" id="L186">                throw new IllegalStateException(</span>
+                        &quot;Inference session is already running&quot;);
+            }
+<span class="fc" id="L189">            activeRuns++;</span>
+            try {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                Tensor[] inputSnapshot = inputs == null</span>
+<span class="fc" id="L192">                        ? new Tensor[0] : copyInputs(inputs);</span>
+<span class="fc" id="L193">                validateInputShapes(inputSnapshot,</span>
+<span class="fc" id="L194">                        implementation.getInputs(handle));</span>
+<span class="fc" id="L195">                backendResult = implementation.run(handle,</span>
+                        inputSnapshot);
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (backendResult == null) {</span>
+<span class="nc" id="L198">                    throw new InferenceException(</span>
+                            &quot;Inference backend returned no asynchronous result&quot;);
+                }
+<span class="fc" id="L201">            } catch (RuntimeException error) {</span>
+<span class="fc" id="L202">                activeRuns--;</span>
+<span class="fc" id="L203">                throw error;</span>
+<span class="nc" id="L204">            } catch (Error error) {</span>
+<span class="nc" id="L205">                activeRuns--;</span>
+<span class="nc" id="L206">                throw error;</span>
+<span class="fc" id="L207">            }</span>
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">        final PendingRun pending = new PendingRun(this);</span>
+<span class="fc" id="L210">        return new SessionRunResource(backendResult, pending);</span>
+    }
+
+    private static void validateInputShapes(Tensor[] inputs,
+                                            TensorInfo[] metadata) {
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (metadata == null || inputs.length != metadata.length) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            throw new IllegalArgumentException(&quot;Expected &quot;</span>
+                    + (metadata == null ? 0 : metadata.length)
+                    + &quot; input tensors but received &quot; + inputs.length);
+        }
+<span class="fc" id="L220">        boolean[] resolved = new boolean[metadata.length];</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (int i = 0; i &lt; inputs.length; i++) {</span>
+<span class="fc" id="L222">            Tensor tensor = inputs[i];</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (tensor == null) {</span>
+<span class="nc" id="L224">                throw new IllegalArgumentException(</span>
+                        &quot;Input tensor &quot; + i + &quot; is null&quot;);
+            }
+<span class="fc" id="L227">            int metadataPosition = i;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (tensor.getName() != null) {</span>
+<span class="fc" id="L229">                metadataPosition = -1;</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                for (int candidate = 0; candidate &lt; metadata.length;</span>
+<span class="nc" id="L231">                        candidate++) {</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                    if (tensor.getName().equals(</span>
+<span class="fc" id="L233">                            metadata[candidate].getName())) {</span>
+<span class="fc" id="L234">                        metadataPosition = candidate;</span>
+<span class="fc" id="L235">                        break;</span>
+                    }
+                }
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                if (metadataPosition &lt; 0) {</span>
+<span class="nc" id="L239">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L240">                            &quot;Unknown model input &quot; + tensor.getName());</span>
+                }
+            }
+<span class="fc" id="L243">            TensorInfo expected = metadata[metadataPosition];</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (resolved[metadataPosition]) {</span>
+<span class="nc" id="L245">                throw new IllegalArgumentException(&quot;Model input &quot;</span>
+<span class="nc" id="L246">                        + expected.getName() + &quot; was supplied more than once&quot;);</span>
+            }
+<span class="fc" id="L248">            resolved[metadataPosition] = true;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (!sameShape(tensor.getShape(), expected.getShape())) {</span>
+<span class="fc" id="L250">                throw new IllegalArgumentException(&quot;Input &quot;</span>
+<span class="fc" id="L251">                        + expected.getName() + &quot; shape does not match the &quot;</span>
+                        + &quot;model metadata; call resizeInput() before run()&quot;);
+            }
+        }
+<span class="fc" id="L255">    }</span>
+
+    private static Tensor[] copyInputs(Tensor[] inputs) {
+<span class="fc" id="L258">        Tensor[] copy = new Tensor[inputs.length];</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (int i = 0; i &lt; inputs.length; i++) {</span>
+<span class="fc" id="L260">            copy[i] = inputs[i];</span>
+        }
+<span class="fc" id="L262">        return copy;</span>
+    }
+
+    private static boolean sameShape(int[] supplied, int[] expected) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (supplied.length != expected.length) {</span>
+<span class="nc" id="L267">            return false;</span>
+        }
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int i = 0; i &lt; supplied.length; i++) {</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (supplied[i] != expected[i]) {</span>
+<span class="fc" id="L271">                return false;</span>
+            }
+        }
+<span class="fc" id="L274">        return true;</span>
+    }
+
+    /// Resizes an input and reallocates native tensors before the next run.
+    ///
+    /// This method throws while an asynchronous {@link #run(Tensor[])} is
+    /// pending because native runtimes cannot safely reallocate tensors during
+    /// an invocation.
+    ///
+    /// @param name model input name, or {@code null} for the first input
+    /// @param shape new non-negative dimensions
+    /// @throws IllegalStateException if the session is closed or a run is pending
+    public void resizeInput(String name, int[] shape) {
+<span class="fc" id="L287">        synchronized (this) {</span>
+<span class="fc" id="L288">            ensureOpen();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (activeRuns &gt; 0) {</span>
+<span class="fc" id="L290">                throw new IllegalStateException(</span>
+                        &quot;Cannot resize inputs while inference is running&quot;);
+            }
+<span class="fc" id="L293">            implementation.resizeInput(handle, name, shape);</span>
+<span class="fc" id="L294">        }</span>
+<span class="fc" id="L295">    }</span>
+
+    /// Releases the interpreter, delegates, and any temporary staged model.
+    /// The original file supplied by {@link ModelSource#file(String)} is never
+    /// deleted. If a run is pending, release is deferred until that run
+    /// settles. Calling this method more than once has no effect.
+    @Override
+    public void close() {
+<span class="fc" id="L303">        boolean release = false;</span>
+<span class="fc" id="L304">        synchronized (this) {</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (closed) {</span>
+<span class="fc" id="L306">                return;</span>
+            }
+<span class="fc" id="L308">            closed = true;</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (activeRuns == 0) {</span>
+<span class="fc" id="L310">                release = true;</span>
+            } else {
+<span class="fc" id="L312">                closePending = true;</span>
+            }
+<span class="fc" id="L314">        }</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (release) {</span>
+<span class="fc" id="L316">            implementation.close(handle);</span>
+        }
+<span class="fc" id="L318">    }</span>
+
+    private void runFinished() {
+<span class="fc" id="L321">        boolean release = false;</span>
+<span class="fc" id="L322">        synchronized (this) {</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            if (activeRuns &gt; 0) {</span>
+<span class="fc" id="L324">                activeRuns--;</span>
+            }
+<span class="pc bpc" id="L326" title="1 of 4 branches missed.">            if (activeRuns == 0 &amp;&amp; closePending) {</span>
+<span class="fc" id="L327">                closePending = false;</span>
+<span class="fc" id="L328">                release = true;</span>
+            }
+<span class="fc" id="L330">        }</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (release) {</span>
+<span class="fc" id="L332">            implementation.close(handle);</span>
+        }
+<span class="fc" id="L334">    }</span>
+
+    private void ensureOpen() {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L338">            throw new IllegalStateException(&quot;Inference session is closed&quot;);</span>
+        }
+<span class="fc" id="L340">    }</span>
+
+    private void ensureNotRunning(String operation) {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (activeRuns &gt; 0) {</span>
+<span class="fc" id="L344">            throw new IllegalStateException(</span>
+                    &quot;Cannot &quot; + operation + &quot; while inference is running&quot;);
+        }
+<span class="fc" id="L347">    }</span>
+
+    private static final class PendingRun {
+        private final InferenceSession session;
+        private boolean finished;
+
+<span class="fc" id="L353">        PendingRun(InferenceSession session) {</span>
+<span class="fc" id="L354">            this.session = session;</span>
+<span class="fc" id="L355">        }</span>
+
+        synchronized void finish() {
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (!finished) {</span>
+<span class="fc" id="L359">                finished = true;</span>
+<span class="fc" id="L360">                session.runFinished();</span>
+            }
+<span class="fc" id="L362">        }</span>
+    }
+
+    private static final class SessionRunResource
+            extends AsyncResource&lt;Tensor[]&gt; {
+        private final PendingRun pending;
+
+        SessionRunResource(AsyncResource&lt;Tensor[]&gt; backend,
+<span class="fc" id="L370">                           PendingRun pending) {</span>
+<span class="fc" id="L371">            this.pending = pending;</span>
+<span class="fc" id="L372">            backend.ready(new SuccessCallback&lt;Tensor[]&gt;() {</span>
+                @Override
+                public void onSucess(Tensor[] value) {
+<span class="fc" id="L375">                    SessionRunResource.this.pending.finish();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                    if (!isCancelled()) {</span>
+<span class="fc" id="L377">                        complete(value);</span>
+                    }
+<span class="fc" id="L379">                }</span>
+<span class="fc" id="L380">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable error) {
+<span class="fc" id="L383">                    SessionRunResource.this.pending.finish();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                    if (!isCancelled()) {</span>
+<span class="fc" id="L385">                        error(error);</span>
+                    }
+<span class="fc" id="L387">                }</span>
+            });
+<span class="fc" id="L389">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

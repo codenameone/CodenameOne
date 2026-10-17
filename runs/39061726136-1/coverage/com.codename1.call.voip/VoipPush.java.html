@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VoipPush.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.call.voip</a> &gt; <span class="el_source">VoipPush.java</span></div><h1>VoipPush.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.voip;
+
+import com.codename1.call.CallError;
+import com.codename1.call.CallException;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallId;
+import com.codename1.call.CallState;
+import com.codename1.call.session.CallSession;
+import com.codename1.call.session.Calls;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.call.CallRequests;
+import com.codename1.impl.call.CallWire;
+import com.codename1.util.AsyncResource;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Ringing when the app is not running.
+///
+/// A VoIP push is a push the operating system delivers straight to the
+/// calling machinery, launching the app if it has to. It is the only way an
+/// app that is not running can make the phone ring.
+///
+/// ```java
+/// VoipPush.setListener(new VoipPushListener() {
+///     public void callReceived(PushedCall call) {
+///         if (call.isStale()) { history.addMissed(call.getHandle()); return; }
+///         signalling.attach(call.getSession().getCallId(), call.getData());
+///     }
+///     public void tokenChanged(String token) { server.registerVoip(token); }
+/// });
+/// VoipPush.register();
+/// ```
+///
+/// #### The payload has a fixed shape, and the server must honour it
+///
+/// Because the call is reported to the system before any Java runs, the
+/// **native code parses the push itself**. It looks for one key:
+///
+/// ```json
+/// { &quot;cn1call&quot;: { &quot;uuid&quot;: &quot;6B29FC40-CA47-1067-B31D-00DD010662DA&quot;,
+///                &quot;handle&quot;: &quot;+14155551212&quot;, &quot;handleType&quot;: &quot;phoneNumber&quot;,
+///                &quot;displayName&quot;: &quot;Jane Doe&quot;, &quot;video&quot;: false,
+///                &quot;ttl&quot;: 30, &quot;data&quot;: &quot;opaque, handed back untouched&quot; } }
+/// ```
+///
+/// `uuid` and `handle` are required; the rest have defaults from the build
+/// hints. `data` is never parsed by the framework. Sending a payload without
+/// `cn1call` means the app is woken and nothing rings -- on iOS, that is the
+/// case that gets the app killed.
+///
+/// To **retract** a call that was cancelled before it was answered, send the
+/// same `uuid` with `&quot;cancel&quot;: true`.
+///
+/// #### Set the listener before registering
+///
+/// Calls that arrived before the app was listening are held and delivered
+/// when [#setListener] installs one. An app that registers first and listens
+/// later still gets them -- the queue is drained on the first listener -- but
+/// an app that never sets a listener will find its calls timed out and ended
+/// by the platform.
+public final class VoipPush {
+
+<span class="fc" id="L88">    private static final List&lt;VoipPushListener&gt; LISTENERS =</span>
+            new ArrayList&lt;VoipPushListener&gt;();
+
+    private static String token;
+
+    private VoipPush() {
+    }
+
+    /// Whether this platform can be woken by a VoIP push.
+    public static boolean isSupported() {
+<span class="fc" id="L98">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.isVoipPushSupported();</span>
+    }
+
+    /// Installs the listener and immediately drains any calls that arrived
+    /// before the app was listening.
+    public static void setListener(VoipPushListener l) {
+        CallBridge b;
+        // The listener, the readiness and the drain decision under ONE
+        // ordering. Split, a call clearing the listener could pause after
+        // removing it, a second could install a replacement and publish
+        // &quot;listening&quot;, and the first could then publish &quot;not listening&quot; and
+        // clear the drain -- leaving a registered listener while iOS queued
+        // its pushed calls and CallKit actions until they expired.
+<span class="fc" id="L112">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L113">            LISTENERS.clear();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (l != null) {</span>
+<span class="fc" id="L115">                LISTENERS.add(l);</span>
+            }
+            // BEFORE the bridge lookup. Returning early when there is no port
+            // yet -- setListener from an app's init runs before Display.init
+            // -- left this false while a listener was stored, so the
+            // readiness the bridge later published was &quot;not listening&quot;.
+            //
+            // Through the shared flag: an action listener registered without
+            // VoipPush counts too, and turning this off here must not silence
+            // a Calls listener that is still installed.
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            CallRequests.setPushesWanted(l != null);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            drainWanted = l != null;</span>
+<span class="fc" id="L127">        }</span>
+        // OUTSIDE the monitor. CallRequests.bridge() drains the port's held
+        // pushes as part of resolving it, and a drain reaches the
+        // application's callReceived -- so this ran app code while LISTENERS
+        // was held, and a callback that waited on any thread which itself
+        // calls setListener, including ordinary listener replacement or
+        // shutdown, deadlocked the EDT and the call UI with it. The flags
+        // above still move first, which is the ordering the comment there is
+        // about; only the lookup moved.
+<span class="fc" id="L136">        b = CallRequests.bridge();</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L138">            drainIfWanted(b);</span>
+        }
+        // The TOKEN this listener has never been told about.
+        //
+        // PushKit supplies credentials during a cold launch -- the registry
+        // is created in willFinishLaunching, so this is the ordinary
+        // ordering, not a race -- and with no listener installed yet the
+        // delivery was dropped. The documented setListener(); register();
+        // sequence then got the same token back from native, so &quot;changed&quot; was
+        // false and tokenChanged never fired at all: an app following the
+        // example, which ignores the returned resource, never registered its
+        // token with its server and could not be called.
+        //
+        // Round 46 declined to hold tokens on the grounds that replaying a
+        // stale one would tell a listener its token had changed when it had
+        // not. That is right for a listener that has already been told and
+        // wrong for one that has not -- which is this case, and which is why
+        // the question is asked per listener rather than per token.
+        String known;
+<span class="fc" id="L157">        synchronized (VoipPush.class) {</span>
+<span class="fc" id="L158">            known = token;</span>
+<span class="fc" id="L159">        }</span>
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        if (l != null &amp;&amp; known != null) {</span>
+            // Checked against the current token at delivery, because
+            // setListener can run off the EDT and a
+            // rotation landing between this snapshot and the delivery would
+            // queue the NEW token first and this stale one after it. A
+            // listener that updates its server in the callback would finish
+            // registered under a token that is no longer valid and stop
+            // receiving calls -- the exact failure the replay exists to
+            // prevent, arrived at from the other side.
+            //
+            // Addressed to THIS listener, not to whoever is registered when
+            // it runs. Two setListener calls before the EDT drains queued two
+            // replays of the same value, and both found the replacement
+            // installed -- so it heard tokenChanged twice, which the
+            // value check cannot filter because the value never changed.
+            //
+            // Not covered by a unit test on purpose: core-unittests never
+            // initialises Display, so post() runs every delivery inline on
+            // the calling thread and nothing can overtake anything. A test
+            // there would assert the harness, not this.
+<span class="fc" id="L180">            post(new Delivery(null, known, l));</span>
+        }
+        // Anything that arrived before this listener existed. Taken out under
+        // the monitor and delivered outside it, so a listener that installs
+        // another one from callReceived does not deadlock.
+        Delivery[] held;
+<span class="fc" id="L186">        synchronized (LISTENERS) {</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">            if (l == null || HELD.isEmpty()) {</span>
+<span class="fc" id="L188">                return;</span>
+            }
+<span class="fc" id="L190">            held = HELD.toArray(new Delivery[HELD.size()]);</span>
+<span class="fc" id="L191">            HELD.clear();</span>
+<span class="fc" id="L192">        }</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (Delivery d : held) {</span>
+            // ONE AT A TIME, and one that throws does not take the rest.
+            // HELD has already been emptied by the time this loop runs, so a
+            // delivery abandoned here is a pushed call lost for good: the
+            // native drain claimed it, its unanswered-call watchdog no
+            // longer owns it, and nothing consults HELD again until the next
+            // setListener. An application whose callReceived throws on the
+            // first of three calls used to lose the other two.
+<span class="fc" id="L201">            deliver(d);</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    /// Whether a listener is waiting for the calls the port already has.
+    /// Guarded by LISTENERS, like the listener it belongs to.
+    private static boolean drainWanted;
+
+    /// Calls delivered while no push listener was installed.
+    ///
+    /// The port's readiness flag is the UNION of the two listener kinds --
+    /// an app that registers a Calls action listener makes it true without
+    /// touching VoipPush -- so a pushed call can be drained before any push
+    /// listener exists. Dropping it there lost the call for good: the drain
+    /// had already claimed it, so the platform's own unanswered-call
+    /// watchdog would not retire it either, and the system went on ringing a
+    /// call the app was never told about.
+    ///
+    /// Held here instead, and replayed by [#setListener]. Guarded by
+    /// LISTENERS, because whether to hold is decided by whether one exists.
+<span class="fc" id="L221">    private static final List&lt;Delivery&gt; HELD = new ArrayList&lt;Delivery&gt;();</span>
+
+    /// Drains once, when there is somewhere to drain from.
+    ///
+    /// A listener installed before the port existed had nothing to ask, and
+    /// no later operation asked on its behalf -- so a call the native side
+    /// had already reported was never handed over.
+    ///
+    /// @hidden not part of the public API.
+    public static void drainIfWanted(CallBridge b) {
+        // The same monitor the flag is written under; the drain itself
+        // happens outside it.
+<span class="fc" id="L233">        synchronized (LISTENERS) {</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">            if (!drainWanted || b == null) {</span>
+<span class="fc" id="L235">                return;</span>
+            }
+<span class="fc" id="L237">            drainWanted = false;</span>
+<span class="fc" id="L238">        }</span>
+<span class="fc" id="L239">        b.drainPendingCalls(CallRequests.nextId());</span>
+<span class="fc" id="L240">    }</span>
+
+    /// Registers for VoIP pushes, resolving with the token to give the
+    /// application's server.
+    ///
+    /// Errors with [com.codename1.call.CallError#NOT_SUPPORTED] where
+    /// [#isSupported()] is false, rather than resolving with a token that
+    /// could never receive anything.
+    public static AsyncResource&lt;String&gt; register() {
+<span class="fc" id="L249">        CallBridge b = CallRequests.bridge();</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L251">            EdtResult&lt;String&gt; r = new EdtResult&lt;String&gt;();</span>
+<span class="fc" id="L252">            r.error(new CallException(CallError.NOT_SUPPORTED));</span>
+<span class="fc" id="L253">            return r;</span>
+        }
+<span class="fc" id="L255">        int id = CallRequests.nextId();</span>
+<span class="fc" id="L256">        EdtResult&lt;String&gt; r = CallRequests.openString(id);</span>
+<span class="fc" id="L257">        b.registerVoipPush(id);</span>
+<span class="fc" id="L258">        return r;</span>
+    }
+
+    /// Stops VoIP push delivery.
+    public static void unregister() {
+<span class="fc" id="L263">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="nc" id="L265">            b.unregisterVoipPush(CallRequests.nextId());</span>
+        }
+        // The CACHE goes here, not only wherever a port happens to tell us.
+        // An explicit opt-out means the token this app holds is no longer
+        // one anybody should act on, and leaving it left getToken() handing
+        // back a dead value and a later setListener replaying it as though
+        // it were current. iOS does deliver a null now, but that is an
+        // asynchronous courtesy from one port; the facade's own contract
+        // should not depend on it.
+<span class="fc" id="L274">        synchronized (VoipPush.class) {</span>
+<span class="fc" id="L275">            token = null;</span>
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">    }</span>
+
+    /// The last known token, or null.
+    public static String getToken() {
+<span class="fc" id="L281">        synchronized (VoipPush.class) {</span>
+<span class="fc" id="L282">            return token;</span>
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Entry points the ports call up into.
+    // ------------------------------------------------------------------
+
+    /// Delivers one call the native side already reported to the system.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverPushedCall(String callId, String handleWire,
+            String displayName, boolean video, boolean stale,
+            boolean synthesizedId, String data, long receivedAt) {
+<span class="fc" id="L296">        String id = CallId.normalize(callId);</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (id == null) {</span>
+            // Nothing useful can be done with a record whose identifier did
+            // not survive; dropping one row is better than failing the drain
+            // and losing the rest of the batch.
+<span class="nc" id="L301">            return;</span>
+        }
+<span class="fc" id="L303">        CallHandle handle = CallWire.decodeHandle(handleWire);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (handle == null) {</span>
+            // A blank rather than an empty string, matching what the native
+            // side already showed the user: CN1Call.m substitutes &quot; &quot; for a
+            // handle with no value before reporting to CallKit, so the call
+            // rang with an empty caller and this describes the same thing.
+            //
+            // CallHandle rejects &quot;&quot; outright, so the previous fallback threw
+            // and took the rest of the drained batch with it -- one malformed
+            // push losing every good call queued behind it.
+<span class="fc" id="L313">            handle = CallHandle.generic(&quot; &quot;);</span>
+        }
+<span class="fc" id="L315">        CallSession existing = Calls.getSession(id);</span>
+        CallSession session;
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L318">            session = existing;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        } else if (stale) {</span>
+            // Detached on purpose. A stale call is already over, so
+            // registering it would leave every missed or cancelled cold-start
+            // push sitting in getSessions() for the life of the process --
+            // and those APIs promise CURRENT calls. The app still gets a
+            // session to read the handle and the id off, which is all a
+            // missed-call log needs.
+<span class="fc" id="L326">            session = Calls.detachedSession(id, handle, displayName);</span>
+        } else {
+<span class="fc" id="L328">            session = Calls.adoptSession(id, handle, displayName,</span>
+                    CallState.RINGING);
+        }
+<span class="fc" id="L331">        post(new Delivery(new PushedCall(session, data, stale, synthesizedId,</span>
+                receivedAt)));
+<span class="fc" id="L333">    }</span>
+
+    /// Answers the drain with how many calls it produced.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverPendingCallsDrained(int requestId, int count) {
+<span class="fc" id="L339">        EdtResult&lt;Integer&gt; r = CallRequests.takeCount(requestId);</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="nc" id="L341">            r.complete(Integer.valueOf(count));</span>
+        }
+<span class="fc" id="L343">    }</span>
+
+    /// Delivers the VoIP push token.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverToken(int requestId, String value) {
+        boolean changed;
+<span class="fc" id="L350">        synchronized (VoipPush.class) {</span>
+<span class="pc bpc" id="L351" title="4 of 6 branches missed.">            changed = value == null ? token != null : !value.equals(token);</span>
+<span class="fc" id="L352">            token = value;</span>
+<span class="fc" id="L353">        }</span>
+<span class="fc" id="L354">        EdtResult&lt;String&gt; r = CallRequests.takeString(requestId);</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L356">            r.complete(value);</span>
+        }
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (changed) {</span>
+            // Only on a real change. A port with several registrations
+            // waiting settles them one at a time through here, and a
+            // rotation that produces the same token is not a rotation --
+            // neither is a reason to tell the app its token changed.
+<span class="fc" id="L363">            post(new Delivery(null, value));</span>
+        }
+<span class="fc" id="L365">    }</span>
+
+    /// Fails a registration.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverRegistrationFailed(int requestId,
+            int errorOrdinal, String message) {
+<span class="nc" id="L372">        EdtResult&lt;String&gt; r = CallRequests.takeString(requestId);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (r != null) {</span>
+<span class="nc" id="L374">            r.error(CallWire.decodeError(errorOrdinal, message));</span>
+        }
+<span class="nc" id="L376">    }</span>
+
+    /// Runs one delivery, containing whatever the application does with it.
+    ///
+    /// The same rule VpnTunnel.deliver states for its packet loop: a
+    /// callback that throws must not end the sequence it arrived in. Here
+    /// the sequence is a replay of calls the port has already handed over,
+    /// so ending it early loses them permanently.
+    private static void deliver(Delivery d) {
+        try {
+<span class="fc" id="L386">            post(d);</span>
+<span class="nc" id="L387">        } catch (Throwable appFailure) {</span>
+<span class="nc" id="L388">            report(appFailure);</span>
+<span class="fc" id="L389">        }</span>
+<span class="fc" id="L390">    }</span>
+
+    /// Logs what the application threw, and never throws itself.
+    private static void report(Throwable appFailure) {
+        try {
+<span class="fc" id="L395">            com.codename1.io.Log.e(appFailure);</span>
+<span class="nc" id="L396">        } catch (Throwable nowhereToLog) { //NOPMD EmptyCatchBlock</span>
+            // Deliberately nothing.
+<span class="fc" id="L398">        }</span>
+<span class="fc" id="L399">    }</span>
+
+    private static void post(Delivery d) {
+        // A CALL with nobody to hand it to is held, not dropped; see HELD.
+        // A token is not: it is re-read from getToken() by whoever asks, and
+        // replaying a stale one at a listener that registers later would say
+        // &quot;your token just changed&quot; about a token that did not.
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        if (d.call != null) {</span>
+<span class="fc" id="L407">            synchronized (LISTENERS) {</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                if (LISTENERS.isEmpty()) {</span>
+<span class="fc" id="L409">                    HELD.add(d);</span>
+<span class="fc" id="L410">                    return;</span>
+                }
+<span class="fc" id="L412">            }</span>
+        }
+<span class="pc bpc" id="L414" title="3 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L415">            Display.getInstance().callSerially(d);</span>
+        } else {
+<span class="fc" id="L417">            d.run();</span>
+        }
+<span class="fc" id="L419">    }</span>
+
+    private static VoipPushListener[] listeners() {
+<span class="fc" id="L422">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L423">            return LISTENERS.toArray(new VoipPushListener[LISTENERS.size()]);</span>
+        }
+    }
+
+    /// One inbound event carried to the EDT. A static class so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class Delivery implements Runnable {
+        private final PushedCall call;
+        private final String newToken;
+        /// The listener this delivery was made FOR, or null for anyone.
+        ///
+        /// A replay belongs to the listener that installed itself; a rotation
+        /// belongs to whoever is listening when it lands.
+        private final VoipPushListener addressee;
+
+        Delivery(PushedCall call) {
+<span class="fc" id="L439">            this(call, null, null);</span>
+<span class="fc" id="L440">        }</span>
+
+        Delivery(PushedCall call, String newToken) {
+<span class="fc" id="L443">            this(call, newToken, null);</span>
+<span class="fc" id="L444">        }</span>
+
+        Delivery(PushedCall call, String newToken,
+<span class="fc" id="L447">                VoipPushListener addressee) {</span>
+<span class="fc" id="L448">            this.call = call;</span>
+<span class="fc" id="L449">            this.newToken = newToken;</span>
+<span class="fc" id="L450">            this.addressee = addressee;</span>
+<span class="fc" id="L451">        }</span>
+
+        /// Whether a later delivery has already superseded this one.
+        ///
+        /// Asked as &quot;is this still the current token&quot; rather than counted.
+        /// A version counter has to be advanced on exactly the deliveries
+        /// that replace a queued one and on no others, and getting that
+        /// wrong is silent in both directions: advancing it for a settlement
+        /// that posts nothing of its own -- the iOS drain answers each
+        /// waiting register() separately with the SAME value -- retires a
+        /// queued tokenChanged() that nothing replaces, so the listener never
+        /// hears the token at all. Comparing the value cannot express either
+        /// mistake, because the invariant IS the comparison: a listener is
+        /// never told a token that is not the one getToken() would return.
+        private boolean superseded() {
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            if (call != null) {</span>
+<span class="fc" id="L467">                return false;</span>
+            }
+<span class="fc" id="L469">            synchronized (VoipPush.class) {</span>
+<span class="pc bpc" id="L470" title="3 of 4 branches missed.">                return newToken == null ? token != null</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">                        : !newToken.equals(token);</span>
+            }
+        }
+
+        @Override
+        public void run() {
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">            if (superseded()) {</span>
+                // A rotation overtook this one; the listener has been told
+                // the newer value and must not now be told an older one.
+<span class="nc" id="L480">                return;</span>
+            }
+<span class="fc" id="L482">            VoipPushListener[] ls = listeners();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            if (ls.length == 0) {</span>
+                // The listener went away between post() deciding there was
+                // one and this reaching the EDT. A CALL dropped here is lost
+                // for good: the native drain already claimed it, so its
+                // unclaimed-call timeout no longer owns it, and HELD is only
+                // consulted by setListener. Put it back so the next listener
+                // gets it.
+                //
+                // A token is not requeued, for the reason post() gives.
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">                if (call == null) {</span>
+<span class="fc" id="L493">                    return;</span>
+                }
+                // RE-READ under the monitor, and only held if it is still
+                // true. Between the empty snapshot above and this block a
+                // setListener can install a listener and drain an
+                // already-empty HELD -- so adding here would park the call
+                // behind a listener that is live right now, and nothing would
+                // look at HELD again until the NEXT setListener.
+<span class="nc" id="L501">                synchronized (LISTENERS) {</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                    if (LISTENERS.isEmpty()) {</span>
+<span class="nc" id="L503">                        HELD.add(this);</span>
+<span class="nc" id="L504">                        return;</span>
+                    }
+<span class="nc" id="L506">                    ls = LISTENERS.toArray(new VoipPushListener[LISTENERS.size()]);</span>
+<span class="nc" id="L507">                }</span>
+            }
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            for (VoipPushListener l : ls) {</span>
+<span class="pc bpc" id="L510" title="1 of 4 branches missed.">                if (addressee != null &amp;&amp; addressee != l) { //NOPMD CompareObjectsWithEquals</span>
+                    // Somebody else's replay. Identity, not equals: two
+                    // listeners that compare equal are still two
+                    // registrations, and only the one that asked should be
+                    // told what it missed.
+<span class="nc" id="L515">                    continue;</span>
+                }
+                // PER LISTENER, so one that throws does not silence the
+                // others. Two registrations are two apps' worth of code as
+                // far as this class is concerned.
+                try {
+<span class="fc bfc" id="L521" title="All 2 branches covered.">                    if (call != null) {</span>
+<span class="fc" id="L522">                        l.callReceived(current());</span>
+                    } else {
+<span class="fc" id="L524">                        l.tokenChanged(newToken);</span>
+                    }
+<span class="fc" id="L526">                } catch (Throwable appFailure) {</span>
+<span class="fc" id="L527">                    report(appFailure);</span>
+<span class="fc" id="L528">                }</span>
+            }
+<span class="fc" id="L530">        }</span>
+
+        /// The call as it stands NOW, rather than as it stood when it was
+        /// queued.
+        ///
+        /// A held call waits in HELD for as long as it takes a listener to
+        /// arrive, and the call itself does not wait with it: the far end
+        /// hangs up, or the platform retires it, and Calls marks the session
+        /// ENDED and forgets it. PushedCall is immutable, so the replay went
+        /// on saying stale=false and handed the new listener a dead call
+        /// described as live -- inviting it to attach signalling and media,
+        /// which is exactly what isStale() exists to prevent it doing.
+        ///
+        /// Re-read here rather than mended when the call ends, because this
+        /// is the point where the answer is used; a flag set earlier would
+        /// have to be kept right through every later transition.
+        private PushedCall current() {
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (call.isStale()) {</span>
+                // Already stale, and never registered: a stale call gets a
+                // DETACHED session, so the lookup below would say &quot;gone&quot;
+                // about something that was never there and this would rebuild
+                // it for no reason.
+<span class="fc" id="L552">                return call;</span>
+            }
+<span class="fc" id="L554">            CallSession s = call.getSession();</span>
+<span class="pc bpc" id="L555" title="1 of 4 branches missed.">            if (s != null &amp;&amp; s.getState() != CallState.ENDED</span>
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">                    &amp;&amp; Calls.getSession(s.getCallId()) != null) {</span>
+<span class="fc" id="L557">                return call;</span>
+            }
+<span class="fc" id="L559">            return new PushedCall(s, call.getData(), true,</span>
+<span class="fc" id="L560">                    call.isIdentifierSynthesized(), call.getReceivedAt());</span>
+        }
+    }
+
+    /// Clears the listener and cached token.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L568">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L569">            LISTENERS.clear();</span>
+<span class="fc" id="L570">            HELD.clear();</span>
+<span class="fc" id="L571">        }</span>
+<span class="fc" id="L572">        synchronized (VoipPush.class) {</span>
+<span class="fc" id="L573">            token = null;</span>
+<span class="fc" id="L574">        }</span>
+<span class="fc" id="L575">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

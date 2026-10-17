@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneAnalyticsProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">CodenameOneAnalyticsProvider.java</span></div><h1>CodenameOneAnalyticsProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
+
+/// The Codename One first-party analytics provider. It batches events and
+/// posts them as JSON to the Codename One cloud
+/// (`/api/v2/analytics/events`), where they are stored and aggregated for the
+/// reports shown in the developer console. The capabilities you actually get
+/// (screen views, custom events, retention window, raw export) are gated
+/// server-side by your subscription tier.
+///
+/// App identity is read from the build-injected `Display` properties
+/// (`build_key`, `package_name`, `AppName`, `AppVersion`, `OSVer`) -- the same
+/// mechanism the on-device crash client uses -- so no API key needs to be
+/// embedded in the app. Events are buffered in memory and flushed when the
+/// batch fills up or when {@link #flush()} is called.
+///
+/// ```java
+/// Analytics.addProvider(new CodenameOneAnalyticsProvider());
+/// Analytics.setConsent(AnalyticsConsent.granted());
+/// ```
+<span class="fc" id="L53">public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {</span>
+    private static final String DEFAULT_BASE_URL = &quot;https://cloud.codenameone.com&quot;;
+    private static final String PATH = &quot;/api/v2/analytics/events&quot;;
+    private static final String SCREEN_VIEW = &quot;screen_view&quot;;
+    private static final int DEFAULT_BATCH_SIZE = 20;
+
+<span class="fc" id="L59">    private final Object lock = new Object();</span>
+<span class="fc" id="L60">    private final List&lt;PendingEvent&gt; buffer = new ArrayList&lt;PendingEvent&gt;();</span>
+<span class="fc" id="L61">    private int batchSize = DEFAULT_BATCH_SIZE;</span>
+    private String endpoint;
+    // A pseudonymous session id, generated once per app run (per provider
+    // instance). It is not persisted, so it naturally resets when the app is
+    // relaunched -- the server uses it to group events into sessions and to
+    // reconstruct screen-to-screen flows without needing any hardware id.
+    private String sessionId;
+
+    /// Overrides the ingest endpoint URL. By default the provider posts to the
+    /// Codename One cloud (honouring the `cloudServerURL` display property).
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the full ingest URL
+    public void setEndpoint(String url) {
+<span class="nc" id="L76">        this.endpoint = url;</span>
+<span class="nc" id="L77">    }</span>
+
+    /// Sets the number of events buffered before an automatic flush.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the batch size, values below 1 are clamped to 1
+    public void setBatchSize(int size) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        this.batchSize = size &lt; 1 ? 1 : size;</span>
+<span class="fc" id="L86">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L90">        return &quot;codenameone&quot;;</span>
+    }
+
+    @Override
+    public void trackScreen(String name, String referrer) {
+<span class="fc" id="L95">        PendingEvent e = new PendingEvent();</span>
+<span class="fc" id="L96">        e.name = SCREEN_VIEW;</span>
+<span class="fc" id="L97">        e.screen = name;</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (referrer != null &amp;&amp; referrer.length() &gt; 0) {</span>
+<span class="fc" id="L99">            e.params = new java.util.LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L100">            e.params.put(&quot;referrer&quot;, referrer);</span>
+        }
+<span class="fc" id="L102">        enqueue(e);</span>
+<span class="fc" id="L103">    }</span>
+
+    @Override
+    public void trackEvent(AnalyticsEvent event) {
+<span class="fc" id="L107">        PendingEvent e = new PendingEvent();</span>
+<span class="fc" id="L108">        e.name = event.getName();</span>
+<span class="fc" id="L109">        e.category = event.getCategory();</span>
+<span class="fc" id="L110">        e.clientTs = event.getTimestamp();</span>
+<span class="fc" id="L111">        e.params = event.getParameters();</span>
+<span class="fc" id="L112">        enqueue(e);</span>
+<span class="fc" id="L113">    }</span>
+
+    @Override
+    public void setUserProperty(String key, String value) {
+<span class="nc" id="L117">        PendingEvent e = new PendingEvent();</span>
+<span class="nc" id="L118">        e.name = &quot;user_property&quot;;</span>
+<span class="nc" id="L119">        e.params = new java.util.LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L120">        e.params.put(&quot;key&quot;, key);</span>
+<span class="nc" id="L121">        e.params.put(&quot;value&quot;, value);</span>
+<span class="nc" id="L122">        enqueue(e);</span>
+<span class="nc" id="L123">    }</span>
+
+    @Override
+    public void reportCrash(AnalyticsCrashReport report) {
+<span class="nc" id="L127">        String description = report.getMessage();</span>
+<span class="nc bnc" id="L128" title="All 6 branches missed.">        if ((description == null || description.length() == 0) &amp;&amp; report.getThrowable() != null) {</span>
+<span class="nc" id="L129">            description = report.getThrowable().getClass().getName();</span>
+        }
+<span class="nc" id="L131">        PendingEvent e = new PendingEvent();</span>
+<span class="nc" id="L132">        e.name = &quot;app_exception&quot;;</span>
+<span class="nc" id="L133">        e.params = new java.util.LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        e.params.put(&quot;description&quot;, description == null ? &quot;&quot; : description);</span>
+<span class="nc" id="L135">        e.params.put(&quot;fatal&quot;, Boolean.valueOf(report.isFatal()));</span>
+<span class="nc" id="L136">        enqueue(e);</span>
+<span class="nc" id="L137">    }</span>
+
+    @Override
+    public void flush() {
+        List&lt;PendingEvent&gt; pending;
+<span class="fc" id="L142">        synchronized (lock) {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (buffer.isEmpty()) {</span>
+<span class="nc" id="L144">                return;</span>
+            }
+<span class="fc" id="L146">            pending = new ArrayList&lt;PendingEvent&gt;(buffer);</span>
+<span class="fc" id="L147">            buffer.clear();</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">        post(buildBatch(pending));</span>
+<span class="fc" id="L150">    }</span>
+
+    @Override
+    public boolean supports(AnalyticsCapability capability) {
+<span class="pc bpc" id="L154" title="7 of 14 branches missed.">        return capability == AnalyticsCapability.SCREEN_VIEWS</span>
+                || capability == AnalyticsCapability.EVENTS
+                || capability == AnalyticsCapability.USER_PROPERTIES
+                || capability == AnalyticsCapability.CRASH_REPORTING
+                || capability == AnalyticsCapability.REAL_TIME
+                || capability == AnalyticsCapability.FUNNELS
+                || capability == AnalyticsCapability.RAW_EXPORT;
+    }
+
+    private void enqueue(PendingEvent e) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (e.clientTs &lt;= 0) {</span>
+<span class="fc" id="L165">            e.clientTs = System.currentTimeMillis();</span>
+        }
+        boolean full;
+<span class="fc" id="L168">        synchronized (lock) {</span>
+<span class="fc" id="L169">            buffer.add(e);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            full = buffer.size() &gt;= batchSize;</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (full) {</span>
+<span class="fc" id="L173">            flush();</span>
+        }
+<span class="fc" id="L175">    }</span>
+
+    private String buildBatch(List&lt;PendingEvent&gt; events) {
+<span class="fc" id="L178">        AnalyticsContext ctx = getContext();</span>
+<span class="fc" id="L179">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        String clientId = ctx == null || ctx.getClientId() == null ? &quot;&quot; : ctx.getClientId();</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        String appName = ctx == null ? &quot;&quot; : ctx.getAppName();</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        String appVersion = ctx == null ? &quot;&quot; : ctx.getAppVersion();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        String platform = ctx == null ? &quot;&quot; : ctx.getPlatform();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        String locale = ctx == null ? &quot;&quot; : ctx.getLocale();</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        String buildKey = d == null ? &quot;&quot; : d.getProperty(&quot;build_key&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        String packageName = d == null ? &quot;&quot; : d.getProperty(&quot;package_name&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        String osVersion = d == null ? &quot;&quot; : d.getProperty(&quot;OSVer&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        if (locale == null || locale.length() == 0) {</span>
+<span class="nc" id="L189">            Locale loc = Locale.getDefault();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            locale = loc == null ? &quot;&quot; : loc.toString();</span>
+        }
+
+<span class="fc" id="L193">        StringBuilder b = new StringBuilder(384);</span>
+<span class="fc" id="L194">        b.append('{');</span>
+<span class="fc" id="L195">        AnalyticsJson.appendString(b, &quot;clientId&quot;, clientId, true);</span>
+<span class="fc" id="L196">        AnalyticsJson.appendString(b, &quot;sessionId&quot;, sessionId(), false);</span>
+<span class="fc" id="L197">        AnalyticsJson.appendString(b, &quot;buildKey&quot;, buildKey, false);</span>
+<span class="fc" id="L198">        AnalyticsJson.appendString(b, &quot;packageName&quot;, packageName, false);</span>
+<span class="fc" id="L199">        AnalyticsJson.appendString(b, &quot;appName&quot;, appName, false);</span>
+<span class="fc" id="L200">        AnalyticsJson.appendString(b, &quot;appVersion&quot;, appVersion, false);</span>
+<span class="fc" id="L201">        AnalyticsJson.appendString(b, &quot;platform&quot;, platform, false);</span>
+<span class="fc" id="L202">        AnalyticsJson.appendString(b, &quot;osVersion&quot;, osVersion, false);</span>
+<span class="fc" id="L203">        AnalyticsJson.appendString(b, &quot;locale&quot;, locale, false);</span>
+        // Device segmentation metadata (first-party only). Shared by every
+        // event in the batch, so the server denormalises it onto each stored
+        // row. None of it is a hardware identifier: the model is the public
+        // marketing/hardware string, never the user-assigned device name.
+<span class="fc" id="L208">        appendDeviceMetadata(b, d, locale);</span>
+        // The desktop OS name (JavaSE exposes os.name; harmless empty on mobile
+        // ports). The platform field above already carries the coarse platform.
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        String osName = d == null ? &quot;&quot; : d.getProperty(&quot;os.name&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (osName != null) {</span>
+<span class="fc" id="L213">            osName = osName.trim();</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        AnalyticsJson.appendString(b, &quot;osName&quot;, osName == null ? &quot;&quot; : osName, false);</span>
+        // A coarse browser label on the JavaScript port (empty elsewhere).
+<span class="fc" id="L217">        AnalyticsJson.appendString(b, &quot;browser&quot;, browserName(d), false);</span>
+        // The app-scoped custom dimensions the console segments by. Always
+        // emitted, as an empty object when none are set.
+<span class="fc" id="L220">        b.append(&quot;,\&quot;dimensions\&quot;:&quot;);</span>
+<span class="fc" id="L221">        appendDimensions(b);</span>
+        // Reaching here means the Analytics facade already satisfied the
+        // analytics consent gate; the flag tells the server consent was
+        // granted (consent travels with the data).
+<span class="fc" id="L225">        AnalyticsJson.appendBoolean(b, &quot;consentAnalytics&quot;, true, false);</span>
+<span class="fc" id="L226">        b.append(&quot;,\&quot;events\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (int i = 0; i &lt; events.size(); i++) {</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L229">                b.append(',');</span>
+            }
+<span class="fc" id="L231">            appendEvent(b, events.get(i));</span>
+        }
+<span class="fc" id="L233">        b.append(&quot;]}&quot;);</span>
+<span class="fc" id="L234">        return b.toString();</span>
+    }
+
+    /// Appends the shared device-segmentation fields to the batch JSON. Every
+    /// value is read defensively so a single unavailable property never aborts
+    /// a flush. The device model is the public hardware/marketing string
+    /// (`iPhone15,2`, `Pixel 8`) -- never the user-assigned device name, which
+    /// would be personally identifying.
+    private void appendDeviceMetadata(StringBuilder b, Display d, String locale) {
+<span class="fc" id="L243">        String deviceModel = &quot;&quot;;</span>
+<span class="fc" id="L244">        String manufacturer = &quot;&quot;;</span>
+<span class="fc" id="L245">        String formFactor = &quot;phone&quot;;</span>
+<span class="fc" id="L246">        String density = &quot;&quot;;</span>
+<span class="fc" id="L247">        int screenWidth = 0;</span>
+<span class="fc" id="L248">        int screenHeight = 0;</span>
+<span class="fc" id="L249">        String network = &quot;&quot;;</span>
+<span class="fc" id="L250">        String language = &quot;&quot;;</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (d != null) {</span>
+            // DeviceHardwareModel is the privacy-safe hardware identifier added
+            // to the iOS/Android ports; DeviceName is the fallback for ports
+            // that don't implement it (on Android it is already Build.MODEL).
+<span class="fc" id="L255">            deviceModel = d.getProperty(&quot;DeviceHardwareModel&quot;, d.getProperty(&quot;DeviceName&quot;, &quot;&quot;));</span>
+<span class="fc" id="L256">            manufacturer = d.getProperty(&quot;DeviceManufacturer&quot;, &quot;&quot;);</span>
+<span class="fc" id="L257">            formFactor = formFactor(d);</span>
+<span class="fc" id="L258">            density = densityName(d.getDeviceDensity());</span>
+<span class="fc" id="L259">            screenWidth = d.getDisplayWidth();</span>
+<span class="fc" id="L260">            screenHeight = d.getDisplayHeight();</span>
+        }
+        try {
+<span class="fc" id="L263">            network = networkName(NetworkManager.getInstance().getCurrentNetworkType());</span>
+<span class="nc" id="L264">        } catch (Throwable t) {</span>
+<span class="nc" id="L265">            network = &quot;&quot;;</span>
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">        Locale loc = Locale.getDefault();</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (loc != null) {</span>
+<span class="fc" id="L269">            language = loc.getLanguage();</span>
+        }
+<span class="pc bpc" id="L271" title="4 of 6 branches missed.">        if ((language == null || language.length() == 0) &amp;&amp; locale != null) {</span>
+<span class="nc" id="L272">            int us = locale.indexOf('_');</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            language = us &gt; 0 ? locale.substring(0, us) : locale;</span>
+        }
+<span class="fc" id="L275">        AnalyticsJson.appendString(b, &quot;deviceModel&quot;, deviceModel, false);</span>
+<span class="fc" id="L276">        AnalyticsJson.appendString(b, &quot;deviceManufacturer&quot;, manufacturer, false);</span>
+<span class="fc" id="L277">        AnalyticsJson.appendString(b, &quot;formFactor&quot;, formFactor, false);</span>
+<span class="fc" id="L278">        AnalyticsJson.appendString(b, &quot;density&quot;, density, false);</span>
+<span class="fc" id="L279">        AnalyticsJson.appendLong(b, &quot;screenWidth&quot;, screenWidth, false);</span>
+<span class="fc" id="L280">        AnalyticsJson.appendLong(b, &quot;screenHeight&quot;, screenHeight, false);</span>
+<span class="fc" id="L281">        AnalyticsJson.appendString(b, &quot;network&quot;, network, false);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        AnalyticsJson.appendString(b, &quot;language&quot;, language == null ? &quot;&quot; : language, false);</span>
+<span class="fc" id="L283">    }</span>
+
+    private static String formFactor(Display d) {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (CN.isWatch()) {</span>
+<span class="nc" id="L287">            return &quot;watch&quot;;</span>
+        }
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (d.isDesktop()) {</span>
+<span class="nc" id="L290">            return &quot;desktop&quot;;</span>
+        }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (d.isTablet()) {</span>
+<span class="nc" id="L293">            return &quot;tablet&quot;;</span>
+        }
+<span class="fc" id="L295">        return &quot;phone&quot;;</span>
+    }
+
+    private static String densityName(int density) {
+<span class="pc bpc" id="L299" title="9 of 10 branches missed.">        switch (density) {</span>
+<span class="nc" id="L300">            case Display.DENSITY_VERY_LOW: return &quot;very_low&quot;;</span>
+<span class="nc" id="L301">            case Display.DENSITY_LOW: return &quot;low&quot;;</span>
+<span class="fc" id="L302">            case Display.DENSITY_MEDIUM: return &quot;medium&quot;;</span>
+<span class="nc" id="L303">            case Display.DENSITY_HIGH: return &quot;high&quot;;</span>
+<span class="nc" id="L304">            case Display.DENSITY_VERY_HIGH: return &quot;very_high&quot;;</span>
+<span class="nc" id="L305">            case Display.DENSITY_HD: return &quot;hd&quot;;</span>
+<span class="nc" id="L306">            case Display.DENSITY_560: return &quot;xhd&quot;;</span>
+<span class="nc" id="L307">            case Display.DENSITY_2HD: return &quot;2hd&quot;;</span>
+<span class="nc" id="L308">            case Display.DENSITY_4K: return &quot;4k&quot;;</span>
+<span class="nc" id="L309">            default: return &quot;&quot;;</span>
+        }
+    }
+
+    private static String networkName(int type) {
+<span class="pc bpc" id="L314" title="5 of 6 branches missed.">        switch (type) {</span>
+<span class="nc" id="L315">            case NetworkManager.NETWORK_TYPE_WIFI: return &quot;wifi&quot;;</span>
+<span class="nc" id="L316">            case NetworkManager.NETWORK_TYPE_CELLULAR: return &quot;cellular&quot;;</span>
+<span class="nc" id="L317">            case NetworkManager.NETWORK_TYPE_ETHERNET: return &quot;ethernet&quot;;</span>
+<span class="nc" id="L318">            case NetworkManager.NETWORK_TYPE_BLUETOOTH: return &quot;bluetooth&quot;;</span>
+<span class="fc" id="L319">            case NetworkManager.NETWORK_TYPE_NONE: return &quot;none&quot;;</span>
+<span class="nc" id="L320">            default: return &quot;&quot;;</span>
+        }
+    }
+
+    /// Derives a coarse browser label from the user agent on the JavaScript
+    /// port. Returns the empty string on every non-web platform (where the
+    /// user agent property is absent). The order of the checks matters: Edge
+    /// and Opera advertise a Chrome token, so they are tested first.
+    private static String browserName(Display d) {
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L330">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L332">        String ua = d.getProperty(&quot;User-Agent&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">        if (ua == null || ua.length() == 0) {</span>
+<span class="fc" id="L334">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L336">        ua = ua.toLowerCase();</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (ua.indexOf(&quot;edg&quot;) &gt;= 0) {</span>
+<span class="nc" id="L338">            return &quot;Edge&quot;;</span>
+        }
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        if (ua.indexOf(&quot;opr&quot;) &gt;= 0 || ua.indexOf(&quot;opera&quot;) &gt;= 0) {</span>
+<span class="nc" id="L341">            return &quot;Opera&quot;;</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (ua.indexOf(&quot;firefox&quot;) &gt;= 0) {</span>
+<span class="nc" id="L344">            return &quot;Firefox&quot;;</span>
+        }
+<span class="nc bnc" id="L346" title="All 4 branches missed.">        if (ua.indexOf(&quot;chrome&quot;) &gt;= 0 || ua.indexOf(&quot;crios&quot;) &gt;= 0) {</span>
+<span class="nc" id="L347">            return &quot;Chrome&quot;;</span>
+        }
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (ua.indexOf(&quot;safari&quot;) &gt;= 0) {</span>
+<span class="nc" id="L350">            return &quot;Safari&quot;;</span>
+        }
+<span class="nc" id="L352">        return &quot;other&quot;;</span>
+    }
+
+    /// Appends the custom dimensions as a nested JSON object built from
+    /// {@link Analytics#getDimensions()}. Emits {@code {}} when empty.
+    private static void appendDimensions(StringBuilder b) {
+<span class="fc" id="L358">        Map&lt;String, String&gt; dimensions = Analytics.getDimensions();</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        if (dimensions.isEmpty()) {</span>
+<span class="fc" id="L360">            b.append(&quot;{}&quot;);</span>
+<span class="fc" id="L361">            return;</span>
+        }
+<span class="fc" id="L363">        b.append('{');</span>
+<span class="fc" id="L364">        boolean first = true;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : dimensions.entrySet()) {</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L367">                b.append(',');</span>
+            }
+<span class="fc" id="L369">            b.append('&quot;');</span>
+<span class="fc" id="L370">            AnalyticsJson.escape(b, e.getKey());</span>
+<span class="fc" id="L371">            b.append(&quot;\&quot;:&quot;);</span>
+<span class="fc" id="L372">            AnalyticsJson.appendValue(b, e.getValue());</span>
+<span class="fc" id="L373">            first = false;</span>
+<span class="fc" id="L374">        }</span>
+<span class="fc" id="L375">        b.append('}');</span>
+<span class="fc" id="L376">    }</span>
+
+    private String sessionId() {
+<span class="fc" id="L379">        synchronized (lock) {</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (sessionId == null) {</span>
+<span class="fc" id="L381">                Random r = new Random();</span>
+<span class="fc" id="L382">                char[] hex = &quot;0123456789abcdef&quot;.toCharArray();</span>
+<span class="fc" id="L383">                StringBuilder s = new StringBuilder(16);</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L385">                    s.append(hex[r.nextInt(16)]);</span>
+                }
+<span class="fc" id="L387">                sessionId = s.toString();</span>
+            }
+<span class="fc" id="L389">            return sessionId;</span>
+        }
+    }
+
+    private static void appendEvent(StringBuilder b, PendingEvent e) {
+<span class="fc" id="L394">        b.append('{');</span>
+<span class="fc" id="L395">        AnalyticsJson.appendString(b, &quot;name&quot;, e.name, true);</span>
+<span class="fc" id="L396">        AnalyticsJson.appendString(b, &quot;category&quot;, e.category, false);</span>
+<span class="fc" id="L397">        AnalyticsJson.appendString(b, &quot;screen&quot;, e.screen, false);</span>
+<span class="fc" id="L398">        AnalyticsJson.appendLong(b, &quot;clientTs&quot;, e.clientTs, false);</span>
+<span class="fc" id="L399">        b.append(&quot;,\&quot;params\&quot;:&quot;);</span>
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">        if (e.params == null || e.params.isEmpty()) {</span>
+<span class="fc" id="L401">            b.append(&quot;{}&quot;);</span>
+        } else {
+<span class="fc" id="L403">            b.append('{');</span>
+<span class="fc" id="L404">            boolean first = true;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; p : e.params.entrySet()) {</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L407">                    b.append(',');</span>
+                }
+<span class="fc" id="L409">                b.append('&quot;');</span>
+<span class="fc" id="L410">                AnalyticsJson.escape(b, p.getKey());</span>
+<span class="fc" id="L411">                b.append(&quot;\&quot;:&quot;);</span>
+<span class="fc" id="L412">                AnalyticsJson.appendValue(b, p.getValue());</span>
+<span class="fc" id="L413">                first = false;</span>
+<span class="fc" id="L414">            }</span>
+<span class="fc" id="L415">            b.append('}');</span>
+        }
+<span class="fc" id="L417">        b.append('}');</span>
+<span class="fc" id="L418">    }</span>
+
+    private void post(String json) {
+<span class="fc" id="L421">        ConnectionRequest req = new ConnectionRequest();</span>
+<span class="fc" id="L422">        req.setUrl(resolveEndpoint());</span>
+<span class="fc" id="L423">        req.setPost(true);</span>
+<span class="fc" id="L424">        req.setHttpMethod(&quot;POST&quot;);</span>
+<span class="fc" id="L425">        req.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L426">        req.setRequestBody(json);</span>
+<span class="fc" id="L427">        req.setFailSilently(true);</span>
+<span class="fc" id="L428">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L429">    }</span>
+
+    private String resolveEndpoint() {
+<span class="pc bpc" id="L432" title="3 of 4 branches missed.">        if (endpoint != null &amp;&amp; endpoint.length() &gt; 0) {</span>
+<span class="nc" id="L433">            return endpoint;</span>
+        }
+<span class="fc" id="L435">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">        String base = d == null ? DEFAULT_BASE_URL : d.getProperty(&quot;cloudServerURL&quot;, DEFAULT_BASE_URL);</span>
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">        if (base == null || base.length() == 0) {</span>
+<span class="nc" id="L438">            base = DEFAULT_BASE_URL;</span>
+        }
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">        if (base.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L441">            base = base.substring(0, base.length() - 1);</span>
+        }
+<span class="fc" id="L443">        return base + PATH;</span>
+    }
+
+    private static final class PendingEvent {
+        private String name;
+        private String category;
+        private String screen;
+        private long clientTs;
+        private Map&lt;String, Object&gt; params;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

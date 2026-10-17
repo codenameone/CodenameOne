@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceText.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceText.java</span></div><h1>SurfaceText.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import java.util.Map;
+
+/// A static text node. The text may embed `${key}` placeholders that the platform renderer
+/// substitutes from the state map of the current timeline entry or live-activity update, so
+/// frequently changing values do not require re-publishing the whole descriptor:
+///
+/// ```java
+/// new SurfaceText(&quot;${status}&quot;).setFontSize(13).setColor(SurfaceColor.SECONDARY_LABEL)
+/// ```
+///
+/// For values the OS should animate on its own clock (countdowns, elapsed time) use
+/// `SurfaceDynamicText` instead.
+public class SurfaceText extends SurfaceNode {
+    private String text;
+    private int fontSize;
+    private SurfaceFontWeight fontWeight;
+    private SurfaceColor color;
+    private int maxLines;
+
+    /// Creates a text node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: literal text, optionally embedding `${key}` state placeholders
+<span class="fc" id="L49">    public SurfaceText(String text) {</span>
+<span class="fc" id="L50">        this.text = text;</span>
+<span class="fc" id="L51">    }</span>
+
+    /// Sets the font size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontSize`: the size in dips
+    ///
+    /// #### Returns
+    ///
+    /// this text node, for chaining
+    public SurfaceText setFontSize(int fontSize) {
+<span class="fc" id="L63">        this.fontSize = fontSize;</span>
+<span class="fc" id="L64">        return this;</span>
+    }
+
+    /// Sets the font weight.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontWeight`: the weight
+    ///
+    /// #### Returns
+    ///
+    /// this text node, for chaining
+    public SurfaceText setFontWeight(SurfaceFontWeight fontWeight) {
+<span class="fc" id="L77">        this.fontWeight = fontWeight;</span>
+<span class="fc" id="L78">        return this;</span>
+    }
+
+    /// Sets the text color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// this text node, for chaining
+    public SurfaceText setColor(SurfaceColor color) {
+<span class="fc" id="L91">        this.color = color;</span>
+<span class="fc" id="L92">        return this;</span>
+    }
+
+    /// Limits the number of rendered lines.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxLines`: maximum line count, 0 for unlimited
+    ///
+    /// #### Returns
+    ///
+    /// this text node, for chaining
+    public SurfaceText setMaxLines(int maxLines) {
+<span class="fc" id="L105">        this.maxLines = maxLines;</span>
+<span class="fc" id="L106">        return this;</span>
+    }
+
+    /// Returns the text, potentially containing `${key}` placeholders.
+    public String getText() {
+<span class="nc" id="L111">        return text;</span>
+    }
+
+    /// Returns the font size in dips, 0 for the platform default.
+    public int getFontSize() {
+<span class="nc" id="L116">        return fontSize;</span>
+    }
+
+    /// Returns the font weight, or null for the platform default.
+    public SurfaceFontWeight getFontWeight() {
+<span class="nc" id="L121">        return fontWeight;</span>
+    }
+
+    /// Returns the text color, or null for the platform default.
+    public SurfaceColor getColor() {
+<span class="nc" id="L126">        return color;</span>
+    }
+
+    /// Returns the maximum line count, 0 for unlimited.
+    public int getMaxLines() {
+<span class="nc" id="L131">        return maxLines;</span>
+    }
+
+    @Override
+    public SurfaceText setPadding(int all) {
+<span class="nc" id="L136">        super.setPadding(all);</span>
+<span class="nc" id="L137">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setPadding(int top, int right, int bottom, int left) {
+<span class="nc" id="L142">        super.setPadding(top, right, bottom, left);</span>
+<span class="nc" id="L143">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setBackground(SurfaceColor background) {
+<span class="nc" id="L148">        super.setBackground(background);</span>
+<span class="nc" id="L149">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setCornerRadius(int radius) {
+<span class="nc" id="L154">        super.setCornerRadius(radius);</span>
+<span class="nc" id="L155">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setAlignment(SurfaceAlignment alignment) {
+<span class="nc" id="L160">        super.setAlignment(alignment);</span>
+<span class="nc" id="L161">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setWeight(int weight) {
+<span class="nc" id="L166">        super.setWeight(weight);</span>
+<span class="nc" id="L167">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setSize(int widthDips, int heightDips) {
+<span class="nc" id="L172">        super.setSize(widthDips, heightDips);</span>
+<span class="nc" id="L173">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setAction(String actionId) {
+<span class="nc" id="L178">        super.setAction(actionId);</span>
+<span class="nc" id="L179">        return this;</span>
+    }
+
+    @Override
+    public SurfaceText setAction(String actionId, Map&lt;String, Object&gt; params) {
+<span class="nc" id="L184">        super.setAction(actionId, params);</span>
+<span class="nc" id="L185">        return this;</span>
+    }
+
+    @Override
+    String getType() {
+<span class="fc" id="L190">        return &quot;text&quot;;</span>
+    }
+
+    @Override
+    void serializeContent(Map&lt;String, Object&gt; out, Map&lt;String, byte[]&gt; images, int depth) {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        out.put(&quot;text&quot;, text == null ? &quot;&quot; : text);</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (fontSize != 0) {</span>
+<span class="fc" id="L197">            out.put(&quot;size&quot;, Integer.valueOf(fontSize));</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (fontWeight != null) {</span>
+<span class="fc" id="L200">            out.put(&quot;fw&quot;, fontWeight.getJsonName());</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (color != null) {</span>
+<span class="fc" id="L203">            out.put(&quot;color&quot;, SurfaceSerializer.colorMap(color));</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (maxLines != 0) {</span>
+<span class="fc" id="L206">            out.put(&quot;maxLines&quot;, Integer.valueOf(maxLines));</span>
+        }
+<span class="fc" id="L208">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

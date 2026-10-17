@@ -1,0 +1,1607 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.rest</a> &gt; <span class="el_source">RequestBuilder.java</span></div><h1>RequestBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io.rest;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.RequestAuthorizer;
+import com.codename1.io.Data;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.gzip.GZConnectionRequest;
+import com.codename1.properties.PropertyBusinessObject;
+import com.codename1.ui.CN;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Base64;
+import com.codename1.util.Callback;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// This class is used to build, invoke the http request and to get the http
+/// response
+public class RequestBuilder {
+
+    private String method;
+
+    private String url;
+
+<span class="fc" id="L62">    private Map&lt;String, Object&gt; queryParams = new HashMap();</span>
+
+
+<span class="fc" id="L65">    private Map&lt;String, String&gt; headers = new HashMap();</span>
+
+<span class="fc" id="L67">    private Map&lt;String, String&gt; pathParams = new HashMap();</span>
+
+    private Integer timeout;
+    private Integer readTimeout;
+
+    private Boolean cookiesEnabled;
+
+    private Data body;
+
+    private String contentType;
+
+    private ErrorCodeHandler&lt;byte[]&gt; byteArrayErrorCallback;
+    private ErrorCodeHandler&lt;Map&gt; jsonErrorCallback;
+    private ErrorCodeHandler&lt;String&gt; stringErrorCallback;
+
+    /// Whether a redirect may be followed, or NULL when the caller has not said.
+    ///
+    /// Three states rather than two: unspecified has to leave ConnectionRequest's global default
+    /// alone, and only an explicit call may override it -- in either direction.
+    private Boolean followRedirects;
+    private ErrorCodeHandler&lt;PropertyBusinessObject&gt; propertyErrorCallback;
+    private Class errorHandlerPropertyType;
+    //private ActionListener&lt;NetworkEvent&gt; errorCallback;
+<span class="fc" id="L90">    private ArrayList&lt;ActionListener&lt;NetworkEvent&gt;&gt; errorCallbacks = new ArrayList&lt;ActionListener&lt;NetworkEvent&gt;&gt;();</span>
+    private ConnectionRequest.CachingMode cache;
+    private boolean fetched;
+    private Boolean postParameters;
+    private Byte priority;
+    private boolean insecure;
+    private Boolean useBoolean;
+    private Boolean useLongs;
+    private RequestAuthorizer authorizer;
+
+<span class="fc" id="L100">    RequestBuilder(String method, String url) {</span>
+<span class="fc" id="L101">        this.method = method;</span>
+<span class="fc" id="L102">        this.url = url;</span>
+<span class="fc" id="L103">    }</span>
+
+    private static PropertyBusinessObject createBusinessObject(Class type, Map response) throws InstantiationException, IllegalAccessException {
+<span class="fc" id="L106">        PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();</span>
+<span class="fc" id="L107">        pb.getPropertyIndex().populateFromMap(response);</span>
+<span class="fc" id="L108">        return pb;</span>
+    }
+
+    private static List&lt;PropertyBusinessObject&gt; buildBusinessObjectList(Class type, List&lt;Map&gt; lst) throws InstantiationException, IllegalAccessException {
+<span class="fc" id="L112">        List&lt;PropertyBusinessObject&gt; result = new ArrayList&lt;PropertyBusinessObject&gt;();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (Map m : lst) {</span>
+<span class="fc" id="L114">            result.add(createBusinessObject(type, m));</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return result;</span>
+    }
+
+    private void checkFetched() {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (fetched) {</span>
+<span class="nc" id="L121">            throw new RuntimeException(&quot;This method can't be invoked after a request was sent&quot;);</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+    /// Turns off checking to make sure that SSL certificate is valid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `insecure`: true to disable ssl certificate checking
+    ///
+    /// #### Returns
+    ///
+    /// this request builder
+    public RequestBuilder insecure(boolean insecure) {
+<span class="fc" id="L135">        this.insecure = insecure;</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Indicates if JSON should treat boolean values as Boolean. This values is set implicitly to true when reading property business objects
+    ///
+    /// #### Parameters
+    ///
+    /// - `useBoolean`: true to return Boolean objects in JSON Maps
+    ///
+    /// #### Returns
+    ///
+    /// this request builder
+    public RequestBuilder useBoolean(boolean useBoolean) {
+<span class="fc" id="L149">        this.useBoolean = useBoolean;</span>
+<span class="fc" id="L150">        return this;</span>
+    }
+
+    /// Indicates if JSON should treat non-decimal numeric values as Long. If not set, uses the current default
+    /// from the static value in JSONParser.isUseLongs
+    ///
+    /// #### Parameters
+    ///
+    /// - `useLongs`: true to return Long objects in JSON Maps
+    ///
+    /// #### Returns
+    ///
+    /// this request builder
+    public RequestBuilder useLongs(boolean useLongs) {
+<span class="fc" id="L164">        this.useLongs = useLongs;</span>
+<span class="fc" id="L165">        return this;</span>
+    }
+
+    /// Sets the caching mode for this request, see `com.codename1.io.ConnectionRequest#getCacheMode()`
+    ///
+    /// #### Parameters
+    ///
+    /// - `cache`: the cache mode
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder cacheMode(ConnectionRequest.CachingMode cache) {
+<span class="fc" id="L178">        this.cache = cache;</span>
+<span class="fc" id="L179">        return this;</span>
+    }
+
+    /// Overrides the default behavior of methods so they can be sent using the post/get method
+    ///
+    /// #### Parameters
+    ///
+    /// - `postParameters`: true to force post, false to use get method. Defaults to true for all methods other than GET
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder postParameters(Boolean postParameters) {
+<span class="fc" id="L192">        this.postParameters = postParameters;</span>
+<span class="fc" id="L193">        return this;</span>
+    }
+
+    /// Sets the value of the content type
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the content type
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder contentType(String s) {
+<span class="fc" id="L206">        checkFetched();</span>
+<span class="fc" id="L207">        contentType = s;</span>
+<span class="fc" id="L208">        return this;</span>
+    }
+
+    /// Sets the priority of the request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `priority`: The priority.
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance.
+    ///
+    /// #### See also
+    ///
+    /// - ConnectionRequest#setPriority(byte)
+    public RequestBuilder priority(byte priority) {
+<span class="fc" id="L225">        checkFetched();</span>
+<span class="fc" id="L226">        this.priority = priority;</span>
+<span class="fc" id="L227">        return this;</span>
+    }
+
+    /// Sets the cookiesEnabled parameter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cookiesEnabled`: True to enable cookies. False to disable.
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance.
+    ///
+    public RequestBuilder cookiesEnabled(boolean cookiesEnabled) {
+<span class="fc" id="L241">        checkFetched();</span>
+<span class="fc" id="L242">        this.cookiesEnabled = cookiesEnabled;</span>
+<span class="fc" id="L243">        return this;</span>
+    }
+
+    /// Add a path param to the request.
+    /// For example if the request url is: http://domain.com/users/{id}
+    /// The path param can be - key=&quot;id&quot;, value=&quot;1&quot;
+    /// When the request executes the path would be: http://domain.com/users/1
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the identifier key in the request.
+    ///
+    /// - `value`: the value to replace in the url
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder pathParam(String key, String value) {
+<span class="fc" id="L261">        checkFetched();</span>
+<span class="fc" id="L262">        pathParams.put(key, value);</span>
+<span class="fc" id="L263">        return this;</span>
+    }
+
+    /// Add a query parameter to the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: param key
+    ///
+    /// - `value`: param value
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder queryParam(String key, String value) {
+<span class="fc" id="L278">        checkFetched();</span>
+<span class="fc" id="L279">        queryParams.put(key, value);</span>
+<span class="fc" id="L280">        return this;</span>
+    }
+
+    /// Add multiple query parameter values to the request using same key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: param key
+    ///
+    /// - `values`: param values
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    ///
+    public RequestBuilder queryParam(String key, String[] values) {
+<span class="fc" id="L296">        checkFetched();</span>
+<span class="fc" id="L297">        queryParams.put(key, values);</span>
+<span class="fc" id="L298">        return this;</span>
+    }
+
+    /// Add a header to the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`
+    ///
+    /// - `value`
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder header(String key, String value) {
+<span class="fc" id="L313">        checkFetched();</span>
+<span class="fc" id="L314">        headers.put(Objects.requireNonNull(key, &quot;Header key cannot be null&quot;),</span>
+<span class="fc" id="L315">                Objects.requireNonNull(value, &quot;Header value cannot be null&quot;));</span>
+<span class="fc" id="L316">        return this;</span>
+    }
+
+    /// Sets the request body
+    ///
+    /// #### Parameters
+    ///
+    /// - `bodyContent`: request body content
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder body(final String bodyContent) {
+<span class="fc" id="L329">        checkFetched();</span>
+<span class="fc" id="L330">        this.body = new BodyData(bodyContent);</span>
+<span class="fc" id="L331">        return this;</span>
+    }
+
+    /// Sets the request body lazily.
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: Wrapper for the request body that knows how to append to an output stream.
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instances
+    ///
+    /// #### See also
+    ///
+    /// - #body(java.lang.String)
+    public RequestBuilder body(Data body) {
+<span class="nc" id="L348">        checkFetched();</span>
+<span class="nc" id="L349">        this.body = body;</span>
+<span class="nc" id="L350">        return this;</span>
+    }
+
+    /// Sets the request body to the JSON matching the given object
+    ///
+    /// #### Parameters
+    ///
+    /// - `body`: request body
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder body(PropertyBusinessObject body) {
+<span class="nc" id="L363">        body(body.getPropertyIndex().toJSON());</span>
+<span class="nc" id="L364">        return this;</span>
+    }
+
+    /// In case of an error this method is invoked asynchronously to process
+    /// the error content with the byte array data
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the content of the error response
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder onErrorCodeBytes(ErrorCodeHandler&lt;byte[]&gt; err) {
+<span class="nc" id="L378">        checkFetched();</span>
+<span class="nc" id="L379">        byteArrayErrorCallback = err;</span>
+<span class="nc" id="L380">        return this;</span>
+    }
+
+    /// In case of an error this method is invoked asynchronously to process
+    /// the error content with the JSON data
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the content of the error response
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder onErrorCodeJSON(ErrorCodeHandler&lt;Map&gt; err) {
+<span class="fc" id="L394">        checkFetched();</span>
+<span class="fc" id="L395">        jsonErrorCallback = err;</span>
+<span class="fc" id="L396">        return this;</span>
+    }
+
+    /// In case of an error this method is invoked asynchronously to process
+    /// the error content with the JSON data and places it into a business
+    /// object in the callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the content of the error response
+    ///
+    /// - `errorClass`: the class of the business object into which the data is parsed
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder onErrorCode(ErrorCodeHandler&lt;PropertyBusinessObject&gt; err, Class errorClass) {
+<span class="nc" id="L413">        checkFetched();</span>
+<span class="nc" id="L414">        propertyErrorCallback = err;</span>
+<span class="nc" id="L415">        errorHandlerPropertyType = errorClass;</span>
+<span class="nc" id="L416">        return this;</span>
+    }
+
+    /// In case of an error this method is invoked asynchronously to process
+    /// the error content with the JSON data
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the content of the error response
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    /// Whether this request may follow a redirect. Requests follow them by default.
+    ///
+    /// Turn it off for a request that carries CREDENTIALS. A redirect is followed with the same
+    /// headers, so a 307 hands the Authorization header -- and the body -- to whatever host the
+    /// response names, including an `http://` one, which silently undoes a caller that was
+    /// careful to use HTTPS. A 302 or 303 is not safer, only different: it turns a POST into a
+    /// GET and the final 2xx then reports success for a write that never happened.
+    ///
+    /// `ConnectionRequest` has always had this per request; this passes it through, which is all
+    /// that was missing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `follow`: false to refuse redirects
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder followRedirects(boolean follow) {
+<span class="fc" id="L448">        checkFetched();</span>
+<span class="fc" id="L449">        followRedirects = Boolean.valueOf(follow);</span>
+<span class="fc" id="L450">        return this;</span>
+    }
+
+    public RequestBuilder onErrorCodeString(ErrorCodeHandler&lt;String&gt; err) {
+<span class="fc" id="L454">        checkFetched();</span>
+<span class="fc" id="L455">        stringErrorCallback = err;</span>
+<span class="fc" id="L456">        return this;</span>
+    }
+
+    /// Invoked for exceptions or failures such as disconnect.  Replaces any existing
+    /// callbacks previously registered with `#onError(com.codename1.ui.events.ActionListener)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: callback for a networking error
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    ///
+    /// #### See also
+    ///
+    /// - #onError(com.codename1.ui.events.ActionListener, boolean)
+    public RequestBuilder onError(ActionListener&lt;NetworkEvent&gt; error) {
+<span class="nc" id="L474">        return onError(error, true);</span>
+    }
+
+    /// Invoked for exceptions or failures such as disconnect
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: callback for a networking error
+    ///
+    /// - `replace`: @param replace If true, replaces the existing errorCallback(s) with the handler
+    /// provided.
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    ///
+    public RequestBuilder onError(ActionListener&lt;NetworkEvent&gt; error, boolean replace) {
+<span class="nc" id="L491">        checkFetched();</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (replace) {</span>
+<span class="nc" id="L493">            errorCallbacks.clear();</span>
+        }
+<span class="nc" id="L495">        errorCallbacks.add(error);</span>
+<span class="nc" id="L496">        return this;</span>
+    }
+
+    /// Sets the request timeout
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: request timeout in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder timeout(int timeout) {
+<span class="fc" id="L509">        checkFetched();</span>
+<span class="fc" id="L510">        this.timeout = timeout;</span>
+<span class="fc" id="L511">        return this;</span>
+    }
+
+    /// Sets the request read timeout.  Only used if `ConnectionRequest#isReadTimeoutSupported()`
+    /// is true on this platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: The timeout.
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance.
+    public RequestBuilder readTimeout(int timeout) {
+<span class="fc" id="L525">        checkFetched();</span>
+<span class="fc" id="L526">        this.readTimeout = timeout;</span>
+<span class="fc" id="L527">        return this;</span>
+    }
+
+    /// Sets the request to be a gzip request
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder gzip() {
+<span class="nc" id="L536">        header(&quot;Accept-Encoding&quot;, &quot;gzip&quot;);</span>
+<span class="nc" id="L537">        return this;</span>
+    }
+
+    /// Add accept json header to the request
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder acceptJson() {
+<span class="nc" id="L546">        header(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="nc" id="L547">        return this;</span>
+    }
+
+    /// Sets both the content type and accept headers to &quot;application/json&quot;
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder jsonContent() {
+<span class="fc" id="L556">        return contentType(&quot;application/json&quot;).</span>
+<span class="fc" id="L557">                header(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+    }
+
+    /// Add a basic authentication Authorization header
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder basicAuth(String username, String password) {
+<span class="fc" id="L566">        header(&quot;Authorization&quot;, &quot;Basic &quot; + Base64.encodeNoNewline(StringUtil.getBytes(username + &quot;:&quot; + password)));</span>
+<span class="fc" id="L567">        return this;</span>
+    }
+
+    /// Add an authorization bearer header, this is shorthand for
+    /// `header(&quot;Authorization&quot;, &quot;Bearer &quot; + token)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the authorization token
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder bearer(String token) {
+<span class="fc" id="L581">        header(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+<span class="fc" id="L582">        return this;</span>
+    }
+
+    /// Gives the request an authorizer: the source of its `Authorization` header, renewed
+    /// and sent again once if the service answers `401`. See [RequestAuthorizer].
+    ///
+    /// Without this call the request uses whatever
+    /// [com.codename1.io.NetworkManager#setAuthorizer(String, RequestAuthorizer)] registered
+    /// for its URL. A header set with [#header(String, String)], [#bearer(String)] or
+    /// [#basicAuth(String, String)] wins over either. The blocking methods of this builder,
+    /// such as [#getAsString()], return the final answer like the asynchronous ones: a
+    /// renewal and the second attempt happen before they do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `authorizer`: the authorizer, or [RequestAuthorizer#NONE] to send this request
+    ///   without even the default one
+    ///
+    /// #### Returns
+    ///
+    /// RequestBuilder instance
+    public RequestBuilder authorizer(RequestAuthorizer authorizer) {
+<span class="fc" id="L604">        checkFetched();</span>
+<span class="fc" id="L605">        this.authorizer = authorizer;</span>
+<span class="fc" id="L606">        return this;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: invoked with the result of the builder query
+    ///
+    /// #### Returns
+    ///
+    /// the ConnectionRequest instance
+    public ConnectionRequest fetchAsString(final OnComplete&lt;Response&lt;String&gt;&gt; callback) {
+<span class="fc" id="L620">        return getAsStringAsyncImpl(callback);</span>
+    }
+
+    private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
+<span class="fc" id="L624">        final Connection request = createRequest(false);</span>
+<span class="fc" id="L625">        request.addResponseListener(new GetAsStringAsyncImplActionListener(request, callback));</span>
+<span class="fc" id="L626">        fetched = true;</span>
+<span class="fc" id="L627">        CN.addToQueue(request);</span>
+<span class="fc" id="L628">        return request;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Deprecated
+    ///
+    /// please use `#fetchAsString(com.codename1.util.OnComplete)` instead
+    public void getAsStringAsync(final Callback&lt;Response&lt;String&gt;&gt; callback) {
+<span class="fc" id="L642">        getAsStringAsyncImpl(callback);</span>
+<span class="fc" id="L643">    }</span>
+
+    /// Executes the request synchronously
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;String&gt; getAsString() {
+<span class="fc" id="L651">        ConnectionRequest request = createRequest(false);</span>
+<span class="fc" id="L652">        fetched = true;</span>
+<span class="fc" id="L653">        CN.addToQueueAndWait(request);</span>
+<span class="fc" id="L654">        Response res = null;</span>
+        try {
+<span class="fc" id="L656">            byte[] respData = request.getResponseData();</span>
+<span class="fc" id="L657">            String resp = null;</span>
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">            if (respData != null) {</span>
+<span class="fc" id="L659">                resp = new String(respData, &quot;UTF-8&quot;);</span>
+            }
+<span class="fc" id="L661">            res = new Response(request.getResponseCode(), resp,</span>
+<span class="fc" id="L662">                    request.getResponseErrorMessage());</span>
+<span class="nc" id="L663">        } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L664">            ex.printStackTrace();</span>
+<span class="fc" id="L665">        }</span>
+<span class="fc" id="L666">        return res;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Returns
+    ///
+    /// the connection request instance
+    public ConnectionRequest fetchAsBytes(final OnComplete&lt;Response&lt;byte[]&gt;&gt; callback) {
+<span class="fc" id="L680">        return getAsBytesAsyncImpl(callback);</span>
+    }
+
+    private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
+<span class="fc" id="L684">        final Connection request = createRequest(false);</span>
+<span class="fc" id="L685">        request.addResponseListener(new GetAsBytesAsyncImplActionListener(request, callback));</span>
+<span class="fc" id="L686">        fetched = true;</span>
+<span class="fc" id="L687">        CN.addToQueue(request);</span>
+<span class="fc" id="L688">        return request;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#fetchAsBytes(com.codename1.util.OnComplete)` instead
+    public void getAsBytesAsync(final Callback&lt;Response&lt;byte[]&gt;&gt; callback) {
+<span class="fc" id="L702">        getAsBytesAsyncImpl(callback);</span>
+<span class="fc" id="L703">    }</span>
+
+    /// Executes the request synchronously
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;byte[]&gt; getAsBytes() {
+<span class="nc" id="L711">        ConnectionRequest request = createRequest(false);</span>
+<span class="nc" id="L712">        fetched = true;</span>
+<span class="nc" id="L713">        CN.addToQueueAndWait(request);</span>
+<span class="nc" id="L714">        return new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    public ConnectionRequest fetchAsJsonMap(final OnComplete&lt;Response&lt;Map&gt;&gt; callback) {
+<span class="fc" id="L728">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L729">        request.addResponseListener(new FetchAsJsonMapActionListener(request, callback));</span>
+<span class="fc" id="L730">        fetched = true;</span>
+<span class="fc" id="L731">        CN.addToQueue(request);</span>
+<span class="fc" id="L732">        return request;</span>
+    }
+
+    /// Executes the request asynchronously when the server is expected to return
+    /// a **top-level JSON array** (`[{...}, {...}]`). Internally this funnels
+    /// through the same JSON parser as `#fetchAsJsonMap(OnComplete)`, which
+    /// wraps top-level arrays under the synthetic key `&quot;root&quot;`; this builder
+    /// unwraps that key for you so the callback receives the array directly:
+    ///
+    /// ```java
+    /// Rest.get(&quot;https://api.example.com/items&quot;)
+    ///     .header(&quot;Authorization&quot;, &quot;Bearer &quot; + token)
+    ///     .acceptJson()
+    ///     .fetchAsJsonList(response -&gt; {
+    ///         List items = response.getResponseData();
+    ///         renderItems(items);
+    ///     });
+    /// ```
+    ///
+    /// If the server returns a JSON object instead of an array, the callback
+    /// receives an empty list. If you don't know up-front whether the
+    /// response is an array or an object, use `#fetchAsJsonMap(OnComplete)`
+    /// and branch on `data.get(&quot;root&quot;) instanceof List`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response (with the unwrapped list) to this
+    ///   callback. Always invoked on the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    public ConnectionRequest fetchAsJsonList(final OnComplete&lt;Response&lt;List&gt;&gt; callback) {
+<span class="nc" id="L765">        final Connection request = createRequest(true);</span>
+<span class="nc" id="L766">        request.addResponseListener(new FetchAsJsonListActionListener(request, callback));</span>
+<span class="nc" id="L767">        fetched = true;</span>
+<span class="nc" id="L768">        CN.addToQueue(request);</span>
+<span class="nc" id="L769">        return request;</span>
+    }
+
+    /// Executes the request asynchronously, parses the JSON response, and
+    /// hands the typed DTO to `callback`. Uses the build-time POJO binding
+    /// framework: `type` must be annotated with `@Mapped` (see
+    /// `com.codename1.annotations.Mapped` /
+    /// `com.codename1.mapping.Mappers`) so the build registers a typed
+    /// mapper for it.
+    ///
+    /// ```java
+    /// // model
+    /// @Mapped public final class Asset {
+    ///     @JsonProperty public String id;
+    ///     @JsonProperty public String originalFileName;
+    /// }
+    ///
+    /// // call site
+    /// Rest.get(url + &quot;/assets/&quot; + id)
+    ///     .header(&quot;Authorization&quot;, &quot;Bearer &quot; + token)
+    ///     .acceptJson()
+    ///     .fetchAsMapped(Asset.class, response -&gt; {
+    ///         Asset a = response.getResponseData();   // already typed -- no Map casts
+    ///         render(a);
+    ///     });
+    /// ```
+    ///
+    /// Compared to `#fetchAsJsonMap(OnComplete)`: no `(Map) cast`, no
+    /// `m.get(&quot;id&quot;)` boilerplate, no key-typo surprises at runtime. The
+    /// per-class mapper is generated by the Maven plugin's
+    /// `process-annotations` mojo from the `@Mapped` annotation and lives
+    /// in `&lt;basePackage&gt;.generated.&lt;Class&gt;Mapper`.
+    ///
+    /// If the type has no registered mapper at runtime, the listener
+    /// completes with `null` data and a non-200 response code is *not*
+    /// synthesised -- inspect `response.getResponseCode()` to differentiate
+    /// &quot;server returned an error&quot; from &quot;no mapper registered&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the `@Mapped` class to deserialise into
+    /// - `callback`: invoked on the EDT with the typed result
+    ///
+    /// #### Returns
+    ///
+    /// the Connection Request object so it can be killed if necessary
+    public &lt;T&gt; ConnectionRequest fetchAsMapped(final Class&lt;T&gt; type, final OnComplete&lt;Response&lt;T&gt;&gt; callback) {
+<span class="fc" id="L816">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L817">        request.addResponseListener(new FetchAsMappedActionListener&lt;T&gt;(request, type, callback));</span>
+<span class="fc" id="L818">        fetched = true;</span>
+<span class="fc" id="L819">        CN.addToQueue(request);</span>
+<span class="fc" id="L820">        return request;</span>
+    }
+
+    /// List-typed variant of `#fetchAsMapped(Class, OnComplete)`. Use when
+    /// the server returns a top-level JSON array of DTOs:
+    ///
+    /// ```java
+    /// Rest.get(url + &quot;/albums&quot;)
+    ///     .header(&quot;Authorization&quot;, &quot;Bearer &quot; + token)
+    ///     .acceptJson()
+    ///     .fetchAsMappedList(Album.class, response -&gt; {
+    ///         List&lt;Album&gt; albums = response.getResponseData();
+    ///         renderAlbums(albums);
+    ///     });
+    /// ```
+    ///
+    /// Internally goes through the same `{&quot;root&quot;: [...]}` envelope as
+    /// `#fetchAsJsonList(OnComplete)`, then maps each element through the
+    /// registered mapper for `type`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the per-element `@Mapped` class
+    /// - `callback`: invoked on the EDT with `List&lt;T&gt;` data
+    ///
+    /// #### Returns
+    ///
+    /// the Connection Request object so it can be killed if necessary
+    public &lt;T&gt; ConnectionRequest fetchAsMappedList(final Class&lt;T&gt; type, final OnComplete&lt;Response&lt;List&lt;T&gt;&gt;&gt; callback) {
+<span class="fc" id="L849">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L850">        request.addResponseListener(new FetchAsMappedListActionListener&lt;T&gt;(request, type, callback));</span>
+<span class="fc" id="L851">        fetched = true;</span>
+<span class="fc" id="L852">        CN.addToQueue(request);</span>
+<span class="fc" id="L853">        return request;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback. This fetches JSON data and parses it into a properties business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// - `type`: the class of the business object returned
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    public ConnectionRequest fetchAsProperties(final OnComplete&lt;Response&lt;PropertyBusinessObject&gt;&gt; callback, final Class type) {
+<span class="fc" id="L869">        useBoolean(true);</span>
+<span class="fc" id="L870">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L871">        request.addResponseListener(new FetchAsPropertiesActionListener(request, type, callback));</span>
+<span class="fc" id="L872">        fetched = true;</span>
+<span class="fc" id="L873">        CN.addToQueue(request);</span>
+<span class="fc" id="L874">        return request;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#fetchAsJsonMap(com.codename1.util.OnComplete)` instead
+    public ConnectionRequest getAsJsonMap(final SuccessCallback&lt;Response&lt;Map&gt;&gt; callback) {
+<span class="fc" id="L892">        return getAsJsonMap(callback, null);</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// - `onError`: the error callback
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#fetchAsJsonMap(com.codename1.util.OnComplete)` instead
+    public ConnectionRequest getAsJsonMap(final SuccessCallback&lt;Response&lt;Map&gt;&gt; callback, final FailureCallback&lt;? extends Object&gt; onError) {
+<span class="fc" id="L912">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L913">        request.addResponseListener(new GetAsJsonMapActionListener(request, onError, callback));</span>
+<span class="fc" id="L914">        bindOnError(request, onError);</span>
+<span class="fc" id="L915">        fetched = true;</span>
+<span class="fc" id="L916">        CN.addToQueue(request);</span>
+<span class="fc" id="L917">        return request;</span>
+    }
+
+    private void bindOnError(final ConnectionRequest req, final FailureCallback&lt;? extends Object&gt; f) {
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="fc" id="L922">            return;</span>
+        }
+<span class="nc" id="L924">        req.addResponseCodeListener(new BindOnErrorResponseCodeActionListener(f));</span>
+<span class="nc" id="L925">        req.addExceptionListener(new BindOnErrorExceptionActionListener(f));</span>
+<span class="nc" id="L926">    }</span>
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#fetchAsJsonMap(com.codename1.util.OnComplete)` instead
+    public void getAsJsonMapAsync(final Callback&lt;Response&lt;Map&gt;&gt; callback) {
+<span class="nc" id="L939">        getAsJsonMap(callback, callback);</span>
+<span class="nc" id="L940">    }</span>
+
+    /// Executes the request synchronously
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;Map&gt; getAsJsonMap() {
+<span class="fc" id="L948">        ConnectionRequest request = createRequest(true);</span>
+<span class="fc" id="L949">        fetched = true;</span>
+<span class="fc" id="L950">        CN.addToQueueAndWait(request);</span>
+<span class="fc" id="L951">        Map response = ((Connection) request).json;</span>
+<span class="fc" id="L952">        return new Response(request.getResponseCode(), response, request.getResponseErrorMessage());</span>
+    }
+
+    /// Executes the request synchronously
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type of the business object to create
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;PropertyBusinessObject&gt; getAsProperties(Class type) {
+<span class="nc" id="L965">        useBoolean(true);</span>
+<span class="nc" id="L966">        ConnectionRequest request = createRequest(true);</span>
+<span class="nc" id="L967">        fetched = true;</span>
+<span class="nc" id="L968">        CN.addToQueueAndWait(request);</span>
+<span class="nc" id="L969">        Map response = ((Connection) request).json;</span>
+        try {
+<span class="nc" id="L971">            PropertyBusinessObject pb = createBusinessObject(type, response);</span>
+<span class="nc" id="L972">            return new Response(request.getResponseCode(), pb, request.getResponseErrorMessage());</span>
+<span class="nc" id="L973">        } catch (InstantiationException err) {</span>
+<span class="nc" id="L974">            Log.e(err);</span>
+<span class="nc" id="L975">            throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L976">        } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L977">            Log.e(err);</span>
+<span class="nc" id="L978">            throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L979">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L980">            Log.e(err);</span>
+<span class="nc" id="L981">            throw new RuntimeException(err.toString(), err);</span>
+        }
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback. This fetches JSON data and parses it into a properties business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// - `type`: the class of the business object returned
+    ///
+    /// - `root`: the root element's key of the structured content
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    public ConnectionRequest fetchAsPropertyList(final OnComplete&lt;Response&lt;List&lt;PropertyBusinessObject&gt;&gt;&gt; callback, final Class type, final String root) {
+<span class="fc" id="L1000">        useBoolean(true);</span>
+<span class="fc" id="L1001">        final Connection request = createRequest(true);</span>
+<span class="fc" id="L1002">        request.addResponseListener(new FetchAsPropertyListActionListener(request, root, type, callback));</span>
+<span class="fc" id="L1003">        fetched = true;</span>
+<span class="fc" id="L1004">        CN.addToQueue(request);</span>
+<span class="fc" id="L1005">        return request;</span>
+    }
+
+    /// Executes the request asynchronously and writes the response to the provided
+    /// Callback. This fetches JSON data and parses it into a properties business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: writes the response to this callback
+    ///
+    /// - `type`: the class of the business object returned
+    ///
+    /// #### Returns
+    ///
+    /// returns the Connection Request object so it can be killed if necessary
+    public ConnectionRequest fetchAsPropertyList(final OnComplete&lt;Response&lt;List&lt;PropertyBusinessObject&gt;&gt;&gt; callback, final Class type) {
+<span class="nc" id="L1021">        return fetchAsPropertyList(callback, type, &quot;root&quot;);</span>
+    }
+
+    /// Executes the request synchronously
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type of the business object to create
+    ///
+    /// - `root`: the root element's key of the structured content
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;List&lt;PropertyBusinessObject&gt;&gt; getAsPropertyList(Class type, String root) {
+<span class="nc" id="L1036">        useBoolean(true);</span>
+<span class="nc" id="L1037">        ConnectionRequest request = createRequest(true);</span>
+<span class="nc" id="L1038">        fetched = true;</span>
+<span class="nc" id="L1039">        CN.addToQueueAndWait(request);</span>
+<span class="nc" id="L1040">        Map response = ((Connection) request).json;</span>
+        try {
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">            if (response == null) {</span>
+<span class="nc" id="L1043">                return null;</span>
+            }
+<span class="nc" id="L1045">            List&lt;Map&gt; lst = (List&lt;Map&gt;) response.get(root);</span>
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">            if (lst == null) {</span>
+<span class="nc" id="L1047">                return null;</span>
+            }
+<span class="nc" id="L1049">            List&lt;PropertyBusinessObject&gt; result = buildBusinessObjectList(type, lst);</span>
+<span class="nc" id="L1050">            return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());</span>
+<span class="nc" id="L1051">        } catch (InstantiationException err) {</span>
+<span class="nc" id="L1052">            Log.e(err);</span>
+<span class="nc" id="L1053">            throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1054">        } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L1055">            Log.e(err);</span>
+<span class="nc" id="L1056">            throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1057">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L1058">            Log.e(err);</span>
+<span class="nc" id="L1059">            throw new RuntimeException(err.toString(), err);</span>
+        }
+    }
+
+    /// Executes the request synchronously
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type of the business object to create
+    ///
+    /// #### Returns
+    ///
+    /// Response Object
+    public Response&lt;List&lt;PropertyBusinessObject&gt;&gt; getAsPropertyList(Class type) {
+<span class="nc" id="L1073">        return getAsPropertyList(type, &quot;root&quot;);</span>
+    }
+
+    public String getRequestUrl() {
+<span class="nc" id="L1077">        return this.url;</span>
+    }
+
+    private JSONParser createJSONParser() {
+<span class="fc" id="L1081">        JSONParser jp = new JSONParser();</span>
+<span class="fc bfc" id="L1082" title="All 2 branches covered.">        if (useBoolean != null) {</span>
+<span class="fc" id="L1083">            jp.setUseBooleanInstance(useBoolean);</span>
+        }
+<span class="fc bfc" id="L1085" title="All 2 branches covered.">        if (useLongs != null) {</span>
+<span class="fc" id="L1086">            jp.setUseLongsInstance(useLongs);</span>
+        }
+<span class="fc" id="L1088">        return jp;</span>
+    }
+
+    private Connection createRequest(boolean parseJson) {
+<span class="fc" id="L1092">        Connection req = new Connection(parseJson);</span>
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : pathParams.entrySet()) {</span>
+<span class="fc" id="L1094">            String key = entry.getKey();</span>
+<span class="fc" id="L1095">            url = StringUtil.replaceAll(url, &quot;{&quot; + key + &quot;}&quot;, entry.getValue());</span>
+<span class="fc" id="L1096">        }</span>
+<span class="fc bfc" id="L1097" title="All 2 branches covered.">        if (contentType != null) {</span>
+<span class="fc" id="L1098">            req.setContentType(contentType);</span>
+        }
+<span class="fc" id="L1100">        req.setFailSilently(hasErrorCodeHandler());</span>
+<span class="fc bfc" id="L1101" title="All 2 branches covered.">        if (followRedirects != null) {</span>
+            // Only when the CALLER said so. Applying the field unconditionally would push this
+            // builder's default over ConnectionRequest.setDefaultFollowRedirects for every
+            // request that never asked, and testing it as a plain boolean made an explicit
+            // followRedirects(true) unreachable whenever the global default was false -- which is
+            // the opposite of a per-request setting.
+<span class="fc" id="L1107">            req.setFollowRedirects(followRedirects.booleanValue());</span>
+        }
+<span class="fc bfc" id="L1109" title="All 2 branches covered.">        if (cache != null) {</span>
+<span class="fc" id="L1110">            req.setCacheMode(cache);</span>
+        }
+<span class="fc" id="L1112">        req.setReadResponseForErrors(true);</span>
+<span class="fc" id="L1113">        req.setDuplicateSupported(true);</span>
+<span class="fc" id="L1114">        req.setUrl(url);</span>
+<span class="fc" id="L1115">        req.setHttpMethod(method);</span>
+<span class="fc bfc" id="L1116" title="All 2 branches covered.">        if (postParameters == null) {</span>
+<span class="pc bpc" id="L1117" title="2 of 6 branches missed.">            req.setPost(&quot;POST&quot;.equalsIgnoreCase(method) || &quot;PUT&quot;.equalsIgnoreCase(method) || &quot;PATCH&quot;.equalsIgnoreCase(method));</span>
+        } else {
+<span class="fc" id="L1119">            req.setPost(postParameters);</span>
+        }
+<span class="fc bfc" id="L1121" title="All 2 branches covered.">        if (body != null) {</span>
+<span class="fc" id="L1122">            req.setRequestBody(body);</span>
+<span class="fc" id="L1123">            req.setWriteRequest(true);</span>
+        }
+<span class="fc bfc" id="L1125" title="All 2 branches covered.">        if (timeout != null) {</span>
+<span class="fc" id="L1126">            req.setTimeout(timeout);</span>
+        }
+<span class="fc bfc" id="L1128" title="All 2 branches covered.">        if (readTimeout != null) {</span>
+<span class="fc" id="L1129">            req.setReadTimeout(readTimeout);</span>
+        }
+<span class="fc bfc" id="L1131" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : queryParams.entrySet()) {</span>
+<span class="fc" id="L1132">            String key = entry.getKey();</span>
+<span class="fc" id="L1133">            Object value = entry.getValue();</span>
+<span class="fc bfc" id="L1134" title="All 2 branches covered.">            if (value instanceof String[]) {</span>
+<span class="fc" id="L1135">                req.addArgument(key, (String[]) value);</span>
+            } else {
+<span class="fc" id="L1137">                req.addArgument(key, (String) value);</span>
+            }
+<span class="fc" id="L1139">        }</span>
+<span class="fc bfc" id="L1140" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : headers.entrySet()) {</span>
+<span class="fc" id="L1141">            req.addRequestHeader(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L1142">        }</span>
+<span class="pc bpc" id="L1143" title="1 of 2 branches missed.">        for (ActionListener&lt;NetworkEvent&gt; l : errorCallbacks) {</span>
+<span class="nc" id="L1144">            req.addExceptionListener(l);</span>
+<span class="nc" id="L1145">        }</span>
+
+<span class="fc" id="L1147">        req.setInsecure(insecure);</span>
+<span class="fc bfc" id="L1148" title="All 2 branches covered.">        if (authorizer != null) {</span>
+<span class="fc" id="L1149">            req.setAuthorizer(authorizer);</span>
+        }
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">        if (cookiesEnabled != null) {</span>
+<span class="fc" id="L1152">            req.setCookiesEnabled(cookiesEnabled);</span>
+        }
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">        if (priority != null) {</span>
+<span class="fc" id="L1155">            req.setPriority(priority);</span>
+        }
+
+<span class="fc" id="L1158">        return req;</span>
+    }
+
+    private boolean hasErrorCodeHandler() {
+<span class="pc bpc" id="L1162" title="2 of 8 branches missed.">        return byteArrayErrorCallback != null</span>
+                || stringErrorCallback != null
+                || jsonErrorCallback != null
+                || propertyErrorCallback != null;
+    }
+
+    private static class FetchAsPropertyListActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final String root;
+        private final Class type;
+        private final OnComplete&lt;Response&lt;List&lt;PropertyBusinessObject&gt;&gt;&gt; callback;
+
+<span class="fc" id="L1174">        public FetchAsPropertyListActionListener(Connection request, String root, Class type, OnComplete&lt;Response&lt;List&lt;PropertyBusinessObject&gt;&gt;&gt; callback) {</span>
+<span class="fc" id="L1175">            this.request = request;</span>
+<span class="fc" id="L1176">            this.root = root;</span>
+<span class="fc" id="L1177">            this.type = type;</span>
+<span class="fc" id="L1178">            this.callback = callback;</span>
+<span class="fc" id="L1179">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1183" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1184">                return;</span>
+            }
+<span class="fc" id="L1186">            Response res = null;</span>
+<span class="fc" id="L1187">            Map response = (Map) evt.getMetaData();</span>
+<span class="pc bpc" id="L1188" title="1 of 2 branches missed.">            if (response == null) {</span>
+<span class="nc" id="L1189">                return;</span>
+            }
+<span class="fc" id="L1191">            List&lt;Map&gt; lst = (List&lt;Map&gt;) response.get(root);</span>
+<span class="pc bpc" id="L1192" title="1 of 2 branches missed.">            if (lst == null) {</span>
+<span class="nc" id="L1193">                return;</span>
+            }
+            try {
+<span class="fc" id="L1196">                List&lt;PropertyBusinessObject&gt; result = buildBusinessObjectList(type, lst);</span>
+<span class="fc" id="L1197">                res = new Response(evt.getResponseCode(), result, evt.getMessage());</span>
+<span class="fc" id="L1198">                callback.completed(res);</span>
+<span class="nc" id="L1199">            } catch (InstantiationException err) {</span>
+<span class="nc" id="L1200">                Log.e(err);</span>
+<span class="nc" id="L1201">                throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1202">            } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L1203">                Log.e(err);</span>
+<span class="nc" id="L1204">                throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1205">            } catch (RuntimeException err) {</span>
+<span class="nc" id="L1206">                Log.e(err);</span>
+<span class="nc" id="L1207">                throw new RuntimeException(err.toString(), err);</span>
+<span class="fc" id="L1208">            }</span>
+<span class="fc" id="L1209">        }</span>
+    }
+
+    private static class BindOnErrorExceptionActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final FailureCallback&lt;?&gt; f;
+
+<span class="nc" id="L1215">        public BindOnErrorExceptionActionListener(FailureCallback&lt;? extends Object&gt; f) {</span>
+<span class="nc" id="L1216">            this.f = f;</span>
+<span class="nc" id="L1217">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="nc" id="L1221">            evt.consume();</span>
+<span class="nc" id="L1222">            f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());</span>
+<span class="nc" id="L1223">        }</span>
+    }
+
+    private static class BindOnErrorResponseCodeActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final FailureCallback&lt;?&gt; f;
+
+<span class="nc" id="L1229">        public BindOnErrorResponseCodeActionListener(FailureCallback&lt;? extends Object&gt; f) {</span>
+<span class="nc" id="L1230">            this.f = f;</span>
+<span class="nc" id="L1231">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="nc" id="L1235">            evt.consume();</span>
+<span class="nc" id="L1236">            f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());</span>
+<span class="nc" id="L1237">        }</span>
+    }
+
+    private static class GetAsJsonMapActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final FailureCallback&lt;?&gt; onError;
+        private final SuccessCallback&lt;Response&lt;Map&gt;&gt; callback;
+
+<span class="fc" id="L1245">        public GetAsJsonMapActionListener(Connection request, FailureCallback&lt;? extends Object&gt; onError, SuccessCallback&lt;Response&lt;Map&gt;&gt; callback) {</span>
+<span class="fc" id="L1246">            this.request = request;</span>
+<span class="fc" id="L1247">            this.onError = onError;</span>
+<span class="fc" id="L1248">            this.callback = callback;</span>
+<span class="fc" id="L1249">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1253" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1254">                return;</span>
+            }
+<span class="pc bpc" id="L1256" title="1 of 2 branches missed.">            if (onError != null) {</span>
+                // this is an error response code and should be handled as an error
+<span class="nc bnc" id="L1258" title="All 2 branches missed.">                if (evt.getResponseCode() &gt; 310) {</span>
+<span class="nc" id="L1259">                    return;</span>
+                }
+            }
+<span class="fc" id="L1262">            Response res = null;</span>
+<span class="fc" id="L1263">            Map response = (Map) evt.getMetaData();</span>
+<span class="fc" id="L1264">            res = new Response(evt.getResponseCode(), response, evt.getMessage());</span>
+<span class="fc" id="L1265">            callback.onSucess(res);</span>
+<span class="fc" id="L1266">        }</span>
+    }
+
+    private static class FetchAsPropertiesActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final Class type;
+        private final OnComplete&lt;Response&lt;PropertyBusinessObject&gt;&gt; callback;
+
+<span class="fc" id="L1274">        public FetchAsPropertiesActionListener(Connection request, Class type, OnComplete&lt;Response&lt;PropertyBusinessObject&gt;&gt; callback) {</span>
+<span class="fc" id="L1275">            this.request = request;</span>
+<span class="fc" id="L1276">            this.type = type;</span>
+<span class="fc" id="L1277">            this.callback = callback;</span>
+<span class="fc" id="L1278">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1282" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1283">                return;</span>
+            }
+<span class="fc" id="L1285">            Response res = null;</span>
+<span class="fc" id="L1286">            Map response = (Map) evt.getMetaData();</span>
+            try {
+<span class="fc" id="L1288">                PropertyBusinessObject pb = createBusinessObject(type, response);</span>
+<span class="fc" id="L1289">                res = new Response(evt.getResponseCode(), pb, evt.getMessage());</span>
+<span class="fc" id="L1290">                callback.completed(res);</span>
+<span class="nc" id="L1291">            } catch (InstantiationException err) {</span>
+<span class="nc" id="L1292">                Log.e(err);</span>
+<span class="nc" id="L1293">                throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1294">            } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L1295">                Log.e(err);</span>
+<span class="nc" id="L1296">                throw new RuntimeException(err.toString(), err);</span>
+<span class="nc" id="L1297">            } catch (RuntimeException err) {</span>
+<span class="nc" id="L1298">                Log.e(err);</span>
+<span class="nc" id="L1299">                throw new RuntimeException(err.toString(), err);</span>
+<span class="fc" id="L1300">            }</span>
+<span class="fc" id="L1301">        }</span>
+    }
+
+    private static class FetchAsJsonMapActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final OnComplete&lt;Response&lt;Map&gt;&gt; callback;
+
+<span class="fc" id="L1308">        public FetchAsJsonMapActionListener(Connection request, OnComplete&lt;Response&lt;Map&gt;&gt; callback) {</span>
+<span class="fc" id="L1309">            this.request = request;</span>
+<span class="fc" id="L1310">            this.callback = callback;</span>
+<span class="fc" id="L1311">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1315" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1316">                return;</span>
+            }
+<span class="fc" id="L1318">            Response res = null;</span>
+<span class="fc" id="L1319">            Map response = (Map) evt.getMetaData();</span>
+<span class="fc" id="L1320">            res = new Response(evt.getResponseCode(), response, evt.getMessage());</span>
+<span class="fc" id="L1321">            callback.completed(res);</span>
+<span class="fc" id="L1322">        }</span>
+    }
+
+    private static class FetchAsJsonListActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final OnComplete&lt;Response&lt;List&gt;&gt; callback;
+
+<span class="nc" id="L1329">        public FetchAsJsonListActionListener(Connection request, OnComplete&lt;Response&lt;List&gt;&gt; callback) {</span>
+<span class="nc" id="L1330">            this.request = request;</span>
+<span class="nc" id="L1331">            this.callback = callback;</span>
+<span class="nc" id="L1332">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="nc bnc" id="L1336" title="All 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1337">                return;</span>
+            }
+            // The JSONParser wraps top-level arrays under &quot;root&quot;.
+<span class="nc" id="L1340">            Map parsed = (Map) evt.getMetaData();</span>
+            List list;
+<span class="nc bnc" id="L1342" title="All 4 branches missed.">            if (parsed != null &amp;&amp; parsed.get(&quot;root&quot;) instanceof List) {</span>
+<span class="nc" id="L1343">                list = (List) parsed.get(&quot;root&quot;);</span>
+            } else {
+<span class="nc" id="L1345">                list = java.util.Collections.emptyList();</span>
+            }
+<span class="nc" id="L1347">            Response res = new Response(evt.getResponseCode(), list, evt.getMessage());</span>
+<span class="nc" id="L1348">            callback.completed(res);</span>
+<span class="nc" id="L1349">        }</span>
+    }
+
+    /// Routes a JSON-object response through the build-time POJO mapping
+    /// framework. Returns a `null` typed result when no mapper is registered
+    /// for `type` (typical cause: forgot `@Mapped` on the class, or the
+    /// process-annotations Mojo didn't run).
+    private static class FetchAsMappedActionListener&lt;T&gt; implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final Class&lt;T&gt; type;
+        private final OnComplete&lt;Response&lt;T&gt;&gt; callback;
+
+<span class="fc" id="L1361">        public FetchAsMappedActionListener(Connection request, Class&lt;T&gt; type, OnComplete&lt;Response&lt;T&gt;&gt; callback) {</span>
+<span class="fc" id="L1362">            this.request = request;</span>
+<span class="fc" id="L1363">            this.type = type;</span>
+<span class="fc" id="L1364">            this.callback = callback;</span>
+<span class="fc" id="L1365">        }</span>
+
+        @Override
+        @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1370" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1371">                return;</span>
+            }
+<span class="fc" id="L1373">            Map&lt;String, Object&gt; parsed = (Map&lt;String, Object&gt;) evt.getMetaData();</span>
+<span class="fc" id="L1374">            T result = null;</span>
+<span class="pc bpc" id="L1375" title="1 of 2 branches missed.">            if (parsed != null) {</span>
+<span class="fc" id="L1376">                com.codename1.mapping.Mapper&lt;T&gt; m =</span>
+<span class="fc" id="L1377">                        com.codename1.mapping.Mappers.get(type);</span>
+<span class="fc bfc" id="L1378" title="All 2 branches covered.">                if (m != null) {</span>
+<span class="fc" id="L1379">                    result = m.fromMap(parsed);</span>
+                }
+            }
+<span class="fc" id="L1382">            Response&lt;T&gt; res = new Response&lt;T&gt;(evt.getResponseCode(), result, evt.getMessage());</span>
+<span class="fc" id="L1383">            callback.completed(res);</span>
+<span class="fc" id="L1384">        }</span>
+    }
+
+    /// List-typed mapped variant. Pulls the array out of the top-level
+    /// JSON envelope (same as `FetchAsJsonListActionListener`), then maps
+    /// each element through the registered mapper for `type`.
+    private static class FetchAsMappedListActionListener&lt;T&gt; implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final Class&lt;T&gt; type;
+        private final OnComplete&lt;Response&lt;List&lt;T&gt;&gt;&gt; callback;
+
+<span class="fc" id="L1395">        public FetchAsMappedListActionListener(Connection request, Class&lt;T&gt; type, OnComplete&lt;Response&lt;List&lt;T&gt;&gt;&gt; callback) {</span>
+<span class="fc" id="L1396">            this.request = request;</span>
+<span class="fc" id="L1397">            this.type = type;</span>
+<span class="fc" id="L1398">            this.callback = callback;</span>
+<span class="fc" id="L1399">        }</span>
+
+        @Override
+        @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1404" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1405">                return;</span>
+            }
+<span class="fc" id="L1407">            Map parsed = (Map) evt.getMetaData();</span>
+<span class="fc" id="L1408">            List raw = null;</span>
+<span class="pc bpc" id="L1409" title="1 of 4 branches missed.">            if (parsed != null &amp;&amp; parsed.get(&quot;root&quot;) instanceof List) {</span>
+<span class="fc" id="L1410">                raw = (List) parsed.get(&quot;root&quot;);</span>
+            }
+            List&lt;T&gt; out;
+<span class="fc bfc" id="L1413" title="All 2 branches covered.">            if (raw == null) {</span>
+<span class="fc" id="L1414">                out = java.util.Collections.emptyList();</span>
+            } else {
+<span class="fc" id="L1416">                com.codename1.mapping.Mapper&lt;T&gt; m =</span>
+<span class="fc" id="L1417">                        com.codename1.mapping.Mappers.get(type);</span>
+<span class="fc bfc" id="L1418" title="All 2 branches covered.">                if (m == null) {</span>
+<span class="fc" id="L1419">                    out = java.util.Collections.emptyList();</span>
+                } else {
+<span class="fc" id="L1421">                    out = new ArrayList&lt;T&gt;(raw.size());</span>
+<span class="fc bfc" id="L1422" title="All 2 branches covered.">                    for (Object e : raw) {</span>
+<span class="pc bpc" id="L1423" title="1 of 2 branches missed.">                        if (e instanceof Map) {</span>
+<span class="fc" id="L1424">                            Map&lt;String, Object&gt; mm = (Map&lt;String, Object&gt;) e;</span>
+<span class="fc" id="L1425">                            out.add(m.fromMap(mm));</span>
+                        }
+<span class="fc" id="L1427">                    }</span>
+                }
+            }
+<span class="fc" id="L1430">            Response&lt;List&lt;T&gt;&gt; res = new Response&lt;List&lt;T&gt;&gt;(evt.getResponseCode(), out, evt.getMessage());</span>
+<span class="fc" id="L1431">            callback.completed(res);</span>
+<span class="fc" id="L1432">        }</span>
+    }
+
+    private static class GetAsBytesAsyncImplActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final Object callback;
+
+<span class="fc" id="L1439">        public GetAsBytesAsyncImplActionListener(Connection request, Object callback) {</span>
+<span class="fc" id="L1440">            this.request = request;</span>
+<span class="fc" id="L1441">            this.callback = callback;</span>
+<span class="fc" id="L1442">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1446" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1447">                return;</span>
+            }
+<span class="fc" id="L1449">            Response res = null;</span>
+<span class="fc" id="L1450">            res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());</span>
+<span class="fc bfc" id="L1451" title="All 2 branches covered.">            if (callback instanceof Callback) {</span>
+<span class="fc" id="L1452">                ((Callback) callback).onSucess(res);</span>
+            } else {
+<span class="fc" id="L1454">                ((OnComplete) callback).completed(res);</span>
+            }
+<span class="fc" id="L1456">        }</span>
+    }
+
+    private static class GetAsStringAsyncImplActionListener implements ActionListener&lt;NetworkEvent&gt; {
+        private final Connection request;
+        private final Object callback;
+
+<span class="fc" id="L1463">        public GetAsStringAsyncImplActionListener(Connection request, Object callback) {</span>
+<span class="fc" id="L1464">            this.request = request;</span>
+<span class="fc" id="L1465">            this.callback = callback;</span>
+<span class="fc" id="L1466">        }</span>
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+<span class="pc bpc" id="L1470" title="1 of 2 branches missed.">            if (request.errorCode) {</span>
+<span class="nc" id="L1471">                return;</span>
+            }
+<span class="fc" id="L1473">            Response res = null;</span>
+            try {
+<span class="fc" id="L1475">                res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), &quot;UTF-8&quot;), evt.getMessage());</span>
+<span class="fc bfc" id="L1476" title="All 2 branches covered.">                if (callback instanceof Callback) {</span>
+<span class="fc" id="L1477">                    ((Callback) callback).onSucess(res);</span>
+                } else {
+<span class="fc" id="L1479">                    ((OnComplete&lt;Response&lt;String&gt;&gt;) callback).completed(res);</span>
+                }
+<span class="nc" id="L1481">            } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L1482">                ex.printStackTrace();</span>
+<span class="fc" id="L1483">            }</span>
+<span class="fc" id="L1484">        }</span>
+    }
+
+    private static class BodyData implements Data {
+        private final String bodyContent;
+
+<span class="fc" id="L1490">        public BodyData(String bodyContent) {</span>
+<span class="fc" id="L1491">            this.bodyContent = bodyContent;</span>
+<span class="fc" id="L1492">        }</span>
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L1496">            output.write(bodyContent.getBytes(&quot;UTF-8&quot;));</span>
+<span class="fc" id="L1497">        }</span>
+
+        @Override
+        public long getSize() throws IOException {
+<span class="nc" id="L1501">            return bodyContent.getBytes(&quot;UTF-8&quot;).length;</span>
+        }
+    }
+
+    class Connection extends GZConnectionRequest {
+        boolean errorCode;
+        Map json;
+        private boolean parseJSON;
+        private ErrorCodeHandler errorHandler;
+        private Object errorObject;
+
+<span class="fc" id="L1512">        public Connection(boolean parseJSON) {</span>
+<span class="fc" id="L1513">            this.parseJSON = parseJSON;</span>
+<span class="fc" id="L1514">        }</span>
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">            if (!(o instanceof Connection)) {</span>
+<span class="nc" id="L1519">                return false;</span>
+            }
+<span class="nc" id="L1521">            Connection that = (Connection) o;</span>
+<span class="nc bnc" id="L1522" title="All 10 branches missed.">            return super.equals(o) &amp;&amp;</span>
+                    errorCode == that.errorCode &amp;&amp;
+                    parseJSON == that.parseJSON &amp;&amp;
+<span class="nc bnc" id="L1525" title="All 6 branches missed.">                    (json == null ? that.json == null : json.equals(that.json)) &amp;&amp;</span>
+<span class="nc bnc" id="L1526" title="All 6 branches missed.">                    (errorHandler == null ? that.errorHandler == null : errorHandler.equals(that.errorHandler)) &amp;&amp;</span>
+<span class="nc bnc" id="L1527" title="All 2 branches missed.">                    (errorObject == null ? that.errorObject == null : errorObject.equals(that.errorObject));</span>
+        }
+
+        /// {@inheritDoc}
+        @Override
+        public int hashCode() {
+<span class="nc" id="L1533">            int result = super.hashCode();</span>
+<span class="nc bnc" id="L1534" title="All 2 branches missed.">            result = 31 * result + (parseJSON ? 1 : 0);</span>
+<span class="nc" id="L1535">            return result;</span>
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="pc bpc" id="L1540" title="1 of 4 branches missed.">            if (byteArrayErrorCallback != null || stringErrorCallback != null ||</span>
+<span class="pc bpc" id="L1541" title="3 of 4 branches missed.">                    jsonErrorCallback != null || propertyErrorCallback != null) {</span>
+<span class="fc" id="L1542">                errorCode = true;</span>
+            } else {
+<span class="nc" id="L1544">                super.handleErrorResponseCode(code, message);</span>
+            }
+<span class="fc" id="L1546">        }</span>
+
+        @Override
+        protected void readUnzipedResponse(InputStream input) throws IOException {
+<span class="fc bfc" id="L1550" title="All 2 branches covered.">            if (errorCode) {</span>
+<span class="pc bpc" id="L1551" title="1 of 2 branches missed.">                if (byteArrayErrorCallback != null) {</span>
+<span class="nc" id="L1552">                    super.readUnzipedResponse(input);</span>
+<span class="nc" id="L1553">                    errorObject = getResponseData();</span>
+<span class="nc" id="L1554">                    errorHandler = byteArrayErrorCallback;</span>
+<span class="nc" id="L1555">                    return;</span>
+                }
+<span class="fc bfc" id="L1557" title="All 2 branches covered.">                if (stringErrorCallback != null) {</span>
+<span class="fc" id="L1558">                    super.readUnzipedResponse(input);</span>
+<span class="fc" id="L1559">                    errorObject = new String(getResponseData(), &quot;UTF-8&quot;);</span>
+<span class="fc" id="L1560">                    errorHandler = stringErrorCallback;</span>
+<span class="fc" id="L1561">                    return;</span>
+                }
+<span class="pc bpc" id="L1563" title="1 of 2 branches missed.">                if (jsonErrorCallback != null) {</span>
+<span class="fc" id="L1564">                    JSONParser jp = createJSONParser();</span>
+<span class="fc" id="L1565">                    errorObject = jp.parseJSON(new InputStreamReader(input, &quot;UTF-8&quot;));</span>
+<span class="fc" id="L1566">                    errorHandler = jsonErrorCallback;</span>
+<span class="fc" id="L1567">                    return;</span>
+                }
+<span class="nc bnc" id="L1569" title="All 2 branches missed.">                if (propertyErrorCallback != null) {</span>
+                    try {
+<span class="nc" id="L1571">                        JSONParser jp = createJSONParser();</span>
+<span class="nc" id="L1572">                        Map m = jp.parseJSON(new InputStreamReader(input, &quot;UTF-8&quot;));</span>
+<span class="nc" id="L1573">                        PropertyBusinessObject pb = (PropertyBusinessObject) errorHandlerPropertyType.newInstance();</span>
+<span class="nc" id="L1574">                        pb.getPropertyIndex().populateFromMap(m);</span>
+<span class="nc" id="L1575">                        errorObject = pb;</span>
+<span class="nc" id="L1576">                        errorHandler = propertyErrorCallback;</span>
+<span class="nc" id="L1577">                    } catch (InstantiationException err) {</span>
+<span class="nc" id="L1578">                        Log.e(err);</span>
+<span class="nc" id="L1579">                        throw new IOException(err.toString(), err);</span>
+<span class="nc" id="L1580">                    } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L1581">                        Log.e(err);</span>
+<span class="nc" id="L1582">                        throw new IOException(err.toString(), err);</span>
+<span class="nc" id="L1583">                    }</span>
+                }
+<span class="nc" id="L1585">                return;</span>
+            }
+<span class="fc bfc" id="L1587" title="All 2 branches covered.">            if (parseJSON) {</span>
+<span class="fc" id="L1588">                JSONParser parser = createJSONParser();</span>
+<span class="fc" id="L1589">                json = parser.parseJSON(new InputStreamReader(input, &quot;UTF-8&quot;));</span>
+<span class="pc bpc" id="L1590" title="1 of 4 branches missed.">                if (hasResponseListeners() &amp;&amp; !isKilled()) {</span>
+<span class="fc" id="L1591">                    fireResponseListener(new NetworkEvent(this, json));</span>
+                }
+<span class="fc" id="L1593">                return;</span>
+            }
+<span class="fc" id="L1595">            super.readUnzipedResponse(input);</span>
+<span class="fc" id="L1596">        }</span>
+
+        @Override
+        protected void postResponse() {
+<span class="fc bfc" id="L1600" title="All 2 branches covered.">            if (errorHandler != null) {</span>
+<span class="fc" id="L1601">                errorHandler.onError(new Response(getResponseCode(), errorObject, getResponseErrorMessage()));</span>
+            }
+<span class="fc" id="L1603">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

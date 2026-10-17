@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppleSignInResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">AppleSignInResult.java</span></div><h1>AppleSignInResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+/// Successful outcome of an [AppleSignIn#signIn(String, AppleSignInCallback)]
+/// call.
+///
+/// Apple only returns the user's name and email on the **first** authorization
+/// for a given app. On subsequent sign-ins those fields are absent in the
+/// native callback; [AppleSignIn] backfills them from [com.codename1.io.Preferences]
+/// when present, so the application sees a consistent result.
+///
+public final class AppleSignInResult {
+
+    String identityToken;
+    String authorizationCode;
+    String userId;
+    String email;
+    String fullName;
+
+<span class="fc" id="L42">    AppleSignInResult() {}</span>
+
+    /// JWT identity token signed by Apple. Send to your backend, where you
+    /// must validate the signature against Apple's JWKS and check the
+    /// `aud` / `iss` / `exp` claims before trusting it.
+    public String getIdentityToken() {
+<span class="fc" id="L48">        return identityToken;</span>
+    }
+
+    /// Authorization code suitable for the server-side `client_secret`
+    /// token exchange (Apple does not expose refresh tokens to public
+    /// clients, so this is the only way to obtain one).
+    public String getAuthorizationCode() {
+<span class="fc" id="L55">        return authorizationCode;</span>
+    }
+
+    /// Stable opaque identifier (&quot;user identifier&quot; in Apple's docs). Treat
+    /// this as the user's primary key for your app.
+    public String getUserId() {
+<span class="fc" id="L61">        return userId;</span>
+    }
+
+    /// Email the user shared with the app. May be the real address, may be
+    /// a relay address (`@privaterelay.appleid.com`), or may be `null` if
+    /// the user has previously signed in and the email was already stored.
+    public String getEmail() {
+<span class="fc" id="L68">        return email;</span>
+    }
+
+    /// Full display name (given + family) on the first authorization;
+    /// previously-stored value otherwise; `null` if the user declined to
+    /// share it.
+    public String getFullName() {
+<span class="fc" id="L75">        return fullName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

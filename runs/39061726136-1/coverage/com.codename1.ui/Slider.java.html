@@ -1,0 +1,1151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Slider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Slider.java</span></div><h1>Slider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.accessibility.AccessibilityManager;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+/// The slider component serves both as a slider widget to allow users to select
+/// a value on a scale via touch/arrows and also to indicate progress. The slider
+/// defaults to percentage display but can represent any positive set of values.
+///
+/// `Slider` is very versatile and can be used to represent things as diverse as the 5 star ranking UI
+/// demonstrated below. Notice that for the UI to work correctly you need to enclose it in a layout that preserves
+/// its preferred size like flow layout.
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form(&quot;Star Slider&quot;, new BoxLayout(BoxLayout.Y_AXIS));
+///   hi.add(FlowLayout.encloseCenter(createStarRankSlider()));
+///   hi.show();
+/// }
+///
+/// private void initStarRankStyle(Style s, Image star) {
+///     s.setBackgroundType(Style.BACKGROUND_IMAGE_TILE_BOTH);
+///     s.setBorder(Border.createEmpty());
+///     s.setBgImage(star);
+///     s.setBgTransparency(0);
+/// }
+///
+/// private Slider createStarRankSlider() {
+///     Slider starRank = new Slider();
+///     starRank.setEditable(true);
+///     starRank.setMinValue(0);
+///     starRank.setMaxValue(10);
+///     Font fnt = Font.createTrueTypeFont(&quot;native:mainLight&quot;, &quot;native:mainLight&quot;).
+///             derive(Display.getInstance().convertToPixels(5, true), Font.STYLE_PLAIN);
+///     Style s = new Style(0xffff33, 0, fnt, (byte)0);
+///     Image fullStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     s.setOpacity(100);
+///     s.setFgColor(0);
+///     Image emptyStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     initStarRankStyle(starRank.getSliderEmptySelectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderEmptyUnselectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderFullSelectedStyle(), fullStar);
+///     initStarRankStyle(starRank.getSliderFullUnselectedStyle(), fullStar);
+///     starRank.setPreferredSize(new Dimension(fullStar.getWidth() * 5, fullStar.getHeight()));
+///     return starRank;
+/// }
+/// ```
+///
+/// Slider can be used as a progress indicator for network operations when combined with the
+/// `com.codename1.components.SliderBridge` component:
+///
+/// ```java
+/// Form hi = new Form(&quot;Download Progress&quot;, new BorderLayout());
+/// Slider progress = new Slider();
+/// Button download = new Button(&quot;Download&quot;);
+/// download.addActionListener((e) -&gt; {
+///     ConnectionRequest cr = new ConnectionRequest(&quot;https://www.codenameone.com/img/blog/new_icon.png&quot;, false);
+///     SliderBridge.bindProgress(cr, progress);
+///     NetworkManager.getInstance().addToQueueAndWait(cr);
+///     if(cr.getResponseCode() == 200) {
+///         hi.add(BorderLayout.CENTER, new ScaleImageLabel(EncodedImage.create(cr.getResponseData())));
+///         hi.revalidate();
+///     }
+/// });
+/// hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
+/// hi.show();
+/// ```
+public class Slider extends Label implements ActionSource {
+<span class="fc" id="L102">    private final EventDispatcher listeners = new EventDispatcher();</span>
+<span class="fc" id="L103">    private final EventDispatcher actionListeners = new EventDispatcher();</span>
+    private int actionEventValue;
+    private int value;
+<span class="fc" id="L106">    private int maxValue = 100;</span>
+<span class="fc" id="L107">    private int minValue = 0;</span>
+    private boolean vertical;
+    private boolean editable;
+<span class="fc" id="L110">    private int increments = 4;</span>
+<span class="fc" id="L111">    private int previousX = -1;</span>
+<span class="fc" id="L112">    private int previousY = -1;</span>
+    private Style sliderFull;
+    private Style sliderFullSelected;
+    private boolean paintingFull;
+    private boolean renderPercentageOnTop;
+    private boolean renderValueOnTop;
+
+<span class="fc" id="L119">    private boolean infinite = false;</span>
+<span class="fc" id="L120">    private float infiniteDirection = 0.03f;</span>
+    private Image thumbImage;
+<span class="fc" id="L122">    private String fullUIID = &quot;Slider&quot;;</span>
+
+
+    /// The default constructor uses internal rendering to draw its state
+    public Slider() {
+<span class="fc" id="L127">        this(&quot;Slider&quot;, &quot;Slider&quot;);</span>
+<span class="fc" id="L128">    }</span>
+
+<span class="fc" id="L130">    private Slider(String uiid, String fullUIID) {</span>
+<span class="fc" id="L131">        setFocusable(false);</span>
+<span class="fc" id="L132">        setUIID(uiid);</span>
+<span class="fc" id="L133">        this.fullUIID = fullUIID;</span>
+<span class="fc" id="L134">        setAlignment(CENTER);</span>
+
+        // This is necessary for the Android theme to make sure that the progress bar
+        // is rendered vertically centered.  Otherwise the thumb image will be
+        // rendered below it (on y axis) rather than over-top of it.
+<span class="fc" id="L139">        putClientProperty(&quot;@centerAlignHBorderBool&quot;, true);</span>
+<span class="fc" id="L140">    }</span>
+
+    /// Creates an infinite progress slider
+    ///
+    /// #### Returns
+    ///
+    /// a slider instance that has no end value
+    public static Slider createInfinite() {
+<span class="fc" id="L148">        Slider s = new Slider();</span>
+<span class="fc" id="L149">        s.infinite = true;</span>
+<span class="fc" id="L150">        return s;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public final void setUIID(String id) {
+<span class="fc" id="L156">        super.setUIID(id);</span>
+<span class="fc" id="L157">        initStyles(id);</span>
+<span class="fc" id="L158">    }</span>
+
+    private void initStyles(String id) {
+<span class="fc" id="L161">        sliderFull = getUIManager().getComponentStyle(id + &quot;Full&quot;);</span>
+<span class="fc" id="L162">        sliderFullSelected = getUIManager().getComponentSelectedStyle(id + &quot;Full&quot;);</span>
+<span class="fc" id="L163">        initCustomStyle(sliderFull);</span>
+<span class="fc" id="L164">        initCustomStyle(sliderFullSelected);</span>
+<span class="fc" id="L165">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isStickyDrag() {
+<span class="fc" id="L170">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void initComponent() {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (infinite) {</span>
+<span class="fc" id="L177">            TopLevelSupport.registerAnimatedInternal(this, this);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (thumbImage == null) {</span>
+<span class="fc" id="L179">                thumbImage = UIManager.getInstance().getThemeImageConstant(&quot;sliderThumbImage&quot;);</span>
+            }
+        }
+<span class="fc" id="L182">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void deinitialize() {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (infinite) {</span>
+            // Matches the registration, which goes through the top level. Resolving
+            // the form here leaked the animation for every infinite slider inside a
+            // Window, where that form is null.
+<span class="fc" id="L191">            TopLevelSupport.deregisterAnimatedInternal(this, this);</span>
+        }
+<span class="fc" id="L193">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (infinite) {</span>
+<span class="fc" id="L199">            super.animate();</span>
+<span class="fc" id="L200">            float f = (infiniteDirection * ((float) maxValue));</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (((int) f) == 0) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                if (f &lt; 0) {</span>
+<span class="nc" id="L203">                    f = -1;</span>
+                } else {
+<span class="nc" id="L205">                    f = 1;</span>
+                }
+            }
+<span class="fc" id="L208">            value += ((int) f);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (value &gt;= maxValue) {</span>
+<span class="fc" id="L210">                value = maxValue;</span>
+<span class="fc" id="L211">                infiniteDirection *= (-1);</span>
+            }
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (value &lt;= 0) {</span>
+<span class="fc" id="L214">                value = 0;</span>
+<span class="fc" id="L215">                infiniteDirection *= (-1);</span>
+            }
+<span class="fc" id="L217">            return true;</span>
+        }
+<span class="nc" id="L219">        return super.animate();</span>
+    }
+
+    /// The infinite slider functionality is used to animate
+    /// progress for which there is no defined value.
+    ///
+    /// #### Returns
+    ///
+    /// true for infinite progress
+    public boolean isInfinite() {
+<span class="fc" id="L229">        return infinite;</span>
+    }
+
+    /// Activates/disables the infinite slider functionality used to animate
+    /// progress for which there is no defined value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: true for infinite progress
+    public void setInfinite(boolean i) {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (infinite != i) {</span>
+<span class="fc" id="L240">            infinite = i;</span>
+<span class="fc" id="L241">            setShouldCalcPreferredSize(true);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (isInitialized()) {</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                if (i) {</span>
+<span class="fc" id="L244">                    TopLevelSupport.registerAnimatedInternal(this, this);</span>
+                } else {
+<span class="fc" id="L246">                    TopLevelSupport.deregisterAnimatedInternal(this, this);</span>
+                }
+            }
+        }
+<span class="fc" id="L250">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="nc" id="L255">        super.refreshTheme(merge);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (sliderFull != null) {</span>
+<span class="nc" id="L257">            deinitializeCustomStyle(sliderFull);</span>
+<span class="nc" id="L258">            deinitializeCustomStyle(sliderFullSelected);</span>
+<span class="nc" id="L259">            initStyles(&quot;Slider&quot;);</span>
+        }
+<span class="nc" id="L261">    }</span>
+
+    /// Indicates the value of progress made
+    ///
+    /// #### Returns
+    ///
+    /// the progress on the slider
+    public int getProgress() {
+<span class="fc" id="L269">        return value;</span>
+    }
+
+    /// Indicates the value of progress made, this method is thread safe and
+    /// can be invoked from any thread although discretion should still be kept
+    /// so one thread doesn't regress progress made by another thread...
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: new value for progress
+    public void setProgress(int value) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (this.value != value) {</span>
+<span class="fc" id="L281">            fireDataChanged(DataChangedListener.CHANGED, value);</span>
+        }
+<span class="fc" id="L283">        setProgressInternal(value);</span>
+<span class="fc" id="L284">    }</span>
+
+    /// Gets the progress of the slider at the point where the provided ActionEvent
+    /// was triggered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: An ActionEvent that originated from this slider.
+    ///
+    /// #### Returns
+    ///
+    /// The progress of the slider.
+    ///
+    public int getProgress(ActionEvent evt) {
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (evt instanceof SliderActionEvent) {</span>
+<span class="nc" id="L299">            return ((SliderActionEvent) evt).value;</span>
+        }
+<span class="nc" id="L301">        return value;</span>
+    }
+
+    /// Internal slider-value updater used by drag/keyboard/setProgress paths.
+    /// Exposed as `protected` so subclasses (e.g. range-slider style multi-
+    /// thumb sliders) can route their own input through the same value-set +
+    /// repaint pipeline as the built-in handlers. See #1523.
+    protected void setProgressInternal(int value) {
+<span class="fc" id="L309">        int oldValue = this.value;</span>
+<span class="fc" id="L310">        this.value = value;</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (oldValue != value) {</span>
+<span class="fc" id="L312">            accessibilityChanged(AccessibilityManager.CHANGE_VALUE);</span>
+        }
+<span class="fc bfc" id="L314" title="All 4 branches covered.">        if (renderValueOnTop || renderPercentageOnTop) {</span>
+<span class="fc" id="L315">            super.setText(formattedValue(value));</span>
+        } else {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (isInitialized()) {</span>
+<span class="fc" id="L318">                repaint();</span>
+            }
+        }
+<span class="fc" id="L321">    }</span>
+
+    /// Allows formatting the appearance of the progress when text is drawn on top
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value of the slider
+    ///
+    /// #### Returns
+    ///
+    /// a string formatted version
+    protected String formattedValue(int value) {
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (renderValueOnTop) {</span>
+<span class="fc" id="L334">            return (&quot;&quot; + value);</span>
+        }
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (renderPercentageOnTop) {</span>
+<span class="fc" id="L337">            return (value + &quot;%&quot;);</span>
+        }
+<span class="nc" id="L339">        return (&quot;&quot;);</span>
+    }
+
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
+    public Style getSliderFullUnselectedStyle() {
+<span class="fc" id="L348">        return sliderFull;</span>
+    }
+
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full and selected
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
+    public Style getSliderFullSelectedStyle() {
+<span class="fc" id="L357">        return sliderFullSelected;</span>
+    }
+
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
+    public Style getSliderEmptyUnselectedStyle() {
+<span class="fc" id="L366">        return super.getUnselectedStyle();</span>
+    }
+
+    /// Returns the `com.codename1.ui.plaf.Style` used to paint the slider when its full and selected
+    ///
+    /// #### Returns
+    ///
+    /// the Style object that shows a completely full style.
+    public Style getSliderEmptySelectedStyle() {
+<span class="fc" id="L375">        return super.getSelectedStyle();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Style getStyle() {
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (paintingFull) {</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            if (sliderFull == null) {</span>
+<span class="nc" id="L383">                initStyles(fullUIID);</span>
+            }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (hasFocus()) {</span>
+<span class="fc" id="L386">                return sliderFullSelected;</span>
+            }
+<span class="fc" id="L388">            return sliderFull;</span>
+        }
+<span class="fc" id="L390">        return super.getStyle();</span>
+    }
+
+    /// Return the size we would generally like for the component
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L396">        Style style = getStyle();</span>
+<span class="fc" id="L397">        int prefW = 0;</span>
+<span class="fc" id="L398">        int prefH = 0;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        if (style.getBorder() != null) {</span>
+<span class="fc" id="L400">            prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);</span>
+<span class="fc" id="L401">            prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);</span>
+        }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (thumbImage != null) {</span>
+<span class="fc" id="L404">            prefW = Math.max(thumbImage.getWidth(), prefW);</span>
+<span class="fc" id="L405">            prefH = Math.max(thumbImage.getHeight(), prefH);</span>
+        }
+        // we don't really need to be in the font height but this provides
+        // a generally good indication for size expectations
+<span class="pc bpc" id="L409" title="1 of 4 branches missed.">        if (Display.getInstance().isTouchScreenDevice() &amp;&amp; isEditable()) {</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">            if (vertical) {</span>
+<span class="nc" id="L411">                prefW = Math.max(prefW, Font.getDefaultFont().charWidth('X') * 2);</span>
+<span class="nc" id="L412">                prefH = Math.max(prefH, Display.getInstance().getDisplayHeight() / 2);</span>
+            } else {
+<span class="fc" id="L414">                prefW = Math.max(prefW, Display.getInstance().getDisplayWidth() / 2);</span>
+<span class="fc" id="L415">                prefH = Math.max(prefH, Font.getDefaultFont().getHeight() * 2);</span>
+            }
+        } else {
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            if (vertical) {</span>
+<span class="fc" id="L419">                prefW = Math.max(prefW, Font.getDefaultFont().charWidth('X'));</span>
+<span class="fc" id="L420">                prefH = Math.max(prefH, Display.getInstance().getDisplayHeight() / 2);</span>
+            } else {
+<span class="fc" id="L422">                prefW = Math.max(prefW, Display.getInstance().getDisplayWidth() / 2);</span>
+<span class="fc" id="L423">                prefH = Math.max(prefH, Font.getDefaultFont().getHeight());</span>
+            }
+        }
+        // A progress bar that paints a thin native capsule should also MEASURE as one.
+        // Without this its preferred height is a full font height -- 19px against a 3px
+        // Fluent bar and an 8px Adwaita one -- so layout reserves six times the space the
+        // platform does, and the capsule is centred in a box the user cannot see. The
+        // widget looks almost right and sits wrong.
+        //
+        // Gated on exactly what makes it paint that way, so nothing that renders the
+        // legacy full-height fill changes size.
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (usesNativeProgressStyles()) {</span>
+<span class="fc" id="L435">            String progressTrackMM = getUIManager().getThemeConstant(&quot;progressTrackThicknessMM&quot;, null);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (progressTrackMM != null) {</span>
+                try {
+<span class="fc" id="L438">                    float tmm = Float.parseFloat(progressTrackMM.trim());</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    if (tmm &gt; 0) {</span>
+<span class="fc" id="L440">                        int trackHeight = Math.max(2, Display.getInstance().convertToPixels(tmm));</span>
+                        // Overlay text still needs a full font-height box; the painter centers
+                        // the thin track inside that box without clipping the Label text.
+<span class="fc bfc" id="L443" title="All 4 branches covered.">                        prefH = isRenderPercentageOnTop() || isRenderValueOnTop()</span>
+<span class="fc" id="L444">                                ? Math.max(trackHeight, Math.max(prefH, style.getFont().getHeight()))</span>
+                                : trackHeight;
+                    }
+<span class="nc" id="L447">                } catch (NumberFormatException notANumber) {</span>
+                    // Malformed constant: keep the font-height default rather than guess.
+<span class="fc" id="L449">                }</span>
+            }
+        }
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">        if (prefH != 0) {</span>
+<span class="fc" id="L453">            prefH += style.getVerticalPadding();</span>
+        }
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        if (prefW != 0) {</span>
+<span class="fc" id="L456">            prefW += style.getHorizontalPadding();</span>
+        }
+<span class="fc" id="L458">        return new Dimension(prefW, prefH);</span>
+    }
+
+    private boolean usesNativeProgressStyles() {
+<span class="fc bfc" id="L462" title="All 8 branches covered.">        if (infinite || vertical || isEditable() || thumbImage != null) {</span>
+<span class="fc" id="L463">            return false;</span>
+        }
+        // Reserve legacy height before any state transition can expose custom artwork.
+        // Pressed also matters when this slider inherits state from a lead component.
+<span class="fc" id="L467">        Style hover = getHoverStyle();</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        return isNativeProgressStyle(getUnselectedStyle())</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                &amp;&amp; isNativeProgressStyle(getSelectedStyle())</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">                &amp;&amp; isNativeProgressStyle(getDisabledStyle())</span>
+<span class="fc bfc" id="L471" title="All 4 branches covered.">                &amp;&amp; isNativeProgressStyle(getPressedStyle())</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                &amp;&amp; (hover == null || isNativeProgressStyle(hover))</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">                &amp;&amp; isNativeProgressStyle(getSliderFullUnselectedStyle())</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">                &amp;&amp; isNativeProgressStyle(getSliderFullSelectedStyle());</span>
+    }
+
+    private boolean isNativeProgressStyle(Style style) {
+<span class="fc bfc" id="L478" title="All 4 branches covered.">        if (style.getBgImage() != null || !isDefaultBackgroundPainter(style)) {</span>
+<span class="fc" id="L479">            return false;</span>
+        }
+<span class="fc" id="L481">        byte background = style.getBackgroundType();</span>
+<span class="fc bfc" id="L482" title="All 4 branches covered.">        if (background != Style.BACKGROUND_NONE &amp;&amp; background != Style.BACKGROUND_IMAGE_SCALED) {</span>
+<span class="fc" id="L483">            return false;</span>
+        }
+<span class="fc" id="L485">        Border border = style.getBorder();</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (border == null) {</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">            return (style.getBgTransparency() &amp; 0xff) == 255;</span>
+        }
+        // Bundled themes use plain pill borders. Keep those native, but preserve
+        // application borders, gradients, images and painters through the legacy path.
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        if (border.getClass() != RoundBorder.class) {</span>
+<span class="fc" id="L492">            return false;</span>
+        }
+<span class="fc" id="L494">        RoundBorder round = (RoundBorder) border;</span>
+<span class="pc bpc" id="L495" title="3 of 6 branches missed.">        return round.isRectangle() &amp;&amp; !round.isOnlyLeftRounded() &amp;&amp; !round.isOnlyRightRounded()</span>
+<span class="pc bpc" id="L496" title="2 of 4 branches missed.">                &amp;&amp; round.getColor() == style.getBgColor() &amp;&amp; round.getOpacity() == 255</span>
+<span class="pc bpc" id="L497" title="1 of 4 branches missed.">                &amp;&amp; (round.getStrokeOpacity() == 0 || round.getStrokeThickness() == 0)</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">                &amp;&amp; round.getShadowOpacity() == 0;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+<span class="fc" id="L504">        super.styleChanged(propertyName, source);</span>
+        // Background customization can switch both the renderer and its preferred height.
+<span class="fc" id="L506">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L507">    }</span>
+
+    /// Paint the progress indicator
+    @Override
+    public void paintComponentBackground(Graphics g) {
+        // Native progress indicators are thin capsules even when their component
+        // receives a taller touch/layout box.  Keep this opt-in so legacy themes
+        // and progress bars with image backgrounds retain their existing painter.
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        if (usesNativeProgressStyles()) {</span>
+<span class="fc" id="L516">            String progressTrackMM = getUIManager().getThemeConstant(&quot;progressTrackThicknessMM&quot;, null);</span>
+<span class="pc bpc" id="L517" title="3 of 4 branches missed.">            if (progressTrackMM != null &amp;&amp; paintNativeProgress(g, progressTrackMM)) {</span>
+<span class="nc" id="L518">                return;</span>
+            }
+        }
+        // Opt-in native-slider look (Material 3): a thin rounded track with the
+        // active portion in the accent colour and a vertical bar thumb, instead of
+        // the legacy full-height fill. Gated on the sliderTrackThicknessMM theme
+        // constant AND isEditable() so progress bars (non-editable sliders) and
+        // every theme that doesn't set the constant keep the existing rendering.
+<span class="pc bpc" id="L526" title="1 of 6 branches missed.">        if (!infinite &amp;&amp; !vertical &amp;&amp; isEditable()) {</span>
+<span class="fc" id="L527">            String trackMM = getUIManager().getThemeConstant(&quot;sliderTrackThicknessMM&quot;, null);</span>
+<span class="pc bpc" id="L528" title="3 of 4 branches missed.">            if (trackMM != null &amp;&amp; paintNativeSlider(g, trackMM)) {</span>
+<span class="nc" id="L529">                return;</span>
+            }
+        }
+<span class="fc" id="L532">        super.paintComponentBackground(g);</span>
+<span class="fc" id="L533">        int clipX = g.getClipX();</span>
+<span class="fc" id="L534">        int clipY = g.getClipY();</span>
+<span class="fc" id="L535">        int clipW = g.getClipWidth();</span>
+<span class="fc" id="L536">        int clipH = g.getClipHeight();</span>
+        //g.pushClip();
+<span class="fc" id="L538">        int width = getWidth();</span>
+<span class="fc" id="L539">        int height = getHeight();</span>
+
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        int voffset = (thumbImage != null) ? thumbImage.getHeight() : 0;</span>
+
+<span class="fc" id="L543">        int y = getY();</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (infinite) {</span>
+<span class="fc" id="L545">            int blockSize = getWidth() / 5;</span>
+<span class="fc" id="L546">            int x = getX() + (int) ((((float) value) / ((float) maxValue - minValue)) * (getWidth() - blockSize));</span>
+<span class="fc" id="L547">            g.clipRect(x, y, blockSize, height - 1);</span>
+<span class="fc" id="L548">        } else {</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">            if (vertical) {</span>
+<span class="nc" id="L550">                int actualHeight = (int) ((((float) value) / ((float) maxValue - minValue)) * (getHeight() - voffset));</span>
+<span class="nc" id="L551">                y += height - actualHeight - voffset;</span>
+<span class="nc" id="L552">            } else {</span>
+<span class="fc" id="L553">                width = (int) ((((float) value) / ((float) maxValue - minValue)) * getWidth());</span>
+            }
+
+<span class="fc" id="L556">            g.clipRect(getX(), y, width, height);</span>
+        }
+
+        // paint the selected style
+<span class="fc" id="L560">        paintingFull = true;</span>
+<span class="fc" id="L561">        super.paintComponentBackground(g);</span>
+<span class="fc" id="L562">        paintingFull = false;</span>
+
+<span class="fc" id="L564">        g.setClip(clipX, clipY, clipW, clipH);</span>
+        //g.popClip();
+<span class="pc bpc" id="L566" title="3 of 4 branches missed.">        if (thumbImage != null &amp;&amp; !infinite) {</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (!vertical) {</span>
+<span class="nc" id="L568">                int xPos = getX() + width - thumbImage.getWidth() / 2;</span>
+<span class="nc" id="L569">                xPos = Math.max(getX(), xPos);</span>
+<span class="nc" id="L570">                xPos = Math.min(getX() + getWidth() - thumbImage.getWidth(), xPos);</span>
+<span class="nc" id="L571">                g.drawImage(thumbImage, xPos,</span>
+<span class="nc" id="L572">                        y + height / 2 - thumbImage.getHeight() / 2);</span>
+<span class="nc" id="L573">            } else {</span>
+<span class="nc" id="L574">                int yPos = y; // + height - thumbImage.getHeight() / 2;</span>
+                //yPos = Math.max(getY(), yPos);
+                //yPos = Math.min(getY() + getHeight() - thumbImage.getHeight(), yPos);
+<span class="nc" id="L577">                g.drawImage(thumbImage, getX() + width / 2 - thumbImage.getWidth() / 2,</span>
+                        yPos);
+            }
+        }
+<span class="fc" id="L581">    }</span>
+
+    /// Paints the Material-3 style slider: a thin rounded track (inactive colour
+    /// from the Slider style, active colour from the SliderFull style) plus a
+    /// vertical rounded bar thumb at the current value. Returns false (so the
+    /// caller falls back to the legacy painter) when the track constant is
+    /// malformed or non-positive. Horizontal, finite, editable sliders only.
+    private boolean paintNativeSlider(Graphics g, String trackMM) {
+        float tmm;
+        try {
+<span class="nc" id="L591">            tmm = Float.parseFloat(trackMM.trim());</span>
+<span class="nc" id="L592">        } catch (NumberFormatException notANumber) {</span>
+<span class="nc" id="L593">            return false;</span>
+<span class="nc" id="L594">        }</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">        if (tmm &lt;= 0) {</span>
+<span class="nc" id="L596">            return false;</span>
+        }
+<span class="nc" id="L598">        Display d = Display.getInstance();</span>
+<span class="nc" id="L599">        int track = Math.max(2, d.convertToPixels(tmm));</span>
+<span class="nc" id="L600">        String thumbC = getUIManager().getThemeConstant(&quot;sliderThumbWidthMM&quot;, null);</span>
+<span class="nc" id="L601">        int thumbW = Math.max(3, track);</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">        if (thumbC != null) {</span>
+            try {
+<span class="nc" id="L604">                thumbW = Math.max(3, d.convertToPixels(Float.parseFloat(thumbC.trim())));</span>
+<span class="nc" id="L605">            } catch (NumberFormatException notANumber) {</span>
+<span class="nc" id="L606">                thumbW = Math.max(3, track);   // malformed constant -&gt; track-derived default</span>
+<span class="nc" id="L607">            }</span>
+        }
+<span class="nc" id="L609">        int x0 = getX();</span>
+<span class="nc" id="L610">        int y0 = getY();</span>
+<span class="nc" id="L611">        int w = getWidth();</span>
+<span class="nc" id="L612">        int h = getHeight();</span>
+<span class="nc" id="L613">        int range = maxValue - minValue;</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">        int valueW = range &lt;= 0 ? 0 : (int) (((float) (value - minValue) / (float) range) * w);</span>
+<span class="nc" id="L615">        int bandY = y0 + (h - track) / 2;</span>
+        int trackColor;
+        int fullColor;
+        // The thumb takes the Slider style's foreground colour so a native theme can
+        // give it a distinct tone (Material 3 renders the bar thumb neutral-grey,
+        // not the accent of the active track).
+        int thumbColor;
+<span class="nc bnc" id="L622" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L623">            trackColor = getSliderEmptyUnselectedStyle().getBgColor();</span>
+<span class="nc" id="L624">            fullColor = getSliderFullSelectedStyle().getBgColor();</span>
+<span class="nc" id="L625">            thumbColor = getSliderEmptyUnselectedStyle().getFgColor();</span>
+        } else {
+            // A disabled M3 slider greys EVERY part - the active track is never
+            // the accent (which would be a bright purple in dark mode). Pull the
+            // greyed tones from the *.disabled styles so light and dark each match.
+<span class="nc" id="L630">            UIManager uim = getUIManager();</span>
+<span class="nc" id="L631">            Style sdis = uim.getComponentCustomStyle(getUIID(), &quot;dis&quot;);</span>
+<span class="nc" id="L632">            Style fdis = uim.getComponentCustomStyle(getUIID() + &quot;Full&quot;, &quot;dis&quot;);</span>
+<span class="nc" id="L633">            trackColor = sdis.getBgColor();</span>
+<span class="nc" id="L634">            fullColor = fdis.getBgColor();</span>
+<span class="nc" id="L635">            thumbColor = sdis.getFgColor();</span>
+        }
+<span class="nc" id="L637">        boolean aa = g.isAntiAliasingSupported();</span>
+<span class="nc" id="L638">        boolean priorAa = g.isAntiAliased();</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">        if (aa) {</span>
+<span class="nc" id="L640">            g.setAntiAliased(true);</span>
+        }
+<span class="nc" id="L642">        int thumbX = Math.max(x0, Math.min(x0 + w - thumbW, x0 + valueW - thumbW / 2));</span>
+        // Thumb height: Material's bar thumb spans the component height (a tall pill);
+        // iOS 26's slider thumb is a short horizontal capsule (wider than tall). Themes
+        // opt into the iOS look via sliderThumbHeightMM; without it the Material
+        // full-height pill is preserved.
+<span class="nc" id="L647">        int thumbH = Math.max(track, h);</span>
+<span class="nc" id="L648">        String thumbHC = getUIManager().getThemeConstant(&quot;sliderThumbHeightMM&quot;, null);</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        if (thumbHC != null) {</span>
+            try {
+<span class="nc" id="L651">                thumbH = Math.max(track, d.convertToPixels(Float.parseFloat(thumbHC.trim())));</span>
+<span class="nc" id="L652">            } catch (NumberFormatException notANumber) {</span>
+<span class="nc" id="L653">                thumbH = Math.max(track, h);   // malformed constant -&gt; full-height default</span>
+<span class="nc" id="L654">            }</span>
+        }
+<span class="nc" id="L656">        int thumbY = y0 + (h - thumbH) / 2;</span>
+        // iOS renders ONE continuous track under the thumb (no M3 gap, no stop
+        // indicator); themes opt in via sliderContinuousTrackBool.
+<span class="nc" id="L659">        boolean continuousTrack = getUIManager().isThemeConstant(&quot;sliderContinuousTrackBool&quot;, false);</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">        if (continuousTrack) {</span>
+<span class="nc" id="L661">            g.setColor(trackColor);</span>
+<span class="nc" id="L662">            g.fillRoundRect(x0, bandY, w, track, track, track);</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            if (valueW &gt; 0) {</span>
+<span class="nc" id="L664">                g.setColor(fullColor);</span>
+<span class="nc" id="L665">                g.fillRoundRect(x0, bandY, Math.min(w, valueW), track, track, track);</span>
+            }
+        } else {
+            // Material 3: TWO rounded segments with a gap on each side of the thumb;
+            // each is a full pill on its OUTER end, subtly rounded on the inner end.
+<span class="nc" id="L670">            int gap = Math.max(2, d.convertToPixels(0.6f));</span>
+<span class="nc" id="L671">            int innerArc = Math.max(2, d.convertToPixels(0.35f));</span>
+<span class="nc" id="L672">            int inStart = Math.min(x0 + w, thumbX + thumbW + gap);</span>
+<span class="nc" id="L673">            int inW = x0 + w - inStart;</span>
+<span class="nc bnc" id="L674" title="All 2 branches missed.">            if (inW &gt; 0) {</span>
+<span class="nc" id="L675">                g.setColor(trackColor);</span>
+<span class="nc" id="L676">                g.fillRoundRect(inStart, bandY, inW, track, track, track);</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">                if (inW &gt;= track) {</span>
+<span class="nc" id="L678">                    g.fillRoundRect(inStart, bandY, track, track, innerArc, innerArc);</span>
+                }
+            }
+<span class="nc" id="L681">            int acW = Math.max(0, (thumbX - gap) - x0);</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">            if (acW &gt; 0) {</span>
+<span class="nc" id="L683">                g.setColor(fullColor);</span>
+<span class="nc" id="L684">                g.fillRoundRect(x0, bandY, acW, track, track, track);</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">                if (acW &gt;= track) {</span>
+<span class="nc" id="L686">                    g.fillRoundRect(x0 + acW - track, bandY, track, track, innerArc, innerArc);</span>
+                }
+            }
+            // M3 &quot;stop indicator&quot;: a small dot near the inactive (far) end.
+<span class="nc" id="L690">            int dotD = Math.max(3, track / 6);</span>
+<span class="nc" id="L691">            g.setColor(fullColor);</span>
+<span class="nc" id="L692">            g.fillArc(x0 + w - track / 2 - dotD / 2, y0 + (h - dotD) / 2, dotD, dotD, 0, 360);</span>
+        }
+        // Optional soft drop-shadow under the thumb (the iOS knob casts one; without
+        // it a white knob is invisible on a light background). sliderThumbShadowSizeMM
+        // sets the spread; a few concentric low-alpha rings approximate a soft blur.
+<span class="nc" id="L697">        String shadowC = getUIManager().getThemeConstant(&quot;sliderThumbShadowSizeMM&quot;, null);</span>
+<span class="nc" id="L698">        int shadow = 0;</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        if (shadowC != null) {</span>
+            try {
+<span class="nc" id="L701">                shadow = d.convertToPixels(Float.parseFloat(shadowC.trim()));</span>
+<span class="nc" id="L702">            } catch (NumberFormatException notANumber) {</span>
+<span class="nc" id="L703">                shadow = 0;   // malformed constant -&gt; no shadow</span>
+<span class="nc" id="L704">            }</span>
+        }
+<span class="nc bnc" id="L706" title="All 2 branches missed.">        if (shadow &gt; 0) {</span>
+<span class="nc" id="L707">            int drop = Math.max(1, shadow / 2);</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">            for (int i = shadow; i &gt;= 1; i--) {</span>
+<span class="nc" id="L709">                g.setColor(0x000000);</span>
+<span class="nc" id="L710">                int oldAlpha = g.concatenateAlpha(10);</span>
+<span class="nc" id="L711">                int sArc = Math.min(thumbW, thumbH) + 2 * i;</span>
+<span class="nc" id="L712">                g.fillRoundRect(thumbX - i, thumbY - i + drop, thumbW + 2 * i, thumbH + 2 * i,</span>
+                        sArc, sArc);
+<span class="nc" id="L714">                g.setAlpha(oldAlpha);</span>
+            }
+        }
+<span class="nc" id="L717">        g.setColor(thumbColor);</span>
+        // Use the smaller dimension as the corner arc so the knob is a true capsule
+        // whether it is taller than wide (Material) or wider than tall (iOS).
+<span class="nc" id="L720">        int thumbArc = Math.min(thumbW, thumbH);</span>
+<span class="nc" id="L721">        g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbArc, thumbArc);</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">        if (aa) {</span>
+<span class="nc" id="L723">            g.setAntiAliased(priorAa);</span>
+        }
+<span class="nc" id="L725">        return true;</span>
+    }
+
+    /// Paints a thin, continuous pill track for native progress indicators.
+    /// Empty/full colours come from the regular Slider UIID pair so light/dark
+    /// and runtime palette overrides continue to work normally.
+    private boolean paintNativeProgress(Graphics g, String trackMM) {
+        float tmm;
+        try {
+<span class="nc" id="L734">            tmm = Float.parseFloat(trackMM.trim());</span>
+<span class="nc" id="L735">        } catch (NumberFormatException notANumber) {</span>
+<span class="nc" id="L736">            return false;</span>
+<span class="nc" id="L737">        }</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">        if (tmm &lt;= 0) {</span>
+<span class="nc" id="L739">            return false;</span>
+        }
+<span class="nc" id="L741">        int track = Math.max(2, Display.getInstance().convertToPixels(tmm));</span>
+<span class="nc" id="L742">        int x = getX();</span>
+<span class="nc" id="L743">        int y = getY() + (getHeight() - track) / 2;</span>
+<span class="nc" id="L744">        int width = getWidth();</span>
+<span class="nc" id="L745">        int range = maxValue - minValue;</span>
+<span class="nc bnc" id="L746" title="All 2 branches missed.">        int fullWidth = range &lt;= 0 ? 0</span>
+                : (int) (((float) (value - minValue) / (float) range) * width);
+
+<span class="nc" id="L749">        boolean aa = g.isAntiAliasingSupported();</span>
+<span class="nc" id="L750">        boolean priorAa = g.isAntiAliased();</span>
+<span class="nc bnc" id="L751" title="All 2 branches missed.">        if (aa) {</span>
+<span class="nc" id="L752">            g.setAntiAliased(true);</span>
+        }
+<span class="nc" id="L754">        g.setColor(super.getStyle().getBgColor());</span>
+<span class="nc" id="L755">        g.fillRoundRect(x, y, width, track, track, track);</span>
+<span class="nc bnc" id="L756" title="All 2 branches missed.">        if (fullWidth &gt; 0) {</span>
+<span class="nc bnc" id="L757" title="All 2 branches missed.">            g.setColor((hasFocus() ? getSliderFullSelectedStyle() : getSliderFullUnselectedStyle()).getBgColor());</span>
+<span class="nc" id="L758">            g.fillRoundRect(x, y, Math.min(width, fullWidth), track, track, track);</span>
+        }
+<span class="nc bnc" id="L760" title="All 2 branches missed.">        if (aa) {</span>
+<span class="nc" id="L761">            g.setAntiAliased(priorAa);</span>
+        }
+<span class="nc" id="L763">        return true;</span>
+    }
+
+    /// Indicates the slider is vertical
+    ///
+    /// #### Returns
+    ///
+    /// true if the slider is vertical
+    public boolean isVertical() {
+<span class="fc" id="L772">        return vertical;</span>
+    }
+
+    /// Indicates the slider is vertical
+    ///
+    /// #### Parameters
+    ///
+    /// - `vertical`: true if the slider is vertical
+    public void setVertical(boolean vertical) {
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">        if (this.vertical != vertical) {</span>
+<span class="fc" id="L782">            this.vertical = vertical;</span>
+<span class="fc" id="L783">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L785">    }</span>
+
+    /// Indicates the slider is modifyable
+    ///
+    /// #### Returns
+    ///
+    /// true if the slider is editable
+    @Override
+    public boolean isEditable() {
+<span class="fc" id="L794">        return editable;</span>
+    }
+
+    /// Indicates the slider is modifyable
+    ///
+    /// #### Parameters
+    ///
+    /// - `editable`: true if the slider is editable
+    public void setEditable(boolean editable) {
+<span class="fc bfc" id="L803" title="All 2 branches covered.">        if (this.editable != editable) {</span>
+<span class="fc" id="L804">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L806">        this.editable = editable;</span>
+<span class="fc" id="L807">        setFocusable(editable);</span>
+<span class="fc" id="L808">    }</span>
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">        if (Display.getInstance().getImplementation().isScrollWheeling()) {</span>
+<span class="nc" id="L813">            return;</span>
+        }
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L816">            return;</span>
+        }
+<span class="pc bpc" id="L818" title="1 of 2 branches missed.">        if (vertical) {</span>
+            // turn the coordinate to a local coordinate and invert it
+<span class="nc" id="L820">            y = Math.abs(getHeight() - (y - getAbsoluteY()));</span>
+<span class="nc" id="L821">            setProgressInternal((int) (Math.min(maxValue, ((float) y) / ((float) getHeight()) * maxValue)));</span>
+        } else {
+<span class="fc" id="L823">            x = Math.abs(x - getAbsoluteX());</span>
+<span class="fc" id="L824">            setProgressInternal((int) (Math.min(maxValue, ((float) x) / ((float) getWidth()) * maxValue)));</span>
+        }
+<span class="fc" id="L826">        value = Math.max(value, minValue);</span>
+<span class="fc" id="L827">        actionEventValue = value;</span>
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">        if (vertical) {</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">            if (previousY &lt; y) {</span>
+<span class="nc" id="L830">                fireDataChanged(DataChangedListener.ADDED, value);</span>
+            } else {
+<span class="nc" id="L832">                fireDataChanged(DataChangedListener.REMOVED, value);</span>
+            }
+<span class="nc" id="L834">            previousY = y;</span>
+        } else {
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">            if (previousX &lt; x) {</span>
+<span class="fc" id="L837">                fireDataChanged(DataChangedListener.ADDED, value);</span>
+            } else {
+<span class="nc" id="L839">                fireDataChanged(DataChangedListener.REMOVED, value);</span>
+            }
+<span class="fc" id="L841">            previousX = x;</span>
+
+        }
+
+<span class="fc" id="L845">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">        if (Display.getInstance().getImplementation().isScrollWheeling()) {</span>
+<span class="nc" id="L851">            return;</span>
+        }
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L854">            return;</span>
+        }
+<span class="pc bpc" id="L856" title="3 of 4 branches missed.">        if (vertical &amp;&amp; previousY == -1) {</span>
+<span class="nc" id="L857">            previousY = y - getAbsoluteY();</span>
+<span class="nc" id="L858">            return;</span>
+        }
+<span class="pc bpc" id="L860" title="2 of 4 branches missed.">        if (!vertical &amp;&amp; previousX == -1) {</span>
+<span class="nc" id="L861">            previousX = x - getAbsoluteX();</span>
+<span class="nc" id="L862">            return;</span>
+        }
+<span class="fc" id="L864">        int per = 0;</span>
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">        if (vertical) {</span>
+            // turn the coordinate to a local coordinate and invert it
+<span class="nc" id="L867">            y = Math.max(getHeight() - (y - getAbsoluteY()), 0);</span>
+<span class="nc" id="L868">            per = (int) (Math.min(maxValue, ((float) y) / ((float) getHeight()) * maxValue));</span>
+        } else {
+<span class="fc" id="L870">            x = Math.max(x - getAbsoluteX(), 0);</span>
+<span class="fc" id="L871">            per = (int) (Math.min(maxValue, ((float) x) / ((float) getWidth()) * maxValue));</span>
+        }
+<span class="fc" id="L873">        per = Math.max(per, minValue);</span>
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">        if (per != getProgress()) {</span>
+<span class="nc" id="L875">            setProgressInternal(per);</span>
+<span class="nc" id="L876">            actionEventValue = value;</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">            if (vertical) {</span>
+<span class="nc bnc" id="L878" title="All 2 branches missed.">                if (previousY &lt; y) {</span>
+<span class="nc" id="L879">                    fireDataChanged(DataChangedListener.ADDED, value);</span>
+                } else {
+<span class="nc" id="L881">                    fireDataChanged(DataChangedListener.REMOVED, value);</span>
+                }
+<span class="nc" id="L883">                previousY = y;</span>
+            } else {
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                if (previousX &lt; x) {</span>
+<span class="nc" id="L886">                    fireDataChanged(DataChangedListener.ADDED, value);</span>
+                } else {
+<span class="nc" id="L888">                    fireDataChanged(DataChangedListener.REMOVED, value);</span>
+                }
+<span class="nc" id="L890">                previousX = x;</span>
+            }
+        }
+<span class="fc" id="L893">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        setHandlesInput(!handlesInput());</span>
+<span class="nc" id="L899">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isSelectableInteraction() {
+<span class="fc" id="L904">        return editable;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="pc bpc" id="L910" title="1 of 2 branches missed.">        if (Display.getInstance().getImplementation().isScrollWheeling()) {</span>
+<span class="nc" id="L911">            return;</span>
+        }
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L914">            return;</span>
+        }
+<span class="fc" id="L916">        fireActionEventImpl();</span>
+<span class="fc" id="L917">        previousX = -1;</span>
+<span class="fc" id="L918">        previousY = -1;</span>
+<span class="fc" id="L919">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int code) {
+<span class="nc" id="L924">        super.keyReleased(code);</span>
+<span class="nc" id="L925">        fireActionEventImpl();</span>
+<span class="nc" id="L926">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int code) {
+<span class="nc bnc" id="L931" title="All 4 branches missed.">        if (editable &amp;&amp; handlesInput()) {</span>
+<span class="nc" id="L932">            int game = Display.getInstance().getGameAction(code);</span>
+<span class="nc bnc" id="L933" title="All 6 branches missed.">            switch (game) {</span>
+                case Display.GAME_UP:
+<span class="nc bnc" id="L935" title="All 2 branches missed.">                    if (vertical) {</span>
+<span class="nc" id="L936">                        setProgressInternal(Math.min(maxValue, value + increments));</span>
+<span class="nc" id="L937">                        fireDataChanged(DataChangedListener.ADDED, value);</span>
+                    } else {
+<span class="nc" id="L939">                        setHandlesInput(false);</span>
+                    }
+<span class="nc" id="L941">                    break;</span>
+                case Display.GAME_DOWN:
+<span class="nc bnc" id="L943" title="All 2 branches missed.">                    if (vertical) {</span>
+<span class="nc" id="L944">                        setProgressInternal(Math.max(minValue, value - increments));</span>
+<span class="nc" id="L945">                        fireDataChanged(DataChangedListener.REMOVED, value);</span>
+                    } else {
+<span class="nc" id="L947">                        setHandlesInput(false);</span>
+                    }
+<span class="nc" id="L949">                    break;</span>
+                case Display.GAME_LEFT:
+<span class="nc bnc" id="L951" title="All 2 branches missed.">                    if (!vertical) {</span>
+<span class="nc" id="L952">                        setProgressInternal(Math.max(minValue, value - increments));</span>
+<span class="nc" id="L953">                        fireDataChanged(DataChangedListener.REMOVED, value);</span>
+                    } else {
+<span class="nc" id="L955">                        setHandlesInput(false);</span>
+                    }
+<span class="nc" id="L957">                    break;</span>
+                case Display.GAME_RIGHT:
+<span class="nc bnc" id="L959" title="All 2 branches missed.">                    if (!vertical) {</span>
+<span class="nc" id="L960">                        setProgressInternal(Math.min(maxValue, value + increments));</span>
+<span class="nc" id="L961">                        fireDataChanged(DataChangedListener.ADDED, value);</span>
+                    } else {
+<span class="nc" id="L963">                        setHandlesInput(false);</span>
+                    }
+<span class="nc" id="L965">                    break;</span>
+                case Display.GAME_FIRE:
+<span class="nc bnc" id="L967" title="All 2 branches missed.">                    if (!Display.getInstance().isThirdSoftButton()) {</span>
+<span class="nc" id="L968">                        fireClicked();</span>
+                    }
+                    break;
+                default:
+                    break;
+            }
+<span class="nc" id="L974">        } else {</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">            if (!Display.getInstance().isThirdSoftButton() &amp;&amp;</span>
+<span class="nc bnc" id="L976" title="All 2 branches missed.">                    Display.getInstance().getGameAction(code) == Display.GAME_FIRE) {</span>
+<span class="nc" id="L977">                fireClicked();</span>
+            }
+        }
+<span class="nc" id="L980">        super.keyPressed(code);</span>
+<span class="nc" id="L981">    }</span>
+
+    /// The increments when the user presses a key to the left/right/up/down etc.
+    ///
+    /// #### Returns
+    ///
+    /// increment value
+    public int getIncrements() {
+<span class="fc" id="L989">        return increments;</span>
+    }
+
+    /// The increments when the user presses a key to the left/right/up/down etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `increments`: increment value
+    public void setIncrements(int increments) {
+<span class="fc" id="L998">        this.increments = increments;</span>
+<span class="fc" id="L999">    }</span>
+
+    private void fireDataChanged(int event, int val) {
+<span class="fc" id="L1002">        listeners.fireDataChangeEvent(val, event);</span>
+<span class="fc" id="L1003">    }</span>
+
+    private void fireActionEventImpl() {
+<span class="fc" id="L1006">        actionListeners.fireActionEvent(new SliderActionEvent(this));</span>
+<span class="fc" id="L1007">    }</span>
+
+    /// Adds a listener to data changed events, notice that the status argument to the data change listener
+    /// shouldn't be relied upon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: new listener
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L1016">        listeners.addListener(l);</span>
+<span class="fc" id="L1017">    }</span>
+
+    /// Removes a listener from data changed events, notice that the status argument to the data change listener
+    /// shouldn't be relied upon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to remove
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L1026">        listeners.removeListener(l);</span>
+<span class="nc" id="L1027">    }</span>
+
+    /// Action listeners give a more coarse event only when the user lifts the finger from the slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    @Override
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L1036">        actionListeners.addListener(l);</span>
+<span class="fc" id="L1037">    }</span>
+
+    /// Action listeners give a more coarse event only when the user lifts the finger from the slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    @Override
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L1046">        actionListeners.removeListener(l);</span>
+<span class="nc" id="L1047">    }</span>
+
+    /// Indicates that the value of the slider should be rendered with a percentage sign
+    /// on top of the slider.
+    ///
+    /// #### Returns
+    ///
+    /// true if so
+    public boolean isRenderPercentageOnTop() {
+<span class="fc" id="L1056">        return renderPercentageOnTop;</span>
+    }
+
+    /// Indicates that the value of the slider should be rendered with a percentage sign
+    /// on top of the slider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderPercentageOnTop`: true to render percentages
+    public void setRenderPercentageOnTop(boolean renderPercentageOnTop) {
+<span class="fc bfc" id="L1066" title="All 2 branches covered.">        if (this.renderPercentageOnTop != renderPercentageOnTop) {</span>
+<span class="fc" id="L1067">            this.renderPercentageOnTop = renderPercentageOnTop;</span>
+<span class="fc" id="L1068">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L1070">    }</span>
+
+    /// #### Returns
+    ///
+    /// the renderValueOnTop
+    public boolean isRenderValueOnTop() {
+<span class="fc" id="L1076">        return renderValueOnTop;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `renderValueOnTop`: the renderValueOnTop to set
+    public void setRenderValueOnTop(boolean renderValueOnTop) {
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">        if (this.renderValueOnTop != renderValueOnTop) {</span>
+<span class="fc" id="L1084">            this.renderValueOnTop = renderValueOnTop;</span>
+<span class="fc" id="L1085">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L1087">    }</span>
+
+    /// #### Returns
+    ///
+    /// the maxValue
+    public int getMaxValue() {
+<span class="fc" id="L1093">        return maxValue;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `maxValue`: the maxValue to set
+    public void setMaxValue(int maxValue) {
+<span class="fc" id="L1100">        this.maxValue = maxValue;</span>
+<span class="fc" id="L1101">    }</span>
+
+    /// #### Returns
+    ///
+    /// the minValue
+    public int getMinValue() {
+<span class="fc" id="L1107">        return minValue;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `minValue`: the minValue to set
+    public void setMinValue(int minValue) {
+<span class="fc" id="L1114">        this.minValue = minValue;</span>
+<span class="fc" id="L1115">    }</span>
+
+    /// The thumb image is drawn on top of the current progress
+    ///
+    /// #### Returns
+    ///
+    /// the thumbImage
+    public Image getThumbImage() {
+<span class="fc" id="L1123">        return thumbImage;</span>
+    }
+
+    /// The thumb image is drawn on top of the current progress
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbImage`: the thumbImage to set
+    public void setThumbImage(Image thumbImage) {
+<span class="fc" id="L1132">        this.thumbImage = thumbImage;</span>
+<span class="fc" id="L1133">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L1134">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+<span class="nc bnc" id="L1139" title="All 4 branches missed.">        return editable &amp;&amp; !vertical;</span>
+    }
+
+    private static class SliderActionEvent extends ActionEvent {
+        private final int value;
+
+        private SliderActionEvent(Slider source) {
+<span class="fc" id="L1146">            super(source, ActionEvent.Type.PointerPressed);</span>
+<span class="fc" id="L1147">            this.value = source.actionEventValue;</span>
+<span class="fc" id="L1148">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

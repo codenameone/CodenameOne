@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HoverTracker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">HoverTracker.java</span></div><h1>HoverTracker.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.PointerEvent;
+
+/// Remembers which component a single top level container's pointer is over, and moves the
+/// hover state as it changes.
+///
+/// This lives in its own class because there are two top level containers and they share no
+/// base class that could hold it -- `Form` and `Window` both extend `Container` directly. The
+/// first version of hover tracking was private to `Form`, which is exactly why a control in a
+/// secondary `Window` could never show a declared hover style: the events reached the window
+/// and nothing there recorded them.
+///
+/// Tracking has to live at this level rather than in `Component` because only the container
+/// knows what the pointer LEFT. A component is never told the pointer moved off it; it simply
+/// stops being the one underneath.
+///
+/// Desktop only in practice, because nothing else generates hover events.
+<span class="fc" id="L41">class HoverTracker {</span>
+    // Capture this before release callbacks: nested dispatch may change the current device.
+    // Desktop touch screens still send finger releases, which must never create hover.
+    static boolean canHoverOnRelease() {
+<span class="fc" id="L45">        Display display = Display.getInstance();</span>
+<span class="fc" id="L46">        int type = display.getPointerType();</span>
+<span class="fc bfc" id="L47" title="All 8 branches covered.">        return display.isDesktop() &amp;&amp; (type == PointerEvent.TYPE_MOUSE</span>
+                || type == PointerEvent.TYPE_STYLUS || type == PointerEvent.TYPE_ERASER);
+    }
+
+    private Component hovered;
+    private Component lastInteractiveScrollHover;
+    private Component pointerTarget;
+    private int pointerX;
+    private int pointerY;
+
+    /// Reports where the pointer now is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component the pointer resolved to, already passed through
+    ///   `LeadUtil.leadParentImpl` by the caller, or **null** when the pointer is over
+    ///   nothing -- which is how a desktop port reports the cursor leaving the window, as a
+    ///   hover at (-1, -1). Both pieces of state have to be cleared in that case or the last
+    ///   component and the last scrollbar thumb stay lit with the cursor elsewhere.
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    void pointerOver(Component cmp, int x, int y) {
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        if (cmp != null &amp;&amp; cmp.isHidden(true)) {</span>
+<span class="fc" id="L72">            cmp = null;</span>
+        }
+<span class="fc" id="L74">        pointerTarget = cmp;</span>
+<span class="fc" id="L75">        pointerX = x;</span>
+<span class="fc" id="L76">        pointerY = y;</span>
+<span class="fc" id="L77">        updateHovered(cmp);</span>
+<span class="fc" id="L78">        updateInteractiveScrollHover(cmp, x, y);</span>
+<span class="fc" id="L79">    }</span>
+
+    static HoverTracker prepareLeadChange(Component changed) {
+<span class="fc" id="L82">        Container root = TopLevelSupport.rootOf(changed);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        HoverTracker tracker = root == null ? null : root.getHoverTracker();</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        if (tracker == null || tracker.hovered == null</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                || (!isInSubtree(changed, tracker.hovered)</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                &amp;&amp; !isInSubtree(LeadUtil.leadParentImpl(changed), tracker.hovered))) {</span>
+<span class="fc" id="L87">            return null;</span>
+        }
+        // Release the old hierarchy while it still owns its flags and animations.
+        // Keep the pointer coordinates so a stationary pointer can acquire the new lead.
+<span class="fc" id="L91">        tracker.updateHovered(null);</span>
+<span class="fc" id="L92">        TooltipManager tooltip = TooltipManager.getInstance();</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">        if (tooltip != null &amp;&amp; tracker.pointerTarget != null) {</span>
+<span class="fc" id="L94">            tooltip.clearTooltipFor(tracker.pointerTarget);</span>
+        }
+<span class="fc" id="L96">        return tracker;</span>
+    }
+
+    void finishLeadChange(Component changed) {
+<span class="fc" id="L100">        Container root = TopLevelSupport.rootOf(changed);</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        Component target = root instanceof Form ? ((Form) root).hoverTargetAt(pointerX, pointerY)</span>
+<span class="pc" id="L102">                : (root instanceof Window ? ((Window) root).hoverTargetAt(pointerX, pointerY) : null);</span>
+        // Reuse normal hit-testing, including focusable-parent capture. Resolve state
+        // only; a topology mutation must not dispatch a pointer callback.
+<span class="fc" id="L105">        pointerOver(target, pointerX, pointerY);</span>
+<span class="fc" id="L106">    }</span>
+
+    // A hover callback can remove its own component without deinitializing the
+    // entire form/window. Drop that detached target before scheduling a tooltip.
+    void clearDetached(TopLevelContainer owner) {
+<span class="pc bpc" id="L111" title="2 of 6 branches missed.">        if ((hovered != null &amp;&amp; hovered.getTopLevelContainer() != owner) //NOPMD CompareObjectsWithEquals</span>
+                || (lastInteractiveScrollHover != null
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                &amp;&amp; lastInteractiveScrollHover.getTopLevelContainer() != owner)) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L114">            pointerOver(null, -1, -1);</span>
+        }
+<span class="fc" id="L116">    }</span>
+
+    void clearFor(Component removed) {
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">        if (isInSubtree(removed, hovered) || isInSubtree(removed, lastInteractiveScrollHover)) {</span>
+<span class="fc" id="L120">            pointerOver(null, -1, -1);</span>
+        }
+<span class="fc" id="L122">    }</span>
+
+    static boolean isInSubtree(Component root, Component target) {
+<span class="fc bfc" id="L125" title="All 6 branches covered.">        return target != null &amp;&amp; (root == target //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                || root instanceof Container &amp;&amp; ((Container) root).contains(target));</span>
+    }
+
+    boolean isOver(Component cmp) {
+<span class="fc bfc" id="L130" title="All 4 branches covered.">        return cmp != null &amp;&amp; hovered == LeadUtil.leadComponentImpl(cmp); //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    private void updateHovered(Component cmp) {
+        // The flag goes on the lead COMPONENT, not on the lead parent the pointer resolved
+        // to, because the lead component is what Component.getStyle() consults: a component
+        // inside a lead hierarchy returns out of the lead branch after asking
+        // lead.isHovered(), and never reaches the plain hover check below it. Marking the
+        // parent therefore left every MultiButton, SpanButton and toolbar command container
+        // unable to show a hover style its theme declared.
+        //
+        // This is the rule the pressed state already follows -- LeadUtil.pointerPressed
+        // delivers to leadComponentImpl(cmp) and getStyle() asks lead.isPressedStyle().
+        // leadComponentImpl answers the component itself when there is no lead, so an
+        // ordinary component is unaffected.
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        Component target = cmp == null ? null : LeadUtil.leadComponentImpl(cmp);</span>
+        // Preferred-size collapse can precede layout, leaving stale hit-test bounds.
+<span class="pc bpc" id="L147" title="3 of 8 branches missed.">        if (cmp != null &amp;&amp; (cmp.isHidden(true) || (target != null &amp;&amp; target.isHidden(true)))) {</span>
+<span class="nc" id="L148">            target = null;</span>
+        }
+        // Identity is the question being asked -- whether this is the same component
+        // instance the pointer was already over -- so equals() would be wrong here as well
+        // as slower.
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (hovered == target) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L154">            return;</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (hovered != null) {</span>
+<span class="fc" id="L157">            repaintLeadParent(hovered);</span>
+<span class="fc" id="L158">            hovered.setHovered(false);</span>
+        }
+<span class="fc" id="L160">        hovered = target;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (target != null) {</span>
+<span class="fc" id="L162">            target.setHovered(true);</span>
+<span class="fc" id="L163">            repaintLeadParent(target);</span>
+        }
+<span class="fc" id="L165">    }</span>
+
+    /// Component.setHovered repaints the component whose flag moved, which is enough for an
+    /// ordinary component and not enough for a lead hierarchy: the style change is read by
+    /// the lead PARENT and by every sibling under it, none of which were asked to repaint.
+    private static void repaintLeadParent(Component cmp) {
+<span class="fc" id="L171">        Component parent = LeadUtil.leadParentImpl(cmp);</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        if (parent != null &amp;&amp; parent != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L173">            parent.repaint();</span>
+        }
+<span class="fc" id="L175">    }</span>
+
+    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an
+    /// interactive (desktop) scrollbar can highlight its thumb, and clears the highlight on
+    /// the previously hovered scrollable. Inert unless interactive scrollbars are enabled.
+    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        if (cmp != null &amp;&amp; !cmp.getUIManager().getLookAndFeel().isInteractiveScroll()) {</span>
+<span class="fc" id="L182">            return;</span>
+        }
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (cmp == null &amp;&amp; lastInteractiveScrollHover == null) {</span>
+<span class="fc" id="L185">            return;</span>
+        }
+<span class="nc" id="L187">        Component scrollable = cmp;</span>
+<span class="nc bnc" id="L188" title="All 6 branches missed.">        while (scrollable != null &amp;&amp; !scrollable.isScrollableY() &amp;&amp; !scrollable.isScrollableX()) {</span>
+<span class="nc" id="L189">            scrollable = scrollable.getParent();</span>
+        }
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        if (lastInteractiveScrollHover != null &amp;&amp; lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L192">            lastInteractiveScrollHover.clearInteractiveScrollHover();</span>
+        }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (scrollable != null) {</span>
+<span class="nc" id="L195">            scrollable.updateInteractiveScrollHover(x, y);</span>
+        }
+<span class="nc" id="L197">        lastInteractiveScrollHover = scrollable;</span>
+<span class="nc" id="L198">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

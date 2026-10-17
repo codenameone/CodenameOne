@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthSample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthSample.java</span></div><h1>HealthSample.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.time.Duration;
+import java.time.Instant;
+
+/// The base of every health record: what it measures and when.
+///
+/// Concrete subclasses correspond to [HealthDataKind] --
+/// [QuantitySample], [CategorySample], [SeriesSample] and the
+/// [SessionSample] family.
+///
+/// #### Instants and intervals
+///
+/// Every sample carries both a start and an end. When they are equal the
+/// sample marks an instant -- see [#isInstantaneous()]. Cumulative types
+/// such as steps are always intervals; see
+/// [HealthDataType#isIntervalOnly()].
+///
+/// #### Identity
+///
+/// [#getId()] is assigned by the platform on write. It is scoped to this
+/// platform and this installation and does **not** survive a reinstall, so
+/// it must not be used as a primary key on your server.
+///
+/// [#getMetadata()] is **not persisted to HealthKit or Health Connect in
+/// this release.** It round-trips through the local store used by the
+/// simulator, desktop and JavaScript, and it travels with a sample you
+/// hold in memory, but a sample written to a mobile platform and read back
+/// comes back without it. Health Connect has no arbitrary metadata --
+/// only a single `clientRecordId` -- so a general map cannot be carried
+/// there at all. Correlate on your own identifier held in your own
+/// storage, keyed by whatever you can reconstruct from the sample's type,
+/// time range and value.
+///
+/// #### Mutability
+///
+/// Samples you build for a write are mutable so optional fields can be
+/// filled in before handing them to [HealthStore]. Samples returned from a
+/// query are snapshots: changing one does not change the store, and to
+/// modify stored data you delete and re-write it.
+public abstract class HealthSample {
+
+    private final HealthDataType type;
+    private final long startMillis;
+    private final long endMillis;
+
+    private String id;
+    private HealthSource source;
+<span class="fc" id="L74">    private RecordingMethod recordingMethod = RecordingMethod.UNKNOWN;</span>
+    private Map&lt;String, String&gt; metadata;
+
+    /// Creates a sample spanning `[startMillis, endMillis]`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `type` is null or the end precedes
+    ///   the start.
+    protected HealthSample(HealthDataType type, long startMillis,
+<span class="fc" id="L84">            long endMillis) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(&quot;a sample requires a data type&quot;);</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (endMillis &lt; startMillis) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(</span>
+                    &quot;sample ends before it starts: &quot; + startMillis + &quot; .. &quot;
+                            + endMillis);
+        }
+<span class="fc" id="L93">        this.type = type;</span>
+<span class="fc" id="L94">        this.startMillis = startMillis;</span>
+<span class="fc" id="L95">        this.endMillis = endMillis;</span>
+<span class="fc" id="L96">    }</span>
+
+    /// What this sample measures.
+    public final HealthDataType getType() {
+<span class="fc" id="L100">        return type;</span>
+    }
+
+    /// Inclusive start, epoch millis UTC.
+    public final long getStartMillis() {
+<span class="fc" id="L105">        return startMillis;</span>
+    }
+
+    /// End, epoch millis UTC. Equal to the start for an instantaneous
+    /// sample.
+    public final long getEndMillis() {
+<span class="fc" id="L111">        return endMillis;</span>
+    }
+
+    /// When this sample starts.
+    ///
+    /// The millis accessors stay, and are what the ports and the wire format
+    /// use: a series can hold tens of thousands of measurements and an
+    /// `Instant` per point is an allocation per point. For a single sample
+    /// this is the type the rest of the framework speaks --
+    /// [com.codename1.calendar] included -- so it is what the public API
+    /// hands out.
+    public final Instant getStart() {
+<span class="fc" id="L123">        return Instant.ofEpochMilli(getStartMillis());</span>
+    }
+
+    /// When this sample ends. Equal to [#getStart()] for an instantaneous
+    /// sample.
+    public final Instant getEnd() {
+<span class="fc" id="L129">        return Instant.ofEpochMilli(getEndMillis());</span>
+    }
+
+    /// How long this sample covers. Zero for an instantaneous sample.
+    public final Duration getDuration() {
+<span class="fc" id="L134">        return Duration.ofMillis(getEndMillis() - getStartMillis());</span>
+    }
+
+    /// `true` when this sample marks a moment rather than a span.
+    public final boolean isInstantaneous() {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        return startMillis == endMillis;</span>
+    }
+
+    /// The span in milliseconds; 0 for an instantaneous sample.
+    public final long getDurationMillis() {
+<span class="fc" id="L144">        return endMillis - startMillis;</span>
+    }
+
+    /// The platform-assigned identifier, or null for a sample that has not
+    /// been written yet. See the class documentation on identity before
+    /// persisting this anywhere.
+    public final String getId() {
+<span class="fc" id="L151">        return id;</span>
+    }
+
+    /// Sets the platform identifier. Called by ports when reading; setting
+    /// it on a sample you are about to write has no effect.
+    public final void setId(String id) {
+<span class="fc" id="L157">        this.id = id;</span>
+<span class="fc" id="L158">    }</span>
+
+    /// Which app and device produced this sample, or null when the
+    /// platform did not report it.
+    public final HealthSource getSource() {
+<span class="fc" id="L163">        return source;</span>
+    }
+
+    /// Sets the originating source. Called by ports when reading.
+    public final void setSource(HealthSource source) {
+<span class="fc" id="L168">        this.source = source;</span>
+<span class="fc" id="L169">    }</span>
+
+    /// How this sample was recorded. Never null; defaults to
+    /// [RecordingMethod#UNKNOWN].
+    public final RecordingMethod getRecordingMethod() {
+<span class="fc" id="L174">        return recordingMethod;</span>
+    }
+
+    /// Declares how this sample was recorded. Worth setting on writes --
+    /// other apps use it to decide how much to trust a value.
+    public final void setRecordingMethod(RecordingMethod recordingMethod) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        this.recordingMethod = recordingMethod == null</span>
+                ? RecordingMethod.UNKNOWN : recordingMethod;
+<span class="fc" id="L182">    }</span>
+
+    /// Free-form metadata carried alongside the sample, never null.
+    ///
+    /// **Not a place for a correlation identifier**, tempting as it
+    /// looks. It round-trips through the local and simulator stores but
+    /// is not written to HealthKit or Health Connect in this release, so
+    /// on a phone it is gone the moment the sample is read back -- and
+    /// [#getId()] is no substitute either, being platform-assigned and
+    /// unstable across a reinstall. Keep the identifier in your own
+    /// storage and correlate on that.
+    public final Map&lt;String, String&gt; getMetadata() {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (metadata == null) {</span>
+<span class="fc" id="L195">            return Collections.emptyMap();</span>
+        }
+<span class="fc" id="L197">        return Collections.unmodifiableMap(metadata);</span>
+    }
+
+    /// Attaches a metadata entry. A null value removes the key.
+    public final void putMetadata(String key, String value) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L203">            return;</span>
+        }
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (metadata != null) {</span>
+<span class="nc" id="L207">                metadata.remove(key);</span>
+            }
+<span class="nc" id="L209">            return;</span>
+        }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (metadata == null) {</span>
+<span class="fc" id="L212">            metadata = new HashMap&lt;String, String&gt;();</span>
+        }
+<span class="fc" id="L214">        metadata.put(key, value);</span>
+<span class="fc" id="L215">    }</span>
+
+    /// Two samples are equal when they carry the same platform
+    /// identifier. Samples that have not been written yet have no
+    /// identifier and are therefore only equal to themselves.
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L223">            return true;</span>
+        }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (!(o instanceof HealthSample)) {</span>
+<span class="nc" id="L226">            return false;</span>
+        }
+<span class="fc" id="L228">        HealthSample other = (HealthSample) o;</span>
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">        return id != null &amp;&amp; id.equals(other.id);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        return id == null ? System.identityHashCode(this) : id.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L239">        return getClass().getName() + &quot;[&quot; + type.getId() + &quot; &quot;</span>
+                + startMillis + &quot;..&quot; + endMillis + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

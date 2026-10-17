@@ -1,0 +1,1589 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TBigInteger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TBigInteger.java</span></div><h1>TBigInteger.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+import java.util.Random;
+
+/// This class represents immutable integer numbers of arbitrary length. Large
+/// numbers are typically used in security applications and therefore BigIntegers
+/// offer dedicated functionality like the generation of large prime numbers or
+/// the computation of modular inverse.
+///
+/// Since the class was modeled to offer all the functionality as the
+/// `Integer` class does, it provides even methods that operate bitwise on
+/// a two's complement representation of large integers. Note however that the
+/// implementations favors an internal representation where magnitude and sign
+/// are treated separately. Hence such operations are inefficient and should be
+/// discouraged. In simple words: Do NOT implement any bit fields based on
+/// BigInteger.
+class TBigInteger {
+
+
+    /* Fields used for the internal representation. */
+
+    /// The `BigInteger` constant 0.
+<span class="fc" id="L40">    public static final TBigInteger ZERO = new TBigInteger(0, 0);</span>
+    /// The `BigInteger` constant 1.
+<span class="fc" id="L42">    public static final TBigInteger ONE = new TBigInteger(1, 1);</span>
+    /// The `BigInteger` constant 10.
+<span class="fc" id="L44">    public static final TBigInteger TEN = new TBigInteger(1, 10);</span>
+    /// The `BigInteger` constant -1.
+<span class="fc" id="L46">    static final TBigInteger MINUS_ONE = new TBigInteger(-1, 1);</span>
+    /// The `BigInteger` constant 0 used for comparison.
+    static final int EQUALS = 0;
+    /// The `BigInteger` constant 1 used for comparison.
+    static final int GREATER = 1;
+    /// The `BigInteger` constant -1 used for comparison.
+    static final int LESS = -1;
+    /// All the `BigInteger` numbers in the range [0,10] are cached.
+<span class="fc" id="L54">    static final TBigInteger[] SMALL_VALUES = {ZERO, ONE, new TBigInteger(1, 2), new TBigInteger(1, 3),</span>
+            new TBigInteger(1, 4), new TBigInteger(1, 5), new TBigInteger(1, 6), new TBigInteger(1, 7),
+            new TBigInteger(1, 8), new TBigInteger(1, 9), TEN};
+    static final TBigInteger[] TWO_POWS;
+
+    static {
+<span class="fc" id="L60">        TWO_POWS = new TBigInteger[32];</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; TWO_POWS.length; i++) {</span>
+<span class="fc" id="L62">            TWO_POWS[i] = TBigInteger.valueOf(1L &lt;&lt; i);</span>
+        }
+<span class="fc" id="L64">    }</span>
+
+    /// The magnitude of this big integer. This array holds unsigned little
+    /// endian digits. For example: `13` is represented as [ 13 ]
+    /// `-13` is represented as [ 13 ] `2^32 + 13` is represented as
+    /// [ 13, 1 ] `2^64 + 13` is represented as [ 13, 0, 1 ] `2^31`
+    /// is represented as [ Integer.MIN_VALUE ] The magnitude array may be longer
+    /// than strictly necessary, which results in additional trailing zeros.
+    transient int[] digits;
+    /// The length of this in measured in ints. Can be less than digits.length().
+    transient int numberLength;
+    /// The sign of this.
+    transient int sign;
+<span class="pc" id="L77">    private transient int firstNonzeroDigit = -2;</span>
+
+    /// Cache for the hash code.
+<span class="pc" id="L80">    private transient int hashCode = 0;</span>
+
+    /// Constructs a random non-negative `BigInteger` instance in the range
+    /// [0, 2^(numBits)-1].
+    ///
+    /// #### Parameters
+    ///
+    /// - `numBits`: maximum length of the new `BigInteger` in bits.
+    ///
+    /// - `rnd`: is an optional random generator to be used.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `numBits` &lt; 0.
+<span class="nc" id="L94">    public TBigInteger(int numBits, Random rnd) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (numBits &lt; 0) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;numBits must be non-negative&quot;);</span>
+        }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (numBits == 0) {</span>
+<span class="nc" id="L99">            sign = 0;</span>
+<span class="nc" id="L100">            numberLength = 1;</span>
+<span class="nc" id="L101">            digits = new int[]{0};</span>
+        } else {
+<span class="nc" id="L103">            sign = 1;</span>
+<span class="nc" id="L104">            numberLength = (numBits + 31) &gt;&gt; 5;</span>
+<span class="nc" id="L105">            digits = new int[numberLength];</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (int i = 0; i &lt; numberLength; i++) {</span>
+<span class="nc" id="L107">                digits[i] = rnd.nextInt();</span>
+            }
+            // Using only the necessary bits
+<span class="nc" id="L110">            digits[numberLength - 1] &gt;&gt;&gt;= (-numBits) &amp; 31;</span>
+<span class="nc" id="L111">            cutOffLeadingZeroes();</span>
+        }
+<span class="nc" id="L113">    }</span>
+
+    /// Constructs a random `BigInteger` instance in the range [0,
+    /// 2^(bitLength)-1] which is probably prime. The probability that the
+    /// returned `BigInteger` is prime is beyond (1-1/2^certainty).
+    ///
+    /// #### Parameters
+    ///
+    /// - `bitLength`: length of the new `BigInteger` in bits.
+    ///
+    /// - `certainty`: tolerated primality uncertainty.
+    ///
+    /// - `rnd`: is an optional random generator to be used.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `bitLength` &lt; 2.
+<span class="fc" id="L130">    public TBigInteger(int bitLength, int certainty, Random rnd) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (bitLength &lt; 2) {</span>
+<span class="nc" id="L132">            throw new ArithmeticException(&quot;bitLength &lt; 2&quot;);</span>
+        }
+<span class="fc" id="L134">        TBigInteger me = TPrimality.consBigInteger(bitLength, certainty, rnd);</span>
+<span class="fc" id="L135">        sign = me.sign;</span>
+<span class="fc" id="L136">        numberLength = me.numberLength;</span>
+<span class="fc" id="L137">        digits = me.digits;</span>
+<span class="fc" id="L138">    }</span>
+
+    /// Constructs a new `BigInteger` instance from the string
+    /// representation. The string representation consists of an optional minus
+    /// sign followed by a non-empty sequence of decimal digits.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: string representation of the new `BigInteger`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException if `val` is not a valid representation of a
+    /// `BigInteger`.
+    public TBigInteger(String val) {
+<span class="fc" id="L155">        this(val, 10);</span>
+<span class="fc" id="L156">    }</span>
+
+    /// Constructs a new `BigInteger` instance from the string
+    /// representation. The string representation consists of an optional minus
+    /// sign followed by a non-empty sequence of digits in the specified radix.
+    /// For the conversion the method `Character.digit(char, radix)` is
+    /// used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: string representation of the new `BigInteger`.
+    ///
+    /// - `radix`: the base to be used for the conversion.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException if `val` is not a valid representation of a
+    /// `BigInteger` or if `radix  Character.MAX_RADIX`.
+<span class="fc" id="L176">    public TBigInteger(String val, int radix) {</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L178">            throw new NullPointerException();</span>
+        }
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        if ((radix &lt; Character.MIN_RADIX) || (radix &gt; Character.MAX_RADIX)) {</span>
+<span class="nc" id="L181">            throw new NumberFormatException(&quot;Radix out of range&quot;);</span>
+        }
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (val.length() == 0) {</span>
+<span class="nc" id="L184">            throw new NumberFormatException(&quot;Zero length BigInteger&quot;);</span>
+        }
+<span class="fc" id="L186">        setFromString(this, val, radix);</span>
+<span class="fc" id="L187">    }</span>
+
+    /// Constructs a new `BigInteger` instance with the given sign and the
+    /// given magnitude. The sign is given as an integer (-1 for negative, 0 for
+    /// zero, 1 for positive). The magnitude is specified as a byte array. The
+    /// most significant byte is the entry at index 0.
+    ///
+    /// #### Parameters
+    ///
+    /// - `signum`: @param signum    sign of the new `BigInteger` (-1 for negative, 0 for
+    /// zero, 1 for positive).
+    ///
+    /// - `magnitude`: @param magnitude magnitude of the new `BigInteger` with the most
+    /// significant byte first.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `magnitude == null`.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException if the sign is not one of -1, 0, 1 or if the sign is zero and
+    /// the magnitude contains non-zero entries.
+<span class="nc" id="L208">    public TBigInteger(int signum, byte[] magnitude) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (magnitude == null) {</span>
+<span class="nc" id="L210">            throw new NullPointerException();</span>
+        }
+<span class="nc bnc" id="L212" title="All 4 branches missed.">        if ((signum &lt; -1) || (signum &gt; 1)) {</span>
+<span class="nc" id="L213">            throw new NumberFormatException(&quot;Invalid signum value&quot;);</span>
+        }
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (signum == 0) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            for (byte element : magnitude) {</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (element != 0) {</span>
+<span class="nc" id="L218">                    throw new NumberFormatException(&quot;signum-magnitude mismatch&quot;);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (magnitude.length == 0) {</span>
+<span class="nc" id="L223">            sign = 0;</span>
+<span class="nc" id="L224">            numberLength = 1;</span>
+<span class="nc" id="L225">            digits = new int[]{0};</span>
+        } else {
+<span class="nc" id="L227">            sign = signum;</span>
+<span class="nc" id="L228">            putBytesPositiveToIntegers(magnitude);</span>
+<span class="nc" id="L229">            cutOffLeadingZeroes();</span>
+        }
+<span class="nc" id="L231">    }</span>
+
+    /// Constructs a new `BigInteger` from the given two's complement
+    /// representation. The most significant byte is the entry at index 0. The
+    /// most significant bit of this entry determines the sign of the new
+    /// `BigInteger` instance. The given array must not be empty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: two's complement representation of the new `BigInteger`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    ///
+    /// - `NumberFormatException`: if the length of `val` is zero.
+<span class="fc" id="L247">    public TBigInteger(byte[] val) {</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (val.length == 0) {</span>
+<span class="nc" id="L249">            throw new NumberFormatException(&quot;Zero length BigInteger&quot;);</span>
+        }
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (val[0] &lt; 0) {</span>
+<span class="nc" id="L252">            sign = -1;</span>
+<span class="nc" id="L253">            putBytesNegativeToIntegers(val);</span>
+        } else {
+<span class="fc" id="L255">            sign = 1;</span>
+<span class="fc" id="L256">            putBytesPositiveToIntegers(val);</span>
+        }
+<span class="fc" id="L258">        cutOffLeadingZeroes();</span>
+<span class="fc" id="L259">    }</span>
+
+    /// Constructs a number which array is of size 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sign`: the sign of the number
+    ///
+    /// - `value`: the only one digit of array
+<span class="fc" id="L268">    TBigInteger(int sign, int value) {</span>
+<span class="fc" id="L269">        this.sign = sign;</span>
+<span class="fc" id="L270">        numberLength = 1;</span>
+<span class="fc" id="L271">        digits = new int[]{value};</span>
+<span class="fc" id="L272">    }</span>
+
+    /// Constructs a number without to create new space. This construct should be
+    /// used only if the three fields of representation are known.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sign`: the sign of the number
+    ///
+    /// - `numberLength`: the length of the internal array
+    ///
+    /// - `digits`: a reference of some array created before
+<span class="fc" id="L284">    TBigInteger(int sign, int numberLength, int[] digits) {</span>
+<span class="fc" id="L285">        this.sign = sign;</span>
+<span class="fc" id="L286">        this.numberLength = numberLength;</span>
+<span class="fc" id="L287">        this.digits = digits;</span>
+<span class="fc" id="L288">    }</span>
+
+    /// Creates a new `BigInteger` whose value is equal to the specified
+    /// `long`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sign`: the sign of the number
+    ///
+    /// - `val`: the value of the new `BigInteger`.
+<span class="fc" id="L298">    TBigInteger(int sign, long val) {</span>
+        // PRE: (val &gt;= 0) &amp;&amp; (sign &gt;= -1) &amp;&amp; (sign &lt;= 1)
+<span class="fc" id="L300">        this.sign = sign;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if ((val &amp; 0xFFFFFFFF00000000L) == 0) {</span>
+            // It fits in one 'int'
+<span class="fc" id="L303">            numberLength = 1;</span>
+<span class="fc" id="L304">            digits = new int[]{(int) val};</span>
+        } else {
+<span class="fc" id="L306">            numberLength = 2;</span>
+<span class="fc" id="L307">            digits = new int[]{(int) val, (int) (val &gt;&gt; 32)};</span>
+        }
+<span class="fc" id="L309">    }</span>
+
+    /// Creates a new `BigInteger` with the given sign and magnitude. This
+    /// constructor does not create a copy, so any changes to the reference will
+    /// affect the new number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `signum`: The sign of the number represented by `digits`
+    ///
+    /// - `digits`: The magnitude of the number
+<span class="fc" id="L320">    TBigInteger(int signum, int[] digits) {</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (digits.length == 0) {</span>
+<span class="fc" id="L322">            sign = 0;</span>
+<span class="fc" id="L323">            numberLength = 1;</span>
+<span class="fc" id="L324">            this.digits = new int[]{0};</span>
+        } else {
+<span class="nc" id="L326">            sign = signum;</span>
+<span class="nc" id="L327">            numberLength = digits.length;</span>
+<span class="nc" id="L328">            this.digits = digits;</span>
+<span class="nc" id="L329">            cutOffLeadingZeroes();</span>
+        }
+<span class="fc" id="L331">    }</span>
+
+    public static TBigInteger valueOf(long val) {
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (val &lt; 0) {</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">            if (val != -1) {</span>
+<span class="fc" id="L336">                return new TBigInteger(-1, -val);</span>
+            }
+<span class="nc" id="L338">            return MINUS_ONE;</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        } else if (val &lt;= 10) {</span>
+<span class="fc" id="L340">            return SMALL_VALUES[(int) val];</span>
+        } else {
+            // (val &gt; 10)
+<span class="fc" id="L343">            return new TBigInteger(1, val);</span>
+        }
+    }
+
+    /// #### See also
+    ///
+    /// - TBigInteger#BigInteger(String, int)
+    private static void setFromString(TBigInteger bi, String val, int radix) {
+        int sign;
+        int[] digits;
+        int numberLength;
+<span class="fc" id="L354">        int stringLength = val.length();</span>
+        int startChar;
+<span class="fc" id="L356">        int endChar = stringLength;</span>
+
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (val.charAt(0) == '-') {</span>
+<span class="nc" id="L359">            sign = -1;</span>
+<span class="nc" id="L360">            startChar = 1;</span>
+<span class="nc" id="L361">            stringLength--;</span>
+        } else {
+<span class="fc" id="L363">            sign = 1;</span>
+<span class="fc" id="L364">            startChar = 0;</span>
+        }
+        /*
+         * We use the following algorithm: split a string into portions of n
+         * characters and convert each portion to an integer according to the
+         * radix. Then convert an exp(radix, n) based number to binary using the
+         * multiplication method. See D. Knuth, The Art of Computer Programming,
+         * vol. 2.
+         */
+
+<span class="fc" id="L374">        int charsPerInt = TConversion.digitFitInInt[radix];</span>
+<span class="fc" id="L375">        int bigRadixDigitsLength = stringLength / charsPerInt;</span>
+<span class="fc" id="L376">        int topChars = stringLength % charsPerInt;</span>
+
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (topChars != 0) {</span>
+<span class="fc" id="L379">            bigRadixDigitsLength++;</span>
+        }
+<span class="fc" id="L381">        digits = new int[bigRadixDigitsLength];</span>
+        // Get the maximal power of radix that fits in int
+<span class="fc" id="L383">        int bigRadix = TConversion.bigRadices[radix - 2];</span>
+        // Parse an input string and accumulate the BigInteger's magnitude
+<span class="fc" id="L385">        int digitIndex = 0; // index of digits array</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        int substrEnd = startChar + ((topChars == 0) ? charsPerInt : topChars);</span>
+        int newDigit;
+
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        for (int substrStart = startChar; substrStart &lt; endChar; substrStart = substrEnd, substrEnd = substrStart +</span>
+                charsPerInt) {
+<span class="fc" id="L391">            int bigRadixDigit = Integer.parseInt(val.substring(substrStart, substrEnd), radix);</span>
+<span class="fc" id="L392">            newDigit = TMultiplication.multiplyByInt(digits, digitIndex, bigRadix);</span>
+<span class="fc" id="L393">            newDigit += TElementary.inplaceAdd(digits, digitIndex, bigRadixDigit);</span>
+<span class="fc" id="L394">            digits[digitIndex++] = newDigit;</span>
+        }
+<span class="fc" id="L396">        numberLength = digitIndex;</span>
+<span class="fc" id="L397">        bi.sign = sign;</span>
+<span class="fc" id="L398">        bi.numberLength = numberLength;</span>
+<span class="fc" id="L399">        bi.digits = digits;</span>
+<span class="fc" id="L400">        bi.cutOffLeadingZeroes();</span>
+<span class="fc" id="L401">    }</span>
+
+    /// Returns a random positive `BigInteger` instance in the range [0,
+    /// 2^(bitLength)-1] which is probably prime. The probability that the
+    /// returned `BigInteger` is prime is beyond (1-1/2^80).
+    ///
+    /// **Implementation Note:** Currently `rnd` is ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bitLength`: length of the new `BigInteger` in bits.
+    ///
+    /// - `rnd`: random generator used to generate the new `BigInteger`.
+    ///
+    /// #### Returns
+    ///
+    /// probably prime random `BigInteger` instance.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `bitLength &lt; 2`.
+    public static TBigInteger probablePrime(int bitLength, Random rnd) {
+<span class="fc" id="L423">        return new TBigInteger(bitLength, 100, rnd);</span>
+    }
+
+    static TBigInteger getPowerOfTwo(int exp) {
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (exp &lt; TWO_POWS.length) {</span>
+<span class="nc" id="L428">            return TWO_POWS[exp];</span>
+        }
+<span class="fc" id="L430">        int intCount = exp &gt;&gt; 5;</span>
+<span class="fc" id="L431">        int bitN = exp &amp; 31;</span>
+<span class="fc" id="L432">        int[] resDigits = new int[intCount + 1];</span>
+<span class="fc" id="L433">        resDigits[intCount] = 1 &lt;&lt; bitN;</span>
+<span class="fc" id="L434">        return new TBigInteger(1, intCount + 1, resDigits);</span>
+    }
+
+    /// Returns the two's complement representation of this BigInteger in a byte
+    /// array.
+    ///
+    /// #### Returns
+    ///
+    /// two's complement representation of `this`.
+    public byte[] toByteArray() {
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (this.sign == 0) {</span>
+<span class="nc" id="L445">            return new byte[]{0};</span>
+        }
+<span class="fc" id="L447">        TBigInteger temp = this;</span>
+<span class="fc" id="L448">        int bitLen = bitLength();</span>
+<span class="fc" id="L449">        int iThis = getFirstNonzeroDigit();</span>
+<span class="fc" id="L450">        int bytesLen = (bitLen &gt;&gt; 3) + 1;</span>
+        /*
+         * Puts the little-endian int array representing the magnitude of this
+         * BigInteger into the big-endian byte array.
+         */
+<span class="fc" id="L455">        byte[] bytes = new byte[bytesLen];</span>
+<span class="fc" id="L456">        int firstByteNumber = 0;</span>
+        int highBytes;
+<span class="fc" id="L458">        int digitIndex = 0;</span>
+<span class="fc" id="L459">        int bytesInInteger = 4;</span>
+        int digit;
+        int hB;
+
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        if (bytesLen - (numberLength &lt;&lt; 2) == 1) {</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">            bytes[0] = (byte) ((sign &lt; 0) ? -1 : 0);</span>
+<span class="nc" id="L465">            highBytes = 4;</span>
+<span class="nc" id="L466">            firstByteNumber++;</span>
+        } else {
+<span class="fc" id="L468">            hB = bytesLen &amp; 3;</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            highBytes = (hB == 0) ? 4 : hB;</span>
+        }
+
+<span class="fc" id="L472">        digitIndex = iThis;</span>
+<span class="fc" id="L473">        bytesLen -= iThis &lt;&lt; 2;</span>
+
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (sign &lt; 0) {</span>
+<span class="nc" id="L476">            digit = -temp.digits[digitIndex];</span>
+<span class="nc" id="L477">            digitIndex++;</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">            if (digitIndex == numberLength) {</span>
+<span class="nc" id="L479">                bytesInInteger = highBytes;</span>
+            }
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            for (int i = 0; i &lt; bytesInInteger; i++, digit &gt;&gt;= 8) {</span>
+<span class="nc" id="L482">                bytes[--bytesLen] = (byte) digit;</span>
+            }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">            while (bytesLen &gt; firstByteNumber) {</span>
+<span class="nc" id="L485">                digit = ~temp.digits[digitIndex];</span>
+<span class="nc" id="L486">                digitIndex++;</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                if (digitIndex == numberLength) {</span>
+<span class="nc" id="L488">                    bytesInInteger = highBytes;</span>
+                }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">                for (int i = 0; i &lt; bytesInInteger; i++, digit &gt;&gt;= 8) {</span>
+<span class="nc" id="L491">                    bytes[--bytesLen] = (byte) digit;</span>
+                }
+            }
+        } else {
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            while (bytesLen &gt; firstByteNumber) {</span>
+<span class="fc" id="L496">                digit = temp.digits[digitIndex];</span>
+<span class="fc" id="L497">                digitIndex++;</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">                if (digitIndex == numberLength) {</span>
+<span class="fc" id="L499">                    bytesInInteger = highBytes;</span>
+                }
+<span class="fc bfc" id="L501" title="All 2 branches covered.">                for (int i = 0; i &lt; bytesInInteger; i++, digit &gt;&gt;= 8) {</span>
+<span class="fc" id="L502">                    bytes[--bytesLen] = (byte) digit;</span>
+                }
+            }
+        }
+<span class="fc" id="L506">        return bytes;</span>
+    }
+
+    /// Returns a (new) `BigInteger` whose value is the absolute value of
+    /// `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `abs(this)`.
+    public TBigInteger abs() {
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        return ((sign &lt; 0) ? new TBigInteger(1, numberLength, digits) : this);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is the `-this`.
+    ///
+    /// #### Returns
+    ///
+    /// `-this`.
+    public TBigInteger negate() {
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        return ((sign == 0) ? this : new TBigInteger(-sign, numberLength, digits));</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this + val`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be added to `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this + val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger add(TBigInteger val) {
+<span class="fc" id="L542">        return TElementary.add(this, val);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this - val`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be subtracted from `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this - val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger subtract(TBigInteger val) {
+<span class="fc" id="L559">        return TElementary.subtract(this, val);</span>
+    }
+
+    /// Returns the sign of this `BigInteger`.
+    ///
+    /// #### Returns
+    ///
+    /// `-1` if `this  0`.
+    public int signum() {
+<span class="fc" id="L568">        return sign;</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this &gt;&gt; n`. For
+    /// negative arguments, the result is also negative. The shift distance may
+    /// be negative which means that `this` is shifted left.
+    ///
+    /// **Implementation Note:** Usage of this method on negative values is
+    /// not recommended as the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: shift distance
+    ///
+    /// #### Returns
+    ///
+    /// @return `this &gt;&gt; n` if `n &gt;= 0`; `this &lt;&lt; (-n)`
+    /// otherwise
+    public TBigInteger shiftRight(int n) {
+<span class="pc bpc" id="L587" title="1 of 4 branches missed.">        if ((n == 0) || (sign == 0)) {</span>
+<span class="fc" id="L588">            return this;</span>
+        }
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">        return ((n &gt; 0) ? TBitLevel.shiftRight(this, n) : TBitLevel.shiftLeft(this, -n));</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this = 0. The shift distance
+    /// may be negative which means that `this` is shifted right. The
+    /// result then corresponds to `floor(this / 2^(-n))`.
+    ///
+    /// **Implementation Note:** Usage of this method on negative values is
+    /// not recommended as the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: shift distance.
+    ///
+    /// #### Returns
+    ///
+    /// @return `this = 0`; `this &gt;&gt; (-n)`.
+    /// otherwise
+    public TBigInteger shiftLeft(int n) {
+<span class="pc bpc" id="L609" title="1 of 4 branches missed.">        if ((n == 0) || (sign == 0)) {</span>
+<span class="fc" id="L610">            return this;</span>
+        }
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        return ((n &gt; 0) ? TBitLevel.shiftLeft(this, n) : TBitLevel.shiftRight(this, -n));</span>
+    }
+
+    TBigInteger shiftLeftOneBit() {
+<span class="nc bnc" id="L616" title="All 2 branches missed.">        return (sign == 0) ? this : TBitLevel.shiftLeftOneBit(this);</span>
+    }
+
+    /// Returns the length of the value's two's complement representation without
+    /// leading zeros for positive numbers / without leading ones for negative
+    /// values.
+    ///
+    /// The two's complement representation of `this` will be at least
+    /// `bitLength() + 1` bits long.
+    ///
+    /// The value will fit into an `int` if `bitLength() &lt; 32` or
+    /// into a `long` if `bitLength() &lt; 64`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the length of the minimal two's complement representation for
+    /// `this` without the sign bit.
+    public int bitLength() {
+<span class="fc" id="L634">        return TBitLevel.bitLength(this);</span>
+    }
+
+    /// Tests whether the bit at position n in `this` is set. The result is
+    /// equivalent to `this &amp; (2^n) != 0`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: position where the bit in `this` has to be inspected.
+    ///
+    /// #### Returns
+    ///
+    /// `this &amp; (2^n) != 0`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `n &lt; 0`.
+    public boolean testBit(int n) {
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">            return ((digits[0] &amp; 1) != 0);</span>
+        }
+<span class="nc bnc" id="L658" title="All 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L659">            throw new ArithmeticException(&quot;Negative bit address&quot;);</span>
+        }
+<span class="nc" id="L661">        int intCount = n &gt;&gt; 5;</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">        if (intCount &gt;= numberLength) {</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            return (sign &lt; 0);</span>
+        }
+<span class="nc" id="L665">        int digit = digits[intCount];</span>
+<span class="nc" id="L666">        n = (1 &lt;&lt; (n &amp; 31)); // int with 1 set to the needed position</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">        if (sign &lt; 0) {</span>
+<span class="nc" id="L668">            int firstNonZeroDigit = getFirstNonzeroDigit();</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            if (intCount &lt; firstNonZeroDigit) {</span>
+<span class="nc" id="L670">                return false;</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">            } else if (firstNonZeroDigit == intCount) {</span>
+<span class="nc" id="L672">                digit = -digit;</span>
+            } else {
+<span class="nc" id="L674">                digit = ~digit;</span>
+            }
+        }
+<span class="nc bnc" id="L677" title="All 2 branches missed.">        return ((digit &amp; n) != 0);</span>
+    }
+
+    /// Returns a new `BigInteger` which has the same binary representation
+    /// as `this` but with the bit at position n set. The result is
+    /// equivalent to `this | 2^n`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: position where the bit in `this` has to be set.
+    ///
+    /// #### Returns
+    ///
+    /// `this | 2^n`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `n &lt; 0`.
+    public TBigInteger setBit(int n) {
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">        if (!testBit(n)) {</span>
+<span class="nc" id="L700">            return TBitLevel.flipBit(this, n);</span>
+        }
+<span class="fc" id="L702">        return this;</span>
+    }
+
+    /// Returns a new `BigInteger` which has the same binary representation
+    /// as `this` but with the bit at position n cleared. The result is
+    /// equivalent to `this &amp; ~(2^n)`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: position where the bit in `this` has to be cleared.
+    ///
+    /// #### Returns
+    ///
+    /// `this &amp; ~(2^n)`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `n &lt; 0`.
+    public TBigInteger clearBit(int n) {
+<span class="pc bpc" id="L724" title="1 of 2 branches missed.">        if (testBit(n)) {</span>
+<span class="fc" id="L725">            return TBitLevel.flipBit(this, n);</span>
+        }
+<span class="nc" id="L727">        return this;</span>
+    }
+
+    /// Returns a new `BigInteger` which has the same binary representation
+    /// as `this` but with the bit at position n flipped. The result is
+    /// equivalent to `this ^ 2^n`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: position where the bit in `this` has to be flipped.
+    ///
+    /// #### Returns
+    ///
+    /// `this ^ 2^n`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `n &lt; 0`.
+    public TBigInteger flipBit(int n) {
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L750">            throw new ArithmeticException(&quot;Negative bit address&quot;);</span>
+        }
+<span class="fc" id="L752">        return TBitLevel.flipBit(this, n);</span>
+    }
+
+    /// Returns the position of the lowest set bit in the two's complement
+    /// representation of this `BigInteger`. If all bits are zero (this=0)
+    /// then -1 is returned as result.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Returns
+    ///
+    /// position of lowest bit if `this != 0`, `-1` otherwise
+    public int getLowestSetBit() {
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">        if (sign == 0) {</span>
+<span class="nc" id="L767">            return -1;</span>
+        }
+        // (sign != 0) implies that exists some non zero digit
+<span class="fc" id="L770">        int i = getFirstNonzeroDigit();</span>
+<span class="fc" id="L771">        return ((i &lt;&lt; 5) + TBigDecimal.numberOfTrailingZeros(digits[i]));</span>
+    }
+
+    /// Use `bitLength(0)` if you want to know the length of the binary
+    /// value in bits.
+    ///
+    /// Returns the number of bits in the binary representation of `this`
+    /// which differ from the sign bit. If `this` is positive the result is
+    /// equivalent to the number of bits set in the binary representation of
+    /// `this`. If `this` is negative the result is equivalent to the
+    /// number of bits set in the binary representation of `-this-1`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Returns
+    ///
+    /// @return number of bits in the binary representation of `this` which
+    /// differ from the sign bit
+    public int bitCount() {
+<span class="nc" id="L791">        return TBitLevel.bitCount(this);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `~this`. The result
+    /// of this operation is `-this-1`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Returns
+    ///
+    /// `~this`.
+    public TBigInteger not() {
+<span class="nc" id="L804">        return TLogical.not(this);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this &amp; val`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be and'ed with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this &amp; val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger and(TBigInteger val) {
+<span class="fc" id="L824">        return TLogical.and(this, val);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this | val`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be or'ed with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this | val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger or(TBigInteger val) {
+<span class="fc" id="L844">        return TLogical.or(this, val);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this ^ val`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be xor'ed with `this`
+    ///
+    /// #### Returns
+    ///
+    /// `this ^ val`
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`
+    public TBigInteger xor(TBigInteger val) {
+<span class="fc" id="L864">        return TLogical.xor(this, val);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this &amp; ~val`.
+    /// Evaluating `x.andNot(val)` returns the same result as
+    /// `x.and(val.not())`.
+    ///
+    /// **Implementation Note:** Usage of this method is not recommended as
+    /// the current implementation is not efficient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be not'ed and then and'ed with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this &amp; ~val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger andNot(TBigInteger val) {
+<span class="nc" id="L886">        return TLogical.andNot(this, val);</span>
+    }
+
+    /// Returns this `BigInteger` as an int value. If `this` is too
+    /// big to be represented as an int, then `this` % 2^32 is returned.
+    ///
+    /// #### Returns
+    ///
+    /// this `BigInteger` as an int value.
+    //@Override
+    public int intValue() {
+<span class="fc" id="L897">        return (sign * digits[0]);</span>
+    }
+
+    /// Returns this `BigInteger` as a long value. If `this` is too
+    /// big to be represented as a long, then `this` % 2^64 is returned.
+    ///
+    /// #### Returns
+    ///
+    /// this `BigInteger` as a long value.
+    //@Override
+    public long longValue() {
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">        long value = (numberLength &gt; 1) ? (((long) digits[1]) &lt;&lt; 32) | (digits[0] &amp; 0xFFFFFFFFL)</span>
+                : (digits[0] &amp; 0xFFFFFFFFL);
+<span class="fc" id="L910">        return (sign * value);</span>
+    }
+
+    /// Returns this `BigInteger` as a float value. If `this` is too
+    /// big to be represented as a float, then `Float.POSITIVE_INFINITY`
+    /// or `Float.NEGATIVE_INFINITY` is returned. Note, that not all
+    /// integers x in the range [-Float.MAX_VALUE, Float.MAX_VALUE] can be
+    /// represented as a float. The float representation has a mantissa of length
+    /// 24. For example, 2^24+1 = 16777217 is returned as float 16777216.0.
+    ///
+    /// #### Returns
+    ///
+    /// this `BigInteger` as a float value.
+    //@Override
+    public float floatValue() {
+<span class="nc" id="L925">        return (float) doubleValue();</span>
+    }
+
+    /// Returns this `BigInteger` as a double value. If `this` is
+    /// too big to be represented as a double, then
+    /// `Double.POSITIVE_INFINITY` or `Double.NEGATIVE_INFINITY` is
+    /// returned. Note, that not all integers x in the range [-Double.MAX_VALUE,
+    /// Double.MAX_VALUE] can be represented as a double. The double
+    /// representation has a mantissa of length 53. For example, 2^53+1 =
+    /// 9007199254740993 is returned as double 9007199254740992.0.
+    ///
+    /// #### Returns
+    ///
+    /// this `BigInteger` as a double value
+    //@Override
+    public double doubleValue() {
+<span class="nc" id="L941">        return TConversion.bigInteger2Double(this);</span>
+    }
+
+    /// Compares this `BigInteger` with `val`. Returns one of the
+    /// three values 1, 0, or -1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be compared with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// @return `1` if `this &gt; val`, `-1` if `this &lt; val`
+    /// , `0` if `this == val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    //@Override
+    public int compareTo(TBigInteger val) {
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">        if (sign &gt; val.sign) {</span>
+<span class="nc" id="L962">            return GREATER;</span>
+        }
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">        if (sign &lt; val.sign) {</span>
+<span class="fc" id="L965">            return LESS;</span>
+        }
+<span class="nc bnc" id="L967" title="All 2 branches missed.">        if (numberLength &gt; val.numberLength) {</span>
+<span class="nc" id="L968">            return sign;</span>
+        }
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (numberLength &lt; val.numberLength) {</span>
+<span class="nc" id="L971">            return -val.sign;</span>
+        }
+        // Equal sign and equal numberLength
+<span class="nc" id="L974">        return (sign * TElementary.compareArrays(digits, val.digits, numberLength));</span>
+    }
+
+    /// Returns the minimum of this `BigInteger` and `val`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be used to compute the minimum with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `min(this, val)`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger min(TBigInteger val) {
+<span class="nc bnc" id="L991" title="All 2 branches missed.">        return ((this.compareTo(val) == LESS) ? this : val);</span>
+    }
+
+    /// Returns the maximum of this `BigInteger` and `val`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be used to compute the maximum with `this`
+    ///
+    /// #### Returns
+    ///
+    /// `max(this, val)`
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`
+    public TBigInteger max(TBigInteger val) {
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">        return ((this.compareTo(val) == GREATER) ? this : val);</span>
+    }
+
+    /// Returns a hash code for this `BigInteger`.
+    ///
+    /// #### Returns
+    ///
+    /// hash code for `this`.
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">        if (hashCode != 0) {</span>
+<span class="nc" id="L1019">            return hashCode;</span>
+        }
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">        for (int digit : digits) {</span>
+<span class="nc" id="L1022">            hashCode = (hashCode * 33 + digit);</span>
+        }
+<span class="nc" id="L1024">        hashCode = hashCode * sign;</span>
+<span class="nc" id="L1025">        return hashCode;</span>
+    }
+
+    /// Returns `true` if `x` is a BigInteger instance and if this
+    /// instance is equal to this `BigInteger`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: object to be compared with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if `x` is a BigInteger and `this == x`,
+    /// `false` otherwise.
+    @Override
+    public boolean equals(Object x) {
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">        if (this == x) {</span>
+<span class="fc" id="L1042">            return true;</span>
+        }
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">        if (x instanceof TBigInteger) {</span>
+<span class="fc" id="L1045">            TBigInteger x1 = (TBigInteger) x;</span>
+<span class="pc bpc" id="L1046" title="1 of 6 branches missed.">            return sign == x1.sign &amp;&amp; numberLength == x1.numberLength &amp;&amp; equalsArrays(x1.digits);</span>
+        }
+<span class="nc" id="L1048">        return false;</span>
+    }
+
+    boolean equalsArrays(final int[] b) {
+        int i;
+<span class="fc bfc" id="L1053" title="All 4 branches covered.">        for (i = numberLength - 1; (i &gt;= 0) &amp;&amp; (digits[i] == b[i]); i--) { // NOPMD EmptyControlStatement</span>
+        }
+<span class="fc bfc" id="L1055" title="All 2 branches covered.">        return i &lt; 0;</span>
+    }
+
+    /// Returns a string representation of this `BigInteger` in decimal
+    /// form.
+    ///
+    /// #### Returns
+    ///
+    /// a string representation of `this` in decimal form.
+    @Override
+    public String toString() {
+<span class="fc" id="L1066">        return TConversion.toDecimalScaledString(this, 0);</span>
+    }
+
+    /// Returns a string containing a string representation of this
+    /// `BigInteger` with base radix. If
+    /// `radix  Character.MAX_RADIX` then a decimal representation is
+    /// returned. The characters of the string representation are generated with
+    /// method `Character.forDigit`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radix`: base to be used for the string representation.
+    ///
+    /// #### Returns
+    ///
+    /// a string representation of this with radix 10.
+    public String toString(int radix) {
+<span class="nc" id="L1083">        return TConversion.bigInteger2String(this, radix);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is greatest common divisor
+    /// of `this` and `val`. If `this==0` and `val==0`
+    /// then zero is returned, otherwise the result is positive.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value with which the greatest common divisor is computed.
+    ///
+    /// #### Returns
+    ///
+    /// `gcd(this, val)`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger gcd(TBigInteger val) {
+<span class="fc" id="L1102">        TBigInteger val1 = this.abs();</span>
+<span class="fc" id="L1103">        TBigInteger val2 = val.abs();</span>
+        // To avoid a possible division by zero
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">        if (val1.signum() == 0) {</span>
+<span class="nc" id="L1106">            return val2;</span>
+<span class="pc bpc" id="L1107" title="1 of 2 branches missed.">        } else if (val2.signum() == 0) {</span>
+<span class="nc" id="L1108">            return val1;</span>
+        }
+
+        // Optimization for small operands
+        // (op2.bitLength() &lt; 64) and (op1.bitLength() &lt; 64)
+<span class="pc bpc" id="L1113" title="10 of 12 branches missed.">        if (((val1.numberLength == 1) || ((val1.numberLength == 2) &amp;&amp; (val1.digits[1] &gt; 0))) &amp;&amp;</span>
+                (val2.numberLength == 1 || (val2.numberLength == 2 &amp;&amp; val2.digits[1] &gt; 0))) {
+<span class="fc" id="L1115">            return TBigInteger.valueOf(TDivision.gcdBinary(val1.longValue(), val2.longValue()));</span>
+        }
+
+<span class="nc" id="L1118">        return TDivision.gcdBinary(val1.copy(), val2.copy());</span>
+
+    }
+
+    /// Returns a new `BigInteger` whose value is `this * val`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: value to be multiplied with `this`.
+    ///
+    /// #### Returns
+    ///
+    /// `this * val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `val == null`.
+    public TBigInteger multiply(TBigInteger val) {
+        // This let us to throw NullPointerException when val == null
+<span class="pc bpc" id="L1137" title="1 of 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L1138">            return ZERO;</span>
+        }
+<span class="pc bpc" id="L1140" title="1 of 2 branches missed.">        if (sign == 0) {</span>
+<span class="nc" id="L1141">            return ZERO;</span>
+        }
+<span class="fc" id="L1143">        return TMultiplication.multiply(this, val);</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this ^ exp`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `exp`: exponent to which `this` is raised.
+    ///
+    /// #### Returns
+    ///
+    /// `this ^ exp`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `exp &lt; 0`.
+    public TBigInteger pow(int exp) {
+<span class="pc bpc" id="L1160" title="1 of 2 branches missed.">        if (exp &lt; 0) {</span>
+<span class="nc" id="L1161">            throw new ArithmeticException(&quot;Negative exponent&quot;);</span>
+        }
+<span class="pc bpc" id="L1163" title="1 of 2 branches missed.">        if (exp == 0) {</span>
+<span class="nc" id="L1164">            return ONE;</span>
+<span class="pc bpc" id="L1165" title="3 of 6 branches missed.">        } else if (exp == 1 || equals(ONE) || equals(ZERO)) {</span>
+<span class="nc" id="L1166">            return this;</span>
+        }
+
+        // if even take out 2^x factor which we can
+        // calculate by shifting.
+<span class="pc bpc" id="L1171" title="1 of 2 branches missed.">        if (!testBit(0)) {</span>
+<span class="nc" id="L1172">            int x = 1;</span>
+<span class="nc bnc" id="L1173" title="All 2 branches missed.">            while (!testBit(x)) {</span>
+<span class="nc" id="L1174">                x++;</span>
+            }
+<span class="nc" id="L1176">            return getPowerOfTwo(x * exp).multiply(this.shiftRight(x).pow(exp));</span>
+        }
+<span class="fc" id="L1178">        return TMultiplication.pow(this, exp);</span>
+    }
+
+    /// Returns a `BigInteger` array which contains `this / divisor`
+    /// at index 0 and `this % divisor` at index 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `divisor`: value by which `this` is divided.
+    ///
+    /// #### Returns
+    ///
+    /// `[this / divisor, this % divisor]`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `divisor == null`.
+    ///
+    /// - `ArithmeticException`: if `divisor == 0`.
+    ///
+    /// #### See also
+    ///
+    /// - #divide
+    ///
+    /// - #remainder
+    public TBigInteger[] divideAndRemainder(TBigInteger divisor) {
+<span class="fc" id="L1204">        int divisorSign = divisor.sign;</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">        if (divisorSign == 0) {</span>
+<span class="nc" id="L1206">            throw new ArithmeticException(&quot;BigInteger divide by zero&quot;);</span>
+        }
+<span class="fc" id="L1208">        int divisorLen = divisor.numberLength;</span>
+<span class="fc" id="L1209">        int[] divisorDigits = divisor.digits;</span>
+<span class="pc bpc" id="L1210" title="1 of 2 branches missed.">        if (divisorLen == 1) {</span>
+<span class="fc" id="L1211">            return TDivision.divideAndRemainderByInteger(this, divisorDigits[0], divisorSign);</span>
+        }
+        // res[0] is a quotient and res[1] is a remainder:
+<span class="nc" id="L1214">        int[] thisDigits = digits;</span>
+<span class="nc" id="L1215">        int thisLen = numberLength;</span>
+<span class="nc bnc" id="L1216" title="All 4 branches missed.">        int cmp = (thisLen != divisorLen) ? ((thisLen &gt; divisorLen) ? 1 : -1) : TElementary.compareArrays(thisDigits,</span>
+                divisorDigits, thisLen);
+<span class="nc bnc" id="L1218" title="All 2 branches missed.">        if (cmp &lt; 0) {</span>
+<span class="nc" id="L1219">            return new TBigInteger[]{ZERO, this};</span>
+        }
+<span class="nc" id="L1221">        int thisSign = sign;</span>
+<span class="nc" id="L1222">        int quotientLength = thisLen - divisorLen + 1;</span>
+<span class="nc" id="L1223">        int remainderLength = divisorLen;</span>
+<span class="nc bnc" id="L1224" title="All 2 branches missed.">        int quotientSign = ((thisSign == divisorSign) ? 1 : -1);</span>
+<span class="nc" id="L1225">        int[] quotientDigits = new int[quotientLength];</span>
+<span class="nc" id="L1226">        int[] remainderDigits = TDivision.divide(quotientDigits, quotientLength, thisDigits, thisLen, divisorDigits,</span>
+                divisorLen);
+<span class="nc" id="L1228">        TBigInteger result0 = new TBigInteger(quotientSign, quotientLength, quotientDigits);</span>
+<span class="nc" id="L1229">        TBigInteger result1 = new TBigInteger(thisSign, remainderLength, remainderDigits);</span>
+<span class="nc" id="L1230">        result0.cutOffLeadingZeroes();</span>
+<span class="nc" id="L1231">        result1.cutOffLeadingZeroes();</span>
+<span class="nc" id="L1232">        return new TBigInteger[]{result0, result1};</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this / divisor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `divisor`: value by which `this` is divided.
+    ///
+    /// #### Returns
+    ///
+    /// `this / divisor`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `divisor == null`.
+    ///
+    /// - `ArithmeticException`: if `divisor == 0`.
+    public TBigInteger divide(TBigInteger divisor) {
+<span class="pc bpc" id="L1251" title="1 of 2 branches missed.">        if (divisor.sign == 0) {</span>
+<span class="nc" id="L1252">            throw new ArithmeticException(&quot;BigInteger divide by zero&quot;);</span>
+        }
+<span class="fc" id="L1254">        int divisorSign = divisor.sign;</span>
+<span class="pc bpc" id="L1255" title="1 of 2 branches missed.">        if (divisor.isOne()) {</span>
+<span class="nc bnc" id="L1256" title="All 2 branches missed.">            return ((divisor.sign &gt; 0) ? this : this.negate());</span>
+        }
+<span class="fc" id="L1258">        int thisSign = sign;</span>
+<span class="fc" id="L1259">        int thisLen = numberLength;</span>
+<span class="fc" id="L1260">        int divisorLen = divisor.numberLength;</span>
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">        if (thisLen + divisorLen == 2) {</span>
+<span class="fc" id="L1262">            long val = (digits[0] &amp; 0xFFFFFFFFL) / (divisor.digits[0] &amp; 0xFFFFFFFFL);</span>
+<span class="pc bpc" id="L1263" title="1 of 2 branches missed.">            if (thisSign != divisorSign) {</span>
+<span class="nc" id="L1264">                val = -val;</span>
+            }
+<span class="fc" id="L1266">            return valueOf(val);</span>
+        }
+<span class="nc bnc" id="L1268" title="All 4 branches missed.">        int cmp = ((thisLen != divisorLen) ? ((thisLen &gt; divisorLen) ? 1 : -1) : TElementary.compareArrays(digits,</span>
+                divisor.digits, thisLen));
+<span class="nc bnc" id="L1270" title="All 2 branches missed.">        if (cmp == EQUALS) {</span>
+<span class="nc bnc" id="L1271" title="All 2 branches missed.">            return ((thisSign == divisorSign) ? ONE : MINUS_ONE);</span>
+        }
+<span class="nc bnc" id="L1273" title="All 2 branches missed.">        if (cmp == LESS) {</span>
+<span class="nc" id="L1274">            return ZERO;</span>
+        }
+<span class="nc" id="L1276">        int resLength = thisLen - divisorLen + 1;</span>
+<span class="nc" id="L1277">        int[] resDigits = new int[resLength];</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">        int resSign = ((thisSign == divisorSign) ? 1 : -1);</span>
+<span class="nc bnc" id="L1279" title="All 2 branches missed.">        if (divisorLen == 1) {</span>
+<span class="nc" id="L1280">            TDivision.divideArrayByInt(resDigits, digits, thisLen, divisor.digits[0]);</span>
+        } else {
+<span class="nc" id="L1282">            TDivision.divide(resDigits, resLength, digits, thisLen, divisor.digits, divisorLen);</span>
+        }
+<span class="nc" id="L1284">        TBigInteger result = new TBigInteger(resSign, resLength, resDigits);</span>
+<span class="nc" id="L1285">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L1286">        return result;</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this % divisor`.
+    /// Regarding signs this methods has the same behavior as the % operator on
+    /// int's, i.e. the sign of the remainder is the same as the sign of this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `divisor`: value by which `this` is divided.
+    ///
+    /// #### Returns
+    ///
+    /// `this % divisor`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `divisor == null`.
+    ///
+    /// - `ArithmeticException`: if `divisor == 0`.
+    public TBigInteger remainder(TBigInteger divisor) {
+<span class="pc bpc" id="L1307" title="1 of 2 branches missed.">        if (divisor.sign == 0) {</span>
+<span class="nc" id="L1308">            throw new ArithmeticException(&quot;BigInteger divide by zero&quot;);</span>
+        }
+<span class="fc" id="L1310">        int thisLen = numberLength;</span>
+<span class="fc" id="L1311">        int divisorLen = divisor.numberLength;</span>
+<span class="pc bpc" id="L1312" title="2 of 6 branches missed.">        if (((thisLen != divisorLen) ? ((thisLen &gt; divisorLen) ? 1 : -1) : TElementary.compareArrays(digits,</span>
+                divisor.digits, thisLen)) == LESS) {
+<span class="nc" id="L1314">            return this;</span>
+        }
+<span class="fc" id="L1316">        int resLength = divisorLen;</span>
+<span class="fc" id="L1317">        int[] resDigits = new int[resLength];</span>
+<span class="pc bpc" id="L1318" title="1 of 2 branches missed.">        if (resLength == 1) {</span>
+<span class="fc" id="L1319">            resDigits[0] = TDivision.remainderArrayByInt(digits, thisLen, divisor.digits[0]);</span>
+        } else {
+<span class="nc" id="L1321">            int qLen = thisLen - divisorLen + 1;</span>
+<span class="nc" id="L1322">            resDigits = TDivision.divide(null, qLen, digits, thisLen, divisor.digits, divisorLen);</span>
+        }
+<span class="fc" id="L1324">        TBigInteger result = new TBigInteger(sign, resLength, resDigits);</span>
+<span class="fc" id="L1325">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L1326">        return result;</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `1/this mod m`. The
+    /// modulus `m` must be positive. The result is guaranteed to be in the
+    /// interval `[0, m)` (0 inclusive, m exclusive). If `this` is
+    /// not relatively prime to m, then an exception is thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the modulus.
+    ///
+    /// #### Returns
+    ///
+    /// `1/this mod m`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `m == null`
+    ///
+    /// - `ArithmeticException`: @throws ArithmeticException  if `m &lt; 0 or` if `this` is not relatively prime
+    /// to `m`
+    public TBigInteger modInverse(TBigInteger m) {
+<span class="nc bnc" id="L1349" title="All 2 branches missed.">        if (m.sign &lt;= 0) {</span>
+<span class="nc" id="L1350">            throw new ArithmeticException(&quot;BigInteger: modulus not positive&quot;);</span>
+        }
+        // If both are even, no inverse exists
+<span class="nc bnc" id="L1353" title="All 4 branches missed.">        if (!(testBit(0) || m.testBit(0))) {</span>
+<span class="nc" id="L1354">            throw new ArithmeticException(&quot;BigInteger not invertible.&quot;);</span>
+        }
+<span class="nc bnc" id="L1356" title="All 2 branches missed.">        if (m.isOne()) {</span>
+<span class="nc" id="L1357">            return ZERO;</span>
+        }
+
+        // From now on: (m &gt; 1)
+<span class="nc" id="L1361">        TBigInteger res = TDivision.modInverseMontgomery(abs().mod(m), m);</span>
+<span class="nc bnc" id="L1362" title="All 2 branches missed.">        if (res.sign == 0) {</span>
+<span class="nc" id="L1363">            throw new ArithmeticException(&quot;BigInteger not invertible.&quot;);</span>
+        }
+
+<span class="nc bnc" id="L1366" title="All 2 branches missed.">        res = ((sign &lt; 0) ? m.subtract(res) : res);</span>
+<span class="nc" id="L1367">        return res;</span>
+
+    }
+
+    /// Returns a new `BigInteger` whose value is `this^exponent mod
+    /// m`. The modulus `m` must be positive. The result is guaranteed to
+    /// be in the interval `[0, m)` (0 inclusive, m exclusive). If the
+    /// exponent is negative, then `this.modInverse(m)^(-exponent) mod m)`
+    /// is computed. The inverse of this only exists if `this` is
+    /// relatively prime to m, otherwise an exception is thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `exponent`: the exponent.
+    ///
+    /// - `m`: the modulus.
+    ///
+    /// #### Returns
+    ///
+    /// `this^exponent mod val`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `m == null` or `exponent == null`.
+    ///
+    /// - `ArithmeticException`: @throws ArithmeticException  if `m &lt; 0` or if `exponent&lt;0` and this is not
+    /// relatively prime to `m`.
+    public TBigInteger modPow(TBigInteger exponent, TBigInteger m) {
+<span class="pc bpc" id="L1395" title="1 of 2 branches missed.">        if (m.sign &lt;= 0) {</span>
+<span class="nc" id="L1396">            throw new ArithmeticException(&quot;BigInteger: modulus not positive&quot;);</span>
+        }
+<span class="fc" id="L1398">        TBigInteger base = this;</span>
+
+<span class="pc bpc" id="L1400" title="3 of 6 branches missed.">        if (m.isOne() || (exponent.sign &gt; 0 &amp;&amp; base.sign == 0)) {</span>
+<span class="nc" id="L1401">            return TBigInteger.ZERO;</span>
+        }
+<span class="pc bpc" id="L1403" title="1 of 2 branches missed.">        if (exponent.sign == 0) {</span>
+<span class="nc" id="L1404">            return TBigInteger.ONE.mod(m);</span>
+        }
+<span class="pc bpc" id="L1406" title="1 of 2 branches missed.">        if (exponent.sign &lt; 0) {</span>
+<span class="nc" id="L1407">            base = modInverse(m);</span>
+<span class="nc" id="L1408">            exponent = exponent.negate();</span>
+        }
+        // From now on: (m &gt; 0) and (exponent &gt;= 0)
+<span class="pc bpc" id="L1411" title="1 of 2 branches missed.">        TBigInteger res = (m.testBit(0)) ? TDivision.oddModPow(base.abs(), exponent, m) : TDivision.evenModPow(</span>
+<span class="nc" id="L1412">                base.abs(), exponent, m);</span>
+<span class="pc bpc" id="L1413" title="3 of 4 branches missed.">        if ((base.sign &lt; 0) &amp;&amp; exponent.testBit(0)) {</span>
+            // -b^e mod m == ((-1 mod m) * (b^e mod m)) mod m
+<span class="nc" id="L1415">            res = m.subtract(TBigInteger.ONE).multiply(res).mod(m);</span>
+        }
+        // else exponent is even, so base^exp is positive
+<span class="fc" id="L1418">        return res;</span>
+    }
+
+    /// Returns a new `BigInteger` whose value is `this mod m`. The
+    /// modulus `m` must be positive. The result is guaranteed to be in the
+    /// interval `[0, m)` (0 inclusive, m exclusive). The behavior of this
+    /// function is not equivalent to the behavior of the % operator defined for
+    /// the built-in `int`'s.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the modulus.
+    ///
+    /// #### Returns
+    ///
+    /// `this mod m`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `m == null`.
+    ///
+    /// - `ArithmeticException`: if `m &lt; 0`.
+    public TBigInteger mod(TBigInteger m) {
+<span class="pc bpc" id="L1441" title="1 of 2 branches missed.">        if (m.sign &lt;= 0) {</span>
+<span class="nc" id="L1442">            throw new ArithmeticException(&quot;BigInteger: modulus not positive&quot;);</span>
+        }
+<span class="fc" id="L1444">        TBigInteger rem = remainder(m);</span>
+<span class="pc bpc" id="L1445" title="1 of 2 branches missed.">        return rem.sign &lt; 0 ? rem.add(m) : rem;</span>
+    }
+
+    /// Tests whether this `BigInteger` is probably prime. If `true`
+    /// is returned, then this is prime with a probability beyond
+    /// (1-1/2^certainty). If `false` is returned, then this is definitely
+    /// composite. If the argument `certainty` &lt;= 0, then this method
+    /// returns true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `certainty`: tolerated primality uncertainty.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true`, if `this` is probably prime, `false`
+    /// otherwise.
+    public boolean isProbablePrime(int certainty) {
+<span class="fc" id="L1463">        return TPrimality.isProbablePrime(abs(), certainty);</span>
+    }
+
+    /* Private Methods */
+
+    /// Returns the smallest integer x &gt; `this` which is probably prime as
+    /// a `BigInteger` instance. The probability that the returned
+    /// `BigInteger` is prime is beyond (1-1/2^80).
+    ///
+    /// #### Returns
+    ///
+    /// smallest integer &gt; `this` which is robably prime.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: if `this &lt; 0`.
+    public TBigInteger nextProbablePrime() {
+<span class="nc bnc" id="L1480" title="All 2 branches missed.">        if (sign &lt; 0) {</span>
+<span class="nc" id="L1481">            throw new ArithmeticException(&quot;start &lt; 0: &quot; + this);</span>
+        }
+<span class="nc" id="L1483">        return TPrimality.nextProbablePrime(this);</span>
+    }
+
+    /// Decreases `numberLength` if there are zero high elements.
+    final void cutOffLeadingZeroes() {
+<span class="pc bpc" id="L1488" title="1 of 4 branches missed.">        while ((numberLength &gt; 0) &amp;&amp; (digits[--numberLength] == 0)) { // NOPMD EmptyControlStatement</span>
+        }
+<span class="pc bpc" id="L1490" title="1 of 2 branches missed.">        if (digits[numberLength++] == 0) { //NOPMD AssignmentInOperand</span>
+<span class="nc" id="L1491">            sign = 0;</span>
+        }
+<span class="fc" id="L1493">    }</span>
+
+    /// Tests if `this.abs()` is equals to `ONE`
+    boolean isOne() {
+<span class="pc bpc" id="L1497" title="1 of 4 branches missed.">        return ((numberLength == 1) &amp;&amp; (digits[0] == 1));</span>
+    }
+
+    /// Puts a big-endian byte array into a little-endian int array.
+    private void putBytesPositiveToIntegers(byte[] byteValues) {
+<span class="fc" id="L1502">        int bytesLen = byteValues.length;</span>
+<span class="fc" id="L1503">        int highBytes = bytesLen &amp; 3;</span>
+<span class="pc bpc" id="L1504" title="1 of 2 branches missed.">        numberLength = (bytesLen &gt;&gt; 2) + ((highBytes == 0) ? 0 : 1);</span>
+<span class="fc" id="L1505">        digits = new int[numberLength];</span>
+<span class="fc" id="L1506">        int i = 0;</span>
+        // Put bytes to the int array starting from the end of the byte array
+<span class="fc bfc" id="L1508" title="All 2 branches covered.">        while (bytesLen &gt; highBytes) {</span>
+<span class="fc" id="L1509">            digits[i++] = (byteValues[--bytesLen] &amp; 0xFF) | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 8 |</span>
+                    (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 16 | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 24;
+        }
+        // Put the first bytes in the highest element of the int array
+<span class="pc bpc" id="L1513" title="1 of 2 branches missed.">        for (int j = 0; j &lt; bytesLen; j++) {</span>
+<span class="nc" id="L1514">            digits[i] = (digits[i] &lt;&lt; 8) | (byteValues[j] &amp; 0xFF);</span>
+        }
+<span class="fc" id="L1516">    }</span>
+
+    /// Puts a big-endian byte array into a little-endian applying two
+    /// complement.
+    private void putBytesNegativeToIntegers(byte[] byteValues) {
+<span class="nc" id="L1521">        int bytesLen = byteValues.length;</span>
+<span class="nc" id="L1522">        int highBytes = bytesLen &amp; 3;</span>
+<span class="nc bnc" id="L1523" title="All 2 branches missed.">        numberLength = (bytesLen &gt;&gt; 2) + ((highBytes == 0) ? 0 : 1);</span>
+<span class="nc" id="L1524">        digits = new int[numberLength];</span>
+<span class="nc" id="L1525">        int i = 0;</span>
+        // Setting the sign
+<span class="nc" id="L1527">        digits[numberLength - 1] = -1;</span>
+        // Put bytes to the int array starting from the end of the byte array
+<span class="nc bnc" id="L1529" title="All 2 branches missed.">        while (bytesLen &gt; highBytes) {</span>
+<span class="nc" id="L1530">            digits[i] = (byteValues[--bytesLen] &amp; 0xFF) | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 8 |</span>
+                    (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 16 | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 24;
+<span class="nc bnc" id="L1532" title="All 2 branches missed.">            if (digits[i] != 0) {</span>
+<span class="nc" id="L1533">                digits[i] = -digits[i];</span>
+<span class="nc" id="L1534">                firstNonzeroDigit = i;</span>
+<span class="nc" id="L1535">                i++;</span>
+<span class="nc bnc" id="L1536" title="All 2 branches missed.">                while (bytesLen &gt; highBytes) {</span>
+<span class="nc" id="L1537">                    digits[i] = (byteValues[--bytesLen] &amp; 0xFF) | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 8 |</span>
+                            (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 16 | (byteValues[--bytesLen] &amp; 0xFF) &lt;&lt; 24;
+<span class="nc" id="L1539">                    digits[i] = ~digits[i];</span>
+<span class="nc" id="L1540">                    i++;</span>
+                }
+                break;
+            }
+<span class="nc" id="L1544">            i++;</span>
+        }
+<span class="nc bnc" id="L1546" title="All 2 branches missed.">        if (highBytes != 0) {</span>
+            // Put the first bytes in the highest element of the int array
+<span class="nc bnc" id="L1548" title="All 2 branches missed.">            if (firstNonzeroDigit != -2) {</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                for (int j = 0; j &lt; bytesLen; j++) {</span>
+<span class="nc" id="L1550">                    digits[i] = (digits[i] &lt;&lt; 8) | (byteValues[j] &amp; 0xFF);</span>
+                }
+<span class="nc" id="L1552">                digits[i] = ~digits[i];</span>
+            } else {
+<span class="nc bnc" id="L1554" title="All 2 branches missed.">                for (int j = 0; j &lt; bytesLen; j++) {</span>
+<span class="nc" id="L1555">                    digits[i] = (digits[i] &lt;&lt; 8) | (byteValues[j] &amp; 0xFF);</span>
+                }
+<span class="nc" id="L1557">                digits[i] = -digits[i];</span>
+            }
+        }
+<span class="nc" id="L1560">    }</span>
+
+    int getFirstNonzeroDigit() {
+<span class="fc bfc" id="L1563" title="All 2 branches covered.">        if (firstNonzeroDigit == -2) {</span>
+            int i;
+<span class="pc bpc" id="L1565" title="1 of 2 branches missed.">            if (this.sign == 0) {</span>
+<span class="nc" id="L1566">                i = -1;</span>
+            } else {
+<span class="pc bpc" id="L1568" title="1 of 2 branches missed.">                for (i = 0; digits[i] == 0; i++) { // NOPMD EmptyControlStatement</span>
+                }
+            }
+<span class="fc" id="L1571">            firstNonzeroDigit = i;</span>
+        }
+<span class="fc" id="L1573">        return firstNonzeroDigit;</span>
+    }
+
+    /*
+     * Returns a copy of the current instance to achieve immutability
+     */
+    TBigInteger copy() {
+<span class="nc" id="L1580">        int[] copyDigits = new int[numberLength];</span>
+<span class="nc" id="L1581">        System.arraycopy(digits, 0, copyDigits, 0, numberLength);</span>
+<span class="nc" id="L1582">        return new TBigInteger(sign, numberLength, copyDigits);</span>
+    }
+
+    void unCache() {
+<span class="nc" id="L1586">        firstNonzeroDigit = -2;</span>
+<span class="nc" id="L1587">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

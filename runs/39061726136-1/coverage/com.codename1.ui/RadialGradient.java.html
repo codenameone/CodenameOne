@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RadialGradient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RadialGradient.java</span></div><h1>RadialGradient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/// Multi-stop radial gradient with CSS shape / extent / center / radius
+/// support. Mirrors CSS `radial-gradient([shape] [extent] [at &lt;pos&gt;], &lt;stops&gt;)`.
+public final class RadialGradient extends Gradient {
+    /// Radial shape: circular (single radius).
+    public static final byte SHAPE_CIRCLE = 0;
+    /// Radial shape: elliptical (separate x/y radii).
+    public static final byte SHAPE_ELLIPSE = 1;
+
+    /// CSS radial extents.
+    public static final byte EXTENT_CLOSEST_SIDE = 0;
+    public static final byte EXTENT_CLOSEST_CORNER = 1;
+    public static final byte EXTENT_FARTHEST_SIDE = 2;
+    public static final byte EXTENT_FARTHEST_CORNER = 3;
+    /// Use the configured relativeRadiusX/Y verbatim (times the rectangle's
+    /// larger dimension).
+    public static final byte EXTENT_EXPLICIT = 4;
+
+<span class="fc" id="L42">    private byte shape = SHAPE_ELLIPSE;</span>
+<span class="fc" id="L43">    private byte extent = EXTENT_FARTHEST_CORNER;</span>
+<span class="fc" id="L44">    private float relativeCenterX = 0.5f;</span>
+<span class="fc" id="L45">    private float relativeCenterY = 0.5f;</span>
+<span class="fc" id="L46">    private float relativeRadiusX = 1f;</span>
+<span class="fc" id="L47">    private float relativeRadiusY = 1f;</span>
+
+    public RadialGradient(int[] colors, float[] positions) {
+<span class="fc" id="L50">        super(colors, positions);</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    public byte getKind() {
+<span class="fc" id="L55">        return KIND_RADIAL;</span>
+    }
+
+    public byte getShape() {
+<span class="fc" id="L59">        return shape;</span>
+    }
+
+    public RadialGradient setShape(byte shape) {
+<span class="fc" id="L63">        this.shape = shape;</span>
+<span class="fc" id="L64">        invalidateRasterCache();</span>
+<span class="fc" id="L65">        return this;</span>
+    }
+
+    public byte getExtent() {
+<span class="fc" id="L69">        return extent;</span>
+    }
+
+    public RadialGradient setExtent(byte extent) {
+<span class="fc" id="L73">        this.extent = extent;</span>
+<span class="fc" id="L74">        invalidateRasterCache();</span>
+<span class="fc" id="L75">        return this;</span>
+    }
+
+    public float getRelativeCenterX() {
+<span class="fc" id="L79">        return relativeCenterX;</span>
+    }
+
+    public RadialGradient setRelativeCenterX(float relativeCenterX) {
+<span class="fc" id="L83">        this.relativeCenterX = relativeCenterX;</span>
+<span class="fc" id="L84">        invalidateRasterCache();</span>
+<span class="fc" id="L85">        return this;</span>
+    }
+
+    public float getRelativeCenterY() {
+<span class="fc" id="L89">        return relativeCenterY;</span>
+    }
+
+    public RadialGradient setRelativeCenterY(float relativeCenterY) {
+<span class="fc" id="L93">        this.relativeCenterY = relativeCenterY;</span>
+<span class="fc" id="L94">        invalidateRasterCache();</span>
+<span class="fc" id="L95">        return this;</span>
+    }
+
+    public float getRelativeRadiusX() {
+<span class="nc" id="L99">        return relativeRadiusX;</span>
+    }
+
+    public RadialGradient setRelativeRadiusX(float relativeRadiusX) {
+<span class="fc" id="L103">        this.relativeRadiusX = relativeRadiusX;</span>
+<span class="fc" id="L104">        invalidateRasterCache();</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    public float getRelativeRadiusY() {
+<span class="nc" id="L109">        return relativeRadiusY;</span>
+    }
+
+    public RadialGradient setRelativeRadiusY(float relativeRadiusY) {
+<span class="fc" id="L113">        this.relativeRadiusY = relativeRadiusY;</span>
+<span class="fc" id="L114">        invalidateRasterCache();</span>
+<span class="fc" id="L115">        return this;</span>
+    }
+
+    /// Computes (cx, cy, rx, ry) in pixel coordinates for a rectangle of the
+    /// given width / height, applying the configured CSS extent.
+    public void computeRadii(int width, int height, float[] out) {
+<span class="nc" id="L121">        float cx = relativeCenterX * width;</span>
+<span class="nc" id="L122">        float cy = relativeCenterY * height;</span>
+        float rx;
+        float ry;
+<span class="nc bnc" id="L125" title="All 5 branches missed.">        switch (extent) {</span>
+            case EXTENT_CLOSEST_SIDE:
+<span class="nc" id="L127">                rx = Math.min(cx, width - cx);</span>
+<span class="nc" id="L128">                ry = Math.min(cy, height - cy);</span>
+<span class="nc" id="L129">                break;</span>
+            case EXTENT_FARTHEST_SIDE:
+<span class="nc" id="L131">                rx = Math.max(cx, width - cx);</span>
+<span class="nc" id="L132">                ry = Math.max(cy, height - cy);</span>
+<span class="nc" id="L133">                break;</span>
+            case EXTENT_CLOSEST_CORNER: {
+<span class="nc" id="L135">                rx = Math.min(cx, width - cx);</span>
+<span class="nc" id="L136">                ry = Math.min(cy, height - cy);</span>
+<span class="nc" id="L137">                float r = (float) Math.sqrt(rx * rx + ry * ry);</span>
+<span class="nc" id="L138">                rx = r;</span>
+<span class="nc" id="L139">                ry = r;</span>
+<span class="nc" id="L140">                break;</span>
+            }
+            case EXTENT_FARTHEST_CORNER: {
+<span class="nc" id="L143">                rx = Math.max(cx, width - cx);</span>
+<span class="nc" id="L144">                ry = Math.max(cy, height - cy);</span>
+<span class="nc" id="L145">                float r = (float) Math.sqrt(rx * rx + ry * ry);</span>
+<span class="nc" id="L146">                rx = r;</span>
+<span class="nc" id="L147">                ry = r;</span>
+<span class="nc" id="L148">                break;</span>
+            }
+            case EXTENT_EXPLICIT:
+            default:
+<span class="nc" id="L152">                float ref = Math.max(width, height);</span>
+<span class="nc" id="L153">                rx = relativeRadiusX * ref;</span>
+<span class="nc" id="L154">                ry = relativeRadiusY * ref;</span>
+                break;
+        }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (shape == SHAPE_CIRCLE) {</span>
+<span class="nc bnc" id="L158" title="All 4 branches missed.">            float r = (extent == EXTENT_CLOSEST_SIDE || extent == EXTENT_CLOSEST_CORNER)</span>
+<span class="nc" id="L159">                    ? Math.min(rx, ry) : Math.max(rx, ry);</span>
+<span class="nc" id="L160">            rx = r;</span>
+<span class="nc" id="L161">            ry = r;</span>
+        }
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (rx &lt;= 0f) {</span>
+<span class="nc" id="L164">            rx = 1f;</span>
+        }
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (ry &lt;= 0f) {</span>
+<span class="nc" id="L167">            ry = 1f;</span>
+        }
+<span class="nc" id="L169">        out[0] = cx;</span>
+<span class="nc" id="L170">        out[1] = cy;</span>
+<span class="nc" id="L171">        out[2] = rx;</span>
+<span class="nc" id="L172">        out[3] = ry;</span>
+<span class="nc" id="L173">    }</span>
+
+    /// Computes shader-ready (cx, cy, rx, ry) for native APIs like Android's
+    /// `RadialGradient` and Java2D's `RadialGradientPaint`. For NO_CYCLE
+    /// this is the same as `computeRadii`. For REPEAT / REFLECT it scales
+    /// the radii so the [0, 1] shader range corresponds to exactly one
+    /// stop-list period (`getPositions()[0]` to `getPositions()[N-1]`),
+    /// matching the CSS `repeating-radial-gradient` semantic.
+    ///
+    /// Use `getNormalizedPositions()` for the matching stop array when
+    /// using these radii with REPEAT/REFLECT.
+    public void computeShaderRadii(int width, int height, float[] out) {
+<span class="nc" id="L185">        computeRadii(width, height, out);</span>
+<span class="nc" id="L186">        byte cycle = getCycleMethod();</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (cycle == CYCLE_NONE) {</span>
+<span class="nc" id="L188">            return;</span>
+        }
+<span class="nc" id="L190">        float[] positions = getPositions();</span>
+<span class="nc" id="L191">        float p0 = positions[0];</span>
+<span class="nc" id="L192">        float pN = positions[positions.length - 1];</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (pN - p0 &lt; 1e-4f) {</span>
+<span class="nc" id="L194">            return;</span>
+        }
+        // The native shader maps its [0, 1] range to [center, center+radius].
+        // To make one stop-list period fit in [0, 1], scale the radii by the
+        // span; rebase to a new effective inner edge by translating the radii.
+        // (Android/Java2D radial gradients are defined out from the center -
+        // there's no inner cutoff - so we only scale the outer radius.)
+<span class="nc" id="L201">        out[2] *= (pN - p0);</span>
+<span class="nc" id="L202">        out[3] *= (pN - p0);</span>
+<span class="nc" id="L203">    }</span>
+
+    /// Returns stop positions rescaled to `[0, 1]` within the
+    /// `[first_stop, last_stop]` range. Use alongside `computeShaderRadii`
+    /// when feeding the native shader API.
+    public float[] getNormalizedPositions() {
+<span class="nc" id="L209">        float[] positions = getPositions();</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (getCycleMethod() == CYCLE_NONE) {</span>
+<span class="nc" id="L211">            return positions;</span>
+        }
+<span class="nc" id="L213">        float p0 = positions[0];</span>
+<span class="nc" id="L214">        float pN = positions[positions.length - 1];</span>
+<span class="nc" id="L215">        float span = pN - p0;</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (span &lt; 1e-4f) {</span>
+<span class="nc" id="L217">            return positions;</span>
+        }
+<span class="nc" id="L219">        float[] out = new float[positions.length];</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        for (int i = 0; i &lt; positions.length; i++) {</span>
+<span class="nc" id="L221">            out[i] = (positions[i] - p0) / span;</span>
+        }
+<span class="nc" id="L223">        return out;</span>
+    }
+
+    @Override
+    public int sampleArgb(int px, int py, int width, int height) {
+<span class="nc" id="L228">        float[] geom = new float[4];</span>
+<span class="nc" id="L229">        computeRadii(width, height, geom);</span>
+<span class="nc" id="L230">        float dx = (px + 0.5f - geom[0]) / geom[2];</span>
+<span class="nc" id="L231">        float dy = (py + 0.5f - geom[1]) / geom[3];</span>
+<span class="nc" id="L232">        float t = (float) Math.sqrt(dx * dx + dy * dy);</span>
+<span class="nc" id="L233">        return sampleStops(t);</span>
+    }
+
+    @Override
+    public RadialGradient copy() {
+<span class="nc" id="L238">        int[] c = getColors();</span>
+<span class="nc" id="L239">        float[] p = getPositions();</span>
+<span class="nc" id="L240">        int[] cc = new int[c.length];</span>
+<span class="nc" id="L241">        float[] pp = new float[p.length];</span>
+<span class="nc" id="L242">        System.arraycopy(c, 0, cc, 0, c.length);</span>
+<span class="nc" id="L243">        System.arraycopy(p, 0, pp, 0, p.length);</span>
+<span class="nc" id="L244">        RadialGradient g = new RadialGradient(cc, pp);</span>
+<span class="nc" id="L245">        g.setCycleMethod(getCycleMethod());</span>
+<span class="nc" id="L246">        g.shape = shape;</span>
+<span class="nc" id="L247">        g.extent = extent;</span>
+<span class="nc" id="L248">        g.relativeCenterX = relativeCenterX;</span>
+<span class="nc" id="L249">        g.relativeCenterY = relativeCenterY;</span>
+<span class="nc" id="L250">        g.relativeRadiusX = relativeRadiusX;</span>
+<span class="nc" id="L251">        g.relativeRadiusY = relativeRadiusY;</span>
+<span class="nc" id="L252">        return g;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Mat22.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">Mat22.java</span></div><h1>Mat22.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+
+/// A 2-by-2 matrix. Stored in column-major order.
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">public class Mat22 {</span>
+
+  public final Vec2 ex, ey;
+
+  /// Convert the matrix to printable format.
+  public String toString() {
+<span class="nc" id="L34">    String s = &quot;&quot;;</span>
+<span class="nc" id="L35">    s += &quot;[&quot; + ex.x + &quot;,&quot; + ey.x + &quot;]\n&quot;;</span>
+<span class="nc" id="L36">    s += &quot;[&quot; + ex.y + &quot;,&quot; + ey.y + &quot;]&quot;;</span>
+<span class="nc" id="L37">    return s;</span>
+  }
+
+  /// Construct zero matrix. Note: this is NOT an identity matrix! djm fixed double allocation
+  /// problem
+<span class="fc" id="L42">  public Mat22() {</span>
+<span class="fc" id="L43">    ex = new Vec2();</span>
+<span class="fc" id="L44">    ey = new Vec2();</span>
+<span class="fc" id="L45">  }</span>
+
+  /// Create a matrix with given vectors as columns.
+  ///
+  /// @param c1 Column 1 of matrix
+  /// @param c2 Column 2 of matrix
+<span class="fc" id="L51">  public Mat22(final Vec2 c1, final Vec2 c2) {</span>
+<span class="fc" id="L52">    ex = c1.clone();</span>
+<span class="fc" id="L53">    ey = c2.clone();</span>
+<span class="fc" id="L54">  }</span>
+
+  /// Create a matrix from four floats.
+  ///
+  /// @param exx
+  /// @param col2x
+  /// @param exy
+  /// @param col2y
+<span class="fc" id="L62">  public Mat22(final float exx, final float col2x, final float exy, final float col2y) {</span>
+<span class="fc" id="L63">    ex = new Vec2(exx, exy);</span>
+<span class="fc" id="L64">    ey = new Vec2(col2x, col2y);</span>
+<span class="fc" id="L65">  }</span>
+
+  /// Set as a copy of another matrix.
+  ///
+  /// @param m Matrix to copy
+  public final Mat22 set(final Mat22 m) {
+<span class="fc" id="L71">    ex.x = m.ex.x;</span>
+<span class="fc" id="L72">    ex.y = m.ex.y;</span>
+<span class="fc" id="L73">    ey.x = m.ey.x;</span>
+<span class="fc" id="L74">    ey.y = m.ey.y;</span>
+<span class="fc" id="L75">    return this;</span>
+  }
+
+  public final Mat22 set(final float exx, final float col2x, final float exy, final float col2y) {
+<span class="fc" id="L79">    ex.x = exx;</span>
+<span class="fc" id="L80">    ex.y = exy;</span>
+<span class="fc" id="L81">    ey.x = col2x;</span>
+<span class="fc" id="L82">    ey.y = col2y;</span>
+<span class="fc" id="L83">    return this;</span>
+  }
+
+  /// Return a clone of this matrix. djm fixed double allocation
+  // @Override // annotation omitted for GWT-compatibility
+  public final Mat22 clone() {
+<span class="fc" id="L89">    return new Mat22(ex, ey);</span>
+  }
+
+  /// Set as a matrix representing a rotation.
+  ///
+  /// @param angle Rotation (in radians) that matrix represents.
+  public final void set(final float angle) {
+<span class="fc" id="L96">    final float c = MathUtils.cos(angle), s = MathUtils.sin(angle);</span>
+<span class="fc" id="L97">    ex.x = c;</span>
+<span class="fc" id="L98">    ey.x = -s;</span>
+<span class="fc" id="L99">    ex.y = s;</span>
+<span class="fc" id="L100">    ey.y = c;</span>
+<span class="fc" id="L101">  }</span>
+
+  /// Set as the identity matrix.
+  public final void setIdentity() {
+<span class="fc" id="L105">    ex.x = 1.0f;</span>
+<span class="fc" id="L106">    ey.x = 0.0f;</span>
+<span class="fc" id="L107">    ex.y = 0.0f;</span>
+<span class="fc" id="L108">    ey.y = 1.0f;</span>
+<span class="fc" id="L109">  }</span>
+
+  /// Set as the zero matrix.
+  public final void setZero() {
+<span class="fc" id="L113">    ex.x = 0.0f;</span>
+<span class="fc" id="L114">    ey.x = 0.0f;</span>
+<span class="fc" id="L115">    ex.y = 0.0f;</span>
+<span class="fc" id="L116">    ey.y = 0.0f;</span>
+<span class="fc" id="L117">  }</span>
+
+  /// Extract the angle from this matrix (assumed to be a rotation matrix).
+  ///
+  /// @return
+  public final float getAngle() {
+<span class="fc" id="L123">    return MathUtils.atan2(ex.y, ex.x);</span>
+  }
+
+  /// Set by column vectors.
+  ///
+  /// @param c1 Column 1
+  /// @param c2 Column 2
+  public final void set(final Vec2 c1, final Vec2 c2) {
+<span class="fc" id="L131">    ex.x = c1.x;</span>
+<span class="fc" id="L132">    ey.x = c2.x;</span>
+<span class="fc" id="L133">    ex.y = c1.y;</span>
+<span class="fc" id="L134">    ey.y = c2.y;</span>
+<span class="fc" id="L135">  }</span>
+
+  /// Returns the inverted Mat22 - does NOT invert the matrix locally!
+  public final Mat22 invert() {
+<span class="fc" id="L139">    final float a = ex.x, b = ey.x, c = ex.y, d = ey.y;</span>
+<span class="fc" id="L140">    final Mat22 B = new Mat22();</span>
+<span class="fc" id="L141">    float det = a * d - b * c;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">    if (det != 0) {</span>
+<span class="fc" id="L143">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L145">    B.ex.x = det * d;</span>
+<span class="fc" id="L146">    B.ey.x = -det * b;</span>
+<span class="fc" id="L147">    B.ex.y = -det * c;</span>
+<span class="fc" id="L148">    B.ey.y = det * a;</span>
+<span class="fc" id="L149">    return B;</span>
+  }
+
+  public final Mat22 invertLocal() {
+<span class="fc" id="L153">    final float a = ex.x, b = ey.x, c = ex.y, d = ey.y;</span>
+<span class="fc" id="L154">    float det = a * d - b * c;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">    if (det != 0) {</span>
+<span class="fc" id="L156">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L158">    ex.x = det * d;</span>
+<span class="fc" id="L159">    ey.x = -det * b;</span>
+<span class="fc" id="L160">    ex.y = -det * c;</span>
+<span class="fc" id="L161">    ey.y = det * a;</span>
+<span class="fc" id="L162">    return this;</span>
+  }
+
+  public final void invertToOut(final Mat22 out) {
+<span class="fc" id="L166">    final float a = ex.x, b = ey.x, c = ex.y, d = ey.y;</span>
+<span class="fc" id="L167">    float det = a * d - b * c;</span>
+    // b2Assert(det != 0.0f);
+<span class="fc" id="L169">    det = 1.0f / det;</span>
+<span class="fc" id="L170">    out.ex.x = det * d;</span>
+<span class="fc" id="L171">    out.ey.x = -det * b;</span>
+<span class="fc" id="L172">    out.ex.y = -det * c;</span>
+<span class="fc" id="L173">    out.ey.y = det * a;</span>
+<span class="fc" id="L174">  }</span>
+
+
+
+  /// Return the matrix composed of the absolute values of all elements. djm: fixed double allocation
+  ///
+  /// @return Absolute value matrix
+  public final Mat22 abs() {
+<span class="fc" id="L182">    return new Mat22(MathUtils.abs(ex.x), MathUtils.abs(ey.x), MathUtils.abs(ex.y),</span>
+<span class="fc" id="L183">        MathUtils.abs(ey.y));</span>
+  }
+
+  /* djm: added */
+  public final void absLocal() {
+<span class="fc" id="L188">    ex.absLocal();</span>
+<span class="fc" id="L189">    ey.absLocal();</span>
+<span class="fc" id="L190">  }</span>
+
+  /// Return the matrix composed of the absolute values of all elements.
+  ///
+  /// @return Absolute value matrix
+  public final static Mat22 abs(final Mat22 R) {
+<span class="fc" id="L196">    return R.abs();</span>
+  }
+
+  /* djm created */
+  public static void absToOut(final Mat22 R, final Mat22 out) {
+<span class="fc" id="L201">    out.ex.x = MathUtils.abs(R.ex.x);</span>
+<span class="fc" id="L202">    out.ex.y = MathUtils.abs(R.ex.y);</span>
+<span class="fc" id="L203">    out.ey.x = MathUtils.abs(R.ey.x);</span>
+<span class="fc" id="L204">    out.ey.y = MathUtils.abs(R.ey.y);</span>
+<span class="fc" id="L205">  }</span>
+
+  /// Multiply a vector by this matrix.
+  ///
+  /// @param v Vector to multiply by matrix.
+  /// @return Resulting vector
+  public final Vec2 mul(final Vec2 v) {
+<span class="fc" id="L212">    return new Vec2(ex.x * v.x + ey.x * v.y, ex.y * v.x + ey.y * v.y);</span>
+  }
+
+  public final void mulToOut(final Vec2 v, final Vec2 out) {
+<span class="fc" id="L216">    final float tempy = ex.y * v.x + ey.y * v.y;</span>
+<span class="fc" id="L217">    out.x = ex.x * v.x + ey.x * v.y;</span>
+<span class="fc" id="L218">    out.y = tempy;</span>
+<span class="fc" id="L219">  }</span>
+
+  public final void mulToOutUnsafe(final Vec2 v, final Vec2 out) {
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">    assert (v != out);</span>
+<span class="fc" id="L223">    out.x = ex.x * v.x + ey.x * v.y;</span>
+<span class="fc" id="L224">    out.y = ex.y * v.x + ey.y * v.y;</span>
+<span class="fc" id="L225">  }</span>
+
+
+  /// Multiply another matrix by this one (this one on left). djm optimized
+  ///
+  /// @param R
+  /// @return
+  public final Mat22 mul(final Mat22 R) {
+    /*
+     * Mat22 C = new Mat22();C.set(this.mul(R.ex), this.mul(R.ey));return C;
+     */
+<span class="fc" id="L236">    final Mat22 C = new Mat22();</span>
+<span class="fc" id="L237">    C.ex.x = ex.x * R.ex.x + ey.x * R.ex.y;</span>
+<span class="fc" id="L238">    C.ex.y = ex.y * R.ex.x + ey.y * R.ex.y;</span>
+<span class="fc" id="L239">    C.ey.x = ex.x * R.ey.x + ey.x * R.ey.y;</span>
+<span class="fc" id="L240">    C.ey.y = ex.y * R.ey.x + ey.y * R.ey.y;</span>
+    // C.set(ex,col2);
+<span class="fc" id="L242">    return C;</span>
+  }
+
+  public final Mat22 mulLocal(final Mat22 R) {
+<span class="fc" id="L246">    mulToOut(R, this);</span>
+<span class="fc" id="L247">    return this;</span>
+  }
+
+  public final void mulToOut(final Mat22 R, final Mat22 out) {
+<span class="fc" id="L251">    final float tempy1 = this.ex.y * R.ex.x + this.ey.y * R.ex.y;</span>
+<span class="fc" id="L252">    final float tempx1 = this.ex.x * R.ex.x + this.ey.x * R.ex.y;</span>
+<span class="fc" id="L253">    out.ex.x = tempx1;</span>
+<span class="fc" id="L254">    out.ex.y = tempy1;</span>
+<span class="fc" id="L255">    final float tempy2 = this.ex.y * R.ey.x + this.ey.y * R.ey.y;</span>
+<span class="fc" id="L256">    final float tempx2 = this.ex.x * R.ey.x + this.ey.x * R.ey.y;</span>
+<span class="fc" id="L257">    out.ey.x = tempx2;</span>
+<span class="fc" id="L258">    out.ey.y = tempy2;</span>
+<span class="fc" id="L259">  }</span>
+
+  public final void mulToOutUnsafe(final Mat22 R, final Mat22 out) {
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">    assert (out != R);</span>
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">    assert (out != this);</span>
+<span class="fc" id="L264">    out.ex.x = this.ex.x * R.ex.x + this.ey.x * R.ex.y;</span>
+<span class="fc" id="L265">    out.ex.y = this.ex.y * R.ex.x + this.ey.y * R.ex.y;</span>
+<span class="fc" id="L266">    out.ey.x = this.ex.x * R.ey.x + this.ey.x * R.ey.y;</span>
+<span class="fc" id="L267">    out.ey.y = this.ex.y * R.ey.x + this.ey.y * R.ey.y;</span>
+<span class="fc" id="L268">  }</span>
+
+  /// Multiply another matrix by the transpose of this one (transpose of this one on left). djm:
+  /// optimized
+  ///
+  /// @param B
+  /// @return
+  public final Mat22 mulTrans(final Mat22 B) {
+    /*
+     * Vec2 c1 = new Vec2(Vec2.dot(this.ex, B.ex), Vec2.dot(this.ey, B.ex)); Vec2 c2 = new
+     * Vec2(Vec2.dot(this.ex, B.ey), Vec2.dot(this.ey, B.ey)); Mat22 C = new Mat22(); C.set(c1, c2);
+     * return C;
+     */
+<span class="fc" id="L281">    final Mat22 C = new Mat22();</span>
+
+<span class="fc" id="L283">    C.ex.x = Vec2.dot(this.ex, B.ex);</span>
+<span class="fc" id="L284">    C.ex.y = Vec2.dot(this.ey, B.ex);</span>
+
+<span class="fc" id="L286">    C.ey.x = Vec2.dot(this.ex, B.ey);</span>
+<span class="fc" id="L287">    C.ey.y = Vec2.dot(this.ey, B.ey);</span>
+<span class="fc" id="L288">    return C;</span>
+  }
+
+  public final Mat22 mulTransLocal(final Mat22 B) {
+<span class="fc" id="L292">    mulTransToOut(B, this);</span>
+<span class="fc" id="L293">    return this;</span>
+  }
+
+  public final void mulTransToOut(final Mat22 B, final Mat22 out) {
+    /*
+     * out.ex.x = Vec2.dot(this.ex, B.ex); out.ex.y = Vec2.dot(this.ey, B.ex); out.ey.x =
+     * Vec2.dot(this.ex, B.ey); out.ey.y = Vec2.dot(this.ey, B.ey);
+     */
+<span class="fc" id="L301">    final float x1 = this.ex.x * B.ex.x + this.ex.y * B.ex.y;</span>
+<span class="fc" id="L302">    final float y1 = this.ey.x * B.ex.x + this.ey.y * B.ex.y;</span>
+<span class="fc" id="L303">    final float x2 = this.ex.x * B.ey.x + this.ex.y * B.ey.y;</span>
+<span class="fc" id="L304">    final float y2 = this.ey.x * B.ey.x + this.ey.y * B.ey.y;</span>
+<span class="fc" id="L305">    out.ex.x = x1;</span>
+<span class="fc" id="L306">    out.ey.x = x2;</span>
+<span class="fc" id="L307">    out.ex.y = y1;</span>
+<span class="fc" id="L308">    out.ey.y = y2;</span>
+<span class="fc" id="L309">  }</span>
+
+  public final void mulTransToOutUnsafe(final Mat22 B, final Mat22 out) {
+<span class="nc bnc" id="L312" title="All 4 branches missed.">    assert (B != out);</span>
+<span class="nc bnc" id="L313" title="All 4 branches missed.">    assert (this != out);</span>
+<span class="nc" id="L314">    out.ex.x = this.ex.x * B.ex.x + this.ex.y * B.ex.y;</span>
+<span class="nc" id="L315">    out.ey.x = this.ex.x * B.ey.x + this.ex.y * B.ey.y;</span>
+<span class="nc" id="L316">    out.ex.y = this.ey.x * B.ex.x + this.ey.y * B.ex.y;</span>
+<span class="nc" id="L317">    out.ey.y = this.ey.x * B.ey.x + this.ey.y * B.ey.y;</span>
+<span class="nc" id="L318">  }</span>
+
+  /// Multiply a vector by the transpose of this matrix.
+  ///
+  /// @param v
+  /// @return
+  public final Vec2 mulTrans(final Vec2 v) {
+    // return new Vec2(Vec2.dot(v, ex), Vec2.dot(v, col2));
+<span class="fc" id="L326">    return new Vec2((v.x * ex.x + v.y * ex.y), (v.x * ey.x + v.y * ey.y));</span>
+  }
+
+  /* djm added */
+  public final void mulTransToOut(final Vec2 v, final Vec2 out) {
+    /*
+     * out.x = Vec2.dot(v, ex); out.y = Vec2.dot(v, col2);
+     */
+<span class="fc" id="L334">    final float tempx = v.x * ex.x + v.y * ex.y;</span>
+<span class="fc" id="L335">    out.y = v.x * ey.x + v.y * ey.y;</span>
+<span class="fc" id="L336">    out.x = tempx;</span>
+<span class="fc" id="L337">  }</span>
+
+  /// Add this matrix to B, return the result.
+  ///
+  /// @param B
+  /// @return
+  public final Mat22 add(final Mat22 B) {
+    // return new Mat22(ex.add(B.ex), col2.add(B.ey));
+<span class="fc" id="L345">    Mat22 m = new Mat22();</span>
+<span class="fc" id="L346">    m.ex.x = ex.x + B.ex.x;</span>
+<span class="fc" id="L347">    m.ex.y = ex.y + B.ex.y;</span>
+<span class="fc" id="L348">    m.ey.x = ey.x + B.ey.x;</span>
+<span class="fc" id="L349">    m.ey.y = ey.y + B.ey.y;</span>
+<span class="fc" id="L350">    return m;</span>
+  }
+
+  /// Add B to this matrix locally.
+  ///
+  /// @param B
+  /// @return
+  public final Mat22 addLocal(final Mat22 B) {
+    // ex.addLocal(B.ex);
+    // col2.addLocal(B.ey);
+<span class="fc" id="L360">    ex.x += B.ex.x;</span>
+<span class="fc" id="L361">    ex.y += B.ex.y;</span>
+<span class="fc" id="L362">    ey.x += B.ey.x;</span>
+<span class="fc" id="L363">    ey.y += B.ey.y;</span>
+<span class="fc" id="L364">    return this;</span>
+  }
+
+  /// Solve A * x = b where A = this matrix.
+  ///
+  /// @return The vector x that solves the above equation.
+  public final Vec2 solve(final Vec2 b) {
+<span class="fc" id="L371">    final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;</span>
+<span class="fc" id="L372">    float det = a11 * a22 - a12 * a21;</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L374">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L376">    final Vec2 x = new Vec2(det * (a22 * b.x - a12 * b.y), det * (a11 * b.y - a21 * b.x));</span>
+<span class="fc" id="L377">    return x;</span>
+  }
+
+  public final void solveToOut(final Vec2 b, final Vec2 out) {
+<span class="fc" id="L381">    final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;</span>
+<span class="fc" id="L382">    float det = a11 * a22 - a12 * a21;</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L384">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L386">    final float tempy = det * (a11 * b.y - a21 * b.x);</span>
+<span class="fc" id="L387">    out.x = det * (a22 * b.x - a12 * b.y);</span>
+<span class="fc" id="L388">    out.y = tempy;</span>
+<span class="fc" id="L389">  }</span>
+
+  public final static Vec2 mul(final Mat22 R, final Vec2 v) {
+    // return R.mul(v);
+<span class="fc" id="L393">    return new Vec2(R.ex.x * v.x + R.ey.x * v.y, R.ex.y * v.x + R.ey.y * v.y);</span>
+  }
+
+  public final static void mulToOut(final Mat22 R, final Vec2 v, final Vec2 out) {
+<span class="nc" id="L397">    final float tempy = R.ex.y * v.x + R.ey.y * v.y;</span>
+<span class="nc" id="L398">    out.x = R.ex.x * v.x + R.ey.x * v.y;</span>
+<span class="nc" id="L399">    out.y = tempy;</span>
+<span class="nc" id="L400">  }</span>
+
+  public final static void mulToOutUnsafe(final Mat22 R, final Vec2 v, final Vec2 out) {
+<span class="pc bpc" id="L403" title="2 of 4 branches missed.">    assert (v != out);</span>
+<span class="fc" id="L404">    out.x = R.ex.x * v.x + R.ey.x * v.y;</span>
+<span class="fc" id="L405">    out.y = R.ex.y * v.x + R.ey.y * v.y;</span>
+<span class="fc" id="L406">  }</span>
+
+  public final static Mat22 mul(final Mat22 A, final Mat22 B) {
+    // return A.mul(B);
+<span class="fc" id="L410">    final Mat22 C = new Mat22();</span>
+<span class="fc" id="L411">    C.ex.x = A.ex.x * B.ex.x + A.ey.x * B.ex.y;</span>
+<span class="fc" id="L412">    C.ex.y = A.ex.y * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="fc" id="L413">    C.ey.x = A.ex.x * B.ey.x + A.ey.x * B.ey.y;</span>
+<span class="fc" id="L414">    C.ey.y = A.ex.y * B.ey.x + A.ey.y * B.ey.y;</span>
+<span class="fc" id="L415">    return C;</span>
+  }
+
+  public final static void mulToOut(final Mat22 A, final Mat22 B, final Mat22 out) {
+<span class="fc" id="L419">    final float tempy1 = A.ex.y * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="fc" id="L420">    final float tempx1 = A.ex.x * B.ex.x + A.ey.x * B.ex.y;</span>
+<span class="fc" id="L421">    final float tempy2 = A.ex.y * B.ey.x + A.ey.y * B.ey.y;</span>
+<span class="fc" id="L422">    final float tempx2 = A.ex.x * B.ey.x + A.ey.x * B.ey.y;</span>
+<span class="fc" id="L423">    out.ex.x = tempx1;</span>
+<span class="fc" id="L424">    out.ex.y = tempy1;</span>
+<span class="fc" id="L425">    out.ey.x = tempx2;</span>
+<span class="fc" id="L426">    out.ey.y = tempy2;</span>
+<span class="fc" id="L427">  }</span>
+
+  public final static void mulToOutUnsafe(final Mat22 A, final Mat22 B, final Mat22 out) {
+<span class="nc bnc" id="L430" title="All 4 branches missed.">    assert (out != A);</span>
+<span class="nc bnc" id="L431" title="All 4 branches missed.">    assert (out != B);</span>
+<span class="nc" id="L432">    out.ex.x = A.ex.x * B.ex.x + A.ey.x * B.ex.y;</span>
+<span class="nc" id="L433">    out.ex.y = A.ex.y * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="nc" id="L434">    out.ey.x = A.ex.x * B.ey.x + A.ey.x * B.ey.y;</span>
+<span class="nc" id="L435">    out.ey.y = A.ex.y * B.ey.x + A.ey.y * B.ey.y;</span>
+<span class="nc" id="L436">  }</span>
+
+  public final static Vec2 mulTrans(final Mat22 R, final Vec2 v) {
+<span class="fc" id="L439">    return new Vec2((v.x * R.ex.x + v.y * R.ex.y), (v.x * R.ey.x + v.y * R.ey.y));</span>
+  }
+
+  public final static void mulTransToOut(final Mat22 R, final Vec2 v, final Vec2 out) {
+<span class="nc" id="L443">    float outx = v.x * R.ex.x + v.y * R.ex.y;</span>
+<span class="nc" id="L444">    out.y = v.x * R.ey.x + v.y * R.ey.y;</span>
+<span class="nc" id="L445">    out.x = outx;</span>
+<span class="nc" id="L446">  }</span>
+
+  public final static void mulTransToOutUnsafe(final Mat22 R, final Vec2 v, final Vec2 out) {
+<span class="nc bnc" id="L449" title="All 4 branches missed.">    assert (out != v);</span>
+<span class="nc" id="L450">    out.y = v.x * R.ey.x + v.y * R.ey.y;</span>
+<span class="nc" id="L451">    out.x = v.x * R.ex.x + v.y * R.ex.y;</span>
+<span class="nc" id="L452">  }</span>
+
+  public final static Mat22 mulTrans(final Mat22 A, final Mat22 B) {
+<span class="nc" id="L455">    final Mat22 C = new Mat22();</span>
+<span class="nc" id="L456">    C.ex.x = A.ex.x * B.ex.x + A.ex.y * B.ex.y;</span>
+<span class="nc" id="L457">    C.ex.y = A.ey.x * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="nc" id="L458">    C.ey.x = A.ex.x * B.ey.x + A.ex.y * B.ey.y;</span>
+<span class="nc" id="L459">    C.ey.y = A.ey.x * B.ey.x + A.ey.y * B.ey.y;</span>
+<span class="nc" id="L460">    return C;</span>
+  }
+
+  public final static void mulTransToOut(final Mat22 A, final Mat22 B, final Mat22 out) {
+<span class="fc" id="L464">    final float x1 = A.ex.x * B.ex.x + A.ex.y * B.ex.y;</span>
+<span class="fc" id="L465">    final float y1 = A.ey.x * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="fc" id="L466">    final float x2 = A.ex.x * B.ey.x + A.ex.y * B.ey.y;</span>
+<span class="fc" id="L467">    final float y2 = A.ey.x * B.ey.x + A.ey.y * B.ey.y;</span>
+
+<span class="fc" id="L469">    out.ex.x = x1;</span>
+<span class="fc" id="L470">    out.ex.y = y1;</span>
+<span class="fc" id="L471">    out.ey.x = x2;</span>
+<span class="fc" id="L472">    out.ey.y = y2;</span>
+<span class="fc" id="L473">  }</span>
+
+  public final static void mulTransToOutUnsafe(final Mat22 A, final Mat22 B, final Mat22 out) {
+<span class="nc bnc" id="L476" title="All 4 branches missed.">    assert (A != out);</span>
+<span class="nc bnc" id="L477" title="All 4 branches missed.">    assert (B != out);</span>
+<span class="nc" id="L478">    out.ex.x = A.ex.x * B.ex.x + A.ex.y * B.ex.y;</span>
+<span class="nc" id="L479">    out.ex.y = A.ey.x * B.ex.x + A.ey.y * B.ex.y;</span>
+<span class="nc" id="L480">    out.ey.x = A.ex.x * B.ey.x + A.ex.y * B.ey.y;</span>
+<span class="nc" id="L481">    out.ey.y = A.ey.x * B.ey.x + A.ey.y * B.ey.y;</span>
+<span class="nc" id="L482">  }</span>
+
+  public final static Mat22 createRotationalTransform(float angle) {
+<span class="fc" id="L485">    Mat22 mat = new Mat22();</span>
+<span class="fc" id="L486">    final float c = MathUtils.cos(angle);</span>
+<span class="fc" id="L487">    final float s = MathUtils.sin(angle);</span>
+<span class="fc" id="L488">    mat.ex.x = c;</span>
+<span class="fc" id="L489">    mat.ey.x = -s;</span>
+<span class="fc" id="L490">    mat.ex.y = s;</span>
+<span class="fc" id="L491">    mat.ey.y = c;</span>
+<span class="fc" id="L492">    return mat;</span>
+  }
+
+  public final static void createRotationalTransform(float angle, Mat22 out) {
+<span class="fc" id="L496">    final float c = MathUtils.cos(angle);</span>
+<span class="fc" id="L497">    final float s = MathUtils.sin(angle);</span>
+<span class="fc" id="L498">    out.ex.x = c;</span>
+<span class="fc" id="L499">    out.ey.x = -s;</span>
+<span class="fc" id="L500">    out.ex.y = s;</span>
+<span class="fc" id="L501">    out.ey.y = c;</span>
+<span class="fc" id="L502">  }</span>
+
+  public final static Mat22 createScaleTransform(float scale) {
+<span class="fc" id="L505">    Mat22 mat = new Mat22();</span>
+<span class="fc" id="L506">    mat.ex.x = scale;</span>
+<span class="fc" id="L507">    mat.ey.y = scale;</span>
+<span class="fc" id="L508">    return mat;</span>
+  }
+
+  public final static void createScaleTransform(float scale, Mat22 out) {
+<span class="fc" id="L512">    out.ex.x = scale;</span>
+<span class="fc" id="L513">    out.ey.y = scale;</span>
+<span class="fc" id="L514">  }</span>
+
+  public int hashCode() {
+<span class="fc" id="L517">    final int prime = 31;</span>
+<span class="fc" id="L518">    int result = 1;</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">    result = prime * result + ((ex == null) ? 0 : ex.hashCode());</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">    result = prime * result + ((ey == null) ? 0 : ey.hashCode());</span>
+<span class="fc" id="L521">    return result;</span>
+  }
+
+  public boolean equals(Object obj) {
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">    if (this == obj) return true;</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">    if (obj == null) return false;</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">    if (getClass() != obj.getClass()) return false;</span>
+<span class="fc" id="L528">    Mat22 other = (Mat22) obj;</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">    if (ex == null) {</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">      if (other.ex != null) return false;</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">    } else if (!ex.equals(other.ex)) return false;</span>
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">    if (ey == null) {</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">      if (other.ey != null) return false;</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">    } else if (!ey.equals(other.ey)) return false;</span>
+<span class="fc" id="L535">    return true;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

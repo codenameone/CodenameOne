@@ -1,0 +1,1022 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractTest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">AbstractTest.java</span></div><h1>AbstractTest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+
+/// A unit test class that simplifies the process of writing test cases
+/// for Codename One.
+<span class="fc" id="L32">public abstract class AbstractTest implements UnitTest {</span>
+    /// {@inheritDoc}
+    @Override
+    public void prepare() {
+<span class="fc" id="L36">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void cleanup() {
+<span class="fc" id="L41">    }</span>
+
+    /// Defaults to two minutes.
+    ///
+    /// {@inheritDoc}
+    @Override
+    public int getTimeoutMillis() {
+<span class="nc" id="L48">        return 120000;</span>
+    }
+
+    /// Returns false, default tests run in their own thread.
+    ///
+    /// {@inheritDoc}
+    @Override
+    public boolean shouldExecuteOnEDT() {
+<span class="nc" id="L56">        return false;</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertBool(boolean b) {
+<span class="nc" id="L65">        TestUtils.assertBool(b);</span>
+<span class="nc" id="L66">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertBool(boolean b, String errorMessage) {
+<span class="nc" id="L74">        TestUtils.assertBool(b, errorMessage);</span>
+<span class="nc" id="L75">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void fail() {
+<span class="nc" id="L83">        TestUtils.fail();</span>
+<span class="nc" id="L84">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void fail(String errorMessage) {
+<span class="nc" id="L92">        TestUtils.fail(errorMessage);</span>
+<span class="nc" id="L93">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTrue(boolean value) {
+<span class="fc" id="L101">        TestUtils.assertTrue(value);</span>
+<span class="fc" id="L102">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTrue(boolean value, String errorMessage) {
+<span class="nc" id="L110">        TestUtils.assertTrue(value, errorMessage);</span>
+<span class="nc" id="L111">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertFalse(boolean value) {
+<span class="nc" id="L119">        TestUtils.assertFalse(value);</span>
+<span class="nc" id="L120">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertFalse(boolean value, String errorMessage) {
+<span class="nc" id="L128">        TestUtils.assertFalse(value, errorMessage);</span>
+<span class="nc" id="L129">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNull(Object object) {
+<span class="fc" id="L137">        TestUtils.assertNull(object);</span>
+<span class="fc" id="L138">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNull(Object object, String errorMessage) {
+<span class="nc" id="L146">        TestUtils.assertNull(object, errorMessage);</span>
+<span class="nc" id="L147">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotNull(Object object) {
+<span class="fc" id="L155">        TestUtils.assertNotNull(object);</span>
+<span class="fc" id="L156">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotNull(Object object, String errorMessage) {
+<span class="nc" id="L164">        TestUtils.assertNotNull(object, errorMessage);</span>
+<span class="nc" id="L165">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertSame(Object expected, Object actual) {
+<span class="nc" id="L173">        TestUtils.assertSame(expected, actual);</span>
+<span class="nc" id="L174">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertSame(Object expected, Object actual, String errorMessage) {
+<span class="nc" id="L182">        TestUtils.assertSame(expected, actual, errorMessage);</span>
+<span class="nc" id="L183">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotSame(Object expected, Object actual) {
+<span class="nc" id="L191">        TestUtils.assertNotSame(expected, actual);</span>
+<span class="nc" id="L192">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotSame(Object expected, Object actual, String errorMessage) {
+<span class="nc" id="L200">        TestUtils.assertNotSame(expected, actual, errorMessage);</span>
+<span class="nc" id="L201">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(byte expected, byte actual) {
+<span class="nc" id="L209">        TestUtils.assertEqual(expected, actual);</span>
+<span class="nc" id="L210">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(byte expected, byte actual, String errorMessage) {
+<span class="nc" id="L218">        TestUtils.assertEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L219">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(short expected, short actual) {
+<span class="nc" id="L227">        TestUtils.assertEqual(expected, actual);</span>
+<span class="nc" id="L228">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(short expected, short actual, String errorMessage) {
+<span class="nc" id="L236">        TestUtils.assertEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L237">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(int expected, int actual) {
+<span class="fc" id="L245">        TestUtils.assertEqual(expected, actual);</span>
+<span class="fc" id="L246">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(int expected, int actual, String errorMessage) {
+<span class="nc" id="L254">        TestUtils.assertEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L255">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(long expected, long actual) {
+<span class="nc" id="L263">        TestUtils.assertEqual(expected, actual);</span>
+<span class="nc" id="L264">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(long expected, long actual, String errorMessage) {
+<span class="nc" id="L272">        TestUtils.assertEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L273">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(float expected, float actual, double maxRelativeError) {
+<span class="nc" id="L281">        TestUtils.assertEqual(expected, actual, maxRelativeError);</span>
+<span class="nc" id="L282">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(float expected, float actual, double maxRelativeError, String errorMessage) {
+<span class="nc" id="L290">        TestUtils.assertEqual(expected, actual, maxRelativeError, errorMessage);</span>
+<span class="nc" id="L291">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(double expected, double actual, double maxRelativeError) {
+<span class="nc" id="L299">        TestUtils.assertEqual(expected, actual, maxRelativeError);</span>
+<span class="nc" id="L300">    }</span>
+
+    /// #### See also
+    ///
+    /// - TestUtils#assertRange(double, double, double)
+    public void assertRange(double expected, double actual, double maxAbsoluteError) {
+<span class="nc" id="L306">        TestUtils.assertRange(expected, actual, maxAbsoluteError);</span>
+<span class="nc" id="L307">    }</span>
+
+    /// #### See also
+    ///
+    /// - TestUtils#assertRange(double, double, double, String)
+    public void assertRange(double expected, double actual, double maxAbsoluteError, String errorMessage) {
+<span class="nc" id="L313">        TestUtils.assertRange(expected, actual, maxAbsoluteError, errorMessage);</span>
+<span class="nc" id="L314">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(double expected, double actual, double maxRelativeError, String errorMessage) {
+<span class="nc" id="L322">        TestUtils.assertEqual(expected, actual, maxRelativeError, errorMessage);</span>
+<span class="nc" id="L323">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(Object expected, Object actual) {
+<span class="nc" id="L331">        TestUtils.assertEqual(expected, actual);</span>
+<span class="nc" id="L332">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertEqual(Object expected, Object actual, String errorMessage) {
+<span class="nc" id="L340">        TestUtils.assertEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L341">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(byte expected, byte actual) {
+<span class="nc" id="L349">        TestUtils.assertNotEqual(expected, actual);</span>
+<span class="nc" id="L350">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(byte expected, byte actual, String errorMessage) {
+<span class="nc" id="L358">        TestUtils.assertNotEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L359">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(short expected, short actual) {
+<span class="nc" id="L367">        TestUtils.assertNotEqual(expected, actual);</span>
+<span class="nc" id="L368">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(short expected, short actual, String errorMessage) {
+<span class="nc" id="L376">        TestUtils.assertNotEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L377">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(int expected, int actual) {
+<span class="fc" id="L385">        TestUtils.assertNotEqual(expected, actual);</span>
+<span class="fc" id="L386">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(int expected, int actual, String errorMessage) {
+<span class="nc" id="L394">        TestUtils.assertNotEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L395">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(long expected, long actual) {
+<span class="nc" id="L403">        TestUtils.assertNotEqual(expected, actual);</span>
+<span class="nc" id="L404">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(long expected, long actual, String errorMessage) {
+<span class="nc" id="L412">        TestUtils.assertNotEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L413">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(float expected, float actual, double minRelativeError) {
+<span class="nc" id="L421">        TestUtils.assertNotEqual(expected, actual, minRelativeError);</span>
+<span class="nc" id="L422">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(float expected, float actual, double minRelativeError, String errorMessage) {
+<span class="nc" id="L430">        TestUtils.assertNotEqual(expected, actual, minRelativeError, errorMessage);</span>
+<span class="nc" id="L431">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(double expected, double actual, double minRelativeError) {
+<span class="nc" id="L439">        TestUtils.assertNotEqual(expected, actual, minRelativeError);</span>
+<span class="nc" id="L440">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(double expected, double actual, double minRelativeError, String errorMessage) {
+<span class="nc" id="L448">        TestUtils.assertNotEqual(expected, actual, minRelativeError, errorMessage);</span>
+<span class="nc" id="L449">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(Object expected, Object actual) {
+<span class="nc" id="L457">        TestUtils.assertNotEqual(expected, actual);</span>
+<span class="nc" id="L458">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNotEqual(Object expected, Object actual, String errorMessage) {
+<span class="nc" id="L466">        TestUtils.assertNotEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L467">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(byte[] expected, byte[] actual) {
+<span class="nc" id="L475">        TestUtils.assertArrayEqual(expected, actual);</span>
+<span class="nc" id="L476">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(byte[] expected, byte[] actual, String errorMessage) {
+<span class="nc" id="L484">        TestUtils.assertArrayEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L485">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(short[] expected, short[] actual) {
+<span class="nc" id="L493">        TestUtils.assertArrayEqual(expected, actual);</span>
+<span class="nc" id="L494">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(short[] expected, short[] actual, String errorMessage) {
+<span class="nc" id="L502">        TestUtils.assertArrayEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L503">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(int[] expected, int[] actual) {
+<span class="nc" id="L511">        TestUtils.assertArrayEqual(expected, actual);</span>
+<span class="nc" id="L512">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(int[] expected, int[] actual, String errorMessage) {
+<span class="nc" id="L520">        TestUtils.assertArrayEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L521">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(long[] expected, long[] actual, long maxRelativeError) {
+<span class="nc" id="L529">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError);</span>
+<span class="nc" id="L530">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(long[] expected, long[] actual, long maxRelativeError, String errorMessage) {
+<span class="nc" id="L538">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError, errorMessage);</span>
+<span class="nc" id="L539">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError) {
+<span class="nc" id="L547">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError);</span>
+<span class="nc" id="L548">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError, String errorMessage) {
+<span class="nc" id="L556">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError, errorMessage);</span>
+<span class="nc" id="L557">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError) {
+<span class="nc" id="L565">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError);</span>
+<span class="nc" id="L566">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError, String errorMessage) {
+<span class="nc" id="L574">        TestUtils.assertArrayEqual(expected, actual, maxRelativeError, errorMessage);</span>
+<span class="nc" id="L575">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(Object[] expected, Object[] actual) {
+<span class="nc" id="L583">        TestUtils.assertArrayEqual(expected, actual);</span>
+<span class="nc" id="L584">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertArrayEqual(Object[] expected, Object[] actual, String errorMessage) {
+<span class="nc" id="L592">        TestUtils.assertArrayEqual(expected, actual, errorMessage);</span>
+<span class="nc" id="L593">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertException(RuntimeException exception, Runnable expression) {
+<span class="nc" id="L601">        TestUtils.assertException(exception, expression);</span>
+<span class="nc" id="L602">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertException(RuntimeException exception, Runnable expression, String message) {
+<span class="nc" id="L610">        TestUtils.assertException(exception, expression, message);</span>
+<span class="nc" id="L611">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNoException(Runnable expression) {
+<span class="nc" id="L619">        TestUtils.assertNoException(expression);</span>
+<span class="nc" id="L620">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertNoException(Runnable expression, String message) {
+<span class="nc" id="L628">        TestUtils.assertNoException(expression, message);</span>
+<span class="nc" id="L629">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void waitFor(final int millis) {
+<span class="nc" id="L637">        TestUtils.waitFor(millis);</span>
+<span class="nc" id="L638">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public Component findByName(String componentName) {
+<span class="nc" id="L646">        return TestUtils.findByName(componentName);</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public Label findLabelText(String text) {
+<span class="nc" id="L655">        return TestUtils.findLabelText(text);</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void clickButtonByLabel(String text) {
+<span class="nc" id="L664">        TestUtils.clickButtonByLabel(text);</span>
+<span class="nc" id="L665">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void clickButtonByName(String name) {
+<span class="nc" id="L673">        TestUtils.clickButtonByName(name);</span>
+<span class="nc" id="L674">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void clickButtonByPath(int[] path) {
+<span class="nc" id="L682">        TestUtils.clickButtonByPath(path);</span>
+<span class="nc" id="L683">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void goBack() {
+<span class="nc" id="L691">        TestUtils.goBack();</span>
+<span class="nc" id="L692">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void clickMenuItem(String name) {
+<span class="nc" id="L700">        TestUtils.clickMenuItem(name);</span>
+<span class="nc" id="L701">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void ensureVisible(Component c) {
+<span class="nc" id="L709">        TestUtils.ensureVisible(c);</span>
+<span class="nc" id="L710">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void ensureVisible(int[] c) {
+<span class="nc" id="L718">        TestUtils.ensureVisible(c);</span>
+<span class="nc" id="L719">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void ensureVisible(String c) {
+<span class="nc" id="L727">        TestUtils.ensureVisible(c);</span>
+<span class="nc" id="L728">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void waitForFormTitle(final String title) {
+<span class="nc" id="L736">        TestUtils.waitForFormTitle(title);</span>
+<span class="nc" id="L737">    }</span>
+
+    /// Waits for a form change and if no form change occurred after a given timeout then fail the test
+    public void waitForUnnamedForm() {
+<span class="nc" id="L741">        TestUtils.waitForUnnamedForm();</span>
+<span class="nc" id="L742">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void waitForFormName(final String name) {
+<span class="nc" id="L750">        TestUtils.waitForFormName(name);</span>
+<span class="nc" id="L751">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void log(String t) {
+<span class="nc" id="L759">        TestUtils.log(t);</span>
+<span class="nc" id="L760">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void log(Throwable t) {
+<span class="nc" id="L768">        TestUtils.log(t);</span>
+<span class="nc" id="L769">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public boolean screenshotTest(String screenshotName) {
+<span class="nc" id="L777">        return TestUtils.screenshotTest(screenshotName);</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void keyPress(int keyCode) {
+<span class="nc" id="L786">        TestUtils.keyPress(keyCode);</span>
+<span class="nc" id="L787">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void keyRelease(int keyCode) {
+<span class="nc" id="L795">        TestUtils.keyRelease(keyCode);</span>
+<span class="nc" id="L796">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void gameKeyPress(int gameKey) {
+<span class="nc" id="L804">        TestUtils.gameKeyPress(gameKey);</span>
+<span class="nc" id="L805">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void gameKeyRelease(int gameKey) {
+<span class="nc" id="L813">        TestUtils.gameKeyRelease(gameKey);</span>
+<span class="nc" id="L814">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerPress(float x, float y, String componentName) {
+<span class="nc" id="L822">        TestUtils.pointerPress(x, y, componentName);</span>
+<span class="nc" id="L823">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerRelease(float x, float y, String componentName) {
+<span class="nc" id="L831">        TestUtils.pointerRelease(x, y, componentName);</span>
+<span class="nc" id="L832">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerDrag(float x, float y, String componentName) {
+<span class="nc" id="L840">        TestUtils.pointerDrag(x, y, componentName);</span>
+<span class="nc" id="L841">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerPress(float x, float y, int[] path) {
+<span class="nc" id="L849">        TestUtils.pointerPress(x, y, path);</span>
+<span class="nc" id="L850">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerRelease(float x, float y, int[] path) {
+<span class="nc" id="L858">        TestUtils.pointerRelease(x, y, path);</span>
+<span class="nc" id="L859">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void pointerDrag(float x, float y, int[] path) {
+<span class="nc" id="L867">        TestUtils.pointerDrag(x, y, path);</span>
+<span class="nc" id="L868">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public Component getComponentByPath(int[] path) {
+<span class="nc" id="L876">        return TestUtils.getComponentByPath(path);</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void setText(String name, String text) {
+<span class="nc" id="L885">        TestUtils.setText(name, text);</span>
+<span class="nc" id="L886">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void setText(int[] path, String text) {
+<span class="nc" id="L894">        TestUtils.setText(path, text);</span>
+<span class="nc" id="L895">    }</span>
+
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTitle(String title) {
+<span class="nc" id="L904">        TestUtils.assertTitle(title);</span>
+<span class="nc" id="L905">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertLabel(String name, String text) {
+<span class="nc" id="L913">        TestUtils.assertLabel(name, text);</span>
+<span class="nc" id="L914">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertLabel(String text) {
+<span class="nc" id="L922">        TestUtils.assertLabel(text);</span>
+<span class="nc" id="L923">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertLabel(int[] path, String text) {
+<span class="nc" id="L931">        TestUtils.assertLabel(path, text);</span>
+<span class="nc" id="L932">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTextArea(String name, String text) {
+<span class="nc" id="L940">        TestUtils.assertTextArea(name, text);</span>
+<span class="nc" id="L941">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTextArea(int[] path, String text) {
+<span class="nc" id="L949">        TestUtils.assertTextArea(path, text);</span>
+<span class="nc" id="L950">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void assertTextArea(String text) {
+<span class="nc" id="L958">        TestUtils.assertTextArea(text);</span>
+<span class="nc" id="L959">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public TextArea findTextAreaText(String text) {
+<span class="nc" id="L967">        return TestUtils.findTextAreaText(text);</span>
+    }
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void setVerboseMode(boolean v) {
+<span class="nc" id="L976">        TestUtils.setVerboseMode(v);</span>
+<span class="nc" id="L977">    }</span>
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void selectInList(String listName, int offset) {
+<span class="nc" id="L985">        TestUtils.selectInList(listName, offset);</span>
+<span class="nc" id="L986">    }</span>
+
+
+    /// This method just invokes the test utils method, it is here for convenience
+    ///
+    /// #### See also
+    ///
+    /// - TestUtils
+    public void selectInList(int[] path, int offset) {
+<span class="nc" id="L995">        TestUtils.selectInList(path, offset);</span>
+<span class="nc" id="L996">    }</span>
+
+
+    /// Returns all the command objects from the toolbar in the order of left, right, overflow &amp; sidemenu
+    ///
+    /// #### Returns
+    ///
+    /// the set of commands
+    public Command[] getToolbarCommands() {
+<span class="nc" id="L1005">        return TestUtils.getToolbarCommands();</span>
+    }
+
+    /// Executes a command from the offset returned by `#getToolbarCommands()`
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset of the command we want to execute
+    public void executeToolbarCommandAtOffset(int offset) {
+<span class="nc" id="L1014">        TestUtils.executeToolbarCommandAtOffset(offset);</span>
+<span class="nc" id="L1015">    }</span>
+
+    /// Shows the sidemenu UI
+    public void showSidemenu() {
+<span class="nc" id="L1019">        TestUtils.showSidemenu();</span>
+<span class="nc" id="L1020">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

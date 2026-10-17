@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClipboardContent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ClipboardContent.java</span></div><h1>ClipboardContent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A set of alternative clipboard representations keyed by MIME type. A clipboard write should
+/// normally include `text/plain` plus any richer formats it can provide. Clipboard readers negotiate
+/// by inspecting `#getMimeTypes()` and requesting the representation they understand best.
+///
+/// Values are usually `String` or `byte[]`. Ports may support additional native value types, but must
+/// retain the plain-text representation when one is supplied.
+<span class="fc" id="L35">public class ClipboardContent {</span>
+    public static final String MIME_TEXT = &quot;text/plain&quot;;
+    public static final String MIME_HTML = &quot;text/html&quot;;
+    public static final String MIME_RTF = &quot;text/rtf&quot;;
+    public static final String MIME_MARKDOWN = &quot;text/markdown&quot;;
+    public static final String MIME_ASCIIDOC = &quot;text/asciidoc&quot;;
+    /// PNG image bytes (`byte[]`).
+    public static final String MIME_PNG = &quot;image/png&quot;;
+    /// JPEG image bytes (`byte[]`).
+    public static final String MIME_JPEG = &quot;image/jpeg&quot;;
+    /// GIF image bytes (`byte[]`).
+    public static final String MIME_GIF = &quot;image/gif&quot;;
+    /// A local file reference (a file path / URI `String`, or a `String[]` for several files).
+    public static final String MIME_FILE = &quot;application/x-file-list&quot;;
+    /// A newline separated list of URIs, the format desktop browsers and file managers use when
+    /// a link or a file is dragged out of them.
+    public static final String MIME_URI_LIST = &quot;text/uri-list&quot;;
+
+<span class="fc" id="L53">    private final List&lt;String&gt; mimeTypes = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L54">    private final List&lt;Object&gt; values = new ArrayList&lt;Object&gt;();</span>
+
+    /// Adds or replaces a representation. Passing null removes the MIME type.
+    public ClipboardContent setData(String mimeType, Object value) {
+<span class="fc" id="L58">        return put(mimeType, value);</span>
+    }
+
+    /// Declares a representation that is only built if something reads it, which is how a drag
+    /// offers a file it has not written yet or an image it has not encoded yet.
+    ///
+    /// The provider is asked at most once and its answer is then cached, so
+    /// `#getData(java.lang.String)` behaves exactly as it would for a value passed to
+    /// `#setData(java.lang.String, java.lang.Object)`. It may run on a native clipboard or drag
+    /// thread; see `ClipboardDataProvider`. Passing a null provider removes the MIME type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the MIME type this provider can produce
+    ///
+    /// - `provider`: the provider, or null to remove the representation
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setDataProvider(String mimeType, ClipboardDataProvider provider) {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        return put(mimeType, provider == null ? null : new LazyValue(provider));</span>
+    }
+
+    private ClipboardContent put(String mimeType, Object value) {
+<span class="fc" id="L83">        String normalized = normalizeMimeType(mimeType);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (normalized.length() == 0) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;MIME type must not be empty&quot;);</span>
+        }
+<span class="fc" id="L87">        int index = mimeTypes.indexOf(normalized);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (index &gt;= 0) {</span>
+<span class="nc" id="L90">                mimeTypes.remove(index);</span>
+<span class="nc" id="L91">                values.remove(index);</span>
+            }
+<span class="fc" id="L93">            return this;</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (index &gt;= 0) {</span>
+<span class="nc" id="L96">            values.set(index, value);</span>
+        } else {
+<span class="fc" id="L98">            mimeTypes.add(normalized);</span>
+<span class="fc" id="L99">            values.add(value);</span>
+        }
+<span class="fc" id="L101">        return this;</span>
+    }
+
+    /// Returns the representation for a MIME type, or null when it isn't available.
+    ///
+    /// A representation registered through
+    /// `#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)` is produced
+    /// here, on the first call for that MIME type.
+    public Object getData(String mimeType) {
+<span class="fc" id="L110">        int index = mimeTypes.indexOf(normalizeMimeType(mimeType));</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (index &lt; 0) {</span>
+<span class="fc" id="L112">            return null;</span>
+        }
+<span class="fc" id="L114">        Object value = values.get(index);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (value instanceof LazyValue) {</span>
+<span class="fc" id="L116">            return ((LazyValue) value).resolve(mimeTypes.get(index));</span>
+        }
+<span class="fc" id="L118">        return value;</span>
+    }
+
+    /// The value for a MIME type, produced now rather than taken from what a transfer
+    /// remembered.
+    ///
+    /// For a transfer that can outlive the one after it. iOS keeps a drag readable for as
+    /// long as a receiver holds one of its item providers, so an older session can be read
+    /// while a newer one is running -- and the memo below belongs to whichever transfer
+    /// armed the operation last, which would hand the older session the newer session's
+    /// value, or make it produce a second one. A port in that position keeps a memo of its
+    /// own, per session; see IOSImplementation.nativeDragResolveCallback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation wanted
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when this content does not offer that type
+    Object produceData(String mimeType) {
+<span class="nc" id="L139">        int index = mimeTypes.indexOf(normalizeMimeType(mimeType));</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L141">            return null;</span>
+        }
+<span class="nc" id="L143">        Object value = values.get(index);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (value instanceof LazyValue) {</span>
+<span class="nc" id="L145">            return ((LazyValue) value).produce(mimeTypes.get(index));</span>
+        }
+<span class="nc" id="L147">        return value;</span>
+    }
+
+    /// Forgets every value a provider has produced, so the next transfer asks for it again.
+    ///
+    /// Resolving once is right *within* a transfer -- a drop queries and then reads, and the
+    /// promised file must not be written twice -- but not beyond one. A component may install
+    /// a single `NativeDragOperation` and be dragged again and again, and a provider that
+    /// generates a temporary file would then have published, on the second drag, a path from
+    /// the first: stale, or by then cleaned up and gone.
+    ///
+    /// Called where an operation is armed for a new session; see
+    /// `NativeDragOperation#resetProvidedValues()`.
+    void resetProvidedValues() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (Object value : values) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (value instanceof LazyValue) {</span>
+<span class="fc" id="L163">                ((LazyValue) value).forget();</span>
+            }
+<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">    }</span>
+
+    /// A provider plus the value it produced. The value is resolved once per transfer and
+    /// remembered, so a target that asks twice -- as a drop does when it queries and then
+    /// reads -- does not run the provider twice and does not, for instance, write the
+    /// promised file twice. `#resetProvidedValues()` is what ends a transfer's memory.
+    private static final class LazyValue {
+        private final ClipboardDataProvider provider;
+        private Object resolved;
+        private boolean done;
+
+<span class="fc" id="L177">        LazyValue(ClipboardDataProvider provider) {</span>
+<span class="fc" id="L178">            this.provider = provider;</span>
+<span class="fc" id="L179">        }</span>
+
+        synchronized Object resolve(String mimeType) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (!done) {</span>
+<span class="fc" id="L183">                done = true;</span>
+<span class="fc" id="L184">                resolved = provider.getClipboardData(mimeType);</span>
+            }
+<span class="fc" id="L186">            return resolved;</span>
+        }
+
+        synchronized void forget() {
+<span class="fc" id="L190">            done = false;</span>
+<span class="fc" id="L191">            resolved = null;</span>
+<span class="fc" id="L192">        }</span>
+
+        /// Runs the provider without remembering the answer, for a caller that remembers
+        /// it somewhere of its own. See `ClipboardContent#produceData(java.lang.String)`.
+        Object produce(String mimeType) {
+<span class="nc" id="L197">            return provider.getClipboardData(mimeType);</span>
+        }
+    }
+
+    /// Returns the binary (`byte[]`) representation for a MIME type -- e.g. the raw bytes of an image
+    /// or file -- or null when it isn't available or isn't binary.
+    public byte[] getBytes(String mimeType) {
+<span class="fc" id="L204">        Object value = getData(mimeType);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        return value instanceof byte[] ? (byte[]) value : null;</span>
+    }
+
+    /// Returns a string representation, or null when the value isn't a string.
+    public String getText(String mimeType) {
+<span class="fc" id="L210">        Object value = getData(mimeType);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        return value instanceof String ? (String) value : null;</span>
+    }
+
+    /// Returns true when this content includes the requested MIME type.
+    public boolean hasMimeType(String mimeType) {
+<span class="fc" id="L216">        return mimeTypes.contains(normalizeMimeType(mimeType));</span>
+    }
+
+    /// Returns the available MIME types in preference order.
+    public String[] getMimeTypes() {
+<span class="fc" id="L221">        return mimeTypes.toArray(new String[mimeTypes.size()]);</span>
+    }
+
+    /// Sets the `#MIME_FILE` representation from a list of file paths or `file:` URIs.
+    ///
+    /// Ports differ on whether a single file is carried as a `String` or a one element
+    /// `String[]`; this writes the form the rest of the framework expects, and
+    /// `#getFiles()` reads either.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: the file paths, or null to remove the representation
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setFiles(String[] paths) {
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">        if (paths == null || paths.length == 0) {</span>
+<span class="fc" id="L239">            return setData(MIME_FILE, null);</span>
+        }
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (paths.length == 1) {</span>
+<span class="fc" id="L242">            return setData(MIME_FILE, paths[0]);</span>
+        }
+<span class="fc" id="L244">        return setData(MIME_FILE, paths.clone());</span>
+    }
+
+    /// Returns the `#MIME_FILE` representation as a path array regardless of whether the
+    /// producer stored one `String` or a `String[]`, or null when no files are available.
+    public String[] getFiles() {
+<span class="fc" id="L250">        Object value = getData(MIME_FILE);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (value instanceof String[]) {</span>
+<span class="fc" id="L252">            String[] paths = (String[]) value;</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            return paths.length == 0 ? null : paths.clone();</span>
+        }
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">        if (value instanceof String &amp;&amp; ((String) value).length() &gt; 0) {</span>
+<span class="fc" id="L256">            return new String[] { (String) value };</span>
+        }
+<span class="fc" id="L258">        return null;</span>
+    }
+
+    /// Returns the first available MIME type from the caller's preference list, or null.
+    public String findPreferredMimeType(String[] preferredMimeTypes) {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (preferredMimeTypes == null) {</span>
+<span class="nc" id="L264">            return null;</span>
+        }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (String preferredMimeType : preferredMimeTypes) {</span>
+<span class="fc" id="L267">            String mimeType = normalizeMimeType(preferredMimeType);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (mimeTypes.contains(mimeType)) {</span>
+<span class="fc" id="L269">                return mimeType;</span>
+            }
+        }
+<span class="fc" id="L272">        return null;</span>
+    }
+
+    private static String normalizeMimeType(String mimeType) {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (mimeType == null) {</span>
+<span class="nc" id="L277">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L279">        int semicolon = mimeType.indexOf(';');</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        String value = semicolon &lt; 0 ? mimeType : mimeType.substring(0, semicolon);</span>
+<span class="fc" id="L281">        return asciiLower(value.trim());</span>
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the device locale.
+    ///
+    /// String.toLowerCase() is locale sensitive, and a Turkish or Azerbaijani default turns
+    /// I into a dotless i: IMAGE/PNG normalized under one of those locales stopped being
+    /// equal to image/png, so every check against the framework's own constants failed and
+    /// a port no longer recognized the representation at all. MIME types, schemes and file
+    /// extensions are ASCII by definition, which is what makes folding only ASCII correct
+    /// rather than merely safe. Codename One has no java.util.Locale to ask for the root
+    /// locale instead.
+    private static String asciiLower(String s) {
+<span class="fc" id="L294">        StringBuilder out = new StringBuilder(s.length());</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        for (int iter = 0; iter &lt; s.length(); iter++) {</span>
+<span class="fc" id="L296">            char c = s.charAt(iter);</span>
+<span class="fc bfc" id="L297" title="All 4 branches covered.">            out.append(c &gt;= 'A' &amp;&amp; c &lt;= 'Z' ? (char) (c + 32) : c);</span>
+        }
+<span class="fc" id="L299">        return out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

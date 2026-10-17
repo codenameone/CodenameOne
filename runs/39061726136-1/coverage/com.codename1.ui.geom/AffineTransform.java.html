@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AffineTransform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.geom</a> &gt; <span class="el_source">AffineTransform.java</span></div><h1>AffineTransform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.geom;
+
+import com.codename1.ui.Transform;
+
+/// A utility class for expressing 2-D affine transforms in Codename One.
+public class AffineTransform {
+    private double m00;
+    private double m10;
+    private double m01;
+    private double m11;
+    private double m02;
+    private double m12;
+
+    /// Creates identity transform.
+<span class="fc" id="L37">    public AffineTransform() {</span>
+<span class="fc" id="L38">        m00 = m11 = 1.0;</span>
+<span class="fc" id="L39">    }</span>
+
+    /// Creates new affine transform as a copy of the given transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `atx`: Transform to copy.
+<span class="nc" id="L46">    public AffineTransform(AffineTransform atx) {</span>
+<span class="nc" id="L47">        m00 = atx.m00;</span>
+<span class="nc" id="L48">        m10 = atx.m10;</span>
+<span class="nc" id="L49">        m01 = atx.m01;</span>
+<span class="nc" id="L50">        m11 = atx.m11;</span>
+<span class="nc" id="L51">        m02 = atx.m02;</span>
+<span class="nc" id="L52">        m12 = atx.m12;</span>
+<span class="nc" id="L53">        check();</span>
+
+<span class="nc" id="L55">    }</span>
+
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
+    public AffineTransform(float m00,
+                           float m10,
+                           float m01,
+                           float m11,
+                           float m02,
+<span class="nc" id="L77">                           float m12) {</span>
+<span class="nc" id="L78">        this.m00 = m00;</span>
+<span class="nc" id="L79">        this.m10 = m10;</span>
+<span class="nc" id="L80">        this.m01 = m01;</span>
+<span class="nc" id="L81">        this.m11 = m11;</span>
+<span class="nc" id="L82">        this.m02 = m02;</span>
+<span class="nc" id="L83">        this.m12 = m12;</span>
+<span class="nc" id="L84">        check();</span>
+<span class="nc" id="L85">    }</span>
+
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: @param m the float array containing the values to be set
+    /// in the new `AffineTransform` object. The length of the
+    /// array is assumed to be at least 4. If the length of the array is
+    /// less than 6, only the first 4 values are taken. If the length of
+    /// the array is greater than 6, the first 6 values are taken.
+<span class="nc" id="L96">    public AffineTransform(float[] m) {</span>
+<span class="nc" id="L97">        int len = m.length;</span>
+<span class="nc" id="L98">        m00 = m[0];</span>
+<span class="nc" id="L99">        m10 = m[1];</span>
+<span class="nc" id="L100">        m01 = m[2];</span>
+<span class="nc" id="L101">        m11 = m[3];</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (len &gt;= 6) {</span>
+<span class="nc" id="L103">            m02 = m[4];</span>
+<span class="nc" id="L104">            m12 = m[5];</span>
+        }
+<span class="nc" id="L106">        check();</span>
+<span class="nc" id="L107">    }</span>
+
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
+    public AffineTransform(
+            double m00,
+            double m10,
+            double m01,
+            double m11,
+            double m02,
+<span class="nc" id="L130">            double m12) {</span>
+<span class="nc" id="L131">        this.m00 = m00;</span>
+<span class="nc" id="L132">        this.m10 = m10;</span>
+<span class="nc" id="L133">        this.m01 = m01;</span>
+<span class="nc" id="L134">        this.m11 = m11;</span>
+<span class="nc" id="L135">        this.m02 = m02;</span>
+<span class="nc" id="L136">        this.m12 = m12;</span>
+<span class="nc" id="L137">        check();</span>
+<span class="nc" id="L138">    }</span>
+
+    /// Creates a new AffineTransform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: @param m the double array containing the values to be set
+    /// in the new `AffineTransform` object. The length of the
+    /// array is assumed to be at least 4. If the length of the array is
+    /// less than 6, only the first 4 values are taken. If the length of
+    /// the array is greater than 6, the first 6 values are taken.
+<span class="nc" id="L149">    public AffineTransform(double[] m) {</span>
+<span class="nc" id="L150">        int len = m.length;</span>
+<span class="nc" id="L151">        m00 = m[0];</span>
+<span class="nc" id="L152">        m10 = m[1];</span>
+<span class="nc" id="L153">        m01 = m[2];</span>
+<span class="nc" id="L154">        m11 = m[3];</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (len &gt;= 6) {</span>
+<span class="nc" id="L156">            m02 = m[4];</span>
+<span class="nc" id="L157">            m12 = m[5];</span>
+        }
+<span class="nc" id="L159">        check();</span>
+<span class="nc" id="L160">    }</span>
+
+    /// Gets a rotation transform
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
+    public static AffineTransform getRotateInstance(double theta) {
+<span class="nc" id="L168">        AffineTransform atx = new AffineTransform();</span>
+<span class="nc" id="L169">        atx.setToRotation(theta);</span>
+<span class="nc" id="L170">        return atx;</span>
+    }
+
+    /// Gets a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
+    ///
+    /// - `anchorx`: Anchor point x-coord.
+    ///
+    /// - `anchory`: Anchor point y-coord.
+    public static AffineTransform getRotateInstance(double theta,
+                                                    double anchorx,
+                                                    double anchory) {
+<span class="nc" id="L185">        AffineTransform atx = new AffineTransform();</span>
+<span class="nc" id="L186">        atx.setToRotation(theta, anchorx, anchory);</span>
+<span class="nc" id="L187">        return atx;</span>
+    }
+
+    private void check() {
+        //if (m10 != 0 || m01 != 0) {
+        //    throw new IllegalArgumentException(&quot;Shearing not currently supported in AffineTransform&quot;);
+        //}
+
+<span class="nc" id="L195">    }</span>
+
+    /// Sets transform to a scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sx`: X-scale factor
+    ///
+    /// - `sy`: Y-scale factor
+    public void setToScale(double sx, double sy) {
+
+<span class="nc" id="L206">        m00 = sx;</span>
+<span class="nc" id="L207">        m10 = 0.0;</span>
+<span class="nc" id="L208">        m01 = 0.0;</span>
+<span class="nc" id="L209">        m11 = sy;</span>
+<span class="nc" id="L210">        m02 = 0.0;</span>
+<span class="nc" id="L211">        m12 = 0.0;</span>
+<span class="nc" id="L212">    }</span>
+
+    /// Sets transform to a shear transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shx`: The shear-x
+    ///
+    /// - `shy`: The shear-y
+    public void setToShear(double shx, double shy) {
+<span class="nc" id="L222">        m00 = 1.0;</span>
+<span class="nc" id="L223">        m01 = shx;</span>
+<span class="nc" id="L224">        m10 = shy;</span>
+<span class="nc" id="L225">        m11 = 1.0;</span>
+<span class="nc" id="L226">        m02 = 0.0;</span>
+<span class="nc" id="L227">        m12 = 0.0;</span>
+
+<span class="nc" id="L229">    }</span>
+
+    /// Sets transform to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vecx`: x-coordinate of rotation vector.
+    ///
+    /// - `vecy`: y-coordinate of rotation vector.
+    public void setToRotation(double vecx, double vecy) {
+        double sin;
+        double cos;
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (vecy == 0) {</span>
+<span class="nc" id="L242">            sin = 0.0;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (vecx &lt; 0.0) {</span>
+<span class="nc" id="L244">                cos = -1.0;</span>
+
+            } else {
+<span class="nc" id="L247">                cos = 1.0;</span>
+
+            }
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        } else if (vecx == 0) {</span>
+<span class="nc" id="L251">            cos = 0.0;</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            sin = (vecy &gt; 0.0) ? 1.0 : -1.0;</span>
+
+        } else {
+<span class="nc" id="L255">            double len = Math.sqrt(vecx * vecx + vecy * vecy);</span>
+<span class="nc" id="L256">            cos = vecx / len;</span>
+<span class="nc" id="L257">            sin = vecy / len;</span>
+
+        }
+<span class="nc" id="L260">        m00 = cos;</span>
+<span class="nc" id="L261">        m10 = sin;</span>
+<span class="nc" id="L262">        m01 = -sin;</span>
+<span class="nc" id="L263">        m11 = cos;</span>
+<span class="nc" id="L264">        m02 = 0.0;</span>
+<span class="nc" id="L265">        m12 = 0.0;</span>
+<span class="nc" id="L266">    }</span>
+
+    /// Sets the transform to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vecx`: x-coordinate of rotation vector.
+    ///
+    /// - `vecy`: y-coordinate of rotation vector
+    ///
+    /// - `anchorx`: Anchor point x-coordinate
+    ///
+    /// - `anchory`: Anchor point y-coordinate
+    public void setToRotation(double vecx, double vecy,
+                              double anchorx, double anchory) {
+<span class="nc" id="L281">        setToRotation(vecx, vecy);</span>
+<span class="nc" id="L282">        double sin = m10;</span>
+<span class="nc" id="L283">        double oneMinusCos = 1.0 - m00;</span>
+<span class="nc" id="L284">        m02 = anchorx * oneMinusCos + anchory * sin;</span>
+<span class="nc" id="L285">        m12 = anchory * oneMinusCos - anchorx * sin;</span>
+<span class="nc" id="L286">    }</span>
+
+    /// Set to the identity matrix.
+    public void setToIdentity() {
+<span class="nc" id="L290">        m00 = m11 = 1.0;</span>
+<span class="nc" id="L291">        m10 = m01 = m02 = m12 = 0.0;</span>
+<span class="nc" id="L292">    }</span>
+
+    /// Sets transform to a translation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tx`: x-translation
+    ///
+    /// - `ty`: y-translation
+    public void setToTranslation(double tx, double ty) {
+<span class="nc" id="L302">        m00 = 1.0;</span>
+<span class="nc" id="L303">        m10 = 0.0;</span>
+<span class="nc" id="L304">        m01 = 0.0;</span>
+<span class="nc" id="L305">        m11 = 1.0;</span>
+<span class="nc" id="L306">        m02 = tx;</span>
+<span class="nc" id="L307">        m12 = ty;</span>
+<span class="nc" id="L308">    }</span>
+
+    /// Sets to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Radian rotation angle.
+    ///
+    /// - `anchorx`: Anchor point x-coord.
+    ///
+    /// - `anchory`: Anchor point y-coord.
+    public void setToRotation(double theta, double anchorx, double anchory) {
+<span class="fc" id="L320">        setToRotation(theta);</span>
+<span class="fc" id="L321">        double sin = m10;</span>
+<span class="fc" id="L322">        double oneMinusCos = 1.0 - m00;</span>
+<span class="fc" id="L323">        m02 = anchorx * oneMinusCos + anchory * sin;</span>
+<span class="fc" id="L324">        m12 = anchory * oneMinusCos - anchorx * sin;</span>
+<span class="fc" id="L325">    }</span>
+
+    /// Sets to a rotation transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theta`: Rotation angle in radians.
+    public void setToRotation(double theta) {
+<span class="fc" id="L333">        double sin = Math.sin(theta);</span>
+        double cos;
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        if (sin == 1.0 || sin == -1.0) {</span>
+<span class="nc" id="L336">            cos = 0.0;</span>
+        } else {
+<span class="fc" id="L338">            cos = Math.cos(theta);</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            if (cos == -1.0) {</span>
+<span class="nc" id="L340">                sin = 0.0;</span>
+
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            } else if (cos == 1.0) {</span>
+<span class="nc" id="L343">                sin = 0.0;</span>
+
+            }
+        }
+<span class="fc" id="L347">        m00 = cos;</span>
+<span class="fc" id="L348">        m10 = sin;</span>
+<span class="fc" id="L349">        m01 = -sin;</span>
+<span class="fc" id="L350">        m11 = cos;</span>
+<span class="fc" id="L351">        m02 = 0.0;</span>
+<span class="fc" id="L352">        m12 = 0.0;</span>
+<span class="fc" id="L353">    }</span>
+
+    /// Sets the transform to the given double coords.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m00`: the X coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m10`: the Y coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m01`: the X coordinate shearing element of the 3x3 matrix
+    ///
+    /// - `m11`: the Y coordinate scaling element of the 3x3 matrix
+    ///
+    /// - `m02`: the X coordinate translation element of the 3x3 matrix
+    ///
+    /// - `m12`: the Y coordinate translation element of the 3x3 matrix
+    public void setTransform(double m00, double m10,
+                             double m01, double m11,
+                             double m02, double m12) {
+<span class="nc" id="L373">        this.m00 = m00;</span>
+<span class="nc" id="L374">        this.m10 = m10;</span>
+<span class="nc" id="L375">        this.m01 = m01;</span>
+<span class="nc" id="L376">        this.m11 = m11;</span>
+<span class="nc" id="L377">        this.m02 = m02;</span>
+<span class="nc" id="L378">        this.m12 = m12;</span>
+
+<span class="nc" id="L380">    }</span>
+
+    /// Converts the transform to a `Transform`
+    public Transform toTransform() {
+<span class="fc" id="L384">        return Transform.makeAffine(m00, m10, m01, m11, m02, m12);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L389">        return &quot;AffineTransform{&quot; + m00 + &quot;,&quot; + m10 + &quot;,&quot; + m01 + &quot;,&quot; + m11 + &quot;,&quot; + m02 + &quot;,&quot; + m12 + &quot;}&quot;;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

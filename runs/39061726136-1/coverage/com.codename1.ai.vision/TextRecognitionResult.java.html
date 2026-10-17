@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextRecognitionResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">TextRecognitionResult.java</span></div><h1>TextRecognitionResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+/// OCR output containing the complete recognized text and portable
+/// block-level geometry. Block bounds use normalized top-left-origin
+/// coordinates; a language tag may be absent when the backend does not expose
+/// per-block language identification.
+public final class TextRecognitionResult {
+<span class="fc" id="L30">    public static final TextRecognitionResult EMPTY =</span>
+            new TextRecognitionResult(&quot;&quot;, new TextBlock[0]);
+
+    private final String text;
+    private final TextBlock[] blocks;
+    private final VisionMetadata metadata;
+
+    /// Creates an OCR result without backend metadata.
+    /// @param text full recognized text in reading order
+    /// @param blocks structured text regions, defensively copied
+    public TextRecognitionResult(String text, TextBlock[] blocks) {
+<span class="fc" id="L41">        this(text, blocks, null);</span>
+<span class="fc" id="L42">    }</span>
+
+    /// Creates an OCR result with backend diagnostics.
+    /// @param text full recognized text in reading order
+    /// @param blocks structured text regions, defensively copied
+    /// @param metadata backend details, or {@code null}
+    public TextRecognitionResult(String text, TextBlock[] blocks,
+<span class="fc" id="L49">                                 VisionMetadata metadata) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        this.text = text == null ? &quot;&quot; : text;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (blocks == null) {</span>
+<span class="fc" id="L52">            this.blocks = new TextBlock[0];</span>
+        } else {
+<span class="fc" id="L54">            this.blocks = new TextBlock[blocks.length];</span>
+<span class="fc" id="L55">            System.arraycopy(blocks, 0, this.blocks, 0, blocks.length);</span>
+        }
+<span class="fc" id="L57">        this.metadata = metadata;</span>
+<span class="fc" id="L58">    }</span>
+
+    /// @return complete recognized text in reading order
+    public String getText() {
+<span class="fc" id="L62">        return text;</span>
+    }
+
+    /// @return defensive copy of recognized blocks
+    public TextBlock[] getBlocks() {
+<span class="nc" id="L67">        TextBlock[] out = new TextBlock[blocks.length];</span>
+<span class="nc" id="L68">        System.arraycopy(blocks, 0, out, 0, blocks.length);</span>
+<span class="nc" id="L69">        return out;</span>
+    }
+
+    /// @return backend metadata, or {@code null} when manually constructed
+    public VisionMetadata getMetadata() {
+<span class="nc" id="L74">        return metadata;</span>
+    }
+
+    /// One recognized text block with confidence and normalized bounds.
+    public static final class TextBlock {
+        private final String text;
+        private final float confidence;
+        private final VisionRect bounds;
+        private final String languageTag;
+
+        /// Creates one OCR block.
+        /// @param text recognized text
+        /// @param confidence recognition confidence in 0..1
+        /// @param bounds normalized block bounds
+        /// @param languageTag BCP-47 tag, or {@code null}
+<span class="nc" id="L89">        public TextBlock(String text, float confidence, VisionRect bounds, String languageTag) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            this.text = text == null ? &quot;&quot; : text;</span>
+<span class="nc" id="L91">            this.confidence = confidence;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            this.bounds = bounds == null ? VisionRect.EMPTY : bounds;</span>
+<span class="nc" id="L93">            this.languageTag = languageTag;</span>
+<span class="nc" id="L94">        }</span>
+
+        /// @return recognized block text
+        public String getText() {
+<span class="nc" id="L98">            return text;</span>
+        }
+
+        /// @return recognition confidence in the range 0..1
+        public float getConfidence() {
+<span class="nc" id="L103">            return confidence;</span>
+        }
+
+        /// @return normalized top-left-origin bounds
+        public VisionRect getBounds() {
+<span class="nc" id="L108">            return bounds;</span>
+        }
+
+        /// @return BCP-47 language tag, or {@code null} when unavailable
+        public String getLanguageTag() {
+<span class="nc" id="L113">            return languageTag;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,944 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Validator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.validation</a> &gt; <span class="el_source">Validator.java</span></div><h1>Validator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.validation;
+
+import com.codename1.components.InteractionDialog;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.InputComponent;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.Painter;
+import com.codename1.ui.PickerComponent;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextComponent;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.util.UITimer;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+/// Binds validation constraints to form elements, when validation fails it can be highlighted directly on
+/// the component via an emblem or change of the UIID (to original UIID name + &quot;Invalid&quot; e.g. &quot;TextFieldInvalid&quot;).
+/// Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.
+///
+/// It's possible to create any custom logic of validation. Example (see
+/// [this discussion](https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465) on StackOverflow):
+///
+/// ```java
+/// Form hi = new Form(&quot;Phone Validator&quot;, BoxLayout.y());
+/// TextField phone = new TextField(&quot;&quot;, &quot;Phone&quot;);
+/// Validator val = new Validator();
+/// val.addConstraint(phone, new Constraint() {
+///   public  boolean isValid(Object value) {
+///     String v = (String)value;
+///     for (int i = 0; i &lt; v.length(); i++) {
+///       char c = v.charAt(i);
+///       if ((c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '+' || c == '-') {
+///         continue;
+///       }
+///       return false;
+///     }
+///     return true;
+///   }
+///   public String getDefaultFailMessage() {
+///     return &quot;Must be valid phone number&quot;;
+///   }
+/// });
+/// hi.add(phone);
+/// hi.show();
+/// ```
+public class Validator {
+    private static final String VALID_MARKER = &quot;cn1$$VALID_MARKER&quot;;
+    /// Indicates the default mode in which validation failures are expressed
+<span class="fc" id="L89">    private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.EMBLEM;</span>
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+<span class="fc" id="L91">    private static Image defaultValidationFailedEmblem = null;</span>
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+<span class="fc" id="L94">    private static float defaultValidationEmblemPositionX = 1;</span>
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+<span class="fc" id="L97">    private static float defaultValidationEmblemPositionY = 0.5f;</span>
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
+<span class="fc" id="L100">    private static boolean validateOnEveryKey = false;</span>
+<span class="fc" id="L101">    private final HashMap&lt;Component, Constraint&gt; constraintList = new HashMap&lt;Component, Constraint&gt;();</span>
+<span class="fc" id="L102">    private final ArrayList&lt;Component&gt; submitButtons = new ArrayList&lt;Component&gt;();</span>
+    // Framework chrome, never an operating system window: this bubble is placed against the
+    // field it belongs to, and native window mode documents those margins as ignored. The
+    // field initialiser needs it as much as the reassignment below does -- it is the instance
+    // that is used until a constraint supplies a message of its own, and missing it is what
+    // FrameworkChromeNeverWindowsTest caught by counting constructions against opt-outs.
+<span class="fc" id="L108">    private InteractionDialog message = newChromePopup();</span>
+
+    /// An InteractionDialog that will not become a window whatever the theme default is.
+    private static InteractionDialog newChromePopup() {
+<span class="fc" id="L112">        InteractionDialog d = new InteractionDialog();</span>
+<span class="fc" id="L113">        d.setNativeWindowMode(false);</span>
+<span class="fc" id="L114">        return d;</span>
+    }
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
+<span class="fc" id="L117">    private String errorMessageUIID = &quot;DialogBody&quot;;</span>
+    /// Indicates the mode in which validation failures are expressed
+<span class="fc" id="L119">    private HighlightMode validationFailureHighlightMode = defaultValidationFailureHighlightMode;</span>
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+<span class="fc" id="L121">    private Image validationFailedEmblem = defaultValidationFailedEmblem;</span>
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+<span class="fc" id="L124">    private float validationEmblemPositionX = defaultValidationEmblemPositionX;</span>
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+<span class="fc" id="L127">    private float validationEmblemPositionY = defaultValidationEmblemPositionY;</span>
+    /// Indicates whether an error message should be shown for the focused component
+    private boolean showErrorMessageForFocusedComponent;
+
+    /// Default constructor
+<span class="fc" id="L132">    public Validator() {</span>
+<span class="fc" id="L133">        validationFailedEmblem = initDefaultValidationFailedEmblem();</span>
+<span class="fc" id="L134">    }</span>
+
+    private static Image initDefaultValidationFailedEmblem() {
+<span class="fc" id="L137">        synchronized (Validator.class) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (defaultValidationFailedEmblem == null) {</span>
+                // initialize the default emblem
+<span class="fc" id="L140">                defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, &quot;InvalidEmblem&quot;, 3);</span>
+            }
+<span class="fc" id="L142">            return defaultValidationFailedEmblem;</span>
+        }
+    }
+
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationFailureHighlightMode
+    public static HighlightMode getDefaultValidationFailureHighlightMode() {
+<span class="nc" id="L152">        return defaultValidationFailureHighlightMode;</span>
+    }
+
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationFailureHighlightMode`: the defaultValidationFailureHighlightMode to set
+    public static void setDefaultValidationFailureHighlightMode(HighlightMode aDefaultValidationFailureHighlightMode) {
+<span class="nc" id="L161">        defaultValidationFailureHighlightMode = aDefaultValidationFailureHighlightMode;</span>
+<span class="nc" id="L162">    }</span>
+
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationFailedEmblem
+    public static Image getDefaultValidationFailedEmblem() {
+<span class="nc" id="L170">        return defaultValidationFailedEmblem;</span>
+    }
+
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationFailedEmblem`: the defaultValidationFailedEmblem to set
+    public static void setDefaultValidationFailedEmblem(Image aDefaultValidationFailedEmblem) {
+<span class="nc" id="L179">        defaultValidationFailedEmblem = aDefaultValidationFailedEmblem;</span>
+<span class="nc" id="L180">    }</span>
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationEmblemPositionX
+    public static float getDefaultValidationEmblemPositionX() {
+<span class="nc" id="L189">        return defaultValidationEmblemPositionX;</span>
+    }
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationEmblemPositionX`: the defaultValidationEmblemPositionX to set
+    public static void setDefaultValidationEmblemPositionX(float aDefaultValidationEmblemPositionX) {
+<span class="nc" id="L199">        defaultValidationEmblemPositionX = aDefaultValidationEmblemPositionX;</span>
+<span class="nc" id="L200">    }</span>
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValidationEmblemPositionY
+    public static float getDefaultValidationEmblemPositionY() {
+<span class="nc" id="L209">        return defaultValidationEmblemPositionY;</span>
+    }
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValidationEmblemPositionY`: the defaultValidationEmblemPositionY to set
+    public static void setDefaultValidationEmblemPositionY(float aDefaultValidationEmblemPositionY) {
+<span class="nc" id="L219">        defaultValidationEmblemPositionY = aDefaultValidationEmblemPositionY;</span>
+<span class="nc" id="L220">    }</span>
+
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
+    ///
+    /// #### Returns
+    ///
+    /// the validateOnEveryKey
+    public static boolean isValidateOnEveryKey() {
+<span class="fc" id="L229">        return validateOnEveryKey;</span>
+    }
+
+    /// Indicates whether validation should occur on every key press (data change listener) or
+    /// action performed (editing completion)
+    ///
+    /// #### Parameters
+    ///
+    /// - `aValidateOnEveryKey`: the validateOnEveryKey to set
+    public static void setValidateOnEveryKey(boolean aValidateOnEveryKey) {
+<span class="fc" id="L239">        validateOnEveryKey = aValidateOnEveryKey;</span>
+<span class="fc" id="L240">    }</span>
+
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Returns
+    ///
+    /// the validationFailureHighlightMode
+    public HighlightMode getValidationFailureHighlightMode() {
+<span class="nc" id="L248">        return validationFailureHighlightMode;</span>
+    }
+
+    /// Indicates the default mode in which validation failures are expressed
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationFailureHighlightMode`: the validationFailureHighlightMode to set
+    public void setValidationFailureHighlightMode(HighlightMode validationFailureHighlightMode) {
+<span class="fc" id="L257">        this.validationFailureHighlightMode = validationFailureHighlightMode;</span>
+<span class="fc" id="L258">    }</span>
+
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Returns
+    ///
+    /// the validationFailedEmblem
+    public Image getValidationFailedEmblem() {
+<span class="nc" id="L266">        return validationFailedEmblem;</span>
+    }
+
+    /// The emblem that will be drawn on top of the component to indicate the validation failure
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationFailedEmblem`: the validationFailedEmblem to set
+    public void setValidationFailedEmblem(Image validationFailedEmblem) {
+<span class="fc" id="L275">        this.validationFailedEmblem = validationFailedEmblem;</span>
+<span class="fc" id="L276">    }</span>
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the validationEmblemPositionX
+    public float getValidationEmblemPositionX() {
+<span class="nc" id="L285">        return validationEmblemPositionX;</span>
+    }
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationEmblemPositionX`: the validationEmblemPositionX to set
+    public void setValidationEmblemPositionX(float validationEmblemPositionX) {
+<span class="nc" id="L295">        this.validationEmblemPositionX = validationEmblemPositionX;</span>
+<span class="nc" id="L296">    }</span>
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Returns
+    ///
+    /// the validationEmblemPositionY
+    public float getValidationEmblemPositionY() {
+<span class="nc" id="L305">        return validationEmblemPositionY;</span>
+    }
+
+    /// The position of the validation emblem on the component as X/Y values between 0 and 1 where
+    /// 0 indicates the start of the component and 1 indicates its end on the given axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `validationEmblemPositionY`: the validationEmblemPositionY to set
+    public void setValidationEmblemPositionY(float validationEmblemPositionY) {
+<span class="nc" id="L315">        this.validationEmblemPositionY = validationEmblemPositionY;</span>
+<span class="nc" id="L316">    }</span>
+
+    /// Indicates whether an error message should be shown for the focused component
+    ///
+    /// #### Returns
+    ///
+    /// true if the error message should be displayed
+    public boolean isShowErrorMessageForFocusedComponent() {
+<span class="nc" id="L324">        return showErrorMessageForFocusedComponent;</span>
+    }
+
+    /// Indicates whether an error message should be shown for the focused component
+    ///
+    /// #### Parameters
+    ///
+    /// - `showErrorMessageForFocusedComponent`: true to show the error message
+    public void setShowErrorMessageForFocusedComponent(boolean showErrorMessageForFocusedComponent) {
+<span class="fc" id="L333">        this.showErrorMessageForFocusedComponent = showErrorMessageForFocusedComponent;</span>
+<span class="fc" id="L334">    }</span>
+
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
+    ///
+    /// #### Returns
+    ///
+    /// the errorMessageUIID
+    public String getErrorMessageUIID() {
+<span class="nc" id="L342">        return errorMessageUIID;</span>
+    }
+
+    /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorMessageUIID`: the errorMessageUIID to set
+    public void setErrorMessageUIID(String errorMessageUIID) {
+<span class="nc" id="L351">        this.errorMessageUIID = errorMessageUIID;</span>
+<span class="nc" id="L352">    }</span>
+
+    /// Places a constraint on the validator, returns this object so constraint
+    /// additions can be chained. Shows validation errors messages even when the
+    /// TextModeLayout is not `onTopMode` (it's possible to disable this
+    /// functionality setting to false the theme constant
+    /// `showValidationErrorsIfNotOnTopMode`: basically, the error
+    /// message is shown for two second in place of the label on the left of the
+    /// InputComponent (or on right of the InputComponent for RTL languages);
+    /// this solution never breaks the layout, because the error message is
+    /// trimmed to fit the available space. The error message UIID is
+    /// &quot;ErrorLabel&quot; when it's not onTopMode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to validate
+    ///
+    /// - `c`: the constraint or constraints
+    ///
+    /// #### Returns
+    ///
+    /// @return this object so we can write code like v.addConstraint(cmp1,
+    /// cons).addConstraint(cmp2, otherConstraint);
+    public Validator addConstraint(Component cmp, Constraint... c) {
+<span class="fc" id="L376">        Constraint constraint = null;</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (c.length == 1) {</span>
+<span class="fc" id="L378">            constraint = c[0];</span>
+<span class="fc" id="L379">            constraintList.put(cmp, constraint);</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        } else if (c.length &gt; 1) {</span>
+<span class="nc" id="L381">            constraint = new GroupConstraint(c);</span>
+<span class="nc" id="L382">            constraintList.put(cmp, constraint);</span>
+        }
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (constraint == null) {</span>
+<span class="nc" id="L385">            throw new IllegalArgumentException(&quot;addConstraint needs at least a Constraint, but the Constraint array in empty&quot;);</span>
+        }
+<span class="fc" id="L387">        bindDataListener(cmp);</span>
+<span class="fc" id="L388">        boolean isV = isValid();</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        for (Component btn : submitButtons) {</span>
+<span class="nc" id="L390">            btn.setEnabled(isV);</span>
+<span class="nc" id="L391">        }</span>
+
+        // Show validation error on iPhone
+<span class="pc bpc" id="L394" title="1 of 4 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;showValidationErrorsIfNotOnTopMode&quot;, true) &amp;&amp; cmp instanceof InputComponent) {</span>
+<span class="fc" id="L395">            final InputComponent inputComponent = (InputComponent) cmp;</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            if (!inputComponent.isOnTopMode()) {</span>
+<span class="fc" id="L397">                Label labelForComponent = null;</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                if (inputComponent instanceof TextComponent) {</span>
+<span class="fc" id="L399">                    labelForComponent = ((TextComponent) inputComponent).getField().getLabelForComponent();</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                } else if (inputComponent instanceof PickerComponent) {</span>
+<span class="nc" id="L401">                    labelForComponent = ((PickerComponent) inputComponent).getPicker().getLabelForComponent();</span>
+                }
+
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                if (labelForComponent != null) {</span>
+<span class="fc" id="L405">                    final Label myLabel = labelForComponent;</span>
+<span class="fc" id="L406">                    final String originalText = myLabel.getText();</span>
+<span class="fc" id="L407">                    final String originalUIID = myLabel.getUIID();</span>
+<span class="fc" id="L408">                    final Constraint myConstraint = constraint;</span>
+
+<span class="fc" id="L410">                    final Runnable showError = new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L413">                            boolean isValid = false;</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                            if (inputComponent instanceof TextComponent) {</span>
+<span class="fc" id="L415">                                isValid = myConstraint.isValid(((TextComponent) inputComponent).getField().getText());</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                            } else if (inputComponent instanceof PickerComponent) {</span>
+<span class="nc" id="L417">                                isValid = myConstraint.isValid(((PickerComponent) inputComponent).getPicker().getValue());</span>
+                            }
+
+<span class="fc" id="L420">                            String errorMessage = trimLongString(UIManager.getInstance().localize(myConstraint.getDefaultFailMessage(), myConstraint.getDefaultFailMessage()), &quot;ErrorLabel&quot;, myLabel.getWidth());</span>
+
+<span class="pc bpc" id="L422" title="3 of 6 branches missed.">                            if (errorMessage != null &amp;&amp; errorMessage.length() &gt; 0 &amp;&amp; !isValid) {</span>
+                                // show the error in place of the label for component
+<span class="fc" id="L424">                                myLabel.setUIID(&quot;ErrorLabel&quot;);</span>
+<span class="fc" id="L425">                                myLabel.setText(errorMessage);</span>
+<span class="fc" id="L426">                                UITimer.timer(2000, false, Display.getInstance().getCurrent(), new Runnable() {</span>
+                                    @Override
+                                    public void run() {
+<span class="fc" id="L429">                                        myLabel.setUIID(originalUIID);</span>
+<span class="fc" id="L430">                                        myLabel.setText(originalText);</span>
+<span class="fc" id="L431">                                    }</span>
+                                });
+                            } else {
+                                // show the label for component without the error
+<span class="nc" id="L435">                                myLabel.setUIID(originalUIID);</span>
+<span class="nc" id="L436">                                myLabel.setText(originalText);</span>
+                            }
+<span class="fc" id="L438">                        }</span>
+                    };
+
+<span class="fc" id="L441">                    FocusListener myFocusListener = new ConstraintFocusListener(showError);</span>
+
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">                    if (inputComponent instanceof TextComponent) {</span>
+<span class="fc" id="L444">                        ((TextComponent) inputComponent).getField().addFocusListener(myFocusListener);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                    } else if (inputComponent instanceof PickerComponent) {</span>
+<span class="nc" id="L446">                        ((PickerComponent) inputComponent).getPicker().addFocusListener(myFocusListener);</span>
+                    }
+
+                }
+            }
+        }
+<span class="fc" id="L452">        return this;</span>
+    }
+
+    /// Long error messages are trimmed to fit the available space in the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorMessage`: the string to be trimmed
+    ///
+    /// - `uiid`: the uiid of the errorMessage
+    ///
+    /// - `width`: the maximum width
+    ///
+    /// #### Returns
+    ///
+    /// the new String trimmed to fit the available width
+    private String trimLongString(String errorMessage, String uiid, int width) {
+<span class="fc" id="L469">        Label errorLabel = new Label(errorMessage, uiid);</span>
+<span class="pc bpc" id="L470" title="1 of 4 branches missed.">        while (errorLabel.getPreferredW() &gt; width &amp;&amp; errorMessage.length() &gt; 1) {</span>
+<span class="fc" id="L471">            errorMessage = errorMessage.substring(0, errorMessage.length() - 1);</span>
+<span class="fc" id="L472">            errorLabel.setText(errorMessage);</span>
+        }
+<span class="fc" id="L474">        return errorMessage;</span>
+    }
+
+    /// Submit buttons (or any other component type) can be disabled until all components contain a valid value.
+    /// Notice that this method should be invoked after all the constraints are added so the initial state of the buttons
+    /// will be correct.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: set of buttons or components to disable until everything is valid
+    ///
+    /// #### Returns
+    ///
+    /// the validator instance so this method can be chained
+    public Validator addSubmitButtons(Component... cmp) {
+<span class="fc" id="L489">        boolean isV = isValid();</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        for (Component c : cmp) {</span>
+<span class="fc" id="L491">            submitButtons.add(c);</span>
+<span class="fc" id="L492">            c.setEnabled(isV);</span>
+        }
+<span class="fc" id="L494">        return this;</span>
+    }
+
+    /// Returns the value of the given component, this can be overriden to add support for custom built components
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
+    ///
+    /// #### Returns
+    ///
+    /// the object value
+    protected Object getComponentValue(Component cmp) {
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (cmp instanceof InputComponent) {</span>
+<span class="fc" id="L508">            cmp = ((InputComponent) cmp).getEditor();</span>
+        }
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        if (cmp instanceof TextArea) {</span>
+<span class="fc" id="L511">            return ((TextArea) cmp).getText();</span>
+        }
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (cmp instanceof Picker) {</span>
+<span class="nc" id="L514">            return ((Picker) cmp).getValue();</span>
+        }
+<span class="pc bpc" id="L516" title="2 of 4 branches missed.">        if (cmp instanceof RadioButton || cmp instanceof CheckBox) {</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            if (((Button) cmp).isSelected()) {</span>
+<span class="nc" id="L518">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L520">            return Boolean.FALSE;</span>
+        }
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (cmp instanceof Label) {</span>
+<span class="nc" id="L523">            return ((Label) cmp).getText();</span>
+        }
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        if (cmp instanceof List) {</span>
+<span class="nc" id="L526">            return ((List) cmp).getSelectedItem();</span>
+        }
+<span class="fc" id="L528">        return null;</span>
+    }
+
+    /// Binds an event listener to the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to bind the data listener to
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this method was exposed by accident, constraint implicitly calls it and you don't need to
+    /// call it directly. It will be made protected in a future update to Codename One!
+    public void bindDataListener(Component cmp) {
+        // Re-validate on focus loss in every configuration so a user who
+        // leaves the field by tapping into another field gets the same
+        // highlight feedback as a user who hits the VKB 'next' / Enter key.
+        // The action-listener registration below only catches the VKB Enter
+        // path; without an explicit focus-lost validate(), the field stays
+        // un-highlighted after a tap-away. See #1459.
+<span class="fc" id="L548">        cmp.addFocusListener(new FocusListener() {</span>
+            @Override
+            public void focusGained(Component focused) {
+<span class="fc" id="L551">            }</span>
+
+            @Override
+            public void focusLost(Component focused) {
+<span class="fc" id="L555">                validate(focused);</span>
+<span class="fc" id="L556">            }</span>
+        });
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (showErrorMessageForFocusedComponent) {</span>
+<span class="pc bpc" id="L559" title="3 of 4 branches missed.">            if (!(cmp instanceof InputComponent &amp;&amp; ((InputComponent) cmp).isOnTopMode())) {</span>
+<span class="fc" id="L560">                cmp.addFocusListener(new FocusListener() {</span>
+                    @Override
+                    public void focusGained(Component cmp) {
+                        // special case. Before the top level is showing don't show
+                        // error dialogs. Resolved through the top level rather than the
+                        // form: getComponentForm() is null inside a Window, so this
+                        // returned every time and the configured popup never appeared
+                        // there at all.
+<span class="fc" id="L568">                        com.codename1.ui.TopLevelContainer p = cmp.getTopLevelContainer();</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                        boolean showing = p instanceof com.codename1.ui.Window</span>
+<span class="fc" id="L570">                                ? ((com.codename1.ui.Window) p).isWindowShowing()</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                                : p == Display.getInstance().getCurrent(); //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">                        if (!showing) {</span>
+<span class="fc" id="L573">                            return;</span>
+                        }
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                        if (message != null) {</span>
+<span class="fc" id="L576">                            message.dispose();</span>
+                        }
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">                        if (!isValid(cmp)) {</span>
+<span class="fc" id="L579">                            String err = getErrorMessage(cmp);</span>
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">                            if (err != null &amp;&amp; err.length() &gt; 0) {</span>
+<span class="fc" id="L581">                                message = new InteractionDialog(err);</span>
+                                // Framework chrome, never an operating system window: this popup is POSITIONED by the
+                                // framework, and native window mode documents those margins as ignored, so in a window
+                                // it comes out centred and loses the placement that is its whole point. See
+                                // TooltipManager for the full note.
+<span class="fc" id="L586">                                message.setNativeWindowMode(false);</span>
+                                // The emblem path below shows by rectangle, which has
+                                // no anchor component to resolve a host from.
+<span class="fc" id="L589">                                message.setTopLevelHost(p);</span>
+<span class="fc" id="L590">                                message.getTitleComponent().setUIID(errorMessageUIID);</span>
+<span class="fc" id="L591">                                message.setAnimateShow(false);</span>
+<span class="pc bpc" id="L592" title="3 of 4 branches missed.">                                if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {</span>
+<span class="fc" id="L593">                                    int xpos = cmp.getAbsoluteX();</span>
+<span class="fc" id="L594">                                    int ypos = cmp.getAbsoluteY();</span>
+<span class="fc" id="L595">                                    Component scr = cmp.getScrollable();</span>
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">                                    if (scr != null) {</span>
+<span class="nc" id="L597">                                        xpos -= scr.getScrollX();</span>
+<span class="nc" id="L598">                                        ypos -= scr.getScrollY();</span>
+<span class="nc" id="L599">                                        scr.addScrollListener(new ScrollListener() {</span>
+                                            @Override
+                                            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+<span class="nc bnc" id="L602" title="All 2 branches missed.">                                                if (message != null) {</span>
+<span class="nc" id="L603">                                                    message.dispose();</span>
+                                                }
+<span class="nc" id="L605">                                                message = null;</span>
+<span class="nc" id="L606">                                            }</span>
+                                        });
+                                    }
+<span class="fc" id="L609">                                    float width = cmp.getWidth();</span>
+<span class="fc" id="L610">                                    float height = cmp.getHeight();</span>
+<span class="fc" id="L611">                                    xpos += Math.round(width * validationEmblemPositionX);</span>
+<span class="fc" id="L612">                                    ypos += Math.round(height * validationEmblemPositionY);</span>
+<span class="fc" id="L613">                                    InteractionDialog dialog = message;</span>
+<span class="fc" id="L614">                                    dialog.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(),</span>
+<span class="fc" id="L615">                                            validationFailedEmblem.getHeight()));</span>
+<span class="fc" id="L616">                                } else {</span>
+<span class="nc" id="L617">                                    message.showPopupDialog(cmp);</span>
+                                }
+                            }
+                        }
+<span class="fc" id="L621">                    }</span>
+
+                    @Override
+                    public void focusLost(Component cmp) {
+                        // Validation on focus-loss is handled by the
+                        // unconditional focus listener registered at the top
+                        // of bindDataListener (see #1459); this listener is
+                        // only responsible for the focus-gained error popup.
+<span class="nc" id="L629">                    }</span>
+                });
+            }
+        }
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        if (validateOnEveryKey) {</span>
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">            if (cmp instanceof TextComponent) {</span>
+<span class="nc" id="L635">                ((TextComponent) cmp).getField().addDataChangedListener(new ComponentListener(cmp));</span>
+<span class="nc" id="L636">                return;</span>
+            }
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">            if (cmp instanceof TextField) {</span>
+<span class="fc" id="L639">                ((TextField) cmp).addDataChangedListener(new ComponentListener(cmp));</span>
+<span class="fc" id="L640">                return;</span>
+            }
+        }
+<span class="fc bfc" id="L643" title="All 2 branches covered.">        if (cmp instanceof TextComponent) {</span>
+<span class="fc" id="L644">            ((TextComponent) cmp).getField().addActionListener(new ComponentListener(cmp));</span>
+<span class="fc" id="L645">            return;</span>
+        }
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (cmp instanceof TextArea) {</span>
+<span class="fc" id="L648">            ((TextArea) cmp).addActionListener(new ComponentListener(cmp));</span>
+<span class="fc" id="L649">            return;</span>
+        }
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (cmp instanceof List) {</span>
+<span class="nc" id="L652">            ((List) cmp).addActionListener(new ComponentListener(cmp));</span>
+<span class="nc" id="L653">            return;</span>
+        }
+<span class="pc bpc" id="L655" title="2 of 4 branches missed.">        if (cmp instanceof CheckBox || cmp instanceof RadioButton) {</span>
+<span class="nc" id="L656">            ((Button) cmp).addActionListener(new ComponentListener(cmp));</span>
+<span class="nc" id="L657">            return;</span>
+        }
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        if (cmp instanceof Picker) {</span>
+<span class="nc" id="L660">            ((Picker) cmp).addActionListener(new ComponentListener(cmp));</span>
+<span class="nc" id="L661">            return;</span>
+        }
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">        if (cmp instanceof PickerComponent) {</span>
+<span class="nc" id="L664">            ((PickerComponent) cmp).getPicker().addActionListener(new ComponentListener(cmp));</span>
+        }
+<span class="fc" id="L666">    }</span>
+
+    /// Returns true if all the constraints are currently valid
+    ///
+    /// #### Returns
+    ///
+    /// true if the entire validator is valid
+    public boolean isValid() {
+<span class="fc bfc" id="L674" title="All 2 branches covered.">        for (Component c : constraintList.keySet()) {</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">            if (!isValid(c)) {</span>
+<span class="fc" id="L676">                return false;</span>
+            }
+<span class="fc" id="L678">        }</span>
+<span class="fc" id="L679">        return true;</span>
+    }
+
+    /// Validates and highlights an individual component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to validate
+    protected void validate(Component cmp) {
+<span class="fc" id="L688">        Object val = getComponentValue(cmp);</span>
+<span class="fc" id="L689">        Constraint c = constraintList.get(cmp);</span>
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (c != null) {</span>
+<span class="fc" id="L691">            setValid(cmp, c.isValid(val));</span>
+        }
+<span class="fc" id="L693">    }</span>
+
+    boolean isValid(Component cmp) {
+<span class="fc" id="L696">        Boolean b = (Boolean) cmp.getClientProperty(VALID_MARKER);</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L698">            return b.booleanValue();</span>
+        }
+<span class="fc" id="L700">        Object val = getComponentValue(cmp);</span>
+<span class="fc" id="L701">        Constraint c = constraintList.get(cmp);</span>
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">        if (c != null) {</span>
+<span class="fc" id="L703">            return c.isValid(val);</span>
+        }
+<span class="nc" id="L705">        return true;</span>
+    }
+
+    /// Returns the validation error message for the given component or null if no such message exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the invalid component
+    ///
+    /// #### Returns
+    ///
+    /// a string representing the error message
+    public String getErrorMessage(Component cmp) {
+<span class="fc" id="L718">        return constraintList.get(cmp).getDefaultFailMessage();</span>
+    }
+
+    void setValid(Component cmp, boolean v) {
+<span class="fc" id="L722">        Boolean b = (Boolean) cmp.getClientProperty(VALID_MARKER);</span>
+<span class="pc bpc" id="L723" title="1 of 4 branches missed.">        if (b != null &amp;&amp; b.booleanValue() == v) {</span>
+<span class="nc" id="L724">            return;</span>
+        }
+<span class="fc" id="L726">        cmp.putClientProperty(VALID_MARKER, v);</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        if (!v) {</span>
+            // if one component is invalid... just disable the submit buttons
+<span class="fc bfc" id="L729" title="All 2 branches covered.">            for (Component c : submitButtons) {</span>
+<span class="fc" id="L730">                c.setEnabled(false);</span>
+<span class="fc" id="L731">            }</span>
+        } else {
+<span class="fc" id="L733">            boolean isV = isValid();</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">            for (Component c : submitButtons) {</span>
+<span class="fc" id="L735">                c.setEnabled(isV);</span>
+<span class="fc" id="L736">            }</span>
+<span class="pc bpc" id="L737" title="1 of 4 branches missed.">            if (message != null &amp;&amp; cmp.hasFocus()) {</span>
+<span class="fc" id="L738">                message.dispose();</span>
+            }
+        }
+
+<span class="pc bpc" id="L742" title="3 of 4 branches missed.">        if (cmp instanceof InputComponent &amp;&amp; ((InputComponent) cmp).isOnTopMode()) {</span>
+<span class="nc" id="L743">            InputComponent tc = (InputComponent) cmp;</span>
+<span class="nc bnc" id="L744" title="All 2 branches missed.">            if (v) {</span>
+<span class="nc" id="L745">                tc.errorMessage(null);</span>
+            } else {
+<span class="nc" id="L747">                tc.errorMessage(getErrorMessage(cmp));</span>
+            }
+        }
+
+<span class="pc bpc" id="L751" title="3 of 4 branches missed.">        if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {</span>
+            // The outer guard used to resolve the form, which is null by design inside a
+            // Window -- so the emblem glass pane was never installed there and EMBLEM
+            // validation showed nothing at all.
+<span class="fc" id="L755">            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();</span>
+<span class="pc bpc" id="L756" title="1 of 4 branches missed.">            if (top != null &amp;&amp; !(top.getGlassPane() instanceof ComponentListener)) {</span>
+<span class="fc" id="L757">                top.setGlassPane(new ComponentListener(null));</span>
+            }
+        }
+<span class="fc bfc" id="L760" title="All 2 branches covered.">        if (v) {</span>
+<span class="pc bpc" id="L761" title="2 of 4 branches missed.">            if (validationFailureHighlightMode == HighlightMode.UIID || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {</span>
+<span class="nc" id="L762">                String uiid = cmp.getUIID();</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">                if (uiid.endsWith(&quot;Invalid&quot;)) {</span>
+<span class="nc" id="L764">                    uiid = uiid.substring(0, uiid.length() - 7);</span>
+<span class="nc" id="L765">                    cmp.setUIID(uiid);</span>
+                }
+<span class="nc" id="L767">                return;</span>
+            }
+        } else {
+<span class="pc bpc" id="L770" title="2 of 4 branches missed.">            if (validationFailureHighlightMode == HighlightMode.UIID || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {</span>
+<span class="nc" id="L771">                String uiid = cmp.getUIID();</span>
+<span class="nc bnc" id="L772" title="All 2 branches missed.">                if (!uiid.endsWith(&quot;Invalid&quot;)) {</span>
+<span class="nc" id="L773">                    cmp.setUIID(uiid + &quot;Invalid&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L777">    }</span>
+
+    /// Indicates the validation failure modes
+<span class="fc" id="L780">    public enum HighlightMode {</span>
+<span class="fc" id="L781">        UIID,</span>
+<span class="fc" id="L782">        EMBLEM,</span>
+<span class="fc" id="L783">        UIID_AND_EMBLEM,</span>
+<span class="fc" id="L784">        NONE</span>
+    }
+
+    private static class ConstraintFocusListener implements FocusListener {
+        private final Runnable showError;
+
+<span class="fc" id="L790">        public ConstraintFocusListener(Runnable showError) {</span>
+<span class="fc" id="L791">            this.showError = showError;</span>
+<span class="fc" id="L792">        }</span>
+
+        @Override
+        public void focusLost(Component cmp) {
+<span class="fc" id="L796">            showError.run();</span>
+<span class="fc" id="L797">        }</span>
+
+        @Override
+        public void focusGained(Component cmp) {
+            // no code here
+<span class="fc" id="L802">        }</span>
+    }
+
+    class ComponentListener implements ActionListener, DataChangedListener, Painter {
+        private final Component cmp;
+<span class="fc" id="L807">        private Rectangle visibleRect = new Rectangle();</span>
+
+<span class="fc" id="L809">        public ComponentListener(Component cmp) {</span>
+<span class="fc" id="L810">            this.cmp = cmp;</span>
+<span class="fc" id="L811">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L815">            validate(cmp);</span>
+<span class="nc" id="L816">        }</span>
+
+        @Override
+        public void dataChanged(int type, int index) {
+<span class="fc" id="L820">            validate(cmp);</span>
+<span class="fc" id="L821">        }</span>
+
+        /// Handles the glasspane work just to save a new class object (smaller code)
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+<span class="fc bfc" id="L826" title="All 2 branches covered.">            for (Component c : constraintList.keySet()) {</span>
+<span class="fc bfc" id="L827" title="All 2 branches covered.">                if (!isValid(c)) {</span>
+<span class="pc bpc" id="L828" title="3 of 4 branches missed.">                    if (c instanceof InputComponent &amp;&amp; ((InputComponent) c).isOnTopMode()) {</span>
+<span class="nc" id="L829">                        continue;</span>
+                    }
+<span class="fc" id="L831">                    int xpos = c.getAbsoluteX();</span>
+<span class="fc" id="L832">                    int ypos = c.getAbsoluteY();</span>
+<span class="fc" id="L833">                    float width = c.getWidth();</span>
+<span class="fc" id="L834">                    float height = c.getHeight();</span>
+<span class="fc" id="L835">                    xpos += Math.round(width * validationEmblemPositionX);</span>
+<span class="fc" id="L836">                    ypos += Math.round(height * validationEmblemPositionY);</span>
+
+                    // The top level, not the form: in a window getComponentForm() is
+                    // null, both helpers below then took their null guard, and the
+                    // emblem was painted straight over any overlay covering it.
+<span class="fc" id="L841">                    com.codename1.ui.TopLevelContainer emblemTop = c.getTopLevelContainer();</span>
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">                    if (isPointCoveredByFormLayer(xpos, ypos, emblemTop)) {</span>
+<span class="nc" id="L843">                        continue;</span>
+                    }
+<span class="fc" id="L845">                    int emblemWidth = validationFailedEmblem.getWidth();</span>
+<span class="fc" id="L846">                    int emblemHeight = validationFailedEmblem.getHeight();</span>
+                    int drawX;
+                    // The owning surface's width, not the main display's. Component
+                    // coordinates are local to the window they live in, so a narrower
+                    // window clipped the emblem and a wider one flipped it needlessly.
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">                    int surfaceWidth = emblemTop == null</span>
+<span class="pc" id="L852">                            ? Display.getInstance().getDisplayWidth()</span>
+<span class="fc" id="L853">                            : emblemTop.asContainer().getWidth();</span>
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">                    if (xpos + emblemWidth &gt; surfaceWidth) {</span>
+<span class="fc" id="L855">                        drawX = xpos - emblemWidth;</span>
+                    } else {
+<span class="nc" id="L857">                        drawX = xpos - emblemWidth / 2;</span>
+                    }
+<span class="fc" id="L859">                    int drawY = ypos - emblemHeight / 2;</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">                    if (isEmblemRectCoveredByInteractionDialog(new Rectangle(drawX, drawY, emblemWidth, emblemHeight), emblemTop)) {</span>
+<span class="nc" id="L861">                        continue;</span>
+                    }
+
+<span class="fc" id="L864">                    Container parent = c.getParent();</span>
+<span class="fc" id="L865">                    visibleRect = parent.getVisibleBounds(visibleRect);</span>
+<span class="fc" id="L866">                    Container grandParent = parent.getParent();</span>
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">                    if (grandParent != null) {</span>
+<span class="fc" id="L868">                        visibleRect.setX(visibleRect.getX() + grandParent.getAbsoluteX());</span>
+<span class="fc" id="L869">                        visibleRect.setY(visibleRect.getY() + grandParent.getAbsoluteY());</span>
+                    }
+
+<span class="fc" id="L872">                    int[] originalClip = g.getClip();</span>
+<span class="fc" id="L873">                    g.setClip(visibleRect);</span>
+<span class="fc" id="L874">                    g.drawImage(validationFailedEmblem, drawX, drawY);</span>
+<span class="fc" id="L875">                    g.setClip(originalClip);</span>
+                }
+<span class="fc" id="L877">            }</span>
+<span class="fc" id="L878">        }</span>
+
+        boolean isPointCoveredByFormLayer(int x, int y, com.codename1.ui.TopLevelContainer form) {
+<span class="pc bpc" id="L881" title="1 of 2 branches missed.">            if (form == null) {</span>
+<span class="nc" id="L882">                return false;</span>
+            }
+<span class="fc bfc" id="L884" title="All 2 branches covered.">            return isPointCoveredByContainer(x, y, form.getLayeredPane()) ||</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">                    isPointCoveredByContainer(x, y, form.getLayeredPane(InteractionDialog.class, true)) ||</span>
+<span class="pc bpc" id="L886" title="1 of 2 branches missed.">                    isPointCoveredByContainer(x, y, form.getFormLayeredPane(InteractionDialog.class, true));</span>
+        }
+
+        private boolean isPointCoveredByContainer(int x, int y, Container container) {
+<span class="pc bpc" id="L890" title="2 of 4 branches missed.">            if (container == null || !container.isVisible()) {</span>
+<span class="nc" id="L891">                return false;</span>
+            }
+<span class="fc bfc" id="L893" title="All 2 branches covered.">            if (container.visibleBoundsContains(x, y)) {</span>
+<span class="fc bfc" id="L894" title="All 2 branches covered.">                for (int i = container.getComponentCount() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L895">                    Component child = container.getComponentAt(i);</span>
+<span class="pc bpc" id="L896" title="3 of 4 branches missed.">                    if (child instanceof Container &amp;&amp; isPointCoveredByContainer(x, y, (Container) child)) {</span>
+<span class="nc" id="L897">                        return true;</span>
+                    }
+<span class="pc bpc" id="L899" title="2 of 6 branches missed.">                    if (!(child instanceof Container) &amp;&amp; child.isVisible() &amp;&amp; child.visibleBoundsContains(x, y)) {</span>
+<span class="fc" id="L900">                        return true;</span>
+                    }
+                }
+            }
+<span class="fc" id="L904">            return false;</span>
+        }
+
+        boolean isEmblemRectCoveredByInteractionDialog(Rectangle emblemRect,
+                com.codename1.ui.TopLevelContainer form) {
+<span class="pc bpc" id="L909" title="2 of 4 branches missed.">            if (form == null || emblemRect == null) {</span>
+<span class="nc" id="L910">                return false;</span>
+            }
+<span class="fc bfc" id="L912" title="All 2 branches covered.">            return containsVisibleInteractionDialogCoveringRect(form.getLayeredPane(InteractionDialog.class, true), emblemRect) ||</span>
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">                    containsVisibleInteractionDialogCoveringRect(form.getFormLayeredPane(InteractionDialog.class, true), emblemRect);</span>
+        }
+
+        private boolean containsVisibleInteractionDialogCoveringRect(Container container, Rectangle rect) {
+<span class="pc bpc" id="L917" title="1 of 4 branches missed.">            if (container == null || !container.isVisible()) {</span>
+<span class="fc" id="L918">                return false;</span>
+            }
+<span class="fc bfc" id="L920" title="All 2 branches covered.">            for (int i = 0; i &lt; container.getComponentCount(); i++) {</span>
+<span class="fc" id="L921">                Component child = container.getComponentAt(i);</span>
+<span class="pc bpc" id="L922" title="1 of 4 branches missed.">                if (child instanceof InteractionDialog &amp;&amp; child.isVisible()) {</span>
+<span class="fc bfc" id="L923" title="All 2 branches covered.">                    if (rectanglesIntersect(rect, child.getAbsoluteX(), child.getAbsoluteY(), child.getWidth(), child.getHeight())) {</span>
+<span class="fc" id="L924">                        return true;</span>
+                    }
+                }
+<span class="fc bfc" id="L927" title="All 4 branches covered.">                if (child instanceof Container &amp;&amp; containsVisibleInteractionDialogCoveringRect((Container) child, rect)) {</span>
+<span class="fc" id="L928">                    return true;</span>
+                }
+            }
+<span class="fc" id="L931">            return false;</span>
+        }
+
+        private boolean rectanglesIntersect(Rectangle rect, int x, int y, int width, int height) {
+<span class="fc" id="L935">            int r1x2 = rect.getX() + rect.getWidth();</span>
+<span class="fc" id="L936">            int r1y2 = rect.getY() + rect.getHeight();</span>
+<span class="fc" id="L937">            int r2x2 = x + width;</span>
+<span class="fc" id="L938">            int r2y2 = y + height;</span>
+<span class="pc bpc" id="L939" title="3 of 8 branches missed.">            return rect.getX() &lt; r2x2 &amp;&amp; r1x2 &gt; x &amp;&amp; rect.getY() &lt; r2y2 &amp;&amp; r1y2 &gt; y;</span>
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

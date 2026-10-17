@@ -1,0 +1,1506 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>World.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics</a> &gt; <span class="el_source">World.java</span></div><h1>World.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics;
+
+import com.codename1.gaming.physics.box2d.callbacks.ContactFilter;
+import com.codename1.gaming.physics.box2d.callbacks.ContactListener;
+import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
+import com.codename1.gaming.physics.box2d.callbacks.DestructionListener;
+import com.codename1.gaming.physics.box2d.callbacks.QueryCallback;
+import com.codename1.gaming.physics.box2d.callbacks.RayCastCallback;
+import com.codename1.gaming.physics.box2d.callbacks.TreeCallback;
+import com.codename1.gaming.physics.box2d.callbacks.TreeRayCastCallback;
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
+import com.codename1.gaming.physics.box2d.collision.TimeOfImpact.TOIInput;
+import com.codename1.gaming.physics.box2d.collision.TimeOfImpact.TOIOutput;
+import com.codename1.gaming.physics.box2d.collision.TimeOfImpact.TOIOutputState;
+import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhase;
+import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhaseStrategy;
+import com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree;
+import com.codename1.gaming.physics.box2d.collision.shapes.ChainShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.EdgeShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.PolygonShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.ShapeType;
+import com.codename1.gaming.physics.box2d.common.Color3f;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Sweep;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactRegister;
+import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
+import com.codename1.gaming.physics.box2d.dynamics.joints.JointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.JointEdge;
+import com.codename1.gaming.physics.box2d.dynamics.joints.PulleyJoint;
+import com.codename1.gaming.physics.box2d.pooling.IDynamicStack;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+import com.codename1.gaming.physics.box2d.pooling.arrays.Vec2Array;
+import com.codename1.gaming.physics.box2d.pooling.normal.DefaultWorldPool;
+
+/// The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
+/// world also contains efficient memory management facilities.
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">public class World {</span>
+  public static final int WORLD_POOL_SIZE = 100;
+  public static final int WORLD_POOL_CONTAINER_SIZE = 10;
+
+  public static final int NEW_FIXTURE = 0x0001;
+  public static final int LOCKED = 0x0002;
+  public static final int CLEAR_FORCES = 0x0004;
+
+
+  // statistics gathering
+<span class="fc" id="L78">  public int activeContacts = 0;</span>
+<span class="fc" id="L79">  public int contactPoolCount = 0;</span>
+
+  protected int m_flags;
+
+  protected ContactManager m_contactManager;
+
+  private Body m_bodyList;
+  private Joint m_jointList;
+
+  private int m_bodyCount;
+  private int m_jointCount;
+
+<span class="fc" id="L91">  private final Vec2 m_gravity = new Vec2();</span>
+  private boolean m_allowSleep;
+
+  // private Body m_groundBody;
+
+  private DestructionListener m_destructionListener;
+  private DebugDraw m_debugDraw;
+
+  private final IWorldPool pool;
+
+  /// This is used to compute the time step ratio to support a variable time step.
+  private float m_inv_dt0;
+
+  // these are for debugging the solver
+  private boolean m_warmStarting;
+  private boolean m_continuousPhysics;
+  private boolean m_subStepping;
+
+  private boolean m_stepComplete;
+
+  private Profile m_profile;
+
+
+<span class="fc" id="L114">  private ContactRegister[][] contactStacks =</span>
+<span class="fc" id="L115">      new ContactRegister[ShapeType.values().length][ShapeType.values().length];</span>
+
+  /// Construct a world object.
+  ///
+  /// @param gravity the world gravity vector.
+  public World(Vec2 gravity) {
+<span class="fc" id="L121">    this(gravity, new DefaultWorldPool(WORLD_POOL_SIZE, WORLD_POOL_CONTAINER_SIZE));</span>
+<span class="fc" id="L122">  }</span>
+
+  /// Construct a world object.
+  ///
+  /// @param gravity the world gravity vector.
+  public World(Vec2 gravity, IWorldPool pool) {
+<span class="fc" id="L128">    this(gravity, pool, new DynamicTree());</span>
+<span class="fc" id="L129">  }</span>
+  
+<span class="fc" id="L131">  public World(Vec2 gravity, IWorldPool argPool, BroadPhaseStrategy broadPhaseStrategy) {</span>
+<span class="fc" id="L132">    pool = argPool;</span>
+<span class="fc" id="L133">    m_destructionListener = null;</span>
+<span class="fc" id="L134">    m_debugDraw = null;</span>
+
+<span class="fc" id="L136">    m_bodyList = null;</span>
+<span class="fc" id="L137">    m_jointList = null;</span>
+
+<span class="fc" id="L139">    m_bodyCount = 0;</span>
+<span class="fc" id="L140">    m_jointCount = 0;</span>
+
+<span class="fc" id="L142">    m_warmStarting = true;</span>
+<span class="fc" id="L143">    m_continuousPhysics = true;</span>
+<span class="fc" id="L144">    m_subStepping = false;</span>
+<span class="fc" id="L145">    m_stepComplete = true;</span>
+
+<span class="fc" id="L147">    m_allowSleep = true;</span>
+<span class="fc" id="L148">    m_gravity.set(gravity);</span>
+
+<span class="fc" id="L150">    m_flags = CLEAR_FORCES;</span>
+
+<span class="fc" id="L152">    m_inv_dt0 = 0f;</span>
+
+<span class="fc" id="L154">    m_contactManager = new ContactManager(this, broadPhaseStrategy);</span>
+<span class="fc" id="L155">    m_profile = new Profile();</span>
+
+<span class="fc" id="L157">    initializeRegisters();</span>
+<span class="fc" id="L158">  }</span>
+
+  public void setAllowSleep(boolean flag) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">    if (flag == m_allowSleep) {</span>
+<span class="nc" id="L162">      return;</span>
+    }
+
+<span class="fc" id="L165">    m_allowSleep = flag;</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">    if (m_allowSleep == false) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">      for (Body b = m_bodyList; b != null; b = b.m_next) {</span>
+<span class="nc" id="L168">        b.setAwake(true);</span>
+      }
+    }
+<span class="fc" id="L171">  }</span>
+  
+  public void setSubStepping(boolean subStepping) {
+<span class="fc" id="L174">    this.m_subStepping = subStepping;</span>
+<span class="fc" id="L175">  }</span>
+
+  public boolean isSubStepping() {
+<span class="fc" id="L178">    return m_subStepping;</span>
+  }
+  
+  public boolean isAllowSleep() {
+<span class="fc" id="L182">    return m_allowSleep;</span>
+  }
+
+  private void addType(IDynamicStack&lt;Contact&gt; creator, ShapeType type1, ShapeType type2) {
+<span class="fc" id="L186">    ContactRegister register = new ContactRegister();</span>
+<span class="fc" id="L187">    register.creator = creator;</span>
+<span class="fc" id="L188">    register.primary = true;</span>
+<span class="fc" id="L189">    contactStacks[type1.ordinal()][type2.ordinal()] = register;</span>
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">    if (type1 != type2) {</span>
+<span class="fc" id="L192">      ContactRegister register2 = new ContactRegister();</span>
+<span class="fc" id="L193">      register2.creator = creator;</span>
+<span class="fc" id="L194">      register2.primary = false;</span>
+<span class="fc" id="L195">      contactStacks[type2.ordinal()][type1.ordinal()] = register2;</span>
+    }
+<span class="fc" id="L197">  }</span>
+
+  private void initializeRegisters() {
+<span class="fc" id="L200">    addType(pool.getCircleContactStack(), ShapeType.CIRCLE, ShapeType.CIRCLE);</span>
+<span class="fc" id="L201">    addType(pool.getPolyCircleContactStack(), ShapeType.POLYGON, ShapeType.CIRCLE);</span>
+<span class="fc" id="L202">    addType(pool.getPolyContactStack(), ShapeType.POLYGON, ShapeType.POLYGON);</span>
+<span class="fc" id="L203">    addType(pool.getEdgeCircleContactStack(), ShapeType.EDGE, ShapeType.CIRCLE);</span>
+<span class="fc" id="L204">    addType(pool.getEdgePolyContactStack(), ShapeType.EDGE, ShapeType.POLYGON);</span>
+<span class="fc" id="L205">    addType(pool.getChainCircleContactStack(), ShapeType.CHAIN, ShapeType.CIRCLE);</span>
+<span class="fc" id="L206">    addType(pool.getChainPolyContactStack(), ShapeType.CHAIN, ShapeType.POLYGON);</span>
+<span class="fc" id="L207">  }</span>
+
+  public Contact popContact(Fixture fixtureA, int indexA, Fixture fixtureB, int indexB) {
+<span class="fc" id="L210">    final ShapeType type1 = fixtureA.getType();</span>
+<span class="fc" id="L211">    final ShapeType type2 = fixtureB.getType();</span>
+
+<span class="fc" id="L213">    final ContactRegister reg = contactStacks[type1.ordinal()][type2.ordinal()];</span>
+<span class="fc" id="L214">    final IDynamicStack&lt;Contact&gt; creator = reg.creator;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">    if (creator != null) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">      if (reg.primary) {</span>
+<span class="fc" id="L217">        Contact c = creator.pop();</span>
+<span class="fc" id="L218">        c.init(fixtureA, indexA, fixtureB, indexB);</span>
+<span class="fc" id="L219">        return c;</span>
+      } else {
+<span class="fc" id="L221">        Contact c = creator.pop();</span>
+<span class="fc" id="L222">        c.init(fixtureB, indexB, fixtureA, indexA);</span>
+<span class="fc" id="L223">        return c;</span>
+      }
+    } else {
+<span class="nc" id="L226">      return null;</span>
+    }
+  }
+
+  public void pushContact(Contact contact) {
+<span class="nc" id="L231">    Fixture fixtureA = contact.getFixtureA();</span>
+<span class="nc" id="L232">    Fixture fixtureB = contact.getFixtureB();</span>
+    
+<span class="nc bnc" id="L234" title="All 6 branches missed.">    if (contact.m_manifold.pointCount &gt; 0 &amp;&amp; !fixtureA.isSensor() &amp;&amp; !fixtureB.isSensor()) {</span>
+<span class="nc" id="L235">      fixtureA.getBody().setAwake(true);</span>
+<span class="nc" id="L236">      fixtureB.getBody().setAwake(true);</span>
+    }
+
+<span class="nc" id="L239">    ShapeType type1 = fixtureA.getType();</span>
+<span class="nc" id="L240">    ShapeType type2 = fixtureB.getType();</span>
+
+<span class="nc" id="L242">    IDynamicStack&lt;Contact&gt; creator = contactStacks[type1.ordinal()][type2.ordinal()].creator;</span>
+<span class="nc" id="L243">    creator.push(contact);</span>
+<span class="nc" id="L244">  }</span>
+
+  public IWorldPool getPool() {
+<span class="fc" id="L247">    return pool;</span>
+  }
+
+  /// Register a destruction listener. The listener is owned by you and must remain in scope.
+  ///
+  /// @param listener
+  public void setDestructionListener(DestructionListener listener) {
+<span class="fc" id="L254">    m_destructionListener = listener;</span>
+<span class="fc" id="L255">  }</span>
+
+  /// Register a contact filter to provide specific control over collision. Otherwise the default
+  /// filter is used (_defaultFilter). The listener is owned by you and must remain in scope.
+  ///
+  /// @param filter
+  public void setContactFilter(ContactFilter filter) {
+<span class="fc" id="L262">    m_contactManager.m_contactFilter = filter;</span>
+<span class="fc" id="L263">  }</span>
+
+  /// Register a contact event listener. The listener is owned by you and must remain in scope.
+  ///
+  /// @param listener
+  public void setContactListener(ContactListener listener) {
+<span class="fc" id="L269">    m_contactManager.m_contactListener = listener;</span>
+<span class="fc" id="L270">  }</span>
+
+  /// Register a routine for debug drawing. The debug draw functions are called inside with
+  /// World.DrawDebugData method. The debug draw object is owned by you and must remain in scope.
+  ///
+  /// @param debugDraw
+  public void setDebugDraw(DebugDraw debugDraw) {
+<span class="fc" id="L277">    m_debugDraw = debugDraw;</span>
+<span class="fc" id="L278">  }</span>
+
+  /// create a rigid body given a definition. No reference to the definition is retained.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param def
+  /// @return
+  public Body createBody(BodyDef def) {
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">    assert (isLocked() == false);</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">    if (isLocked()) {</span>
+<span class="nc" id="L288">      return null;</span>
+    }
+    // TODO djm pooling
+<span class="fc" id="L291">    Body b = new Body(def, this);</span>
+
+    // add to world doubly linked list
+<span class="fc" id="L294">    b.m_prev = null;</span>
+<span class="fc" id="L295">    b.m_next = m_bodyList;</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">    if (m_bodyList != null) {</span>
+<span class="fc" id="L297">      m_bodyList.m_prev = b;</span>
+    }
+<span class="fc" id="L299">    m_bodyList = b;</span>
+<span class="fc" id="L300">    ++m_bodyCount;</span>
+
+<span class="fc" id="L302">    return b;</span>
+  }
+
+  /// destroy a rigid body given a definition. No reference to the definition is retained. This
+  /// function is locked during callbacks.
+  ///
+  /// @warning This automatically deletes all associated shapes and joints.
+  /// @warning This function is locked during callbacks.
+  /// @param body
+  public void destroyBody(Body body) {
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">    assert (m_bodyCount &gt; 0);</span>
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">    assert (isLocked() == false);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">    if (isLocked()) {</span>
+<span class="nc" id="L315">      return;</span>
+    }
+
+    // Delete the attached joints.
+<span class="fc" id="L319">    JointEdge je = body.m_jointList;</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">    while (je != null) {</span>
+<span class="nc" id="L321">      JointEdge je0 = je;</span>
+<span class="nc" id="L322">      je = je.next;</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">      if (m_destructionListener != null) {</span>
+<span class="nc" id="L324">        m_destructionListener.sayGoodbye(je0.joint);</span>
+      }
+
+<span class="nc" id="L327">      destroyJoint(je0.joint);</span>
+
+<span class="nc" id="L329">      body.m_jointList = je;</span>
+<span class="nc" id="L330">    }</span>
+<span class="fc" id="L331">    body.m_jointList = null;</span>
+
+    // Delete the attached contacts.
+<span class="fc" id="L334">    ContactEdge ce = body.m_contactList;</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">    while (ce != null) {</span>
+<span class="nc" id="L336">      ContactEdge ce0 = ce;</span>
+<span class="nc" id="L337">      ce = ce.next;</span>
+<span class="nc" id="L338">      m_contactManager.destroy(ce0.contact);</span>
+<span class="nc" id="L339">    }</span>
+<span class="fc" id="L340">    body.m_contactList = null;</span>
+
+<span class="fc" id="L342">    Fixture f = body.m_fixtureList;</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">    while (f != null) {</span>
+<span class="fc" id="L344">      Fixture f0 = f;</span>
+<span class="fc" id="L345">      f = f.m_next;</span>
+
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">      if (m_destructionListener != null) {</span>
+<span class="nc" id="L348">        m_destructionListener.sayGoodbye(f0);</span>
+      }
+
+<span class="fc" id="L351">      f0.destroyProxies(m_contactManager.m_broadPhase);</span>
+<span class="fc" id="L352">      f0.destroy();</span>
+      // TODO djm recycle fixtures (here or in that destroy method)
+<span class="fc" id="L354">      body.m_fixtureList = f;</span>
+<span class="fc" id="L355">      body.m_fixtureCount -= 1;</span>
+<span class="fc" id="L356">    }</span>
+<span class="fc" id="L357">    body.m_fixtureList = null;</span>
+<span class="fc" id="L358">    body.m_fixtureCount = 0;</span>
+
+    // Remove world body list.
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">    if (body.m_prev != null) {</span>
+<span class="fc" id="L362">      body.m_prev.m_next = body.m_next;</span>
+    }
+
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">    if (body.m_next != null) {</span>
+<span class="nc" id="L366">      body.m_next.m_prev = body.m_prev;</span>
+    }
+
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">    if (body == m_bodyList) {</span>
+<span class="nc" id="L370">      m_bodyList = body.m_next;</span>
+    }
+
+<span class="fc" id="L373">    --m_bodyCount;</span>
+    // TODO djm recycle body
+<span class="fc" id="L375">  }</span>
+
+  /// create a joint to constrain bodies together. No reference to the definition is retained. This
+  /// may cause the connected bodies to cease colliding.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param def
+  /// @return
+  public Joint createJoint(JointDef def) {
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">    assert (isLocked() == false);</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">    if (isLocked()) {</span>
+<span class="nc" id="L386">      return null;</span>
+    }
+
+<span class="fc" id="L389">    Joint j = Joint.create(this, def);</span>
+
+    // Connect to the world list.
+<span class="fc" id="L392">    j.m_prev = null;</span>
+<span class="fc" id="L393">    j.m_next = m_jointList;</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">    if (m_jointList != null) {</span>
+<span class="fc" id="L395">      m_jointList.m_prev = j;</span>
+    }
+<span class="fc" id="L397">    m_jointList = j;</span>
+<span class="fc" id="L398">    ++m_jointCount;</span>
+
+    // Connect to the bodies' doubly linked lists.
+<span class="fc" id="L401">    j.m_edgeA.joint = j;</span>
+<span class="fc" id="L402">    j.m_edgeA.other = j.getBodyB();</span>
+<span class="fc" id="L403">    j.m_edgeA.prev = null;</span>
+<span class="fc" id="L404">    j.m_edgeA.next = j.getBodyA().m_jointList;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">    if (j.getBodyA().m_jointList != null) {</span>
+<span class="fc" id="L406">      j.getBodyA().m_jointList.prev = j.m_edgeA;</span>
+    }
+<span class="fc" id="L408">    j.getBodyA().m_jointList = j.m_edgeA;</span>
+
+<span class="fc" id="L410">    j.m_edgeB.joint = j;</span>
+<span class="fc" id="L411">    j.m_edgeB.other = j.getBodyA();</span>
+<span class="fc" id="L412">    j.m_edgeB.prev = null;</span>
+<span class="fc" id="L413">    j.m_edgeB.next = j.getBodyB().m_jointList;</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">    if (j.getBodyB().m_jointList != null) {</span>
+<span class="fc" id="L415">      j.getBodyB().m_jointList.prev = j.m_edgeB;</span>
+    }
+<span class="fc" id="L417">    j.getBodyB().m_jointList = j.m_edgeB;</span>
+
+<span class="fc" id="L419">    Body bodyA = def.bodyA;</span>
+<span class="fc" id="L420">    Body bodyB = def.bodyB;</span>
+
+    // If the joint prevents collisions, then flag any contacts for filtering.
+<span class="fc bfc" id="L423" title="All 2 branches covered.">    if (def.collideConnected == false) {</span>
+<span class="fc" id="L424">      ContactEdge edge = bodyB.getContactList();</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">      while (edge != null) {</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (edge.other == bodyA) {</span>
+          // Flag the contact for filtering at the next time step (where either
+          // body is awake).
+<span class="nc" id="L429">          edge.contact.flagForFiltering();</span>
+        }
+
+<span class="nc" id="L432">        edge = edge.next;</span>
+      }
+    }
+
+    // Note: creating a joint doesn't wake the bodies.
+
+<span class="fc" id="L438">    return j;</span>
+  }
+
+  /// destroy a joint. This may cause the connected bodies to begin colliding.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param j the joint to destroy
+  public void destroyJoint(Joint j) {
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">    assert (isLocked() == false);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">    if (isLocked()) {</span>
+<span class="nc" id="L448">      return;</span>
+    }
+
+<span class="fc" id="L451">    boolean collideConnected = j.getCollideConnected();</span>
+
+    // Remove from the doubly linked list.
+<span class="fc bfc" id="L454" title="All 2 branches covered.">    if (j.m_prev != null) {</span>
+<span class="fc" id="L455">      j.m_prev.m_next = j.m_next;</span>
+    }
+
+<span class="fc bfc" id="L458" title="All 2 branches covered.">    if (j.m_next != null) {</span>
+<span class="fc" id="L459">      j.m_next.m_prev = j.m_prev;</span>
+    }
+
+<span class="fc bfc" id="L462" title="All 2 branches covered.">    if (j == m_jointList) {</span>
+<span class="fc" id="L463">      m_jointList = j.m_next;</span>
+    }
+
+    // Disconnect from island graph.
+<span class="fc" id="L467">    Body bodyA = j.getBodyA();</span>
+<span class="fc" id="L468">    Body bodyB = j.getBodyB();</span>
+
+    // Wake up connected bodies.
+<span class="fc" id="L471">    bodyA.setAwake(true);</span>
+<span class="fc" id="L472">    bodyB.setAwake(true);</span>
+
+    // Remove from body 1.
+<span class="fc bfc" id="L475" title="All 2 branches covered.">    if (j.m_edgeA.prev != null) {</span>
+<span class="fc" id="L476">      j.m_edgeA.prev.next = j.m_edgeA.next;</span>
+    }
+
+<span class="fc bfc" id="L479" title="All 2 branches covered.">    if (j.m_edgeA.next != null) {</span>
+<span class="fc" id="L480">      j.m_edgeA.next.prev = j.m_edgeA.prev;</span>
+    }
+
+<span class="fc bfc" id="L483" title="All 2 branches covered.">    if (j.m_edgeA == bodyA.m_jointList) {</span>
+<span class="fc" id="L484">      bodyA.m_jointList = j.m_edgeA.next;</span>
+    }
+
+<span class="fc" id="L487">    j.m_edgeA.prev = null;</span>
+<span class="fc" id="L488">    j.m_edgeA.next = null;</span>
+
+    // Remove from body 2
+<span class="fc bfc" id="L491" title="All 2 branches covered.">    if (j.m_edgeB.prev != null) {</span>
+<span class="fc" id="L492">      j.m_edgeB.prev.next = j.m_edgeB.next;</span>
+    }
+
+<span class="fc bfc" id="L495" title="All 2 branches covered.">    if (j.m_edgeB.next != null) {</span>
+<span class="fc" id="L496">      j.m_edgeB.next.prev = j.m_edgeB.prev;</span>
+    }
+
+<span class="fc bfc" id="L499" title="All 2 branches covered.">    if (j.m_edgeB == bodyB.m_jointList) {</span>
+<span class="fc" id="L500">      bodyB.m_jointList = j.m_edgeB.next;</span>
+    }
+
+<span class="fc" id="L503">    j.m_edgeB.prev = null;</span>
+<span class="fc" id="L504">    j.m_edgeB.next = null;</span>
+
+<span class="fc" id="L506">    Joint.destroy(j);</span>
+
+<span class="pc bpc" id="L508" title="2 of 4 branches missed.">    assert (m_jointCount &gt; 0);</span>
+<span class="fc" id="L509">    --m_jointCount;</span>
+
+    // If the joint prevents collisions, then flag any contacts for filtering.
+<span class="fc bfc" id="L512" title="All 2 branches covered.">    if (collideConnected == false) {</span>
+<span class="fc" id="L513">      ContactEdge edge = bodyB.getContactList();</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">      while (edge != null) {</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">        if (edge.other == bodyA) {</span>
+          // Flag the contact for filtering at the next time step (where either
+          // body is awake).
+<span class="nc" id="L518">          edge.contact.flagForFiltering();</span>
+        }
+
+<span class="nc" id="L521">        edge = edge.next;</span>
+      }
+    }
+<span class="fc" id="L524">  }</span>
+
+  // djm pooling
+<span class="fc" id="L527">  private final TimeStep step = new TimeStep();</span>
+  // Profiling stopwatches: each holds the millis timestamp of its last reset.
+<span class="fc" id="L529">  private long stepTimer = System.currentTimeMillis();</span>
+<span class="fc" id="L530">  private long tempTimer = System.currentTimeMillis();</span>
+
+  /// Take a time step. This performs collision detection, integration, and constraint solution.
+  ///
+  /// @param dt the amount of time to simulate, this should not vary.
+  /// @param velocityIterations for the velocity constraint solver.
+  /// @param positionIterations for the position constraint solver.
+  public void step(float dt, int velocityIterations, int positionIterations) {
+<span class="fc" id="L538">    stepTimer = System.currentTimeMillis();</span>
+    // log.debug(&quot;Starting step&quot;);
+    // If new fixtures were added, we need to find the new contacts.
+<span class="fc bfc" id="L541" title="All 2 branches covered.">    if ((m_flags &amp; NEW_FIXTURE) == NEW_FIXTURE) {</span>
+      // log.debug(&quot;There's a new fixture, lets look for new contacts&quot;);
+<span class="fc" id="L543">      m_contactManager.findNewContacts();</span>
+<span class="fc" id="L544">      m_flags &amp;= ~NEW_FIXTURE;</span>
+    }
+
+<span class="fc" id="L547">    m_flags |= LOCKED;</span>
+
+<span class="fc" id="L549">    step.dt = dt;</span>
+<span class="fc" id="L550">    step.velocityIterations = velocityIterations;</span>
+<span class="fc" id="L551">    step.positionIterations = positionIterations;</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">    if (dt &gt; 0.0f) {</span>
+<span class="fc" id="L553">      step.inv_dt = 1.0f / dt;</span>
+    } else {
+<span class="nc" id="L555">      step.inv_dt = 0.0f;</span>
+    }
+
+<span class="fc" id="L558">    step.dtRatio = m_inv_dt0 * dt;</span>
+
+<span class="fc" id="L560">    step.warmStarting = m_warmStarting;</span>
+
+    // Update contacts. This is where some contacts are destroyed.
+<span class="fc" id="L563">    tempTimer = System.currentTimeMillis();</span>
+<span class="fc" id="L564">    m_contactManager.collide();</span>
+<span class="fc" id="L565">    m_profile.collide = (System.currentTimeMillis() - tempTimer);</span>
+
+    // Integrate velocities, solve velocity constraints, and integrate positions.
+<span class="pc bpc" id="L568" title="2 of 4 branches missed.">    if (m_stepComplete &amp;&amp; step.dt &gt; 0.0f) {</span>
+<span class="fc" id="L569">      tempTimer = System.currentTimeMillis();</span>
+<span class="fc" id="L570">      solve(step);</span>
+<span class="fc" id="L571">      m_profile.solve = (System.currentTimeMillis() - tempTimer);</span>
+    }
+
+    // Handle TOI events.
+<span class="pc bpc" id="L575" title="1 of 4 branches missed.">    if (m_continuousPhysics &amp;&amp; step.dt &gt; 0.0f) {</span>
+<span class="fc" id="L576">      tempTimer = System.currentTimeMillis();</span>
+<span class="fc" id="L577">      solveTOI(step);</span>
+<span class="fc" id="L578">      m_profile.solveTOI = (System.currentTimeMillis() - tempTimer);</span>
+    }
+
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">    if (step.dt &gt; 0.0f) {</span>
+<span class="fc" id="L582">      m_inv_dt0 = step.inv_dt;</span>
+    }
+
+<span class="fc bfc" id="L585" title="All 2 branches covered.">    if ((m_flags &amp; CLEAR_FORCES) == CLEAR_FORCES) {</span>
+<span class="fc" id="L586">      clearForces();</span>
+    }
+
+<span class="fc" id="L589">    m_flags &amp;= ~LOCKED;</span>
+    // log.debug(&quot;ending step&quot;);
+
+<span class="fc" id="L592">    m_profile.step = System.currentTimeMillis() - stepTimer;</span>
+<span class="fc" id="L593">  }</span>
+
+  /// Call this after you are done with time steps to clear the forces. You normally call this after
+  /// each call to Step, unless you are performing sub-steps. By default, forces will be
+  /// automatically cleared, so you don't need to call this function.
+  ///
+  /// @see setAutoClearForces
+  public void clearForces() {
+<span class="fc bfc" id="L601" title="All 2 branches covered.">    for (Body body = m_bodyList; body != null; body = body.getNext()) {</span>
+<span class="fc" id="L602">      body.m_force.setZero();</span>
+<span class="fc" id="L603">      body.m_torque = 0.0f;</span>
+    }
+<span class="fc" id="L605">  }</span>
+
+<span class="fc" id="L607">  private final Color3f color = new Color3f();</span>
+<span class="fc" id="L608">  private final Transform xf = new Transform();</span>
+<span class="fc" id="L609">  private final Vec2 cA = new Vec2();</span>
+<span class="fc" id="L610">  private final Vec2 cB = new Vec2();</span>
+<span class="fc" id="L611">  private final Vec2Array avs = new Vec2Array();</span>
+
+  /// Call this to draw shapes and other debug draw data.
+  public void drawDebugData() {
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">    if (m_debugDraw == null) {</span>
+<span class="nc" id="L616">      return;</span>
+    }
+
+<span class="fc" id="L619">    int flags = m_debugDraw.getFlags();</span>
+
+<span class="fc bfc" id="L621" title="All 2 branches covered.">    if ((flags &amp; DebugDraw.e_shapeBit) == DebugDraw.e_shapeBit) {</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">      for (Body b = m_bodyList; b != null; b = b.getNext()) {</span>
+<span class="fc" id="L623">        xf.set(b.getTransform());</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        for (Fixture f = b.getFixtureList(); f != null; f = f.getNext()) {</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">          if (b.isActive() == false) {</span>
+<span class="nc" id="L626">            color.set(0.5f, 0.5f, 0.3f);</span>
+<span class="nc" id="L627">            drawShape(f, xf, color);</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">          } else if (b.getType() == BodyType.STATIC) {</span>
+<span class="fc" id="L629">            color.set(0.5f, 0.9f, 0.3f);</span>
+<span class="fc" id="L630">            drawShape(f, xf, color);</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">          } else if (b.getType() == BodyType.KINEMATIC) {</span>
+<span class="nc" id="L632">            color.set(0.5f, 0.5f, 0.9f);</span>
+<span class="nc" id="L633">            drawShape(f, xf, color);</span>
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">          } else if (b.isAwake() == false) {</span>
+<span class="nc" id="L635">            color.set(0.5f, 0.5f, 0.5f);</span>
+<span class="nc" id="L636">            drawShape(f, xf, color);</span>
+          } else {
+<span class="fc" id="L638">            color.set(0.9f, 0.7f, 0.7f);</span>
+<span class="fc" id="L639">            drawShape(f, xf, color);</span>
+          }
+        }
+      }
+    }
+
+<span class="fc bfc" id="L645" title="All 2 branches covered.">    if ((flags &amp; DebugDraw.e_jointBit) == DebugDraw.e_jointBit) {</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">      for (Joint j = m_jointList; j != null; j = j.getNext()) {</span>
+<span class="fc" id="L647">        drawJoint(j);</span>
+      }
+    }
+
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">    if ((flags &amp; DebugDraw.e_pairBit) == DebugDraw.e_pairBit) {</span>
+<span class="nc" id="L652">      color.set(0.3f, 0.9f, 0.9f);</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">      for (Contact c = m_contactManager.m_contactList; c != null; c = c.getNext()) {</span>
+<span class="nc" id="L654">        Fixture fixtureA = c.getFixtureA();</span>
+<span class="nc" id="L655">        Fixture fixtureB = c.getFixtureB();</span>
+<span class="nc" id="L656">        fixtureA.getAABB(c.getChildIndexA()).getCenterToOut(cA);</span>
+<span class="nc" id="L657">        fixtureB.getAABB(c.getChildIndexB()).getCenterToOut(cB);</span>
+<span class="nc" id="L658">        m_debugDraw.drawSegment(cA, cB, color);</span>
+      }
+    }
+
+<span class="fc bfc" id="L662" title="All 2 branches covered.">    if ((flags &amp; DebugDraw.e_aabbBit) == DebugDraw.e_aabbBit) {</span>
+<span class="fc" id="L663">      color.set(0.9f, 0.3f, 0.9f);</span>
+
+<span class="fc bfc" id="L665" title="All 2 branches covered.">      for (Body b = m_bodyList; b != null; b = b.getNext()) {</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">        if (b.isActive() == false) {</span>
+<span class="nc" id="L667">          continue;</span>
+        }
+
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        for (Fixture f = b.getFixtureList(); f != null; f = f.getNext()) {</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">          for (int i = 0; i &lt; f.m_proxyCount; ++i) {</span>
+<span class="fc" id="L672">            FixtureProxy proxy = f.m_proxies[i];</span>
+<span class="fc" id="L673">            AABB aabb = m_contactManager.m_broadPhase.getFatAABB(proxy.proxyId);</span>
+<span class="fc" id="L674">            Vec2[] vs = avs.get(4);</span>
+<span class="fc" id="L675">            vs[0].set(aabb.lowerBound.x, aabb.lowerBound.y);</span>
+<span class="fc" id="L676">            vs[1].set(aabb.upperBound.x, aabb.lowerBound.y);</span>
+<span class="fc" id="L677">            vs[2].set(aabb.upperBound.x, aabb.upperBound.y);</span>
+<span class="fc" id="L678">            vs[3].set(aabb.lowerBound.x, aabb.upperBound.y);</span>
+<span class="fc" id="L679">            m_debugDraw.drawPolygon(vs, 4, color);</span>
+          }
+        }
+      }
+    }
+
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">    if ((flags &amp; DebugDraw.e_centerOfMassBit) == DebugDraw.e_centerOfMassBit) {</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">      for (Body b = m_bodyList; b != null; b = b.getNext()) {</span>
+<span class="nc" id="L687">        xf.set(b.getTransform());</span>
+<span class="nc" id="L688">        xf.p.set(b.getWorldCenter());</span>
+<span class="nc" id="L689">        m_debugDraw.drawTransform(xf);</span>
+      }
+    }
+
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">    if ((flags &amp; DebugDraw.e_dynamicTreeBit) == DebugDraw.e_dynamicTreeBit) {</span>
+<span class="nc" id="L694">      m_contactManager.m_broadPhase.drawTree(m_debugDraw);</span>
+    }
+<span class="fc" id="L696">  }</span>
+
+<span class="fc" id="L698">  private final WorldQueryWrapper wqwrapper = new WorldQueryWrapper();</span>
+
+  /// Query the world for all fixtures that potentially overlap the provided AABB.
+  ///
+  /// @param callback a user implemented callback class.
+  /// @param aabb the query box.
+  public void queryAABB(QueryCallback callback, AABB aabb) {
+<span class="fc" id="L705">    wqwrapper.broadPhase = m_contactManager.m_broadPhase;</span>
+<span class="fc" id="L706">    wqwrapper.callback = callback;</span>
+<span class="fc" id="L707">    m_contactManager.m_broadPhase.query(wqwrapper, aabb);</span>
+<span class="fc" id="L708">  }</span>
+
+<span class="fc" id="L710">  private final WorldRayCastWrapper wrcwrapper = new WorldRayCastWrapper();</span>
+<span class="fc" id="L711">  private final RayCastInput input = new RayCastInput();</span>
+
+  /// Ray-cast the world for all fixtures in the path of the ray. Your callback controls whether you
+  /// get the closest point, any point, or n-points. The ray-cast ignores shapes that contain the
+  /// starting point.
+  ///
+  /// @param callback a user implemented callback class.
+  /// @param point1 the ray starting point
+  /// @param point2 the ray ending point
+  public void raycast(RayCastCallback callback, Vec2 point1, Vec2 point2) {
+<span class="fc" id="L721">    wrcwrapper.broadPhase = m_contactManager.m_broadPhase;</span>
+<span class="fc" id="L722">    wrcwrapper.callback = callback;</span>
+<span class="fc" id="L723">    input.maxFraction = 1.0f;</span>
+<span class="fc" id="L724">    input.p1.set(point1);</span>
+<span class="fc" id="L725">    input.p2.set(point2);</span>
+<span class="fc" id="L726">    m_contactManager.m_broadPhase.raycast(wrcwrapper, input);</span>
+<span class="fc" id="L727">  }</span>
+
+  /// Get the world body list. With the returned body, use Body.getNext to get the next body in the
+  /// world list. A null body indicates the end of the list.
+  ///
+  /// @return the head of the world body list.
+  public Body getBodyList() {
+<span class="fc" id="L734">    return m_bodyList;</span>
+  }
+
+  /// Get the world joint list. With the returned joint, use Joint.getNext to get the next joint in
+  /// the world list. A null joint indicates the end of the list.
+  ///
+  /// @return the head of the world joint list.
+  public Joint getJointList() {
+<span class="fc" id="L742">    return m_jointList;</span>
+  }
+
+  /// Get the world contact list. With the returned contact, use Contact.getNext to get the next
+  /// contact in the world list. A null contact indicates the end of the list.
+  ///
+  /// @return the head of the world contact list.
+  /// @warning contacts are created and destroyed in the middle of a time step. Use ContactListener
+  ///          to avoid missing contacts.
+  public Contact getContactList() {
+<span class="nc" id="L752">    return m_contactManager.m_contactList;</span>
+  }
+
+  public boolean isSleepingAllowed() {
+<span class="fc" id="L756">    return m_allowSleep;</span>
+  }
+
+  public void setSleepingAllowed(boolean sleepingAllowed) {
+<span class="fc" id="L760">    m_allowSleep = sleepingAllowed;</span>
+<span class="fc" id="L761">  }</span>
+
+  /// Enable/disable warm starting. For testing.
+  ///
+  /// @param flag
+  public void setWarmStarting(boolean flag) {
+<span class="fc" id="L767">    m_warmStarting = flag;</span>
+<span class="fc" id="L768">  }</span>
+
+  public boolean isWarmStarting() {
+<span class="fc" id="L771">    return m_warmStarting;</span>
+  }
+
+  /// Enable/disable continuous physics. For testing.
+  ///
+  /// @param flag
+  public void setContinuousPhysics(boolean flag) {
+<span class="fc" id="L778">    m_continuousPhysics = flag;</span>
+<span class="fc" id="L779">  }</span>
+
+  public boolean isContinuousPhysics() {
+<span class="fc" id="L782">    return m_continuousPhysics;</span>
+  }
+
+
+
+  /// Get the number of broad-phase proxies.
+  ///
+  /// @return
+  public int getProxyCount() {
+<span class="fc" id="L791">    return m_contactManager.m_broadPhase.getProxyCount();</span>
+  }
+
+  /// Get the number of bodies.
+  ///
+  /// @return
+  public int getBodyCount() {
+<span class="fc" id="L798">    return m_bodyCount;</span>
+  }
+
+  /// Get the number of joints.
+  ///
+  /// @return
+  public int getJointCount() {
+<span class="fc" id="L805">    return m_jointCount;</span>
+  }
+
+  /// Get the number of contacts (each may have 0 or more contact points).
+  ///
+  /// @return
+  public int getContactCount() {
+<span class="fc" id="L812">    return m_contactManager.m_contactCount;</span>
+  }
+
+  /// Gets the height of the dynamic tree
+  ///
+  /// @return
+  public int getTreeHeight() {
+<span class="fc" id="L819">    return m_contactManager.m_broadPhase.getTreeHeight();</span>
+  }
+
+  /// Gets the balance of the dynamic tree
+  ///
+  /// @return
+  public int getTreeBalance() {
+<span class="fc" id="L826">    return m_contactManager.m_broadPhase.getTreeBalance();</span>
+  }
+
+  /// Gets the quality of the dynamic tree
+  ///
+  /// @return
+  public float getTreeQuality() {
+<span class="fc" id="L833">    return m_contactManager.m_broadPhase.getTreeQuality();</span>
+  }
+
+  /// Change the global gravity vector.
+  ///
+  /// @param gravity
+  public void setGravity(Vec2 gravity) {
+<span class="fc" id="L840">    m_gravity.set(gravity);</span>
+<span class="fc" id="L841">  }</span>
+
+  /// Get the global gravity vector.
+  ///
+  /// @return
+  public Vec2 getGravity() {
+<span class="fc" id="L847">    return m_gravity;</span>
+  }
+
+  /// Is the world locked (in the middle of a time step).
+  ///
+  /// @return
+  public boolean isLocked() {
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">    return (m_flags &amp; LOCKED) == LOCKED;</span>
+  }
+
+  /// Set flag to control automatic clearing of forces after each time step.
+  ///
+  /// @param flag
+  public void setAutoClearForces(boolean flag) {
+<span class="pc bpc" id="L861" title="1 of 2 branches missed.">    if (flag) {</span>
+<span class="nc" id="L862">      m_flags |= CLEAR_FORCES;</span>
+    } else {
+<span class="fc" id="L864">      m_flags &amp;= ~CLEAR_FORCES;</span>
+    }
+<span class="fc" id="L866">  }</span>
+
+  /// Get the flag that controls automatic clearing of forces after each time step.
+  ///
+  /// @return
+  public boolean getAutoClearForces() {
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">    return (m_flags &amp; CLEAR_FORCES) == CLEAR_FORCES;</span>
+  }
+
+  /// Get the contact manager for testing purposes
+  ///
+  /// @return
+  public ContactManager getContactManager() {
+<span class="nc" id="L879">    return m_contactManager;</span>
+  }
+
+  public Profile getProfile() {
+<span class="nc" id="L883">    return m_profile;</span>
+  }
+
+<span class="fc" id="L886">  private final Island island = new Island();</span>
+<span class="fc" id="L887">  private Body[] stack = new Body[10]; // TODO djm find a good initial stack number;</span>
+<span class="fc" id="L888">  private final Profile islandProfile = new Profile();</span>
+<span class="fc" id="L889">  private long broadphaseTimer = System.currentTimeMillis();</span>
+
+  private void solve(TimeStep step) {
+<span class="fc" id="L892">    m_profile.solveInit = 0;</span>
+<span class="fc" id="L893">    m_profile.solveVelocity = 0;</span>
+<span class="fc" id="L894">    m_profile.solvePosition = 0;</span>
+
+    // Size the island for the worst case.
+<span class="fc" id="L897">    island.init(m_bodyCount, m_contactManager.m_contactCount, m_jointCount,</span>
+        m_contactManager.m_contactListener);
+
+    // Clear all the island flags.
+<span class="fc bfc" id="L901" title="All 2 branches covered.">    for (Body b = m_bodyList; b != null; b = b.m_next) {</span>
+<span class="fc" id="L902">      b.m_flags &amp;= ~Body.e_islandFlag;</span>
+    }
+<span class="fc bfc" id="L904" title="All 2 branches covered.">    for (Contact c = m_contactManager.m_contactList; c != null; c = c.m_next) {</span>
+<span class="fc" id="L905">      c.m_flags &amp;= ~Contact.ISLAND_FLAG;</span>
+    }
+<span class="fc bfc" id="L907" title="All 2 branches covered.">    for (Joint j = m_jointList; j != null; j = j.m_next) {</span>
+<span class="fc" id="L908">      j.m_islandFlag = false;</span>
+    }
+
+    // Build and simulate all awake islands.
+<span class="fc" id="L912">    int stackSize = m_bodyCount;</span>
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">    if (stack.length &lt; stackSize) {</span>
+<span class="nc" id="L914">      stack = new Body[stackSize];</span>
+    }
+<span class="fc bfc" id="L916" title="All 2 branches covered.">    for (Body seed = m_bodyList; seed != null; seed = seed.m_next) {</span>
+<span class="fc bfc" id="L917" title="All 2 branches covered.">      if ((seed.m_flags &amp; Body.e_islandFlag) == Body.e_islandFlag) {</span>
+<span class="fc" id="L918">        continue;</span>
+      }
+
+<span class="pc bpc" id="L921" title="1 of 4 branches missed.">      if (seed.isAwake() == false || seed.isActive() == false) {</span>
+<span class="nc" id="L922">        continue;</span>
+      }
+
+      // The seed can be dynamic or kinematic.
+<span class="fc bfc" id="L926" title="All 2 branches covered.">      if (seed.getType() == BodyType.STATIC) {</span>
+<span class="fc" id="L927">        continue;</span>
+      }
+
+      // Reset island and stack.
+<span class="fc" id="L931">      island.clear();</span>
+<span class="fc" id="L932">      int stackCount = 0;</span>
+<span class="fc" id="L933">      stack[stackCount++] = seed;</span>
+<span class="fc" id="L934">      seed.m_flags |= Body.e_islandFlag;</span>
+
+      // Perform a depth first search (DFS) on the constraint graph.
+<span class="fc bfc" id="L937" title="All 2 branches covered.">      while (stackCount &gt; 0) {</span>
+        // Grab the next body off the stack and add it to the island.
+<span class="fc" id="L939">        Body b = stack[--stackCount];</span>
+<span class="pc bpc" id="L940" title="2 of 4 branches missed.">        assert (b.isActive() == true);</span>
+<span class="fc" id="L941">        island.add(b);</span>
+
+        // Make sure the body is awake.
+<span class="fc" id="L944">        b.setAwake(true);</span>
+
+        // To keep islands as small as possible, we don't
+        // propagate islands across static bodies.
+<span class="fc bfc" id="L948" title="All 2 branches covered.">        if (b.getType() == BodyType.STATIC) {</span>
+<span class="fc" id="L949">          continue;</span>
+        }
+
+        // Search all contacts connected to this body.
+<span class="fc bfc" id="L953" title="All 2 branches covered.">        for (ContactEdge ce = b.m_contactList; ce != null; ce = ce.next) {</span>
+<span class="fc" id="L954">          Contact contact = ce.contact;</span>
+
+          // Has this contact already been added to an island?
+<span class="fc bfc" id="L957" title="All 2 branches covered.">          if ((contact.m_flags &amp; Contact.ISLAND_FLAG) == Contact.ISLAND_FLAG) {</span>
+<span class="fc" id="L958">            continue;</span>
+          }
+
+          // Is this contact solid and touching?
+<span class="pc bpc" id="L962" title="1 of 4 branches missed.">          if (contact.isEnabled() == false || contact.isTouching() == false) {</span>
+<span class="fc" id="L963">            continue;</span>
+          }
+
+          // Skip sensors.
+<span class="fc" id="L967">          boolean sensorA = contact.m_fixtureA.m_isSensor;</span>
+<span class="fc" id="L968">          boolean sensorB = contact.m_fixtureB.m_isSensor;</span>
+<span class="pc bpc" id="L969" title="2 of 4 branches missed.">          if (sensorA || sensorB) {</span>
+<span class="nc" id="L970">            continue;</span>
+          }
+
+<span class="fc" id="L973">          island.add(contact);</span>
+<span class="fc" id="L974">          contact.m_flags |= Contact.ISLAND_FLAG;</span>
+
+<span class="fc" id="L976">          Body other = ce.other;</span>
+
+          // Was the other body already added to this island?
+<span class="fc bfc" id="L979" title="All 2 branches covered.">          if ((other.m_flags &amp; Body.e_islandFlag) == Body.e_islandFlag) {</span>
+<span class="fc" id="L980">            continue;</span>
+          }
+
+<span class="pc bpc" id="L983" title="2 of 4 branches missed.">          assert (stackCount &lt; stackSize);</span>
+<span class="fc" id="L984">          stack[stackCount++] = other;</span>
+<span class="fc" id="L985">          other.m_flags |= Body.e_islandFlag;</span>
+        }
+
+        // Search all joints connect to this body.
+<span class="fc bfc" id="L989" title="All 2 branches covered.">        for (JointEdge je = b.m_jointList; je != null; je = je.next) {</span>
+<span class="fc bfc" id="L990" title="All 2 branches covered.">          if (je.joint.m_islandFlag == true) {</span>
+<span class="fc" id="L991">            continue;</span>
+          }
+
+<span class="fc" id="L994">          Body other = je.other;</span>
+
+          // Don't simulate joints connected to inactive bodies.
+<span class="pc bpc" id="L997" title="1 of 2 branches missed.">          if (other.isActive() == false) {</span>
+<span class="nc" id="L998">            continue;</span>
+          }
+
+<span class="fc" id="L1001">          island.add(je.joint);</span>
+<span class="fc" id="L1002">          je.joint.m_islandFlag = true;</span>
+
+<span class="fc bfc" id="L1004" title="All 2 branches covered.">          if ((other.m_flags &amp; Body.e_islandFlag) == Body.e_islandFlag) {</span>
+<span class="fc" id="L1005">            continue;</span>
+          }
+
+<span class="pc bpc" id="L1008" title="2 of 4 branches missed.">          assert (stackCount &lt; stackSize);</span>
+<span class="fc" id="L1009">          stack[stackCount++] = other;</span>
+<span class="fc" id="L1010">          other.m_flags |= Body.e_islandFlag;</span>
+        }
+<span class="fc" id="L1012">      }</span>
+<span class="fc" id="L1013">      island.solve(islandProfile, step, m_gravity, m_allowSleep);</span>
+<span class="fc" id="L1014">      m_profile.solveInit += islandProfile.solveInit;</span>
+<span class="fc" id="L1015">      m_profile.solveVelocity += islandProfile.solveVelocity;</span>
+<span class="fc" id="L1016">      m_profile.solvePosition += islandProfile.solvePosition;</span>
+
+      // Post solve cleanup.
+<span class="fc bfc" id="L1019" title="All 2 branches covered.">      for (int i = 0; i &lt; island.m_bodyCount; ++i) {</span>
+        // Allow static bodies to participate in other islands.
+<span class="fc" id="L1021">        Body b = island.m_bodies[i];</span>
+<span class="fc bfc" id="L1022" title="All 2 branches covered.">        if (b.getType() == BodyType.STATIC) {</span>
+<span class="fc" id="L1023">          b.m_flags &amp;= ~Body.e_islandFlag;</span>
+        }
+      }
+    }
+
+<span class="fc" id="L1028">    broadphaseTimer = System.currentTimeMillis();</span>
+    // Synchronize fixtures, check for out of range bodies.
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">    for (Body b = m_bodyList; b != null; b = b.getNext()) {</span>
+      // If a body was not in an island then it did not move.
+<span class="fc bfc" id="L1032" title="All 2 branches covered.">      if ((b.m_flags &amp; Body.e_islandFlag) == 0) {</span>
+<span class="fc" id="L1033">        continue;</span>
+      }
+
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">      if (b.getType() == BodyType.STATIC) {</span>
+<span class="nc" id="L1037">        continue;</span>
+      }
+
+      // Update fixtures (for broad-phase).
+<span class="fc" id="L1041">      b.synchronizeFixtures();</span>
+    }
+
+    // Look for new contacts.
+<span class="fc" id="L1045">    m_contactManager.findNewContacts();</span>
+<span class="fc" id="L1046">    m_profile.broadphase = System.currentTimeMillis() - broadphaseTimer;</span>
+<span class="fc" id="L1047">  }</span>
+
+<span class="fc" id="L1049">  private final Island toiIsland = new Island();</span>
+<span class="fc" id="L1050">  private final TOIInput toiInput = new TOIInput();</span>
+<span class="fc" id="L1051">  private final TOIOutput toiOutput = new TOIOutput();</span>
+<span class="fc" id="L1052">  private final TimeStep subStep = new TimeStep();</span>
+<span class="fc" id="L1053">  private final Body[] tempBodies = new Body[2];</span>
+<span class="fc" id="L1054">  private final Sweep backup1 = new Sweep();</span>
+<span class="fc" id="L1055">  private final Sweep backup2 = new Sweep();</span>
+
+  private void solveTOI(final TimeStep step) {
+
+<span class="fc" id="L1059">    final Island island = toiIsland;</span>
+<span class="fc" id="L1060">    island.init(2 * Settings.maxTOIContacts, Settings.maxTOIContacts, 0,</span>
+        m_contactManager.m_contactListener);
+<span class="pc bpc" id="L1062" title="1 of 2 branches missed.">    if (m_stepComplete) {</span>
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">      for (Body b = m_bodyList; b != null; b = b.m_next) {</span>
+<span class="fc" id="L1064">        b.m_flags &amp;= ~Body.e_islandFlag;</span>
+<span class="fc" id="L1065">        b.m_sweep.alpha0 = 0.0f;</span>
+      }
+
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">      for (Contact c = m_contactManager.m_contactList; c != null; c = c.m_next) {</span>
+        // Invalidate TOI
+<span class="fc" id="L1070">        c.m_flags &amp;= ~(Contact.TOI_FLAG | Contact.ISLAND_FLAG);</span>
+<span class="fc" id="L1071">        c.m_toiCount = 0;</span>
+<span class="fc" id="L1072">        c.m_toi = 1.0f;</span>
+      }
+    }
+
+    // Find TOI events and solve them.
+    for (;;) {
+      // Find the first TOI.
+<span class="fc" id="L1079">      Contact minContact = null;</span>
+<span class="fc" id="L1080">      float minAlpha = 1.0f;</span>
+
+<span class="fc bfc" id="L1082" title="All 2 branches covered.">      for (Contact c = m_contactManager.m_contactList; c != null; c = c.m_next) {</span>
+        // Is this contact disabled?
+<span class="fc bfc" id="L1084" title="All 2 branches covered.">        if (c.isEnabled() == false) {</span>
+<span class="fc" id="L1085">          continue;</span>
+        }
+
+        // Prevent excessive sub-stepping.
+<span class="pc bpc" id="L1089" title="1 of 2 branches missed.">        if (c.m_toiCount &gt; Settings.maxSubSteps) {</span>
+<span class="nc" id="L1090">          continue;</span>
+        }
+
+<span class="fc" id="L1093">        float alpha = 1.0f;</span>
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">        if ((c.m_flags &amp; Contact.TOI_FLAG) != 0) {</span>
+          // This contact has a valid cached TOI.
+<span class="nc" id="L1096">          alpha = c.m_toi;</span>
+        } else {
+<span class="fc" id="L1098">          Fixture fA = c.getFixtureA();</span>
+<span class="fc" id="L1099">          Fixture fB = c.getFixtureB();</span>
+
+          // Is there a sensor?
+<span class="pc bpc" id="L1102" title="2 of 4 branches missed.">          if (fA.isSensor() || fB.isSensor()) {</span>
+<span class="nc" id="L1103">            continue;</span>
+          }
+
+<span class="fc" id="L1106">          Body bA = fA.getBody();</span>
+<span class="fc" id="L1107">          Body bB = fB.getBody();</span>
+
+<span class="fc" id="L1109">          BodyType typeA = bA.m_type;</span>
+<span class="fc" id="L1110">          BodyType typeB = bB.m_type;</span>
+<span class="pc bpc" id="L1111" title="2 of 6 branches missed.">          assert (typeA == BodyType.DYNAMIC || typeB == BodyType.DYNAMIC);</span>
+
+<span class="fc bfc" id="L1113" title="All 4 branches covered.">          boolean activeA = bA.isAwake() &amp;&amp; typeA != BodyType.STATIC;</span>
+<span class="pc bpc" id="L1114" title="1 of 4 branches missed.">          boolean activeB = bB.isAwake() &amp;&amp; typeB != BodyType.STATIC;</span>
+
+          // Is at least one body active (awake and dynamic or kinematic)?
+<span class="fc bfc" id="L1117" title="All 4 branches covered.">          if (activeA == false &amp;&amp; activeB == false) {</span>
+<span class="fc" id="L1118">            continue;</span>
+          }
+
+<span class="pc bpc" id="L1121" title="1 of 4 branches missed.">          boolean collideA = bA.isBullet() || typeA != BodyType.DYNAMIC;</span>
+<span class="pc bpc" id="L1122" title="1 of 4 branches missed.">          boolean collideB = bB.isBullet() || typeB != BodyType.DYNAMIC;</span>
+
+          // Are these two non-bullet dynamic bodies?
+<span class="pc bpc" id="L1125" title="1 of 4 branches missed.">          if (collideA == false &amp;&amp; collideB == false) {</span>
+<span class="fc" id="L1126">            continue;</span>
+          }
+
+          // Compute the TOI for this contact.
+          // Put the sweeps onto the same time interval.
+<span class="fc" id="L1131">          float alpha0 = bA.m_sweep.alpha0;</span>
+
+<span class="pc bpc" id="L1133" title="1 of 2 branches missed.">          if (bA.m_sweep.alpha0 &lt; bB.m_sweep.alpha0) {</span>
+<span class="nc" id="L1134">            alpha0 = bB.m_sweep.alpha0;</span>
+<span class="nc" id="L1135">            bA.m_sweep.advance(alpha0);</span>
+<span class="pc bpc" id="L1136" title="1 of 2 branches missed.">          } else if (bB.m_sweep.alpha0 &lt; bA.m_sweep.alpha0) {</span>
+<span class="nc" id="L1137">            alpha0 = bA.m_sweep.alpha0;</span>
+<span class="nc" id="L1138">            bB.m_sweep.advance(alpha0);</span>
+          }
+
+<span class="pc bpc" id="L1141" title="2 of 4 branches missed.">          assert (alpha0 &lt; 1.0f);</span>
+
+<span class="fc" id="L1143">          int indexA = c.getChildIndexA();</span>
+<span class="fc" id="L1144">          int indexB = c.getChildIndexB();</span>
+
+          // Compute the time of impact in interval [0, minTOI]
+<span class="fc" id="L1147">          final TOIInput input = toiInput;</span>
+<span class="fc" id="L1148">          input.proxyA.set(fA.getShape(), indexA);</span>
+<span class="fc" id="L1149">          input.proxyB.set(fB.getShape(), indexB);</span>
+<span class="fc" id="L1150">          input.sweepA.set(bA.m_sweep);</span>
+<span class="fc" id="L1151">          input.sweepB.set(bB.m_sweep);</span>
+<span class="fc" id="L1152">          input.tMax = 1.0f;</span>
+
+<span class="fc" id="L1154">          pool.getTimeOfImpact().timeOfImpact(toiOutput, input);</span>
+
+          // Beta is the fraction of the remaining portion of the .
+<span class="fc" id="L1157">          float beta = toiOutput.t;</span>
+<span class="fc bfc" id="L1158" title="All 2 branches covered.">          if (toiOutput.state == TOIOutputState.TOUCHING) {</span>
+<span class="fc" id="L1159">            alpha = MathUtils.min(alpha0 + (1.0f - alpha0) * beta, 1.0f);</span>
+          } else {
+<span class="fc" id="L1161">            alpha = 1.0f;</span>
+          }
+
+<span class="fc" id="L1164">          c.m_toi = alpha;</span>
+<span class="fc" id="L1165">          c.m_flags |= Contact.TOI_FLAG;</span>
+        }
+
+<span class="fc bfc" id="L1168" title="All 2 branches covered.">        if (alpha &lt; minAlpha) {</span>
+          // This is the minimum TOI found so far.
+<span class="fc" id="L1170">          minContact = c;</span>
+<span class="fc" id="L1171">          minAlpha = alpha;</span>
+        }
+      }
+
+<span class="pc bpc" id="L1175" title="1 of 4 branches missed.">      if (minContact == null || 1.0f - 10.0f * Settings.EPSILON &lt; minAlpha) {</span>
+        // No more TOI events. Done!
+<span class="fc" id="L1177">        m_stepComplete = true;</span>
+<span class="fc" id="L1178">        break;</span>
+      }
+
+      // Advance the bodies to the TOI.
+<span class="fc" id="L1182">      Fixture fA = minContact.getFixtureA();</span>
+<span class="fc" id="L1183">      Fixture fB = minContact.getFixtureB();</span>
+<span class="fc" id="L1184">      Body bA = fA.getBody();</span>
+<span class="fc" id="L1185">      Body bB = fB.getBody();</span>
+
+<span class="fc" id="L1187">      backup1.set(bA.m_sweep);</span>
+<span class="fc" id="L1188">      backup2.set(bB.m_sweep);</span>
+
+<span class="fc" id="L1190">      bA.advance(minAlpha);</span>
+<span class="fc" id="L1191">      bB.advance(minAlpha);</span>
+
+      // The TOI contact likely has some new contact points.
+<span class="fc" id="L1194">      minContact.update(m_contactManager.m_contactListener);</span>
+<span class="fc" id="L1195">      minContact.m_flags &amp;= ~Contact.TOI_FLAG;</span>
+<span class="fc" id="L1196">      ++minContact.m_toiCount;</span>
+
+      // Is the contact solid?
+<span class="pc bpc" id="L1199" title="2 of 4 branches missed.">      if (minContact.isEnabled() == false || minContact.isTouching() == false) {</span>
+        // Restore the sweeps.
+<span class="nc" id="L1201">        minContact.setEnabled(false);</span>
+<span class="nc" id="L1202">        bA.m_sweep.set(backup1);</span>
+<span class="nc" id="L1203">        bB.m_sweep.set(backup2);</span>
+<span class="nc" id="L1204">        bA.synchronizeTransform();</span>
+<span class="nc" id="L1205">        bB.synchronizeTransform();</span>
+<span class="nc" id="L1206">        continue;</span>
+      }
+
+<span class="fc" id="L1209">      bA.setAwake(true);</span>
+<span class="fc" id="L1210">      bB.setAwake(true);</span>
+
+      // Build the island
+<span class="fc" id="L1213">      island.clear();</span>
+<span class="fc" id="L1214">      island.add(bA);</span>
+<span class="fc" id="L1215">      island.add(bB);</span>
+<span class="fc" id="L1216">      island.add(minContact);</span>
+
+<span class="fc" id="L1218">      bA.m_flags |= Body.e_islandFlag;</span>
+<span class="fc" id="L1219">      bB.m_flags |= Body.e_islandFlag;</span>
+<span class="fc" id="L1220">      minContact.m_flags |= Contact.ISLAND_FLAG;</span>
+
+      // Get contacts on bodyA and bodyB.
+<span class="fc" id="L1223">      tempBodies[0] = bA;</span>
+<span class="fc" id="L1224">      tempBodies[1] = bB;</span>
+<span class="fc bfc" id="L1225" title="All 2 branches covered.">      for (int i = 0; i &lt; 2; ++i) {</span>
+<span class="fc" id="L1226">        Body body = tempBodies[i];</span>
+<span class="fc bfc" id="L1227" title="All 2 branches covered.">        if (body.m_type == BodyType.DYNAMIC) {</span>
+<span class="fc bfc" id="L1228" title="All 2 branches covered.">          for (ContactEdge ce = body.m_contactList; ce != null; ce = ce.next) {</span>
+<span class="pc bpc" id="L1229" title="1 of 2 branches missed.">            if (island.m_bodyCount == island.m_bodyCapacity) {</span>
+<span class="nc" id="L1230">              break;</span>
+            }
+
+<span class="pc bpc" id="L1233" title="1 of 2 branches missed.">            if (island.m_contactCount == island.m_contactCapacity) {</span>
+<span class="nc" id="L1234">              break;</span>
+            }
+
+<span class="fc" id="L1237">            Contact contact = ce.contact;</span>
+
+            // Has this contact already been added to the island?
+<span class="fc bfc" id="L1240" title="All 2 branches covered.">            if ((contact.m_flags &amp; Contact.ISLAND_FLAG) != 0) {</span>
+<span class="fc" id="L1241">              continue;</span>
+            }
+
+            // Only add static, kinematic, or bullet bodies.
+<span class="fc" id="L1245">            Body other = ce.other;</span>
+<span class="pc bpc" id="L1246" title="2 of 4 branches missed.">            if (other.m_type == BodyType.DYNAMIC &amp;&amp; body.isBullet() == false</span>
+<span class="pc bpc" id="L1247" title="1 of 2 branches missed.">                &amp;&amp; other.isBullet() == false) {</span>
+<span class="fc" id="L1248">              continue;</span>
+            }
+
+            // Skip sensors.
+<span class="nc" id="L1252">            boolean sensorA = contact.m_fixtureA.m_isSensor;</span>
+<span class="nc" id="L1253">            boolean sensorB = contact.m_fixtureB.m_isSensor;</span>
+<span class="nc bnc" id="L1254" title="All 4 branches missed.">            if (sensorA || sensorB) {</span>
+<span class="nc" id="L1255">              continue;</span>
+            }
+
+            // Tentatively advance the body to the TOI.
+<span class="nc" id="L1259">            backup1.set(other.m_sweep);</span>
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">            if ((other.m_flags &amp; Body.e_islandFlag) == 0) {</span>
+<span class="nc" id="L1261">              other.advance(minAlpha);</span>
+            }
+
+            // Update the contact points
+<span class="nc" id="L1265">            contact.update(m_contactManager.m_contactListener);</span>
+
+            // Was the contact disabled by the user?
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">            if (contact.isEnabled() == false) {</span>
+<span class="nc" id="L1269">              other.m_sweep.set(backup1);</span>
+<span class="nc" id="L1270">              other.synchronizeTransform();</span>
+<span class="nc" id="L1271">              continue;</span>
+            }
+
+            // Are there contact points?
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">            if (contact.isTouching() == false) {</span>
+<span class="nc" id="L1276">              other.m_sweep.set(backup1);</span>
+<span class="nc" id="L1277">              other.synchronizeTransform();</span>
+<span class="nc" id="L1278">              continue;</span>
+            }
+
+            // Add the contact to the island
+<span class="nc" id="L1282">            contact.m_flags |= Contact.ISLAND_FLAG;</span>
+<span class="nc" id="L1283">            island.add(contact);</span>
+
+            // Has the other body already been added to the island?
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">            if ((other.m_flags &amp; Body.e_islandFlag) != 0) {</span>
+<span class="nc" id="L1287">              continue;</span>
+            }
+
+            // Add the other body to the island.
+<span class="nc" id="L1291">            other.m_flags |= Body.e_islandFlag;</span>
+
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">            if (other.m_type != BodyType.STATIC) {</span>
+<span class="nc" id="L1294">              other.setAwake(true);</span>
+            }
+
+<span class="nc" id="L1297">            island.add(other);</span>
+          }
+        }
+      }
+
+<span class="fc" id="L1302">      subStep.dt = (1.0f - minAlpha) * step.dt;</span>
+<span class="fc" id="L1303">      subStep.inv_dt = 1.0f / subStep.dt;</span>
+<span class="fc" id="L1304">      subStep.dtRatio = 1.0f;</span>
+<span class="fc" id="L1305">      subStep.positionIterations = 20;</span>
+<span class="fc" id="L1306">      subStep.velocityIterations = step.velocityIterations;</span>
+<span class="fc" id="L1307">      subStep.warmStarting = false;</span>
+<span class="fc" id="L1308">      island.solveTOI(subStep, bA.m_islandIndex, bB.m_islandIndex);</span>
+
+      // Reset island flags and synchronize broad-phase proxies.
+<span class="fc bfc" id="L1311" title="All 2 branches covered.">      for (int i = 0; i &lt; island.m_bodyCount; ++i) {</span>
+<span class="fc" id="L1312">        Body body = island.m_bodies[i];</span>
+<span class="fc" id="L1313">        body.m_flags &amp;= ~Body.e_islandFlag;</span>
+
+<span class="fc bfc" id="L1315" title="All 2 branches covered.">        if (body.m_type != BodyType.DYNAMIC) {</span>
+<span class="fc" id="L1316">          continue;</span>
+        }
+
+<span class="fc" id="L1319">        body.synchronizeFixtures();</span>
+
+        // Invalidate all contact TOIs on this displaced body.
+<span class="fc bfc" id="L1322" title="All 2 branches covered.">        for (ContactEdge ce = body.m_contactList; ce != null; ce = ce.next) {</span>
+<span class="fc" id="L1323">          ce.contact.m_flags &amp;= ~(Contact.TOI_FLAG | Contact.ISLAND_FLAG);</span>
+        }
+      }
+
+      // Commit fixture proxy movements to the broad-phase so that new contacts are created.
+      // Also, some contacts can be destroyed.
+<span class="fc" id="L1329">      m_contactManager.findNewContacts();</span>
+
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">      if (m_subStepping) {</span>
+<span class="nc" id="L1332">        m_stepComplete = false;</span>
+<span class="nc" id="L1333">        break;</span>
+      }
+<span class="fc" id="L1335">    }</span>
+<span class="fc" id="L1336">  }</span>
+
+  private void drawJoint(Joint joint) {
+<span class="fc" id="L1339">    Body bodyA = joint.getBodyA();</span>
+<span class="fc" id="L1340">    Body bodyB = joint.getBodyB();</span>
+<span class="fc" id="L1341">    Transform xf1 = bodyA.getTransform();</span>
+<span class="fc" id="L1342">    Transform xf2 = bodyB.getTransform();</span>
+<span class="fc" id="L1343">    Vec2 x1 = xf1.p;</span>
+<span class="fc" id="L1344">    Vec2 x2 = xf2.p;</span>
+<span class="fc" id="L1345">    Vec2 p1 = pool.popVec2();</span>
+<span class="fc" id="L1346">    Vec2 p2 = pool.popVec2();</span>
+<span class="fc" id="L1347">    joint.getAnchorA(p1);</span>
+<span class="fc" id="L1348">    joint.getAnchorB(p2);</span>
+
+<span class="fc" id="L1350">    color.set(0.5f, 0.8f, 0.8f);</span>
+
+<span class="pc bpc" id="L1352" title="3 of 4 branches missed.">    switch (joint.getType()) {</span>
+    // TODO djm write after writing joints
+      case DISTANCE:
+<span class="nc" id="L1355">        m_debugDraw.drawSegment(p1, p2, color);</span>
+<span class="nc" id="L1356">        break;</span>
+
+      case PULLEY: {
+<span class="nc" id="L1359">        PulleyJoint pulley = (PulleyJoint) joint;</span>
+<span class="nc" id="L1360">        Vec2 s1 = pulley.getGroundAnchorA();</span>
+<span class="nc" id="L1361">        Vec2 s2 = pulley.getGroundAnchorB();</span>
+<span class="nc" id="L1362">        m_debugDraw.drawSegment(s1, p1, color);</span>
+<span class="nc" id="L1363">        m_debugDraw.drawSegment(s2, p2, color);</span>
+<span class="nc" id="L1364">        m_debugDraw.drawSegment(s1, s2, color);</span>
+      }
+<span class="nc" id="L1366">        break;</span>
+      case CONSTANT_VOLUME:
+      case MOUSE:
+        // don't draw this
+<span class="nc" id="L1370">        break;</span>
+      default:
+<span class="fc" id="L1372">        m_debugDraw.drawSegment(x1, p1, color);</span>
+<span class="fc" id="L1373">        m_debugDraw.drawSegment(p1, p2, color);</span>
+<span class="fc" id="L1374">        m_debugDraw.drawSegment(x2, p2, color);</span>
+    }
+<span class="fc" id="L1376">    pool.pushVec2(2);</span>
+<span class="fc" id="L1377">  }</span>
+
+  // NOTE this corresponds to the liquid test, so the debugdraw can draw
+  // the liquid particles correctly. They should be the same.
+<span class="fc" id="L1381">  private static Integer LIQUID_INT = new Integer(1234598372);</span>
+<span class="fc" id="L1382">  private float liquidLength = .12f;</span>
+<span class="fc" id="L1383">  private float averageLinearVel = -1;</span>
+<span class="fc" id="L1384">  private final Vec2 liquidOffset = new Vec2();</span>
+<span class="fc" id="L1385">  private final Vec2 circCenterMoved = new Vec2();</span>
+<span class="fc" id="L1386">  private final Color3f liquidColor = new Color3f(.4f, .4f, 1f);</span>
+
+<span class="fc" id="L1388">  private final Vec2 center = new Vec2();</span>
+<span class="fc" id="L1389">  private final Vec2 axis = new Vec2();</span>
+<span class="fc" id="L1390">  private final Vec2 v1 = new Vec2();</span>
+<span class="fc" id="L1391">  private final Vec2 v2 = new Vec2();</span>
+<span class="fc" id="L1392">  private final Vec2Array tlvertices = new Vec2Array();</span>
+
+  private void drawShape(Fixture fixture, Transform xf, Color3f color) {
+<span class="pc bpc" id="L1395" title="3 of 5 branches missed.">    switch (fixture.getType()) {</span>
+      case CIRCLE: {
+<span class="fc" id="L1397">        CircleShape circle = (CircleShape) fixture.getShape();</span>
+
+        // Vec2 center = Mul(xf, circle.m_p);
+<span class="fc" id="L1400">        Transform.mulToOutUnsafe(xf, circle.m_p, center);</span>
+<span class="fc" id="L1401">        float radius = circle.m_radius;</span>
+<span class="fc" id="L1402">        xf.q.getXAxis(axis);</span>
+
+<span class="pc bpc" id="L1404" title="3 of 4 branches missed.">        if (fixture.getUserData() != null &amp;&amp; fixture.getUserData().equals(LIQUID_INT)) {</span>
+<span class="nc" id="L1405">          Body b = fixture.getBody();</span>
+<span class="nc" id="L1406">          liquidOffset.set(b.m_linearVelocity);</span>
+<span class="nc" id="L1407">          float linVelLength = b.m_linearVelocity.length();</span>
+<span class="nc bnc" id="L1408" title="All 2 branches missed.">          if (averageLinearVel == -1) {</span>
+<span class="nc" id="L1409">            averageLinearVel = linVelLength;</span>
+          } else {
+<span class="nc" id="L1411">            averageLinearVel = .98f * averageLinearVel + .02f * linVelLength;</span>
+          }
+<span class="nc" id="L1413">          liquidOffset.mulLocal(liquidLength / averageLinearVel / 2);</span>
+<span class="nc" id="L1414">          circCenterMoved.set(center).addLocal(liquidOffset);</span>
+<span class="nc" id="L1415">          center.subLocal(liquidOffset);</span>
+<span class="nc" id="L1416">          m_debugDraw.drawSegment(center, circCenterMoved, liquidColor);</span>
+<span class="nc" id="L1417">          return;</span>
+        }
+
+<span class="fc" id="L1420">        m_debugDraw.drawSolidCircle(center, radius, axis, color);</span>
+      }
+<span class="fc" id="L1422">        break;</span>
+
+      case POLYGON: {
+<span class="fc" id="L1425">        PolygonShape poly = (PolygonShape) fixture.getShape();</span>
+<span class="fc" id="L1426">        int vertexCount = poly.m_count;</span>
+<span class="pc bpc" id="L1427" title="2 of 4 branches missed.">        assert (vertexCount &lt;= Settings.maxPolygonVertices);</span>
+<span class="fc" id="L1428">        Vec2[] vertices = tlvertices.get(Settings.maxPolygonVertices);</span>
+
+<span class="fc bfc" id="L1430" title="All 2 branches covered.">        for (int i = 0; i &lt; vertexCount; ++i) {</span>
+          // vertices[i] = Mul(xf, poly.m_vertices[i]);
+<span class="fc" id="L1432">          Transform.mulToOutUnsafe(xf, poly.m_vertices[i], vertices[i]);</span>
+        }
+
+<span class="fc" id="L1435">        m_debugDraw.drawSolidPolygon(vertices, vertexCount, color);</span>
+      }
+<span class="fc" id="L1437">        break;</span>
+      case EDGE: {
+<span class="nc" id="L1439">        EdgeShape edge = (EdgeShape) fixture.getShape();</span>
+<span class="nc" id="L1440">        Transform.mulToOutUnsafe(xf, edge.m_vertex1, v1);</span>
+<span class="nc" id="L1441">        Transform.mulToOutUnsafe(xf, edge.m_vertex2, v2);</span>
+<span class="nc" id="L1442">        m_debugDraw.drawSegment(v1, v2, color);</span>
+      }
+<span class="nc" id="L1444">        break;</span>
+
+      case CHAIN: {
+<span class="nc" id="L1447">        ChainShape chain = (ChainShape) fixture.getShape();</span>
+<span class="nc" id="L1448">        int count = chain.m_count;</span>
+<span class="nc" id="L1449">        Vec2[] vertices = chain.m_vertices;</span>
+
+<span class="nc" id="L1451">        Transform.mulToOutUnsafe(xf, vertices[0], v1);</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">        for (int i = 1; i &lt; count; ++i) {</span>
+<span class="nc" id="L1453">          Transform.mulToOutUnsafe(xf, vertices[i], v2);</span>
+<span class="nc" id="L1454">          m_debugDraw.drawSegment(v1, v2, color);</span>
+<span class="nc" id="L1455">          m_debugDraw.drawCircle(v1, 0.05f, color);</span>
+<span class="nc" id="L1456">          v1.set(v2);</span>
+        }
+      }
+<span class="nc" id="L1459">        break;</span>
+      default:
+        break;
+    }
+<span class="fc" id="L1463">  }</span>
+}
+
+
+<span class="fc" id="L1467">class WorldQueryWrapper implements TreeCallback {</span>
+  public boolean treeCallback(int nodeId) {
+<span class="fc" id="L1469">    FixtureProxy proxy = (FixtureProxy) broadPhase.getUserData(nodeId);</span>
+<span class="fc" id="L1470">    return callback.reportFixture(proxy.fixture);</span>
+  }
+
+  BroadPhase broadPhase;
+  QueryCallback callback;
+};
+
+
+<span class="fc" id="L1478">class WorldRayCastWrapper implements TreeRayCastCallback {</span>
+
+  // djm pooling
+<span class="fc" id="L1481">  private final RayCastOutput output = new RayCastOutput();</span>
+<span class="fc" id="L1482">  private final Vec2 temp = new Vec2();</span>
+<span class="fc" id="L1483">  private final Vec2 point = new Vec2();</span>
+
+  public float raycastCallback(RayCastInput input, int nodeId) {
+<span class="fc" id="L1486">    Object userData = broadPhase.getUserData(nodeId);</span>
+<span class="fc" id="L1487">    FixtureProxy proxy = (FixtureProxy) userData;</span>
+<span class="fc" id="L1488">    Fixture fixture = proxy.fixture;</span>
+<span class="fc" id="L1489">    int index = proxy.childIndex;</span>
+<span class="fc" id="L1490">    boolean hit = fixture.raycast(output, input, index);</span>
+
+<span class="pc bpc" id="L1492" title="1 of 2 branches missed.">    if (hit) {</span>
+<span class="fc" id="L1493">      float fraction = output.fraction;</span>
+      // Vec2 point = (1.0f - fraction) * input.p1 + fraction * input.p2;
+<span class="fc" id="L1495">      temp.set(input.p2).mulLocal(fraction);</span>
+<span class="fc" id="L1496">      point.set(input.p1).mulLocal(1 - fraction).addLocal(temp);</span>
+<span class="fc" id="L1497">      return callback.reportFixture(fixture, point, output.normal, fraction);</span>
+    }
+
+<span class="nc" id="L1500">    return input.maxFraction;</span>
+  }
+
+  BroadPhase broadPhase;
+  RayCastCallback callback;
+};
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

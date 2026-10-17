@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeriesSample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SeriesSample.java</span></div><h1>SeriesSample.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// A run of measurements that share one record identity -- a beat-to-beat
+/// heart-rate trace, a cadence series.
+///
+/// #### Why this type exists
+///
+/// The two platforms disagree about grouping. Health Connect's
+/// `HeartRateRecord` is a single record containing many samples, and
+/// deleting it means deleting the record as a whole. HealthKit returns the
+/// same data as many independent samples with no grouping at all.
+///
+/// Flattening Health Connect into individual samples loses the identity
+/// you need in order to delete; inventing a series on iOS would claim a
+/// grouping that is not there. So the choice is yours:
+/// [SampleQuery#setFlattenSeries(boolean)] defaults to `true`, which gives
+/// both platforms plain [QuantitySample] objects and lets cross-platform
+/// code be identical. Turn it off when you need record identity -- and
+/// note that **iOS returns [QuantitySample] objects either way**, not
+/// one-point series, because HealthKit stores each measurement
+/// separately and has no record to preserve. Test the type rather than
+/// casting.
+///
+/// #### Storage
+///
+/// Values are held in parallel primitive arrays rather than a list of
+/// objects. A month of continuous heart rate is tens of thousands of
+/// points, and boxing each one is real memory pressure on a phone.
+public final class SeriesSample extends HealthSample {
+
+    private final long[] sampleStarts;
+    private final long[] sampleEnds;
+    private final double[] values;
+    private final HealthUnit unit;
+
+    private SeriesSample(HealthDataType type, long startMillis,
+            long endMillis, long[] sampleStarts, long[] sampleEnds,
+            double[] values, HealthUnit unit) {
+<span class="fc" id="L61">        super(type, startMillis, endMillis);</span>
+<span class="fc" id="L62">        this.sampleStarts = sampleStarts;</span>
+<span class="fc" id="L63">        this.sampleEnds = sampleEnds;</span>
+<span class="fc" id="L64">        this.values = values;</span>
+<span class="fc" id="L65">        this.unit = unit;</span>
+<span class="fc" id="L66">    }</span>
+
+    /// Creates a series. The three arrays must be the same length and are
+    /// copied defensively.
+    ///
+    /// **The measurements must be in chronological order.** Both platforms
+    /// produce them that way, and readers rely on it: a reader asked for
+    /// the newest N points of a long record takes them from the end rather
+    /// than sorting half a million measurements to find out where they
+    /// are.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the arrays are null, differ in
+    ///   length, or `unit` is null.
+    public static SeriesSample create(HealthDataType type, long startMillis,
+            long endMillis, long[] sampleStarts, long[] sampleEnds,
+            double[] values, HealthUnit unit) {
+<span class="pc bpc" id="L84" title="3 of 6 branches missed.">        if (sampleStarts == null || sampleEnds == null || values == null) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(</span>
+                    &quot;a series requires start, end and value arrays&quot;);
+        }
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (sampleStarts.length != values.length</span>
+                || sampleEnds.length != values.length) {
+<span class="nc" id="L90">            throw new IllegalArgumentException(</span>
+                    &quot;series arrays differ in length: starts=&quot;
+                            + sampleStarts.length + &quot; ends=&quot; + sampleEnds.length
+                            + &quot; values=&quot; + values.length);
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (unit == null) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;a series requires a unit&quot;);</span>
+        }
+        // A series with nothing in it is not a record, it is an absence of
+        // one. Writing it expanded to no wire records at all, and an empty
+        // batch is reported by both bridges as a successful write of
+        // nothing -- the caller was told it worked while the store never
+        // heard of it.
+        // A series is a run of measurements, and flattening one -- the
+        // default read shape -- turns each into a QuantitySample. A
+        // category or session type has no numeric value, so such a series
+        // could be written to the local store and then threw on the next
+        // ordinary read.
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (type == null || type.getCanonicalUnit() == null) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            throw new IllegalArgumentException((type == null ? &quot;null&quot;</span>
+<span class="nc" id="L110">                    : type.getId()) + &quot; has no numeric value, so it cannot&quot;</span>
+                            + &quot; be recorded as a series&quot;);
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (values.length == 0) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(</span>
+                    &quot;a series needs at least one measurement&quot;);
+        }
+        // Every measurement, not just the enclosing span. A point whose
+        // end precedes its start was accepted here and written to the
+        // local store, and then the default flattened read threw out of
+        // toQuantitySample() -- inside the read callback, where it takes
+        // the whole page with it.
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (int i = 0; i &lt; values.length; i++) {</span>
+            // Same rule as HealthQuantity: a series carries raw doubles
+            // rather than quantities, so nothing else would have caught a
+            // NaN on the way into a store.
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">            if (Double.isNaN(values[i]) || Double.isInfinite(values[i])) {</span>
+<span class="nc" id="L127">                throw new IllegalArgumentException(&quot;measurement &quot; + i</span>
+                        + &quot; of this series is not a finite number: &quot;
+                        + values[i]);
+            }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (sampleEnds[i] &lt; sampleStarts[i]) {</span>
+<span class="nc" id="L132">                throw new IllegalArgumentException(&quot;measurement &quot; + i</span>
+                        + &quot; of this series ends before it starts: &quot;
+                        + sampleStarts[i] + &quot; &gt; &quot; + sampleEnds[i]);
+            }
+            // Chronological, as the contract above states, and now
+            // enforced: a reader asked for the newest measurements of a
+            // long record takes them from the end rather than sorting
+            // half a million of them to find out where they are, so an
+            // unordered series would have been answered with the wrong
+            // points and no sign that anything was amiss.
+<span class="fc bfc" id="L142" title="All 4 branches covered.">            if (i &gt; 0 &amp;&amp; sampleStarts[i] &lt; sampleStarts[i - 1]) {</span>
+<span class="fc" id="L143">                throw new IllegalArgumentException(&quot;measurement &quot; + i</span>
+                        + &quot; of this series starts before the one before&quot;
+                        + &quot; it: &quot; + sampleStarts[i] + &quot; &lt; &quot;
+                        + sampleStarts[i - 1] + &quot;; a series must be in&quot;
+                        + &quot; chronological order&quot;);
+            }
+            // Inside the record, too. Reads match the enclosing span
+            // first, so a point outside it is unreachable by a query
+            // around itself and yet gets flattened into the answer for a
+            // query around the record -- returning a sample the caller's
+            // range does not contain.
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">            if (sampleStarts[i] &lt; startMillis || sampleEnds[i] &gt; endMillis) {</span>
+<span class="nc" id="L155">                throw new IllegalArgumentException(&quot;measurement &quot; + i</span>
+                        + &quot; of this series falls outside the record's span &quot;
+                        + startMillis + &quot;..&quot; + endMillis + &quot;: &quot;
+                        + sampleStarts[i] + &quot;..&quot; + sampleEnds[i]);
+            }
+        }
+<span class="fc" id="L161">        long[] s = new long[sampleStarts.length];</span>
+<span class="fc" id="L162">        long[] e = new long[sampleEnds.length];</span>
+<span class="fc" id="L163">        double[] v = new double[values.length];</span>
+<span class="fc" id="L164">        System.arraycopy(sampleStarts, 0, s, 0, s.length);</span>
+<span class="fc" id="L165">        System.arraycopy(sampleEnds, 0, e, 0, e.length);</span>
+<span class="fc" id="L166">        System.arraycopy(values, 0, v, 0, v.length);</span>
+<span class="fc" id="L167">        return new SeriesSample(type, startMillis, endMillis, s, e, v, unit);</span>
+    }
+
+    /// The number of measurements in this series.
+    public int size() {
+<span class="fc" id="L172">        return values.length;</span>
+    }
+
+    /// The start of measurement `i`, epoch millis UTC.
+    public long getSampleStartMillis(int i) {
+<span class="fc" id="L177">        return sampleStarts[i];</span>
+    }
+
+    /// The end of measurement `i`, epoch millis UTC. Equal to the start
+    /// for an instantaneous measurement.
+    public long getSampleEndMillis(int i) {
+<span class="fc" id="L183">        return sampleEnds[i];</span>
+    }
+
+    /// Measurement `i` converted into `in`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `in` measures a different
+    ///   dimension.
+    public double getSampleValue(int i, HealthUnit in) {
+<span class="fc" id="L193">        return HealthUnit.convert(values[i], unit, in);</span>
+    }
+
+    /// The unit every measurement in this series is expressed in.
+    public HealthUnit getUnit() {
+<span class="fc" id="L198">        return unit;</span>
+    }
+
+    /// Measurement `i` as a standalone [QuantitySample]. Allocates, so
+    /// prefer the indexed accessors when walking the whole series.
+    ///
+    /// The returned sample inherits this series' source, recording method
+    /// and identifier -- meaning several extracted samples share one
+    /// identifier, since they came from one record.
+    public QuantitySample toQuantitySample(int i) {
+<span class="fc" id="L208">        QuantitySample q = QuantitySample.create(getType(),</span>
+                new HealthQuantity(values[i], unit),
+                sampleStarts[i], sampleEnds[i]);
+<span class="fc" id="L211">        q.setId(getId());</span>
+<span class="fc" id="L212">        q.setSource(getSource());</span>
+<span class="fc" id="L213">        q.setRecordingMethod(getRecordingMethod());</span>
+        // Metadata too. Flattening is the default read shape, so dropping
+        // it here meant a series written to the local store with metadata
+        // came back as quantities carrying none -- while the same sample
+        // written whole round-tripped fine.
+        for (java.util.Map.Entry&lt;String, String&gt; e
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                : getMetadata().entrySet()) {</span>
+<span class="nc" id="L220">            q.putMetadata(e.getKey(), e.getValue());</span>
+<span class="nc" id="L221">        }</span>
+<span class="fc" id="L222">        return q;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L227">        return &quot;SeriesSample[&quot; + getType().getId() + &quot; x&quot; + values.length</span>
+<span class="nc" id="L228">                + &quot; &quot; + unit.getSymbol() + &quot; &quot; + getStartMillis() + &quot;..&quot;</span>
+<span class="nc" id="L229">                + getEndMillis() + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

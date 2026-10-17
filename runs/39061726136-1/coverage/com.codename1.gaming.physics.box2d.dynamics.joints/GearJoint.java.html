@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GearJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">GearJoint.java</span></div><h1>GearJoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/// Created at 11:34:45 AM Jan 23, 2011
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+//Gear Joint:
+//C0 = (coordinate1 + ratio * coordinate2)_initial
+//C = (coordinate1 + ratio * coordinate2) - C0 = 0
+//J = [J1 ratio * J2]
+//K = J * invM * JT
+//= J1 * invM1 * J1T + ratio * ratio * J2 * invM2 * J2T
+//
+//Revolute:
+//coordinate = rotation
+//Cdot = angularVelocity
+//J = [0 0 1]
+//K = J * invM * JT = invI
+//
+//Prismatic:
+//coordinate = dot(p - pg, ug)
+//Cdot = dot(v + cross(w, r), ug)
+//J = [ug cross(r, ug)]
+//K = J * invM * JT = invMass + invI * cross(r, ug)^2
+
+/// A gear joint is used to connect two joints together. Either joint can be a revolute or prismatic
+/// joint. You specify a gear ratio to bind the motions together: coordinate1 + ratio * coordinate2 =
+/// constant The ratio can be negative or positive. If one joint is a revolute joint and the other
+/// joint is a prismatic joint, then the ratio will have units of length or units of 1/length.
+///
+/// @warning The revolute and prismatic joints must be attached to fixed bodies (which must be body1
+///          on those joints).
+/// @warning You have to manually destroy the gear joint if joint1 or joint2 is destroyed.
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">public class GearJoint extends Joint {</span>
+
+  private final Joint m_joint1;
+  private final Joint m_joint2;
+
+  private final JointType m_typeA;
+  private final JointType m_typeB;
+
+  // Body A is connected to body C
+  // Body B is connected to body D
+  private final Body m_bodyC;
+  private final Body m_bodyD;
+
+  // Solver shared
+<span class="fc" id="L76">  private final Vec2 m_localAnchorA = new Vec2();</span>
+<span class="fc" id="L77">  private final Vec2 m_localAnchorB = new Vec2();</span>
+<span class="fc" id="L78">  private final Vec2 m_localAnchorC = new Vec2();</span>
+<span class="fc" id="L79">  private final Vec2 m_localAnchorD = new Vec2();</span>
+
+<span class="fc" id="L81">  private final Vec2 m_localAxisC = new Vec2();</span>
+<span class="fc" id="L82">  private final Vec2 m_localAxisD = new Vec2();</span>
+
+  private float m_referenceAngleA;
+  private float m_referenceAngleB;
+
+  private float m_constant;
+  private float m_ratio;
+
+  private float m_impulse;
+
+  // Solver temp
+  private int m_indexA, m_indexB, m_indexC, m_indexD;
+<span class="fc" id="L94">  private final Vec2 m_lcA = new Vec2(), m_lcB = new Vec2(), m_lcC = new Vec2(),</span>
+      m_lcD = new Vec2();
+  private float m_mA, m_mB, m_mC, m_mD;
+  private float m_iA, m_iB, m_iC, m_iD;
+<span class="fc" id="L98">  private final Vec2 m_JvAC = new Vec2(), m_JvBD = new Vec2();</span>
+  private float m_JwA, m_JwB, m_JwC, m_JwD;
+  private float m_mass;
+
+  protected GearJoint(IWorldPool argWorldPool, GearJointDef def) {
+<span class="fc" id="L103">    super(argWorldPool, def);</span>
+
+<span class="fc" id="L105">    m_joint1 = def.joint1;</span>
+<span class="fc" id="L106">    m_joint2 = def.joint2;</span>
+
+<span class="fc" id="L108">    m_typeA = m_joint1.getType();</span>
+<span class="fc" id="L109">    m_typeB = m_joint2.getType();</span>
+
+<span class="pc bpc" id="L111" title="4 of 6 branches missed.">    assert (m_typeA == JointType.REVOLUTE || m_typeA == JointType.PRISMATIC);</span>
+<span class="pc bpc" id="L112" title="4 of 6 branches missed.">    assert (m_typeB == JointType.REVOLUTE || m_typeB == JointType.PRISMATIC);</span>
+
+    float coordinateA, coordinateB;
+
+    // TODO_ERIN there might be some problem with the joint edges in Joint.
+
+<span class="fc" id="L118">    m_bodyC = m_joint1.getBodyA();</span>
+<span class="fc" id="L119">    m_bodyA = m_joint1.getBodyB();</span>
+
+    // Get geometry of joint1
+<span class="fc" id="L122">    Transform xfA = m_bodyA.m_xf;</span>
+<span class="fc" id="L123">    float aA = m_bodyA.m_sweep.a;</span>
+<span class="fc" id="L124">    Transform xfC = m_bodyC.m_xf;</span>
+<span class="fc" id="L125">    float aC = m_bodyC.m_sweep.a;</span>
+
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">    if (m_typeA == JointType.REVOLUTE) {</span>
+<span class="fc" id="L128">      RevoluteJoint revolute = (RevoluteJoint) def.joint1;</span>
+<span class="fc" id="L129">      m_localAnchorC.set(revolute.m_localAnchorA);</span>
+<span class="fc" id="L130">      m_localAnchorA.set(revolute.m_localAnchorB);</span>
+<span class="fc" id="L131">      m_referenceAngleA = revolute.m_referenceAngle;</span>
+<span class="fc" id="L132">      m_localAxisC.setZero();</span>
+
+<span class="fc" id="L134">      coordinateA = aA - aC - m_referenceAngleA;</span>
+<span class="fc" id="L135">    } else {</span>
+<span class="nc" id="L136">      Vec2 pA = pool.popVec2();</span>
+<span class="nc" id="L137">      Vec2 temp = pool.popVec2();</span>
+<span class="nc" id="L138">      PrismaticJoint prismatic = (PrismaticJoint) def.joint1;</span>
+<span class="nc" id="L139">      m_localAnchorC.set(prismatic.m_localAnchorA);</span>
+<span class="nc" id="L140">      m_localAnchorA.set(prismatic.m_localAnchorB);</span>
+<span class="nc" id="L141">      m_referenceAngleA = prismatic.m_referenceAngle;</span>
+<span class="nc" id="L142">      m_localAxisC.set(prismatic.m_localXAxisA);</span>
+
+<span class="nc" id="L144">      Vec2 pC = m_localAnchorC;</span>
+<span class="nc" id="L145">      Rot.mulToOutUnsafe(xfA.q, m_localAnchorA, temp);</span>
+<span class="nc" id="L146">      temp.addLocal(xfA.p).subLocal(xfC.p);</span>
+<span class="nc" id="L147">      Rot.mulTransUnsafe(xfC.q, temp, pA);</span>
+<span class="nc" id="L148">      coordinateA = Vec2.dot(pA.subLocal(pC), m_localAxisC);</span>
+<span class="nc" id="L149">      pool.pushVec2(2);</span>
+    }
+
+<span class="fc" id="L152">    m_bodyD = m_joint2.getBodyA();</span>
+<span class="fc" id="L153">    m_bodyB = m_joint2.getBodyB();</span>
+
+    // Get geometry of joint2
+<span class="fc" id="L156">    Transform xfB = m_bodyB.m_xf;</span>
+<span class="fc" id="L157">    float aB = m_bodyB.m_sweep.a;</span>
+<span class="fc" id="L158">    Transform xfD = m_bodyD.m_xf;</span>
+<span class="fc" id="L159">    float aD = m_bodyD.m_sweep.a;</span>
+
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">    if (m_typeB == JointType.REVOLUTE) {</span>
+<span class="fc" id="L162">      RevoluteJoint revolute = (RevoluteJoint) def.joint2;</span>
+<span class="fc" id="L163">      m_localAnchorD.set(revolute.m_localAnchorA);</span>
+<span class="fc" id="L164">      m_localAnchorB.set(revolute.m_localAnchorB);</span>
+<span class="fc" id="L165">      m_referenceAngleB = revolute.m_referenceAngle;</span>
+<span class="fc" id="L166">      m_localAxisD.setZero();</span>
+
+<span class="fc" id="L168">      coordinateB = aB - aD - m_referenceAngleB;</span>
+<span class="fc" id="L169">    } else {</span>
+<span class="nc" id="L170">      Vec2 pB = pool.popVec2();</span>
+<span class="nc" id="L171">      Vec2 temp = pool.popVec2();</span>
+<span class="nc" id="L172">      PrismaticJoint prismatic = (PrismaticJoint) def.joint2;</span>
+<span class="nc" id="L173">      m_localAnchorD.set(prismatic.m_localAnchorA);</span>
+<span class="nc" id="L174">      m_localAnchorB.set(prismatic.m_localAnchorB);</span>
+<span class="nc" id="L175">      m_referenceAngleB = prismatic.m_referenceAngle;</span>
+<span class="nc" id="L176">      m_localAxisD.set(prismatic.m_localXAxisA);</span>
+
+<span class="nc" id="L178">      Vec2 pD = m_localAnchorD;</span>
+<span class="nc" id="L179">      Rot.mulToOutUnsafe(xfB.q, m_localAnchorB, temp);</span>
+<span class="nc" id="L180">      temp.addLocal(xfB.p).subLocal(xfD.p);</span>
+<span class="nc" id="L181">      Rot.mulTransUnsafe(xfD.q, temp, pB);</span>
+<span class="nc" id="L182">      coordinateB = Vec2.dot(pB.subLocal(pD), m_localAxisD);</span>
+<span class="nc" id="L183">      pool.pushVec2(2);</span>
+    }
+
+<span class="fc" id="L186">    m_ratio = def.ratio;</span>
+
+<span class="fc" id="L188">    m_constant = coordinateA + m_ratio * coordinateB;</span>
+
+<span class="fc" id="L190">    m_impulse = 0.0f;</span>
+<span class="fc" id="L191">  }</span>
+
+  public void getAnchorA(Vec2 argOut) {
+<span class="nc" id="L194">    m_bodyA.getWorldPointToOut(m_localAnchorA, argOut);</span>
+<span class="nc" id="L195">  }</span>
+
+  public void getAnchorB(Vec2 argOut) {
+<span class="nc" id="L198">    m_bodyB.getWorldPointToOut(m_localAnchorB, argOut);</span>
+<span class="nc" id="L199">  }</span>
+
+  public void getReactionForce(float inv_dt, Vec2 argOut) {
+<span class="nc" id="L202">    argOut.set(m_JvAC).mulLocal(m_impulse);</span>
+<span class="nc" id="L203">    argOut.mulLocal(inv_dt);</span>
+<span class="nc" id="L204">  }</span>
+
+  public float getReactionTorque(float inv_dt) {
+<span class="nc" id="L207">    float L = m_impulse * m_JwA;</span>
+<span class="nc" id="L208">    return inv_dt * L;</span>
+  }
+
+  public void setRatio(float argRatio) {
+<span class="nc" id="L212">    m_ratio = argRatio;</span>
+<span class="nc" id="L213">  }</span>
+
+  public float getRatio() {
+<span class="nc" id="L216">    return m_ratio;</span>
+  }
+
+  public void initVelocityConstraints(SolverData data) {
+<span class="fc" id="L220">    m_indexA = m_bodyA.m_islandIndex;</span>
+<span class="fc" id="L221">    m_indexB = m_bodyB.m_islandIndex;</span>
+<span class="fc" id="L222">    m_indexC = m_bodyC.m_islandIndex;</span>
+<span class="fc" id="L223">    m_indexD = m_bodyD.m_islandIndex;</span>
+<span class="fc" id="L224">    m_lcA.set(m_bodyA.m_sweep.localCenter);</span>
+<span class="fc" id="L225">    m_lcB.set(m_bodyB.m_sweep.localCenter);</span>
+<span class="fc" id="L226">    m_lcC.set(m_bodyC.m_sweep.localCenter);</span>
+<span class="fc" id="L227">    m_lcD.set(m_bodyD.m_sweep.localCenter);</span>
+<span class="fc" id="L228">    m_mA = m_bodyA.m_invMass;</span>
+<span class="fc" id="L229">    m_mB = m_bodyB.m_invMass;</span>
+<span class="fc" id="L230">    m_mC = m_bodyC.m_invMass;</span>
+<span class="fc" id="L231">    m_mD = m_bodyD.m_invMass;</span>
+<span class="fc" id="L232">    m_iA = m_bodyA.m_invI;</span>
+<span class="fc" id="L233">    m_iB = m_bodyB.m_invI;</span>
+<span class="fc" id="L234">    m_iC = m_bodyC.m_invI;</span>
+<span class="fc" id="L235">    m_iD = m_bodyD.m_invI;</span>
+
+    // Vec2 cA = data.positions[m_indexA].c;
+<span class="fc" id="L238">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L239">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L240">    float wA = data.velocities[m_indexA].w;</span>
+
+    // Vec2 cB = data.positions[m_indexB].c;
+<span class="fc" id="L243">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L244">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L245">    float wB = data.velocities[m_indexB].w;</span>
+
+    // Vec2 cC = data.positions[m_indexC].c;
+<span class="fc" id="L248">    float aC = data.positions[m_indexC].a;</span>
+<span class="fc" id="L249">    Vec2 vC = data.velocities[m_indexC].v;</span>
+<span class="fc" id="L250">    float wC = data.velocities[m_indexC].w;</span>
+
+    // Vec2 cD = data.positions[m_indexD].c;
+<span class="fc" id="L253">    float aD = data.positions[m_indexD].a;</span>
+<span class="fc" id="L254">    Vec2 vD = data.velocities[m_indexD].v;</span>
+<span class="fc" id="L255">    float wD = data.velocities[m_indexD].w;</span>
+
+<span class="fc" id="L257">    Rot qA = pool.popRot(), qB = pool.popRot(), qC = pool.popRot(), qD = pool.popRot();</span>
+<span class="fc" id="L258">    qA.set(aA);</span>
+<span class="fc" id="L259">    qB.set(aB);</span>
+<span class="fc" id="L260">    qC.set(aC);</span>
+<span class="fc" id="L261">    qD.set(aD);</span>
+
+<span class="fc" id="L263">    m_mass = 0.0f;</span>
+
+<span class="fc" id="L265">    Vec2 temp = pool.popVec2();</span>
+
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">    if (m_typeA == JointType.REVOLUTE) {</span>
+<span class="fc" id="L268">      m_JvAC.setZero();</span>
+<span class="fc" id="L269">      m_JwA = 1.0f;</span>
+<span class="fc" id="L270">      m_JwC = 1.0f;</span>
+<span class="fc" id="L271">      m_mass += m_iA + m_iC;</span>
+    } else {
+<span class="nc" id="L273">      Vec2 rC = pool.popVec2();</span>
+<span class="nc" id="L274">      Vec2 rA = pool.popVec2();</span>
+<span class="nc" id="L275">      Rot.mulToOutUnsafe(qC, m_localAxisC, m_JvAC);</span>
+<span class="nc" id="L276">      Rot.mulToOutUnsafe(qC, temp.set(m_localAnchorC).subLocal(m_lcC), rC);</span>
+<span class="nc" id="L277">      Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_lcA), rA);</span>
+<span class="nc" id="L278">      m_JwC = Vec2.cross(rC, m_JvAC);</span>
+<span class="nc" id="L279">      m_JwA = Vec2.cross(rA, m_JvAC);</span>
+<span class="nc" id="L280">      m_mass += m_mC + m_mA + m_iC * m_JwC * m_JwC + m_iA * m_JwA * m_JwA;</span>
+<span class="nc" id="L281">      pool.pushVec2(2);</span>
+    }
+
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">    if (m_typeB == JointType.REVOLUTE) {</span>
+<span class="fc" id="L285">      m_JvBD.setZero();</span>
+<span class="fc" id="L286">      m_JwB = m_ratio;</span>
+<span class="fc" id="L287">      m_JwD = m_ratio;</span>
+<span class="fc" id="L288">      m_mass += m_ratio * m_ratio * (m_iB + m_iD);</span>
+    } else {
+<span class="nc" id="L290">      Vec2 u = pool.popVec2();</span>
+<span class="nc" id="L291">      Vec2 rD = pool.popVec2();</span>
+<span class="nc" id="L292">      Vec2 rB = pool.popVec2();</span>
+<span class="nc" id="L293">      Rot.mulToOutUnsafe(qD, m_localAxisD, u);</span>
+<span class="nc" id="L294">      Rot.mulToOutUnsafe(qD, temp.set(m_localAnchorD).subLocal(m_lcD), rD);</span>
+<span class="nc" id="L295">      Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_lcB), rB);</span>
+<span class="nc" id="L296">      m_JvBD.set(u).mulLocal(m_ratio);</span>
+<span class="nc" id="L297">      m_JwD = m_ratio * Vec2.cross(rD, u);</span>
+<span class="nc" id="L298">      m_JwB = m_ratio * Vec2.cross(rB, u);</span>
+<span class="nc" id="L299">      m_mass += m_ratio * m_ratio * (m_mD + m_mB) + m_iD * m_JwD * m_JwD + m_iB * m_JwB * m_JwB;</span>
+<span class="nc" id="L300">      pool.pushVec2(3);</span>
+    }
+
+    // Compute effective mass.
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">    m_mass = m_mass &gt; 0.0f ? 1.0f / m_mass : 0.0f;</span>
+
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">    if (data.step.warmStarting) {</span>
+<span class="fc" id="L307">      vA.x += (m_mA * m_impulse) * m_JvAC.x;</span>
+<span class="fc" id="L308">      vA.y += (m_mA * m_impulse) * m_JvAC.y;</span>
+<span class="fc" id="L309">      wA += m_iA * m_impulse * m_JwA;</span>
+
+<span class="fc" id="L311">      vB.x += (m_mB * m_impulse) * m_JvBD.x;</span>
+<span class="fc" id="L312">      vB.y += (m_mB * m_impulse) * m_JvBD.y;</span>
+<span class="fc" id="L313">      wB += m_iB * m_impulse * m_JwB;</span>
+
+<span class="fc" id="L315">      vC.x -= (m_mC * m_impulse) * m_JvAC.x;</span>
+<span class="fc" id="L316">      vC.y -= (m_mC * m_impulse) * m_JvAC.y;</span>
+<span class="fc" id="L317">      wC -= m_iC * m_impulse * m_JwC;</span>
+
+<span class="fc" id="L319">      vD.x -= (m_mD * m_impulse) * m_JvBD.x;</span>
+<span class="fc" id="L320">      vD.y -= (m_mD * m_impulse) * m_JvBD.y;</span>
+<span class="fc" id="L321">      wD -= m_iD * m_impulse * m_JwD;</span>
+    } else {
+<span class="nc" id="L323">      m_impulse = 0.0f;</span>
+    }
+<span class="fc" id="L325">    pool.pushVec2(1);</span>
+<span class="fc" id="L326">    pool.pushRot(4);</span>
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L329">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L331">    data.velocities[m_indexB].w = wB;</span>
+    // data.velocities[m_indexC].v = vC;
+<span class="fc" id="L333">    data.velocities[m_indexC].w = wC;</span>
+    // data.velocities[m_indexD].v = vD;
+<span class="fc" id="L335">    data.velocities[m_indexD].w = wD;</span>
+<span class="fc" id="L336">  }</span>
+
+  public void solveVelocityConstraints(SolverData data) {
+<span class="fc" id="L339">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L340">    float wA = data.velocities[m_indexA].w;</span>
+<span class="fc" id="L341">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L342">    float wB = data.velocities[m_indexB].w;</span>
+<span class="fc" id="L343">    Vec2 vC = data.velocities[m_indexC].v;</span>
+<span class="fc" id="L344">    float wC = data.velocities[m_indexC].w;</span>
+<span class="fc" id="L345">    Vec2 vD = data.velocities[m_indexD].v;</span>
+<span class="fc" id="L346">    float wD = data.velocities[m_indexD].w;</span>
+
+<span class="fc" id="L348">    Vec2 temp1 = pool.popVec2();</span>
+<span class="fc" id="L349">    Vec2 temp2 = pool.popVec2();</span>
+<span class="fc" id="L350">    float Cdot =</span>
+<span class="fc" id="L351">        Vec2.dot(m_JvAC, temp1.set(vA).subLocal(vC)) + Vec2.dot(m_JvBD, temp2.set(vB).subLocal(vD));</span>
+<span class="fc" id="L352">    Cdot += (m_JwA * wA - m_JwC * wC) + (m_JwB * wB - m_JwD * wD);</span>
+<span class="fc" id="L353">    pool.pushVec2(2);</span>
+
+<span class="fc" id="L355">    float impulse = -m_mass * Cdot;</span>
+<span class="fc" id="L356">    m_impulse += impulse;</span>
+
+<span class="fc" id="L358">    vA.x += (m_mA * impulse) * m_JvAC.x;</span>
+<span class="fc" id="L359">    vA.y += (m_mA * impulse) * m_JvAC.y;</span>
+<span class="fc" id="L360">    wA += m_iA * impulse * m_JwA;</span>
+
+<span class="fc" id="L362">    vB.x += (m_mB * impulse) * m_JvBD.x;</span>
+<span class="fc" id="L363">    vB.y += (m_mB * impulse) * m_JvBD.y;</span>
+<span class="fc" id="L364">    wB += m_iB * impulse * m_JwB;</span>
+
+<span class="fc" id="L366">    vC.x -= (m_mC * impulse) * m_JvAC.x;</span>
+<span class="fc" id="L367">    vC.y -= (m_mC * impulse) * m_JvAC.y;</span>
+<span class="fc" id="L368">    wC -= m_iC * impulse * m_JwC;</span>
+
+<span class="fc" id="L370">    vD.x -= (m_mD * impulse) * m_JvBD.x;</span>
+<span class="fc" id="L371">    vD.y -= (m_mD * impulse) * m_JvBD.y;</span>
+<span class="fc" id="L372">    wD -= m_iD * impulse * m_JwD;</span>
+
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L376">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L378">    data.velocities[m_indexB].w = wB;</span>
+    // data.velocities[m_indexC].v = vC;
+<span class="fc" id="L380">    data.velocities[m_indexC].w = wC;</span>
+    // data.velocities[m_indexD].v = vD;
+<span class="fc" id="L382">    data.velocities[m_indexD].w = wD;</span>
+<span class="fc" id="L383">  }</span>
+
+  public Joint getJoint1() {
+<span class="nc" id="L386">    return m_joint1;</span>
+  }
+
+  public Joint getJoint2() {
+<span class="nc" id="L390">    return m_joint2;</span>
+  }
+
+  public boolean solvePositionConstraints(SolverData data) {
+<span class="fc" id="L394">    Vec2 cA = data.positions[m_indexA].c;</span>
+<span class="fc" id="L395">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L396">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L397">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L398">    Vec2 cC = data.positions[m_indexC].c;</span>
+<span class="fc" id="L399">    float aC = data.positions[m_indexC].a;</span>
+<span class="fc" id="L400">    Vec2 cD = data.positions[m_indexD].c;</span>
+<span class="fc" id="L401">    float aD = data.positions[m_indexD].a;</span>
+
+<span class="fc" id="L403">    Rot qA = pool.popRot(), qB = pool.popRot(), qC = pool.popRot(), qD = pool.popRot();</span>
+<span class="fc" id="L404">    qA.set(aA);</span>
+<span class="fc" id="L405">    qB.set(aB);</span>
+<span class="fc" id="L406">    qC.set(aC);</span>
+<span class="fc" id="L407">    qD.set(aD);</span>
+
+<span class="fc" id="L409">    float linearError = 0.0f;</span>
+
+    float coordinateA, coordinateB;
+
+<span class="fc" id="L413">    Vec2 temp = pool.popVec2();</span>
+<span class="fc" id="L414">    Vec2 JvAC = pool.popVec2();</span>
+<span class="fc" id="L415">    Vec2 JvBD = pool.popVec2();</span>
+    float JwA, JwB, JwC, JwD;
+<span class="fc" id="L417">    float mass = 0.0f;</span>
+
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">    if (m_typeA == JointType.REVOLUTE) {</span>
+<span class="fc" id="L420">      JvAC.setZero();</span>
+<span class="fc" id="L421">      JwA = 1.0f;</span>
+<span class="fc" id="L422">      JwC = 1.0f;</span>
+<span class="fc" id="L423">      mass += m_iA + m_iC;</span>
+
+<span class="fc" id="L425">      coordinateA = aA - aC - m_referenceAngleA;</span>
+    } else {
+<span class="nc" id="L427">      Vec2 rC = pool.popVec2();</span>
+<span class="nc" id="L428">      Vec2 rA = pool.popVec2();</span>
+<span class="nc" id="L429">      Vec2 pC = pool.popVec2();</span>
+<span class="nc" id="L430">      Vec2 pA = pool.popVec2();</span>
+<span class="nc" id="L431">      Rot.mulToOutUnsafe(qC, m_localAxisC, JvAC);</span>
+<span class="nc" id="L432">      Rot.mulToOutUnsafe(qC, temp.set(m_localAnchorC).subLocal(m_lcC), rC);</span>
+<span class="nc" id="L433">      Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_lcA), rA);</span>
+<span class="nc" id="L434">      JwC = Vec2.cross(rC, JvAC);</span>
+<span class="nc" id="L435">      JwA = Vec2.cross(rA, JvAC);</span>
+<span class="nc" id="L436">      mass += m_mC + m_mA + m_iC * JwC * JwC + m_iA * JwA * JwA;</span>
+
+<span class="nc" id="L438">      pC.set(m_localAnchorC).subLocal(m_lcC);</span>
+<span class="nc" id="L439">      Rot.mulTransUnsafe(qC, temp.set(rA).addLocal(cA).subLocal(cC), pA);</span>
+<span class="nc" id="L440">      coordinateA = Vec2.dot(pA.subLocal(pC), m_localAxisC);</span>
+<span class="nc" id="L441">      pool.pushVec2(4);</span>
+    }
+
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">    if (m_typeB == JointType.REVOLUTE) {</span>
+<span class="fc" id="L445">      JvBD.setZero();</span>
+<span class="fc" id="L446">      JwB = m_ratio;</span>
+<span class="fc" id="L447">      JwD = m_ratio;</span>
+<span class="fc" id="L448">      mass += m_ratio * m_ratio * (m_iB + m_iD);</span>
+
+<span class="fc" id="L450">      coordinateB = aB - aD - m_referenceAngleB;</span>
+    } else {
+<span class="nc" id="L452">      Vec2 u = pool.popVec2();</span>
+<span class="nc" id="L453">      Vec2 rD = pool.popVec2();</span>
+<span class="nc" id="L454">      Vec2 rB = pool.popVec2();</span>
+<span class="nc" id="L455">      Vec2 pD = pool.popVec2();</span>
+<span class="nc" id="L456">      Vec2 pB = pool.popVec2();</span>
+<span class="nc" id="L457">      Rot.mulToOutUnsafe(qD, m_localAxisD, u);</span>
+<span class="nc" id="L458">      Rot.mulToOutUnsafe(qD, temp.set(m_localAnchorD).subLocal(m_lcD), rD);</span>
+<span class="nc" id="L459">      Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_lcB), rB);</span>
+<span class="nc" id="L460">      JvBD.set(u).mulLocal(m_ratio);</span>
+<span class="nc" id="L461">      JwD = Vec2.cross(rD, u);</span>
+<span class="nc" id="L462">      JwB = Vec2.cross(rB, u);</span>
+<span class="nc" id="L463">      mass += m_ratio * m_ratio * (m_mD + m_mB) + m_iD * JwD * JwD + m_iB * JwB * JwB;</span>
+
+<span class="nc" id="L465">      pD.set(m_localAnchorD).subLocal(m_lcD);</span>
+<span class="nc" id="L466">      Rot.mulTransUnsafe(qD, temp.set(rB).addLocal(cB).subLocal(cD), pB);</span>
+<span class="nc" id="L467">      coordinateB = Vec2.dot(pB.subLocal(pD), m_localAxisD);</span>
+<span class="nc" id="L468">      pool.pushVec2(5);</span>
+    }
+
+<span class="fc" id="L471">    float C = (coordinateA + m_ratio * coordinateB) - m_constant;</span>
+
+<span class="fc" id="L473">    float impulse = 0.0f;</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">    if (mass &gt; 0.0f) {</span>
+<span class="fc" id="L475">      impulse = -C / mass;</span>
+    }
+<span class="fc" id="L477">    pool.pushVec2(3);</span>
+<span class="fc" id="L478">    pool.pushRot(4);</span>
+
+<span class="fc" id="L480">    cA.x += (m_mA * impulse) * JvAC.x;</span>
+<span class="fc" id="L481">    cA.y += (m_mA * impulse) * JvAC.y;</span>
+<span class="fc" id="L482">    aA += m_iA * impulse * JwA;</span>
+
+<span class="fc" id="L484">    cB.x += (m_mB * impulse) * JvBD.x;</span>
+<span class="fc" id="L485">    cB.y += (m_mB * impulse) * JvBD.y;</span>
+<span class="fc" id="L486">    aB += m_iB * impulse * JwB;</span>
+
+<span class="fc" id="L488">    cC.x -= (m_mC * impulse) * JvAC.x;</span>
+<span class="fc" id="L489">    cC.y -= (m_mC * impulse) * JvAC.y;</span>
+<span class="fc" id="L490">    aC -= m_iC * impulse * JwC;</span>
+
+<span class="fc" id="L492">    cD.x -= (m_mD * impulse) * JvBD.x;</span>
+<span class="fc" id="L493">    cD.y -= (m_mD * impulse) * JvBD.y;</span>
+<span class="fc" id="L494">    aD -= m_iD * impulse * JwD;</span>
+
+    // data.positions[m_indexA].c = cA;
+<span class="fc" id="L497">    data.positions[m_indexA].a = aA;</span>
+    // data.positions[m_indexB].c = cB;
+<span class="fc" id="L499">    data.positions[m_indexB].a = aB;</span>
+    // data.positions[m_indexC].c = cC;
+<span class="fc" id="L501">    data.positions[m_indexC].a = aC;</span>
+    // data.positions[m_indexD].c = cD;
+<span class="fc" id="L503">    data.positions[m_indexD].a = aD;</span>
+
+    // TODO_ERIN not implemented
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">    return linearError &lt; Settings.linearSlop;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,2001 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TextField.java</span></div><h1>TextField.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// A specialized version of `com.codename1.ui.TextArea` with some minor deviations from the original
+/// specifically:
+///
+/// - Blinking cursor is rendered on `TextField` only
+///
+/// - `com.codename1.ui.events.DataChangeListener` is only available in `TextField`.
+/// This is crucial for character by character input event tracking
+///
+/// - `com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener)` is only available in `TextField`
+///
+/// - Different UIID's (&quot;`TextField`&quot; vs. &quot;`TextArea`&quot;)
+///
+/// The demo code below shows simple input using text fields:
+///
+/// ```java
+/// TableLayout tl;
+/// int spanButton = 2;
+/// if(Display.getInstance().isTablet()) {
+///     tl = new TableLayout(7, 2);
+/// } else {
+///     tl = new TableLayout(14, 1);
+///     spanButton = 1;
+/// }
+/// tl.setGrowHorizontally(true);
+/// hi.setLayout(tl);
+///
+/// TextField firstName = new TextField(&quot;&quot;, &quot;First Name&quot;, 20, TextArea.ANY);
+/// TextField surname = new TextField(&quot;&quot;, &quot;Surname&quot;, 20, TextArea.ANY);
+/// TextField email = new TextField(&quot;&quot;, &quot;E-Mail&quot;, 20, TextArea.EMAILADDR);
+/// TextField url = new TextField(&quot;&quot;, &quot;URL&quot;, 20, TextArea.URL);
+/// TextField phone = new TextField(&quot;&quot;, &quot;Phone&quot;, 20, TextArea.PHONENUMBER);
+///
+/// TextField num1 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num2 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num3 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num4 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+///
+/// Button submit = new Button(&quot;Submit&quot;);
+/// TableLayout.Constraint cn = tl.createConstraint();
+/// cn.setHorizontalSpan(spanButton);
+/// cn.setHorizontalAlign(Component.RIGHT);
+/// hi.add(&quot;First Name&quot;).add(firstName).
+///         add(&quot;Surname&quot;).add(surname).
+///         add(&quot;E-Mail&quot;).add(email).
+///         add(&quot;URL&quot;).add(url).
+///         add(&quot;Phone&quot;).add(phone).
+///         add(&quot;Credit Card&quot;).
+///                 add(GridLayout.encloseIn(4, num1, num2, num3, num4)).
+///         add(cn, submit);
+/// ```
+///
+/// The following code demonstrates a more advanced search widget where the data is narrowed as we type
+/// directly into the title area search. Notice that the `TextField` and its hint are styled to look like the title.
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+/// Form hi = new Form(&quot;Toolbar&quot;, BoxLayout.y());
+/// Style s = UIManager.getInstance().getComponentStyle(&quot;Title&quot;);
+///
+/// TextField searchField = new TextField(&quot;&quot;, &quot;Toolbar Search&quot;);
+/// searchField.getHintLabel().setUIID(&quot;Title&quot;);
+/// searchField.setUIID(&quot;Title&quot;);
+/// searchField.getAllStyles().setAlignment(Component.LEFT);
+/// hi.getToolbar().setTitleComponent(searchField);
+///
+/// FontImage searchIcon = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, s);
+/// hi.getToolbar().addCommandToRightBar(&quot;&quot;, searchIcon, e -&gt; searchField.startEditingAsync());
+///
+/// hi.addAll(
+///         new Label(&quot;A Game of Thrones&quot;),
+///         new Label(&quot;A Clash Of Kings&quot;),
+///         new Label(&quot;A Storm Of Swords&quot;),
+///         new Label(&quot;A Feast For Crows&quot;),
+///         new Label(&quot;A Dance With Dragons&quot;));
+///
+/// searchField.addDataChangedListener((type, index) -&gt; {
+///     String text = searchField.getText().toLowerCase();
+///     for (Component cmp : hi.getContentPane()) {
+///         String value = ((Label) cmp).getText().toLowerCase();
+///         boolean show = text.length() == 0 || value.indexOf(text) &gt; -1;
+///         cmp.setHidden(!show);
+///         cmp.setVisible(show);
+///     }
+///     hi.getContentPane().animateLayout(250);
+/// });
+/// ```
+public class TextField extends TextArea {
+<span class="fc" id="L123">    private static final char[] DEFAULT_SYMBOL_TABLE = new char[]{</span>
+            '.', ',', '?', '!', '$', '@', '\'', '-',
+            '_', ')', '(', ':', ';', '&amp;', '/', '~',
+            '\\', '%', '*', '#', '+', '&gt;', '=', '&lt;',
+            '&quot;'
+    };
+<span class="fc" id="L129">    private static final String[] DEFAULT_KEY_CODES = {</span>
+            // 0
+            &quot; 0&quot;,
+            // 1
+            &quot;.,?!'\&quot;1-()@/:_&quot;,
+            // 2
+            &quot;ABC2&quot;,
+            // 3
+            &quot;DEF3&quot;,
+            // 4
+            &quot;GHI4&quot;,
+            // 5
+            &quot;JKL5&quot;,
+            // 6
+            &quot;MNO6&quot;,
+            // 7
+            &quot;PQRS7&quot;,
+            // 8
+            &quot;TUV8&quot;,
+            // 9
+            &quot;WXYZ9&quot;,
+    };
+<span class="fc" id="L151">    private static final Vector firstUppercaseInputMode = new Vector();</span>
+<span class="fc" id="L152">    private static boolean replaceMenuDefault = true;</span>
+<span class="fc" id="L153">    private static String clearText = &quot;Clear&quot;;</span>
+<span class="fc" id="L154">    private static String t9Text = &quot;T9&quot;;</span>
+    private static Hashtable inputModes;
+<span class="fc" id="L156">    private static String[] defaultInputModeOrder = {&quot;Abc&quot;, &quot;ABC&quot;, &quot;abc&quot;, &quot;123&quot;};</span>
+<span class="fc" id="L157">    private static boolean qwertyAutoDetect = true;</span>
+    private static boolean qwertyDevice;
+    /// Key to change the input mode on the device
+<span class="fc" id="L160">    private static int defaultChangeInputModeKey = '#';</span>
+    /// The default key for poping open the symbol dialog
+<span class="fc" id="L162">    private static int defaultSymbolDialogKey = '*';</span>
+<span class="fc" id="L163">    private static boolean useNativeTextInput = true;</span>
+<span class="fc" id="L164">    private static char[] symbolTable = DEFAULT_SYMBOL_TABLE;</span>
+<span class="pc" id="L165">    private final Command DELETE_COMMAND = new CommandHandler(clearText, 1);</span>
+<span class="pc" id="L166">    private final Command T9_COMMAND = new CommandHandler(t9Text, 2);</span>
+<span class="pc" id="L167">    private long cursorBlinkTime = System.currentTimeMillis();</span>
+<span class="pc" id="L168">    private boolean drawCursor = true;</span>
+<span class="pc" id="L169">    private int cursorY = 0;</span>
+<span class="pc" id="L170">    private int cursorX = -1;</span>
+    private boolean pressedAndNotReleased;
+    private long pressTime;
+<span class="pc" id="L173">    private boolean useSoftkeys = true;</span>
+    private long releaseTime;
+    private String previousText;
+<span class="pc" id="L176">    private int commitTimeout = 1000;</span>
+    private boolean pendingCommit;
+<span class="pc" id="L178">    private int pressCount = 0;</span>
+    private int lastKeyCode;
+    private int pressedKeyCode;
+    private boolean longClick;
+    private Command originalClearCommand;
+<span class="pc" id="L183">    private String inputMode = defaultInputModeOrder[0];</span>
+<span class="pc" id="L184">    private String[] inputModeOrder = defaultInputModeOrder;</span>
+<span class="pc" id="L185">    private int blinkOnTime = 800;</span>
+<span class="pc" id="L186">    private int blinkOffTime = 200;</span>
+    private boolean qwertyInitialized;
+<span class="pc" id="L188">    private boolean qwerty = qwertyDevice;</span>
+<span class="pc" id="L189">    private boolean replaceMenu = replaceMenuDefault;</span>
+    private Command[] originalCommands;
+    private boolean overwriteMode;
+<span class="pc" id="L192">    private boolean enableInputScroll = true;</span>
+<span class="pc" id="L193">    private int keyFwd = Display.GAME_RIGHT;</span>
+<span class="pc" id="L194">    private int keyBack = Display.GAME_LEFT;</span>
+    /// Indicates whether the left/right keys will trigger editing, this is true by default.
+    /// Left and right key edit trigger might be disabled for cases such as text field
+    /// positioned horizontally one next to the other.
+<span class="pc" id="L198">    private boolean leftAndRightEditingTrigger = true;</span>
+    private Command selectCommand;
+
+    /// Default constructor
+    public TextField() {
+<span class="fc" id="L203">        super(1, 20);</span>
+<span class="fc" id="L204">        setUIIDFinal(&quot;TextField&quot;);</span>
+<span class="fc" id="L205">        setSingleLineTextArea(true);</span>
+<span class="fc" id="L206">    }</span>
+
+    /// Construct a text field with space reserved for columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: - the number of columns
+    public TextField(int columns) {
+<span class="nc" id="L214">        super(1, columns);</span>
+<span class="nc" id="L215">        setUIIDFinal(&quot;TextField&quot;);</span>
+<span class="nc" id="L216">        setSingleLineTextArea(true);</span>
+<span class="nc" id="L217">    }</span>
+
+    /// Construct text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    public TextField(String text) {
+<span class="fc" id="L225">        super(text, 1, 20);</span>
+<span class="fc" id="L226">        setUIIDFinal(&quot;TextField&quot;);</span>
+<span class="fc" id="L227">        setSingleLineTextArea(true);</span>
+<span class="fc" id="L228">    }</span>
+
+    /// Construct text field with a hint
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    ///
+    /// - `hint`: the hint string
+    public TextField(String text, String hint) {
+<span class="fc" id="L238">        this(text);</span>
+<span class="fc" id="L239">        setHint(hint);</span>
+<span class="fc" id="L240">    }</span>
+
+    /// Construct text field with a hint, columns and constraint values
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    ///
+    /// - `hint`: the hint string
+    ///
+    /// - `columns`: columns value
+    ///
+    /// - `constraint`: the constraint value
+    public TextField(String text, String hint, int columns, int constraint) {
+<span class="fc" id="L254">        this(text);</span>
+<span class="fc" id="L255">        setHint(hint);</span>
+<span class="fc" id="L256">        setColumns(columns);</span>
+<span class="fc" id="L257">        setConstraint(constraint);</span>
+<span class="fc" id="L258">    }</span>
+
+    /// Construct text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    ///
+    /// - `columns`: - the number of columns
+    public TextField(String text, int columns) {
+<span class="fc" id="L268">        super(text, 1, columns);</span>
+<span class="fc" id="L269">        setUIIDFinal(&quot;TextField&quot;);</span>
+<span class="fc" id="L270">        setSingleLineTextArea(true);</span>
+<span class="fc" id="L271">    }</span>
+
+    /// Indicates that native text input should be used in text field when in place editing is supported by the platform
+    ///
+    /// #### Returns
+    ///
+    /// the useNativeTextInput
+    ///
+    /// #### Deprecated
+    ///
+    /// this API is no longer useful and should be avoided
+    public static boolean isUseNativeTextInput() {
+<span class="nc" id="L283">        return useNativeTextInput;</span>
+    }
+
+    /// Indicates that native text input should be used in text field when in place editing is supported by the platform
+    ///
+    /// #### Parameters
+    ///
+    /// - `aUseNativeTextInput`: the useNativeTextInput to set
+    ///
+    /// #### Deprecated
+    ///
+    /// this API is no longer useful and should be avoided
+    public static void setUseNativeTextInput(boolean aUseNativeTextInput) {
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        boolean changed = useNativeTextInput != aUseNativeTextInput;</span>
+<span class="nc" id="L297">        useNativeTextInput = aUseNativeTextInput;</span>
+<span class="nc bnc" id="L298" title="All 4 branches missed.">        if (changed &amp;&amp; Display.isInitialized()) {</span>
+<span class="nc" id="L299">            Form current = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">            if (current != null) {</span>
+<span class="nc" id="L301">                current.repaint();</span>
+            }
+<span class="nc" id="L303">            Desktop.getInstance().repaintWindows();</span>
+        }
+<span class="nc" id="L305">    }</span>
+
+    /// Set the text that should appear on the clear softkey
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: localized text for the clear softbutton
+    public static void setClearText(String text) {
+<span class="nc" id="L313">        clearText = text;</span>
+<span class="nc" id="L314">    }</span>
+
+    /// Set the text that should appear on the T9 softkey
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: text for the T9 softbutton
+    public static void setT9Text(String text) {
+<span class="nc" id="L322">        t9Text = text;</span>
+<span class="nc" id="L323">    }</span>
+
+    /// Construct text field/area depending on whether native in place editing is supported
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Returns
+    ///
+    /// a text field if native in place editing is unsupported and a text area if it is
+    public static TextArea create(String text, int columns) {
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (Display.impl.isNativeInputSupported()) {</span>
+<span class="nc" id="L338">            return new TextArea(text, 1, columns);</span>
+        }
+<span class="nc" id="L340">        return new TextField(text, columns);</span>
+    }
+
+    /// Default factory method
+    ///
+    /// #### Returns
+    ///
+    /// a text field if native in place editing is unsupported and a text area if it is
+    public static TextArea create() {
+<span class="nc" id="L349">        return create(20);</span>
+    }
+
+    /// Construct text field/area depending on whether native in place editing is supported
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Returns
+    ///
+    /// a text field if native in place editing is unsupported and a text area if it is
+    public static TextArea create(int columns) {
+<span class="nc" id="L362">        return create(&quot;&quot;, columns);</span>
+    }
+
+    /// Construct text field/area depending on whether native in place editing is supported
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the field
+    ///
+    /// #### Returns
+    ///
+    /// a text field if native in place editing is unsupported and a text area if it is
+    public static TextArea create(String text) {
+<span class="nc" id="L375">        return create(text, 20);</span>
+    }
+
+    private static synchronized void initInputModes() {
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (inputModes != null) {</span>
+<span class="nc" id="L380">            return;</span>
+        }
+<span class="fc" id="L382">        firstUppercaseInputMode.addElement(&quot;Abc&quot;);</span>
+<span class="fc" id="L383">        inputModes = new Hashtable();</span>
+<span class="fc" id="L384">        Hashtable upcase = new Hashtable();</span>
+<span class="fc" id="L385">        int dlen = DEFAULT_KEY_CODES.length;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        for (int iter = 0; iter &lt; dlen; iter++) {</span>
+<span class="fc" id="L387">            upcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter]);</span>
+        }
+
+<span class="fc" id="L390">        inputModes.put(&quot;ABC&quot;, upcase);</span>
+
+<span class="fc" id="L392">        Hashtable lowcase = new Hashtable();</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        for (int iter = 0; iter &lt; dlen; iter++) {</span>
+<span class="fc" id="L394">            lowcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());</span>
+        }
+<span class="fc" id="L396">        inputModes.put(&quot;abc&quot;, lowcase);</span>
+
+<span class="fc" id="L398">        Hashtable numbers = new Hashtable();</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 10; iter++) {</span>
+<span class="fc" id="L400">            numbers.put(Integer.valueOf('0' + iter), &quot;&quot; + iter);</span>
+        }
+<span class="fc" id="L402">        inputModes.put(&quot;123&quot;, numbers);</span>
+<span class="fc" id="L403">    }</span>
+
+    /// Adds a new inputmode hashtable with the given name and set of values
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: a unique display name for the input mode e.g. ABC, 123 etc...
+    ///
+    /// - `values`: @param values      The key for the hashtable is an Integer keyCode and the value
+    /// is a String containing the characters to toggle between for the given keycode
+    ///
+    /// - `firstUpcase`: @param firstUpcase indicates if this input mode in an input mode used for the special
+    /// case where the first letter is an upper case letter
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public static void addInputMode(String name, Hashtable values, boolean firstUpcase) {
+<span class="nc" id="L421">        initInputModes();</span>
+<span class="nc" id="L422">        inputModes.put(name, values);</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        if (firstUpcase) {</span>
+<span class="nc" id="L424">            firstUppercaseInputMode.addElement(name);</span>
+        }
+<span class="nc" id="L426">    }</span>
+
+    /// Returns the order in which input modes are toggled by default
+    ///
+    /// #### Returns
+    ///
+    /// the default order of the input mode
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public static String[] getDefaultInputModeOrder() {
+<span class="nc" id="L438">        return defaultInputModeOrder;</span>
+    }
+
+    /// Sets the order in which input modes are toggled by default and allows
+    /// disabling/hiding an input mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `order`: the order for the input modes in all future created fields
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public static void setDefaultInputModeOrder(String[] order) {
+<span class="nc" id="L452">        defaultInputModeOrder = order;</span>
+<span class="nc" id="L453">    }</span>
+
+    /// Returns the symbol table for the device
+    ///
+    /// #### Returns
+    ///
+    /// the symbol table of the device for the symbol table input
+    public static char[] getSymbolTable() {
+<span class="nc" id="L461">        return symbolTable;</span>
+    }
+
+    /// Sets the symbol table to show when the user clicks the symbol table key
+    ///
+    /// #### Parameters
+    ///
+    /// - `table`: the symbol table of the device for the symbol table input
+    public static void setSymbolTable(char[] table) {
+<span class="nc" id="L470">        symbolTable = table;</span>
+<span class="nc" id="L471">    }</span>
+
+    /// Indicates whether the menu of the form should be replaced with the T9/Clear
+    /// commands for the duration of interactivity with the text field
+    ///
+    /// #### Returns
+    ///
+    /// true if the menu should be replaced
+    public static boolean isReplaceMenuDefault() {
+<span class="nc" id="L480">        return replaceMenuDefault;</span>
+    }
+
+    /// Indicates whether the menu of the form should be replaced with the T9/Clear
+    /// commands for the duration of interactivity with the text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `replaceMenu`: true if the menu should be replaced
+    public static void setReplaceMenuDefault(boolean replaceMenu) {
+<span class="nc" id="L490">        replaceMenuDefault = replaceMenu;</span>
+<span class="nc" id="L491">    }</span>
+
+    /// Indicates whether the text field should try to auto detect qwerty and
+    /// switch the qwerty device flag implicitly
+    ///
+    /// #### Returns
+    ///
+    /// true for qwerty auto detection
+    public static boolean isQwertyAutoDetect() {
+<span class="nc" id="L500">        return qwertyAutoDetect;</span>
+    }
+
+    /// Indicates whether the text field should try to auto detect qwerty and
+    /// switch the qwerty device flag implicitly
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: true for qwerty auto detection
+    public static void setQwertyAutoDetect(boolean v) {
+<span class="nc" id="L510">        qwertyAutoDetect = v;</span>
+<span class="nc" id="L511">    }</span>
+
+    /// The default value for the qwerty flag so it doesn't need setting for every
+    /// text field individually.
+    ///
+    /// #### Returns
+    ///
+    /// true for qwerty devices
+    public static boolean isQwertyDevice() {
+<span class="nc" id="L520">        return qwertyDevice;</span>
+    }
+
+    /// The default value for the qwerty flag so it doesn't need setting for every
+    /// text field individually.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: true for qwerty device
+    public static void setQwertyDevice(boolean v) {
+<span class="nc" id="L530">        qwertyDevice = v;</span>
+<span class="nc" id="L531">    }</span>
+
+    /// Key to change the input mode on the device
+    ///
+    /// #### Returns
+    ///
+    /// key to change the input mode
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public static int getDefaultChangeInputModeKey() {
+<span class="nc" id="L543">        return defaultChangeInputModeKey;</span>
+    }
+
+    /// Key to change the input mode on the device
+    ///
+    /// #### Parameters
+    ///
+    /// - `k`: key to change the input mode
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public static void setDefaultChangeInputModeKey(int k) {
+<span class="nc" id="L556">        defaultChangeInputModeKey = k;</span>
+<span class="nc" id="L557">    }</span>
+
+    /// The default key for poping open the symbol dialog
+    ///
+    /// #### Returns
+    ///
+    /// the default key
+    public static int getDefaultSymbolDialogKey() {
+<span class="nc" id="L565">        return defaultSymbolDialogKey;</span>
+    }
+
+    /// The default key for poping open the symbol dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: new key value
+    public static void setDefaultSymbolDialogKey(int d) {
+<span class="nc" id="L574">        defaultSymbolDialogKey = d;</span>
+<span class="nc" id="L575">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isEnableInputScroll() {
+<span class="fc" id="L580">        return enableInputScroll;</span>
+    }
+
+    /// Indicates whether text field input should scroll to the right side when no
+    /// more room for the input is present.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enableInputScroll`: true to enable scrolling to the side
+    public void setEnableInputScroll(boolean enableInputScroll) {
+<span class="nc" id="L590">        this.enableInputScroll = enableInputScroll;</span>
+<span class="nc" id="L591">    }</span>
+
+    /// Performs a backspace operation
+    public void deleteChar() {
+
+<span class="nc" id="L596">        String text = getText();</span>
+
+<span class="nc bnc" id="L598" title="All 2 branches missed.">        if (text.length() &gt; 0) {</span>
+<span class="nc" id="L599">            int cursorCharPosition = getCursorPosition();</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">            if (cursorCharPosition &gt; 0) {</span>
+<span class="nc" id="L601">                int tmpCursorCharPosition = cursorCharPosition - 1;</span>
+
+<span class="nc bnc" id="L603" title="All 2 branches missed.">                if (!overwriteMode) {</span>
+<span class="nc bnc" id="L604" title="All 2 branches missed.">                    if (tmpCursorCharPosition == text.length()) {</span>
+<span class="nc" id="L605">                        text = text.substring(0, text.length() - 1);</span>
+                    } else {
+<span class="nc" id="L607">                        text = text.substring(0, tmpCursorCharPosition) +</span>
+<span class="nc" id="L608">                                text.substring(tmpCursorCharPosition + 1);</span>
+                    }
+<span class="nc" id="L610">                    super.setText(text);</span>
+<span class="nc" id="L611">                    commitChange();</span>
+<span class="nc" id="L612">                    fireDataChanged(DataChangedListener.REMOVED, tmpCursorCharPosition);</span>
+                }
+
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                if (cursorCharPosition == 1) {</span>
+<span class="nc" id="L616">                    cursorX = 0;</span>
+<span class="nc" id="L617">                    cursorCharPosition = 0;</span>
+                } else {
+<span class="nc" id="L619">                    setCursorPosition(tmpCursorCharPosition);</span>
+                }
+
+            }
+        }
+<span class="nc" id="L624">    }</span>
+
+    /// Commit the changes made to the text field as a complete edit operation. This
+    /// is used in a numeric keypad to allow the user to repeatedly press a number
+    /// to change values.
+    protected void commitChange() {
+<span class="fc" id="L630">        pendingCommit = false;</span>
+<span class="fc" id="L631">        previousText = null;</span>
+<span class="fc" id="L632">        pressCount = 0;</span>
+<span class="fc" id="L633">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isPendingCommit() {
+<span class="fc" id="L638">        return pendingCommit;</span>
+    }
+
+    /// The amount of time in milliseconds it will take for a change to get committed into
+    /// the field.
+    ///
+    /// #### Returns
+    ///
+    /// the time for a commit timeout
+    public int getCommitTimeout() {
+<span class="nc" id="L648">        return commitTimeout;</span>
+    }
+
+    /// The amount of time in milliseconds it will take for a change to get committed into
+    /// the field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commitTimeout`: @param commitTimeout indicates the amount of time that should elapse for a commit
+    /// to automatically occur
+    public void setCommitTimeout(int commitTimeout) {
+<span class="nc" id="L659">        this.commitTimeout = commitTimeout;</span>
+<span class="nc" id="L660">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    @Override
+    public String getInputMode() {
+<span class="fc" id="L669">        return inputMode;</span>
+    }
+
+    /// Sets the current selected input mode matching one of the existing input
+    /// modes
+    ///
+    /// #### Parameters
+    ///
+    /// - `inputMode`: @param inputMode the display name of the input mode by default the following modes
+    /// are supported: Abc, ABC, abc, 123
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public void setInputMode(String inputMode) {
+<span class="nc" id="L684">        this.inputMode = inputMode;</span>
+<span class="nc" id="L685">        repaint();</span>
+<span class="nc" id="L686">    }</span>
+
+    /// Indicates whether the key changes the current input mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code
+    ///
+    /// #### Returns
+    ///
+    /// true for the hash (#) key code
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    protected boolean isChangeInputMode(int keyCode) {
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">        return keyCode == defaultChangeInputModeKey;</span>
+    }
+
+    @Override
+    boolean showLightweightVKB() {
+<span class="fc" id="L707">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getInputModeOrder() {
+<span class="nc" id="L713">        return inputModeOrder;</span>
+    }
+
+    /// Sets the order in which input modes are toggled and allows disabling/hiding
+    /// an input mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `order`: the order for the input modes in this field
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public void setInputModeOrder(String[] order) {
+<span class="fc" id="L727">        inputModeOrder = order;</span>
+<span class="fc" id="L728">        inputMode = order[0];</span>
+<span class="fc" id="L729">    }</span>
+
+    /// Used for the case of first sentence character should be upper case
+    private String pickLowerOrUpper(String inputMode) {
+        // check the character before the cursor..
+<span class="fc" id="L734">        int pos = getCursorPosition() - 1;</span>
+
+        // we have input which has moved the cursor position further
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">        if (pendingCommit) {</span>
+<span class="nc" id="L738">            pos--;</span>
+        }
+<span class="fc" id="L740">        String text = getText();</span>
+<span class="pc bpc" id="L741" title="1 of 2 branches missed.">        if (pos &gt;= text.length()) {</span>
+<span class="nc" id="L742">            pos = text.length() - 1;</span>
+        }
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">        while (pos &gt; -1) {</span>
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">            if (text.charAt(pos) == '.') {</span>
+<span class="nc" id="L746">                return inputMode.toUpperCase();</span>
+            }
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">            if (text.charAt(pos) != ' ') {</span>
+<span class="fc" id="L749">                return inputMode.toLowerCase();</span>
+            }
+<span class="nc" id="L751">            pos--;</span>
+        }
+<span class="nc" id="L753">        return inputMode.toUpperCase();</span>
+    }
+
+    /// Returns the input mode for the ong click mode
+    ///
+    /// #### Returns
+    ///
+    /// returns 123 by default
+    protected String getLongClickInputMode() {
+<span class="nc" id="L762">        return &quot;123&quot;;</span>
+    }
+
+    /// Returns the character matching the given key code after the given amount
+    /// of user presses
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressCount`: number of times this keycode was pressed
+    ///
+    /// - `keyCode`: the actual keycode input by the user
+    ///
+    /// - `longClick`: does this click constitute a long click
+    ///
+    /// #### Returns
+    ///
+    /// @return the char mapping to this key or 0 if no appropriate char was found
+    /// (navigation, input mode change etc...).
+    protected char getCharPerKeyCode(int pressCount, int keyCode, boolean longClick) {
+<span class="fc" id="L781">        initInputModes();</span>
+<span class="fc" id="L782">        String input = inputMode;</span>
+
+        // if this is a first letter uppercase input mode then we need to pick either
+        // the upper case mode or the lower case mode...
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">        if (longClick) {</span>
+<span class="nc" id="L787">            input = getLongClickInputMode();</span>
+        } else {
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">            if (firstUppercaseInputMode.contains(input)) {</span>
+<span class="fc" id="L790">                input = pickLowerOrUpper(input);</span>
+            }
+        }
+
+<span class="fc" id="L794">        Hashtable mode = (Hashtable) inputModes.get(input);</span>
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">        if (mode != null) {</span>
+<span class="fc" id="L796">            String s = (String) mode.get(Integer.valueOf(keyCode));</span>
+<span class="pc bpc" id="L797" title="1 of 2 branches missed.">            if (s != null) {</span>
+<span class="nc" id="L798">                pressCount = pressCount % s.length();</span>
+<span class="nc" id="L799">                return s.charAt(pressCount);</span>
+            }
+        }
+<span class="fc" id="L802">        return 0;</span>
+    }
+
+    /// Blocks the text area from opening the native text box editing on touchscreen click
+    @Override
+    void onClick() {
+<span class="nc bnc" id="L808" title="All 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L809">            super.onClick();</span>
+        }
+<span class="nc" id="L811">    }</span>
+
+    private void increaseCursor() {
+<span class="nc" id="L814">        cursorX++;</span>
+<span class="nc" id="L815">        String txt = getCurrentTextLine();</span>
+<span class="nc bnc" id="L816" title="All 4 branches missed.">        if (cursorX &gt; txt.length() || cursorY &gt;= getLines()) {</span>
+<span class="nc bnc" id="L817" title="All 2 branches missed.">            if (isSingleLineTextArea()) {</span>
+<span class="nc" id="L818">                cursorX = 0;</span>
+<span class="nc" id="L819">                return;</span>
+            }
+<span class="nc" id="L821">            cursorY++;</span>
+<span class="nc bnc" id="L822" title="All 2 branches missed.">            if (cursorY &gt; getLines()) {</span>
+<span class="nc" id="L823">                cursorY = 0;</span>
+<span class="nc bnc" id="L824" title="All 2 branches missed.">                if (!isCursorPositionCycle()) {</span>
+<span class="nc" id="L825">                    cursorY = getLines();</span>
+<span class="nc" id="L826">                    cursorX = txt.length();</span>
+                }
+            } else {
+<span class="nc" id="L829">                cursorX = 0;</span>
+            }
+        }
+<span class="nc" id="L832">        updateScroll();</span>
+<span class="nc" id="L833">    }</span>
+
+    private void decreaseCursor() {
+<span class="nc" id="L836">        cursorX--;</span>
+<span class="nc bnc" id="L837" title="All 4 branches missed.">        if (cursorX &lt; 0 || cursorY &gt;= getLines()) {</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">            if (isSingleLineTextArea()) {</span>
+<span class="nc" id="L839">                cursorX = getCurrentTextLine().length();</span>
+<span class="nc" id="L840">                return;</span>
+            }
+<span class="nc" id="L842">            cursorY--;</span>
+<span class="nc bnc" id="L843" title="All 2 branches missed.">            if (cursorY &lt; 0) {</span>
+<span class="nc" id="L844">                cursorY = getLines() - 1;</span>
+<span class="nc bnc" id="L845" title="All 2 branches missed.">                if (!isCursorPositionCycle()) {</span>
+<span class="nc" id="L846">                    cursorY = 0;</span>
+<span class="nc" id="L847">                    cursorX = 0;</span>
+                }
+            } else {
+<span class="nc" id="L850">                cursorX = getTextAt(cursorY).length();</span>
+            }
+        }
+<span class="nc" id="L853">        updateScroll();</span>
+<span class="nc" id="L854">    }</span>
+
+    private void increaseCursorLine() {
+<span class="nc" id="L857">        cursorY++;</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        if (cursorY &gt;= getLines()) {</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            if (isCursorPositionCycle()) {</span>
+<span class="nc" id="L860">                cursorY = 0;</span>
+            } else {
+<span class="nc" id="L862">                cursorY--;</span>
+            }
+        }
+<span class="nc" id="L865">        String line = getTextAt(cursorY);</span>
+<span class="nc bnc" id="L866" title="All 2 branches missed.">        if (cursorX &gt; line.length()) {</span>
+<span class="nc" id="L867">            cursorX = line.length();</span>
+        }
+<span class="nc" id="L869">        updateScroll();</span>
+<span class="nc" id="L870">    }</span>
+
+    private void decreaseCursorLine() {
+<span class="nc" id="L873">        cursorY--;</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">        if (cursorY &lt; 0) {</span>
+<span class="nc bnc" id="L875" title="All 2 branches missed.">            if (isCursorPositionCycle()) {</span>
+<span class="nc" id="L876">                cursorY = getLines() - 1;</span>
+            } else {
+<span class="nc" id="L878">                cursorY++;</span>
+            }
+        }
+<span class="nc" id="L881">        String line = getTextAt(cursorY);</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        if (cursorX &gt; line.length()) {</span>
+<span class="nc" id="L883">            cursorX = line.length();</span>
+        }
+<span class="nc" id="L885">        updateScroll();</span>
+<span class="nc" id="L886">    }</span>
+
+    private void updateScroll() {
+<span class="nc bnc" id="L889" title="All 4 branches missed.">        if (!isSingleLineTextArea() &amp;&amp; isScrollableY()) {</span>
+<span class="nc" id="L890">            Font textFont = getStyle().getFont();</span>
+<span class="nc" id="L891">            int rowsGap = getRowsGap();</span>
+<span class="nc" id="L892">            int lineHeight = textFont.getHeight() + rowsGap;</span>
+<span class="nc" id="L893">            Rectangle rect = new Rectangle(getScrollX(), getCursorY() * lineHeight, getWidth(), lineHeight);</span>
+<span class="nc" id="L894">            scrollRectToVisible(rect, this);</span>
+        }
+<span class="nc" id="L896">    }</span>
+
+    private void updateCursorLocation(int pos) {
+<span class="fc bfc" id="L899" title="All 2 branches covered.">        if (isSingleLineTextArea()) {</span>
+<span class="fc" id="L900">            cursorX = pos;</span>
+<span class="fc" id="L901">            return;</span>
+        }
+<span class="fc" id="L903">        String text = getText();</span>
+<span class="fc" id="L904">        String currentLine = &quot;&quot;;</span>
+<span class="fc" id="L905">        int currentLineLength = 0;</span>
+<span class="fc" id="L906">        int numOfChars = 0;</span>
+<span class="fc" id="L907">        int currentY = 0;</span>
+<span class="fc bfc" id="L908" title="All 4 branches covered.">        while (numOfChars &lt;= pos &amp;&amp; currentY &lt; getLines()) {</span>
+<span class="fc" id="L909">            currentLine = getTextAt(currentY);</span>
+<span class="fc" id="L910">            currentLineLength = currentLine.length();</span>
+<span class="fc bfc" id="L911" title="All 2 branches covered.">            if (numOfChars + currentLineLength &lt; text.length() &amp;&amp;</span>
+<span class="pc bpc" id="L912" title="1 of 2 branches missed.">                    (text.charAt(numOfChars + currentLineLength) == '\n' ||</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">                            text.charAt(numOfChars + currentLineLength) == ' ')) {</span>
+<span class="fc" id="L914">                currentLineLength++;</span>
+            }
+<span class="fc" id="L916">            numOfChars += currentLineLength;</span>
+<span class="fc" id="L917">            currentY++;</span>
+        }
+<span class="fc" id="L919">        cursorY = Math.max(0, currentY - 1);</span>
+<span class="fc" id="L920">        cursorX = currentLineLength - (numOfChars - pos);</span>
+<span class="pc bpc" id="L921" title="1 of 4 branches missed.">        if (cursorX == currentLineLength &amp;&amp; currentLineLength &gt; currentLine.length()) {</span>
+<span class="nc" id="L922">            cursorX--;</span>
+        }
+<span class="fc" id="L924">    }</span>
+
+    private String getCurrentTextLine() {
+<span class="nc bnc" id="L927" title="All 2 branches missed.">        if (isSingleLineTextArea()) {</span>
+<span class="nc" id="L928">            return getText();</span>
+        }
+<span class="nc" id="L930">        return getTextAt(getCursorY());</span>
+    }
+
+    private void moveCursor(int game) {
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">        if (handlesInput()) {</span>
+
+<span class="nc bnc" id="L936" title="All 2 branches missed.">            if (game == keyFwd) {</span>
+<span class="nc" id="L937">                increaseCursor();</span>
+<span class="nc" id="L938">                repaint();</span>
+<span class="nc bnc" id="L939" title="All 2 branches missed.">            } else if (game == keyBack) {</span>
+<span class="nc" id="L940">                decreaseCursor();</span>
+<span class="nc" id="L941">                repaint();</span>
+            }
+
+<span class="nc bnc" id="L944" title="All 2 branches missed.">            if (!isSingleLineTextArea()) {</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">                if (game == Display.GAME_UP) {</span>
+<span class="nc" id="L946">                    decreaseCursorLine();</span>
+<span class="nc" id="L947">                    repaint();</span>
+<span class="nc bnc" id="L948" title="All 2 branches missed.">                } else if (game == Display.GAME_DOWN) {</span>
+<span class="nc" id="L949">                    increaseCursorLine();</span>
+<span class="nc" id="L950">                    repaint();</span>
+                }
+            }
+        }
+
+<span class="fc" id="L955">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getCursorPosition() {
+<span class="fc" id="L960">        String txt = getText();</span>
+<span class="pc bpc" id="L961" title="1 of 4 branches missed.">        if (txt == null || txt.length() == 0) {</span>
+<span class="fc" id="L962">            updateCursorLocation(0);</span>
+<span class="fc" id="L963">            return 0;</span>
+        }
+<span class="fc bfc" id="L965" title="All 2 branches covered.">        if (cursorX == -1) {</span>
+<span class="fc" id="L966">            updateCursorLocation(getText().length());</span>
+        }
+<span class="fc bfc" id="L968" title="All 2 branches covered.">        if (isSingleLineTextArea()) {</span>
+<span class="fc" id="L969">            return getCursorX();</span>
+        }
+
+<span class="fc" id="L972">        int pos = 0;</span>
+<span class="fc" id="L973">        int line = 0;</span>
+<span class="pc bpc" id="L974" title="1 of 4 branches missed.">        while (line &lt; cursorY &amp;&amp; line &lt; getLines()) {</span>
+<span class="fc" id="L975">            String l = getTextAt(line);</span>
+<span class="fc" id="L976">            pos += l.length();</span>
+<span class="pc bpc" id="L977" title="2 of 4 branches missed.">            if (pos &lt; txt.length() &amp;&amp; (txt.charAt(pos) == '\n' ||</span>
+<span class="nc bnc" id="L978" title="All 2 branches missed.">                    txt.charAt(pos) == ' ')) {</span>
+<span class="fc" id="L979">                pos++;</span>
+            }
+<span class="fc" id="L981">            line++;</span>
+<span class="fc" id="L982">        }</span>
+<span class="fc" id="L983">        return Math.min(getText().length(), pos + cursorX);</span>
+    }
+
+    /// Sets the position of the cursor char position
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the cursor position
+    public void setCursorPosition(int pos) {
+<span class="pc bpc" id="L992" title="1 of 2 branches missed.">        if (pos &lt; -1) {</span>
+<span class="nc" id="L993">            throw new IllegalArgumentException(&quot;Illegal cursor position: &quot; + pos);</span>
+        }
+<span class="fc" id="L995">        pos = Math.min(pos, getText().length());</span>
+<span class="fc" id="L996">        pos = Math.max(0, pos);</span>
+<span class="fc" id="L997">        updateCursorLocation(pos);</span>
+<span class="fc" id="L998">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getCursorY() {
+<span class="fc" id="L1003">        return cursorY;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getCursorX() {
+<span class="fc" id="L1009">        return cursorX;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setText(String text) {
+<span class="fc" id="L1015">        super.setText(text);</span>
+<span class="pc bpc" id="L1016" title="1 of 2 branches missed.">        if (text != null) {</span>
+<span class="fc" id="L1017">            int pos = getCursorPosition();</span>
+<span class="pc bpc" id="L1018" title="1 of 2 branches missed.">            if (pos &lt; 0) {</span>
+<span class="nc" id="L1019">                pos = text.length();</span>
+            } else {
+<span class="fc bfc" id="L1021" title="All 2 branches covered.">                if (pos &gt; text.length()) {</span>
+<span class="fc" id="L1022">                    pos = text.length();</span>
+                }
+            }
+<span class="fc" id="L1025">            setCursorPosition(pos);</span>
+<span class="fc" id="L1026">        } else {</span>
+<span class="nc" id="L1027">            setCursorPosition(0);</span>
+        }
+<span class="fc" id="L1029">    }</span>
+
+    /// Clears the text from the TextField
+    public void clear() {
+<span class="pc bpc" id="L1033" title="1 of 2 branches missed.">        if (isEditing()) {</span>
+<span class="nc" id="L1034">            stopEditing();</span>
+<span class="nc" id="L1035">            setText(&quot;&quot;);</span>
+<span class="nc" id="L1036">            commitChange();</span>
+<span class="nc" id="L1037">            startEditingAsync();</span>
+        } else {
+<span class="fc" id="L1039">            setText(&quot;&quot;);</span>
+<span class="fc" id="L1040">            commitChange();</span>
+        }
+<span class="fc" id="L1042">    }</span>
+
+    /// Invoked on a long click by the user
+    private void longClick(int keyCode) {
+<span class="nc" id="L1046">        longClick = true;</span>
+<span class="nc" id="L1047">        keyReleaseOrLongClick(keyCode, true);</span>
+<span class="nc" id="L1048">        moveCursor(Display.getInstance().getGameAction(keyCode));</span>
+<span class="nc" id="L1049">    }</span>
+
+    /// Returns true if this is the clear key on the device, many devices don't contain
+    /// a clear key and even in those that contain it this might be an issue
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key code that might be the clear key
+    ///
+    /// #### Returns
+    ///
+    /// true if this is the clear key.
+    protected boolean isClearKey(int keyCode) {
+<span class="pc bpc" id="L1062" title="2 of 4 branches missed.">        return keyCode == MenuBar.clearSK || keyCode == MenuBar.backspaceSK;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void longKeyPress(int keyCode) {
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">        if (isClearKey(keyCode)) {</span>
+<span class="nc" id="L1069">            setText(&quot;&quot;);</span>
+        }
+<span class="nc" id="L1071">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isQwertyInput() {
+<span class="fc bfc" id="L1076" title="All 2 branches covered.">        if (!qwertyInitialized) {</span>
+<span class="fc" id="L1077">            qwertyInitialized = true;</span>
+<span class="fc" id="L1078">            int type = Display.getInstance().getKeyboardType();</span>
+<span class="pc bpc" id="L1079" title="1 of 2 branches missed.">            if (type == Display.KEYBOARD_TYPE_UNKNOWN) {</span>
+<span class="fc" id="L1080">                qwerty = qwertyDevice;</span>
+            } else {
+<span class="nc bnc" id="L1082" title="All 4 branches missed.">                qwerty = type == Display.KEYBOARD_TYPE_QWERTY ||</span>
+                        type == Display.KEYBOARD_TYPE_VIRTUAL;
+<span class="nc bnc" id="L1084" title="All 2 branches missed.">                if (!qwertyDevice) {</span>
+<span class="nc" id="L1085">                    qwertyDevice = qwerty;</span>
+                }
+            }
+        }
+<span class="fc" id="L1089">        return qwerty;</span>
+    }
+
+    /// True is this is a qwerty device or a device that is currently in
+    /// qwerty mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `qwerty`: the value of qwerty mode
+    public void setQwertyInput(boolean qwerty) {
+<span class="fc" id="L1099">        this.qwerty = qwerty;</span>
+<span class="fc" id="L1100">    }</span>
+
+    /// Returns true if the given input mode should commit immediately or
+    /// wait for the commit timeout
+    ///
+    /// #### Parameters
+    ///
+    /// - `mode`: the input mode
+    ///
+    /// #### Returns
+    ///
+    /// returns true for input mode 123 by default
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    protected boolean isImmediateInputMode(String mode) {
+<span class="nc" id="L1117">        return &quot;123&quot;.equals(mode);</span>
+    }
+
+    private boolean keyReleaseOrLongClick(int keyCode, boolean longClick) {
+        // user pressed a different key, autocommit everything
+<span class="pc bpc" id="L1122" title="2 of 4 branches missed.">        if (lastKeyCode != keyCode &amp;&amp; pendingCommit) {</span>
+<span class="nc" id="L1123">            commitChange();</span>
+        }
+<span class="fc" id="L1125">        lastKeyCode = keyCode;</span>
+<span class="fc" id="L1126">        boolean isClearKey = isClearKey(keyCode);</span>
+<span class="fc" id="L1127">        int pos = getCursorPosition();</span>
+<span class="pc bpc" id="L1128" title="3 of 4 branches missed.">        if (isQwertyInput() &amp;&amp; !isClearKey) {</span>
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">            if (keyCode &gt; 0) {</span>
+<span class="nc bnc" id="L1130" title="All 2 branches missed.">                if (previousText == null) {</span>
+<span class="nc" id="L1131">                    previousText = getText();</span>
+                }
+<span class="nc bnc" id="L1133" title="All 2 branches missed.">                if (pos &lt; 0) {</span>
+<span class="nc" id="L1134">                    pos = 0;</span>
+<span class="nc" id="L1135">                    setCursorPosition(pos);</span>
+                }
+
+<span class="nc" id="L1138">                insertChars(&quot;&quot; + (char) keyCode);</span>
+<span class="nc" id="L1139">                commitChange();</span>
+<span class="nc" id="L1140">                fireDataChanged(DataChangedListener.ADDED, pos);</span>
+<span class="nc" id="L1141">                return true;</span>
+            }
+        } else {
+<span class="fc" id="L1144">            char c = getCharPerKeyCode(pressCount, keyCode, longClick);</span>
+<span class="pc bpc" id="L1145" title="1 of 2 branches missed.">            if (c != 0) {</span>
+                String text;
+<span class="nc bnc" id="L1147" title="All 2 branches missed.">                if (previousText == null) {</span>
+<span class="nc" id="L1148">                    previousText = getText();</span>
+                }
+<span class="nc bnc" id="L1150" title="All 2 branches missed.">                if (!pendingCommit) {</span>
+<span class="nc" id="L1151">                    insertChars(&quot;&quot; + c);</span>
+<span class="nc" id="L1152">                    pendingCommit = true;</span>
+<span class="nc" id="L1153">                    pressCount++;</span>
+                } else {
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">                    if (overwriteMode) {</span>
+                        //neutralize incrementation within *insertChars*
+<span class="nc" id="L1157">                        decreaseCursor();</span>
+                        //overwrite the character of previous keystroke
+<span class="nc" id="L1159">                        insertChars(&quot;&quot; + c);</span>
+<span class="nc" id="L1160">                        pressCount++;</span>
+                    } else {
+<span class="nc bnc" id="L1162" title="All 4 branches missed.">                        if (pos &gt; 0 &amp;&amp; pos &lt; getMaxSize() &amp;&amp;</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">                                previousText.length() &lt; getMaxSize() &amp;&amp;</span>
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">                                validChar(&quot;&quot; + c)) {</span>
+<span class="nc" id="L1165">                            text = previousText.substring(0, pos - 1) + c +</span>
+<span class="nc" id="L1166">                                    previousText.substring(pos - 1);</span>
+<span class="nc" id="L1167">                            pendingCommit = true;</span>
+<span class="nc" id="L1168">                            pressCount++;</span>
+<span class="nc" id="L1169">                            super.setText(text);</span>
+                        }
+                    }
+                }
+
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">                if (isImmediateInputMode(inputMode)) {</span>
+<span class="nc" id="L1175">                    commitChange();</span>
+<span class="nc" id="L1176">                    fireDataChanged(DataChangedListener.ADDED, pos);</span>
+                } else {
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                    if (pressCount == 1) {</span>
+<span class="nc" id="L1179">                        fireDataChanged(DataChangedListener.ADDED, pos);</span>
+                    } else {
+<span class="nc" id="L1181">                        fireDataChanged(DataChangedListener.CHANGED, pos);</span>
+                    }
+                }
+<span class="nc" id="L1184">                return true;</span>
+            }
+        }
+
+<span class="pc bpc" id="L1188" title="1 of 2 branches missed.">        if (isChangeInputMode(keyCode)) {</span>
+<span class="nc" id="L1189">            int ilen = inputModeOrder.length;</span>
+<span class="nc bnc" id="L1190" title="All 2 branches missed.">            for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="nc bnc" id="L1191" title="All 2 branches missed.">                if (inputModeOrder[iter].equals(inputMode)) {</span>
+<span class="nc" id="L1192">                    iter++;</span>
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">                    if (iter &lt; inputModeOrder.length) {</span>
+<span class="nc" id="L1194">                        setInputMode(inputModeOrder[iter]);</span>
+                    } else {
+<span class="nc" id="L1196">                        setInputMode(inputModeOrder[0]);</span>
+                    }
+<span class="nc" id="L1198">                    return true;</span>
+                }
+            }
+<span class="nc" id="L1201">            return true;</span>
+        }
+<span class="pc bpc" id="L1203" title="1 of 2 branches missed.">        if (isClearKey) {</span>
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">            if (longClick) {</span>
+                // long click on the clear key should erase the field entirely
+<span class="nc" id="L1206">                setText(&quot;&quot;);</span>
+<span class="nc" id="L1207">                commitChange();</span>
+            } else {
+<span class="nc" id="L1209">                deleteChar();</span>
+            }
+<span class="nc" id="L1211">            return true;</span>
+        }
+<span class="pc bpc" id="L1213" title="1 of 2 branches missed.">        if (isSymbolDialogKey(keyCode)) {</span>
+<span class="nc" id="L1214">            showSymbolDialog();</span>
+<span class="nc" id="L1215">            return true;</span>
+        }
+<span class="fc" id="L1217">        return false;</span>
+    }
+
+    /// This method is responsible for adding a character into the field and is
+    /// the focal point for all input. It can be overriden to prevent a particular
+    /// char from insertion or provide a different behavior for char insertion.
+    /// It is the responsibility of this method to shift the cursor and invoke
+    /// setText...
+    ///
+    /// This method accepts a string for the more elaborate cases such as multi-char
+    /// input and paste.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: character for insertion
+    ///
+    /// #### Deprecated
+    ///
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
+    public void insertChars(String c) {
+<span class="nc" id="L1237">        String currentText = getText();</span>
+        //if the contraint is numeric only, don't insert a char that isn't
+        //numeric
+<span class="nc bnc" id="L1240" title="All 2 branches missed.">        if (!validChar(c)) {</span>
+<span class="nc" id="L1241">            return;</span>
+        }
+<span class="nc" id="L1243">        int pos = getCursorPosition() + 1;</span>
+<span class="nc bnc" id="L1244" title="All 4 branches missed.">        if (overwriteMode &amp;&amp; pos &lt;= currentText.length()) {</span>
+<span class="nc" id="L1245">            setText(currentText.substring(0, pos - 1) + c +</span>
+<span class="nc" id="L1246">                    currentText.substring(pos));</span>
+        } else {
+<span class="nc bnc" id="L1248" title="All 2 branches missed.">            if (currentText.length() + c.length() &gt; getMaxSize()) {</span>
+<span class="nc" id="L1249">                return;</span>
+            }
+<span class="nc" id="L1251">            setText(currentText.substring(0, pos - 1) + c +</span>
+<span class="nc" id="L1252">                    currentText.substring(pos - 1));</span>
+        }
+<span class="nc bnc" id="L1254" title="All 2 branches missed.">        if (c.length() &gt; 1) {</span>
+<span class="nc" id="L1255">            pos += c.length() - 1;</span>
+            //update cursor to the end.
+<span class="nc" id="L1257">            setCursorPosition(pos);</span>
+<span class="nc" id="L1258">            return;</span>
+        }
+<span class="nc" id="L1260">        increaseCursor();</span>
+<span class="nc" id="L1261">    }</span>
+
+    /// Checks if the candidate input is valid for this TextField
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the String to insert
+    ///
+    /// #### Returns
+    ///
+    /// true if the String is valid
+    public boolean validChar(String c) {
+        // The base type, not the whole constraint. Every modifier -- PASSWORD, SENSITIVE,
+        // NON_PREDICTIVE, USERNAME, UPPERCASE, ONE_TIME_CODE -- is a bit above the base,
+        // and comparing the whole value meant a single one of them turned a numeric field
+        // back into a field that took anything. Every other consumer of a constraint in
+        // the framework already masks; these comparisons were simply left behind.
+<span class="fc" id="L1278">        int constraint = getConstraint() &amp; 0xffff;</span>
+<span class="fc bfc" id="L1279" title="All 2 branches covered.">        if (constraint == TextArea.NUMERIC) {</span>
+<span class="fc bfc" id="L1280" title="All 4 branches covered.">            return c.charAt(0) &gt;= '0' &amp;&amp; c.charAt(0) &lt;= '9';</span>
+<span class="fc bfc" id="L1281" title="All 2 branches covered.">        } else if (constraint == TextArea.PHONENUMBER) {</span>
+<span class="pc bpc" id="L1282" title="1 of 6 branches missed.">            return (c.charAt(0) &gt;= '0' &amp;&amp; c.charAt(0) &lt;= '9') || c.charAt(0) == '+';</span>
+<span class="pc bpc" id="L1283" title="1 of 2 branches missed.">        } else if (constraint == TextArea.DECIMAL) {</span>
+<span class="nc bnc" id="L1284" title="All 12 branches missed.">            return (c.charAt(0) &gt;= '0' &amp;&amp; c.charAt(0) &lt;= '9') || c.charAt(0) == '+' || c.charAt(0) == '-' || c.charAt(0) == '.' || c.charAt(0) == ',';</span>
+        }
+
+<span class="fc" id="L1287">        return true;</span>
+    }
+
+    /// Invoked to show the symbol dialog, this method can be overriden by subclasses to
+    /// manipulate the symbol table
+    protected void showSymbolDialog() {
+<span class="nc" id="L1293">        Command cancel = new Command(getUIManager().localize(&quot;cancel&quot;, &quot;Cancel&quot;));</span>
+<span class="nc" id="L1294">        Command r = Dialog.show(&quot;&quot;, createSymbolTable(), cancel);</span>
+<span class="nc bnc" id="L1295" title="All 4 branches missed.">        if (r != null &amp;&amp; r != cancel) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1296">            insertChars(r.getCommandName());</span>
+        }
+<span class="nc" id="L1298">    }</span>
+
+    /// Creates a symbol table container used by the showSymbolDialog method.
+    /// This method is designed for subclases to override and customize.
+    ///
+    /// #### Returns
+    ///
+    /// container for the symbol table.
+    protected Container createSymbolTable() {
+<span class="nc" id="L1307">        char[] symbolArray = getSymbolTable();</span>
+<span class="nc" id="L1308">        Container symbols = new Container(new GridLayout(symbolArray.length / 5, 5));</span>
+<span class="nc" id="L1309">        int slen = symbolArray.length;</span>
+<span class="nc bnc" id="L1310" title="All 2 branches missed.">        for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc" id="L1311">            Button button = new Button(new Command(&quot;&quot; + symbolArray[iter]));</span>
+<span class="nc" id="L1312">            button.setUIID(&quot;VKBButton&quot;);</span>
+<span class="nc" id="L1313">            button.setAlignment(CENTER);</span>
+<span class="nc" id="L1314">            symbols.addComponent(button);</span>
+        }
+<span class="nc" id="L1316">        return symbols;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="pc bpc" id="L1322" title="2 of 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1323">            super.keyReleased(keyCode);</span>
+<span class="nc" id="L1324">            return;</span>
+        }
+<span class="pc bpc" id="L1326" title="1 of 2 branches missed.">        if (!isEditable()) {</span>
+<span class="nc" id="L1327">            return;</span>
+        }
+<span class="fc" id="L1329">        pressedAndNotReleased = false;</span>
+<span class="fc" id="L1330">        releaseTime = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">        if (!longClick) {</span>
+<span class="pc bpc" id="L1332" title="1 of 2 branches missed.">            if (keyReleaseOrLongClick(keyCode, false)) {</span>
+<span class="nc" id="L1333">                return;</span>
+            }
+        }
+<span class="fc" id="L1336">        longClick = false;</span>
+<span class="fc" id="L1337">        super.keyReleased(keyCode);</span>
+<span class="fc" id="L1338">    }</span>
+
+    /// The amount of time considered as a &quot;long click&quot; causing the long click method
+    /// to be invoked.
+    ///
+    /// #### Returns
+    ///
+    /// currently defaults to 800
+    protected int getLongClickDuration() {
+<span class="nc" id="L1347">        return 800;</span>
+    }
+
+    /// Returns true if the cursor should cycle to the beginning of the text when the
+    /// user navigates beyond the edge of the text and visa versa.
+    ///
+    /// #### Returns
+    ///
+    /// true by default
+    protected boolean isCursorPositionCycle() {
+<span class="nc" id="L1357">        return true;</span>
+    }
+
+    /// Returns true if this keycode is the one mapping to the symbol dialog popup
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the keycode to check
+    ///
+    /// #### Returns
+    ///
+    /// true if this is the star symbol *
+    protected boolean isSymbolDialogKey(int keyCode) {
+<span class="pc bpc" id="L1370" title="1 of 2 branches missed.">        return keyCode == defaultSymbolDialogKey;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L1376">        deregisterFromAnimation();</span>
+        // if the text field is removed without restoring the commands we need to restore them
+<span class="pc bpc" id="L1378" title="1 of 2 branches missed.">        if (handlesInput()) {</span>
+<span class="nc" id="L1379">            TopLevelContainer f = getTopLevelContainer();</span>
+<span class="nc bnc" id="L1380" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1381">                removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);</span>
+            } else {
+                // Form only: the clear command lives on the soft button bar, which a
+                // Window has no equivalent of -- commands there reach the desktop menu
+                // instead. Nothing to restore when there is no such bar.
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1387">                    f.asContainer().setClearCommandInternal(originalClearCommand);</span>
+                }
+<span class="nc" id="L1389">                originalClearCommand = null;</span>
+            }
+<span class="nc" id="L1391">            pressedAndNotReleased = false;</span>
+<span class="nc" id="L1392">            setHandlesInput(false);</span>
+        }
+<span class="fc" id="L1394">        super.deinitialize();</span>
+<span class="fc" id="L1395">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setEditable(boolean b) {
+<span class="fc" id="L1400">        super.setEditable(b);</span>
+<span class="pc bpc" id="L1401" title="1 of 4 branches missed.">        if (!b &amp;&amp; handlesInput()) {</span>
+<span class="nc" id="L1402">            setHandlesInput(false);</span>
+<span class="nc bnc" id="L1403" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1404">                removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);</span>
+            } else {
+<span class="nc" id="L1406">                Form f = getComponentForm();</span>
+                // Null inside a Window by design. The clear command lives on a Form's
+                // MenuBar, which a Window has none of, so there is nothing to restore
+                // there -- but dereferencing it threw out of an ordinary click.
+<span class="nc bnc" id="L1410" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1411">                    f.setClearCommand(originalClearCommand);</span>
+                }
+<span class="nc" id="L1413">                originalClearCommand = null;</span>
+            }
+<span class="nc" id="L1415">            pressedAndNotReleased = false;</span>
+        }
+<span class="fc" id="L1417">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyRepeated(int keyCode) {
+<span class="nc bnc" id="L1422" title="All 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1423">            super.keyRepeated(keyCode);</span>
+<span class="nc" id="L1424">            return;</span>
+        }
+        // the default implementation interfears with long press
+<span class="nc bnc" id="L1427" title="All 2 branches missed.">        if (isQwertyInput()) {</span>
+<span class="nc" id="L1428">            super.keyRepeated(keyCode);</span>
+        }
+<span class="nc" id="L1430">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="fc" id="L1435">        setSuppressActionEvent(false);</span>
+<span class="pc bpc" id="L1436" title="2 of 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1437">            super.keyPressed(keyCode);</span>
+<span class="nc" id="L1438">            return;</span>
+        }
+<span class="pc bpc" id="L1440" title="1 of 2 branches missed.">        if (!isEditable()) {</span>
+<span class="nc" id="L1441">            return;</span>
+        }
+<span class="fc" id="L1443">        pressedAndNotReleased = true;</span>
+<span class="fc" id="L1444">        pressedKeyCode = keyCode;</span>
+<span class="fc" id="L1445">        pressTime = System.currentTimeMillis();</span>
+
+        // try to autodetect a qwerty device
+<span class="pc bpc" id="L1448" title="1 of 2 branches missed.">        if (qwertyAutoDetect) {</span>
+<span class="pc bpc" id="L1449" title="7 of 10 branches missed.">            if ((!qwerty) &amp;&amp; ((keyCode &gt;= 'a' &amp;&amp; keyCode &lt;= 'z') || (keyCode &gt;= 'A' &amp;&amp; keyCode &lt;= 'Z'))) {</span>
+<span class="nc" id="L1450">                qwertyDevice = true;</span>
+<span class="nc" id="L1451">                qwerty = true;</span>
+            }
+        }
+
+<span class="pc bpc" id="L1455" title="2 of 4 branches missed.">        if ((!handlesInput()) &amp;&amp; isEditingTrigger(keyCode)) {</span>
+<span class="nc" id="L1456">            setHandlesInput(true);</span>
+<span class="nc bnc" id="L1457" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1458">                T9_COMMAND.setDisposesDialog(false);</span>
+<span class="nc" id="L1459">                DELETE_COMMAND.setDisposesDialog(false);</span>
+<span class="nc" id="L1460">                originalClearCommand = installCommands(DELETE_COMMAND, T9_COMMAND);</span>
+            } else {
+<span class="nc" id="L1462">                Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1463" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1464">                    originalClearCommand = f.getClearCommand();</span>
+<span class="nc" id="L1465">                    f.setClearCommand(DELETE_COMMAND);</span>
+                }
+            }
+<span class="nc" id="L1468">            return;</span>
+        }
+
+<span class="fc" id="L1471">        moveCursor(Display.getInstance().getGameAction(keyCode));</span>
+
+<span class="pc bpc" id="L1473" title="3 of 4 branches missed.">        if (handlesInput() &amp;&amp; isEditingEndTrigger(keyCode)) {</span>
+<span class="nc" id="L1474">            setHandlesInput(false);</span>
+<span class="nc bnc" id="L1475" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1476">                removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);</span>
+            } else {
+<span class="nc" id="L1478">                Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1479" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1480">                    f.setClearCommand(originalClearCommand);</span>
+<span class="nc" id="L1481">                    originalClearCommand = null;</span>
+                }
+            }
+<span class="nc" id="L1484">            fireActionEvent();</span>
+<span class="nc" id="L1485">            return;</span>
+        } else {
+<span class="pc bpc" id="L1487" title="1 of 2 branches missed.">            if (handlesInput()) {</span>
+<span class="nc" id="L1488">                return;</span>
+            }
+        }
+<span class="fc" id="L1491">        super.keyPressed(keyCode);</span>
+<span class="fc" id="L1492">    }</span>
+
+    /// Installs the clear and t9 commands onto the parent form, this method can
+    /// be overriden to provide device specific placement for these commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `clear`: the clear command
+    ///
+    /// - `t9`: the t9 command
+    ///
+    /// #### Returns
+    ///
+    /// @return clear command already installed in the form if applicable, none if no
+    /// clear command was installed before or not applicable.
+    protected Command installCommands(Command clear, Command t9) {
+<span class="nc" id="L1508">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1509" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L1510">            Command original = f.getClearCommand();</span>
+<span class="nc bnc" id="L1511" title="All 2 branches missed.">            if (original instanceof CommandHandler) {</span>
+<span class="nc" id="L1512">                original = originalClearCommand;</span>
+            }
+<span class="nc bnc" id="L1514" title="All 4 branches missed.">            if (replaceMenu &amp;&amp; originalCommands == null) {</span>
+<span class="nc" id="L1515">                originalCommands = new Command[f.getCommandCount()];</span>
+<span class="nc" id="L1516">                int olen = originalCommands.length;</span>
+<span class="nc bnc" id="L1517" title="All 2 branches missed.">                for (int iter = 0; iter &lt; olen; iter++) {</span>
+<span class="nc" id="L1518">                    originalCommands[iter] = f.getCommand(iter);</span>
+                }
+<span class="nc" id="L1520">                f.removeAllCommands();</span>
+<span class="nc bnc" id="L1521" title="All 2 branches missed.">                if (Display.getInstance().isThirdSoftButton()) {</span>
+<span class="nc" id="L1522">                    getComponentForm().getMenuBar().addSelectCommand(getSelectCommandText());</span>
+<span class="nc" id="L1523">                    selectCommand = getComponentForm().getCommand(0);</span>
+                }
+            }
+
+
+<span class="nc" id="L1528">            f.addCommand(clear, 0);</span>
+<span class="nc" id="L1529">            f.addCommand(t9, 0);</span>
+<span class="nc" id="L1530">            f.setClearCommand(clear);</span>
+<span class="nc" id="L1531">            f.revalidate();</span>
+<span class="nc" id="L1532">            return original;</span>
+        }
+<span class="nc" id="L1534">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isSelectableInteraction() {
+<span class="fc" id="L1540">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="nc bnc" id="L1546" title="All 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1547">            super.fireClicked();</span>
+<span class="nc" id="L1548">            return;</span>
+        }
+<span class="nc bnc" id="L1550" title="All 2 branches missed.">        if ((!handlesInput())) {</span>
+<span class="nc" id="L1551">            setHandlesInput(true);</span>
+<span class="nc bnc" id="L1552" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1553">                T9_COMMAND.setDisposesDialog(false);</span>
+<span class="nc" id="L1554">                DELETE_COMMAND.setDisposesDialog(false);</span>
+<span class="nc" id="L1555">                originalClearCommand = installCommands(DELETE_COMMAND, T9_COMMAND);</span>
+            } else {
+<span class="nc" id="L1557">                Form f = getComponentForm();</span>
+                // See above: no MenuBar in a Window, so no clear command to take over.
+<span class="nc bnc" id="L1559" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1560">                    originalClearCommand = f.getClearCommand();</span>
+<span class="nc" id="L1561">                    f.setClearCommand(DELETE_COMMAND);</span>
+                }
+            }
+<span class="nc" id="L1564">            return;</span>
+        }
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">        if (handlesInput()) {</span>
+<span class="nc" id="L1567">            setHandlesInput(false);</span>
+<span class="nc bnc" id="L1568" title="All 2 branches missed.">            if (useSoftkeys) {</span>
+<span class="nc" id="L1569">                removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);</span>
+            } else {
+<span class="nc" id="L1571">                Form f = getComponentForm();</span>
+                // Null inside a Window by design. The clear command lives on a Form's
+                // MenuBar, which a Window has none of, so there is nothing to restore
+                // there -- but dereferencing it threw out of an ordinary click.
+<span class="nc bnc" id="L1575" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1576">                    f.setClearCommand(originalClearCommand);</span>
+                }
+<span class="nc" id="L1578">                originalClearCommand = null;</span>
+            }
+<span class="nc" id="L1580">            fireActionEvent();</span>
+        }
+<span class="nc" id="L1582">    }</span>
+
+    /// Removes the clear and t9 commands from the parent form, this method can
+    /// be overriden to provide device specific placement for these commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `clear`: the clear command
+    ///
+    /// - `t9`: the t9 command
+    ///
+    /// - `originalClear`: the command originally assigned as the clear command (or null if no command was assigned before)
+    protected void removeCommands(Command clear, Command t9, Command originalClear) {
+<span class="nc" id="L1595">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1596" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L1597">            f.removeCommand(clear);</span>
+<span class="nc" id="L1598">            f.removeCommand(t9);</span>
+<span class="nc bnc" id="L1599" title="All 2 branches missed.">            if (selectCommand != null) {</span>
+<span class="nc" id="L1600">                f.removeCommand(selectCommand);</span>
+            }
+<span class="nc" id="L1602">            f.setClearCommand(originalClearCommand);</span>
+<span class="nc bnc" id="L1603" title="All 4 branches missed.">            if (replaceMenu &amp;&amp; originalCommands != null) {</span>
+<span class="nc" id="L1604">                int olen = originalCommands.length;</span>
+<span class="nc bnc" id="L1605" title="All 2 branches missed.">                for (int iter = olen - 1; iter &gt;= 0; iter--) {</span>
+<span class="nc" id="L1606">                    f.addCommand(originalCommands[iter]);</span>
+                }
+<span class="nc" id="L1608">                originalCommands = null;</span>
+            }
+<span class="nc" id="L1610">            f.revalidate();</span>
+        }
+<span class="nc" id="L1612">    }</span>
+
+    @Override
+    void focusLostInternal() {
+        // we don't call super to avoid the text area blocking the scrolling
+<span class="fc" id="L1617">        stopComponentLableTicker();</span>
+
+<span class="pc bpc" id="L1619" title="3 of 6 branches missed.">        if (handlesInput() || pressedAndNotReleased || pendingCommit) {</span>
+<span class="nc" id="L1620">            setHandlesInput(false);</span>
+<span class="nc" id="L1621">            Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc bnc" id="L1623" title="All 2 branches missed.">                if (useSoftkeys) {</span>
+<span class="nc" id="L1624">                    removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);</span>
+                } else {
+<span class="nc" id="L1626">                    f.setClearCommand(originalClearCommand);</span>
+                }
+            }
+<span class="nc" id="L1629">            releaseTime = System.currentTimeMillis();</span>
+<span class="nc" id="L1630">            commitChange();</span>
+<span class="nc" id="L1631">            pressedAndNotReleased = false;</span>
+<span class="nc" id="L1632">            longClick = false;</span>
+        }
+<span class="pc bpc" id="L1634" title="1 of 2 branches missed.">        if (isEditing()) {</span>
+<span class="nc" id="L1635">            fireActionEvent();</span>
+<span class="nc" id="L1636">            setSuppressActionEvent(true);</span>
+        }
+<span class="fc" id="L1638">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L1639" title="1 of 2 branches missed.">        if (f != null) {</span>
+            // prevent the VKB folding in case we are moving from one text component to another
+<span class="fc bfc" id="L1641" title="All 2 branches covered.">            if (f.getFocused() instanceof TextField) {</span>
+<span class="fc" id="L1642">                return;</span>
+            }
+<span class="pc bpc" id="L1644" title="3 of 4 branches missed.">            if (f.getFocused() instanceof TextArea &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1645">                return;</span>
+            }
+<span class="fc" id="L1647">            Display.getInstance().setShowVirtualKeyboard(false);</span>
+        }
+
+<span class="fc" id="L1650">    }</span>
+
+    @Override
+    void focusGainedInternal() {
+<span class="fc" id="L1654">        setSuppressActionEvent(false);</span>
+<span class="fc" id="L1655">        startComponentLableTicker();</span>
+<span class="fc" id="L1656">        releaseTime = System.currentTimeMillis();</span>
+<span class="fc" id="L1657">        pressedAndNotReleased = false;</span>
+<span class="fc" id="L1658">        longClick = false;</span>
+<span class="fc" id="L1659">    }</span>
+
+    /// Indicates whether the given key code should be ignored or should trigger
+    /// editing, by default fire or any numeric key should trigger editing implicitly.
+    /// This method is only called when handles input is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the keycode passed to the keyPressed method
+    ///
+    /// #### Returns
+    ///
+    /// true if this key code should cause a switch to editing mode.
+    protected boolean isEditingTrigger(int keyCode) {
+<span class="pc bpc" id="L1673" title="1 of 2 branches missed.">        if (!isEditable()) {</span>
+<span class="nc" id="L1674">            return false;</span>
+        }
+<span class="fc" id="L1676">        int gk = Display.getInstance().getGameAction(keyCode);</span>
+<span class="pc bpc" id="L1677" title="1 of 2 branches missed.">        if (isQwertyInput()) {</span>
+<span class="nc bnc" id="L1678" title="All 14 branches missed.">            return keyCode &gt; 0 || (gk == Display.GAME_FIRE) || isClearKey(keyCode) || isEnterKey(keyCode)</span>
+                    || (leftAndRightEditingTrigger &amp;&amp; ((gk == Display.GAME_LEFT) || (gk == Display.GAME_RIGHT)));
+        }
+<span class="pc bpc" id="L1681" title="8 of 14 branches missed.">        return (keyCode &gt;= '0' &amp;&amp; keyCode &lt;= '9') || isClearKey(keyCode) ||</span>
+                (gk == Display.GAME_FIRE)
+                || (leftAndRightEditingTrigger &amp;&amp; ((gk == Display.GAME_LEFT) || (gk == Display.GAME_RIGHT)));
+    }
+
+    /// Indicates whether the given key code should be ignored or should trigger
+    /// cause editing to end. By default the fire key, up or down will trigger
+    /// the end of editing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the keycode passed to the keyPressed method
+    ///
+    /// #### Returns
+    ///
+    /// true if this key code should cause a switch to editing mode.
+    protected boolean isEditingEndTrigger(int keyCode) {
+<span class="nc" id="L1698">        int k = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc" id="L1699">        boolean endTrigger = false;</span>
+<span class="nc bnc" id="L1700" title="All 2 branches missed.">        if (isQwertyInput()) {</span>
+<span class="nc bnc" id="L1701" title="All 2 branches missed.">            if (isSingleLineTextArea()) {</span>
+<span class="nc bnc" id="L1702" title="All 10 branches missed.">                endTrigger = keyCode &lt; 0 &amp;&amp; (k == Display.GAME_FIRE || k == Display.GAME_UP || k == Display.GAME_DOWN || isEnterKey(keyCode));</span>
+            } else {
+<span class="nc bnc" id="L1704" title="All 4 branches missed.">                endTrigger = keyCode &lt; 0 &amp;&amp; (k == Display.GAME_FIRE);</span>
+            }
+        } else {
+<span class="nc bnc" id="L1707" title="All 2 branches missed.">            if (isSingleLineTextArea()) {</span>
+<span class="nc bnc" id="L1708" title="All 6 branches missed.">                endTrigger = (k == Display.GAME_FIRE || k == Display.GAME_UP || k == Display.GAME_DOWN);</span>
+            } else {
+<span class="nc bnc" id="L1710" title="All 2 branches missed.">                endTrigger = (k == Display.GAME_FIRE);</span>
+            }
+        }
+<span class="nc" id="L1713">        return endTrigger;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+
+        //the native input will show the string.
+<span class="pc bpc" id="L1721" title="2 of 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.impl.isNativeEditorVisible(this, g)) {</span>
+<span class="nc bnc" id="L1722" title="All 2 branches missed.">            if (!Display.impl.nativeEditorPaintsHint()) {</span>
+<span class="nc" id="L1723">                paintHint(g);</span>
+            }
+<span class="nc" id="L1725">            return;</span>
+        }
+
+<span class="fc" id="L1728">        UIManager manager = getUIManager();</span>
+<span class="fc" id="L1729">        manager.getLookAndFeel().drawTextField(g, this);</span>
+
+<span class="pc bpc" id="L1731" title="1 of 6 branches missed.">        if (drawCursor &amp;&amp; hasFocus() &amp;&amp; isEditable()) {</span>
+<span class="fc" id="L1732">            manager.getLookAndFeel().drawTextFieldCursor(g, this);</span>
+        }
+
+<span class="fc" id="L1735">        paintHint(g);</span>
+<span class="fc" id="L1736">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L1741" title="All 2 branches covered.">        if (isSingleLineTextArea()) {</span>
+<span class="fc" id="L1742">            return getUIManager().getLookAndFeel().getTextFieldPreferredSize(this);</span>
+        } else {
+<span class="fc" id="L1744">            return getUIManager().getLookAndFeel().getTextAreaSize(this, true);</span>
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L1751">        super.initComponentImpl();</span>
+<span class="fc" id="L1752">        boolean rtl = isRTL();</span>
+<span class="fc bfc" id="L1753" title="All 2 branches covered.">        keyFwd = rtl ? Display.GAME_LEFT : Display.GAME_RIGHT;</span>
+<span class="fc bfc" id="L1754" title="All 2 branches covered.">        keyBack = rtl ? Display.GAME_RIGHT : Display.GAME_LEFT;</span>
+
+<span class="fc" id="L1756">        registerForAnimation();</span>
+<span class="fc" id="L1757">    }</span>
+
+    /// The amount of time in milliseconds in which the cursor is visible
+    ///
+    /// #### Returns
+    ///
+    /// time for the cursor to stay &quot;on&quot;
+    public int getCursorBlinkTimeOn() {
+<span class="nc" id="L1765">        return blinkOnTime;</span>
+    }
+
+    /// The amount of time in milliseconds in which the cursor is visible
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: for the cursor to stay &quot;on&quot;
+    public void setCursorBlinkTimeOn(int time) {
+<span class="nc" id="L1774">        blinkOnTime = time;</span>
+<span class="nc" id="L1775">    }</span>
+
+    /// The amount of time in milliseconds in which the cursor is invisible
+    ///
+    /// #### Returns
+    ///
+    /// time for the cursor to stay &quot;off&quot;
+    public int getCursorBlinkTimeOff() {
+<span class="nc" id="L1783">        return blinkOffTime;</span>
+    }
+
+    /// The amount of time in milliseconds in which the cursor is invisible
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: for the cursor to stay &quot;off&quot;
+    public void setCursorBlinkTimeOff(int time) {
+<span class="nc" id="L1792">        blinkOffTime = time;</span>
+<span class="nc" id="L1793">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc" id="L1798">        boolean ani = super.animate();</span>
+
+        // while native editing we don't need the cursor animations
+<span class="pc bpc" id="L1801" title="1 of 2 branches missed.">        if (Display.getInstance().isNativeEditorVisible(this)) {</span>
+<span class="nc" id="L1802">            return ani;</span>
+        }
+<span class="pc bpc" id="L1804" title="1 of 4 branches missed.">        if (hasFocus() &amp;&amp; isVisible()) {</span>
+<span class="fc" id="L1805">            long currentTime = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L1806" title="All 2 branches covered.">            if (drawCursor) {</span>
+<span class="fc bfc" id="L1807" title="All 2 branches covered.">                if ((currentTime - cursorBlinkTime) &gt; blinkOnTime) {</span>
+<span class="fc" id="L1808">                    cursorBlinkTime = currentTime;</span>
+<span class="fc" id="L1809">                    drawCursor = false;</span>
+<span class="fc" id="L1810">                    return true;</span>
+                }
+            } else {
+<span class="fc bfc" id="L1813" title="All 2 branches covered.">                if ((currentTime - cursorBlinkTime) &gt; blinkOffTime) {</span>
+<span class="fc" id="L1814">                    cursorBlinkTime = currentTime;</span>
+<span class="fc" id="L1815">                    drawCursor = true;</span>
+<span class="fc" id="L1816">                    return true;</span>
+                }
+            }
+<span class="pc bpc" id="L1819" title="1 of 2 branches missed.">            if (pressedAndNotReleased) {</span>
+<span class="nc bnc" id="L1820" title="All 2 branches missed.">                if (currentTime - pressTime &gt;= getLongClickDuration()) {</span>
+<span class="nc" id="L1821">                    pressedAndNotReleased = false;</span>
+<span class="nc" id="L1822">                    longClick(pressedKeyCode);</span>
+                }
+            } else {
+<span class="pc bpc" id="L1825" title="3 of 4 branches missed.">                if (pendingCommit &amp;&amp; currentTime - releaseTime &gt; commitTimeout) {</span>
+<span class="nc" id="L1826">                    commitChange();</span>
+                }
+            }
+<span class="fc" id="L1829">        } else {</span>
+<span class="fc" id="L1830">            drawCursor = false;</span>
+        }
+<span class="fc" id="L1832">        return ani;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="pc bpc" id="L1838" title="2 of 4 branches missed.">        if (useNativeTextInput &amp;&amp; Display.getInstance().isNativeInputSupported()) {</span>
+<span class="nc" id="L1839">            super.pointerReleased(x, y);</span>
+<span class="nc" id="L1840">            return;</span>
+        }
+
+        // unlike text area the text field supports shifting the cursor with the touch screen
+<span class="fc" id="L1844">        int lineHeight = getStyle().getFont().getHeight() + getRowsGap();</span>
+<span class="fc" id="L1845">        int line = (y - getAbsoluteY()) / lineHeight;</span>
+<span class="fc" id="L1846">        cursorY = line;</span>
+<span class="fc" id="L1847">        cursorY = Math.min(cursorY, getLines() - 1);</span>
+<span class="fc" id="L1848">        cursorY = Math.max(cursorY, 0);</span>
+<span class="fc" id="L1849">        String text = getTextAt(cursorY);</span>
+<span class="fc" id="L1850">        int textLength = text.length();</span>
+<span class="fc" id="L1851">        int position = 0;</span>
+<span class="fc" id="L1852">        Font f = getStyle().getFont();</span>
+<span class="fc" id="L1853">        x -= getAbsoluteX();</span>
+<span class="fc bfc" id="L1854" title="All 2 branches covered.">        for (int iter = 0; iter &lt; textLength; iter++) {</span>
+<span class="fc" id="L1855">            int width = f.substringWidth(text, 0, iter);</span>
+<span class="fc bfc" id="L1856" title="All 2 branches covered.">            if (x &gt; width) {</span>
+<span class="fc" id="L1857">                position = iter;</span>
+            } else {
+                break;
+            }
+        }
+<span class="pc bpc" id="L1862" title="1 of 2 branches missed.">        if (position == textLength - 1) {</span>
+<span class="nc bnc" id="L1863" title="All 2 branches missed.">            if (f.stringWidth(text) &lt; x) {</span>
+<span class="nc" id="L1864">                position = textLength;</span>
+            }
+        }
+<span class="fc" id="L1867">        cursorX = position;</span>
+<span class="pc bpc" id="L1868" title="1 of 2 branches missed.">        if (!isEditable()) {</span>
+<span class="nc" id="L1869">            return;</span>
+        }
+<span class="fc" id="L1871">        super.pointerReleased(x, y);</span>
+<span class="fc" id="L1872">    }</span>
+
+    /// When set to true softkeys are used to enable delete functionality
+    ///
+    /// #### Returns
+    ///
+    /// true if softkeys should be used
+    public boolean isUseSoftkeys() {
+<span class="nc" id="L1880">        return useSoftkeys;</span>
+    }
+
+    /// When set to true softkeys are used to enable delete functionality
+    ///
+    /// #### Parameters
+    ///
+    /// - `useSoftkeys`: true if softkeys should be used
+    public void setUseSoftkeys(boolean useSoftkeys) {
+<span class="nc" id="L1889">        this.useSoftkeys = useSoftkeys;</span>
+<span class="nc" id="L1890">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void onEditComplete(String text) {
+<span class="nc" id="L1895">        super.onEditComplete(text);</span>
+<span class="nc" id="L1896">        setCursorPosition(text.length());</span>
+<span class="nc" id="L1897">    }</span>
+
+    /// Indicates whether the menu of the form should be replaced with the T9/Clear
+    /// commands for the duration of interactivity with the text field
+    ///
+    /// #### Returns
+    ///
+    /// true if the menu should be replaced
+    public boolean isReplaceMenu() {
+<span class="nc" id="L1906">        return replaceMenu;</span>
+    }
+
+    /// Indicates whether the menu of the form should be replaced with the T9/Clear
+    /// commands for the duration of interactivity with the text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `replaceMenu`: true if the menu should be replaced
+    public void setReplaceMenu(boolean replaceMenu) {
+<span class="fc" id="L1916">        this.replaceMenu = replaceMenu;</span>
+<span class="fc" id="L1917">    }</span>
+
+    /// Indicates that this is the overwrite mode
+    ///
+    /// #### Returns
+    ///
+    /// true if input with overwrite characters
+    public boolean isOverwriteMode() {
+<span class="nc" id="L1925">        return overwriteMode;</span>
+    }
+
+    /// Indicates that this is the overwrite mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `overwriteMode`: set to true if input with overwrite characters
+    public void setOverwriteMode(boolean overwriteMode) {
+<span class="nc" id="L1934">        this.overwriteMode = overwriteMode;</span>
+<span class="nc" id="L1935">    }</span>
+
+    /// Indicates whether the left/right keys will trigger editing, this is true by default.
+    /// Left and right key edit trigger might be disabled for cases such as text field
+    /// positioned horizontally one next to the other.
+    ///
+    /// #### Returns
+    ///
+    /// leftAndRightEditingTrigger Indicates whether the left/right keys will trigger editing
+    public boolean isLeftAndRightEditingTrigger() {
+<span class="nc" id="L1945">        return leftAndRightEditingTrigger;</span>
+    }
+
+    /// Indicates whether the left/right keys will trigger editing, this is true by default.
+    /// Left and right key edit trigger might be disabled for cases such as text field
+    /// positioned horizontally one next to the other.
+    ///
+    /// #### Parameters
+    ///
+    /// - `leftAndRightEditingTrigger`: Indicates whether the left/right keys will trigger editing
+    public void setLeftAndRightEditingTrigger(boolean leftAndRightEditingTrigger) {
+<span class="fc" id="L1956">        this.leftAndRightEditingTrigger = leftAndRightEditingTrigger;</span>
+<span class="fc" id="L1957">    }</span>
+
+    // setAlignment(int) used to be overridden here purely to throw
+    // IllegalArgumentException for Component.CENTER. That block is gone; the
+    // override is no longer needed because the parent TextArea.setAlignment
+    // already routes to Style.setAlignment and the rendering pipeline handles
+    // CENTER identically to LEFT/RIGHT. Removing the override also keeps PMD
+    // happy (UselessOverridingMethod). See #1511.
+
+    /// {@inheritDoc}
+    @Override
+    protected TextSelection.Spans calculateTextSelectionSpan(TextSelection sel) {
+<span class="nc" id="L1969">        return getUIManager().getLookAndFeel().calculateTextFieldSpan(sel, this);</span>
+    }
+
+    class CommandHandler extends Command {
+<span class="fc" id="L1973">        CommandHandler(String title, int id) {</span>
+<span class="fc" id="L1974">            super(title, id);</span>
+<span class="fc" id="L1975">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L1979">            ev.consume();</span>
+<span class="nc bnc" id="L1980" title="All 3 branches missed.">            switch (getId()) {</span>
+                case 1:
+                    // key press for activating clear causes keyRelease never to be
+                    // called triggering a long click, this code disables the long click
+<span class="nc" id="L1984">                    releaseTime = System.currentTimeMillis();</span>
+<span class="nc" id="L1985">                    pressedAndNotReleased = false;</span>
+<span class="nc" id="L1986">                    longClick = false;</span>
+<span class="nc" id="L1987">                    deleteChar();</span>
+<span class="nc" id="L1988">                    break;</span>
+                case 2:
+<span class="nc" id="L1990">                    ev.consume();</span>
+<span class="nc" id="L1991">                    editString();</span>
+<span class="nc" id="L1992">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L1996">        }</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

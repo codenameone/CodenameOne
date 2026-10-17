@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SensorScan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">SensorScan.java</span></div><h1>SensorScan.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.bluetooth.le.BleScan;
+
+/// A running sensor scan. Stop it as soon as the user has chosen a device
+/// -- scanning is expensive and both platforms throttle apps that leave it
+/// running.
+public final class SensorScan {
+
+    private final BleScan delegate;
+    private java.util.Timer timeout;
+    private boolean stopped;
+
+    /// Wraps an underlying BLE scan. Created by [HealthSensors].
+<span class="fc" id="L37">    SensorScan(BleScan delegate) {</span>
+<span class="fc" id="L38">        this.delegate = delegate;</span>
+<span class="fc" id="L39">    }</span>
+
+    /// Stops the scan automatically after `millis`.
+    ///
+    /// A BLE scan is one of the most expensive things an app can leave
+    /// running, and neither [com.codename1.bluetooth.le.BleScan] nor the
+    /// platform stops one on its own. Without this the documented
+    /// [SensorScanSettings#getTimeoutMillis()] -- including its default --
+    /// did nothing, and a scan ran until the app was killed.
+    void scheduleTimeout(long millis) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (millis &lt;= 0) {</span>
+<span class="nc" id="L50">            return;</span>
+        }
+        // CLDC's Timer has no named/daemon constructor.
+<span class="fc" id="L53">        timeout = new java.util.Timer();</span>
+<span class="fc" id="L54">        timeout.schedule(new StopTask(this), millis);</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Stops the scan. Idempotent.
+    public void stop() {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (stopped) {</span>
+<span class="nc" id="L60">            return;</span>
+        }
+<span class="fc" id="L62">        stopped = true;</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (timeout != null) {</span>
+<span class="fc" id="L64">            timeout.cancel();</span>
+<span class="fc" id="L65">            timeout = null;</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (delegate != null) {</span>
+<span class="fc" id="L68">            delegate.stop();</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    /// Named rather than anonymous so the timer holds no synthetic
+    /// reference beyond the scan it stops.
+    private static final class StopTask extends java.util.TimerTask {
+        private final SensorScan scan;
+
+<span class="fc" id="L77">        StopTask(SensorScan scan) {</span>
+<span class="fc" id="L78">            this.scan = scan;</span>
+<span class="fc" id="L79">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L83">            scan.stop();</span>
+<span class="fc" id="L84">        }</span>
+    }
+
+    /// `true` until [#stop()] is called or the scan times out.
+    public boolean isScanning() {
+<span class="pc bpc" id="L89" title="2 of 6 branches missed.">        return !stopped &amp;&amp; delegate != null &amp;&amp; delegate.isActive();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarModelCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarModelCodec.java</span></div><h1>CalendarModelCodec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Lossless map encoding used by the offline cache and provider fixtures.
+public final class CalendarModelCodec {
+
+    private CalendarModelCodec() {
+    }
+
+    public static Map&lt;String, Object&gt; encodeEvent(CalendarEvent e) {
+<span class="fc" id="L42">        Map&lt;String, Object&gt; m = common(e.getId(), e.getCalendarId(), e.getSourceId(), e.getVersion(), e.getTitle(), e.getDescription(), e.getLocation());</span>
+<span class="fc" id="L43">        m.put(&quot;codecVersion&quot;, Integer.valueOf(1));</span>
+<span class="fc" id="L44">        put(m, &quot;url&quot;, e.getUrl());</span>
+<span class="fc" id="L45">        put(m, &quot;recurringEventId&quot;, e.getRecurringEventId());</span>
+<span class="fc" id="L46">        put(m, &quot;start&quot;, encodeDateTime(e.getStart()));</span>
+<span class="fc" id="L47">        put(m, &quot;end&quot;, encodeDateTime(e.getEnd()));</span>
+<span class="fc" id="L48">        put(m, &quot;status&quot;, e.getStatus().name());</span>
+<span class="fc" id="L49">        put(m, &quot;availability&quot;, e.getAvailability().name());</span>
+<span class="fc" id="L50">        put(m, &quot;privacy&quot;, e.getPrivacy().name());</span>
+<span class="fc" id="L51">        put(m, &quot;recurrence&quot;, encodeRecurrence(e.getRecurrence()));</span>
+<span class="fc" id="L52">        List&lt;Object&gt; attendees = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        for (CalendarAttendee a : e.getAttendees()) {</span>
+<span class="nc" id="L54">            attendees.add(encodeAttendee(a));</span>
+<span class="nc" id="L55">        }</span>
+<span class="fc" id="L56">        m.put(&quot;attendees&quot;, attendees);</span>
+<span class="fc" id="L57">        List&lt;Object&gt; alarms = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        for (CalendarAlarm a : e.getAlarms()) {</span>
+<span class="nc" id="L59">            alarms.add(encodeAlarm(a));</span>
+<span class="nc" id="L60">        }</span>
+<span class="fc" id="L61">        m.put(&quot;alarms&quot;, alarms);</span>
+<span class="fc" id="L62">        List&lt;Object&gt; attachments = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        for (CalendarAttachment a : e.getAttachments()) {</span>
+<span class="nc" id="L64">            attachments.add(encodeAttachment(a));</span>
+<span class="nc" id="L65">        }</span>
+<span class="fc" id="L66">        m.put(&quot;attachments&quot;, attachments);</span>
+<span class="fc" id="L67">        put(m, &quot;conference&quot;, encodeConference(e.getConference()));</span>
+<span class="fc" id="L68">        m.put(&quot;providerData&quot;, new HashMap&lt;String, String&gt;(e.getProviderData()));</span>
+<span class="fc" id="L69">        return m;</span>
+    }
+
+    public static CalendarEvent decodeEvent(Map m) {
+<span class="fc" id="L73">        CalendarEvent e = new CalendarEvent().setId(s(m, &quot;id&quot;)).setCalendarId(s(m, &quot;calendarId&quot;)).setSourceId(s(m, &quot;sourceId&quot;)).setVersion(s(m, &quot;version&quot;)).setTitle(s(m, &quot;title&quot;)).setDescription(s(m, &quot;description&quot;)).setLocation(s(m, &quot;location&quot;)).setUrl(s(m, &quot;url&quot;)).setRecurringEventId(s(m, &quot;recurringEventId&quot;)).setStart(decodeDateTime(map(m, &quot;start&quot;))).setEnd(decodeDateTime(map(m, &quot;end&quot;)));</span>
+<span class="fc" id="L74">        e.setStatus(eventStatus(s(m, &quot;status&quot;)));</span>
+<span class="fc" id="L75">        e.setAvailability(eventAvailability(s(m, &quot;availability&quot;)));</span>
+<span class="fc" id="L76">        e.setPrivacy(eventPrivacy(s(m, &quot;privacy&quot;)));</span>
+<span class="fc" id="L77">        e.setRecurrence(decodeRecurrence(map(m, &quot;recurrence&quot;)));</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        for (Object v : list(m, &quot;attendees&quot;)) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="nc" id="L80">                e.addAttendee(decodeAttendee((Map) v));</span>
+            }
+<span class="nc" id="L82">        }</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        for (Object v : list(m, &quot;alarms&quot;)) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="nc" id="L85">                e.addAlarm(decodeAlarm((Map) v));</span>
+            }
+<span class="nc" id="L87">        }</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        for (Object v : list(m, &quot;attachments&quot;)) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="nc" id="L90">                e.addAttachment(decodeAttachment((Map) v));</span>
+            }
+<span class="nc" id="L92">        }</span>
+<span class="fc" id="L93">        e.setConference(decodeConference(map(m, &quot;conference&quot;)));</span>
+<span class="fc" id="L94">        copyProvider(m, e, null);</span>
+<span class="fc" id="L95">        return e;</span>
+    }
+
+    public static Map&lt;String, Object&gt; encodeTask(CalendarTask t) {
+<span class="fc" id="L99">        Map&lt;String, Object&gt; m = common(t.getId(), t.getCalendarId(), t.getSourceId(), t.getVersion(), t.getTitle(), t.getDescription(), t.getLocation());</span>
+<span class="fc" id="L100">        m.put(&quot;codecVersion&quot;, Integer.valueOf(1));</span>
+<span class="fc" id="L101">        put(m, &quot;start&quot;, encodeDateTime(t.getStart()));</span>
+<span class="fc" id="L102">        put(m, &quot;due&quot;, encodeDateTime(t.getDue()));</span>
+<span class="fc" id="L103">        put(m, &quot;recurrence&quot;, encodeRecurrence(t.getRecurrence()));</span>
+<span class="fc" id="L104">        m.put(&quot;completed&quot;, Boolean.valueOf(t.isCompleted()));</span>
+<span class="fc" id="L105">        put(m, &quot;completionTime&quot;, epochMillis(t.getCompletionTime()));</span>
+<span class="fc" id="L106">        m.put(&quot;priority&quot;, Integer.valueOf(t.getPriority()));</span>
+<span class="fc" id="L107">        List&lt;Object&gt; alarms = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (CalendarAlarm a : t.getAlarms()) {</span>
+<span class="fc" id="L109">            alarms.add(encodeAlarm(a));</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        m.put(&quot;alarms&quot;, alarms);</span>
+<span class="fc" id="L112">        List&lt;Object&gt; attachments = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        for (CalendarAttachment a : t.getAttachments()) {</span>
+<span class="nc" id="L114">            attachments.add(encodeAttachment(a));</span>
+<span class="nc" id="L115">        }</span>
+<span class="fc" id="L116">        m.put(&quot;attachments&quot;, attachments);</span>
+<span class="fc" id="L117">        m.put(&quot;providerData&quot;, new HashMap&lt;String, String&gt;(t.getProviderData()));</span>
+<span class="fc" id="L118">        return m;</span>
+    }
+
+    public static CalendarTask decodeTask(Map m) {
+<span class="fc" id="L122">        CalendarTask t = new CalendarTask().setId(s(m, &quot;id&quot;)).setCalendarId(s(m, &quot;calendarId&quot;)).setSourceId(s(m, &quot;sourceId&quot;)).setVersion(s(m, &quot;version&quot;)).setTitle(s(m, &quot;title&quot;)).setDescription(s(m, &quot;description&quot;)).setLocation(s(m, &quot;location&quot;)).setStart(decodeDateTime(map(m, &quot;start&quot;))).setDue(decodeDateTime(map(m, &quot;due&quot;))).setRecurrence(decodeRecurrence(map(m, &quot;recurrence&quot;))).setCompleted(bool(m, &quot;completed&quot;)).setCompletionTime(instantObj(m, &quot;completionTime&quot;)).setPriority(integer(m, &quot;priority&quot;, 0));</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (Object v : list(m, &quot;alarms&quot;)) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="fc" id="L125">                t.addAlarm(decodeAlarm((Map) v));</span>
+            }
+<span class="fc" id="L127">        }</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        for (Object v : list(m, &quot;attachments&quot;)) {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="nc" id="L130">                t.addAttachment(decodeAttachment((Map) v));</span>
+            }
+<span class="nc" id="L132">        }</span>
+<span class="fc" id="L133">        copyProvider(m, null, t);</span>
+<span class="fc" id="L134">        return t;</span>
+    }
+
+    public static Map&lt;String, Object&gt; encodeDateTime(CalendarDateTime d) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (d == null) {</span>
+<span class="fc" id="L139">            return null;</span>
+        }
+<span class="fc" id="L141">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L142">        m.put(&quot;allDay&quot;, Boolean.valueOf(d.isAllDay()));</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (d.isAllDay()) {</span>
+<span class="fc" id="L144">            m.put(&quot;year&quot;, d.getDate().getYear());</span>
+<span class="fc" id="L145">            m.put(&quot;month&quot;, d.getDate().getMonthValue());</span>
+<span class="fc" id="L146">            m.put(&quot;day&quot;, d.getDate().getDayOfMonth());</span>
+        } else {
+<span class="fc" id="L148">            m.put(&quot;timestamp&quot;, Long.valueOf(d.getDateTime().toInstant().toEpochMilli()));</span>
+<span class="fc" id="L149">            m.put(&quot;timeZoneId&quot;, d.getDateTime().getZone().getId());</span>
+        }
+<span class="fc" id="L151">        return m;</span>
+    }
+
+    public static CalendarDateTime decodeDateTime(Map m) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L156">            return null;</span>
+        }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (bool(m, &quot;allDay&quot;)) {</span>
+<span class="fc" id="L159">            return CalendarDateTime.allDay(LocalDate.of(integer(m, &quot;year&quot;, 1970), integer(m, &quot;month&quot;, 1), integer(m, &quot;day&quot;, 1)));</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        String zone = s(m, &quot;timeZoneId&quot;) == null ? &quot;UTC&quot; : s(m, &quot;timeZoneId&quot;);</span>
+<span class="fc" id="L162">        return CalendarDateTime.timed(ZonedDateTime.ofInstant(Instant.ofEpochMilli(lng(m, &quot;timestamp&quot;, 0L)), ZoneId.of(zone)));</span>
+    }
+
+    private static Map&lt;String, Object&gt; common(String id, String cal, String src, String ver, String title, String desc, String loc) {
+<span class="fc" id="L166">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L167">        put(m, &quot;id&quot;, id);</span>
+<span class="fc" id="L168">        put(m, &quot;calendarId&quot;, cal);</span>
+<span class="fc" id="L169">        put(m, &quot;sourceId&quot;, src);</span>
+<span class="fc" id="L170">        put(m, &quot;version&quot;, ver);</span>
+<span class="fc" id="L171">        put(m, &quot;title&quot;, title);</span>
+<span class="fc" id="L172">        put(m, &quot;description&quot;, desc);</span>
+<span class="fc" id="L173">        put(m, &quot;location&quot;, loc);</span>
+<span class="fc" id="L174">        return m;</span>
+    }
+
+    private static Map&lt;String, Object&gt; encodeRecurrence(CalendarRecurrenceRule r) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="fc" id="L179">            return null;</span>
+        }
+<span class="nc" id="L181">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        put(m, &quot;frequency&quot;, r.getFrequency() == null ? null : r.getFrequency().name());</span>
+<span class="nc" id="L183">        m.put(&quot;interval&quot;, r.getInterval());</span>
+<span class="nc" id="L184">        put(m, &quot;count&quot;, r.getCount());</span>
+<span class="nc" id="L185">        put(m, &quot;until&quot;, encodeDateTime(r.getUntil()));</span>
+<span class="nc" id="L186">        m.put(&quot;daysOfWeek&quot;, new ArrayList&lt;Integer&gt;(r.getDaysOfWeek()));</span>
+<span class="nc" id="L187">        m.put(&quot;daysOfMonth&quot;, new ArrayList&lt;Integer&gt;(r.getDaysOfMonth()));</span>
+<span class="nc" id="L188">        m.put(&quot;months&quot;, new ArrayList&lt;Integer&gt;(r.getMonths()));</span>
+<span class="nc" id="L189">        return m;</span>
+    }
+
+    private static CalendarRecurrenceRule decodeRecurrence(Map m) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (m == null) {</span>
+<span class="fc" id="L194">            return null;</span>
+        }
+<span class="nc" id="L196">        CalendarRecurrenceRule r = new CalendarRecurrenceRule().setInterval(integer(m, &quot;interval&quot;, 1)).setCount(intObj(m, &quot;count&quot;)).setUntil(decodeDateTime(map(m, &quot;until&quot;)));</span>
+<span class="nc" id="L197">        r.setFrequency(frequency(s(m, &quot;frequency&quot;)));</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        for (Object v : list(m, &quot;daysOfWeek&quot;)) {</span>
+<span class="nc" id="L199">            r.addDayOfWeek(((Number) v).intValue());</span>
+<span class="nc" id="L200">        }</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        for (Object v : list(m, &quot;daysOfMonth&quot;)) {</span>
+<span class="nc" id="L202">            r.addDayOfMonth(((Number) v).intValue());</span>
+<span class="nc" id="L203">        }</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        for (Object v : list(m, &quot;months&quot;)) {</span>
+<span class="nc" id="L205">            r.addMonth(((Number) v).intValue());</span>
+<span class="nc" id="L206">        }</span>
+<span class="nc" id="L207">        return r;</span>
+    }
+
+    private static Map&lt;String, Object&gt; encodeAttendee(CalendarAttendee a) {
+<span class="nc" id="L211">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L212">        put(m, &quot;name&quot;, a.getName());</span>
+<span class="nc" id="L213">        put(m, &quot;email&quot;, a.getEmail());</span>
+<span class="nc" id="L214">        put(m, &quot;uri&quot;, a.getUri());</span>
+<span class="nc" id="L215">        m.put(&quot;role&quot;, a.getRole().name());</span>
+<span class="nc" id="L216">        m.put(&quot;response&quot;, a.getResponse().name());</span>
+<span class="nc" id="L217">        m.put(&quot;organizer&quot;, a.isOrganizer());</span>
+<span class="nc" id="L218">        m.put(&quot;self&quot;, a.isSelf());</span>
+<span class="nc" id="L219">        return m;</span>
+    }
+
+    private static CalendarAttendee decodeAttendee(Map m) {
+<span class="nc" id="L223">        return new CalendarAttendee().setName(s(m, &quot;name&quot;)).setEmail(s(m, &quot;email&quot;)).setUri(s(m, &quot;uri&quot;)).setOrganizer(bool(m, &quot;organizer&quot;)).setSelf(bool(m, &quot;self&quot;)).setRole(attendeeRole(s(m, &quot;role&quot;))).setResponse(attendeeResponse(s(m, &quot;response&quot;)));</span>
+    }
+
+    private static Map&lt;String, Object&gt; encodeAlarm(CalendarAlarm a) {
+<span class="fc" id="L227">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        put(m, &quot;timeBeforeMillis&quot;, a.getTimeBefore() == null ? null : Long.valueOf(a.getTimeBefore().toMillis()));</span>
+<span class="fc" id="L229">        put(m, &quot;absoluteTime&quot;, epochMillis(a.getAbsoluteTime()));</span>
+<span class="fc" id="L230">        m.put(&quot;method&quot;, a.getMethod().name());</span>
+<span class="fc" id="L231">        return m;</span>
+    }
+
+    private static CalendarAlarm decodeAlarm(Map m) {
+<span class="fc" id="L235">        CalendarAlarm a = new CalendarAlarm();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (m.get(&quot;timeBeforeMillis&quot;) != null) {</span>
+<span class="fc" id="L237">            a.setTimeBefore(Duration.ofMillis(lng(m, &quot;timeBeforeMillis&quot;, 0L)));</span>
+        } else {
+<span class="nc" id="L239">            a.setAbsoluteTime(instantObj(m, &quot;absoluteTime&quot;));</span>
+        }
+<span class="fc" id="L241">        a.setMethod(alarmMethod(s(m, &quot;method&quot;)));</span>
+<span class="fc" id="L242">        return a;</span>
+    }
+
+    private static Map&lt;String, Object&gt; encodeAttachment(CalendarAttachment a) {
+<span class="nc" id="L246">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L247">        put(m, &quot;id&quot;, a.getId());</span>
+<span class="nc" id="L248">        put(m, &quot;name&quot;, a.getName());</span>
+<span class="nc" id="L249">        put(m, &quot;mimeType&quot;, a.getMimeType());</span>
+<span class="nc" id="L250">        put(m, &quot;uri&quot;, a.getUri());</span>
+<span class="nc" id="L251">        m.put(&quot;size&quot;, Long.valueOf(a.getSize()));</span>
+<span class="nc" id="L252">        put(m, &quot;content&quot;, a.getContent());</span>
+<span class="nc" id="L253">        return m;</span>
+    }
+
+    private static CalendarAttachment decodeAttachment(Map m) {
+<span class="nc" id="L257">        return new CalendarAttachment().setId(s(m, &quot;id&quot;)).setName(s(m, &quot;name&quot;)).setMimeType(s(m, &quot;mimeType&quot;)).setUri(s(m, &quot;uri&quot;)).setSize(lng(m, &quot;size&quot;, -1)).setContent((byte[]) m.get(&quot;content&quot;));</span>
+    }
+
+    private static Map&lt;String, Object&gt; encodeConference(CalendarConference c) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="fc" id="L262">            return null;</span>
+        }
+<span class="nc" id="L264">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L265">        put(m, &quot;provider&quot;, c.getProvider());</span>
+<span class="nc" id="L266">        put(m, &quot;id&quot;, c.getId());</span>
+<span class="nc" id="L267">        put(m, &quot;joinUrl&quot;, c.getJoinUrl());</span>
+<span class="nc" id="L268">        m.put(&quot;createRequested&quot;, c.isCreateRequested());</span>
+<span class="nc" id="L269">        m.put(&quot;phoneNumbers&quot;, new ArrayList&lt;String&gt;(c.getPhoneNumbers()));</span>
+<span class="nc" id="L270">        return m;</span>
+    }
+
+    private static CalendarConference decodeConference(Map m) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (m == null) {</span>
+<span class="fc" id="L275">            return null;</span>
+        }
+<span class="nc" id="L277">        CalendarConference c = new CalendarConference().setProvider(s(m, &quot;provider&quot;)).setId(s(m, &quot;id&quot;)).setJoinUrl(s(m, &quot;joinUrl&quot;)).setCreateRequested(bool(m, &quot;createRequested&quot;));</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        for (Object v : list(m, &quot;phoneNumbers&quot;)) {</span>
+<span class="nc" id="L279">            c.addPhoneNumber(String.valueOf(v));</span>
+<span class="nc" id="L280">        }</span>
+<span class="nc" id="L281">        return c;</span>
+    }
+
+    private static void copyProvider(Map m, CalendarEvent e, CalendarTask t) {
+<span class="fc" id="L285">        Map p = map(m, &quot;providerData&quot;);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            for (Object value : p.entrySet()) {</span>
+<span class="fc" id="L288">                Map.Entry entry = (Map.Entry) value;</span>
+<span class="fc" id="L289">                String key = String.valueOf(entry.getKey());</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                String text = entry.getValue() == null ? null : String.valueOf(entry.getValue());</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                if (e != null) {</span>
+<span class="fc" id="L292">                    e.putProviderData(key, text);</span>
+                } else {
+<span class="nc" id="L294">                    t.putProviderData(key, text);</span>
+                }
+<span class="fc" id="L296">            }</span>
+        }
+<span class="fc" id="L298">    }</span>
+
+    private static CalendarEvent.Status eventStatus(String value) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        for (CalendarEvent.Status candidate : CalendarEvent.Status.values()) {</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="fc" id="L303">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L306">        return CalendarEvent.Status.CONFIRMED;</span>
+    }
+
+    private static CalendarEvent.Availability eventAvailability(String value) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        for (CalendarEvent.Availability candidate : CalendarEvent.Availability.values()) {</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="fc" id="L312">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L315">        return CalendarEvent.Availability.BUSY;</span>
+    }
+
+    private static CalendarEvent.Privacy eventPrivacy(String value) {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        for (CalendarEvent.Privacy candidate : CalendarEvent.Privacy.values()) {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="fc" id="L321">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L324">        return CalendarEvent.Privacy.DEFAULT;</span>
+    }
+
+    private static CalendarRecurrenceRule.Frequency frequency(String value) {
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        for (CalendarRecurrenceRule.Frequency candidate : CalendarRecurrenceRule.Frequency.values()) {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="nc" id="L330">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L333">        return null;</span>
+    }
+
+    private static CalendarAttendee.Role attendeeRole(String value) {
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        for (CalendarAttendee.Role candidate : CalendarAttendee.Role.values()) {</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="nc" id="L339">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L342">        return CalendarAttendee.Role.REQUIRED;</span>
+    }
+
+    private static CalendarAttendee.Response attendeeResponse(String value) {
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        for (CalendarAttendee.Response candidate : CalendarAttendee.Response.values()) {</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="nc" id="L348">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L351">        return CalendarAttendee.Response.NONE;</span>
+    }
+
+    private static CalendarAlarm.Method alarmMethod(String value) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        for (CalendarAlarm.Method candidate : CalendarAlarm.Method.values()) {</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            if (candidate.name().equals(value)) {</span>
+<span class="fc" id="L357">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L360">        return CalendarAlarm.Method.DEFAULT;</span>
+    }
+
+    private static void put(Map&lt;String, Object&gt; m, String k, Object v) {
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (v != null) {</span>
+<span class="fc" id="L365">            m.put(k, v);</span>
+        }
+<span class="fc" id="L367">    }</span>
+
+    private static String s(Map m, String k) {
+<span class="fc" id="L370">        Object v = m.get(k);</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        return v == null ? null : String.valueOf(v);</span>
+    }
+
+    private static Map map(Map m, String k) {
+<span class="fc" id="L375">        Object v = m.get(k);</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        return v instanceof Map ? (Map) v : null;</span>
+    }
+
+    private static List list(Map m, String k) {
+<span class="fc" id="L380">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        return v instanceof List ? (List) v : new ArrayList();</span>
+    }
+
+    private static boolean bool(Map m, String k) {
+<span class="fc" id="L385">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L386" title="1 of 4 branches missed.">        return Boolean.TRUE.equals(v) || &quot;true&quot;.equals(String.valueOf(v));</span>
+    }
+
+    private static int integer(Map m, String k, int d) {
+<span class="fc" id="L390">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        return v instanceof Number ? ((Number) v).intValue() : d;</span>
+    }
+
+    private static long lng(Map m, String k, long d) {
+<span class="fc" id="L395">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        return v instanceof Number ? ((Number) v).longValue() : d;</span>
+    }
+
+    private static Integer intObj(Map m, String k) {
+<span class="nc" id="L400">        Object v = m.get(k);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        return v instanceof Number ? Integer.valueOf(((Number) v).intValue()) : null;</span>
+    }
+
+    private static Long lngObj(Map m, String k) {
+<span class="fc" id="L405">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        return v instanceof Number ? Long.valueOf(((Number) v).longValue()) : null;</span>
+    }
+
+    private static Long epochMillis(Instant value) {
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        return value == null ? null : Long.valueOf(value.toEpochMilli());</span>
+    }
+
+    private static Instant instantObj(Map m, String k) {
+<span class="fc" id="L414">        Long value = lngObj(m, k);</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        return value == null ? null : Instant.ofEpochMilli(value.longValue());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

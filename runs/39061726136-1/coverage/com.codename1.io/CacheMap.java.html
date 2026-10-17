@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CacheMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">CacheMap.java</span></div><h1>CacheMap.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.ui.Display;
+
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// A cache map is essentially a hashtable that indexes entries based on age and is
+/// limited to a fixed size. Hence when an entry is placed into the cache map and the
+/// cache size needs to increase, the least referenced entry is removed.
+/// A cache hit is made both on fetching and putting, hence frequently fetched elements
+/// will never be removed from a sufficiently large cache.
+/// Cache can work purely in memory or swap data into storage based on user definitions.
+/// Notice that this class isn't threadsafe.
+public class CacheMap {
+<span class="fc" id="L41">    private final Hashtable memoryCache = new Hashtable();</span>
+<span class="fc" id="L42">    private final Hashtable weakCache = new Hashtable();</span>
+<span class="fc" id="L43">    private int cacheSize = 10;</span>
+<span class="fc" id="L44">    private int storageCacheSize = 0;</span>
+    private Vector storageCacheContentVec;
+<span class="fc" id="L46">    private String cachePrefix = &quot;&quot;;</span>
+    private boolean alwaysStore;
+
+    /// Default constructor
+<span class="fc" id="L50">    public CacheMap() {</span>
+<span class="fc" id="L51">    }</span>
+
+    /// Creates a cache map with a prefix string
+    ///
+    /// #### Parameters
+    ///
+    /// - `prefix`: string to prepend to the cache entries in storage
+<span class="fc" id="L58">    public CacheMap(String prefix) {</span>
+<span class="fc" id="L59">        this.cachePrefix = prefix;</span>
+<span class="fc" id="L60">    }</span>
+
+    private Vector getStorageCacheContent() {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (storageCacheContentVec == null) {</span>
+<span class="fc" id="L64">            storageCacheContentVec = (Vector) Storage.getInstance().readObject(&quot;$CACHE$Idx&quot; + cachePrefix);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (storageCacheContentVec == null) {</span>
+<span class="fc" id="L66">                storageCacheContentVec = new Vector();</span>
+            }
+        }
+<span class="fc" id="L69">        return storageCacheContentVec;</span>
+    }
+
+    /// Indicates the size of the memory cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Returns
+    ///
+    /// the cacheSize
+    public int getCacheSize() {
+<span class="fc" id="L79">        return cacheSize;</span>
+    }
+
+    /// Indicates the size of the memory cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Parameters
+    ///
+    /// - `cacheSize`: the cacheSize to set
+    public void setCacheSize(int cacheSize) {
+<span class="fc" id="L89">        this.cacheSize = cacheSize;</span>
+<span class="fc" id="L90">    }</span>
+
+    /// Puts the given key/value pair in the cache
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    ///
+    /// - `value`: the value
+    public void put(Object key, Object value) {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (cacheSize &lt;= memoryCache.size()) {</span>
+            // we need to find the oldest entry
+<span class="fc" id="L102">            Enumeration e = memoryCache.keys();</span>
+<span class="fc" id="L103">            long oldest = System.currentTimeMillis();</span>
+<span class="fc" id="L104">            Object oldestKey = null;</span>
+<span class="fc" id="L105">            Object[] oldestValue = null;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            while (e.hasMoreElements()) {</span>
+<span class="fc" id="L107">                Object currentKey = e.nextElement();</span>
+<span class="fc" id="L108">                Object[] currentValue = (Object[]) memoryCache.get(currentKey);</span>
+<span class="fc" id="L109">                long currentAge = ((Long) currentValue[0]).longValue();</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">                if (currentAge &lt;= oldest || oldestValue == null) {</span>
+<span class="fc" id="L111">                    oldest = currentAge;</span>
+<span class="fc" id="L112">                    oldestKey = currentKey;</span>
+<span class="fc" id="L113">                    oldestValue = currentValue;</span>
+                }
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">            placeInStorageCache(oldestKey, oldest, oldestValue[1]);</span>
+<span class="fc" id="L117">            weakCache.put(oldestKey, Display.getInstance().createSoftWeakRef(oldestValue[1]));</span>
+<span class="fc" id="L118">            memoryCache.remove(oldestKey);</span>
+        }
+<span class="fc" id="L120">        long lastAccess = System.currentTimeMillis();</span>
+<span class="fc" id="L121">        memoryCache.put(key, new Object[]{Long.valueOf(lastAccess), value});</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (alwaysStore) {</span>
+<span class="fc" id="L123">            placeInStorageCache(key, lastAccess, value);</span>
+        }
+<span class="fc" id="L125">    }</span>
+
+
+    /// Deletes a cached entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: entry to remove from the cache
+    public void delete(Object key) {
+<span class="fc" id="L134">        memoryCache.remove(key);</span>
+<span class="fc" id="L135">        weakCache.remove(key);</span>
+<span class="fc" id="L136">        Vector storageCacheContent = getStorageCacheContent();</span>
+<span class="fc" id="L137">        int s = storageCacheContent.size();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; s; iter++) {</span>
+<span class="nc" id="L139">            Object[] obj = (Object[]) storageCacheContent.elementAt(iter);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (obj[1].equals(key)) {</span>
+<span class="nc" id="L141">                Storage.getInstance().deleteStorageFile(&quot;$CACHE$&quot; + cachePrefix + key);</span>
+<span class="nc" id="L142">                obj[0] = Long.valueOf(Long.MIN_VALUE);</span>
+<span class="nc" id="L143">                obj[1] = obj[0];</span>
+<span class="nc" id="L144">                Storage.getInstance().writeObject(&quot;$CACHE$Idx&quot; + cachePrefix, storageCacheContent);</span>
+<span class="nc" id="L145">                return;</span>
+            }
+        }
+<span class="fc" id="L148">    }</span>
+
+    /// Returns the object matching the given key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: key object
+    ///
+    /// #### Returns
+    ///
+    /// value from a previous put or null
+    public Object get(Object key) {
+<span class="fc" id="L160">        Object[] o = (Object[]) memoryCache.get(key);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (o != null) {</span>
+<span class="fc" id="L162">            return o[1];</span>
+        }
+<span class="fc" id="L164">        Object ref = weakCache.get(key);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (ref != null) {</span>
+<span class="fc" id="L166">            ref = Display.getInstance().extractHardRef(ref);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (ref != null) {</span>
+                // cache hit! Promote it to the hard cache again
+<span class="fc" id="L169">                put(key, ref);</span>
+<span class="fc" id="L170">                return ref;</span>
+            }
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (storageCacheSize &gt; 0) {</span>
+<span class="nc" id="L174">            Vector storageCacheContent = getStorageCacheContent();</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            for (int iter = 0; iter &lt; storageCacheContent.size(); iter++) {</span>
+<span class="nc" id="L176">                Object[] obj = (Object[]) storageCacheContent.elementAt(iter);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                if (obj[1].equals(key)) {</span>
+                    // place the object back into the memory cache and return the value
+<span class="nc" id="L179">                    Vector v = (Vector) Storage.getInstance().readObject(&quot;$CACHE$&quot; + cachePrefix + key);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    if (v != null) {</span>
+<span class="nc" id="L181">                        Object val = v.elementAt(0);</span>
+<span class="nc" id="L182">                        put(key, val);</span>
+<span class="nc" id="L183">                        return val;</span>
+                    }
+<span class="nc" id="L185">                    return null;</span>
+                }
+            }
+        }
+<span class="fc" id="L189">        return null;</span>
+    }
+
+    /// Clears the caches for this cache object
+    public void clearAllCache() {
+<span class="fc" id="L194">        clearMemoryCache();</span>
+<span class="fc" id="L195">        clearStorageCache();</span>
+<span class="fc" id="L196">    }</span>
+
+    /// Clears the memory cache
+    public void clearMemoryCache() {
+<span class="fc" id="L200">        memoryCache.clear();</span>
+<span class="fc" id="L201">        weakCache.clear();</span>
+<span class="fc" id="L202">    }</span>
+
+    private void placeInStorageCache(Object key, long lastAccessed, Object value) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (storageCacheSize &lt; 1) {</span>
+<span class="fc" id="L206">            return;</span>
+        }
+
+<span class="fc" id="L209">        Vector storageCacheContent = getStorageCacheContent();</span>
+<span class="fc" id="L210">        int vecSize = storageCacheContent.size();</span>
+
+        // find the best place
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; vecSize; iter++) {</span>
+<span class="nc" id="L214">            Object[] index = (Object[]) storageCacheContent.elementAt(iter);</span>
+<span class="nc" id="L215">            Object indexKey = index[1];</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (indexKey.equals(key)) {</span>
+                // already in storage just update the data
+<span class="nc" id="L218">                placeInStorageCache(iter, key, lastAccessed, value);</span>
+<span class="nc" id="L219">                return;</span>
+            }
+        }
+
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (storageCacheContent.size() &lt; storageCacheSize) {</span>
+<span class="fc" id="L224">            placeInStorageCache(storageCacheContent.size(), key, lastAccessed, value);</span>
+        } else {
+<span class="nc" id="L226">            long smallest = Long.MAX_VALUE;</span>
+<span class="nc" id="L227">            int offset = 0;</span>
+
+            // find the best place
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            for (int iter = 0; iter &lt; vecSize; iter++) {</span>
+<span class="nc" id="L231">                Object[] index = (Object[]) storageCacheContent.elementAt(iter);</span>
+<span class="nc" id="L232">                long current = ((Long) index[0]).longValue();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                if (smallest &gt; current) {</span>
+<span class="nc" id="L234">                    smallest = current;</span>
+<span class="nc" id="L235">                    offset = iter;</span>
+                }
+            }
+<span class="nc" id="L238">            placeInStorageCache(offset, key, lastAccessed, value);</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+    private void placeInStorageCache(int offset, Object key, long lastAccessed, Object value) {
+<span class="fc" id="L243">        Vector v = new Vector();</span>
+<span class="fc" id="L244">        v.addElement(value);</span>
+<span class="fc" id="L245">        Long l = Long.valueOf(lastAccessed);</span>
+<span class="fc" id="L246">        v.addElement(l);</span>
+<span class="fc" id="L247">        v.addElement(key);</span>
+<span class="fc" id="L248">        Storage.getInstance().writeObject(&quot;$CACHE$&quot; + cachePrefix + key.toString(), v);</span>
+<span class="fc" id="L249">        Vector storageCacheContent = getStorageCacheContent();</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (storageCacheContent.size() &gt; offset) {</span>
+<span class="nc" id="L251">            storageCacheContent.setElementAt(new Object[]{l, key}, offset);</span>
+        } else {
+<span class="fc" id="L253">            storageCacheContent.insertElementAt(new Object[]{l, key}, offset);</span>
+        }
+<span class="fc" id="L255">        Storage.getInstance().writeObject(&quot;$CACHE$Idx&quot; + cachePrefix, storageCacheContent);</span>
+<span class="fc" id="L256">    }</span>
+
+    /// Returns the keys for all the objects currently in cache, this is useful
+    /// to traverse all the objects and refresh them without actually deleting
+    /// the cache and fetching them from scratch.
+    ///
+    /// **Important** this vector is a copy of a current state, keys might
+    /// not exist anymore or might change, others might be added in the interim.
+    ///
+    /// #### Returns
+    ///
+    /// @return a vector containing a snapshot of the current elements within the
+    /// cache.
+    public Vector getKeysInCache() {
+<span class="fc" id="L270">        Vector r = new Vector();</span>
+<span class="fc" id="L271">        Enumeration en = memoryCache.keys();</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        while (en.hasMoreElements()) {</span>
+<span class="fc" id="L273">            r.addElement(en.nextElement());</span>
+        }
+<span class="fc" id="L275">        Vector storageCacheContent = getStorageCacheContent();</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; storageCacheContent.size(); iter++) {</span>
+<span class="nc" id="L277">            Object[] o = (Object[]) storageCacheContent.elementAt(iter);</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            if (!r.contains(o[1])) {</span>
+<span class="nc" id="L279">                r.addElement(o[1]);</span>
+            }
+        }
+<span class="fc" id="L282">        return r;</span>
+    }
+
+    /// Clears the storage cache
+    public void clearStorageCache() {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (storageCacheSize &gt; 0) {</span>
+<span class="fc" id="L288">            Vector v = getStorageCacheContent();</span>
+<span class="fc" id="L289">            int s = v.size();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            for (int iter = 0; iter &lt; s; iter++) {</span>
+<span class="nc" id="L291">                Object[] arr = (Object[]) v.elementAt(iter);</span>
+<span class="nc" id="L292">                Storage.getInstance().deleteStorageFile(&quot;$CACHE$&quot; + cachePrefix + arr[iter].toString());</span>
+            }
+<span class="fc" id="L294">            Storage.getInstance().deleteStorageFile(&quot;$CACHE$Idx&quot; + cachePrefix);</span>
+<span class="fc" id="L295">            storageCacheContentVec = new Vector();</span>
+        }
+<span class="fc" id="L297">    }</span>
+
+    /// Indicates the size of the storage cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Returns
+    ///
+    /// the storageCacheSize
+    public int getStorageCacheSize() {
+<span class="fc" id="L306">        return storageCacheSize;</span>
+    }
+
+    /// Indicates the size of the storage cache after which the cache won't grow further
+    /// Size is indicated by number of elements stored and not by KB or similar benchmark!
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageCacheSize`: the storageCacheSize to set
+    public void setStorageCacheSize(int storageCacheSize) {
+<span class="fc" id="L316">        this.storageCacheSize = storageCacheSize;</span>
+        /*for(int iter = 0 ; iter &lt; storageCacheSize ; iter++) {
+            Vector v = fetchFromStorageCache(iter);
+            if(v != null) {
+                Object o = new Object[] {v.elementAt(1), v.elementAt(2)};
+                Vector storageCacheContent = getStorageCacheContent();
+                if(iter &gt;= storageCacheContent.size()) {
+                    storageCacheContent.addElement(o);
+                } else {
+                    storageCacheContent.insertElementAt(o, iter);
+                }
+            }
+        }*/
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (storageCacheSize == 0) {</span>
+<span class="fc" id="L330">            alwaysStore = false;</span>
+        }
+<span class="fc" id="L332">    }</span>
+
+    /// A prefix prepended to storage entries to differentiate them
+    ///
+    /// #### Returns
+    ///
+    /// the cachePrefix
+    public String getCachePrefix() {
+<span class="fc" id="L340">        return cachePrefix;</span>
+    }
+
+    /// A prefix prepended to storage entries to differentiate them
+    ///
+    /// #### Parameters
+    ///
+    /// - `cachePrefix`: the cachePrefix to set
+    public void setCachePrefix(String cachePrefix) {
+<span class="fc" id="L349">        this.cachePrefix = cachePrefix;</span>
+<span class="fc" id="L350">    }</span>
+
+    /// When set to true indicates that all entries should be persisted to storage
+    /// for a constantly persisting cache
+    ///
+    /// #### Returns
+    ///
+    /// the alwaysStore
+    public boolean isAlwaysStore() {
+<span class="fc" id="L359">        return alwaysStore;</span>
+    }
+
+    /// When set to true indicates that all entries should be persisted to storage
+    /// for a constantly persisting cache
+    ///
+    /// #### Parameters
+    ///
+    /// - `alwaysStore`: the alwaysStore to set
+    public void setAlwaysStore(boolean alwaysStore) {
+<span class="fc" id="L369">        this.alwaysStore = alwaysStore;</span>
+<span class="fc" id="L370">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

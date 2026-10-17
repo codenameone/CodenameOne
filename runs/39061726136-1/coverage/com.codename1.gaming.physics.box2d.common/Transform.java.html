@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Transform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">Transform.java</span></div><h1>Transform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+
+// updated to rev 100
+
+/// A transform contains translation and rotation. It is used to represent the position and
+/// orientation of rigid frames.
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">public class Transform {</span>
+
+  /// The translation caused by the transform
+  public final Vec2 p;
+
+  /// A matrix representing a rotation
+  public final Rot q;
+
+  /// The default constructor.
+<span class="fc" id="L40">  public Transform() {</span>
+<span class="fc" id="L41">    p = new Vec2();</span>
+<span class="fc" id="L42">    q = new Rot();</span>
+<span class="fc" id="L43">  }</span>
+
+  /// Initialize as a copy of another transform.
+<span class="nc" id="L46">  public Transform(final Transform xf) {</span>
+<span class="nc" id="L47">    p = xf.p.clone();</span>
+<span class="nc" id="L48">    q = xf.q.clone();</span>
+<span class="nc" id="L49">  }</span>
+
+  /// Initialize using a position vector and a rotation matrix.
+<span class="nc" id="L52">  public Transform(final Vec2 _position, final Rot _R) {</span>
+<span class="nc" id="L53">    p = _position.clone();</span>
+<span class="nc" id="L54">    q = _R.clone();</span>
+<span class="nc" id="L55">  }</span>
+
+  /// Set this to equal another transform.
+  public final Transform set(final Transform xf) {
+<span class="fc" id="L59">    p.set(xf.p);</span>
+<span class="fc" id="L60">    q.set(xf.q);</span>
+<span class="fc" id="L61">    return this;</span>
+  }
+
+  /// Set this based on the position and angle.
+  ///
+  /// @param p
+  /// @param angle
+  public final void set(Vec2 p, float angle) {
+<span class="fc" id="L69">    this.p.set(p);</span>
+<span class="fc" id="L70">    q.set(angle);</span>
+<span class="fc" id="L71">  }</span>
+
+  /// Set this to the identity transform.
+  public final void setIdentity() {
+<span class="fc" id="L75">    p.setZero();</span>
+<span class="fc" id="L76">    q.setIdentity();</span>
+<span class="fc" id="L77">  }</span>
+
+  public final static Vec2 mul(final Transform T, final Vec2 v) {
+<span class="fc" id="L80">    return new Vec2((T.q.c * v.x - T.q.s * v.y) + T.p.x, (T.q.s * v.x + T.q.c * v.y) + T.p.y);</span>
+  }
+
+  public final static void mulToOut(final Transform T, final Vec2 v, final Vec2 out) {
+<span class="fc" id="L84">    final float tempy = (T.q.s * v.x + T.q.c * v.y) + T.p.y;</span>
+<span class="fc" id="L85">    out.x = (T.q.c * v.x - T.q.s * v.y) + T.p.x;</span>
+<span class="fc" id="L86">    out.y = tempy;</span>
+<span class="fc" id="L87">  }</span>
+
+  public final static void mulToOutUnsafe(final Transform T, final Vec2 v, final Vec2 out) {
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">    assert (v != out);</span>
+<span class="fc" id="L91">    out.x = (T.q.c * v.x - T.q.s * v.y) + T.p.x;</span>
+<span class="fc" id="L92">    out.y = (T.q.s * v.x + T.q.c * v.y) + T.p.y;</span>
+<span class="fc" id="L93">  }</span>
+
+  public final static Vec2 mulTrans(final Transform T, final Vec2 v) {
+<span class="fc" id="L96">    final float px = v.x - T.p.x;</span>
+<span class="fc" id="L97">    final float py = v.y - T.p.y;</span>
+<span class="fc" id="L98">    return new Vec2((T.q.c * px + T.q.s * py), (-T.q.s * px + T.q.c * py));</span>
+  }
+
+  public final static void mulTransToOut(final Transform T, final Vec2 v, final Vec2 out) {
+<span class="fc" id="L102">    final float px = v.x - T.p.x;</span>
+<span class="fc" id="L103">    final float py = v.y - T.p.y;</span>
+<span class="fc" id="L104">    final float tempy = (-T.q.s * px + T.q.c * py);</span>
+<span class="fc" id="L105">    out.x = (T.q.c * px + T.q.s * py);</span>
+<span class="fc" id="L106">    out.y = tempy;</span>
+<span class="fc" id="L107">  }</span>
+  
+  public final static void mulTransToOutUnsafe(final Transform T, final Vec2 v, final Vec2 out) {
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">    assert(v != out);</span>
+<span class="fc" id="L111">    final float px = v.x - T.p.x;</span>
+<span class="fc" id="L112">    final float py = v.y - T.p.y;</span>
+<span class="fc" id="L113">    out.x = (T.q.c * px + T.q.s * py);</span>
+<span class="fc" id="L114">    out.y = (-T.q.s * px + T.q.c * py);</span>
+<span class="fc" id="L115">  }</span>
+
+  public final static Transform mul(final Transform A, final Transform B) {
+<span class="nc" id="L118">    Transform C = new Transform();</span>
+<span class="nc" id="L119">    Rot.mulUnsafe(A.q, B.q, C.q);</span>
+<span class="nc" id="L120">    Rot.mulToOutUnsafe(A.q, B.p, C.p);</span>
+<span class="nc" id="L121">    C.p.addLocal(A.p);</span>
+<span class="nc" id="L122">    return C;</span>
+  }
+
+  public final static void mulToOut(final Transform A, final Transform B, final Transform out) {
+<span class="nc bnc" id="L126" title="All 4 branches missed.">    assert (out != A);</span>
+<span class="nc" id="L127">    Rot.mul(A.q, B.q, out.q);</span>
+<span class="nc" id="L128">    Rot.mulToOut(A.q, B.p, out.p);</span>
+<span class="nc" id="L129">    out.p.addLocal(A.p);</span>
+<span class="nc" id="L130">  }</span>
+
+  public final static void mulToOutUnsafe(final Transform A, final Transform B, final Transform out) {
+<span class="nc bnc" id="L133" title="All 4 branches missed.">    assert (out != B);</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">    assert (out != A);</span>
+<span class="nc" id="L135">    Rot.mulUnsafe(A.q, B.q, out.q);</span>
+<span class="nc" id="L136">    Rot.mulToOutUnsafe(A.q, B.p, out.p);</span>
+<span class="nc" id="L137">    out.p.addLocal(A.p);</span>
+<span class="nc" id="L138">  }</span>
+
+<span class="fc" id="L140">  private static Vec2 pool = new Vec2();</span>
+
+  public final static Transform mulTrans(final Transform A, final Transform B) {
+<span class="nc" id="L143">    Transform C = new Transform();</span>
+<span class="nc" id="L144">    Rot.mulTransUnsafe(A.q, B.q, C.q);</span>
+<span class="nc" id="L145">    pool.set(B.p).subLocal(A.p);</span>
+<span class="nc" id="L146">    Rot.mulTransUnsafe(A.q, pool, C.p);</span>
+<span class="nc" id="L147">    return C;</span>
+  }
+
+  public final static void mulTransToOut(final Transform A, final Transform B, final Transform out) {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">    assert (out != A);</span>
+<span class="nc" id="L152">    Rot.mulTrans(A.q, B.q, out.q);</span>
+<span class="nc" id="L153">    pool.set(B.p).subLocal(A.p);</span>
+<span class="nc" id="L154">    Rot.mulTrans(A.q, pool, out.p);</span>
+<span class="nc" id="L155">  }</span>
+
+  public final static void mulTransToOutUnsafe(final Transform A, final Transform B,
+      final Transform out) {
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">    assert (out != A);</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">    assert (out != B);</span>
+<span class="fc" id="L161">    Rot.mulTransUnsafe(A.q, B.q, out.q);</span>
+<span class="fc" id="L162">    pool.set(B.p).subLocal(A.p);</span>
+<span class="fc" id="L163">    Rot.mulTransUnsafe(A.q, pool, out.p);</span>
+<span class="fc" id="L164">  }</span>
+
+  public final String toString() {
+<span class="nc" id="L167">    String s = &quot;XForm:\n&quot;;</span>
+<span class="nc" id="L168">    s += &quot;Position: &quot; + p + &quot;\n&quot;;</span>
+<span class="nc" id="L169">    s += &quot;R: \n&quot; + q + &quot;\n&quot;;</span>
+<span class="nc" id="L170">    return s;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

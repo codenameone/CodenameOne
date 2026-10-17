@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SamplePage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SamplePage.java</span></div><h1>SamplePage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// One page of samples, plus the token needed to fetch the next.
+///
+/// ```java
+/// String token = null;
+/// do {
+///     SamplePage page = store.readSamplePage(query.setPageToken(token)).get();
+///     process(page.getSamples());
+///     token = page.getNextPageToken();
+/// } while (token != null);
+/// ```
+public final class SamplePage {
+
+    private final List&lt;HealthSample&gt; samples;
+    private final String nextPageToken;
+    private final boolean truncated;
+
+    /// Creates a page. The sample list is copied defensively.
+    public SamplePage(List&lt;HealthSample&gt; samples, String nextPageToken,
+<span class="fc" id="L47">            boolean truncated) {</span>
+<span class="fc" id="L48">        List&lt;HealthSample&gt; copy = new ArrayList&lt;HealthSample&gt;();</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (samples != null) {</span>
+<span class="fc" id="L50">            copy.addAll(samples);</span>
+        }
+<span class="fc" id="L52">        this.samples = copy;</span>
+<span class="fc" id="L53">        this.nextPageToken = nextPageToken;</span>
+<span class="fc" id="L54">        this.truncated = truncated;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// The samples in this page, never null.
+    public List&lt;HealthSample&gt; getSamples() {
+<span class="fc" id="L59">        return Collections.unmodifiableList(samples);</span>
+    }
+
+    /// The token that fetches the following page, or null when this is the
+    /// last one. Pass it to [SampleQuery#setPageToken(String)].
+    public String getNextPageToken() {
+<span class="fc" id="L65">        return nextPageToken;</span>
+    }
+
+    /// `true` when the query's limit cut the result short and more data
+    /// matched than was returned.
+    ///
+    /// **Not a paging instruction.** Page on
+    /// [#getNextPageToken()] and nothing else. Truncated with a null token
+    /// is the store saying the rest is unreachable through this query --
+    /// Health Connect resumes per record type, so a page merged from
+    /// several types has no token that could return what the merge
+    /// dropped. Looping on this flag instead re-issues the same first page
+    /// forever. Narrow the range, raise the limit, or query one type at a
+    /// time.
+    ///
+    /// A page can also be the last one and still be truncated, which means
+    /// the store stopped early rather than running out of data -- worth
+    /// surfacing rather than quietly showing a partial total.
+    public boolean isTruncated() {
+<span class="fc" id="L84">        return truncated;</span>
+    }
+
+    /// How many samples this page holds.
+    public int size() {
+<span class="fc" id="L89">        return samples.size();</span>
+    }
+
+    /// `true` when this page holds no samples.
+    public boolean isEmpty() {
+<span class="nc" id="L94">        return samples.isEmpty();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        return &quot;SamplePage[&quot; + samples.size() + &quot; samples&quot;</span>
+                + (nextPageToken == null ? &quot;&quot; : &quot;, more&quot;) + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

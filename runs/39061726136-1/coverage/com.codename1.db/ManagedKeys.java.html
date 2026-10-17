@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManagedKeys.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.db</a> &gt; <span class="el_source">ManagedKeys.java</span></div><h1>ManagedKeys.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.db;
+
+import com.codename1.security.CryptoException;
+import com.codename1.security.SecureRandom;
+import com.codename1.security.SecureStorage;
+
+import java.io.IOException;
+
+/// Generates and retrieves the random keys behind `DatabaseConfig#managed()`.
+///
+/// This lives in the core rather than in each port on purpose: every platform must
+/// derive byte-identical key material from the same alias, or a database written on
+/// one device could not be opened on another. The only per-platform part is where
+/// `com.codename1.security.SecureStorage` physically puts the bytes.
+final class ManagedKeys {
+
+    /// Prefix applied to every alias so database keys cannot collide with whatever
+    /// else the application stores through `SecureStorage`.
+    private static final String ACCOUNT_PREFIX = &quot;cn1.db.key.&quot;;
+
+    private static final int KEY_LENGTH = 32;
+
+    private ManagedKeys() {
+    }
+
+    /// Returns the managed key for an alias, generating and storing one on first use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alias`: the logical key name, normally the database name
+    ///
+    /// #### Returns
+    ///
+    /// 32 bytes of key material
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the platform cannot store or retrieve the key
+    static synchronized byte[] keyFor(String alias) throws IOException {
+        // Synchronized because the read-generate-store sequence below is not atomic. Two threads
+        // opening the same managed database for the first time could otherwise both see nothing
+        // stored, generate different keys, and each overwrite the other: whichever key lost the
+        // race would still have written a database nobody can ever read again.
+<span class="nc" id="L66">        String account = accountName(alias);</span>
+<span class="nc" id="L67">        SecureStorage storage = SecureStorage.getInstance();</span>
+
+<span class="nc" id="L69">        String existing = storage.get(account);</span>
+<span class="nc bnc" id="L70" title="All 4 branches missed.">        if (existing != null &amp;&amp; existing.length() == KEY_LENGTH * 2) {</span>
+<span class="nc" id="L71">            return fromHex(existing);</span>
+        }
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (existing != null) {</span>
+            // Something is stored under our account but it is not a key we wrote.
+            // Overwriting it would destroy whatever it is and silently re-key the
+            // database, so refuse instead.
+<span class="nc" id="L77">            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                    &quot;The stored managed database key for '&quot; + alias + &quot;' is malformed. &quot;
+                    + &quot;Refusing to overwrite it, because generating a new key would make &quot;
+                    + &quot;any existing database unreadable.&quot;);
+        }
+
+        // Nothing came back, which is not the same as nothing being there. Every platform's
+        // get() answers null for an entry it could not read as well as for one that does not
+        // exist, and generating on the strength of that overwrites a key that was there all
+        // along -- after which the database encrypted under the old one cannot be opened by
+        // anyone, ever. So the store is asked the question it can actually answer, and a key is
+        // generated only when it says the entry is absent.
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (storage.entryState(account) != SecureStorage.ENTRY_ABSENT) {</span>
+<span class="nc" id="L90">            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                    &quot;The managed database key for '&quot; + alias + &quot;' could not be read, and this &quot;
+                    + &quot;platform cannot say whether one is stored. Refusing to generate a &quot;
+                    + &quot;replacement, because doing so would overwrite an existing key and leave &quot;
+                    + &quot;the database it encrypted unreadable. Try again when the key store is &quot;
+                    + &quot;available, or supply a passphrase with DatabaseConfig.passphrase().&quot;);
+        }
+
+        byte[] generated;
+        try {
+<span class="nc" id="L100">            generated = SecureRandom.bytes(KEY_LENGTH);</span>
+<span class="nc" id="L101">        } catch (CryptoException noRandomness) {</span>
+            // Same failure as a store that will not hold the key, and it has to arrive the same
+            // way. SecureRandom reports an unavailable or failing platform RNG by throwing an
+            // unchecked CryptoException, which walked straight out of this method past its
+            // declared contract: on Android the reflective open handler read it as
+            // NOT_SUPPORTED -- &quot;this platform has no cipher&quot;, which is the wrong thing to tell
+            // anyone, since the cipher is fine and the randomness is not -- and the other ports
+            // let it out unchecked at a caller that is only prepared for an IOException. There
+            // is nothing to fall back to: a key from a broken RNG is the one outcome worse than
+            // no key at all.
+<span class="nc" id="L111">            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                    &quot;This platform could not produce the randomness a managed database key needs.&quot;
+                    + &quot; Supply a passphrase with DatabaseConfig.passphrase() instead.&quot;,
+                    noRandomness);
+<span class="nc" id="L115">        }</span>
+        // Created rather than written, and the answer is what the store ended up holding. The
+        // synchronized above covers threads in this VM and nothing between two: an application
+        // can run in more than one process -- Android components with their own android:process,
+        // or two runs of a desktop build -- and both can find nothing stored and generate. Whoever
+        // lost the race takes the winner's key here instead of overwriting it, so the database is
+        // opened with the key the store actually has rather than the one this call made up.
+<span class="nc" id="L122">        String stored = storage.setIfAbsent(account, toHex(generated));</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (stored == null) {</span>
+            // Deliberately fatal. Carrying on with a key we cannot persist would
+            // produce a database that can never be reopened, and falling back to a
+            // derived or constant key would silently downgrade the protection the
+            // caller asked for. Both are worse than failing here.
+<span class="nc" id="L128">            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                    &quot;This platform cannot store a managed database key. Supply a passphrase &quot;
+                    + &quot;with DatabaseConfig.passphrase() instead.&quot;);
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (stored.length() != KEY_LENGTH * 2) {</span>
+<span class="nc" id="L133">            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                    &quot;The managed database key for '&quot; + alias + &quot;' was stored by something else &quot;
+                    + &quot;and is not a key this can read. Refusing to overwrite it, because a &quot;
+                    + &quot;replacement would leave any database it encrypted unreadable.&quot;);
+        }
+<span class="nc" id="L138">        return fromHex(stored);</span>
+    }
+
+    /// Removes the managed key for an alias.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alias`: the logical key name
+    ///
+    /// #### Returns
+    ///
+    /// true if an entry was removed
+    static boolean forget(String alias) {
+<span class="nc" id="L151">        return SecureStorage.getInstance().remove(accountName(alias));</span>
+    }
+
+    /// Whether a key is stored under this alias.
+    ///
+    /// `#forget(String)` cannot answer it: every platform's remove reports success for an entry
+    /// that was not there -- Android returns the commit result, the keychain treats
+    /// errSecItemNotFound as success -- so a caller choosing between two aliases has to look
+    /// before it deletes rather than infer from what the delete returned.
+    static boolean has(String alias) {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        return state(alias) == SecureStorage.ENTRY_PRESENT;</span>
+    }
+
+    /// What the key store says about an alias: present, absent, or unknown.
+    ///
+    /// Separate from `#has(String)` because a caller that acts on absence has to tell absence from
+    /// a store that could not be asked. Deleting on the strength of a failed lookup is how an
+    /// unrelated database loses its key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alias`: the logical key name
+    ///
+    /// #### Returns
+    ///
+    /// one of the `SecureStorage` entry states
+    static int state(String alias) {
+<span class="nc" id="L178">        SecureStorage storage = SecureStorage.getInstance();</span>
+<span class="nc" id="L179">        String account = accountName(alias);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (storage.get(account) != null) {</span>
+            // Readable, so it is certainly there, whatever the store would say about it.
+<span class="nc" id="L182">            return SecureStorage.ENTRY_PRESENT;</span>
+        }
+<span class="nc" id="L184">        return storage.entryState(account);</span>
+    }
+
+    /// Maps an alias to the `SecureStorage` account name.
+    ///
+    /// A platform key store may not accept every character an application can put in a database
+    /// name, so unsafe ones are escaped -- but escaped reversibly, as `%` followed by two hex
+    /// digits. Folding them all to `_` would make `customer/db` and `customer_db` the same
+    /// account: two databases would silently share a key, and forgetting one would destroy the
+    /// other. `%` itself is escaped so the encoding stays unambiguous.
+    private static String accountName(String alias) {
+<span class="nc" id="L195">        StringBuilder b = new StringBuilder(ACCOUNT_PREFIX.length() + alias.length() + 8);</span>
+<span class="nc" id="L196">        b.append(ACCOUNT_PREFIX);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alias.length(); iter++) {</span>
+<span class="nc" id="L198">            char c = alias.charAt(iter);</span>
+<span class="nc bnc" id="L199" title="All 18 branches missed.">            boolean safe = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '.' || c == '-' || c == '_';
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (safe) {</span>
+<span class="nc" id="L202">                b.append(c);</span>
+            } else {
+<span class="nc" id="L204">                b.append('%');</span>
+<span class="nc" id="L205">                b.append(&quot;0123456789abcdef&quot;.charAt((c &gt;&gt; 12) &amp; 0x0f));</span>
+<span class="nc" id="L206">                b.append(&quot;0123456789abcdef&quot;.charAt((c &gt;&gt; 8) &amp; 0x0f));</span>
+<span class="nc" id="L207">                b.append(&quot;0123456789abcdef&quot;.charAt((c &gt;&gt; 4) &amp; 0x0f));</span>
+<span class="nc" id="L208">                b.append(&quot;0123456789abcdef&quot;.charAt(c &amp; 0x0f));</span>
+            }
+        }
+<span class="nc" id="L211">        return b.toString();</span>
+    }
+
+    private static String toHex(byte[] data) {
+<span class="nc" id="L215">        StringBuilder b = new StringBuilder(data.length * 2);</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        for (byte raw : data) {</span>
+<span class="nc" id="L217">            int v = raw &amp; 0xff;</span>
+<span class="nc" id="L218">            b.append(&quot;0123456789abcdef&quot;.charAt(v &gt;&gt;&gt; 4));</span>
+<span class="nc" id="L219">            b.append(&quot;0123456789abcdef&quot;.charAt(v &amp; 0x0f));</span>
+        }
+<span class="nc" id="L221">        return b.toString();</span>
+    }
+
+    private static byte[] fromHex(String hex) throws IOException {
+<span class="nc" id="L225">        byte[] out = new byte[hex.length() / 2];</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        for (int iter = 0; iter &lt; out.length; iter++) {</span>
+<span class="nc" id="L227">            int hi = digit(hex.charAt(iter * 2));</span>
+<span class="nc" id="L228">            int lo = digit(hex.charAt(iter * 2 + 1));</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">            if (hi &lt; 0 || lo &lt; 0) {</span>
+<span class="nc" id="L230">                throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                        &quot;The stored managed database key is not valid hexadecimal&quot;);
+            }
+<span class="nc" id="L233">            out[iter] = (byte) ((hi &lt;&lt; 4) | lo);</span>
+        }
+<span class="nc" id="L235">        return out;</span>
+    }
+
+    private static int digit(char c) {
+<span class="nc bnc" id="L239" title="All 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L240">            return c - '0';</span>
+        }
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="nc" id="L243">            return c - 'a' + 10;</span>
+        }
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="nc" id="L246">            return c - 'A' + 10;</span>
+        }
+<span class="nc" id="L248">        return -1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

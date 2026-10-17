@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AggregateResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">AggregateResult.java</span></div><h1>AggregateResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// One bucket of an [AggregateQuery] result: a span of time and the
+/// metrics computed over it.
+///
+/// #### A missing value is null, never zero
+///
+/// [#get(HealthDataType,AggregateMetric)] returns `null` when the bucket
+/// held no data. That distinction matters: a day with no step data and a
+/// day on which the user genuinely took no steps are different facts, and
+/// collapsing them into `0` turns &quot;we don't know&quot; into &quot;you did nothing&quot;.
+/// Every health app that gets this wrong draws the same wrong chart --
+/// a flat line through the days the phone was left at home.
+///
+/// ```java
+/// HealthQuantity total = bucket.get(HealthDataType.STEPS, AggregateMetric.TOTAL);
+/// if (total == null) {
+///     renderNoDataMarker(bucket.getBucketStartMillis());
+/// } else {
+///     renderBar(total.getValue(HealthUnit.COUNT));
+/// }
+/// ```
+public final class AggregateResult {
+
+    private final long bucketStartMillis;
+    private final long bucketEndMillis;
+<span class="fc" id="L52">    private final Map&lt;String, HealthQuantity&gt; values =</span>
+            new HashMap&lt;String, HealthQuantity&gt;();
+<span class="fc" id="L54">    private final Map&lt;String, Integer&gt; counts = new HashMap&lt;String, Integer&gt;();</span>
+
+    /// Creates an empty bucket spanning `[start, end)`.
+<span class="fc" id="L57">    public AggregateResult(long bucketStartMillis, long bucketEndMillis) {</span>
+<span class="fc" id="L58">        this.bucketStartMillis = bucketStartMillis;</span>
+<span class="fc" id="L59">        this.bucketEndMillis = bucketEndMillis;</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Inclusive start of this bucket, epoch millis UTC.
+    public long getBucketStartMillis() {
+<span class="nc" id="L64">        return bucketStartMillis;</span>
+    }
+
+    /// Exclusive end of this bucket, epoch millis UTC.
+    public long getBucketEndMillis() {
+<span class="nc" id="L69">        return bucketEndMillis;</span>
+    }
+
+    /// The computed value, or `null` when this bucket held no data for
+    /// that type and metric. See the class documentation -- do not
+    /// substitute zero.
+    public HealthQuantity get(HealthDataType type, AggregateMetric metric) {
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        if (type == null || metric == null) {</span>
+<span class="nc" id="L77">            return null;</span>
+        }
+<span class="fc" id="L79">        return values.get(key(type, metric));</span>
+    }
+
+    /// How many samples contributed to `type` in this bucket. Zero is a
+    /// real answer here, unlike [#get(HealthDataType,AggregateMetric)].
+    public int getSampleCount(HealthDataType type) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L86">            return 0;</span>
+        }
+<span class="fc" id="L88">        Integer n = counts.get(type.getId());</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        return n == null ? 0 : n.intValue();</span>
+    }
+
+    /// `true` when no metric in this bucket produced a value.
+    public boolean isEmpty() {
+<span class="fc" id="L94">        return values.isEmpty();</span>
+    }
+
+    /// Records a computed value. Called by [HealthStore] and by ports; a
+    /// null value clears the entry rather than storing a placeholder.
+    public void put(HealthDataType type, AggregateMetric metric,
+            HealthQuantity value) {
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (type == null || metric == null) {</span>
+<span class="nc" id="L102">            return;</span>
+        }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L105">            values.remove(key(type, metric));</span>
+        } else {
+<span class="fc" id="L107">            values.put(key(type, metric), value);</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    /// Records how many samples contributed to `type`.
+    public void setSampleCount(HealthDataType type, int count) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (type != null) {</span>
+<span class="fc" id="L114">            counts.put(type.getId(), Integer.valueOf(count));</span>
+        }
+<span class="fc" id="L116">    }</span>
+
+    private static String key(HealthDataType type, AggregateMetric metric) {
+<span class="fc" id="L119">        return type.getId() + '\0' + metric.name();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L124">        return &quot;AggregateResult[&quot; + bucketStartMillis + &quot;..&quot;</span>
+<span class="nc" id="L125">                + bucketEndMillis + &quot; &quot; + values.size() + &quot; values]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtoReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.grpc</a> &gt; <span class="el_source">ProtoReader.java</span></div><h1>ProtoReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.grpc;
+
+import java.io.ByteArrayInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+
+/// Low-level protobuf wire-format reader used by generated
+/// [ProtoCodec] implementations. Wraps a `byte[]` so the reader
+/// can [#remaining()] and slice nested-message bodies without
+/// re-buffering.
+///
+/// Generated codecs call [#readTag()] in a loop, dispatch on the
+/// field number, and call the appropriate `readXxx` method. Unknown
+/// fields are passed to [#skipField(int)] -- the same recovery
+/// behaviour `protoc`-generated code exhibits.
+public final class ProtoReader {
+
+    private final byte[] buf;
+    private final int limit;
+    private int pos;
+
+    public ProtoReader(byte[] data) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        this(data, 0, data == null ? 0 : data.length);</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public ProtoReader(byte[] data, int offset, int length) {</span>
+<span class="fc" id="L37">        this.buf = data;</span>
+<span class="fc" id="L38">        this.pos = offset;</span>
+<span class="fc" id="L39">        this.limit = offset + length;</span>
+<span class="fc" id="L40">    }</span>
+
+    public boolean isAtEnd() {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        return pos &gt;= limit;</span>
+    }
+
+    public int remaining() {
+<span class="fc" id="L47">        return limit - pos;</span>
+    }
+
+    /// Reads the next tag (`(fieldNumber &lt;&lt; 3) | wireType`) or
+    /// returns 0 when the stream is at EOF. Generated codecs use
+    /// the 0 sentinel as the loop exit condition.
+    public int readTag() throws IOException {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (isAtEnd()) {</span>
+<span class="fc" id="L55">            return 0;</span>
+        }
+<span class="fc" id="L57">        return readVarint32();</span>
+    }
+
+    /// Skips a single field whose tag has already been consumed.
+    /// Wire type extracted from `tag` (`tag &amp; 0x7`).
+    public void skipField(int tag) throws IOException {
+<span class="fc" id="L63">        int wire = tag &amp; 0x7;</span>
+<span class="fc bfc" id="L64" title="All 5 branches covered.">        switch (wire) {</span>
+            case ProtoWriter.WIRE_VARINT:
+<span class="fc" id="L66">                readVarint64();</span>
+<span class="fc" id="L67">                return;</span>
+            case ProtoWriter.WIRE_I64:
+<span class="fc" id="L69">                advance(8);</span>
+<span class="fc" id="L70">                return;</span>
+            case ProtoWriter.WIRE_LEN: {
+<span class="fc" id="L72">                int len = readVarint32();</span>
+<span class="fc" id="L73">                advance(len);</span>
+<span class="fc" id="L74">                return;</span>
+            }
+            case ProtoWriter.WIRE_I32:
+<span class="fc" id="L77">                advance(4);</span>
+<span class="fc" id="L78">                return;</span>
+            default:
+<span class="fc" id="L80">                throw new IOException(&quot;Unsupported wire type &quot; + wire</span>
+                        + &quot; for field &quot; + (tag &gt;&gt;&gt; 3));
+        }
+    }
+
+    // -- Primitive readers --------------------------------------------
+
+    public int readVarint32() throws IOException {
+<span class="fc" id="L88">        return (int) readVarint64();</span>
+    }
+
+    public long readVarint64() throws IOException {
+<span class="fc" id="L92">        long result = 0L;</span>
+<span class="fc" id="L93">        int shift = 0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        while (shift &lt; 64) {</span>
+<span class="fc" id="L95">            int b = readByte();</span>
+<span class="fc" id="L96">            result |= (long) (b &amp; 0x7F) &lt;&lt; shift;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if ((b &amp; 0x80) == 0) {</span>
+<span class="fc" id="L98">                return result;</span>
+            }
+<span class="fc" id="L100">            shift += 7;</span>
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        throw new IOException(&quot;Malformed varint -- exceeds 10 bytes&quot;);</span>
+    }
+
+    public int readFixed32() throws IOException {
+<span class="fc" id="L106">        ensure(4);</span>
+<span class="fc" id="L107">        int b0 = buf[pos++] &amp; 0xFF;</span>
+<span class="fc" id="L108">        int b1 = buf[pos++] &amp; 0xFF;</span>
+<span class="fc" id="L109">        int b2 = buf[pos++] &amp; 0xFF;</span>
+<span class="fc" id="L110">        int b3 = buf[pos++] &amp; 0xFF;</span>
+<span class="fc" id="L111">        return b0 | (b1 &lt;&lt; 8) | (b2 &lt;&lt; 16) | (b3 &lt;&lt; 24);</span>
+    }
+
+    public long readFixed64() throws IOException {
+<span class="fc" id="L115">        ensure(8);</span>
+<span class="fc" id="L116">        long lo = readFixed32() &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L117">        long hi = readFixed32() &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L118">        return (hi &lt;&lt; 32) | lo;</span>
+    }
+
+    public float readFloat() throws IOException {
+<span class="fc" id="L122">        return Float.intBitsToFloat(readFixed32());</span>
+    }
+
+    public double readDouble() throws IOException {
+<span class="fc" id="L126">        return Double.longBitsToDouble(readFixed64());</span>
+    }
+
+    public boolean readBool() throws IOException {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        return readVarint64() != 0L;</span>
+    }
+
+    public static int zagZig32(int n) {
+<span class="fc" id="L134">        return (n &gt;&gt;&gt; 1) ^ -(n &amp; 1);</span>
+    }
+
+    public static long zagZig64(long n) {
+<span class="fc" id="L138">        return (n &gt;&gt;&gt; 1) ^ -(n &amp; 1L);</span>
+    }
+
+    public int readSInt32() throws IOException {
+<span class="fc" id="L142">        return zagZig32(readVarint32());</span>
+    }
+
+    public long readSInt64() throws IOException {
+<span class="fc" id="L146">        return zagZig64(readVarint64());</span>
+    }
+
+    public String readString() throws IOException {
+<span class="fc" id="L150">        int len = readVarint32();</span>
+<span class="fc" id="L151">        ensure(len);</span>
+        try {
+<span class="fc" id="L153">            String s = new String(buf, pos, len, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L154">            pos += len;</span>
+<span class="fc" id="L155">            return s;</span>
+<span class="nc" id="L156">        } catch (UnsupportedEncodingException uee) {</span>
+<span class="nc" id="L157">            throw new RuntimeException(uee);</span>
+        }
+    }
+
+    public byte[] readBytes() throws IOException {
+<span class="fc" id="L162">        int len = readVarint32();</span>
+<span class="fc" id="L163">        ensure(len);</span>
+<span class="fc" id="L164">        byte[] out = new byte[len];</span>
+<span class="fc" id="L165">        System.arraycopy(buf, pos, out, 0, len);</span>
+<span class="fc" id="L166">        pos += len;</span>
+<span class="fc" id="L167">        return out;</span>
+    }
+
+    /// Reads a length-delimited sub-message via `codec`.
+    public &lt;T&gt; T readMessage(ProtoCodec&lt;T&gt; codec) throws IOException {
+<span class="fc" id="L172">        int len = readVarint32();</span>
+<span class="fc" id="L173">        ensure(len);</span>
+<span class="fc" id="L174">        ProtoReader sub = new ProtoReader(buf, pos, len);</span>
+<span class="fc" id="L175">        pos += len;</span>
+<span class="fc" id="L176">        return codec.read(sub);</span>
+    }
+
+    /// Reads a packed `repeated` scalar segment and appends each
+    /// element to `target` using the supplied [PackedReader] strategy.
+    public &lt;T&gt; void readPacked(java.util.List&lt;T&gt; target, PackedReader&lt;T&gt; strategy) throws IOException {
+<span class="fc" id="L182">        int len = readVarint32();</span>
+<span class="fc" id="L183">        ensure(len);</span>
+<span class="fc" id="L184">        int end = pos + len;</span>
+<span class="fc" id="L185">        ProtoReader sub = new ProtoReader(buf, pos, len);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        while (!sub.isAtEnd()) {</span>
+<span class="fc" id="L187">            target.add(strategy.read(sub));</span>
+        }
+<span class="fc" id="L189">        pos = end;</span>
+<span class="fc" id="L190">    }</span>
+
+    private int readByte() throws IOException {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (pos &gt;= limit) {</span>
+<span class="fc" id="L194">            throw new EOFException(&quot;Unexpected end of protobuf stream&quot;);</span>
+        }
+<span class="fc" id="L196">        return buf[pos++] &amp; 0xFF;</span>
+    }
+
+    private void ensure(int n) throws IOException {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (n &lt; 0) {</span>
+<span class="fc" id="L201">            throw new IOException(&quot;Negative length&quot;);</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (pos + n &gt; limit) {</span>
+<span class="fc" id="L204">            throw new EOFException(&quot;Truncated protobuf stream: need &quot; + n</span>
+                    + &quot; more bytes but &quot; + (limit - pos) + &quot; remaining&quot;);
+        }
+<span class="fc" id="L207">    }</span>
+
+    private void advance(int n) throws IOException {
+<span class="fc" id="L210">        ensure(n);</span>
+<span class="fc" id="L211">        pos += n;</span>
+<span class="fc" id="L212">    }</span>
+
+    /// Strategy hook for [#readPacked]. Lets the generated codec
+    /// reuse this reader without committing to a fixed element type.
+    public interface PackedReader&lt;T&gt; {
+        T read(ProtoReader in) throws IOException;
+    }
+
+    /// Wraps the supplied byte array in a fresh reader. Convenience
+    /// for unit tests; production code allocates the reader directly.
+    public static ProtoReader of(byte[] data) {
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        return new ProtoReader(data == null ? new byte[0] : data);</span>
+    }
+
+    /// Convenience helper for callers that prefer `ByteArrayInputStream`
+    /// over byte arrays. Not used internally but kept for symmetry
+    /// with [ProtoWriter#stream()].
+    public static byte[] drain(ByteArrayInputStream in) throws IOException {
+<span class="fc" id="L230">        int n = in.available();</span>
+<span class="fc" id="L231">        byte[] out = new byte[n];</span>
+<span class="fc" id="L232">        int read = 0;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        while (read &lt; n) {</span>
+<span class="fc" id="L234">            int r = in.read(out, read, n - read);</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (r &lt; 0) {</span>
+<span class="nc" id="L236">                throw new EOFException();</span>
+            }
+<span class="fc" id="L238">            read += r;</span>
+<span class="fc" id="L239">        }</span>
+<span class="fc" id="L240">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

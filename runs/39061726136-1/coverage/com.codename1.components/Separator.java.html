@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Separator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">Separator.java</span></div><h1>Separator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/// A rule that divides one group of controls from the next.
+///
+/// Every desktop toolkit draws one -- `NSBox` in separator mode, WinUI's
+/// `MenuFlyoutSeparator` and navigation separators, `GtkSeparator` -- and Codename One had
+/// no component for it, so applications drew their own out of a `Label` with a bottom
+/// border, or a `Container` with a fixed height and a background colour. Those look
+/// approximately right on one platform and wrong everywhere else, because the thing that
+/// differs between platforms is exactly the part they hard-code: the thickness, the
+/// colour, and how much air sits either side of it.
+///
+/// All three come from the `Separator` UIID. The rule itself is the style's **border**
+/// where there is one and its background colour otherwise, the air either side is the
+/// style's margin, and the thickness is the `separatorThicknessMM` theme constant. A
+/// theme that says nothing gets a one-pixel line in the foreground colour.
+///
+/// ```java
+/// Container settings = new Container(BoxLayout.y());
+/// settings.add(new Label(&quot;Appearance&quot;))
+///         .add(new Separator())
+///         .add(new Label(&quot;Privacy&quot;));
+/// ```
+///
+/// A separator is not focusable and is skipped by keyboard traversal: it is decoration,
+/// and stopping on it with Tab would be a bug on every platform.
+public class Separator extends Component {
+
+    /// A rule that runs left to right, dividing the rows of a vertical stack.
+    public static final int HORIZONTAL = 0;
+
+    /// A rule that runs top to bottom, dividing the columns of a horizontal row.
+    public static final int VERTICAL = 1;
+
+<span class="fc" id="L63">    private int orientation = HORIZONTAL;</span>
+
+    /// A horizontal separator.
+    public Separator() {
+<span class="fc" id="L67">        this(HORIZONTAL);</span>
+<span class="fc" id="L68">    }</span>
+
+    /// A separator running in the given direction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: `#HORIZONTAL` or `#VERTICAL`
+<span class="fc" id="L75">    public Separator(int orientation) {</span>
+<span class="fc" id="L76">        this.orientation = orientation;</span>
+<span class="fc" id="L77">        setUIID(&quot;Separator&quot;);</span>
+<span class="fc" id="L78">        setFocusable(false);</span>
+<span class="fc" id="L79">    }</span>
+
+    /// The direction this rule runs in.
+    ///
+    /// #### Returns
+    ///
+    /// `#HORIZONTAL` or `#VERTICAL`
+    public int getOrientation() {
+<span class="nc" id="L87">        return orientation;</span>
+    }
+
+    /// Sets the direction this rule runs in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: `#HORIZONTAL` or `#VERTICAL`
+    public void setOrientation(int orientation) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (this.orientation != orientation) {</span>
+<span class="nc" id="L97">            this.orientation = orientation;</span>
+<span class="nc" id="L98">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="nc" id="L100">    }</span>
+
+    /// The rule's thickness in pixels, from the `separatorThicknessMM` theme constant.
+    ///
+    /// Never zero. A theme is free to ask for a hairline, and a hairline on a high density
+    /// screen rounds to zero millimetres worth of pixels -- which would make the separator
+    /// invisible rather than thin, and invisible is the one thing it must not be.
+    ///
+    /// #### Returns
+    ///
+    /// the thickness in pixels, at least 1
+    protected int getThickness() {
+        // A string, like every other *MM constant here (see Slider's track and thumb): the
+        // theme format has no float accessor, and parsing a malformed one has to fall back
+        // rather than throw out of a paint.
+<span class="fc" id="L115">        String mm = getUIManager().getThemeConstant(&quot;separatorThicknessMM&quot;, null);</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">        if (mm == null || mm.trim().length() == 0) {</span>
+<span class="nc" id="L117">            return 1;</span>
+        }
+        try {
+<span class="fc" id="L120">            return Math.max(1, Display.getInstance().convertToPixels(Float.parseFloat(mm.trim())));</span>
+<span class="fc" id="L121">        } catch (NumberFormatException notANumber) {</span>
+<span class="fc" id="L122">            return 1;</span>
+        }
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L128">        Style s = getStyle();</span>
+<span class="fc" id="L129">        int thickness = getThickness();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (orientation == VERTICAL) {</span>
+<span class="fc" id="L131">            return new Dimension(thickness + s.getHorizontalPadding(), s.getVerticalPadding());</span>
+        }
+<span class="fc" id="L133">        return new Dimension(s.getHorizontalPadding(), thickness + s.getVerticalPadding());</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L138">        Style s = getStyle();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (s.getBorder() != null) {</span>
+            // A themed border already draws the rule, including the per-side colours a
+            // platform that wants a two-tone bevel needs. Painting over it would double it.
+<span class="nc" id="L142">            return;</span>
+        }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if ((s.getBgTransparency() &amp; 0xff) == 0xff) {</span>
+            // An opaque background IS the rule, and Component.paintBackground has already
+            // drawn it. The component is exactly as thick as the rule, so filling over it with
+            // the foreground would repaint the whole visible area in the text colour -- which
+            // is what the Android Material and iOS Modern themes would have got, since both
+            // define Separator through background-color and never set a foreground.
+            //
+            // Same reasoning as the border case above: whoever already drew the rule owns it.
+<span class="fc" id="L152">            return;</span>
+        }
+<span class="nc" id="L154">        int thickness = getThickness();</span>
+<span class="nc" id="L155">        g.setColor(s.getFgColor());</span>
+<span class="nc" id="L156">        int alpha = g.concatenateAlpha(s.getFgAlpha());</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (orientation == VERTICAL) {</span>
+<span class="nc" id="L158">            g.fillRect(getX() + s.getPaddingLeft(isRTL()) + (getWidth() - s.getHorizontalPadding()</span>
+                            - thickness) / 2,
+<span class="nc" id="L160">                    getY() + s.getPaddingTop(),</span>
+                    thickness,
+<span class="nc" id="L162">                    getHeight() - s.getVerticalPadding());</span>
+        } else {
+<span class="nc" id="L164">            g.fillRect(getX() + s.getPaddingLeft(isRTL()),</span>
+<span class="nc" id="L165">                    getY() + s.getPaddingTop() + (getHeight() - s.getVerticalPadding()</span>
+                            - thickness) / 2,
+<span class="nc" id="L167">                    getWidth() - s.getHorizontalPadding(),</span>
+                    thickness);
+        }
+<span class="nc" id="L170">        g.setAlpha(alpha);</span>
+<span class="nc" id="L171">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
