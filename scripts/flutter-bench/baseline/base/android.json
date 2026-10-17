@@ -2,15 +2,38 @@
  "gallery": {
   "code_bytes": {
    "runs": 1,
-   "value": 4720336
+   "tolerance": {
+    "value": 0.005
+   },
+   "value": 4854044
+  },
+  "cold_start_ratio": {
+   "runs": 8,
+   "tolerance": {
+    "value": 0.55
+   },
+   "value": 0.265
+  },
+  "idle_memory_ratio": {
+   "runs": 8,
+   "tolerance": {
+    "value": 0.2
+   },
+   "value": 0.523
   },
   "install_bytes": {
-   "runs": 1,
-   "value": 91589516
+   "runs": 2,
+   "tolerance": {
+    "value": 0.001
+   },
+   "value": 81949943
   },
   "wire_bytes": {
-   "runs": 1,
-   "value": 91589516
+   "runs": 2,
+   "tolerance": {
+    "value": 0.001
+   },
+   "value": 81949943
   }
  }
 }

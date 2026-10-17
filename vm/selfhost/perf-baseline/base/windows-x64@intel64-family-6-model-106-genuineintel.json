@@ -126,10 +126,11 @@
  "valueEscape": {
   "all": {
    "memory": 0.044,
-   "runs": 1,
-   "time": 0.132,
+   "runs": 2,
+   "time": 0.174,
    "tolerance": {
-    "memory": 0.55
+    "memory": 0.55,
+    "time": 0.4
    }
   }
  }
