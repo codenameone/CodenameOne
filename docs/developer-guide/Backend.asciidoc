@@ -364,8 +364,8 @@ there is nothing next to the binary.
 | `cn1.orm.validateSchema`
 | Whether start-up compares the entity mappings with the existing tables, after
   migrations and table creation, and refuses to serve when a table or column is
-  missing or a column can't hold what its field stores. Nullability differences
-  are logged, not fatal. True unless set.
+  missing or a column can't hold what its field stores. A `NOT NULL` that
+  differs from the mapping is logged, not fatal. True unless set.
 
 | `cn1.flyway.enabled`
 | Whether pending schema migrations run at start-up. True whenever the project

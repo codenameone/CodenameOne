@@ -1160,11 +1160,27 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
 
     /// Whether an existing column can hold what the mapping stores. A @Temporal
     /// field on SQLite also accepts a TEXT column: SQLite has no date type, and
-    /// schemas written for it commonly declare their dates as TEXT.
+    /// schemas written for it commonly declare their dates as TEXT. Elsewhere
+    /// the column has to be the same temporal kind: a DATE column drops the
+    /// time of a timestamp, and a DATE mapping drops the time it reads from a
+    /// timestamp column.
     private boolean storageCompatible(Attribute attr, String found, String expected) {
         int family = typeFamily(found);
-        return family == typeFamily(expected)
-                || attr.temporal != 0 && "sqlite".equals(sql.dialect()) && family == 2;
+        if ("sqlite".equals(sql.dialect())) {
+            return family == typeFamily(expected) || attr.temporal != 0 && family == 2;
+        }
+        return family == typeFamily(expected) && (attr.temporal == 0 || family != 5 || temporalKind(found) == attr.temporal);
+    }
+
+    /// The @Temporal kind a date/time column holds: TEMPORAL_DATE for a date,
+    /// TEMPORAL_TIMESTAMP for one with a time of day, and 0 for a time-only
+    /// column, which holds neither.
+    private int temporalKind(String type) {
+        String token = firstTypeToken(type);
+        if ("date".equals(token)) {
+            return Attribute.TEMPORAL_DATE;
+        }
+        return token.startsWith("time") && !token.startsWith("timestamp") ? 0 : Attribute.TEMPORAL_TIMESTAMP;
     }
 
     private boolean keyColumn(EntityModel model, int index) {
@@ -1428,15 +1444,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return parts.toArray(new String[parts.size()]);
     }
-    private int typeFamily(String type) {
+    private static String asciiLower(String type) {
         StringBuilder lower = new StringBuilder();
         for (int i = 0; i < type.length(); i++) {
             char ch = type.charAt(i);
             lower.append(ch >= 'A' && ch <= 'Z' ? (char) (ch + 32) : ch);
         }
-        String name = lower.toString();
-        String[] tokens = split(name.replace('(', ' '), ' ');
-        String token = tokens.length == 0 ? "" : tokens[0];
+        return lower.toString();
+    }
+    private static String firstTypeToken(String type) {
+        String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
+        return tokens.length == 0 ? "" : tokens[0];
+    }
+    private int typeFamily(String type) {
+        String name = asciiLower(type);
+        String token = firstTypeToken(type);
         if ("postgresql".equals(sql.dialect()) && ("bool".equals(token) || "boolean".equals(token))) {
             return 6;
         }

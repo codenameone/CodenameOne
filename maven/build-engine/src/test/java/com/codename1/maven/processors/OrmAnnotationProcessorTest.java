@@ -131,7 +131,9 @@ public class OrmAnnotationProcessorTest {
         sources.put("hiddenbase.Audited","package hiddenbase; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public abstract class Audited { private long created; protected String createdBy; long revision; "
             + "public long created() { return created; } public void created(long v) { created=v; } public String createdBy() { return createdBy; } public void createdBy(String v) { createdBy=v; } public long revision() { return revision; } public void revision(long v) { revision=v; } "
             // Package-private callback in another package: reached through a woven accessor, virtually.
-            + "@DbTransient private int loads; @PostLoad void loaded() { loads++; } public int loads() { return loads; } }");
+            + "@DbTransient private int loads; @PostLoad void loaded() { loads++; } public int loads() { return loads; } "
+            // Private: a subclass method of the same name does not override it, so it still runs.
+            + "@DbTransient private int stamps; @PrePersist private void stamp() { stamps++; } public int stamps() { return stamps; } }");
         sources.put("hidden.Place","package hidden; import com.codename1.annotations.db.*; @Embeddable public class Place { private String city; private int zip; public Place() {} "
             + "public String city() { return city; } public void city(String v) { city=v; } public int zip() { return zip; } public void zip(int v) { zip=v; } }");
         sources.put("hidden.Rider","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hidden_rider\") public class Rider extends hiddenbase.Audited { "
@@ -141,7 +143,9 @@ public class OrmAnnotationProcessorTest {
             + "public Boolean active() { return active; } public void active(Boolean v) { active=v; } public Place home() { return home; } public void home(Place v) { home=v; } "
             + "public String cached() { return cached; } public void cached(String v) { cached=v; } public String constant() { return constant; } "
             // Private and protected callbacks on the entity itself.
-            + "@DbTransient private int updates; @PrePersist private void defaults() { if(name==null) name=\"anon\"; } @PreUpdate protected void touched() { updates++; } public int updates() { return updates; } }");
+            + "@DbTransient private int updates; @PrePersist private void defaults() { if(name==null) name=\"anon\"; } @PreUpdate protected void touched() { updates++; } public int updates() { return updates; } "
+            // Same names as the superclass's private and other-package callbacks, which they do not override.
+            + "public void stamp() { throw new IllegalStateException(\"not a callback\"); } public void loaded() { throw new IllegalStateException(\"not a callback\"); } }");
         sources.put("hidden.Riders","package hidden; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Rider.class,key=Long.class) public interface Riders extends CrudRepository<Rider,Long> { "
             + "List<Rider> findByNameOrderByScoreDesc(String name); long countByScoreGreaterThan(int score); }");
         sources.put("hidden.Check","package hidden; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
@@ -149,6 +153,7 @@ public class OrmAnnotationProcessorTest {
             + "Rider a=new Rider(); a.name(\"ann\"); a.score(7); a.active(Boolean.TRUE); a.created(1234L); a.createdBy(\"ops\"); a.revision(3); a.cached(\"changed\"); Place p=new Place(); p.city(\"Haifa\"); p.zip(31000); a.home(p); repo.insert(a); "
             + "Rider b=new Rider(); b.name(\"ann\"); b.score(2); repo.insert(b); Rider c=new Rider(); repo.insert(c); s.commitTransaction(); "
             + "if(!\"anon\".equals(c.name())) throw new AssertionError(\"private @PrePersist \"+c.name()); "
+            + "if(a.stamps()!=1 || c.stamps()!=1) throw new AssertionError(\"private inherited @PrePersist \"+a.stamps()); "
             + "if(a.id()==0 || b.id()==0) throw new AssertionError(\"generated id written through the accessor\"); "
             + "s.clear(); Rider back=repo.findById(a.id()); "
             + "if(back==a) throw new AssertionError(\"expected a fresh instance\"); "
@@ -215,12 +220,14 @@ public class OrmAnnotationProcessorTest {
             + "public Date signedUp() { return signedUp; } public void signedUp(Date v) { signedUp=v; } public Date birthday() { return birthday; } public void birthday(Date v) { birthday=v; } "
             + "public Date lastSeen() { return lastSeen; } public void lastSeen(Date v) { lastSeen=v; } public Set<String> tags() { return tags; } public int loads() { return loads; } }");
         // Mapped over a table the mapping does not fit: a plain Date over a TIMESTAMP
-        // column, which would need a conversion, and a column nobody created yet.
-        sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; }");
-        sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s) { "
+        // column, which would need a conversion, a column nobody created yet, and a
+        // DATE mapping over a timestamp column, which would drop the time it reads.
+        // SQLite has no date type, so there the last one fits.
+        sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
+        sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite) { "
             + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
-            + "if(mine.size()!=2) throw new AssertionError(\"report \"+mine); "
-            + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED; "
+            + "if(mine.size()!=(sqlite?2:3)) throw new AssertionError(\"report \"+mine); "
+            + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
             + "s.beginTransaction(); Customer c=new Customer(); c.name(\"Ada\"); c.signedUp(new Date(1709214306789L)); c.birthday(new Date(-14256000000L)); c.lastSeen(new Date(1672628645000L)); "
             + "c.tags().add(\"vip\"); c.tags().add(\"beta\"); s.persist(c); s.commitTransaction(); "
@@ -232,6 +239,14 @@ public class OrmAnnotationProcessorTest {
             + "if(back==null || back.loads()!=1 || !\"Ada\".equals(back.name())) throw new AssertionError(\"load\"); "
             + "if(back.signedUp().getTime()!=1709214306789L || back.birthday().getTime()!=-14256000000L || back.lastSeen().getTime()!=1672628645000L) throw new AssertionError(\"dates \"+back.signedUp().getTime()+\" \"+back.birthday().getTime()+\" \"+back.lastSeen().getTime()); "
             + "if(!new HashSet<String>(Arrays.asList(\"vip\",\"beta\")).equals(back.tags())) throw new AssertionError(\"tags \"+back.tags()); "
+            // A native date column orders and compares as a date: PostgreSQL refuses the
+            // text collation on one, and LIKE is not offered on it.
+            + "Date before=new Date(1709214306000L), dayBefore=new Date(-14256000000L-86400000L), day=new Date(-14256000000L); "
+            + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
+            + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "
+            + "try { s.query(Customer.class).like(\"signedUp\",\"2024%\").list(); throw new AssertionError(\"builder LIKE on a date\"); } catch(IllegalArgumentException expected) {} "
+            + "try { s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp LIKE '2024%'\",Customer.class).list(); throw new AssertionError(\"JPQL LIKE on a date\"); } catch(IllegalArgumentException expected) {} "
             + "s.beginTransaction(); back.tags().remove(\"beta\"); back.tags().add(\"gamma\"); back.signedUp(new Date(1709214306790L)); s.commitTransaction(); "
             + "s.clear(); back=s.find(Customer.class,Long.valueOf(c.id())); "
             + "if(!new HashSet<String>(Arrays.asList(\"vip\",\"gamma\")).equals(back.tags()) || back.signedUp().getTime()!=1709214306790L) throw new AssertionError(\"update \"+back.tags()); "
@@ -250,7 +265,7 @@ public class OrmAnnotationProcessorTest {
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT)",
             "CREATE TABLE legacy_customer_tag (customer_no BIGINT NOT NULL, tag VARCHAR(255) NOT NULL, PRIMARY KEY (customer_no, tag))",
-            "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+")"};
+            "CREATE TABLE legacy_visit (id BIGINT PRIMARY KEY, happened "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+", logged "+(mysql ? "DATETIME(3)" : "TIMESTAMP")+")"};
         for(String statement:ddl) {
             if(backend) db.execute(statement,new Object[0]);
             else try(java.sql.Statement st=jdbc.createStatement()) { st.execute(statement); }
@@ -258,7 +273,7 @@ public class OrmAnnotationProcessorTest {
         com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(db) : null;
         com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(jdbc));
         com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
-        try { loader.loadClass("adopt.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        try { loader.loadClass("adopt.Check").getMethod("run",com.codename1.orm.session.Session.class,boolean.class).invoke(null,session,"sqlite".equals(dialect)); }
         catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError(dialect+(backend?" backend: ":" client: ")+error.getCause(),error.getCause()); }
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
@@ -1238,6 +1253,24 @@ public class OrmAnnotationProcessorTest {
                     session.commitTransaction();session.clear();org.junit.Assert.assertEquals(closed,type.getField("state").get(session.find(type,id)));
                 } finally { session.close();db.close(); }
             }
+        }
+    }
+
+    /// An explicit column type wins over the @Temporal one, so it has to be a type
+    /// that holds the value the converter writes.
+    @Test
+    public void temporalFieldsRejectAColumnTypeThatCannotHoldThem() throws Exception {
+        String[][] cases={{"TIMESTAMP","BIGINT","false"},{"TIMESTAMP","DATE","false"},{"DATE","TIMESTAMP(3)","false"},{"DATE","varchar(20)","false"},
+            {"TIMESTAMP","TIMESTAMP(3)","true"},{"TIMESTAMP","datetime(3)","true"},{"TIMESTAMP","TIMESTAMPTZ","true"},{"DATE","date","true"},{"DATE","TEXT","true"}};
+        for(String[] c:cases) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("temporaltype.Entry","package temporaltype; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; "
+                + "@Entity public class Entry { @Id public long id; @Temporal(TemporalType."+c[0]+") @Column(type=\""+c[1]+"\") public Date at; }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,Collections.<String>emptyList());
+            String errors=ctx.getErrors().toString();
+            if(Boolean.parseBoolean(c[2])) assertFalse(c[0]+" over "+c[1]+": "+errors,ctx.hasErrors());
+            else assertTrue(c[0]+" over "+c[1]+": "+errors,errors.contains("does not hold a @Temporal("+c[0]+") value: at"));
         }
     }
 

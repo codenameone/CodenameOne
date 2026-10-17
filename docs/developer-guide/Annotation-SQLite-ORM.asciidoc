@@ -403,14 +403,14 @@ issue has one of three kinds:
                           as a plain `Date` field over a `TIMESTAMP` column, or a
                           primary key that differs from the mapping. Change the
                           mapping, or convert the column.
-| `CONSTRAINT_MISMATCH` | Nullability differs from the mapping. Reading and
+| `CONSTRAINT_MISMATCH` | The column's `NOT NULL` differs from the mapping. Reading and
                           writing still work; a column stricter than its mapping
                           is a legitimate design.
 |===
 
 `session.validateSchema()` runs the same checks and throws a
-`PersistenceException` whose message is the report. Neither migrates schemas or
-validates every database-specific constraint. Existing tables are
+`PersistenceException` whose message is the report. These calls don't migrate
+schemas or check every database-specific constraint. Existing tables are
 left to <<client-schema-migrations,migrations>>, which `EntityManager.open(name)`
 applies before it returns. In particular, a legacy client DAO's text char
 columns need migration to the managed layer's numeric UTF-16 storage when moving
@@ -419,8 +419,8 @@ to a managed schema.
 A backend server validates the schema at startup, after migrations and
 `cn1.orm.createTables`, and refuses to start on a `MIGRATION_REQUIRED` or
 `UNSUPPORTED` issue, so a mapping the database can't serve fails before the
-first request rather than on the requests that touch it. Nullability
-differences are logged and tolerated. Set `cn1.orm.validateSchema=false` to start
+first request rather than on the requests that touch it. A
+`CONSTRAINT_MISMATCH` is logged and tolerated. Set `cn1.orm.validateSchema=false` to start
 anyway.
 
 [[orm-native-dates]]
@@ -452,6 +452,11 @@ reads as the instant it names.
 `@Temporal` applies to entity fields of type `java.util.Date`. It can't be
 combined with `@Convert`, used on an identifier or version, or applied to
 element-collection values. A field with `@Temporal` requires `openSession()`.
+An explicit `@Column(type)` on one must name a matching date type, such as
+`TIMESTAMP(3)` or `DATE`, or `TEXT`. Queries order and compare the field as a
+date, so `LIKE` and the text functions don't apply to it. The schema report
+marks a `DATE` column under a `TIMESTAMP` mapping, or the reverse, as
+`UNSUPPORTED`, because one of them drops the time of day.
 
 [[orm-existing-schema]]
 ==== Adopting an existing schema

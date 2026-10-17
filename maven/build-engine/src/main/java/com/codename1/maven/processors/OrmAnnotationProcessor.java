@@ -430,8 +430,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     // is called through a static accessor OrmEnhancer weaves into
                     // its declaring class, so the generated model never needs
                     // reflection to reach it.
-                    if (!method.isPublic()) hideCallback(ec,methodOwners.get(method),method);
-                    ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
+                    // The call is cast to the declaring class so the accessor
+                    // is resolved from there: a private callback of a mapped
+                    // superclass is not overridden by a subclass method of the
+                    // same name, and `e.name()` would resolve to that one.
+                    String call="e."+method.getName()+"()";
+                    if (!method.isPublic()) {
+                        hideCallback(ec,methodOwners.get(method),method);
+                        call="(("+methodOwners.get(method).replace('/','.')+")(Object)e)."+method.getName()+"()";
+                    }
+                    ec.callbacks[event]=ec.callbacks[event]==null?call:ec.callbacks[event]+"; "+call;
                 }
             }
         }
@@ -533,6 +541,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             // with no @Column(type) is typed by the dialect, which is what keeps
             // the entity portable.
             pf.explicitSqlType = (colType == null || colType.length() == 0) ? null : colType;
+            // An explicit type wins over the @Temporal one in the DDL and the
+            // schema report alike, so a BIGINT here would be created and
+            // accepted while the converter writes ISO text into it.
+            if (pf.temporal != 0 && pf.explicitSqlType != null && !holdsTemporal(pf.explicitSqlType,pf.temporal))
+                ctx.error(cls,"@Column(type=\""+pf.explicitSqlType+"\") does not hold a @Temporal("
+                        +(pf.temporal==1?"DATE":"TIMESTAMP")+") value: "+pf.fieldName);
             pf.nullable = nullable;
 
             pf.dialectKind = dialectKind(pf.kind);
@@ -1015,7 +1029,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         Set<String> events=new LinkedHashSet<String>();
         for(MethodInfo method:cls.getMethods()) {
-            for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())) result.remove(i);
+            for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())
+                    && overridable(result.get(i),owners.get(result.get(i)),cls.getInternalName())) result.remove(i);
             for(String annotation:method.getAnnotations().keySet()) {
                 if(annotation.matches("Lcom/codename1/annotations/db/(PrePersist|PostPersist|PreUpdate|PostUpdate|PreRemove|PostRemove|PostLoad);"))
                     if(!events.add(annotation)) ctx.error(cls,"Duplicate lifecycle callback: "+annotation);
@@ -1024,6 +1039,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             owners.put(method,cls.getInternalName());
         }
         return result;
+    }
+
+    /// Whether a subclass method of the same name and descriptor overrides an
+    /// inherited one. A private method is never overridden, and a
+    /// package-private one only from its own package; such an inherited
+    /// callback still runs beside the subclass method.
+    private static boolean overridable(MethodInfo inherited,String declaringInternal,String subclassInternal) {
+        if(inherited.isPrivate()) return false;
+        if(inherited.isPublic() || inherited.isProtected()) return true;
+        return packageOf(declaringInternal.replace('/','.')).equals(packageOf(subclassInternal.replace('/','.')));
     }
 
     private List<FieldPath> persistentFields(AnnotatedClass cls,EntityClass entity,ProcessorContext ctx,
@@ -1105,6 +1130,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             out.append(c);
         }
         return out.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /// Whether a declared column type holds a @Temporal value of the given kind
+    /// (1 DATE, 2 TIMESTAMP). TEXT holds either: SQLite has no date type and
+    /// schemas written for it declare their dates as TEXT. Mirrors SessionImpl's
+    /// check of an existing column.
+    static boolean holdsTemporal(String type,int temporal) {
+        String token=type.trim().toLowerCase(java.util.Locale.ROOT).split("[\\s(]",2)[0];
+        if("text".equals(token)) return true;
+        if(temporal==1) return "date".equals(token);
+        return "timestamp".equals(token) || "timestamptz".equals(token) || "datetime".equals(token);
     }
 
     private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
@@ -1712,7 +1748,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("default:return false;} }\n");
         sb.append("  public void lifecycle(").append(ec.binaryName).append(" e,int event) { switch(event) {\n");
         for (int event=0;event<ec.callbacks.length;event++) if(ec.callbacks[event]!=null)
-            sb.append("case ").append(event).append(": e.").append(ec.callbacks[event]).append("(); return;\n");
+            sb.append("case ").append(event).append(": ").append(ec.callbacks[event]).append("; return;\n");
         sb.append("default: return; }}\n}\n");
         return sb.toString();
     }
