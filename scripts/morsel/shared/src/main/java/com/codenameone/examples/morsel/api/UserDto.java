@@ -26,8 +26,9 @@ import com.codename1.annotations.Mapped;
 ///
 /// @param username The sign-in name, which is the e-mail address the account was opened with.
 /// @param customer Every account can delivery.
-/// @param courier Granted: the account may drive.
+/// @param courier Granted: the account may deliver.
 /// @param admin Granted: the account may run the service.
+/// @param merchant On a restaurant's staff: the account takes its orders and keeps its menu.
 /// @param suspended Blocked by an admin: the account cannot sign in or call the API.
 /// @param vehicle A courier's car, as customers see it. Empty for anyone else.
 /// @param plate The car's licence plate. Empty for anyone else.
@@ -47,6 +48,7 @@ public record UserDto(
         boolean customer,
         boolean courier,
         boolean admin,
+        boolean merchant,
         boolean suspended,
         String vehicle,
         String plate,

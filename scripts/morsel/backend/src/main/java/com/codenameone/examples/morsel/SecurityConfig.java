@@ -389,6 +389,7 @@ public class SecurityConfig {
                             "/api/account/register")).permitAll()
                     .requestMatchers("/api/courier/**").hasRole(Roles.COURIER)
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
+                    .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())
             // end::morsel-api-rules[]
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)

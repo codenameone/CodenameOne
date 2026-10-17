@@ -266,7 +266,11 @@ public class Accounts {
         // ledger, and settling it is the admin's to arrange -- the role given
         // back for the cash-out, or paid outside the app. A removal for cause
         // must not wait on a payout, so it is not refused here.
-        users.updateUser(User.withUserDetails(signIn).roles(roles(courier, admin)).build());
+        // Merchant is not one of the switches: it comes with a place on a
+        // restaurant's staff, and stays as long as that does.
+        boolean merchant = authorities(signIn).contains("ROLE_" + Roles.MERCHANT);
+        users.updateUser(User.withUserDetails(signIn).roles(roles(courier, admin, merchant))
+                .build());
         // The role and the approval go together, whichever way it was given:
         // being approved is what lets a courier go on line.
         if (courier) {
@@ -424,7 +428,7 @@ public class Accounts {
         live.drop(username);
         // The account as it was, answered as what it now is: unable to sign in.
         return new UserDto(was.username(), was.displayName(), was.phone(), was.phoneVerified(),
-                was.customer(), was.courier(), was.admin(), true, was.vehicle(), was.plate(),
+                was.customer(), was.courier(), was.admin(), was.merchant(), true, was.vehicle(), was.plate(),
                 was.gender(), was.courierStatus(), was.flagged(), was.flagReason(),
                 was.language());
     }
@@ -553,8 +557,15 @@ public class Accounts {
     }
 
     private static String[] roles(boolean courier, boolean admin) {
+        return roles(courier, admin, false);
+    }
+
+    private static String[] roles(boolean courier, boolean admin, boolean merchant) {
         List<String> roles = new ArrayList<String>();
         roles.add(Roles.CUSTOMER);
+        if (merchant) {
+            roles.add(Roles.MERCHANT);
+        }
         if (courier) {
             roles.add(Roles.COURIER);
         }
@@ -587,8 +598,9 @@ public class Accounts {
         boolean customer = authorities.contains("ROLE_" + Roles.CUSTOMER);
         boolean courier = authorities.contains("ROLE_" + Roles.COURIER);
         boolean admin = authorities.contains("ROLE_" + Roles.ADMIN);
+        boolean merchant = authorities.contains("ROLE_" + Roles.MERCHANT);
         return new UserDto(profile.getUsername(), profile.getDisplayName(), profile.getPhone(),
-                profile.isPhoneVerified(), customer, courier, admin, !enabled, profile.getVehicle(),
+                profile.isPhoneVerified(), customer, courier, admin, merchant, !enabled, profile.getVehicle(),
                 profile.getPlate(), profile.getGender(), courierStatus, profile.isFlagged(),
                 profile.getFlagReason(), profile.getLanguage());
     }

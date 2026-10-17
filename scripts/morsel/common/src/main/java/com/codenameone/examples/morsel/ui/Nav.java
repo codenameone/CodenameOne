@@ -31,6 +31,7 @@ import com.codenameone.examples.morsel.courier.ApplyForm;
 import com.codenameone.examples.morsel.courier.CourierForm;
 import com.codenameone.examples.morsel.courier.Shift;
 import com.codenameone.examples.morsel.live.LiveChannel;
+import com.codenameone.examples.morsel.merchant.MerchantForm;
 import com.codenameone.examples.morsel.net.Account;
 import com.codenameone.examples.morsel.net.Session;
 import com.codenameone.examples.morsel.notify.Notifications;
@@ -38,17 +39,18 @@ import com.codenameone.examples.morsel.customer.CustomerForm;
 
 /// Decides which screen the app is on.
 ///
-/// The app is three apps in one -- for riding, for onboarding and for
-/// administering -- and which of them a user may enter is the server's
+/// The app is four apps in one -- for ordering, for delivering, for running a
+/// restaurant and for administering -- and which of them a user may enter is the server's
 /// decision: it is the roles on their account, as `/api/me` reports them. Each
 /// has a home screen of its own, with its own menu, and the user is in one of
 /// them at a time. Hiding a mode here is a courtesy and not the protection; the
-/// server refuses a courier's or an admin's call from anyone without the role,
+/// server refuses a courier's, a merchant's or an admin's call from anyone without the role,
 /// whatever the app shows.
 public final class Nav {
     public static final String CUSTOMER = "customer";
     public static final String COURIER = "courier";
     public static final String ADMIN = "admin";
+    public static final String MERCHANT = "merchant";
 
     /// The home screen of a mode.
     public interface Home {
@@ -127,7 +129,7 @@ public final class Nav {
         LiveChannel.start();
         String mode = mode(user);
         Telemetry.role(mode);
-        // Onboarding is for the approved. Anyone else who chooses it gets the
+        // Delivering is for the approved. Anyone else who chooses it gets the
         // way there: the application, and what has become of it.
         if (!COURIER.equals(mode)) {
             // Out of the courier's side of the app is off line as far as the
@@ -135,6 +137,7 @@ public final class Nav {
             Shift.leave();
         }
         Home home = ADMIN.equals(mode) ? new AdminForm()
+                : MERCHANT.equals(mode) ? new MerchantForm()
                 : !COURIER.equals(mode) ? new CustomerForm()
                 : user.courier() ? new CourierForm() : new ApplyForm();
         home.start();
@@ -147,13 +150,17 @@ public final class Nav {
     ///
     /// The one they chose last, while their account still allows it. With no
     /// choice made, the one their account is for: an admin administers, a
-    /// courier drives, and everyone else deliveries. A choice is remembered for the
+    /// merchant runs their restaurant, a courier delivers, and everyone else
+    /// orders. A choice is remembered for the
     /// account that made it, so the next person to sign in on the same device
     /// starts where their own account does.
     public static String mode(UserDto user) {
         String saved = AppConfig.mode(Session.owner(user.username()));
         if (ADMIN.equals(saved) && user.admin()) {
             return ADMIN;
+        }
+        if (MERCHANT.equals(saved) && user.merchant()) {
+            return MERCHANT;
         }
         // Not only for a courier: someone who is applying to be one is in the
         // courier's side of the app too, on the screen that says how it stands.
@@ -163,7 +170,8 @@ public final class Nav {
         if (CUSTOMER.equals(saved)) {
             return CUSTOMER;
         }
-        return user.admin() ? ADMIN : user.courier() ? COURIER : CUSTOMER;
+        return user.admin() ? ADMIN : user.merchant() ? MERCHANT
+                : user.courier() ? COURIER : CUSTOMER;
     }
 
     /// The user chose `mode` from the menu.

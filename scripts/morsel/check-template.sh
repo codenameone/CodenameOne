@@ -5,7 +5,7 @@
 #   check-template.sh [work-directory]
 #
 # The Initializr offers this application as a template, from resources that
-# scripts/sync-initializr-morsel.py derives from it. That the resources match
+# scripts/sync-initializr-template.py derives from it. That the resources match
 # is one question; this is the other: whether a project generated from them,
 # under another name and in another package, still builds. The real generator
 # makes the project, and it is then built against this checkout:
@@ -26,7 +26,7 @@ WORK="${1:-$HERE/target/template-check}"
 
 log() { echo "[morsel-template] $*" >&2; }
 
-python3 "$ROOT/scripts/sync-initializr-morsel.py"
+python3 "$ROOT/scripts/sync-initializr-template.py" morsel
 
 # The version this checkout installs, which the generated poms are pointed at:
 # the release the Initializr generates against does not have this project's

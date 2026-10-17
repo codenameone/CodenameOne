@@ -36,8 +36,8 @@ public enum Template {
     // A whole application rather than a starting point: a ride-hailing app with a
     // rider, a driver and an admin mode, and the server it talks to. It is the
     // project in scripts/wayline, which CI builds and tests; the resources named
-    // here are derived from it by scripts/sync-initializr-wayline.py and never
-    // edited by hand.
+    // here are derived from it by `scripts/sync-initializr-template.py wayline`
+    // and never edited by hand.
     //
     // Its preview is a resource of its own, read when the template is chosen,
     // and not an image of the theme: the theme is loaded at start-up, so a

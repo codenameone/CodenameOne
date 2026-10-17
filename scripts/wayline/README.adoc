@@ -207,7 +207,7 @@ Android and iOS through `scripts/build-android-app.sh` and
 
 == The Initializr template
 
-`scripts/sync-initializr-wayline.py --write` copies this project into the
+`scripts/sync-initializr-template.py wayline --write` copies this project into the
 Initializr's resources; without `--write` it fails when they differ, which is what
 CI runs. Change the project here, never the copies.
 

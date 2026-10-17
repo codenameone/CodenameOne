@@ -18,13 +18,16 @@
  */
 package com.codenameone.examples.morsel;
 
-/// The roles an account can hold. Every account is a customer; onboarding and
-/// administering are granted on top of that, and the app offers a mode for each
-/// role the account holds.
+/// The roles an account can hold. Every account is a customer; delivering,
+/// running a restaurant and administering are granted on top of that, and the
+/// app offers a mode for each role the account holds.
 public final class Roles {
     public static final String CUSTOMER = "CUSTOMER";
     public static final String COURIER = "COURIER";
     public static final String ADMIN = "ADMIN";
+    /// Works for a restaurant on the service: takes its orders and keeps its
+    /// menu. Which restaurant is the restaurant's staff list, not the role.
+    public static final String MERCHANT = "MERCHANT";
 
     private Roles() {
     }

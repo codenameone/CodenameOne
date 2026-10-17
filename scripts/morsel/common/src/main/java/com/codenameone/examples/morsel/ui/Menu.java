@@ -138,6 +138,7 @@ public final class Menu {
         top.add(who);
         // Which of the three apps this is, said in words at the top of each.
         top.add(FlowLayout.encloseIn(Ui.badge(Nav.ADMIN.equals(mode) ? "Admin mode"
+                : Nav.MERCHANT.equals(mode) ? "Restaurant mode"
                 : Nav.COURIER.equals(mode) ? "Courier mode" : "Customer mode", "WlModeBadge")));
 
         Container list = new Container(BoxLayout.y());
@@ -145,14 +146,18 @@ public final class Menu {
         list.setScrollVisible(false);
         list.add(places);
         // The other modes, for an account whose roles open more than one.
-        // Everyone may delivery; onboarding and administering are granted.
-        if (user.courier() || user.admin() || !Nav.CUSTOMER.equals(mode)) {
+        // Everyone may order; delivering, running a restaurant and
+        // administering are granted.
+        if (user.courier() || user.admin() || user.merchant() || !Nav.CUSTOMER.equals(mode)) {
             list.add(Ui.label("Switch to", "WlMenuLabel"));
             if (!Nav.CUSTOMER.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_HAIL, "Riding", Nav.CUSTOMER));
+                list.add(other(FontImage.MATERIAL_RESTAURANT_MENU, "Ordering", Nav.CUSTOMER));
             }
             if (user.courier() && !Nav.COURIER.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_DIRECTIONS_CAR, "Onboarding", Nav.COURIER));
+                list.add(other(FontImage.MATERIAL_DELIVERY_DINING, "Delivering", Nav.COURIER));
+            }
+            if (user.merchant() && !Nav.MERCHANT.equals(mode)) {
+                list.add(other(FontImage.MATERIAL_STOREFRONT, "Your restaurant", Nav.MERCHANT));
             }
             if (user.admin() && !Nav.ADMIN.equals(mode)) {
                 list.add(other(FontImage.MATERIAL_INSIGHTS, "Administration", Nav.ADMIN));
