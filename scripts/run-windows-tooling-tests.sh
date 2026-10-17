@@ -135,6 +135,7 @@ EOF
 mvn -B -q -f "$(winpath "$SETTINGS_CP_DIR/cp-pom.xml")" dependency:build-classpath \
   "-Dmdep.outputFile=$(winpath "$SETTINGS_CP_DIR/cp.txt")"
 SETTINGS_CP="$(cat "$SETTINGS_CP_DIR/cp.txt")"
+WORK_DIR_W="$(winpath "$WORK_DIR")"
 
 MATRIX_FAILURES=()
 
@@ -146,13 +147,12 @@ run_settings_scenario() {
   # Settings consumes its launch binding after reading it. Every scenario
   # needs its own file or only the first screenshot has a selected project.
   local binding_file="$SETTINGS_CP_DIR/settings-$name.input"
-  local work_dir_w="$(winpath "$WORK_DIR")"
   cat > "$binding_file" <<EOF
 # Codename One Settings project binding
-projectDir=$work_dir_w
-settings=$work_dir_w\\codenameone_settings.properties
-pom=$work_dir_w\\pom.xml
-multimoduleRoot=$work_dir_w
+projectDir=$WORK_DIR_W
+settings=$WORK_DIR_W\\codenameone_settings.properties
+pom=$WORK_DIR_W\\pom.xml
+multimoduleRoot=$WORK_DIR_W
 EOF
   wt_log "Settings render scenario: $name ($*)"
   if ! "$JAVA_BIN" "$@" \
