@@ -125,6 +125,19 @@ public class UnityProjectImporterTest {
         assertTrue(read(main).endsWith("// mine\n"));
     }
 
+    /// A main class the first import created, rather than replaced, is
+    /// the import's own too: a customization of it is kept by the next.
+    @Test
+    public void keepsACustomizedEntryPointTheImportCreated() throws Exception {
+        File main = new File(common, "src/main/java/com/acme/game/MyGame.java");
+        importIt();
+        String src = read(main);
+        write(main, src + "// mine\n");
+        importIt();
+        assertTrue(read(main).endsWith("// mine\n"));
+        assertFalse(new File(main.getPath() + ".pre-unity-import").exists());
+    }
+
     /// The copy mirrors the Unity project: what the project dropped goes,
     /// what changed is taken, and what the import never copied stays.
     @Test

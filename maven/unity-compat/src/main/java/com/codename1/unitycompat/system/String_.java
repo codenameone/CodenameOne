@@ -32,7 +32,10 @@ public final class String_ {
     private String_() {
     }
 
-    /// A null array is the empty string, as on .NET.
+    /// A null array is the empty string, as on .NET, and not an
+    /// ArgumentNullException: the `String(Char[])` constructor documents
+    /// "If value is null or contains no elements, an Empty instance is
+    /// initialized." Only the overloads taking an index and a count throw.
     public static String New(char[] chars) {
         return chars == null ? "" : new String(chars);
     }

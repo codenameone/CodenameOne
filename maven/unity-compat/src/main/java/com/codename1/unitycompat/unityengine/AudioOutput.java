@@ -32,7 +32,7 @@ package com.codename1.unitycompat.unityengine;
 public interface AudioOutput {
     /// Starts a clip. `voice` identifies the playback: a source's own
     /// voice is replaced by its next `Play`, and a one-shot gets a voice
-    /// of its own that nothing refers to again. `volume` is 0..1, the
+    /// of its own, which its source changes only the volume of. `volume` is 0..1, the
     /// source's own -- its volume, a one-shot's scale, zero when muted --
     /// and the output multiplies the listener's in (see
     /// [#listenerVolume(float)]); `pitch` is a speed, 1 unchanged.

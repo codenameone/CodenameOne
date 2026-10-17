@@ -194,10 +194,16 @@ public final class UnityProjectImporter {
         String src = UnityProjectBuilder.mainClassSource(pkg, cls, "",
                 "/// The Codename One entry point: runs the first scene of the imported Unity project.\n");
         byte[] bytes = src.getBytes(StandardCharsets.UTF_8);
+        // Written beside a main class an import created from nothing, so
+        // that a later import knows the class is its own -- and that a
+        // developer's edit to it is an edit, not an application class to
+        // back up and replace. A backup says the same for a class that was
+        // there before the first import.
+        File owned = new File(f.getPath() + ".unity-import");
         if (f.isFile()) {
             File backup = new File(f.getPath() + ".pre-unity-import");
             boolean unchanged = Arrays.equals(bytes, Files.readAllBytes(f.toPath()));
-            if (backup.exists()) {
+            if (backup.exists() || owned.exists()) {
                 // A repeated import: the backup already holds the application's
                 // original class, and overwriting it would lose the only copy.
                 // The file itself is what an earlier import wrote -- unless the
@@ -211,6 +217,8 @@ public final class UnityProjectImporter {
                 Files.copy(f.toPath(), backup.toPath());
                 log.info("Saved the previous " + f.getName() + " as " + backup.getName());
             }
+        } else {
+            Files.write(owned.toPath(), new byte[0]);
         }
         Files.write(f.toPath(), bytes);
     }

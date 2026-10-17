@@ -327,7 +327,9 @@ final class PhysicsWorld {
     /// This is the mouse's question and no script's, so it has the mouse's
     /// rule: an object on the Ignore Raycast layer is not there. Unity sends
     /// it no `OnMouseDown`, and since it is passed over rather than found
-    /// and then refused, what lies behind it gets the press.
+    /// and then refused, what lies behind it gets the press. A trigger is
+    /// passed over the same way while `Physics2D.queriesHitTriggers` is
+    /// false: Unity calls `OnMouseDown` on a trigger only when it is true.
     static Collider2D at(float x, float y) {
         flush();
         scratch.x = x;
@@ -342,7 +344,7 @@ final class PhysicsWorld {
             }
             for (int j = 0; j < colliders.size(); j++) { // NOPMD ForLoopCanBeForeach
                 Collider2D c = (Collider2D) colliders.get(j);
-                if (c.gameObject.layer == IGNORE_RAYCAST || !covers(c)) {
+                if (c.gameObject.layer == IGNORE_RAYCAST || (c.trigger && !Physics2D.hitTriggers) || !covers(c)) {
                     continue;
                 }
                 Transform t = c.gameObject.transform;

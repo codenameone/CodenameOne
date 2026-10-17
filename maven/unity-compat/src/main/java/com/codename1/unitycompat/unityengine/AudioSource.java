@@ -64,6 +64,16 @@ public final class AudioSource extends Behaviour {
     boolean mute;
     boolean playOnAwake = true;
     private int voice;
+    /// The one-shots this source started that may still be sounding, with
+    /// the scale each was played at and when it ends on [#now()]. Unity's
+    /// `mute` mutes the source, and a one-shot is a sound of the source:
+    /// `volume` and `mute` reach these too. Stop, Pause and deactivation
+    /// are left to the main voice, since Unity's documentation of them
+    /// speaks of the clip and says nothing of one-shots.
+    private int[] shots = new int[0];
+    private float[] shotScale = new float[0];
+    private float[] shotEnd = new float[0];
+    private int shotCount;
     private boolean playing;
     private boolean paused;
     /// Where in the clip the voice was, in seconds, at `startedAt`.
@@ -310,6 +320,7 @@ public final class AudioSource extends Behaviour {
         if (playing && output != null) {
             output.volume(voice, level(1f));
         }
+        relevelShots();
     }
 
     public float get_pitch() {
@@ -398,6 +409,7 @@ public final class AudioSource extends Behaviour {
         if (playing && output != null) {
             output.volume(voice, level(1f));
         }
+        relevelShots();
     }
 
     public boolean get_playOnAwake() {
@@ -617,7 +629,53 @@ public final class AudioSource extends Behaviour {
         }
         record("shot", c);
         if (output != null) {
-            output.play(newVoice(), c, level(volumeScale), pitch, false);
+            int v = newVoice();
+            output.play(v, c, level(volumeScale), pitch, false);
+            float speed = pitch < 0f ? -pitch : pitch;
+            keepShot(v, volumeScale, now() + (speed > 0f ? c.get_length() / speed : c.get_length()));
+        }
+    }
+
+    /// Remembers a one-shot, after forgetting those that have ended.
+    private void keepShot(int v, float scale, float end) {
+        float t = now();
+        int n = 0;
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                shots[n] = shots[i];
+                shotScale[n] = shotScale[i];
+                shotEnd[n] = shotEnd[i];
+                n++;
+            }
+        }
+        if (n == shots.length) {
+            int size = n * 2 + 2;
+            int[] s2 = new int[size];
+            float[] c2 = new float[size];
+            float[] e2 = new float[size];
+            System.arraycopy(shots, 0, s2, 0, n);
+            System.arraycopy(shotScale, 0, c2, 0, n);
+            System.arraycopy(shotEnd, 0, e2, 0, n);
+            shots = s2;
+            shotScale = c2;
+            shotEnd = e2;
+        }
+        shots[n] = v;
+        shotScale[n] = scale;
+        shotEnd[n] = end;
+        shotCount = n + 1;
+    }
+
+    /// Applies `volume` and `mute` to the one-shots still sounding.
+    private void relevelShots() {
+        if (output == null) {
+            return;
+        }
+        float t = now();
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                output.volume(shots[i], level(shotScale[i]));
+            }
         }
     }
 
