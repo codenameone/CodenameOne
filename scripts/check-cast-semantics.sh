@@ -24,7 +24,8 @@ TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 # The modules whose bytecode ParparVM translates and that we own. A translation
 # sees maven/core, maven/ios and vm/JavaAPI, and -- in an application with
 # Android sources -- maven/android-compat, whose runtime the build relocates into
-# the application's own classes. Nothing else of ours.
+# the application's own classes. Nothing else of ours, but for OPTIONAL_ROOTS
+# below.
 # Deliberately NOT covered, for the one reason: the code runs on a VM whose
 # CHECKCAST does throw, so its catch(ClassCastException) handlers are live and
 # correct and demanding an instanceof there buys nothing.
@@ -37,6 +38,16 @@ DEFAULT_ROOTS=(
   "maven/core/target/classes"
   "maven/ios/target/classes"
   "maven/android-compat/target/classes"
+)
+# Translated too, but built only under the unity-compat Maven profile, which
+# needs the .NET SDK: maven/unity-compat, the runtime an application with Unity
+# sources ships, together with the classes translated from C# that sit beside
+# it in target/classes. Checked whenever it is built, and never demanded by
+# --require-all, because the PR CI leg that passes that flag has no .NET and
+# must not need one. .github/workflows/unity-compat.yml builds the module and
+# names this directory explicitly, so there it cannot be skipped.
+OPTIONAL_ROOTS=(
+  "maven/unity-compat/target/classes"
 )
 
 write_baseline=0
@@ -63,6 +74,13 @@ if [[ ${#roots[@]} -eq 0 ]]; then
     else
       echo "check-cast-semantics: skipping $candidate (not built)" >&2
       missing=1
+    fi
+  done
+  for candidate in "${OPTIONAL_ROOTS[@]}"; do
+    if [[ -d "$REPO_ROOT/$candidate" ]]; then
+      roots+=("$REPO_ROOT/$candidate")
+    else
+      echo "check-cast-semantics: skipping $candidate (not built; needs -Dunity-compat)" >&2
     fi
   done
   if [[ "$require_all" -eq 1 && "$missing" -eq 1 ]]; then

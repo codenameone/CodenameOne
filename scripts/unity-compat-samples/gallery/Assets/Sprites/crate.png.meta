@@ -1,0 +1,12 @@
+fileFormatVersion: 2
+guid: 9c4b6a8d0e2f4a1cb3d5e7f9a1b2c3d5
+TextureImporter:
+  serializedVersion: 12
+  textureType: 8
+  spriteMode: 1
+  spritePixelsToUnits: 16
+  spritePivot: {x: 0.25, y: 0.75}
+  alignment: 9
+  userData:
+  assetBundleName:
+  assetBundleVariant:

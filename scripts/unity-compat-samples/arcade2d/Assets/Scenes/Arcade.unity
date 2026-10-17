@@ -1,0 +1,444 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!29 &1
+OcclusionCullingSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+--- !u!1 &10
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 11}
+  - component: {fileID: 12}
+  - component: {fileID: 13}
+  m_Layer: 0
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_IsActive: 1
+--- !u!4 &11
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 10}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!20 &12
+Camera:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 10}
+  m_Enabled: 1
+  m_BackGroundColor: {r: 0.1, g: 0.1, b: 0.2, a: 0}
+  orthographic: 1
+  orthographic size: 5
+--- !u!81 &13
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 10}
+  m_Enabled: 1
+--- !u!1 &100
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 101}
+  - component: {fileID: 102}
+  - component: {fileID: 103}
+  - component: {fileID: 104}
+  - component: {fileID: 105}
+  m_Layer: 0
+  m_Name: Player
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &101
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 100}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -3, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children:
+  - {fileID: 111}
+  m_Father: {fileID: 0}
+--- !u!212 &102
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_Sprite: {fileID: 4567001, guid: 9c1d2e3f4a5b4c6d8e7f0a1b2c3d4e5f, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 2
+--- !u!60 &103
+PolygonCollider2D:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_IsTrigger: 0
+  m_Offset: {x: 0, y: 0}
+  m_Points:
+    m_Paths:
+    - - {x: 0, y: 0.5}
+      - {x: -0.5, y: -0.5}
+      - {x: 0.5, y: -0.5}
+--- !u!50 &104
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 100}
+  m_BodyType: 1
+  m_Simulated: 1
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0.05
+  m_GravityScale: 0
+  m_Constraints: 0
+--- !u!114 &105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000001, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  shot: {fileID: 7700000000000000001, guid: b2000000000000000000000000000001, type: 3}
+  muzzle: {fileID: 111}
+  shots: {fileID: 121}
+  label: {fileID: 413}
+  turnSpeed: 90
+  shotSpeed: 6
+  bonus:
+  - 10
+  - 20
+  words:
+  - one
+  - "two words"
+  tints:
+  - {r: 1, g: 1, b: 0, a: 1}
+  - {r: 0, g: 1, b: 1, a: 1}
+  startAngle: 0
+--- !u!1 &110
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 111}
+  m_Layer: 0
+  m_Name: Muzzle
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &111
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 110}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.8, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 101}
+--- !u!1 &120
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 121}
+  m_Layer: 0
+  m_Name: Shots
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &121
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 120}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!1 &200
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 201}
+  - component: {fileID: 202}
+  - component: {fileID: 203}
+  - component: {fileID: 204}
+  - component: {fileID: 205}
+  m_Layer: 0
+  m_Name: Target
+  m_TagString: Target
+  m_IsActive: 1
+--- !u!4 &201
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 200}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.25, y: 2, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!212 &202
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 200}
+  m_Enabled: 1
+  m_Sprite: {fileID: -4567002, guid: 9c1d2e3f4a5b4c6d8e7f0a1b2c3d4e5f, type: 3}
+  m_Color: {r: 1, g: 0.5, b: 0.25, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 1
+--- !u!60 &203
+PolygonCollider2D:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 200}
+  m_Enabled: 1
+  m_IsTrigger: 0
+  m_Offset: {x: 0, y: 0}
+  m_Points:
+    m_Paths:
+    - - {x: -0.25, y: -0.25}
+      - {x: 0.75, y: -0.25}
+      - {x: 0.75, y: 0.25}
+      - {x: 0.25, y: 0.25}
+      - {x: 0.25, y: 0.75}
+      - {x: -0.25, y: 0.75}
+--- !u!50 &204
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 200}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0.05
+  m_GravityScale: 0
+  m_Constraints: 0
+--- !u!114 &205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 200}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000003, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  label: {fileID: 413}
+  hurt: {fileID: 4567001, guid: 9c1d2e3f4a5b4c6d8e7f0a1b2c3d4e5f, type: 3}
+  lives: 2
+--- !u!1 &300
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 301}
+  - component: {fileID: 302}
+  m_Layer: 0
+  m_Name: Floor
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &301
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 300}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -4.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!61 &302
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 300}
+  m_Enabled: 1
+  m_IsTrigger: 0
+  m_Offset: {x: 0, y: 0}
+  serializedVersion: 2
+  m_Size: {x: 20, y: 1}
+--- !u!1 &310
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 311}
+  - component: {fileID: 312}
+  - component: {fileID: 313}
+  - component: {fileID: 314}
+  - component: {fileID: 315}
+  m_Layer: 0
+  m_Name: Rock
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &311
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 310}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3, y: -2, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!212 &312
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 310}
+  m_Enabled: 1
+  m_Sprite: {fileID: -4567002, guid: 9c1d2e3f4a5b4c6d8e7f0a1b2c3d4e5f, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+--- !u!60 &313
+PolygonCollider2D:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 310}
+  m_Enabled: 1
+  m_IsTrigger: 0
+  m_Offset: {x: 0, y: 0}
+  m_Points:
+    m_Paths:
+    - - {x: -0.25, y: -0.25}
+      - {x: 0.75, y: -0.25}
+      - {x: 0.75, y: 0.25}
+      - {x: 0.25, y: 0.25}
+      - {x: 0.25, y: 0.75}
+      - {x: -0.25, y: 0.75}
+--- !u!50 &314
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 310}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0.05
+  m_GravityScale: 1
+  m_Constraints: 0
+--- !u!114 &315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000004, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!1 &400
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 401}
+  - component: {fileID: 402}
+  - component: {fileID: 403}
+  m_Layer: 0
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!224 &401
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 400}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_Children:
+  - {fileID: 411}
+  m_Father: {fileID: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0, y: 0}
+--- !u!223 &402
+Canvas:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 400}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+--- !u!114 &403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_UiScaleMode: 1
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 1
+--- !u!1 &410
+GameObject:
+  m_ObjectHideFlags: 0
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 411}
+  - component: {fileID: 412}
+  - component: {fileID: 413}
+  m_Layer: 0
+  m_Name: Label
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!224 &411
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 410}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 401}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 10, y: -20}
+  m_SizeDelta: {x: 300, y: 40}
+  m_Pivot: {x: 0, y: 1}
+--- !u!222 &412
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 410}
+--- !u!114 &413
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 410}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FontData:
+    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_FontSize: 24
+    m_FontStyle: 1
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 3
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+  m_Text: 'Hits: none'

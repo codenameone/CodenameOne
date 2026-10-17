@@ -73,9 +73,6 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int LINE_STRIP = 0x0003;
     private static final int TRIANGLES = 0x0004;
     private static final int TRIANGLE_STRIP = 0x0005;
-    private static final int SRC_ALPHA = 0x0302;
-    private static final int ONE_MINUS_SRC_ALPHA = 0x0303;
-    private static final int ONE = 1;
     private static final int CULL_FACE = 0x0B44;
     private static final int DEPTH_TEST = 0x0B71;
     private static final int BLEND = 0x0BE2;
@@ -382,11 +379,13 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.disable(BLEND);
         } else {
             gl.enable(BLEND);
-            if (blend == RenderState.BlendMode.ADDITIVE) {
-                gl.blendFunc(SRC_ALPHA, ONE);
-            } else {
-                gl.blendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA);
-            }
+            // Separate factors for the alpha channel, so that an opaque
+            // frame stays opaque: see JavaScriptBlendFactors.
+            boolean additive = blend == RenderState.BlendMode.ADDITIVE;
+            gl.blendFuncSeparate(JavaScriptBlendFactors.sourceColor(additive),
+                    JavaScriptBlendFactors.destinationColor(additive),
+                    JavaScriptBlendFactors.sourceAlpha(additive),
+                    JavaScriptBlendFactors.destinationAlpha(additive));
         }
 
         RenderState.CullMode cull = state.getCullMode();

@@ -198,8 +198,7 @@ class CleanTargetLinuxIntegrationTest {
         Path portClasses = Paths.get("..", "..", "maven", "linux", "target", "classes").normalize().toAbsolutePath();
         Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
                 .normalize().toAbsolutePath();
-        Path adsMockClasses = Paths.get("..", "..", "maven", "cn1-ads-mock", "target", "classes")
-                .normalize().toAbsolutePath();
+        Path libraryClasses = CleanTargetIntegrationTest.helloSuiteLibraryClasses();
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
                 "codenameone-core must be built (maven/core/target/classes)");
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/linux/LinuxImplementation.class")),
@@ -236,7 +235,7 @@ class CleanTargetLinuxIntegrationTest {
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         String cp = coreClasses + java.io.File.pathSeparator + portClasses
                 + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir
-                + java.io.File.pathSeparator + adsMockClasses;
+                + java.io.File.pathSeparator + libraryClasses;
         List<String> appCompile = new ArrayList<>(Arrays.asList(
                 "-encoding", "UTF-8",
                 "-source", config.targetVersion, "-target", config.targetVersion,
@@ -266,7 +265,7 @@ class CleanTargetLinuxIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("linuxhello-out");
         String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
-                + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + adsMockClasses + ";" + resStage;
+                + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + libraryClasses + ";" + resStage;
         CleanTargetIntegrationTest.runTranslatorMultiSource(sources, outputDir, "LinuxHelloMain", "linux");
 
         Path cmakeRoot = outputDir.resolve("dist");

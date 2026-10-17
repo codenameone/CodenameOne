@@ -58,6 +58,11 @@
       </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-unity-compat</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
         <artifactId>codenameone-buildclient</artifactId>
         <version>${cn1.version}</version>
         <scope>system</scope>

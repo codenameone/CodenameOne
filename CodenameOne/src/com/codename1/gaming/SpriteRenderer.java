@@ -84,6 +84,8 @@ public class SpriteRenderer implements Renderer {
     private RenderState spriteState2D;
     private RenderState spriteState3D;
     private Map textures;
+    // images whose textures were asked back; see releaseTexture
+    private final List released = new ArrayList();
     private Image discImage;
     private Image ringImage;
     private Map labelImages;
@@ -140,6 +142,55 @@ public class SpriteRenderer implements Renderer {
         return models.size();
     }
 
+    /// Releases the texture this renderer keeps for an image, and forgets the
+    /// image.
+    ///
+    /// The renderer uploads every image a sprite is drawn with once, and keeps
+    /// the texture until it is disposed itself. That is right for the art of a
+    /// game, and wrong for an image that is made, shown for a while and never
+    /// shown again -- a text painted into an image, a generated frame: each one
+    /// would hold its texture, and the image with it, for as long as the view
+    /// lives. Call this when such an image is no longer drawn.
+    ///
+    /// The GPU is not touched here, since only a renderer callback has the
+    /// device: the texture is disposed at the start of the next frame, before
+    /// anything is drawn. So it may be called from the frame itself (`GameView`'s
+    /// `update`), and an image released and drawn again -- in the same frame or
+    /// any later one -- is simply uploaded again. An image the renderer has no
+    /// texture for, or null, is ignored.
+    ///
+    /// Like every change to the scene, it belongs on the thread that runs the
+    /// frame.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image whose texture is no longer needed
+    public void releaseTexture(Image image) {
+        if (image != null && textures != null && textures.containsKey(image)) {
+            released.add(image);
+        }
+    }
+
+    /// The number of images this renderer holds a texture for at the moment:
+    /// those drawn since the device was created and not released since.
+    public int getTextureCount() {
+        return textures == null ? 0 : textures.size();
+    }
+
+    /// Disposes the textures that were released since the last frame. An image
+    /// released twice is found in the map only the first time, so no texture is
+    /// handed to the device twice.
+    private void disposeReleased(GraphicsDevice device) {
+        int n = released.size();
+        for (int i = 0; i < n; i++) {
+            Texture t = (Texture) textures.remove(released.get(i));
+            if (t != null) {
+                device.dispose(t);
+            }
+        }
+        released.clear();
+    }
+
     /// The ARGB color the framebuffer is cleared to each frame.
     public void setClearColor(int argb) {
         this.clearColor = argb;
@@ -189,6 +240,8 @@ public class SpriteRenderer implements Renderer {
                 .setCullMode(RenderState.CullMode.NONE);
         material = new Material(Material.Type.SPRITE).setRenderState(spriteState2D);
         textures = new HashMap();
+        // a new device: what was released belonged to the one before it
+        released.clear();
         labelImages = new HashMap();
         discImage = circleTexture(128, 0f, 1f);
         ringImage = circleTexture(128, 0.72f, 1f);
@@ -226,6 +279,9 @@ public class SpriteRenderer implements Renderer {
             updatable.frame(dt);
         }
         scene.update(dt);
+        if (!released.isEmpty()) {
+            disposeReleased(device);
+        }
 
         device.clear(clearColor, true, true);
         // configure the GPU camera from the GameCamera each frame so a moving 3D
@@ -388,6 +444,8 @@ public class SpriteRenderer implements Renderer {
             }
             textures.clear();
         }
+        // their textures went with the rest, just above
+        released.clear();
         if (quad != null) {
             device.dispose(quad.getVertices());
             device.dispose(quad.getIndices());

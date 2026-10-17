@@ -1,0 +1,165 @@
+headless seed=3 frames=240 view=400x300 rate=60 scenes=1
+menu level=Normal hard defined=True nine defined=False floor=Floor at y=-300 wide=1200 listed=3 interactable=True has key=False
+listeners heard 4 then 7
+board board 3x4 of 12 unreadable=2 corner=-3 chars=25
+placed marker0_2@0,2 marker1_1@1,1 marker2_0@2,0 True 99 3 dot=dot wedge=wedge
+resources same=TrueTrue missing=TrueTrueTrueTrue blob=11/925/255 bytes=25
+table table name+points keys=2:W,D weights=3,1,-2
+frame 1 objects=19 Ledge=1 drawn=13 text="menu" text="Best: 0" text="PLAY"
+draw frame=1 commands=13 background=ff141a29
+  count 3 tile.png@0,0+16x16
+  count 1 dot.png@0,0+6x6
+  count 2 unity-polygon-wedge.png@0,0+256x256
+  count 1 tile.png@0,0+4x16
+  count 3 (text)
+  count 3 unity-ui-white.png@0,0+4x4
+  tile.png src=0,0+16x16 layer=0 order=0 at=20000,24000 size=36000x3000 anchor=50,50 rotation=0 color=ffffff80 flip=00
+  tile.png src=0,0+16x16 layer=0 order=1 at=20000,9000 size=1500x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tile.png src=0,0+16x16 layer=0 order=2 at=32000,10500 size=6000x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  dot.png src=0,0+6x6 layer=0 order=2 at=8000,2250 size=1500x1500 anchor=50,50 rotation=0 color=ffff0000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=5750,4500 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=3500,6750 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  tile.png src=0,0+4x16 layer=0 order=0 at=1000,1000 size=2500x800 anchor=0,0 rotation=0 color=ffffffff flip=00
+  text "menu" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
+  text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=99000000 flip=00
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff66cc66 flip=10
+  text "PLAY" layer=0 order=0 at=14000,14750 size=12000x4500 font=1500 fit=0 min=750 max=3000 align=4 style=0 wrap=1 color=ff1a1a1a
+  unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
+input frame=10 key=32 down
+key frame 10 over interface=True panel=True clicks=0
+input frame=12 key=32 up
+input frame=20 pointer=60,250 down
+input frame=24 pointer=200,170 up
+input frame=40 pointer=200,170 down
+frame 42 objects=19 Ledge=1 drawn=13 text="menu" text="Best: 0" text="PLAY"
+draw frame=42 commands=13 background=ff141a29
+  count 3 tile.png@0,0+16x16
+  count 1 dot.png@0,0+6x6
+  count 2 unity-polygon-wedge.png@0,0+256x256
+  count 1 tile.png@0,0+4x16
+  count 3 (text)
+  count 3 unity-ui-white.png@0,0+4x4
+  tile.png src=0,0+16x16 layer=0 order=0 at=20000,24000 size=36000x3000 anchor=50,50 rotation=0 color=ffffff80 flip=00
+  tile.png src=0,0+16x16 layer=0 order=1 at=20000,9000 size=1500x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tile.png src=0,0+16x16 layer=0 order=2 at=32000,10500 size=6000x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  dot.png src=0,0+6x6 layer=0 order=2 at=8000,2250 size=1500x1500 anchor=50,50 rotation=0 color=ffff0000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=5750,4500 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=3500,6750 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  tile.png src=0,0+4x16 layer=0 order=0 at=1000,1000 size=2500x800 anchor=0,0 rotation=0 color=ffffffff flip=00
+  text "menu" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
+  text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=99000000 flip=00
+  unity-ui-white.png src=0,0+4x4 layer=0 order=0 at=14000,14750 size=12000x4500 anchor=0,0 rotation=0 color=ff339933 flip=10
+  text "PLAY" layer=0 order=0 at=14000,14750 size=12000x4500 font=1500 fit=0 min=750 max=3000 align=4 style=0 wrap=1 color=ff1a1a1a
+  unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
+input frame=44 pointer=200,170 up
+play, frame 44 clicks=0
+frame 60 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 0"
+draw frame=60 commands=10 background=ff141a29
+  count 3 tile.png@0,0+16x16
+  count 1 dot.png@0,0+6x6
+  count 2 unity-polygon-wedge.png@0,0+256x256
+  count 1 tile.png@0,0+4x16
+  count 2 (text)
+  count 1 unity-ui-white.png@0,0+4x4
+  tile.png src=0,0+16x16 layer=0 order=0 at=20000,24000 size=36000x3000 anchor=50,50 rotation=0 color=ffffff80 flip=00
+  tile.png src=0,0+16x16 layer=0 order=1 at=20000,10236 size=1500x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tile.png src=0,0+16x16 layer=0 order=2 at=32000,10500 size=6000x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  dot.png src=0,0+6x6 layer=0 order=2 at=8000,2250 size=1500x1500 anchor=50,50 rotation=0 color=ffff0000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=5750,4500 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=3500,6750 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  tile.png src=0,0+4x16 layer=0 order=0 at=1000,1000 size=2500x800 anchor=0,0 rotation=0 color=ffffffff flip=00
+  text "hard" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
+  text "Best: 0" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
+  unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
+tick, frame 74 clicks=1 selected=True
+input frame=90 key=32 down
+key frame 90 over interface=False panel=False clicks=1
+input frame=92 key=32 up
+bounce 1 on Floor at y=-210 frame 100
+pitch clamped 300 -300
+sought to 40ms of 100 playing=True
+clip swap playing=True same=True replaced=False
+one shot playing=True paused=False resumed=True
+time scale negative kept=True
+caught: Input Axis Nope is not setup.
+caught a child out of range=True
+audio frame=100 shot beep
+audio frame=100 play beep
+audio frame=100 seek beep 40
+audio frame=100 play beep
+audio frame=100 shot beep
+voice 3 frames on: 65ms playing=True
+tick, frame 105 clicks=1 selected=True
+voice 9 frames on: 100ms playing=False
+audio frame=112 play beep
+listener paused at 33ms playing=True
+audio frame=114 listener paused
+frame 120 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
+still paused=True at 33ms playing=True
+audio frame=130 listener resumed
+resumed 2 frames: 67ms playing=True
+resumed 6 frames: 100ms playing=False
+tick, frame 136 clicks=1 selected=True
+audio frame=138 play beep
+audio frame=140 looping beep on
+listener volume 50 looping=True
+audio frame=144 listener volume 50
+audio frame=144 output listener 50: beep looping 25
+audio frame=145 output volume beep 13
+audio frame=146 listener volume 100
+audio frame=146 output listener 100: beep looping 25
+audio frame=146 output volume beep 50
+looping: 17ms playing=True
+loop off: 17ms playing=True
+audio frame=151 looping beep off
+loop off 2 frames: 50ms playing=True
+loop off 6 frames: 100ms playing=False
+audio frame=158 listener paused
+audio frame=158 play beep
+played while paused: 0ms playing=True
+audio frame=164 listener resumed
+and 2 frames after: 33ms playing=True
+tick, frame 167 clicks=1 selected=True
+placed while silent: 0ms playing=False, played from 60ms playing=True
+audio frame=172 play beep
+audio frame=172 seek beep 60
+placed 2 frames on: 93ms playing=True
+placed then stopped: 0ms playing=True
+audio frame=174 play beep
+audio frame=180 play beep
+audio frame=180 seek beep 30
+frame 180 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 1 Hard"
+bounce 2 on Floor at y=-220 frame 186
+audio frame=186 shot beep
+pitch 0 12 frames on: 30ms playing=True
+audio frame=193 play beep
+audio frame=193 seek beep 80
+reversed 2 frames: 47ms playing=True
+tick, frame 198 clicks=1 selected=True
+reversed 6 frames: 0ms playing=False
+frame 200 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"
+draw frame=200 commands=10 background=ff141a29
+  count 3 tile.png@0,0+16x16
+  count 1 dot.png@0,0+6x6
+  count 2 unity-polygon-wedge.png@0,0+256x256
+  count 1 tile.png@0,0+8x16
+  count 2 (text)
+  count 1 unity-ui-white.png@0,0+4x4
+  tile.png src=0,0+16x16 layer=0 order=0 at=20000,24000 size=36000x3000 anchor=50,50 rotation=0 color=ffffff80 flip=00
+  tile.png src=0,0+16x16 layer=0 order=1 at=20000,18821 size=1500x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  tile.png src=0,0+16x16 layer=0 order=2 at=32000,10500 size=6000x1500 anchor=50,50 rotation=0 color=ffffffff flip=00
+  dot.png src=0,0+6x6 layer=0 order=2 at=8000,2250 size=1500x1500 anchor=50,50 rotation=0 color=ffff0000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=5750,4500 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  unity-polygon-wedge.png src=0,0+256x256 layer=0 order=2 at=3500,6750 size=1500x1500 anchor=50,50 rotation=0 color=ff000000 flip=00
+  tile.png src=0,0+8x16 layer=0 order=0 at=1000,1000 size=5000x800 anchor=0,0 rotation=0 color=ffffffff flip=00
+  text "hard" layer=0 order=0 at=12500,1000 size=15000x2000 font=1200 fit=0 min=500 max=2000 align=1 style=0 wrap=1 color=ffffffff
+  text "Best: 2 Hard" layer=0 order=0 at=29000,1000 size=10000x2000 font=1200 fit=0 min=500 max=2000 align=2 style=0 wrap=1 color=ffe6e64d
+  unity-ui-white.png src=0,0+4x4 layer=0 order=5 at=0,0 size=40000x30000 anchor=0,0 rotation=0 color=ffffff flip=00
+tick, frame 229 clicks=1 selected=True
+input frame=232 pointer=200,170 down
+input frame=234 pointer=200,170 up
+play, frame 234 clicks=1
+overlay over a camera canvas: panel=False label=hard clicks=2
+frame 240 objects=19 Ledge=1 drawn=10 text="hard" text="Best: 2 Hard"
