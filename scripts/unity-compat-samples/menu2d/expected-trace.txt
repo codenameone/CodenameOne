@@ -81,12 +81,15 @@ bounce 1 on Floor at y=-210 frame 100
 pitch clamped 300 -300
 sought to 40ms of 100 playing=True
 clip swap playing=True same=True replaced=False
+one shot playing=True paused=False resumed=True
+time scale negative kept=True
 caught: Input Axis Nope is not setup.
 caught a child out of range=True
 audio frame=100 shot beep
 audio frame=100 play beep
 audio frame=100 seek beep 40
 audio frame=100 play beep
+audio frame=100 shot beep
 voice 3 frames on: 65ms playing=True
 tick, frame 105 clicks=1 selected=True
 voice 9 frames on: 100ms playing=False

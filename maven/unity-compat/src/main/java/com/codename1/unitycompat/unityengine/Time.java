@@ -123,8 +123,13 @@ public final class Time {
         return timeScale;
     }
 
+    /// A negative scale is ignored and the previous one kept, as Unity's
+    /// `Time.timeScale` documents; NaN is refused the same way.
     public static void set_timeScale(float value) {
-        timeScale = value < 0f ? 0f : value;
+        if (!(value >= 0f)) { // NOPMD LogicInversion: NaN is refused too
+            return;
+        }
+        timeScale = value;
     }
 
     public static int get_frameCount() {

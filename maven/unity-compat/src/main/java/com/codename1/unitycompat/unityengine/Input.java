@@ -154,6 +154,10 @@ public final class Input {
     private static final float[] fingerFromX = new float[FINGERS];
     private static final float[] fingerFromY = new float[FINGERS];
     private static final int[] fingerTaps = new int[FINGERS];
+    /// Where each finger landed: `Touch.rawPosition`, which Unity documents
+    /// as the original contact position, unchanged while the finger drags.
+    private static final float[] fingerRawX = new float[FINGERS];
+    private static final float[] fingerRawY = new float[FINGERS];
     /// Reports since the last frame, each a count followed by that many x
     /// and y pairs.
     private static float[] reports = new float[64];
@@ -166,6 +170,11 @@ public final class Input {
     private static boolean desktopHost;
     private static boolean multiTouch = true;
     private static boolean simulateMouse = true;
+    /// Whether a touch simulation pressed `MOUSE0` and has not released it.
+    /// Turning `simulateMouseWithTouches` off stops new presses only: the
+    /// lift of a press already made still releases the button, or it would
+    /// be held for good.
+    private static boolean simulatedDown;
     private static float clock;
     private static float tapTime;
     private static float tapX;
@@ -204,6 +213,7 @@ public final class Input {
         desktopHost = false;
         multiTouch = true;
         simulateMouse = true;
+        simulatedDown = false;
         clock = 0f;
         tapTime = Float.NEGATIVE_INFINITY;
         tapCount = 0;
@@ -350,13 +360,15 @@ public final class Input {
         }
         mouseX = x;
         mouseY = y;
+        simulatedDown = touchHost;
         post(MOUSE0);
     }
 
     static void pointerReleased(float x, float y) {
-        if (mouseIgnored()) {
+        if (mouseIgnored() && !simulatedDown) {
             return;
         }
+        simulatedDown = false;
         mouseX = x;
         mouseY = y;
         post(-MOUSE0);
@@ -475,6 +487,8 @@ public final class Input {
             fingerY[f] = y;
             fingerFromX[f] = x;
             fingerFromY[f] = y;
+            fingerRawX[f] = x;
+            fingerRawY[f] = y;
             fingerTaps[f] = again ? tapCount + 1 : 1;
         }
     }
@@ -520,8 +534,8 @@ public final class Input {
             t.m_FingerId = f;
             t.m_Position.x = fingerX[f];
             t.m_Position.y = fingerY[f];
-            t.m_RawPosition.x = fingerX[f];
-            t.m_RawPosition.y = fingerY[f];
+            t.m_RawPosition.x = fingerRawX[f];
+            t.m_RawPosition.y = fingerRawY[f];
             t.m_TimeDelta = dt;
             t.m_TapCount = fingerTaps[f];
             float dx = fingerX[f] - fingerFromX[f];

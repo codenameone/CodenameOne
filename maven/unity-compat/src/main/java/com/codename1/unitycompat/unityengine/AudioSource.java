@@ -67,10 +67,17 @@ public final class AudioSource extends Behaviour {
     /// The one-shots this source started that may still be sounding, with
     /// the scale each was played at and when it ends on [#now()]. Unity's
     /// `mute` mutes the source, and a one-shot is a sound of the source:
-    /// `volume` and `mute` reach these too. Stop, Pause and deactivation
-    /// are left to the main voice, since Unity's documentation of them
-    /// speaks of the clip and says nothing of one-shots.
+    /// `volume` and `mute` reach these too, `isPlaying` counts them and
+    /// `Pause`/`UnPause` hold and resume them, all as Unity documents. Stop
+    /// and deactivation are left to the main voice, since Unity's
+    /// documentation of them speaks of the clip and says nothing of
+    /// one-shots. They are kept with no output too, so that a headless run
+    /// answers `isPlaying` as one with sound does.
     private int[] shots = new int[0];
+    /// Whether the shots are paused, and since when: their ends are moved
+    /// on by the pause when it ends.
+    private boolean shotsPaused;
+    private float shotsPausedAt;
     private float[] shotScale = new float[0];
     private float[] shotEnd = new float[0];
     private int shotCount;
@@ -425,10 +432,30 @@ public final class AudioSource extends Behaviour {
     /// unless it loops.
     public boolean get_isPlaying() {
         if (!playing || paused) {
-            return false;
+            return shotSounding();
         }
         expire();
-        return playing;
+        return playing || shotSounding();
+    }
+
+    /// The clock the shots end on: [#now()], stopped while they are paused.
+    private float shotNow() {
+        return shotsPaused ? shotsPausedAt : now();
+    }
+
+    /// Whether a one-shot of this source is still playing; a paused one is
+    /// not, as a paused main voice is not.
+    private boolean shotSounding() {
+        if (shotsPaused) {
+            return false;
+        }
+        float t = now();
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Ends a voice that does not loop and has reached the end of its
@@ -600,6 +627,13 @@ public final class AudioSource extends Behaviour {
     }
 
     public void Pause() {
+        // Only shots that are sounding are held: a Pause with none must not
+        // hold the next PlayOneShot until an UnPause nobody will call.
+        if (!shotsPaused && shotSounding()) {
+            shotsPaused = true;
+            shotsPausedAt = now();
+            pauseShots(true);
+        }
         if (playing && !paused) {
             paused = true;
             pausedAt = now();
@@ -610,6 +644,14 @@ public final class AudioSource extends Behaviour {
     }
 
     public void UnPause() {
+        if (shotsPaused) {
+            float held = now() - shotsPausedAt;
+            for (int i = 0; i < shotCount; i++) {
+                shotEnd[i] += held;
+            }
+            shotsPaused = false;
+            pauseShots(false);
+        }
         if (playing && paused) {
             paused = false;
             startedAt += now() - pausedAt;
@@ -628,17 +670,33 @@ public final class AudioSource extends Behaviour {
             return;
         }
         record("shot", c);
+        int v = newVoice();
         if (output != null) {
-            int v = newVoice();
             output.play(v, c, level(volumeScale), pitch, false);
-            float speed = pitch < 0f ? -pitch : pitch;
-            keepShot(v, volumeScale, now() + (speed > 0f ? c.get_length() / speed : c.get_length()));
+            if (shotsPaused) {
+                output.pause(v, true);
+            }
+        }
+        float speed = pitch < 0f ? -pitch : pitch;
+        keepShot(v, volumeScale, shotNow() + (speed > 0f ? c.get_length() / speed : c.get_length()));
+    }
+
+    /// Holds or resumes the one-shots still to finish.
+    private void pauseShots(boolean value) {
+        if (output == null) {
+            return;
+        }
+        float t = shotNow();
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                output.pause(shots[i], value);
+            }
         }
     }
 
     /// Remembers a one-shot, after forgetting those that have ended.
     private void keepShot(int v, float scale, float end) {
-        float t = now();
+        float t = shotNow();
         int n = 0;
         for (int i = 0; i < shotCount; i++) {
             if (shotEnd[i] > t) {
@@ -671,7 +729,7 @@ public final class AudioSource extends Behaviour {
         if (output == null) {
             return;
         }
-        float t = now();
+        float t = shotNow();
         for (int i = 0; i < shotCount; i++) {
             if (shotEnd[i] > t) {
                 output.volume(shots[i], level(shotScale[i]));

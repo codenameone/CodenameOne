@@ -85,6 +85,18 @@ public class Ball : MonoBehaviour
         bool same = swap.isPlaying;
         swap.clip = null;
         Debug.Log("clip swap playing=" + started + " same=" + same + " replaced=" + swap.isPlaying);
+        // A one-shot is the source playing, and pauses with it.
+        swap.PlayOneShot(beep);
+        bool shot = swap.isPlaying;
+        swap.Pause();
+        bool held = swap.isPlaying;
+        swap.UnPause();
+        Debug.Log("one shot playing=" + shot + " paused=" + held + " resumed=" + swap.isPlaying);
+        // A negative time scale is ignored.
+        float scale = Time.timeScale;
+        Time.timeScale = -1f;
+        Debug.Log("time scale negative kept=" + (Time.timeScale == scale));
+        Time.timeScale = scale;
         DestroyImmediate(swap.gameObject);
     }
 
