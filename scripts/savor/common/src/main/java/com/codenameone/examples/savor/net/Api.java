@@ -21,11 +21,13 @@ package com.codenameone.examples.savor.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.savor.api.AccountApi;
 import com.codenameone.examples.savor.api.AdminApi;
+import com.codenameone.examples.savor.api.CatalogApi;
 import com.codenameone.examples.savor.api.CourierApi;
 import com.codenameone.examples.savor.api.OnboardingApi;
 import com.codenameone.examples.savor.api.GeoApi;
+import com.codenameone.examples.savor.api.MerchantApi;
+import com.codenameone.examples.savor.api.OrderApi;
 import com.codenameone.examples.savor.api.PaymentApi;
-import com.codenameone.examples.savor.api.CustomerApi;
 
 /// The server, as the app calls it.
 ///
@@ -35,7 +37,9 @@ import com.codenameone.examples.savor.api.CustomerApi;
 /// from compiling.
 public final class Api {
     private static AccountApi account;
-    private static CustomerApi customer;
+    private static CatalogApi catalog;
+    private static OrderApi orders;
+    private static MerchantApi merchant;
     private static CourierApi courier;
     private static GeoApi geo;
     private static AdminApi admin;
@@ -47,7 +51,9 @@ public final class Api {
 
     static void connect(String baseUrl) {
         account = RestClients.create(AccountApi.class, baseUrl);
-        customer = RestClients.create(CustomerApi.class, baseUrl);
+        catalog = RestClients.create(CatalogApi.class, baseUrl);
+        orders = RestClients.create(OrderApi.class, baseUrl);
+        merchant = RestClients.create(MerchantApi.class, baseUrl);
         courier = RestClients.create(CourierApi.class, baseUrl);
         geo = RestClients.create(GeoApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
@@ -59,8 +65,19 @@ public final class Api {
         return account;
     }
 
-    public static CustomerApi customer() {
-        return customer;
+    /// Restaurants and their menus, and applying to open one.
+    public static CatalogApi catalog() {
+        return catalog;
+    }
+
+    /// The customer's orders, favourites and addresses.
+    public static OrderApi orders() {
+        return orders;
+    }
+
+    /// The restaurant the caller is on the staff of.
+    public static MerchantApi merchant() {
+        return merchant;
     }
 
     public static CourierApi courier() {
@@ -79,7 +96,7 @@ public final class Api {
         return payments;
     }
 
-    /// Applying to drive, which is open to everyone; [#courier] is for those
+    /// Applying to deliver, which is open to everyone; [#courier] is for those
     /// whose application was approved.
     public static OnboardingApi onboarding() {
         return onboarding;

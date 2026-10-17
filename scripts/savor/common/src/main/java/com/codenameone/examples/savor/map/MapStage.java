@@ -59,7 +59,7 @@ public final class MapStage {
     private final Container chips = new Container(new FlowLayout(Component.CENTER));
     private final Container side = new Container(new FlowLayout(Component.RIGHT));
     private final Label chip = Ui.chip("", (char) 0);
-    private final Button notice = new Button("", "WlChip");
+    private final Button notice = new Button("", "SvChip");
     private final Container notices = new Container(new FlowLayout(Component.CENTER));
     private final Locator.Watcher watcher = new Locator.Watcher() {
         @Override
@@ -91,13 +91,13 @@ public final class MapStage {
         map = Maps.create(center, zoom);
 
         Container shade = new Container(BoxLayout.y());
-        shade.setUIID("WlStatusShade");
+        shade.setUIID("SvStatusShade");
         // All of its height is the inset the device asks to be kept clear, so
         // it is exactly as tall as the status bar and absent where there is
         // none to cover.
         shade.setSafeArea(true);
         Container bar = new Container(new BorderLayout());
-        bar.setUIID("WlMapBar");
+        bar.setUIID("SvMapBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(lead));
         bar.add(BorderLayout.CENTER, header);
         chip.setName("chip");

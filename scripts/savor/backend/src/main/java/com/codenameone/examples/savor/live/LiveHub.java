@@ -33,8 +33,11 @@ import java.util.Map;
 
 /// The open live connections, and what is pushed down them.
 ///
-/// Three frames, each a small JSON object:
+/// Four frames, each a small JSON object:
 ///
+/// - `{"type":"order","id":...,"state":...}` -- an order changed. Sent to its
+///   customer, its restaurant's staff, its courier and the admins, who then
+///   read the order from the API.
 /// - `{"type":"delivery","id":...,"state":...}` -- a delivery changed. Sent to its
 ///   customer, its courier and the admins, who then read the delivery from the API.
 ///   The frame carries no more than that on purpose: the API is the one account

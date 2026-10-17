@@ -68,11 +68,11 @@ public final class SettingsForm {
                 e -> ProfileForm.show(form, () -> show(previous))));
         account.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
                 user.phoneVerified() ? null : "Needed before your first delivery",
-                user.phoneVerified() ? Ui.badge("Verified", "WlBadgeGood")
+                user.phoneVerified() ? Ui.badge("Verified", "SvBadgeGood")
                         : Ui.link("Verify", "verify",
                                 e -> VerifyPhoneForm.show(() -> show(previous)))));
         if (user.courier()) {
-            account.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle(), user.plate(),
+            account.add(Ui.row(FontImage.MATERIAL_TWO_WHEELER, user.vehicle(), user.plate(),
                     null));
         }
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOCK, "Password",
@@ -80,30 +80,12 @@ public final class SettingsForm {
                 e -> password(form)));
         page.add(account);
 
-        Ui.section(page, "Delivery preferences");
-        Container delivery = group();
-        delivery.add(Ui.label("Courier", "WlLabel"));
-        delivery.add(Ui.choice("courierGender", new String[] {"Any courier", "Women only"},
-                new String[] {Prefs.GENDER_ANY, Prefs.GENDER_WOMEN}, Prefs.courierGender(),
-                Prefs::setCourierGender));
-        delivery.add(Ui.row(FontImage.MATERIAL_VOLUME_OFF, "Quiet delivery",
-                "Ask the courier to keep conversation short",
-                Ui.toggle("quietDelivery", Prefs.quietDelivery(), Prefs::setQuietDelivery)));
-        delivery.add(Ui.row(FontImage.MATERIAL_ACCESSIBLE, "Accessible vehicle",
-                "Only cars that take a wheelchair",
-                Ui.toggle("accessibleVehicle", Prefs.accessibleVehicle(),
-                        Prefs::setAccessibleVehicle)));
-        delivery.add(Ui.row(FontImage.MATERIAL_PETS, "Pet friendly",
-                "Tell the courier an animal is coming",
-                Ui.toggle("petFriendly", Prefs.petFriendly(), Prefs::setPetFriendly)));
-        page.add(delivery);
-
         Ui.section(page, "Payment");
         Container pay = group();
         pay.add(Ui.tap(Ui.row(FontImage.MATERIAL_ACCOUNT_BALANCE_WALLET, "Wallet",
                 "Your cards, and which of them pays by default", chevron()), "wallet",
                 e -> WalletForm.show(form)));
-        pay.add(Ui.label("Tip offered first", "WlLabel"));
+        pay.add(Ui.label("Tip offered first", "SvLabel"));
         pay.add(Ui.choice("tip", new String[] {"None", "10%", "15%", "20%"},
                 new String[] {"0", "10", "15", "20"}, String.valueOf(Prefs.tipPercent()),
                 value -> Prefs.setTipPercent(Integer.parseInt(value))));
@@ -124,19 +106,19 @@ public final class SettingsForm {
 
         Ui.section(page, "Appearance");
         Container look = group();
-        look.add(Ui.label("Language", "WlLabel"));
+        look.add(Ui.label("Language", "SvLabel"));
         String speaking = Lang.current();
         for (int iter = 0; iter < Lang.CODES.length; iter++) {
             final String code = Lang.CODES[iter];
-            Label tick = new Label("", "WlRowIcon");
+            Label tick = new Label("", "SvRowIcon");
             if (code.equals(speaking)) {
                 Ui.icon(tick, FontImage.MATERIAL_CHECK, 3.4f);
             }
             Container row = new Container(new BorderLayout());
-            row.setUIID("WlRow");
+            row.setUIID("SvRow");
             // A language is called what its speakers call it, whatever
             // language the rest of the screen is in.
-            row.add(BorderLayout.CENTER, Ui.plain(Lang.name(code), "WlRowTitle"));
+            row.add(BorderLayout.CENTER, Ui.plain(Lang.name(code), "SvRowTitle"));
             row.add(BorderLayout.EAST, tick);
             look.add(Ui.tap(row, "language-" + code, e -> {
                 boolean other = !code.equals(Lang.current());
@@ -147,7 +129,7 @@ public final class SettingsForm {
                 again(previous);
             }));
         }
-        look.add(Ui.label("Theme", "WlLabel"));
+        look.add(Ui.label("Theme", "SvLabel"));
         look.add(Ui.choice("theme", new String[] {"System", "Light", "Dark"},
                 new String[] {Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK},
                 Prefs.theme(), value -> {
@@ -157,7 +139,7 @@ public final class SettingsForm {
                     }
                     again(previous);
                 }));
-        look.add(Ui.label("Distances", "WlLabel"));
+        look.add(Ui.label("Distances", "SvLabel"));
         look.add(Ui.choice("units", new String[] {"Kilometres", "Miles"},
                 new String[] {Prefs.UNITS_KM, Prefs.UNITS_MILES}, Prefs.units(), value -> {
                     Prefs.setUnits(value);
@@ -165,15 +147,8 @@ public final class SettingsForm {
                 }));
         page.add(look);
 
-        Ui.section(page, "Privacy and safety");
+        Ui.section(page, "Privacy");
         Container safe = group();
-        String contact = Prefs.emergencyContactName();
-        safe.add(Ui.row(FontImage.MATERIAL_SHARE_LOCATION, "Share my trips",
-                contact.length() == 0
-                        ? Lang.tr("Name an emergency contact in your profile first")
-                        : Lang.tr("Saves {0}'s number with your account as your trip contact. "
-                                + "No message is sent.", contact),
-                Ui.toggle("shareTrips", Prefs.shareTrips(), Prefs::setShareTrips)));
         // Kept on this device and not with the account: it is this
         // installation that reports or does not.
         safe.add(Ui.row(FontImage.MATERIAL_INSIGHTS, "Usage statistics",
@@ -226,13 +201,13 @@ public final class SettingsForm {
 
     static Container group() {
         Container group = new Container(BoxLayout.y());
-        group.setUIID("WlGroup");
+        group.setUIID("SvGroup");
         return group;
     }
 
     /// The mark at the end of a row that leads somewhere.
     static Label chevron() {
-        Label chevron = new Label("", "WlRowIcon");
+        Label chevron = new Label("", "SvRowIcon");
         Ui.icon(chevron, FontImage.MATERIAL_CHEVRON_RIGHT, 3.4f);
         return chevron;
     }
@@ -249,7 +224,7 @@ public final class SettingsForm {
                 "At least 8 characters", TextArea.PASSWORD);
         final TextField again = Ui.field(page, "New password, again", "again", "",
                 TextArea.PASSWORD);
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button save = Ui.primary("Change password", "submit", null);
         save.addActionListener(e -> {
@@ -285,12 +260,12 @@ public final class SettingsForm {
         page.add(Ui.banner(FontImage.MATERIAL_DELETE_FOREVER, "Delete your account?",
                 "Your sign-in, your profile, your saved cards and your settings are removed "
                 + "for good. Deliveries you took stay in the service's records without your name.",
-                "WlBannerIconBad"));
+                "SvBannerIconBad"));
         // Asked for again, as changing the password asks: being signed in is
         // what a borrowed phone is, too, and the server refuses without it.
         final TextField password = Ui.field(page, "Current password", "password", "",
                 TextArea.PASSWORD);
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         page.add(error);
         final Button go = Ui.danger("Delete my account", "confirmDelete", null);
@@ -313,9 +288,9 @@ public final class SettingsForm {
         Form form = Ui.form(title, "Legal");
         Ui.back(form, previous);
         Container page = Ui.page();
-        page.add(Ui.text(text, "WlText"));
+        page.add(Ui.text(text, "SvText"));
         if (more != null) {
-            page.add(Ui.text(more, "WlText"));
+            page.add(Ui.text(more, "SvText"));
         }
         form.add(BorderLayout.CENTER, page);
         form.show();

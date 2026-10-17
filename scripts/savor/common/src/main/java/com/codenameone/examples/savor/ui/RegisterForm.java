@@ -54,24 +54,23 @@ public final class RegisterForm {
         final TextField password = Ui.field(page, "Password", "password",
                 "At least 8 characters", TextArea.PASSWORD);
 
-        // Riding is open to everyone the moment they have an account. Onboarding
+        // Ordering is open to everyone the moment they have an account. Onboarding
         // is asked for here and granted later, by an admin who has read the
         // application this choice leads to.
         final String[] wants = {Nav.CUSTOMER};
-        page.add(Ui.label("I want to", "WlLabel"));
-        page.add(Ui.choice("want", new String[] {"Delivery", "Drive"},
+        page.add(Ui.label("I want to", "SvLabel"));
+        page.add(Ui.choice("want", new String[] {"Order food", "Deliver"},
                 new String[] {Nav.CUSTOMER, Nav.COURIER}, wants[0], value -> wants[0] = value));
         page.add(Ui.text("Couriers apply after signing up: a few details about you and your "
-                + "car, and five photos. You can delivery in the meantime.", "WlMuted"));
+                + "bike or scooter, and a few photos. You can order in the meantime.", "SvMuted"));
 
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button create = Ui.primary("Create account", "submit", null);
         create.addActionListener(e -> {
             final boolean onboarding = Nav.COURIER.equals(wants[0]);
             final RegisterDto request = new RegisterDto(email.getText().trim(), password.getText(),
-                    name.getText().trim(), phone.getText().trim(), false, null, null, onboarding,
-                    null);
+                    name.getText().trim(), phone.getText().trim(), null, null, onboarding);
             final Net.Failed failed = (status, message) -> {
                 create.setEnabled(true);
                 error.setText(message);
@@ -83,7 +82,7 @@ public final class RegisterForm {
             // first that fails, so nothing is validated twice.
             Api.account().register(request, Net.to(user -> Session.signIn(request.email(),
                     request.password(), () -> {
-                        // Someone who came to drive starts on the courier's side,
+                        // Someone who came to deliver starts on the courier's side,
                         // which for them is the application.
                         AppConfig.setMode(onboarding ? Nav.COURIER : Nav.CUSTOMER, Session.owner(request.email()));
                         Telemetry.registered(onboarding);

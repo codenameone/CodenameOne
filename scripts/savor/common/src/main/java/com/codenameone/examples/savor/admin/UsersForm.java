@@ -72,10 +72,10 @@ public final class UsersForm {
         this.panes = panes;
         this.filter = filter == null || filter.length() == 0 ? ALL : filter;
         Container top = new Container(BoxLayout.y());
-        top.setUIID("WlPage");
+        top.setUIID("SvPage");
         search = new TextField("", Lang.tr("Search by name or e-mail"), 24, TextField.ANY);
-        search.setUIID("WlField");
-        search.getHintLabel().setUIID("WlFieldHint");
+        search.setUIID("SvField");
+        search.getHintLabel().setUIID("SvFieldHint");
         search.setName("search");
         search.addDataChangedListener((type, index) -> fill());
         top.add(search);
@@ -115,9 +115,9 @@ public final class UsersForm {
             shown++;
             Container marks = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
             if (user.flagged()) {
-                marks.add(Ui.badge("Flagged", "WlBadgeWarn"));
+                marks.add(Ui.badge("Flagged", "SvBadgeWarn"));
             }
-            marks.add(Ui.badge(roles(user), user.suspended() ? "WlBadgeBad" : "WlBadge"));
+            marks.add(Ui.badge(roles(user), user.suspended() ? "SvBadgeBad" : "SvBadge"));
             Container row = Ui.row((char) 0, user.displayName(), user.username(), marks);
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
                     Ui.avatar(user.displayName())));
@@ -189,12 +189,12 @@ public final class UsersForm {
         Container page = Ui.page();
 
         Label standing = Ui.badge(user.suspended() ? "Blocked" : user.flagged() ? "Flagged"
-                : "In good standing", user.suspended() ? "WlBadgeBad" : user.flagged()
-                ? "WlBadgeWarn" : "WlBadgeGood");
+                : "In good standing", user.suspended() ? "SvBadgeBad" : user.flagged()
+                ? "SvBadgeWarn" : "SvBadgeGood");
         standing.setName("standing");
         page.add(Ui.person(user.displayName(), user.username(), standing));
         if (user.flagged() && user.flagReason() != null && user.flagReason().length() > 0) {
-            SpanLabel why = Ui.text(user.flagReason(), "WlNotice");
+            SpanLabel why = Ui.text(user.flagReason(), "SvNotice");
             why.setName("flagReason");
             page.add(why);
         }
@@ -252,14 +252,14 @@ public final class UsersForm {
 
         Ui.section(page, "Moderation");
         page.add(Ui.text("A flag marks the account for the admins and changes nothing for "
-                + "its owner. A block signs it out and refuses it until lifted.", "WlMuted"));
+                + "its owner. A block signs it out and refuses it until lifted.", "SvMuted"));
         Container actions = new Container(new GridLayout(1, 2));
-        actions.add(pair("WlPairLeft", user.flagged()
+        actions.add(pair("SvPairLeft", user.flagged()
                 ? Ui.secondary("Remove flag", "unflag", e -> flag(user, false, ""))
                 : Ui.secondary("Flag", "flag", e -> panes.reason("Flag account",
                         Lang.tr("Why does {0} need the admins' attention?", user.displayName()),
                         "Flag", why -> flag(user, true, why)))));
-        actions.add(pair("WlPairRight", user.suspended()
+        actions.add(pair("SvPairRight", user.suspended()
                 ? Ui.secondary("Unblock", "unblock", e -> block(user, false, ""))
                 : Ui.danger("Block", "block", e -> panes.reason("Block account",
                         Lang.tr("{0} is signed out everywhere and cannot sign in again "
@@ -270,7 +270,7 @@ public final class UsersForm {
         Ui.section(page, "History");
         List<ModerationEventDto> events = detail.events();
         if (events == null || events.isEmpty()) {
-            page.add(Ui.label("Nothing has been done to this account.", "WlMuted"));
+            page.add(Ui.label("Nothing has been done to this account.", "SvMuted"));
         }
         for (int iter = 0; events != null && iter < events.size(); iter++) {
             ModerationEventDto event = events.get(iter);
@@ -279,8 +279,8 @@ public final class UsersForm {
                     null);
             row.setName("event-" + iter);
             Container when = new Container(BoxLayout.y());
-            when.add(Ui.plain(Ui.when(event.at()), "WlRowDetail"));
-            when.add(Ui.plain(event.by(), "WlRowDetail"));
+            when.add(Ui.plain(Ui.when(event.at()), "SvRowDetail"));
+            when.add(Ui.plain(event.by(), "SvRowDetail"));
             row.add(BorderLayout.EAST, when);
             page.add(row);
         }

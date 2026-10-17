@@ -63,7 +63,7 @@ public final class WalletForm {
         Container page = Ui.page();
         page.add(Ui.text(picked == null
                 ? "Tap a card to make it the one that pays unless you say otherwise."
-                : "Choose how to pay for this delivery.", "WlMuted"));
+                : "Choose how to pay for this delivery.", "SvMuted"));
         list.setName("methods");
         page.add(list);
         page.add(Ui.secondary("Add a card", "addCard",
@@ -110,19 +110,19 @@ public final class WalletForm {
             boolean cash = "cash".equals(method.kind());
             boolean marked = picked == null ? method.isDefault() : method.id().equals(chosen);
             Container row = new Container(new BorderLayout());
-            row.setUIID(marked ? "WlOptionPicked" : "WlOption");
-            Label icon = new Label("", "WlOptionIcon");
+            row.setUIID(marked ? "SvOptionPicked" : "SvOption");
+            Label icon = new Label("", "SvOptionIcon");
             Ui.icon(icon, cash ? FontImage.MATERIAL_PAYMENTS
                     : FontImage.MATERIAL_CREDIT_CARD, 4f);
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(icon));
             Container lines = new Container(BoxLayout.y());
-            lines.add(Ui.plain(label(method), "WlRowTitle"));
+            lines.add(Ui.plain(label(method), "SvRowTitle"));
             lines.add(Ui.plain(cash ? Lang.tr("Pay the courier directly")
-                    : Lang.tr("Expires {0}", expiry(method)), "WlRowDetail"));
+                    : Lang.tr("Expires {0}", expiry(method)), "SvRowDetail"));
             row.add(BorderLayout.CENTER, lines);
             Container end = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
             if (method.isDefault()) {
-                end.add(Ui.badge("Default", "WlBadgeGood"));
+                end.add(Ui.badge("Default", "SvBadgeGood"));
             }
             row.add(BorderLayout.EAST, end);
             Ui.tap(row, cash ? "method-cash" : "method-" + iter, e -> choose(method));

@@ -31,8 +31,8 @@ import com.codename1.ui.plaf.UIManager;
 ///
 /// Drawn here, in a few lines, because that is all a bar chart is and because
 /// it then takes its colours from `theme.css` like everything else: the bars
-/// are the `WlChart` style's colour, the highest of them `WlChartPeak`'s, and
-/// the lines behind them `WlChartGrid`'s. Nothing here names a colour.
+/// are the `SvChart` style's colour, the highest of them `SvChartPeak`'s, and
+/// the lines behind them `SvChartGrid`'s. Nothing here names a colour.
 public final class Chart extends Component {
     private static final float HEIGHT_MM = 24f;
 
@@ -40,7 +40,7 @@ public final class Chart extends Component {
 
     private Chart(double[] values) {
         this.values = values;
-        setUIID("WlChart");
+        setUIID("SvChart");
         setFocusable(false);
     }
 
@@ -55,8 +55,8 @@ public final class Chart extends Component {
         Container box = new Container(new BorderLayout());
         box.add(BorderLayout.CENTER, chart);
         Container axis = new Container(new BorderLayout());
-        axis.add(BorderLayout.WEST, Ui.plain(from, "WlChartAxis"));
-        axis.add(BorderLayout.EAST, Ui.plain(to, "WlChartAxis"));
+        axis.add(BorderLayout.WEST, Ui.plain(from, "SvChartAxis"));
+        axis.add(BorderLayout.EAST, Ui.plain(to, "SvChartAxis"));
         box.add(BorderLayout.SOUTH, axis);
         return box;
     }
@@ -84,7 +84,7 @@ public final class Chart extends Component {
             return;
         }
         UIManager styles = getUIManager();
-        g.setColor(styles.getComponentStyle("WlChartGrid").getFgColor());
+        g.setColor(styles.getComponentStyle("SvChartGrid").getFgColor());
         // Three lines to read the heights against: the foot, half, the top.
         for (int line = 0; line <= 2; line++) {
             int y = top + (height - 1) * line / 2;
@@ -113,7 +113,7 @@ public final class Chart extends Component {
         int start = left + (width - slot * count + gap) / 2;
         int round = Math.min(bar, CN.convertToPixels(1.2f));
         int normal = style.getFgColor();
-        int highest = styles.getComponentStyle("WlChartPeak").getFgColor();
+        int highest = styles.getComponentStyle("SvChartPeak").getFgColor();
         boolean rtl = isRTL();
         g.setAntiAliased(true);
         for (int iter = 0; iter < count; iter++) {
@@ -132,7 +132,7 @@ public final class Chart extends Component {
     }
 
     /// A share of something, as a bar part of the way along a track: the bar
-    /// is the `WlMeter` style's colour and the track a faint wash of it.
+    /// is the `SvMeter` style's colour and the track a faint wash of it.
     public static final class Meter extends Component {
         private static final int TRACK_ALPHA = 36;
         private final double share;
@@ -140,7 +140,7 @@ public final class Chart extends Component {
         /// @param share from 0 to 1
         public Meter(double share) {
             this.share = share < 0 ? 0 : share > 1 ? 1 : share;
-            setUIID("WlMeter");
+            setUIID("SvMeter");
             setFocusable(false);
         }
 

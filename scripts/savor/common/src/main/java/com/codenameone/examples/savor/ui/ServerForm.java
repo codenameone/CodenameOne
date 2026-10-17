@@ -38,7 +38,7 @@ public final class ServerForm {
         Ui.back(form, previous);
         Container page = Ui.page();
         page.add(Ui.text("The address of the Savor server this app talks to. "
-                + "Changing it signs you out.", "WlText"));
+                + "Changing it signs you out.", "SvText"));
         final TextField url = Ui.field(page, "Address", "url", "http://192.168.1.20:8080",
                 TextArea.URL);
         url.setText(Session.serverUrl());

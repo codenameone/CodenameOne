@@ -28,14 +28,14 @@ import com.codename1.ui.plaf.Style;
 /// "Still looking": a dot that sends out rings, the way a search does on a
 /// map. It runs for as long as it is on screen.
 ///
-/// The colour is the `WlPulse` style's text colour.
+/// The colour is the `SvPulse` style's text colour.
 public final class Pulse extends Component {
     /// How long one ring takes from the dot to the edge.
     private static final int PERIOD_MILLIS = 1800;
     private static final int RINGS = 3;
 
     public Pulse() {
-        setUIID("WlPulse");
+        setUIID("SvPulse");
     }
 
     @Override

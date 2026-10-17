@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.net;
 import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 import com.codenameone.examples.savor.Prefs;
-import com.codenameone.examples.savor.api.PlaceDto;
 import com.codenameone.examples.savor.api.PreferencesDto;
 import com.codenameone.examples.savor.api.ProfileDto;
 
@@ -160,22 +159,22 @@ public final class Account {
         return profile;
     }
 
-    /// Saves the name and the gender, which only the profile screen changes.
-    public static void saveProfile(final String name, final String gender, final Runnable done,
+    /// Saves the name, which only the profile screen changes.
+    public static void saveProfile(final String name, final Runnable done,
             final Net.Failed failed) {
         if (!profileLoaded) {
             // The rest of the profile goes out with the name, and it has not
             // been seen yet; see send().
             fetch(() -> {
                 if (profileLoaded) {
-                    saveProfile(name, gender, done, failed);
+                    saveProfile(name, done, failed);
                 } else {
                     failed.failed(0, "Could not reach the server. Check your connection.");
                 }
             });
             return;
         }
-        ProfileDto wanted = described(name, gender);
+        ProfileDto wanted = new ProfileDto(name);
         final String owner = Session.owner();
         Api.account().saveProfile(wanted, Net.to(user -> {
             // The answer is about the account that asked; see send().
@@ -202,15 +201,12 @@ public final class Account {
         if (applying || Session.user() == null || Prefs.RECENTS.equals(name)) {
             return;
         }
-        if (Prefs.EMERGENCY_NAME.equals(name) || Prefs.EMERGENCY_PHONE.equals(name)
-                || Prefs.HOME.equals(name) || Prefs.WORK.equals(name)) {
-            profileChanged = true;
+        // Where to deliver is the device's: the server keeps saved addresses
+        // of its own, through their own calls.
+        if (Prefs.DELIVER_TO.equals(name)) {
+            return;
         }
-        // The contact's number is in both: it is who a trip is shared with.
-        if (!Prefs.EMERGENCY_NAME.equals(name) && !Prefs.HOME.equals(name)
-                && !Prefs.WORK.equals(name)) {
-            preferencesChanged = true;
-        }
+        preferencesChanged = true;
         schedule(SETTLE_MILLIS);
     }
 
@@ -279,7 +275,7 @@ public final class Account {
                 }
                 // Signing out sends what is waiting and does not wait for the
                 // answer. If somebody else has signed in by the time it comes,
-                // this profile is not theirs: kept, its name and gender would
+                // this profile is not theirs: kept, its name would
                 // go out with their next change and overwrite their own.
                 if (signedInAs(owner)) {
                     profile = wanted;
@@ -338,29 +334,14 @@ public final class Account {
                 Prefs.notifyDeliveryUpdates(),
                 Prefs.notifyReceipts(),
                 Prefs.notifyPromotions(),
-                Prefs.courierGender(),
-                Prefs.quietDelivery(),
-                Prefs.accessibleVehicle(),
-                Prefs.petFriendly(),
                 Prefs.paymentMethod(),
-                Prefs.tipPercent(),
-                Prefs.shareTrips() ? Prefs.emergencyContactPhone() : "");
+                Prefs.tipPercent());
     }
 
-    /// The profile to send: the one the server gave, with the device's values
-    /// for what `Prefs` holds.
+    /// The profile to send: the one the server gave, or the name signed in
+    /// with.
     private static ProfileDto described() {
-        return described(profile == null ? Session.user().displayName() : profile.name(),
-                profile == null ? Session.user().gender() : profile.gender());
-    }
-
-    /// The same, with `name` and `gender` in place of the ones held.
-    private static ProfileDto described(String name, String gender) {
-        PlaceDto home = Prefs.home();
-        PlaceDto work = Prefs.work();
-        return new ProfileDto(name, gender, Prefs.emergencyContactName(),
-                Prefs.emergencyContactPhone(), home == null ? "" : home.name(),
-                work == null ? "" : work.name());
+        return new ProfileDto(profile == null ? Session.user().displayName() : profile.name());
     }
 
     private static void apply(PreferencesDto from) {
@@ -378,49 +359,19 @@ public final class Account {
             Prefs.setNotifyDeliveryUpdates(from.notifyDeliveryUpdates());
             Prefs.setNotifyReceipts(from.notifyReceipts());
             Prefs.setNotifyPromotions(from.notifyPromotions());
-            Prefs.setCourierGender(from.courierGender());
-            Prefs.setQuietDelivery(from.quietDelivery());
-            Prefs.setAccessibleVehicle(from.accessibleVehicle());
-            Prefs.setPetFriendly(from.petFriendly());
             String method = from.defaultPaymentMethodId();
             if (method != null && method.length() > 0) {
                 Prefs.setPaymentMethod(method);
             }
             Prefs.setTipPercent(from.defaultTipPercent());
-            String sharedWith = from.shareTripsWith();
-            Prefs.setShareTrips(sharedWith != null && sharedWith.length() > 0);
         } finally {
             applying = false;
         }
     }
 
     private static void apply(ProfileDto from) {
-        if (from == null) {
-            return;
+        if (from != null) {
+            profile = from;
         }
-        profile = from;
-        applying = true;
-        try {
-            Prefs.setEmergencyContactName(from.emergencyContactName());
-            Prefs.setEmergencyContactPhone(from.emergencyContactPhone());
-            Prefs.setHome(place(Prefs.home(), from.homeAddress()));
-            Prefs.setWork(place(Prefs.work(), from.workAddress()));
-        } finally {
-            applying = false;
-        }
-    }
-
-    /// The place for an address the account has. The server keeps the words
-    /// and not the position, so the place this device already has is kept when
-    /// it is the same one; another is left without a position, for the screen
-    /// that goes there to look up.
-    private static PlaceDto place(PlaceDto known, String address) {
-        if (address == null || address.length() == 0) {
-            return null;
-        }
-        if (known != null && address.equals(known.name())) {
-            return known;
-        }
-        return new PlaceDto(address, "", 0d, 0d);
     }
 }

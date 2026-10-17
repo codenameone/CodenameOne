@@ -57,15 +57,15 @@ public class ApplyForm implements Nav.Home {
     public ApplyForm() {
         menu.item(FontImage.MATERIAL_ASSIGNMENT, "Your application", "home", () -> { });
         Container bar = new Container(new BorderLayout());
-        bar.setUIID("WlHomeBar");
+        bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
         bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(
-                Ui.label("Drive with Savor", "WlHeading")));
+                Ui.label("Drive with Savor", "SvHeading")));
         page.setSafeArea(false);
         Container screen = new Container(new BorderLayout());
         // The strip the status bar is drawn in is the bar's colour, not
         // whatever is behind the screen.
-        screen.setUIID("WlForm");
+        screen.setUIID("SvForm");
         screen.setSafeArea(true);
         screen.add(BorderLayout.NORTH, bar);
         screen.add(BorderLayout.CENTER, page);
@@ -124,9 +124,9 @@ public class ApplyForm implements Nav.Home {
                 started ? Lang.tr("{0} of 5 documents added. Pick up where you left off.",
                         String.valueOf(5 - missing(application)))
                         : "Tell us about you and your car, add five photos, and we take it "
-                        + "from there.", "WlBannerIcon");
+                        + "from there.", "SvBannerIcon");
         page.add(banner);
-        Label state = Ui.label(started ? "Draft" : "Not started", "WlBadge");
+        Label state = Ui.label(started ? "Draft" : "Not started", "SvBadge");
         state.setName("applicationStatus");
         page.add(FlowLayout.encloseCenter(state));
         Ui.section(page, "What you will need");
@@ -149,8 +149,8 @@ public class ApplyForm implements Nav.Home {
     private void pending(CourierApplicationDto application) {
         page.add(Ui.banner(FontImage.MATERIAL_HOURGLASS_TOP, "Application under review",
                 "We have everything we asked for. Someone on our team is reading it.",
-                "WlBannerIconWarn"));
-        Label state = Ui.label("Under review", "WlBadgeWarn");
+                "SvBannerIconWarn"));
+        Label state = Ui.label("Under review", "SvBadgeWarn");
         state.setName("applicationStatus");
         page.add(FlowLayout.encloseCenter(state));
         Ui.section(page, "What happens next");
@@ -168,14 +168,14 @@ public class ApplyForm implements Nav.Home {
     private void rejected(final CourierApplicationDto application) {
         page.add(Ui.banner(FontImage.MATERIAL_ERROR_OUTLINE, "We could not approve this yet",
                 "Read what was missing, put it right, and send the application again.",
-                "WlBannerIconBad"));
-        Label state = Ui.label("Changes needed", "WlBadgeBad");
+                "SvBannerIconBad"));
+        Label state = Ui.label("Changes needed", "SvBadgeBad");
         state.setName("applicationStatus");
         page.add(FlowLayout.encloseCenter(state));
         Ui.section(page, "What the reviewer said");
         Container said = new Container(BoxLayout.y());
-        said.setUIID("WlPanel");
-        com.codename1.components.SpanLabel reason = Ui.text("", "WlText");
+        said.setUIID("SvPanel");
+        com.codename1.components.SpanLabel reason = Ui.text("", "SvText");
         // The reviewer's own words, in whatever language they wrote them.
         reason.setShouldLocalize(false);
         reason.setText(application.rejectionReason());

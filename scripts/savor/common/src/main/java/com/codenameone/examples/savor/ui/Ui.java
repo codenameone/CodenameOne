@@ -67,7 +67,7 @@ public final class Ui {
     /// @param name what a test waits for; the title is for people and changes
     public static Form form(String title, String name) {
         Form form = new Form(title, new BorderLayout());
-        form.setUIID("WlForm");
+        form.setUIID("SvForm");
         form.setName(name);
         watch(form);
         clearOfTheStatusBar(form);
@@ -132,7 +132,7 @@ public final class Ui {
     /// in over both.
     public static Form home(String name) {
         Form form = new Form("", new LayeredLayout());
-        form.setUIID("WlForm");
+        form.setUIID("SvForm");
         form.setName(name);
         watch(form);
         form.getToolbar().hideToolbar();
@@ -172,8 +172,8 @@ public final class Ui {
             }
             added[0] = true;
             Container bar = new Container(new BorderLayout());
-            bar.setUIID("WlPaneBar");
-            Button arrow = button("Back", "back-bar", "WlLink", e2 -> leave.run());
+            bar.setUIID("SvPaneBar");
+            Button arrow = button("Back", "back-bar", "SvLink", e2 -> leave.run());
             icon(arrow, FontImage.MATERIAL_ARROW_BACK, 3.4f);
             bar.add(BorderLayout.WEST, arrow);
             Component top = ((BorderLayout) form.getContentPane().getLayout()).getNorth();
@@ -193,7 +193,7 @@ public final class Ui {
     /// A column of content with the page's margins, that scrolls when it has to.
     public static Container page() {
         Container page = new Column();
-        page.setUIID("WlPage");
+        page.setUIID("SvPage");
         page.setScrollableY(true);
         page.setScrollVisible(false);
         page.setSafeArea(true);
@@ -202,7 +202,7 @@ public final class Ui {
 
     public static Container card() {
         Container card = new Container(BoxLayout.y());
-        card.setUIID("WlCard");
+        card.setUIID("SvCard");
         return card;
     }
 
@@ -219,24 +219,24 @@ public final class Ui {
     }
 
     public static Button primary(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "WlPrimary", onClick);
+        return button(text, name, "SvPrimary", onClick);
     }
 
     public static Button secondary(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "WlSecondary", onClick);
+        return button(text, name, "SvSecondary", onClick);
     }
 
     public static Button danger(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "WlDanger", onClick);
+        return button(text, name, "SvDanger", onClick);
     }
 
     public static Button link(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "WlLink", onClick);
+        return button(text, name, "SvLink", onClick);
     }
 
     /// A round button that floats over the map.
     public static Button round(char icon, String name, ActionListener<ActionEvent> onClick) {
-        Button button = button("", name, "WlMapButton", onClick);
+        Button button = button("", name, "SvMapButton", onClick);
         icon(button, icon, 4f);
         return button;
     }
@@ -244,7 +244,7 @@ public final class Ui {
     /// The same button for a bar that is a surface of its own: flat, since a
     /// shadow says "this floats", and on a bar nothing does.
     public static Button flat(char icon, String name, ActionListener<ActionEvent> onClick) {
-        Button button = button("", name, "WlBarButton", onClick);
+        Button button = button("", name, "SvBarButton", onClick);
         icon(button, icon, 4f);
         return button;
     }
@@ -252,7 +252,7 @@ public final class Ui {
     /// One of a row of things to do: an icon with a word under it.
     public static Button action(char icon, String text, String name,
             ActionListener<ActionEvent> onClick) {
-        Button button = button(text, name, "WlAction", onClick);
+        Button button = button(text, name, "SvAction", onClick);
         icon(button, icon, 4f);
         button.setTextPosition(Component.BOTTOM);
         button.setGap(CN.convertToPixels(0.6f));
@@ -261,7 +261,7 @@ public final class Ui {
 
     /// A short fact in a pill: how far, how long. The icon may be 0.
     public static Label chip(String text, char icon) {
-        Label chip = new Label(text == null ? "" : text, "WlChip");
+        Label chip = new Label(text == null ? "" : text, "SvChip");
         if (icon != 0) {
             icon(chip, icon, 2.7f);
         }
@@ -270,7 +270,7 @@ public final class Ui {
 
     /// A person, as the initials of their name in a circle.
     public static Label avatar(String name) {
-        Label avatar = new Label("", "WlAvatar");
+        Label avatar = new Label("", "SvAvatar");
         // Initials are not words: looking them up would translate "OK".
         avatar.setShouldLocalize(false);
         avatar.setText(initials(name));
@@ -321,12 +321,12 @@ public final class Ui {
             String current, final Chosen chosen, int columns) {
         Container row = new Container(new GridLayout((values.length + columns - 1) / columns,
                 columns));
-        row.setUIID("WlSegments");
+        row.setUIID("SvSegments");
         ButtonGroup group = new ButtonGroup();
         for (int iter = 0; iter < values.length; iter++) {
             final String value = values[iter];
             RadioButton option = RadioButton.createToggle(labels[iter], group);
-            option.setUIID("WlSegment");
+            option.setUIID("SvSegment");
             option.setName(name + "-" + value);
             option.setSelected(value.equals(current));
             option.addActionListener(e -> chosen.chosen(value));
@@ -344,21 +344,21 @@ public final class Ui {
     /// two people with the same name apart.
     public static Container person(String name, String username, Component value) {
         Container who = new Container(new BorderLayout());
-        who.setUIID("WlPanel");
+        who.setUIID("SvPanel");
         Container names = new Container(BoxLayout.y());
-        Label called = plain(name, "WlHeading");
+        Label called = plain(name, "SvHeading");
         shrink(called, 3f);
         String signsIn = username == null ? "" : username;
         Component address;
         if (signsIn.length() > LONG_ADDRESS) {
             // An address has no spaces to break at: a long one is broken
             // where the line ends, which keeps all of it readable.
-            SpanLabel wrapped = text("", "WlMuted");
+            SpanLabel wrapped = text("", "SvMuted");
             wrapped.setShouldLocalize(false);
             wrapped.setText(signsIn);
             address = wrapped;
         } else {
-            Label line = plain(signsIn, "WlMuted");
+            Label line = plain(signsIn, "SvMuted");
             shrink(line, 2f);
             address = line;
         }
@@ -394,7 +394,7 @@ public final class Ui {
 
     /// The heading over a group of settings or facts.
     public static void section(Container page, String title) {
-        page.add(label(title, "WlSection"));
+        page.add(label(title, "SvSection"));
     }
 
     /// A label for text that is a name or a number, not a word to translate.
@@ -408,13 +408,13 @@ public final class Ui {
     /// One line of a receipt or a record: what it is on one side, and its
     /// value, which is never translated, on the other.
     public static Container fact(String caption, String value) {
-        return fact(caption, value, "WlFactValue");
+        return fact(caption, value, "SvFactValue");
     }
 
     public static Container fact(String caption, String value, String valueUiid) {
         Container fact = new Container(new BorderLayout());
-        fact.setUIID("WlFact");
-        fact.add(BorderLayout.CENTER, label(caption, "WlFactLabel"));
+        fact.setUIID("SvFact");
+        fact.add(BorderLayout.CENTER, label(caption, "SvFactLabel"));
         fact.add(BorderLayout.EAST, plain(value, valueUiid));
         return fact;
     }
@@ -424,15 +424,15 @@ public final class Ui {
     /// words under it.
     public static Container banner(char icon, String title, String text, String iconUiid) {
         Container banner = new Container(BoxLayout.y());
-        banner.setUIID("WlBanner");
+        banner.setUIID("SvBanner");
         Label image = new Label("", iconUiid);
         icon(image, icon, 6f);
         banner.add(FlowLayout.encloseCenter(image));
-        SpanLabel heading = text(title, "WlBannerTitle");
+        SpanLabel heading = text(title, "SvBannerTitle");
         heading.getTextComponent().setAlignment(Component.CENTER);
         banner.add(heading);
         if (text != null && text.length() > 0) {
-            SpanLabel words = text(text, "WlBannerText");
+            SpanLabel words = text(text, "SvBannerText");
             words.getTextComponent().setAlignment(Component.CENTER);
             banner.add(words);
         }
@@ -440,13 +440,13 @@ public final class Ui {
     }
 
     public static Container empty(char icon, String title, String text) {
-        return banner(icon, title, text, "WlBannerIcon");
+        return banner(icon, title, text, "SvBannerIcon");
     }
 
     /// A list that fills a screen: rows from edge to edge, scrolling.
     public static Container list(String name) {
         Container list = new Column();
-        list.setUIID("WlList");
+        list.setUIID("SvList");
         list.setScrollableY(true);
         list.setScrollVisible(false);
         list.setName(name);
@@ -507,9 +507,9 @@ public final class Ui {
     /// it: the admin console shows it beside the list on a wide screen.
     public static Container reasonPage(String text, String action, final Reason reason) {
         final Container page = page();
-        page.add(text(text, "WlText"));
+        page.add(text(text, "SvText"));
         final TextField why = field(page, "Reason", "reason", "A sentence the record will keep");
-        final SpanLabel error = text("", "WlError");
+        final SpanLabel error = text("", "SvError");
         error.setName("error");
         page.add(error);
         page.add(danger(action, "confirm", e -> {
@@ -539,10 +539,10 @@ public final class Ui {
     public static TextField field(Container to, String caption, String name, String hint,
             int constraint) {
         TextField field = new TextField("", hint, 24, constraint);
-        field.setUIID("WlField");
-        field.getHintLabel().setUIID("WlFieldHint");
+        field.setUIID("SvField");
+        field.getHintLabel().setUIID("SvFieldHint");
         field.setName(name);
-        to.add(label(caption, "WlLabel")).add(field);
+        to.add(label(caption, "SvLabel")).add(field);
         return field;
     }
 
@@ -554,16 +554,16 @@ public final class Ui {
     /// The icon may be 0, and the last two null.
     public static Container row(char icon, String title, String detail, Component value) {
         Container row = new Container(new BorderLayout());
-        row.setUIID("WlRow");
+        row.setUIID("SvRow");
         if (icon != 0) {
-            Label image = new Label("", "WlRowIcon");
+            Label image = new Label("", "SvRowIcon");
             icon(image, icon, 4f);
             row.add(BorderLayout.WEST, image);
         }
         Container lines = new Container(BoxLayout.y());
-        lines.add(label(title, "WlRowTitle"));
+        lines.add(label(title, "SvRowTitle"));
         if (detail != null && detail.length() > 0) {
-            lines.add(text(detail, "WlRowDetail"));
+            lines.add(text(detail, "SvRowDetail"));
         }
         row.add(BorderLayout.CENTER, lines);
         if (value != null) {
@@ -589,11 +589,6 @@ public final class Ui {
     /// A day, without the time.
     public static String day(long millis) {
         return new SimpleDateFormat("MMM d, yyyy").format(new Date(millis));
-    }
-
-    /// The product a delivery was asked for as, in words.
-    public static String product(String product) {
-        return "comfort".equals(product) ? "Comfort" : "xl".equals(product) ? "XL" : "Standard";
     }
 
     /// A moment, as a short date and time.
@@ -722,11 +717,11 @@ public final class Ui {
     /// The style of the badge a state is shown in.
     public static String stateBadge(DeliveryState state) {
         if (DeliveryState.COMPLETED == state) {
-            return "WlBadgeGood";
+            return "SvBadgeGood";
         }
         if (state != null && state.isActive()) {
-            return "WlBadgeWarn";
+            return "SvBadgeWarn";
         }
-        return "WlBadgeBad";
+        return "SvBadgeBad";
     }
 }

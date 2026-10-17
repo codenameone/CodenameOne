@@ -45,7 +45,7 @@ public class FleetForm extends LiveChannel.Adapter {
 
     private final Form form = Ui.home("Fleet");
     private final MapStage stage;
-    private final Label count = Ui.label("", "WlHeading");
+    private final Label count = Ui.label("", "SvHeading");
     private final Map<String, CarMarker> cars = new HashMap<String, CarMarker>();
 
     FleetForm(final Form previous) {
@@ -56,11 +56,11 @@ public class FleetForm extends LiveChannel.Adapter {
         form.setBackCommand(back);
         stage = new MapStage(Locator.here(), Maps.CITY_ZOOM,
                 Ui.round(FontImage.MATERIAL_ARROW_BACK, "back", e -> previous.showBack()));
-        stage.header(Ui.label("Live map", "WlMapTitle"));
+        stage.header(Ui.label("Live map", "SvMapTitle"));
         stage.addRound(FontImage.MATERIAL_ZOOM_OUT_MAP, "recentre", this::frame);
         count.setName("fleetCount");
         stage.sheet().peek().add(count);
-        stage.sheet().peek().add(Ui.label("Cars move as their couriers report in.", "WlMuted"));
+        stage.sheet().peek().add(Ui.label("Cars move as their couriers report in.", "SvMuted"));
         stage.sheet().ready(false);
         form.add(stage.layers());
         form.addShowListener(e -> {

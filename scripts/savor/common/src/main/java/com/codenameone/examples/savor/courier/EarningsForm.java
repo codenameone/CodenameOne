@@ -74,9 +74,9 @@ public final class EarningsForm {
         page.removeAll();
         final String currency = summary.currency();
         Container balance = new Container(BoxLayout.y());
-        balance.setUIID("WlPanel");
-        balance.add(Ui.label("Ready to cash out", "WlStatLabel"));
-        Label amount = Ui.plain(Ui.money(summary.balance(), currency), "WlChartValue");
+        balance.setUIID("SvPanel");
+        balance.add(Ui.label("Ready to cash out", "SvStatLabel"));
+        Label amount = Ui.plain(Ui.money(summary.balance(), currency), "SvChartValue");
         amount.setName("balance");
         balance.add(amount);
         final boolean banked = account != null && account.accountLast4() != null
@@ -131,12 +131,12 @@ public final class EarningsForm {
             PayoutDto payout = payouts.get(iter);
             Container row = Ui.row(FontImage.MATERIAL_NORTH_EAST, Ui.when(payout.createdAt()),
                     payout.destination(), Ui.plain(Ui.money(payout.amount(), currency),
-                            "WlRowValue"));
+                            "SvRowValue"));
             row.setName("payout-" + iter);
             page.add(row);
         }
         if (payouts == null || payouts.isEmpty()) {
-            page.add(Ui.label("Nothing has been paid out yet.", "WlMuted"));
+            page.add(Ui.label("Nothing has been paid out yet.", "SvMuted"));
         }
         Ui.refresh(form);
     }
@@ -156,7 +156,7 @@ public final class EarningsForm {
             holder.setText(account.holder());
             bank.setText(account.bankName());
         }
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         fields.add(error);
         fields.add(Ui.primary("Save", "submit", e -> {
             String digits = Cards.digits(number.getText());

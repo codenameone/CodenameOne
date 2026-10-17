@@ -42,7 +42,7 @@ public final class SignInForm {
                 TextArea.EMAILADDR);
         final TextField password = Ui.field(page, "Password", "password", "",
                 TextArea.PASSWORD);
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button signIn = Ui.primary("Sign in", "submit", null);
         signIn.addActionListener(e -> {

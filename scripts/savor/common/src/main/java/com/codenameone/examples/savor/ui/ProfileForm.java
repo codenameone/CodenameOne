@@ -23,25 +23,22 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codenameone.examples.savor.Prefs;
-import com.codenameone.examples.savor.api.PlaceDto;
 import com.codenameone.examples.savor.api.ProfileDto;
+import com.codenameone.examples.savor.api.SavedAddressDto;
 import com.codenameone.examples.savor.api.UserDto;
+import com.codenameone.examples.savor.customer.PlaceSearchForm;
 import com.codenameone.examples.savor.map.Locator;
 import com.codenameone.examples.savor.net.Account;
+import com.codenameone.examples.savor.net.Api;
+import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.net.Session;
-import com.codenameone.examples.savor.customer.PlaceSearchForm;
+import java.util.List;
 
-/// Who the user is to the service: their name, who to tell if something goes
-/// wrong, and the two places they go most.
+/// Who the user is to the service: the name couriers and kitchens see, and the
+/// addresses orders go to.
 public final class ProfileForm {
-    private static final String[] GENDERS = {"unspecified", "female", "male", "nonbinary"};
-    private static final String[] GENDER_NAMES = {"Rather not say", "Woman", "Man",
-        "Non-binary"};
-
     private ProfileForm() {
     }
 
@@ -55,62 +52,57 @@ public final class ProfileForm {
         Container page = Ui.page();
 
         Ui.section(page, "About you");
-        final TextField name = Ui.field(page, "Name", "name", "What couriers will call you");
+        final TextField name = Ui.field(page, "Name", "name",
+                "What the kitchen and the courier will call you");
         name.setText(profile == null ? user.displayName() : profile.name());
-        final String[] gender = {profile == null || profile.gender() == null
-                || profile.gender().length() == 0 ? GENDERS[0] : profile.gender()};
-        page.add(Ui.label("Gender", "WlLabel"));
-        // Two rows of two: four of these do not fit side by side in German.
-        page.add(Ui.choice("gender", GENDER_NAMES, GENDERS, gender[0],
-                value -> gender[0] = value, 2));
-        page.add(Ui.text("Customers who ask for a woman at the wheel are offered to couriers "
-                + "who say they are one.", "WlMuted"));
 
-        Ui.section(page, "Emergency contact");
-        final TextField contact = Ui.field(page, "Their name", "emergencyName", "");
-        contact.setText(Prefs.emergencyContactName());
-        final TextField number = Ui.field(page, "Their phone number", "emergencyPhone",
-                "+1 555 0100", TextArea.PHONENUMBER);
-        number.setText(Prefs.emergencyContactPhone());
-
-        Ui.section(page, "Saved places");
-        Container places = SettingsForm.group();
-        places.add(place(form, previous, saved, FontImage.MATERIAL_HOME, "Home", "home",
-                Prefs.home()));
-        places.add(place(form, previous, saved, FontImage.MATERIAL_WORK, "Work", "work",
-                Prefs.work()));
-        page.add(places);
-
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button save = Ui.primary("Save", "submit", null);
         save.addActionListener(e -> {
             save.setEnabled(false);
             error.setText("");
-            Prefs.setEmergencyContactName(contact.getText());
-            Prefs.setEmergencyContactPhone(number.getText());
-            Account.saveProfile(name.getText().trim(), gender[0], saved, (status, message) -> {
+            Account.saveProfile(name.getText().trim(), saved, (status, message) -> {
                 save.setEnabled(true);
                 error.setText(message);
                 Ui.refresh(form);
             });
         });
         page.add(error).add(save);
+
+        // Saved with the account, so they follow it to the browser and to the
+        // next phone; each is saved or removed as it is changed.
+        Ui.section(page, "Saved addresses");
+        final Container addresses = SettingsForm.group();
+        addresses.setName("addresses");
+        page.add(addresses);
+        page.add(Ui.secondary("Add an address", "addAddress",
+                e -> PlaceSearchForm.show(form, Locator.here(), picked ->
+                        Api.orders().saveAddress(new SavedAddressDto(null, picked.name(),
+                                picked.address(), picked.lat(), picked.lng(), ""),
+                                Net.to(added -> load(form, addresses), Ui::fail)))));
         form.add(BorderLayout.CENTER, page);
         form.show();
+        load(form, addresses);
     }
 
-    private static Container place(final Form form, final Form previous, final Runnable saved,
-            char icon, String title, final String which, PlaceDto place) {
-        return Ui.tap(Ui.row(icon, title, place == null ? Lang.tr("Not set") : place.name(),
-                SettingsForm.chevron()), "place-" + which,
-                e -> PlaceSearchForm.show(form, Locator.here(), picked -> {
-                    if ("home".equals(which)) {
-                        Prefs.setHome(picked);
-                    } else {
-                        Prefs.setWork(picked);
-                    }
-                    show(previous, saved);
-                }));
+    private static void load(final Form form, final Container addresses) {
+        Api.orders().addresses(Net.to(found -> {
+            addresses.removeAll();
+            List<SavedAddressDto> all = found;
+            if (all == null || all.isEmpty()) {
+                addresses.add(Ui.text("None yet. Addresses you deliver to can be saved here.",
+                        "SvMuted"));
+            }
+            for (int iter = 0; all != null && iter < all.size(); iter++) {
+                final SavedAddressDto address = all.get(iter);
+                addresses.add(Ui.row(FontImage.MATERIAL_PLACE, address.label(),
+                        address.address(), Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE,
+                                "removeAddress-" + iter,
+                                e -> Api.orders().removeAddress(address.id(),
+                                        Net.to(gone -> load(form, addresses), Ui::fail)))));
+            }
+            Ui.refresh(form);
+        }, Ui::fail));
     }
 }

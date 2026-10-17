@@ -55,51 +55,51 @@ public final class PricingForm {
 
     private static void fill(final Panes panes, final Container page, final PricingDto pricing) {
         page.removeAll();
-        Ui.section(page, Lang.tr("The fare, in {0}", pricing.currency()));
-        final TextField base = money(page, "Base fare", "baseFare", pricing.baseFare(), null);
+        Ui.section(page, Lang.tr("Delivery, in {0}", pricing.currency()));
         Container pair = new Container(new GridLayout(1, 2));
-        Container left = side("WlPairLeft");
-        Container right = side("WlPairRight");
-        final TextField perKm = money(left, "Per kilometre", "perKm", pricing.perKm(), null);
-        final TextField perMinute = money(right, "Per minute", "perMinute", pricing.perMinute(),
+        Container left = side("SvPairLeft");
+        Container right = side("SvPairRight");
+        final TextField base = money(left, "Delivery fee", "baseCents", pricing.baseCents(), null);
+        final TextField perKm = money(right, "Per kilometre", "perKmCents", pricing.perKmCents(),
                 null);
         pair.add(left).add(right);
         page.add(pair);
-        final TextField minimum = money(page, "Minimum fare", "minimumFare", pricing.minimumFare(),
+        final TextField surge = number(page, "Surge, while demand is high", "surge",
+                pricing.surge());
+        page.add(Ui.text("The delivery fee is the courier's, all of it.", "SvMuted"));
+
+        Ui.section(page, "Small orders");
+        pair = new Container(new GridLayout(1, 2));
+        left = side("SvPairLeft");
+        right = side("SvPairRight");
+        final TextField small = money(left, "Below", "smallOrderCents", pricing.smallOrderCents(),
                 null);
+        final TextField smallFee = money(right, "Fee", "smallOrderFeeCents",
+                pricing.smallOrderFeeCents(), null);
+        pair.add(left).add(right);
+        page.add(pair);
 
         Ui.section(page, "The service's share");
         pair = new Container(new GridLayout(1, 2));
-        left = side("WlPairLeft");
-        right = side("WlPairRight");
+        left = side("SvPairLeft");
+        right = side("SvPairRight");
         final TextField fee = number(left, "Service fee, %", "serviceFeePercent",
                 pricing.serviceFeePercent());
         final TextField commission = number(right, "Commission, %", "commissionPercent",
                 pricing.commissionPercent());
         pair.add(left).add(right);
         page.add(pair);
-        page.add(Ui.text("The fee is added to the fare and paid by the customer. The commission "
-                + "is kept from the fare; the rest is the courier's.", "WlMuted"));
+        final TextField tax = number(page, "Tax, %", "taxPercent", pricing.taxPercent());
+        page.add(Ui.text("The service fee is a share of the food, paid by the customer. The "
+                + "commission is kept from what the restaurant is paid.", "SvMuted"));
 
-        Ui.section(page, "Multipliers");
-        final TextField surge = number(page, "Surge, while demand is high", "surgeMultiplier",
-                pricing.surgeMultiplier());
-        pair = new Container(new GridLayout(1, 2));
-        left = side("WlPairLeft");
-        right = side("WlPairRight");
-        final TextField comfort = number(left, "Comfort", "comfortMultiplier",
-                pricing.comfortMultiplier());
-        final TextField xl = number(right, "XL", "xlMultiplier", pricing.xlMultiplier());
-        pair.add(left).add(right);
-        page.add(pair);
-
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button save = Ui.primary("Save prices", "submit", null);
         save.addActionListener(e -> {
             PricingDto wanted = new PricingDto(pricing.currency(), cents(base), cents(perKm),
-                    cents(perMinute), cents(minimum), value(fee), value(commission), value(surge),
-                    value(comfort), value(xl));
+                    value(surge), cents(small), cents(smallFee), value(fee), value(tax),
+                    value(commission));
             save.setEnabled(false);
             error.setText("");
             Api.admin().savePricing(wanted, Net.to(saved -> {

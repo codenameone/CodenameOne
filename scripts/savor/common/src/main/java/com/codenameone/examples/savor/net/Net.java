@@ -31,7 +31,7 @@ import com.codenameone.examples.savor.ui.Lang;
 /// what to do with a failure, and nothing else.
 ///
 /// ```java
-/// Api.customer().active(Net.to(delivery -> show(delivery), Ui::fail));
+/// Api.orders().order(id, Net.to(order -> show(order), Ui::fail));
 /// ```
 public final class Net {
     /// A call to a generated client method, waiting for its callback.

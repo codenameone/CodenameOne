@@ -54,11 +54,11 @@ public final class PaymentsForm {
     private static void open(final Panes panes, final ReceiptDto payment) {
         Container page = ReceiptForm.page(payment, true);
         if ("paid".equals(payment.status())) {
-            page.add(Ui.danger("Refund this delivery", "refund", e -> panes.reason("Refund",
+            page.add(Ui.danger("Refund this order", "refund", e -> panes.reason("Refund",
                     Lang.tr("{0} goes back to the card it came from.",
                             Ui.money(payment.total(), payment.currency())), "Refund", why -> {
                         ReasonDto reason = new ReasonDto(why);
-                        Api.admin().refundDelivery(payment.deliveryId(), reason, Net.to(refunded -> {
+                        Api.admin().refundOrder(payment.orderId(), reason, Net.to(refunded -> {
                             Telemetry.deliveryRefunded("payments");
                             open(panes, refunded);
                         }, Ui::fail));
@@ -76,7 +76,7 @@ public final class PaymentsForm {
         for (int iter = 0; payments != null && iter < payments.size(); iter++) {
             final ReceiptDto payment = payments.get(iter);
             Container value = new Container(BoxLayout.y());
-            value.add(Ui.plain(Ui.money(payment.total(), payment.currency()), "WlRowValue"));
+            value.add(Ui.plain(Ui.money(payment.total(), payment.currency()), "SvRowValue"));
             value.add(Ui.badge(ReceiptForm.status(payment.status()),
                     ReceiptForm.badge(payment.status())));
             String who = payment.customerUsername() == null ? "" : payment.customerUsername();

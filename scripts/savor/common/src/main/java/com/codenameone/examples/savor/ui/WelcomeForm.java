@@ -36,13 +36,13 @@ public final class WelcomeForm {
         form.getToolbar().hideToolbar();
 
         Container hero = new Container(BoxLayout.y());
-        hero.setUIID("WlHero");
+        hero.setUIID("SvHero");
         hero.setSafeArea(true);
-        Label icon = new Label("", "WlHeroIcon");
+        Label icon = new Label("", "SvHeroIcon");
         Ui.icon(icon, FontImage.MATERIAL_NEAR_ME, 10f);
         hero.add(icon);
-        hero.add(Ui.label("Savor", "WlHeroTitle"));
-        hero.add(Ui.text("A delivery when you need one, and a fair way to drive.", "WlHeroText"));
+        hero.add(Ui.label("Savor", "SvHeroTitle"));
+        hero.add(Ui.text("A delivery when you need one, and a fair way to drive.", "SvHeroText"));
 
         Container actions = Ui.page();
         actions.setScrollableY(false);

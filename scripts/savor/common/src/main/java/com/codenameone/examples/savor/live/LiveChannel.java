@@ -46,6 +46,10 @@ import java.util.Timer;
 public final class LiveChannel {
     /// What a screen wants to hear about. All of it arrives on the EDT.
     public interface Listener {
+        /// An order the user is a party to changed: theirs as a customer, their
+        /// restaurant's, or the one they carry.
+        void orderChanged(String id, String state);
+
         void deliveryChanged(String id, String state);
 
         void courierMoved(String deliveryId, double lat, double lng, double heading);
@@ -56,6 +60,10 @@ public final class LiveChannel {
 
     /// A listener that ignores everything, to override the part a screen wants.
     public static class Adapter implements Listener {
+        @Override
+        public void orderChanged(String id, String state) {
+        }
+
         @Override
         public void deliveryChanged(String id, String state) {
         }
@@ -199,7 +207,9 @@ public final class LiveChannel {
             return;
         }
         Object type = json.get("type");
-        if ("delivery".equals(type)) {
+        if ("order".equals(type)) {
+            listener.orderChanged(text(json, "id"), text(json, "state"));
+        } else if ("delivery".equals(type)) {
             listener.deliveryChanged(text(json, "id"), text(json, "state"));
         } else if ("courier".equals(type)) {
             listener.courierMoved(text(json, "deliveryId"), number(json, "lat"), number(json, "lng"),

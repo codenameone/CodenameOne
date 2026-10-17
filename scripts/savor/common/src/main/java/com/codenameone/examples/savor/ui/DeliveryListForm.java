@@ -71,7 +71,7 @@ public final class DeliveryListForm {
                 }
                 Container value = new Container(BoxLayout.y());
                 value.add(Ui.plain(Ui.money(delivery.total() > 0 ? delivery.total() : delivery.fareCents(),
-                        delivery.currency()), "WlRowValue"));
+                        delivery.currency()), "SvRowValue"));
                 value.add(Ui.badge(Ui.state(delivery.state()), Ui.stateBadge(delivery.state())));
                 Container row = Ui.row(FontImage.MATERIAL_PLACE, delivery.dropoffAddress(), detail,
                         value);

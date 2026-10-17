@@ -87,7 +87,7 @@ final class Console {
     private String place = HOME;
 
     Console() {
-        form.setUIID("WlForm");
+        form.setUIID("SvForm");
         form.setName("Admin");
         Ui.watch(form);
         form.setScrollable(false);
@@ -197,7 +197,7 @@ final class Console {
     private void mark(String id) {
         place = id;
         for (int iter = 0; iter < items.length; iter++) {
-            items[iter].setUIID(PLACES[iter][0].equals(id) ? "WlSidePicked" : "WlSideItem");
+            items[iter].setUIID(PLACES[iter][0].equals(id) ? "SvSidePicked" : "SvSideItem");
         }
         Layouts.dress(side);
         // An icon is drawn in the colour of the style it was made for.
@@ -221,12 +221,12 @@ final class Console {
                 return size;
             }
         };
-        panel.setUIID("WlSide");
+        panel.setUIID("SvSide");
         panel.setName("side");
         UserDto user = Session.user();
         Container who = new Container(BoxLayout.y());
-        who.add(Ui.plain(user.displayName(), "WlSideName"));
-        who.add(Ui.plain(user.username(), "WlSideDetail"));
+        who.add(Ui.plain(user.displayName(), "SvSideName"));
+        who.add(Ui.plain(user.username(), "SvSideDetail"));
 
         Container list = new Container(BoxLayout.y());
         list.setScrollableY(true);
@@ -237,7 +237,7 @@ final class Console {
             list.add(items[iter]);
         }
         // The other modes this account's roles open. Everyone may delivery.
-        list.add(Ui.label("Switch to", "WlSideLabel"));
+        list.add(Ui.label("Switch to", "SvSideLabel"));
         list.add(entry(FontImage.MATERIAL_HAIL, "Riding", "switch-" + Nav.CUSTOMER,
                 () -> Nav.switchTo(Nav.CUSTOMER)));
         if (user.courier()) {
@@ -257,7 +257,7 @@ final class Console {
     }
 
     private static Button entry(char icon, String text, String name, final Runnable go) {
-        Button entry = new Button(text, "WlSideItem");
+        Button entry = new Button(text, "SvSideItem");
         entry.setName(name);
         Ui.icon(entry, icon, 3.4f);
         entry.addActionListener(e -> go.run());
@@ -327,7 +327,7 @@ final class Console {
                     return size;
                 }
             };
-            master.setUIID("WlMaster");
+            master.setUIID("SvMaster");
             master.setName(name);
             master.add(BorderLayout.CENTER, content);
             body.removeAll();
@@ -393,10 +393,10 @@ final class Console {
         @Override
         void picked(Component row) {
             if (picked != null) {
-                picked.setUIID("WlRow");
+                picked.setUIID("SvRow");
             }
             picked = row;
-            row.setUIID("WlRowPicked");
+            row.setUIID("SvRowPicked");
         }
 
         /// Puts what is on top in the detail's place, or says that nothing is
@@ -412,7 +412,7 @@ final class Console {
                 Shown top = open.get(open.size() - 1);
                 Ui.viewed(top.name);
                 Container bar = new Container(new BorderLayout());
-                bar.setUIID("WlPaneBar");
+                bar.setUIID("SvPaneBar");
                 // Something shown over the detail is left the way it is on a
                 // phone: back. The detail itself has nowhere to go back to.
                 if (open.size() > 1) {
@@ -420,7 +420,7 @@ final class Console {
                             e -> back());
                     bar.add(BorderLayout.WEST, back);
                 }
-                bar.add(BorderLayout.CENTER, Ui.label(top.title, "WlPaneTitle"));
+                bar.add(BorderLayout.CENTER, Ui.label(top.title, "SvPaneTitle"));
                 Container holder = new Container(new BorderLayout());
                 holder.setName(top.name);
                 // It may still be in the holder it was shown in before

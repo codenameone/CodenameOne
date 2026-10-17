@@ -51,13 +51,13 @@ public final class VerifyPhoneForm {
         Container page = Ui.page();
         page.add(Ui.text(user == null || user.phone() == null
                 ? Lang.tr("We sent a six-digit code to your phone.")
-                : Lang.tr("We sent a six-digit code to {0}.", user.phone()), "WlText"));
-        final SpanLabel demo = Ui.text("", "WlNotice");
+                : Lang.tr("We sent a six-digit code to {0}.", user.phone()), "SvText"));
+        final SpanLabel demo = Ui.text("", "SvNotice");
         demo.setName("demoCode");
         demo.setHidden(true);
         page.add(demo);
         final TextField code = Ui.field(page, "Code", "code", "000000", TextArea.NUMERIC);
-        final SpanLabel error = Ui.text("", "WlError");
+        final SpanLabel error = Ui.text("", "SvError");
         error.setName("error");
         final Button verify = Ui.primary("Verify", "submit", null);
         verify.addActionListener(e -> {

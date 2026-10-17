@@ -41,13 +41,13 @@ public class MerchantForm implements Nav.Home {
     public MerchantForm() {
         menu.item(FontImage.MATERIAL_RECEIPT_LONG, "Orders", "home", () -> { });
         Container bar = new Container(new BorderLayout());
-        bar.setUIID("WlHomeBar");
+        bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
         bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(
-                Ui.label("Your restaurant", "WlHeading")));
+                Ui.label("Your restaurant", "SvHeading")));
         page.setSafeArea(false);
         Container screen = new Container(new BorderLayout());
-        screen.setUIID("WlForm");
+        screen.setUIID("SvForm");
         screen.setSafeArea(true);
         screen.add(BorderLayout.NORTH, bar);
         screen.add(BorderLayout.CENTER, page);

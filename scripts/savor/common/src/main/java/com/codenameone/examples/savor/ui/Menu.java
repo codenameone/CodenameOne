@@ -63,14 +63,14 @@ public final class Menu {
                 return size;
             }
         };
-        panel.setUIID("WlMenu");
+        panel.setUIID("SvMenu");
         panel.setSafeArea(true);
         panel.setGrabsPointerEvents(true);
         panel.setName("menu");
         build();
         // What is left of the screen beside the menu: dimmed, and a tap on it
         // puts the menu away.
-        Button dim = new Button("", "WlScrim");
+        Button dim = new Button("", "SvScrim");
         dim.setName("menu-dim");
         dim.addActionListener(e -> close());
         layer.add(BorderLayout.WEST, panel);
@@ -128,18 +128,18 @@ public final class Menu {
     private void build() {
         UserDto user = Session.user();
         Container top = new Container(BoxLayout.y());
-        top.setUIID("WlMenuTop");
+        top.setUIID("SvMenuTop");
         Container who = new Container(new BorderLayout());
         Container names = new Container(BoxLayout.y());
-        names.add(Ui.label(user.displayName(), "WlMenuName"));
-        names.add(Ui.label(user.username(), "WlMenuDetail"));
+        names.add(Ui.label(user.displayName(), "SvMenuName"));
+        names.add(Ui.label(user.username(), "SvMenuDetail"));
         who.add(BorderLayout.WEST, Ui.avatar(user.displayName()));
         who.add(BorderLayout.CENTER, names);
         top.add(who);
         // Which of the three apps this is, said in words at the top of each.
         top.add(FlowLayout.encloseIn(Ui.badge(Nav.ADMIN.equals(mode) ? "Admin mode"
                 : Nav.MERCHANT.equals(mode) ? "Restaurant mode"
-                : Nav.COURIER.equals(mode) ? "Courier mode" : "Customer mode", "WlModeBadge")));
+                : Nav.COURIER.equals(mode) ? "Courier mode" : "Customer mode", "SvModeBadge")));
 
         Container list = new Container(BoxLayout.y());
         list.setScrollableY(true);
@@ -149,7 +149,7 @@ public final class Menu {
         // Everyone may order; delivering, running a restaurant and
         // administering are granted.
         if (user.courier() || user.admin() || user.merchant() || !Nav.CUSTOMER.equals(mode)) {
-            list.add(Ui.label("Switch to", "WlMenuLabel"));
+            list.add(Ui.label("Switch to", "SvMenuLabel"));
             if (!Nav.CUSTOMER.equals(mode)) {
                 list.add(other(FontImage.MATERIAL_RESTAURANT_MENU, "Ordering", Nav.CUSTOMER));
             }
@@ -165,7 +165,7 @@ public final class Menu {
         }
 
         Container bottom = new Container(BoxLayout.y());
-        bottom.setUIID("WlMenuBottom");
+        bottom.setUIID("SvMenuBottom");
         bottom.add(entry(FontImage.MATERIAL_SETTINGS, "Settings", "menu-settings",
                 () -> SettingsForm.show(form)));
         bottom.add(entry(FontImage.MATERIAL_LOGOUT, "Sign out", "menu-signOut", Nav::signOut));
@@ -180,7 +180,7 @@ public final class Menu {
     }
 
     private Button entry(char icon, String text, String name, final Runnable go) {
-        Button entry = new Button(text, "WlMenuItem");
+        Button entry = new Button(text, "SvMenuItem");
         entry.setName(name);
         Ui.icon(entry, icon, 3.8f);
         entry.addActionListener(e -> {

@@ -60,7 +60,7 @@ public final class ApplicationsForm {
     private ApplicationsForm(Panes panes) {
         this.panes = panes;
         Container top = new Container(BoxLayout.y());
-        top.setUIID("WlPage");
+        top.setUIID("SvPage");
         top.add(Ui.choice("status", new String[] {"Waiting", "Approved", "Sent back"},
                 new String[] {"pending", "approved", "rejected"}, status, value -> {
                     status = value;
@@ -120,7 +120,7 @@ public final class ApplicationsForm {
         state.setName("applicationStatus");
         page.add(Ui.person(application.name(), application.username(), state));
         if ("rejected".equals(application.status())) {
-            page.add(Ui.text(application.rejectionReason(), "WlNotice"));
+            page.add(Ui.text(application.rejectionReason(), "SvNotice"));
         }
 
         Ui.section(page, "Applicant");
@@ -137,12 +137,8 @@ public final class ApplicationsForm {
         }
 
         Ui.section(page, "Vehicle");
-        page.add(Ui.fact("Car", car(application)));
+        page.add(Ui.fact("Vehicle", car(application)));
         page.add(Ui.fact("Licence plate", application.vehiclePlate()));
-        page.add(Ui.fact("Seats for customers", String.valueOf(application.vehicleSeats())));
-        page.add(Ui.fact("Kind of delivery", Lang.tr(Ui.product(application.product()))));
-        page.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible() ? "Yes" : "No")));
-        page.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly() ? "Yes" : "No")));
 
         Ui.section(page, "Documents");
         for (int iter = 0; iter < KINDS.length; iter++) {
@@ -153,7 +149,7 @@ public final class ApplicationsForm {
             Container row = Ui.row(FontImage.MATERIAL_IMAGE, title,
                     missing ? "Not provided" : "Tap to open", Ui.badge(
                             missing ? "Missing" : "Provided",
-                            missing ? "WlBadgeBad" : "WlBadgeGood"));
+                            missing ? "SvBadgeBad" : "SvBadgeGood"));
             if (missing) {
                 page.add(row);
             } else {
@@ -185,7 +181,7 @@ public final class ApplicationsForm {
     /// A document, as large as the screen allows.
     private void picture(String username, String kind, String title) {
         final Container stage = new Container(new BorderLayout());
-        stage.setUIID("WlPicture");
+        stage.setUIID("SvPicture");
         panes.over(title, "Document", stage);
         Api.admin().document(username, kind, Net.to(content -> {
             Image image = decode(content);
@@ -194,7 +190,7 @@ public final class ApplicationsForm {
                         "This picture could not be opened", null));
             } else {
                 ScaleImageLabel shown = new ScaleImageLabel(image);
-                shown.setUIID("WlPicture");
+                shown.setUIID("SvPicture");
                 shown.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
                 shown.setName("picture");
                 stage.add(BorderLayout.CENTER, shown);
@@ -251,7 +247,7 @@ public final class ApplicationsForm {
     }
 
     static String badge(String status) {
-        return "pending".equals(status) ? "WlBadgeWarn" : "approved".equals(status)
-                ? "WlBadgeGood" : "rejected".equals(status) ? "WlBadgeBad" : "WlBadge";
+        return "pending".equals(status) ? "SvBadgeWarn" : "approved".equals(status)
+                ? "SvBadgeGood" : "rejected".equals(status) ? "SvBadgeBad" : "SvBadge";
     }
 }

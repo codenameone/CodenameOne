@@ -49,7 +49,7 @@ public final class AdminDeliveriesForm {
     private AdminDeliveriesForm(Panes panes) {
         this.panes = panes;
         Container top = new Container(BoxLayout.y());
-        top.setUIID("WlPage");
+        top.setUIID("SvPage");
         top.add(Ui.choice("filter", FILTER_NAMES, FILTERS, filter, value -> {
             filter = value;
             fill();
@@ -86,7 +86,7 @@ public final class AdminDeliveriesForm {
                     : Lang.tr("{0} with {1}", delivery.customerName(), delivery.courierName());
             Container value = new Container(BoxLayout.y());
             value.add(Ui.plain(Ui.money(delivery.total() > 0 ? delivery.total() : delivery.fareCents(),
-                    delivery.currency()), "WlRowValue"));
+                    delivery.currency()), "SvRowValue"));
             value.add(Ui.badge(Ui.state(delivery.state()), Ui.stateBadge(delivery.state())));
             final Container picked = Ui.row(FontImage.MATERIAL_PLACE, delivery.dropoffAddress(),
                     Ui.when(delivery.requestedAt()) + Ui.DOT + people, value);
@@ -118,12 +118,12 @@ public final class AdminDeliveriesForm {
     private void show(final DeliveryDto delivery) {
         Container page = Ui.page();
         Label total = Ui.plain(Ui.money(delivery.total() > 0 ? delivery.total() : delivery.fareCents(),
-                delivery.currency()), "WlAmount");
+                delivery.currency()), "SvAmount");
         page.add(total);
         Label state = Ui.badge(Ui.state(delivery.state()), Ui.stateBadge(delivery.state()));
         state.setName("deliveryState");
         page.add(FlowLayout.encloseCenter(state));
-        page.add(FlowLayout.encloseCenter(Ui.plain(Ui.when(delivery.requestedAt()), "WlMuted")));
+        page.add(FlowLayout.encloseCenter(Ui.plain(Ui.when(delivery.requestedAt()), "SvMuted")));
 
         Ui.section(page, "Trip");
         page.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, delivery.pickupAddress(), null, null));
@@ -131,43 +131,43 @@ public final class AdminDeliveriesForm {
                 Ui.distance(delivery.distanceMeters()) + Ui.DOT + Ui.minutes(delivery.durationSeconds()),
                 null));
         Ui.section(page, "People");
-        page.add(Ui.row(FontImage.MATERIAL_HAIL, delivery.customerName(), delivery.customerUsername(), null));
+        page.add(Ui.row(FontImage.MATERIAL_PERSON, delivery.customerName(), delivery.customerUsername(), null));
         if (delivery.courierName() != null && delivery.courierName().length() > 0) {
-            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, delivery.courierName(),
+            page.add(Ui.row(FontImage.MATERIAL_TWO_WHEELER, delivery.courierName(),
                     delivery.vehicle() + (delivery.plate() == null || delivery.plate().length() == 0 ? ""
                             : Ui.DOT + delivery.plate()), null));
         }
         Ui.section(page, "Payment");
-        page.add(Ui.fact("Kind of delivery", Lang.tr(Ui.product(delivery.product()))));
-        page.add(Ui.fact("Fare", Ui.money(delivery.fareCents(), delivery.currency())));
-        page.add(Ui.fact("Service fee", Ui.money(delivery.serviceFee(), delivery.currency())));
+        page.add(Ui.fact("Delivery fee", Ui.money(delivery.fareCents(), delivery.currency())));
         page.add(Ui.fact("Tip", Ui.money(delivery.tip(), delivery.currency())));
         page.add(Ui.fact("Paid with", delivery.cash() ? Lang.tr("Cash") : delivery.paymentMethodLabel()));
         page.add(Ui.fact("Payment", Lang.tr(payment(delivery.paymentStatus()))));
 
         if (delivery.state().isActive()) {
-            page.add(Ui.danger("Cancel this delivery", "cancelDelivery", e -> panes.reason(
-                    "Cancel delivery", Lang.tr("The customer and the courier are both told, and "
-                            + "nobody is charged."), "Cancel delivery", why -> {
+            // The order is what is called off: its delivery shares its id and
+            // ends with it, and the hold on the card is let go.
+            page.add(Ui.danger("Cancel this order", "cancelOrder", e -> panes.reason(
+                    "Cancel order", Lang.tr("The customer, the kitchen and the courier are all "
+                            + "told, and nobody is charged."), "Cancel order", why -> {
                         ReasonDto reason = new ReasonDto(why);
-                        Api.admin().cancelDelivery(delivery.id(), reason, Net.to(cancelled -> {
+                        Api.admin().cancelOrder(delivery.id(), reason, Net.to(cancelled -> {
                             Telemetry.deliveryCancelled("admin", delivery.state());
                             panes.home();
                         }, Ui::fail));
                     })));
         }
         if ("PAID".equals(delivery.paymentStatus()) && !delivery.cash()) {
-            page.add(Ui.danger("Refund this delivery", "refund", e -> panes.reason("Refund",
+            page.add(Ui.danger("Refund this order", "refund", e -> panes.reason("Refund",
                     Lang.tr("{0} goes back to the card it came from.", Ui.money(
                             delivery.total() > 0 ? delivery.total() : delivery.fareCents(), delivery.currency())),
                     "Refund", why -> {
                         ReasonDto reason = new ReasonDto(why);
-                        Api.admin().refundDelivery(delivery.id(), reason, Net.to(refunded -> {
+                        Api.admin().refundOrder(delivery.id(), reason, Net.to(refunded -> {
                             Telemetry.deliveryRefunded("deliveries");
                             // The processor may not have returned the money
                             // yet; the receipt says which.
                             Ui.say("refund_pending".equals(refunded.status())
-                                    ? "The refund is pending" : "The delivery was refunded");
+                                    ? "The refund is pending" : "The order was refunded");
                             panes.home();
                         }, Ui::fail));
                     })));

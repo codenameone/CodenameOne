@@ -62,17 +62,17 @@ public final class Layouts {
     private static final Map<String, String> DESKTOP = new HashMap<String, String>();
 
     static {
-        String[] dressed = {"WlForm", "WlPage", "WlList", "WlPrimary", "WlSecondary", "WlDanger",
-            "WlLink", "WlField", "WlFieldHint", "WlRow", "WlRowPicked", "WlRowIcon", "WlRowTitle",
-            "WlRowDetail", "WlRowValue", "WlSection", "WlHeading", "WlText", "WlMuted", "WlLabel",
-            "WlTitle", "WlError", "WlNotice", "WlPanel", "WlFact", "WlFactLabel", "WlFactValue",
-            "WlFactTotal", "WlSegments", "WlSegment", "WlTile", "WlStat", "WlStatValue",
-            "WlStatLabel", "WlChartValue", "WlChartAxis", "WlAmount", "WlBannerIcon",
-            "WlBannerTitle", "WlBannerText", "WlAlert", "WlSide", "WlSideItem", "WlSidePicked",
-            "WlSideLabel", "WlSideName", "WlSideDetail", "WlPaneBar", "WlPaneTitle", "WlMaster",
-            "WlBarButton", "WlHomeBar"};
+        String[] dressed = {"SvForm", "SvPage", "SvList", "SvPrimary", "SvSecondary", "SvDanger",
+            "SvLink", "SvField", "SvFieldHint", "SvRow", "SvRowPicked", "SvRowIcon", "SvRowTitle",
+            "SvRowDetail", "SvRowValue", "SvSection", "SvHeading", "SvText", "SvMuted", "SvLabel",
+            "SvTitle", "SvError", "SvNotice", "SvPanel", "SvFact", "SvFactLabel", "SvFactValue",
+            "SvFactTotal", "SvSegments", "SvSegment", "SvTile", "SvStat", "SvStatValue",
+            "SvStatLabel", "SvChartValue", "SvChartAxis", "SvAmount", "SvBannerIcon",
+            "SvBannerTitle", "SvBannerText", "SvAlert", "SvSide", "SvSideItem", "SvSidePicked",
+            "SvSideLabel", "SvSideName", "SvSideDetail", "SvPaneBar", "SvPaneTitle", "SvMaster",
+            "SvBarButton", "SvHomeBar"};
         for (int iter = 0; iter < dressed.length; iter++) {
-            DESKTOP.put(dressed[iter], "WlDesk" + dressed[iter].substring(2));
+            DESKTOP.put(dressed[iter], "SvDesk" + dressed[iter].substring(2));
         }
     }
 

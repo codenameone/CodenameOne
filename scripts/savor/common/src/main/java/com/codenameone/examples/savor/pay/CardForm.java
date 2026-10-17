@@ -57,7 +57,7 @@ public final class CardForm {
     private final Form previous;
     private final Runnable added;
     private final Container page = Ui.page();
-    private final SpanLabel error = Ui.text("", "WlError");
+    private final SpanLabel error = Ui.text("", "SvError");
     private String setupId;
 
     private CardForm(Form previous, Runnable added) {
@@ -99,7 +99,7 @@ public final class CardForm {
     private void hosted(final String url) {
         page.add(Ui.banner(FontImage.MATERIAL_LOCK, "Your card goes straight to the bank",
                 "The payment provider's own page opens in your browser. Savor never sees "
-                + "the number. Come back here when you have finished.", "WlBannerIcon"));
+                + "the number. Come back here when you have finished.", "SvBannerIcon"));
         page.add(error);
         page.add(Ui.primary("Open the secure page", "openHosted", e -> {
             waiting = this;
@@ -109,12 +109,12 @@ public final class CardForm {
     }
 
     private void typed() {
-        final Label number = Ui.plain(mask(""), "WlCardNumber");
-        final Label holder = Ui.plain("", "WlCardSmall");
-        final Label expires = Ui.plain("MM/YY", "WlCardSmall");
-        final Label brand = Ui.plain("", "WlCardBrand");
+        final Label number = Ui.plain(mask(""), "SvCardNumber");
+        final Label holder = Ui.plain("", "SvCardSmall");
+        final Label expires = Ui.plain("MM/YY", "SvCardSmall");
+        final Label brand = Ui.plain("", "SvCardBrand");
         Container face = new Container(new BorderLayout());
-        face.setUIID("WlCardFace");
+        face.setUIID("SvCardFace");
         face.add(BorderLayout.NORTH, brand);
         face.add(BorderLayout.CENTER, number);
         Container foot = new Container(new BorderLayout());
@@ -128,8 +128,8 @@ public final class CardForm {
         Container pair = new Container(new GridLayout(1, 2));
         Container left = new Container(BoxLayout.y());
         Container right = new Container(BoxLayout.y());
-        left.setUIID("WlPairLeft");
-        right.setUIID("WlPairRight");
+        left.setUIID("SvPairLeft");
+        right.setUIID("SvPairRight");
         final TextField expiry = Ui.field(left, "Expires", "cardExpiry", "MM/YY",
                 TextArea.NUMERIC);
         final TextField cvc = Ui.field(right, "Security code", "cardCvc", "123",
@@ -162,7 +162,7 @@ public final class CardForm {
             face.revalidate();
         });
         page.add(Ui.text("This server takes no real payments. Use the test card "
-                + "4242 4242 4242 4242 with any date ahead and any three digits.", "WlNotice"));
+                + "4242 4242 4242 4242 with any date ahead and any three digits.", "SvNotice"));
         page.add(error);
         page.add(Ui.primary("Save card", "saveCard", e -> {
             String wrong = Cards.check(digits.getText(), expiry.getText(), cvc.getText());

@@ -219,14 +219,15 @@ public final class Telemetry {
 
     // ------------------------------------------------------------------ deliveries
 
-    /// @param products how many kinds of car were priced
-    public static void deliveryQuoted(int products, double meters) {
-        send(DELIVERY, "delivery_quoted", "products", Integer.valueOf(products), "distance",
+    /// @param lines how many dishes the cart holds
+    public static void orderQuoted(int lines, double meters) {
+        send(DELIVERY, "order_quoted", "lines", Integer.valueOf(lines), "distance",
                 distance(meters));
     }
 
-    public static void deliveryRequested(String product, boolean cash) {
-        send(DELIVERY, "delivery_requested", "product", product, "payment", cash ? "cash" : "card");
+    public static void orderPlaced(boolean cash, boolean promo) {
+        send(DELIVERY, "order_placed", "payment", cash ? "cash" : "card", "promo",
+                promo ? "yes" : "no");
     }
 
     /// @param by `customer`, `courier` or `admin`

@@ -41,7 +41,7 @@ public final class ConsentForm {
         Container page = Ui.page();
         Container banner = Ui.banner(FontImage.MATERIAL_INSIGHTS, "Help improve Savor",
                 "Savor can count which screens are opened and which features are used, "
-                + "so that we can see what works and fix what does not.", "WlBannerIcon");
+                + "so that we can see what works and fix what does not.", "SvBannerIcon");
         // The page has its own top padding, and the banner's on top of it
         // pushed the last line of the promise below under the answers.
         banner.getAllStyles().setPaddingTop(0);
@@ -50,11 +50,11 @@ public final class ConsentForm {
                 "Never your name, e-mail, phone number, places or card details", null));
         // The two answers stay in view however much there is to read.
         Container answers = new Container(BoxLayout.y());
-        answers.setUIID("WlPage");
+        answers.setUIID("SvPage");
         answers.setSafeArea(true);
         answers.add(Ui.primary("Share usage statistics", "consentYes", e -> answer(true, then)));
         answers.add(Ui.secondary("Not now", "consentNo", e -> answer(false, then)));
-        answers.add(Ui.text("Turn it on or off at any time in Settings", "WlMuted"));
+        answers.add(Ui.text("Turn it on or off at any time in Settings", "SvMuted"));
         form.add(BorderLayout.SOUTH, answers);
         form.add(BorderLayout.CENTER, page);
         form.show();

@@ -49,9 +49,9 @@ public final class ReceiptForm {
     private ReceiptForm() {
     }
 
-    /// Fetches the customer's receipt for `deliveryId` and shows it.
-    public static void open(final Form previous, String deliveryId) {
-        Api.payments().receipt(deliveryId, Net.to(receipt -> show(previous, receipt, false),
+    /// Fetches the customer's receipt for order `orderId` and shows it.
+    public static void open(final Form previous, String orderId) {
+        Api.payments().receipt(orderId, Net.to(receipt -> show(previous, receipt, false),
                 Ui::fail));
     }
 
@@ -73,49 +73,51 @@ public final class ReceiptForm {
         Container page = Ui.page();
         final String currency = receipt.currency();
 
-        Label total = Ui.plain(Ui.money(receipt.total(), currency), "WlAmount");
+        Label total = Ui.plain(Ui.money(receipt.total(), currency), "SvAmount");
         total.setName("total");
         page.add(total);
         Label status = Ui.badge(status(receipt.status()), badge(receipt.status()));
         status.setName("paymentStatus");
         page.add(FlowLayout.encloseCenter(status));
         page.add(FlowLayout.encloseCenter(Ui.plain(
-                receipt.paidAt() > 0 ? Ui.when(receipt.paidAt()) : "", "WlMuted")));
+                receipt.paidAt() > 0 ? Ui.when(receipt.paidAt()) : "", "SvMuted")));
 
-        Ui.section(page, "Trip");
-        Container trip = new Container(BoxLayout.y());
-        trip.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, receipt.pickupName(), null, null));
-        trip.add(Ui.row(FontImage.MATERIAL_PLACE, receipt.dropoffName(),
-                Ui.distance(receipt.distanceMeters()) + Ui.DOT
-                        + Ui.minutes(receipt.durationSeconds()), null));
+        Ui.section(page, "Order");
+        Container order = new Container(BoxLayout.y());
+        order.add(Ui.row(FontImage.MATERIAL_STOREFRONT, receipt.restaurantName(), null, null));
+        order.add(Ui.row(FontImage.MATERIAL_PLACE, receipt.dropoffName(), null, null));
         if (receipt.courierName() != null && receipt.courierName().length() > 0) {
-            trip.add(Ui.row(FontImage.MATERIAL_PERSON, receipt.courierName(), receipt.vehicle(),
-                    null));
+            order.add(Ui.row(FontImage.MATERIAL_TWO_WHEELER, receipt.courierName(),
+                    receipt.vehicle(), null));
         }
         if (admin && receipt.customerUsername() != null && receipt.customerUsername().length() > 0) {
-            trip.add(Ui.row(FontImage.MATERIAL_HAIL, receipt.customerUsername(), "Customer", null));
+            order.add(Ui.row(FontImage.MATERIAL_PERSON, receipt.customerUsername(), "Customer",
+                    null));
         }
-        page.add(trip);
+        page.add(order);
 
-        Ui.section(page, "Fare");
-        Container fare = new Container(BoxLayout.y());
-        fare.setUIID("WlPanel");
-        fare.add(Ui.fact("Base fare", Ui.money(receipt.baseFare(), currency)));
-        fare.add(Ui.fact("Distance", Ui.money(receipt.distanceFare(), currency)));
-        fare.add(Ui.fact("Time", Ui.money(receipt.timeFare(), currency)));
-        fare.add(Ui.fact("Service fee", Ui.money(receipt.serviceFee(), currency)));
+        Ui.section(page, "Paid");
+        Container paid = new Container(BoxLayout.y());
+        paid.setUIID("SvPanel");
+        paid.add(Ui.fact("Food", Ui.money(receipt.subtotal(), currency)));
+        paid.add(Ui.fact("Delivery", Ui.money(receipt.deliveryFee(), currency)));
+        paid.add(Ui.fact("Service fee", Ui.money(receipt.serviceFee(), currency)));
+        if (receipt.smallOrderFee() > 0) {
+            paid.add(Ui.fact("Small order fee", Ui.money(receipt.smallOrderFee(), currency)));
+        }
+        paid.add(Ui.fact("Tax", Ui.money(receipt.tax(), currency)));
         if (receipt.discount() > 0) {
-            fare.add(Ui.fact("Discount", "-" + Ui.money(receipt.discount(), currency)));
+            paid.add(Ui.fact("Discount", "-" + Ui.money(receipt.discount(), currency)));
         }
         if (receipt.tip() > 0) {
             Container tipped = Ui.fact("Tip", Ui.money(receipt.tip(), currency));
             tipped.getComponentAt(1).setName("tipPaid");
-            fare.add(tipped);
+            paid.add(tipped);
         }
-        fare.add(Ui.fact("Total", Ui.money(receipt.total(), currency), "WlFactTotal"));
-        fare.add(Ui.fact("Paid with", "cash".equals(receipt.status()) ? Lang.tr("Cash")
+        paid.add(Ui.fact("Total", Ui.money(receipt.total(), currency), "SvFactTotal"));
+        paid.add(Ui.fact("Paid with", "cash".equals(receipt.status()) ? Lang.tr("Cash")
                 : receipt.methodLabel()));
-        page.add(fare);
+        page.add(paid);
         return page;
     }
 
@@ -127,12 +129,12 @@ public final class ReceiptForm {
             tip(form, previous, page, receipt);
         }
         if (admin && "paid".equals(receipt.status())) {
-            page.add(Ui.danger("Refund this delivery", "refund", e -> Ui.reason(form,
+            page.add(Ui.danger("Refund this order", "refund", e -> Ui.reason(form,
                     "Refund", Lang.tr("{0} goes back to the card it came from.",
                             Ui.money(receipt.total(), currency)), "Refund",
                     why -> {
                         ReasonDto reason = new ReasonDto(why);
-                        Api.admin().refundDelivery(receipt.deliveryId(), reason, Net.to(refunded -> {
+                        Api.admin().refundOrder(receipt.orderId(), reason, Net.to(refunded -> {
                             Telemetry.deliveryRefunded("receipt");
                             show(previous, refunded, true);
                         }, Ui::fail));
@@ -140,14 +142,14 @@ public final class ReceiptForm {
         }
     }
 
-    /// The tip: three shares of the fare to tap, or an amount to type.
+    /// The tip: three shares of the food to tap, or an amount to type.
     private static void tip(final Form form, final Form previous, Container page,
             final ReceiptDto receipt) {
         Ui.section(page, "Add a tip");
         page.add(Ui.text(receipt.courierName() == null || receipt.courierName().length() == 0
                 ? Lang.tr("All of it goes to your courier.")
-                : Lang.tr("All of it goes to {0}.", receipt.courierName()), "WlMuted"));
-        final long fare = receipt.baseFare() + receipt.distanceFare() + receipt.timeFare();
+                : Lang.tr("All of it goes to {0}.", receipt.courierName()), "SvMuted"));
+        final long fare = receipt.subtotal();
         String[] labels = new String[PERCENTS.length];
         String[] values = new String[PERCENTS.length];
         for (int iter = 0; iter < PERCENTS.length; iter++) {
@@ -156,8 +158,8 @@ public final class ReceiptForm {
             labels[iter] = PERCENTS[iter] + "%  " + Ui.money(cents, receipt.currency());
         }
         final TextField custom = new TextField("", Lang.tr("Another amount"), 8, TextArea.DECIMAL);
-        custom.setUIID("WlField");
-        custom.getHintLabel().setUIID("WlFieldHint");
+        custom.setUIID("SvField");
+        custom.getHintLabel().setUIID("SvFieldHint");
         custom.setName("tipCustom");
         final long[] chosen = {0};
         Container presets = Ui.choice("tip", labels, values, "", value -> {
@@ -188,7 +190,7 @@ public final class ReceiptForm {
                 }
             }
             final int reported = share;
-            Api.payments().tip(receipt.deliveryId(), tip, Net.to(tipped -> {
+            Api.payments().tip(receipt.orderId(), tip, Net.to(tipped -> {
                 Telemetry.tipped("receipt", reported);
                 Ui.say("Thank you. Your tip was sent.");
                 show(previous, tipped, false);
@@ -226,8 +228,8 @@ public final class ReceiptForm {
     }
 
     public static String badge(String status) {
-        return "paid".equals(status) || "cash".equals(status) ? "WlBadgeGood"
-                : "failed".equals(status) || "refund_failed".equals(status) ? "WlBadgeBad"
-                : "WlBadgeWarn";
+        return "paid".equals(status) || "cash".equals(status) ? "SvBadgeGood"
+                : "failed".equals(status) || "refund_failed".equals(status) ? "SvBadgeBad"
+                : "SvBadgeWarn";
     }
 }

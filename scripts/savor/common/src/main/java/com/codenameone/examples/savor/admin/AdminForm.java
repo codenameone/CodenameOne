@@ -88,13 +88,13 @@ public class AdminForm implements Nav.Home {
         // have it, and the mode said beside the title: an admin who also deliveries
         // should never have to wonder which app this is.
         Container bar = new Container(new BorderLayout());
-        bar.setUIID("WlHomeBar");
+        bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
         bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(
-                Ui.label("Operations", "WlHeading")));
+                Ui.label("Operations", "SvHeading")));
         // In the menu the badge stands under a name and keeps a gap above it;
         // here it is alone on the bar's centre line.
-        Label admin = Ui.badge("Admin", "WlModeBadge");
+        Label admin = Ui.badge("Admin", "SvModeBadge");
         admin.getAllStyles().setMargin(0, 0, 0, 0);
         bar.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(admin));
 
@@ -123,7 +123,7 @@ public class AdminForm implements Nav.Home {
         Container screen = new Container(new BorderLayout());
         // The strip the status bar is drawn in is the bar's colour, not
         // whatever is behind the screen.
-        screen.setUIID("WlForm");
+        screen.setUIID("SvForm");
         screen.setSafeArea(true);
         screen.add(BorderLayout.NORTH, bar);
         screen.add(BorderLayout.CENTER, page);

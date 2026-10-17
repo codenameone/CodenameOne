@@ -44,17 +44,11 @@ public final class Prefs {
     public static final String NOTIFY_DELIVERY_UPDATES = "notifyDeliveryUpdates";
     public static final String NOTIFY_RECEIPTS = "notifyReceipts";
     public static final String NOTIFY_PROMOTIONS = "notifyPromotions";
-    public static final String COURIER_GENDER = "courierGender";
-    public static final String QUIET_DELIVERY = "quietDelivery";
-    public static final String ACCESSIBLE_VEHICLE = "accessibleVehicle";
-    public static final String PET_FRIENDLY = "petFriendly";
     public static final String PAYMENT_METHOD = "defaultPaymentMethodId";
     public static final String TIP_PERCENT = "defaultTipPercent";
-    public static final String SHARE_TRIPS = "shareTrips";
-    public static final String EMERGENCY_NAME = "emergencyContactName";
-    public static final String EMERGENCY_PHONE = "emergencyContactPhone";
-    public static final String HOME = "home";
-    public static final String WORK = "work";
+    /// Where orders go unless the cart says otherwise. Kept on the device:
+    /// the addresses the account saved are the server's.
+    public static final String DELIVER_TO = "deliverTo";
     public static final String RECENTS = "recents";
     /// Whose the recent destinations are: see [#ownedBy].
     private static final String RECENTS_OWNER = "recentsOwner";
@@ -64,17 +58,14 @@ public final class Prefs {
     public static final String THEME_DARK = "dark";
     public static final String UNITS_KM = "km";
     public static final String UNITS_MILES = "mi";
-    public static final String GENDER_ANY = "any";
-    public static final String GENDER_WOMEN = "women";
     /// The one way to pay that needs nothing set up.
     public static final String PAYMENT_CASH = "cash";
 
     private static final String PREFIX = "savor.pref.";
     /// The plain values that are a copy of the account's; see [#ownedBy].
     private static final String[] ACCOUNT_OWNED = {NOTIFY_DELIVERY_UPDATES, NOTIFY_RECEIPTS,
-        NOTIFY_PROMOTIONS, COURIER_GENDER, QUIET_DELIVERY, ACCESSIBLE_VEHICLE, PET_FRIENDLY,
-        PAYMENT_METHOD, TIP_PERCENT, SHARE_TRIPS, EMERGENCY_NAME, EMERGENCY_PHONE};
-    /// How many destinations are remembered.
+        NOTIFY_PROMOTIONS, PAYMENT_METHOD, TIP_PERCENT};
+    /// How many delivery addresses are remembered.
     private static final int RECENT_LIMIT = 4;
 
     private static Listener listener;
@@ -145,44 +136,9 @@ public final class Prefs {
         put(NOTIFY_PROMOTIONS, on);
     }
 
-    // -------------------------------------------------------------- the delivery
-
-    /// Who the customer wants at the wheel: [#GENDER_ANY] or [#GENDER_WOMEN].
-    public static String courierGender() {
-        return text(COURIER_GENDER, GENDER_ANY);
-    }
-
-    public static void setCourierGender(String gender) {
-        put(COURIER_GENDER, gender);
-    }
-
-    public static boolean quietDelivery() {
-        return flag(QUIET_DELIVERY, false);
-    }
-
-    public static void setQuietDelivery(boolean on) {
-        put(QUIET_DELIVERY, on);
-    }
-
-    public static boolean accessibleVehicle() {
-        return flag(ACCESSIBLE_VEHICLE, false);
-    }
-
-    public static void setAccessibleVehicle(boolean on) {
-        put(ACCESSIBLE_VEHICLE, on);
-    }
-
-    public static boolean petFriendly() {
-        return flag(PET_FRIENDLY, false);
-    }
-
-    public static void setPetFriendly(boolean on) {
-        put(PET_FRIENDLY, on);
-    }
-
     // --------------------------------------------------------------- payment
 
-    /// The id of the way the user pays unless they say otherwise for a delivery.
+    /// The id of the way the user pays unless they say otherwise for an order.
     public static String paymentMethod() {
         return text(PAYMENT_METHOD, PAYMENT_CASH);
     }
@@ -191,7 +147,7 @@ public final class Prefs {
         put(PAYMENT_METHOD, id);
     }
 
-    /// The tip offered first on a receipt, as a percentage of the fare.
+    /// The tip offered first at checkout, as a percentage of the food.
     public static int tipPercent() {
         return Preferences.get(PREFIX + TIP_PERCENT, 0);
     }
@@ -203,56 +159,19 @@ public final class Prefs {
         }
     }
 
-    // ---------------------------------------------------- privacy and safety
-
-    /// Whether a delivery under way is shared with the emergency contact.
-    public static boolean shareTrips() {
-        return flag(SHARE_TRIPS, false);
-    }
-
-    public static void setShareTrips(boolean on) {
-        put(SHARE_TRIPS, on);
-    }
-
-    public static String emergencyContactName() {
-        return text(EMERGENCY_NAME, "");
-    }
-
-    public static void setEmergencyContactName(String name) {
-        put(EMERGENCY_NAME, name);
-    }
-
-    public static String emergencyContactPhone() {
-        return text(EMERGENCY_PHONE, "");
-    }
-
-    public static void setEmergencyContactPhone(String phone) {
-        put(EMERGENCY_PHONE, phone);
-    }
-
     // ---------------------------------------------------------------- places
 
-    /// Home, or null while the user has named none.
-    public static PlaceDto home() {
-        return place(HOME);
+    /// Where orders are delivered, or null until the customer has said.
+    public static PlaceDto deliverTo() {
+        return place(DELIVER_TO);
     }
 
-    public static void setHome(PlaceDto place) {
-        store(HOME, place);
-        changed(HOME);
+    public static void setDeliverTo(PlaceDto place) {
+        store(DELIVER_TO, place);
+        changed(DELIVER_TO);
     }
 
-    /// Work, or null while the user has named none.
-    public static PlaceDto work() {
-        return place(WORK);
-    }
-
-    public static void setWork(PlaceDto place) {
-        store(WORK, place);
-        changed(WORK);
-    }
-
-    /// The last few destinations, the newest first.
+    /// The last few places delivered to, the newest first.
     public static List<PlaceDto> recents() {
         List<PlaceDto> all = new ArrayList<PlaceDto>();
         for (int iter = 0; iter < RECENT_LIMIT; iter++) {
@@ -309,8 +228,7 @@ public final class Prefs {
         for (int iter = 0; iter < RECENT_LIMIT; iter++) {
             store(RECENTS + "." + iter, null);
         }
-        store(HOME, null);
-        store(WORK, null);
+        store(DELIVER_TO, null);
         for (String name : ACCOUNT_OWNED) {
             Preferences.delete(PREFIX + name);
         }

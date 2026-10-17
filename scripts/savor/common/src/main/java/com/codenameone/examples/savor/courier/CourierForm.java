@@ -370,15 +370,15 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     /// The card at the top: online or off, and what today has made.
     private void header() {
         Container card = new Container(new BorderLayout());
-        card.setUIID("WlStatusCard");
+        card.setUIID("SvStatusCard");
         card.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
-                Ui.badge(online ? "Online" : "Offline", online ? "WlBadgeGood" : "WlBadge")));
+                Ui.badge(online ? "Online" : "Offline", online ? "SvBadgeGood" : "SvBadge")));
         if (earnings != null) {
             Container today = new Container(BoxLayout.y());
             today.add(Ui.label(Ui.money(earnings.todayCents(), earnings.currency()),
-                    "WlStatusValue"));
+                    "SvStatusValue"));
             today.add(Ui.label(Lang.tr("Today, {0} trips", String.valueOf(earnings.todayDeliveries())),
-                    "WlStatusDetail"));
+                    "SvStatusDetail"));
             card.add(BorderLayout.EAST, today);
         }
         stage.header(card);
@@ -386,19 +386,19 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void waiting() {
         Container peek = sheet.peek();
-        Label title = Ui.label(online ? "Looking for deliveries" : "You are offline", "WlHeading");
+        Label title = Ui.label(online ? "Looking for deliveries" : "You are offline", "SvHeading");
         title.setName("courierState");
         peek.add(title);
         if (lastFare != null) {
-            peek.add(Ui.text(Lang.tr("Trip complete: {0}", lastFare), "WlNotice"));
+            peek.add(Ui.text(Lang.tr("Trip complete: {0}", lastFare), "SvNotice"));
         }
         if (online) {
             peek.add(Ui.label("Stay close to busy streets; requests come to the nearest car.",
-                    "WlMuted"));
+                    "SvMuted"));
             peek.add(FlowLayout.encloseCenter(new Pulse()));
         } else {
-            peek.add(Ui.label("Go online to start taking deliveries.", "WlMuted"));
-            Button go = new Button("GO", "WlGo");
+            peek.add(Ui.label("Go online to start taking deliveries.", "SvMuted"));
+            Button go = new Button("GO", "SvGo");
             go.setName("goOnline");
             go.addActionListener(e -> report(true, Ui::fail));
             peek.add(FlowLayout.encloseCenter(go));
@@ -420,12 +420,12 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     private void offer() {
         final String id = delivery.id();
         Container peek = sheet.peek();
-        Label title = Ui.label("Delivery request", "WlHeading");
+        Label title = Ui.label("Delivery request", "SvHeading");
         title.setName("courierState");
         countdown = new Ring();
         countdown.setName("countdown");
         countdown.start(delivery.offerExpiresInSeconds(), delivery.offerExpiresInSeconds());
-        Label fare = Ui.label(Ui.money(delivery.fareCents(), delivery.currency()), "WlFare");
+        Label fare = Ui.label(Ui.money(delivery.fareCents(), delivery.currency()), "SvFare");
         fare.setName("fare");
         Container words = new Container(BoxLayout.y());
         words.add(title);
@@ -446,8 +446,8 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
                 () -> Telemetry.offerAnswered(false))));
         sheet.more().add(Ui.row(FontImage.MATERIAL_PERSON, delivery.customerName(), asked(), null));
         sheet.more().add(Ui.row(delivery.cash() ? FontImage.MATERIAL_PAYMENTS
-                : FontImage.MATERIAL_CREDIT_CARD, delivery.cash() ? "Cash" : "Card",
-                Lang.tr(Ui.product(delivery.product())), null));
+                : FontImage.MATERIAL_CREDIT_CARD, delivery.cash() ? "Cash at the door" : "Paid by card",
+                null, null));
     }
 
     private void trip() {
@@ -457,7 +457,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         Label title = Ui.label(DeliveryState.ACCEPTED == state
                 ? Lang.tr("Pick up {0}", delivery.customerName())
                 : DeliveryState.ARRIVED == state ? Lang.tr("Waiting for {0}", delivery.customerName())
-                : Lang.tr("On the trip"), "WlHeading");
+                : Lang.tr("On the trip"), "SvHeading");
         title.setName("courierState");
         peek.add(title);
         boolean aboard = DeliveryState.IN_PROGRESS == state;
@@ -468,14 +468,14 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             // Said before the trip ends, so that it is not a surprise at the door.
             Label cash = Ui.label(Lang.tr("Collect {0} in cash", Ui.money(
                     delivery.total() > 0 ? delivery.total() : delivery.fareCents(), delivery.currency())),
-                    "WlNotice");
+                    "SvNotice");
             cash.setName("collectCash");
             Ui.icon(cash, FontImage.MATERIAL_PAYMENTS, 3f);
             peek.add(cash);
         }
         if (!aboard) {
             Container reach = new Container(new GridLayout(1, 2));
-            reach.setUIID("WlActions");
+            reach.setUIID("SvActions");
             reach.add(Ui.action(FontImage.MATERIAL_CALL, "Call", "call", e -> call()));
             reach.add(Ui.action(FontImage.MATERIAL_SMS, "Message", "message", e -> message()));
             peek.add(reach);
@@ -504,7 +504,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         more.add(Ui.row(FontImage.MATERIAL_PERSON, delivery.customerName(), asked(), null));
         more.add(Ui.row(FontImage.MATERIAL_PLACE, delivery.dropoffAddress(),
                 Ui.distance(delivery.distanceMeters()) + Ui.DOT + Ui.minutes(delivery.durationSeconds()),
-                Ui.label(Ui.money(delivery.fareCents(), delivery.currency()), "WlRowValue")));
+                Ui.label(Ui.money(delivery.fareCents(), delivery.currency()), "SvRowValue")));
         // A customer who is aboard is taken where they are going: there is no
         // cancelling from here, only finishing.
         if (!aboard) {
@@ -540,21 +540,8 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
         }
     }
 
-    /// What the customer asked for with the delivery, in a line.
+    /// What the customer asked of the courier, in a line.
     private String asked() {
-        StringBuilder asked = new StringBuilder();
-        if (delivery.quietDelivery()) {
-            asked.append(Lang.tr("Quiet delivery"));
-        }
-        if (delivery.accessibleVehicle()) {
-            asked.append(asked.length() > 0 ? ", " : "").append(Lang.tr("Accessible vehicle"));
-        }
-        if (delivery.petFriendly()) {
-            asked.append(asked.length() > 0 ? ", " : "").append(Lang.tr("Pet friendly"));
-        }
-        if (delivery.note() != null && delivery.note().length() > 0) {
-            asked.append(asked.length() > 0 ? ", " : "").append(delivery.note());
-        }
-        return asked.toString();
+        return delivery.note() == null ? "" : delivery.note();
     }
 }

@@ -267,9 +267,9 @@ public final class Nav {
     private static void unreachable() {
         Form form = Ui.form("Savor", "Unreachable");
         Container page = Ui.page();
-        page.add(Ui.label("No connection", "WlTitle"));
+        page.add(Ui.label("No connection", "SvTitle"));
         page.add(Ui.text(Lang.tr("The server at {0} did not answer.", Session.serverUrl()),
-                "WlText"));
+                "SvText"));
         page.add(Ui.primary("Try again", "retry", e -> launch()));
         if (AppConfig.serverSwitchable()) {
             page.add(Ui.secondary("Server address", "server", e -> ServerForm.show(form)));

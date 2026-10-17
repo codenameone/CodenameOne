@@ -41,9 +41,7 @@ import com.codenameone.examples.savor.Telemetry;
 import com.codenameone.examples.savor.api.DocumentDto;
 import com.codenameone.examples.savor.api.DocumentUploadDto;
 import com.codenameone.examples.savor.api.CourierApplicationDto;
-import com.codenameone.examples.savor.api.ProfileDto;
 import com.codenameone.examples.savor.api.UserDto;
-import com.codenameone.examples.savor.net.Account;
 import com.codenameone.examples.savor.net.Api;
 import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.net.Session;
@@ -75,26 +73,22 @@ public final class ApplicationForm {
     private static final char[] KIND_ICONS = {FontImage.MATERIAL_BADGE,
         FontImage.MATERIAL_CREDIT_CARD, FontImage.MATERIAL_FACE,
         FontImage.MATERIAL_DESCRIPTION, FontImage.MATERIAL_VERIFIED_USER};
-    private static final String[] STEPS = {"About you", "Your licence", "Your car",
+    private static final String[] STEPS = {"About you", "Your licence", "Your vehicle",
         "Your documents", "Review and submit"};
-    private static final String[] GENDERS = {"unspecified", "female", "male", "nonbinary"};
-    private static final String[] GENDER_NAMES = {"Rather not say", "Woman", "Man",
-        "Non-binary"};
     private static final String ISO = "yyyy-MM-dd";
 
     private final Form form = Ui.form("Drive with Savor", "Application");
     private final Runnable done;
     private final Container body = Ui.page();
-    private final Label stepLabel = Ui.plain("", "WlStepLabel");
-    private final Label stepTitle = Ui.label("", "WlTitle");
+    private final Label stepLabel = Ui.plain("", "SvStepLabel");
+    private final Label stepTitle = Ui.label("", "SvTitle");
     private final Container progress = new Container(new BorderLayout());
-    private final SpanLabel error = Ui.text("", "WlError");
+    private final SpanLabel error = Ui.text("", "SvError");
     private final Button next = Ui.primary("Continue", "next", e -> forward());
     private final Button back = Ui.link("Back", "backStep", e -> backward());
     /// The pictures taken on this visit, to show beside their documents.
     private final Map<String, Image> thumbs = new HashMap<String, Image>();
     private CourierApplicationDto application;
-    private String gender;
     private int step;
     /// Reads what the step on screen has in its fields into [#application].
     private Runnable collect = () -> { };
@@ -104,10 +98,6 @@ public final class ApplicationForm {
         this.done = done;
         Ui.back(form, () -> done.run());
         UserDto user = Session.user();
-        ProfileDto profile = Account.profile();
-        gender = profile != null && profile.gender() != null && profile.gender().length() > 0
-                ? profile.gender() : user.gender() == null || user.gender().length() == 0
-                ? GENDERS[0] : user.gender();
         if (application.legalName() == null || application.legalName().length() == 0) {
             this.application = filled(user.displayName(), application.dateOfBirth(),
                     application.licenceNumber(), application.licenceExpiry());
@@ -115,10 +105,10 @@ public final class ApplicationForm {
         stepLabel.setName("step");
         error.setName("error");
         Container head = new Container(BoxLayout.y());
-        head.setUIID("WlPage");
+        head.setUIID("SvPage");
         head.add(stepLabel).add(stepTitle).add(progress);
         Container foot = new Container(BoxLayout.y());
-        foot.setUIID("WlFooter");
+        foot.setUIID("SvFooter");
         foot.setSafeArea(true);
         foot.add(error).add(next).add(back);
         form.add(BorderLayout.NORTH, head);
@@ -152,7 +142,7 @@ public final class ApplicationForm {
         } else if (step == 1) {
             licence();
         } else if (step == 2) {
-            car();
+            vehicle();
         } else if (step == 3) {
             documents();
         } else {
@@ -166,20 +156,16 @@ public final class ApplicationForm {
 
     private void you() {
         body.add(Ui.text("As it is written on your licence. Customers see only your first name.",
-                "WlMuted"));
+                "SvMuted"));
         final TextField name = Ui.field(body, "Legal name", "legalName", "");
         name.setText(application.legalName());
         final Picker born = date(body, "Date of birth", "dateOfBirth", application.dateOfBirth());
-        body.add(Ui.label("Gender", "WlLabel"));
-        body.add(Ui.choice("gender", GENDER_NAMES, GENDERS, gender, value -> gender = value, 2));
-        body.add(Ui.text("Customers who ask for a woman at the wheel are offered to couriers "
-                + "who say they are one.", "WlMuted"));
         collect = () -> application = filled(name.getText().trim(), iso(born),
                 application.licenceNumber(), application.licenceExpiry());
     }
 
     private void licence() {
-        body.add(Ui.text("The number is on the front of the card.", "WlMuted"));
+        body.add(Ui.text("The number is on the front of the card.", "SvMuted"));
         final TextField number = Ui.field(body, "Licence number", "licenceNumber", "");
         number.setText(application.licenceNumber());
         final Picker expiry = date(body, "Expires", "licenceExpiry", application.licenceExpiry());
@@ -187,27 +173,25 @@ public final class ApplicationForm {
                 application.dateOfBirth(), number.getText().trim(), iso(expiry));
     }
 
-    private void car() {
+    private void vehicle() {
         Container pair = new Container(new GridLayout(1, 2));
-        Container left = side("WlPairLeft");
-        Container right = side("WlPairRight");
-        final TextField make = Ui.field(left, "Make", "vehicleMake", "Toyota");
-        final TextField model = Ui.field(right, "Model", "vehicleModel", "Prius");
+        Container left = side("SvPairLeft");
+        Container right = side("SvPairRight");
+        final TextField make = Ui.field(left, "Make", "vehicleMake", "Vespa");
+        final TextField model = Ui.field(right, "Model", "vehicleModel", "Primavera");
         pair.add(left).add(right);
         body.add(pair);
         Container second = new Container(new GridLayout(1, 2));
-        left = side("WlPairLeft");
-        right = side("WlPairRight");
+        left = side("SvPairLeft");
+        right = side("SvPairRight");
         final TextField year = Ui.field(left, "Year", "vehicleYear", "2021", TextArea.NUMERIC);
         final TextField colour = Ui.field(right, "Colour", "vehicleColor", "Blue");
         second.add(left).add(right);
         body.add(second);
         Container third = new Container(new GridLayout(1, 2));
-        left = side("WlPairLeft");
-        right = side("WlPairRight");
+        left = side("SvPairLeft");
+        right = side("SvPairRight");
         final TextField plate = Ui.field(left, "Licence plate", "vehiclePlate", "7ABC123");
-        final TextField seats = Ui.field(right, "Seats for customers", "vehicleSeats", "4",
-                TextArea.NUMERIC);
         third.add(left).add(right);
         body.add(third);
         make.setText(application.vehicleMake());
@@ -216,30 +200,12 @@ public final class ApplicationForm {
                 ? String.valueOf(application.vehicleYear()) : "");
         colour.setText(application.vehicleColor());
         plate.setText(application.vehiclePlate());
-        seats.setText(String.valueOf(application.vehicleSeats() > 0
-                ? application.vehicleSeats() : 4));
-        final String[] product = {application.product() == null
-                || application.product().length() == 0 ? "standard" : application.product()};
-        body.add(Ui.label("Kind of delivery", "WlLabel"));
-        body.add(Ui.choice("product", new String[] {"Standard", "Comfort", "XL"},
-                new String[] {"standard", "comfort", "xl"}, product[0],
-                value -> product[0] = value));
-        body.add(Ui.text("Comfort is a newer, roomier car. XL seats six or more.", "WlMuted"));
-        final boolean[] accessible = {application.accessible()};
-        body.add(Ui.row(FontImage.MATERIAL_ACCESSIBLE, "Takes a wheelchair",
-                "A ramp or a lift, and room to secure the chair",
-                Ui.toggle("accessible", accessible[0], on -> accessible[0] = on)));
-        final boolean[] pets = {application.petFriendly()};
-        body.add(Ui.row(FontImage.MATERIAL_PETS, "Takes pets",
-                "Customers travelling with a pet are offered to you",
-                Ui.toggle("petFriendly", pets[0], on -> pets[0] = on)));
         collect = () -> {
             CourierApplicationDto a = application;
             application = new CourierApplicationDto(a.username(), a.name(), a.status(),
                     a.legalName(), a.dateOfBirth(), a.licenceNumber(), a.licenceExpiry(),
                     make.getText().trim(), model.getText().trim(), number(year.getText()),
-                    colour.getText().trim(), plate.getText().trim(), number(seats.getText()),
-                    product[0], accessible[0], pets[0], a.documents(), a.rejectionReason(),
+                    colour.getText().trim(), plate.getText().trim(), a.documents(), a.rejectionReason(),
                     a.submittedAt(), a.reviewedAt(), a.reviewedBy());
         };
     }
@@ -251,14 +217,13 @@ public final class ApplicationForm {
         CourierApplicationDto a = application;
         return new CourierApplicationDto(a.username(), a.name(), a.status(), legalName,
                 dateOfBirth, licenceNumber, licenceExpiry, a.vehicleMake(), a.vehicleModel(),
-                a.vehicleYear(), a.vehicleColor(), a.vehiclePlate(), a.vehicleSeats(),
-                a.product(), a.accessible(), a.petFriendly(), a.documents(),
+                a.vehicleYear(), a.vehicleColor(), a.vehiclePlate(), a.documents(),
                 a.rejectionReason(), a.submittedAt(), a.reviewedAt(), a.reviewedBy());
     }
 
     private void documents() {
         body.add(Ui.text("Photograph each one flat, with all four corners in the picture.",
-                "WlMuted"));
+                "SvMuted"));
         for (int iter = 0; iter < KINDS.length; iter++) {
             body.add(document(iter));
         }
@@ -271,8 +236,8 @@ public final class ApplicationForm {
         String status = status(kind);
         boolean have = !"missing".equals(status);
         Container box = new Container(BoxLayout.y());
-        box.setUIID("WlOption");
-        Label picture = new Label("", "WlThumb");
+        box.setUIID("SvOption");
+        Label picture = new Label("", "SvThumb");
         Image thumb = thumbs.get(kind);
         if (thumb != null) {
             int side = CN.convertToPixels(9f);
@@ -282,15 +247,15 @@ public final class ApplicationForm {
         }
         Label state = Ui.badge(have ? "rejected".equals(status) ? "Rejected"
                 : "accepted".equals(status) ? "Accepted" : "Added" : "Needed",
-                have ? "rejected".equals(status) ? "WlBadgeBad" : "WlBadgeGood" : "WlBadgeWarn");
+                have ? "rejected".equals(status) ? "SvBadgeBad" : "SvBadgeGood" : "SvBadgeWarn");
         state.setName("status-" + kind);
         // The state stands over the name and not beside it: the name is long
         // in some languages and has to keep the whole line.
         state.getAllStyles().setMargin(0, 0, 0, 0);
         Container lines = new Container(BoxLayout.y());
         lines.add(FlowLayout.encloseIn(state));
-        lines.add(Ui.label(KIND_NAMES[index], "WlRowTitle"));
-        lines.add(Ui.text(KIND_HINTS[index], "WlRowDetail"));
+        lines.add(Ui.label(KIND_NAMES[index], "SvRowTitle"));
+        lines.add(Ui.text(KIND_HINTS[index], "SvRowDetail"));
         Container top = new Container(new BorderLayout());
         top.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(picture));
         top.add(BorderLayout.CENTER, lines);
@@ -321,26 +286,22 @@ public final class ApplicationForm {
 
     private void review() {
         body.add(Ui.text("Have a last look. You can change anything until it is handed in.",
-                "WlMuted"));
+                "SvMuted"));
         Ui.section(body, "You");
         body.add(Ui.fact("Legal name", application.legalName()));
         body.add(Ui.fact("Date of birth", application.dateOfBirth()));
         body.add(Ui.fact("Licence", application.licenceNumber()));
         body.add(Ui.fact("Licence expires", application.licenceExpiry()));
         Ui.section(body, "Your car");
-        body.add(Ui.fact("Car", ApplyForm.car(application)));
+        body.add(Ui.fact("Vehicle", ApplyForm.car(application)));
         body.add(Ui.fact("Licence plate", application.vehiclePlate()));
-        body.add(Ui.fact("Seats for customers", String.valueOf(application.vehicleSeats())));
-        body.add(Ui.fact("Kind of delivery", Lang.tr(Ui.product(application.product()))));
-        body.add(Ui.fact("Takes a wheelchair", Lang.tr(application.accessible() ? "Yes" : "No")));
-        body.add(Ui.fact("Takes pets", Lang.tr(application.petFriendly() ? "Yes" : "No")));
         Ui.section(body, "Documents");
         int have = KINDS.length - ApplyForm.missing(application);
         Container documents = Ui.fact("Photos added", have + " / " + KINDS.length);
         documents.getComponentAt(1).setName("documentsAdded");
         body.add(documents);
         body.add(Ui.text("By submitting you confirm that all of this is true and that the "
-                + "documents are your own.", "WlMuted"));
+                + "documents are your own.", "SvMuted"));
     }
 
     // ----------------------------------------------------------- moving along
@@ -372,16 +333,9 @@ public final class ApplicationForm {
             display();
             return;
         }
-        final boolean named = step == 0;
         Api.onboarding().save(application, Net.to(saved -> {
             application = saved;
             next.setEnabled(true);
-            if (named) {
-                // The gender is the account's, not the application's.
-                ProfileDto profile = Account.profile();
-                Account.saveProfile(profile == null ? Session.user().displayName() : profile.name(),
-                        gender, () -> { }, (status, message) -> { });
-            }
             step++;
             display();
         }, this::failed));
@@ -397,7 +351,7 @@ public final class ApplicationForm {
         if (step == 2) {
             return empty(application.vehicleMake()) || empty(application.vehicleModel())
                     || empty(application.vehicleColor()) || empty(application.vehiclePlate())
-                    || application.vehicleYear() <= 0 || application.vehicleSeats() <= 0;
+                    || application.vehicleYear() <= 0;
         }
         return false;
     }
@@ -442,7 +396,7 @@ public final class ApplicationForm {
     private static Picker date(Container to, String caption, String name, String value) {
         Picker picker = new Picker();
         picker.setType(Display.PICKER_TYPE_DATE);
-        picker.setUIID("WlField");
+        picker.setUIID("SvField");
         picker.setName(name);
         picker.setFormatter(new SimpleDateFormat("d MMM yyyy"));
         if (value != null && value.length() > 0) {
@@ -453,7 +407,7 @@ public final class ApplicationForm {
                 picker.setDate(new Date());
             }
         }
-        to.add(Ui.label(caption, "WlLabel")).add(picker);
+        to.add(Ui.label(caption, "SvLabel")).add(picker);
         return picker;
     }
 

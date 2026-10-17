@@ -44,8 +44,8 @@ import java.util.List;
 /// `MapView` draws OpenStreetMap vector tiles with no key and no account, in a
 /// light or a dark style to match the app. Everything put on it is drawn here,
 /// in code, in colours from `theme.css`: the pickup and drop-off pins
-/// (`WlMarkerPickup`, `WlMarkerDropoff`), the car (`WlMarkerCar`) and the route
-/// (`WlRoute`). In each of those styles the text colour is the shape and the
+/// (`SvMarkerPickup`, `SvMarkerDropoff`), the car (`SvMarkerCar`) and the route
+/// (`SvRoute`). In each of those styles the text colour is the shape and the
 /// background colour is its edge.
 public final class Maps {
     public static final int CITY_ZOOM = 13;
@@ -81,12 +81,12 @@ public final class Maps {
 
     /// Where the delivery starts: a disc with a dot in it.
     public static Marker pickup(MapView map, LatLng at) {
-        return marker(map, at, pin("WlMarkerPickup", true));
+        return marker(map, at, pin("SvMarkerPickup", true));
     }
 
     /// Where the delivery ends: the same, square.
     public static Marker dropoff(MapView map, LatLng at) {
-        return marker(map, at, pin("WlMarkerDropoff", false));
+        return marker(map, at, pin("SvMarkerDropoff", false));
     }
 
     private static Marker marker(MapView map, LatLng at, EncodedImage icon) {
@@ -139,7 +139,7 @@ public final class Maps {
     }
 
     private static EncodedImage drawCar(double heading) {
-        Style style = UIManager.getInstance().getComponentStyle("WlMarkerCar");
+        Style style = UIManager.getInstance().getComponentStyle("SvMarkerCar");
         // Square, and wide enough for the car's length at any angle.
         int side = CN.convertToPixels(9f);
         double length = side * 0.78;
@@ -201,7 +201,7 @@ public final class Maps {
 
     /// Draws `points` as the route and returns it, to remove it by.
     public static Line route(MapView map, List<LatLng> points) {
-        Style style = UIManager.getInstance().getComponentStyle("WlRoute");
+        Style style = UIManager.getInstance().getComponentStyle("SvRoute");
         int width = Math.max(4, CN.convertToPixels(1.1f));
         // The edge first, so that the line is drawn over it.
         Polyline edge = stroke(points, style.getBgColor(), width + Math.max(2, width / 2));
