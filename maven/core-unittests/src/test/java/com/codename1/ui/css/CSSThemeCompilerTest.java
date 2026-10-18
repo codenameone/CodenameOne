@@ -802,6 +802,37 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("#f00", resource.getTheme("Theme").get("@accent"));
     }
 
+    @Test
+    public void testTheLastDeriveWinsAlsoForAStateWithItsOwn() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("BaseA{font-family:'native:MainBold';}"
+                + "BaseB{font-family:'native:MainLight';}"
+                + "Child:selected{cn1-derive:BaseA;}"
+                + "Child:disabled{cn1-derive:BaseB;}"
+                + "Child:selected{font-size:20px;}", resource, "Theme");
+        assertEquals("native:MainLight", fontName((Font) resource.getTheme("Theme").get("Child.sel#font")));
+    }
+
+    @Test
+    public void testFamilyWalkContinuesPastANativeFont() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("A{font-family:'native:MainBold',monospace;}"
+                + "B{font-family:'native:MainBold','native:MainLight';}", resource, "Theme");
+        assertEquals(Font.FACE_MONOSPACE, ((Font) resource.getTheme("Theme").get("A.font")).getFace());
+        assertEquals("native:MainLight", fontName((Font) resource.getTheme("Theme").get("B.font")));
+    }
+
+    @Test
+    public void testJavaOnlyNumberSpellingsAreRejected() {
+        for (String bad : new String[]{"1fpx", "NaNpx", "Infinitypx", "1dpx", "0x1p3px", "1.px"}) {
+            assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                    .compile("Label{padding:" + bad + ";}", new MutableResource(), "Theme"), bad);
+        }
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{padding:.5mm 1e1px +2px -0px;}", resource, "Theme");
+        assertEquals("0.5,2,0,10", resource.getTheme("Theme").get("Label.padding"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

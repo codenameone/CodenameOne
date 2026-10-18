@@ -5509,12 +5509,20 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                         for (String theme : themes) {
                             String folder = res + "/" + stripSlash(theme) + "/" + id;
                             if (!fs.isDirectory(folder)) continue;
+                            // Variant names match in any case, as the build-time compiler's do, so
+                            // medium.PNG is still the medium variant and wins over veryhigh.png.
+                            String[] files = fs.listFiles(folder);
                             for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
-                                image = load(folder + "/" + density);
+                                for (String file : files) {
+                                    if (density.equalsIgnoreCase(stripSlash(file))) {
+                                        image = load(folder + "/" + file);
+                                        break;
+                                    }
+                                }
                                 if (image != null) break;
                             }
                             if (image == null) {
-                                for (String file : fs.listFiles(folder)) {
+                                for (String file : files) {
                                     // Any case, as CSSTheme.getResourceImage() accepts medium.PNG.
                                     if (file.regionMatches(true, file.length() - 4, ".png", 0, 4)) {
                                         image = load(folder + "/" + file);

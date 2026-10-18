@@ -1840,6 +1840,20 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void anUpperCaseDensityVariantBeatsADenserOne() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("verylow.PNG").toFile());
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("4k.png").toFile());
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(3, image.getWidth(), "every display density is at least very low");
+    }
+
+    @Test
     void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,

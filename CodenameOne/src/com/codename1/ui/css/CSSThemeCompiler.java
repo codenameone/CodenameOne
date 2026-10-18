@@ -197,6 +197,10 @@ public class CSSThemeCompiler {
                     break;
                 }
                 target = "@" + v.substring("var(--".length(), v.length() - 1).trim();
+                // Across separate compile() calls the theme keeps only final values, and a quoted
+                // "#abc" is stored exactly like an unquoted #abc custom property, so whether an
+                // earlier value was quoted is not recoverable from it. Compiling the stylesheet
+                // whole, as live reload and the GUI builder do, keeps the exact typing.
                 // A constant a previous compile stored is a final value: a var() still in it was
                 // quoted text there, and must not be expanded through the alias. Any other earlier
                 // value is classified like a fresh one, so `#abc` still becomes a color.
@@ -470,7 +474,7 @@ public class CSSThemeCompiler {
                 continue;
             }
             String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
-            if ("cn1-derive".equals(property) && statePrefix.length() > 0) {
+            if ("cn1-derive".equals(property)) {
                 ownerDerives.put(uiid, value.trim());
             }
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
@@ -630,6 +634,17 @@ public class CSSThemeCompiler {
         ArrayList<String> chain = new ArrayList<String>();
         while (id != null && !chain.contains(id)) {
             chain.add(id);
+            // A derive this compile declared, in any state: the last one in source order is the
+            // owning UIID's only parent in the build-time compiler, for every state.
+            String owner = dark ? ownerDerives.get("$Dark" + id) : null;
+            if (owner == null) {
+                owner = ownerDerives.get(id);
+            }
+            if (owner != null) {
+                id = owner;
+                continue;
+            }
+            // Otherwise a derive a previous compile into the same theme stored.
             Object stateDerive = null;
             if (state.length() > 0) {
                 stateDerive = dark ? theme.get("$Dark" + id + "." + state + "derive") : null;
@@ -680,9 +695,11 @@ public class CSSThemeCompiler {
             String[] families = splitOnComma(familyList);
             for (String entry : families) {
                 String family = unquote(entry);
+                // The build-time compiler walks on past a native font, so a later one, or a later
+                // monospace, wins; only a generic family or monospace ends the walk.
                 if (family.startsWith("native:")) {
                     ttfName = family;
-                    break;
+                    continue;
                 }
                 if ("monospace".equalsIgnoreCase(family)) {
                     monospace = true;
@@ -822,11 +839,59 @@ public class CSSThemeCompiler {
         if (t.length() == 0) {
             throw new CSSSyntaxException("Missing number in: " + original);
         }
+        // CSS number syntax only: Float.parseFloat would also take 1f, 1d, 0x1p3, NaN and
+        // Infinity, which the build-time parser reads as a number followed by a unit.
+        if (!isCssNumber(t)) {
+            throw new CSSSyntaxException("Invalid number in: " + original);
+        }
         try {
             return Float.parseFloat(t);
         } catch (NumberFormatException err) {
             throw new CSSSyntaxException("Invalid number in: " + original, err);
         }
+    }
+
+    /// `[+-]? (digits | digits? . digits) ([eE] [+-]? digits)?`, the CSS number token.
+    private static boolean isCssNumber(String t) {
+        int i = 0;
+        int n = t.length();
+        if (i < n && (t.charAt(i) == '+' || t.charAt(i) == '-')) {
+            i++;
+        }
+        int intDigits = 0;
+        while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+            i++;
+            intDigits++;
+        }
+        int fracDigits = 0;
+        if (i < n && t.charAt(i) == '.') {
+            i++;
+            while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+                i++;
+                fracDigits++;
+            }
+            if (fracDigits == 0) {
+                return false;
+            }
+        }
+        if (intDigits + fracDigits == 0) {
+            return false;
+        }
+        if (i < n && (t.charAt(i) == 'e' || t.charAt(i) == 'E')) {
+            i++;
+            if (i < n && (t.charAt(i) == '+' || t.charAt(i) == '-')) {
+                i++;
+            }
+            int expDigits = 0;
+            while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+                i++;
+                expDigits++;
+            }
+            if (expDigits == 0) {
+                return false;
+            }
+        }
+        return i == n;
     }
 
     private static boolean endsWithIgnoreCase(String value, String suffix) {
