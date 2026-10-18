@@ -2111,7 +2111,7 @@ public final class UnityRuntime {
     /// it.
     private static void canvasKeys(Canvas canvas, DrawCommand d) {
         d.sortingOrder = canvas.sortingOrder;
-        boolean overlay = canvas.renderMode == 0 || canvas.worldCamera == null;
+        boolean overlay = canvas.renderMode == 0 || !Object.op_Implicit(canvas.worldCamera);
         d.group = overlay ? 1 : 0;
         d.sortingLayer = overlay ? 0 : sortingLayer(canvas.sortingLayerID);
         d.depth = canvas.planeDistance;

@@ -628,7 +628,7 @@ public class UnityGameView extends GameView {
     /// Safe from any thread. The steps have been run, and the scene shows
     /// the last of them, once [#framesAdvanced()] has grown by `frames`.
     public void advance(int frames, float deltaSeconds) {
-        if (frames < 0 || deltaSeconds < 0f || Float.isNaN(deltaSeconds)) {
+        if (frames < 0 || deltaSeconds < 0f || Float.isNaN(deltaSeconds) || Float.isInfinite(deltaSeconds)) {
             throw new IllegalArgumentException("advance: " + frames + " frames of " + deltaSeconds + " seconds");
         }
         clockHeld.set(true);

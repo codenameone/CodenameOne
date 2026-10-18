@@ -126,7 +126,10 @@ public final class Time {
     /// A negative scale is ignored and the previous one kept, as Unity's
     /// `Time.timeScale` documents; NaN is refused the same way.
     public static void set_timeScale(float value) {
-        if (!(value >= 0f)) { // NOPMD LogicInversion: NaN is refused too
+        // Unity takes a scale from 0 to 100 and refuses the rest, NaN
+        // included. An infinite one would leave the fixed-step loop an
+        // accumulator that subtracting a step never brings down.
+        if (!(value >= 0f && value <= 100f)) { // NOPMD LogicInversion: NaN is refused too
             return;
         }
         timeScale = value;

@@ -171,6 +171,25 @@ public class UnityProjectImporterTest {
         assertEquals("now a file", read(new File(unity, "Assets/Levels")));
     }
 
+    /// A link inside the project is reported and not followed, so one that
+    /// points at a folder above it cannot recurse.
+    @Test
+    public void skipsSymbolicLinksInsideTheProject() throws Exception {
+        File loop = new File(game, "Assets/Scripts/Loop");
+        try {
+            Files.createSymbolicLink(loop.toPath(), game.toPath());
+        } catch (UnsupportedOperationException | IOException e) {
+            return; // a file system without links
+        }
+        UnityProjectImporter.Result r = importIt();
+        assertFalse(new File(unity, "Assets/Scripts/Loop").exists());
+        boolean reported = false;
+        for (String s : r.ignored) {
+            reported |= s.startsWith("Assets/Scripts/Loop (a symbolic link");
+        }
+        assertTrue(r.ignored.toString(), reported);
+    }
+
     /// The record of what was imported is a file in the project; a line
     /// edited into it must not name a file elsewhere for deletion.
     @Test

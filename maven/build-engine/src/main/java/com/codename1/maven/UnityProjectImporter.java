@@ -129,6 +129,13 @@ public final class UnityProjectImporter {
     }
 
     private void copy(File src, File dest, String path, Set<String> imported, Result r) throws IOException {
+        // A link inside the two trees is skipped, never followed: it can
+        // lead out of the project, or back to a folder above it and round
+        // for ever. `Assets` itself may be a link; that one is the project.
+        if (path.indexOf('/') >= 0 && Files.isSymbolicLink(src.toPath())) {
+            r.ignored.add(path + " (a symbolic link; copy what it points to into the project instead)");
+            return;
+        }
         // An asset that was a file and is now a folder, or the other way
         // round: the old one is in the way of the new, and stale entries
         // are only swept after the copy, so it goes first.
