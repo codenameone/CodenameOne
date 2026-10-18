@@ -113,6 +113,14 @@ public final class Trips {
     public static final long DISH_CENTS = 1800;
 
     private static final Map<String, Kitchen> KITCHENS = new HashMap<>();
+    /// The application the kitchens above were opened in. Classes whose
+    /// contexts differ (one injects the database, another does not) each start
+    /// the application afresh, with an empty in-memory database, and a compiled
+    /// run keeps this class's statics across all of them in one process, so a
+    /// kitchen remembered from an application that has stopped names a
+    /// restaurant the running one never had. Each running application has its
+    /// own MockMvc, which is what tells them apart.
+    private static MockMvc kitchensOf;
     private static int kitchens;
 
     public static Trip trip(double fromLat, double fromLng, double toLat, double toLng) {
@@ -126,8 +134,13 @@ public final class Trips {
     }
 
     /// The restaurant at a point, opened, approved and given a menu the first
-    /// time it is asked for. Every class shares one server, so it is kept.
+    /// time it is asked for, and kept for as long as the application it was
+    /// opened in runs.
     public static synchronized Kitchen kitchen(MockMvc mvc, double lat, double lng) throws Exception {
+        if (kitchensOf != mvc) {
+            KITCHENS.clear();
+            kitchensOf = mvc;
+        }
         String key = lat + "," + lng;
         Kitchen known = KITCHENS.get(key);
         if (known != null) {

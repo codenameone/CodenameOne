@@ -47,7 +47,9 @@ To see it running first, the two commands under <<Running it>> are all it takes.
   the wallet, the settings and the live channel. Styled in
   `src/main/css/theme.css`, whose first block of variables holds the colors and
   the corner radius everything else is drawn with. The text is in
-  `src/main/l10n`, in English, Spanish, French, German and Hebrew.
+  `src/main/l10n`, in English, Spanish, French, German and Hebrew. The
+  translations are machine-generated samples that no native speaker has
+  reviewed; have them checked before you ship.
   What it reports to Codename One analytics about how it is used, once the user
   has agreed, is all in `Telemetry`.
 

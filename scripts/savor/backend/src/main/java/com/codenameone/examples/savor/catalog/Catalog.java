@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.savor.catalog;
 
+import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -296,7 +297,7 @@ public class Catalog {
         if (photo == null) {
             throw new ResponseStatusException(404, "No such photo");
         }
-        return new PhotoDto(photo.getId(), photo.getContentType(), photo.getData());
+        return new PhotoDto(photo.getId(), photo.getContentType(), Base64.encode(photo.getData()));
     }
 
     // ------------------------------------------------------------- favorites

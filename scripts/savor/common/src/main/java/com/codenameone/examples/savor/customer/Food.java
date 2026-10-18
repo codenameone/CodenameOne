@@ -100,7 +100,7 @@ public final class Food {
     }
 
     /// A photo's place that paints its cover itself while it shows an icon,
-    /// and steps aside once [Pictures] has given it the photograph.
+    /// and keeps the photograph [Pictures] gives it to the same rounded card.
     private static final class Cover extends Label {
         private final int[] tones;
 
@@ -111,33 +111,33 @@ public final class Food {
 
         @Override
         public void paint(Graphics g) {
+            int x = getX();
+            int y = getY();
+            int w = getWidth();
+            int h = getHeight();
+            int[] clip = g.getClip();
+            // A hero runs edge to edge; everything else is a card, and its
+            // photograph is rounded with it.
+            if (!"SvHeroPhoto".equals(getUIID()) && g.isShapeClipSupported()) {
+                float r = CN.convertToPixels(2f);
+                GeneralPath shape = new GeneralPath();
+                shape.moveTo(x + r, y);
+                shape.lineTo(x + w - r, y);
+                shape.quadTo(x + w, y, x + w, y + r);
+                shape.lineTo(x + w, y + h - r);
+                shape.quadTo(x + w, y + h, x + w - r, y + h);
+                shape.lineTo(x + r, y + h);
+                shape.quadTo(x, y + h, x, y + h - r);
+                shape.lineTo(x, y + r);
+                shape.quadTo(x, y, x + r, y);
+                shape.closePath();
+                g.setClip(shape);
+            }
             if (getIcon() instanceof FontImage) {
-                int x = getX();
-                int y = getY();
-                int w = getWidth();
-                int h = getHeight();
-                int[] clip = g.getClip();
-                // A hero runs edge to edge; everything else is a card.
-                boolean rounded = !"SvHeroPhoto".equals(getUIID()) && g.isShapeClipSupported();
-                if (rounded) {
-                    float r = CN.convertToPixels(2f);
-                    GeneralPath shape = new GeneralPath();
-                    shape.moveTo(x + r, y);
-                    shape.lineTo(x + w - r, y);
-                    shape.quadTo(x + w, y, x + w, y + r);
-                    shape.lineTo(x + w, y + h - r);
-                    shape.quadTo(x + w, y + h, x + w - r, y + h);
-                    shape.lineTo(x + r, y + h);
-                    shape.quadTo(x, y + h, x, y + h - r);
-                    shape.lineTo(x, y + r);
-                    shape.quadTo(x, y, x + r, y);
-                    shape.closePath();
-                    g.setClip(shape);
-                }
                 g.fillLinearGradient(tones[0], tones[1], x, y, w, h, false);
-                g.setClip(clip);
             }
             super.paint(g);
+            g.setClip(clip);
         }
     }
 

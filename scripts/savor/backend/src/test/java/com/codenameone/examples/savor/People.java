@@ -27,8 +27,9 @@ import static com.codename1.backend.test.SecurityMockMvcRequestPostProcessors.jw
 
 /// The people a test needs, made fresh for it.
 ///
-/// Every test class shares one running server and one database, so a test that
-/// borrowed a demo account would meet whatever the test before it left behind:
+/// Test classes share a running server and its database for as long as they
+/// can, so a test that borrowed a demo account would meet whatever the test
+/// before it left behind:
 /// a delivery under way, a courier still on line. Each test makes its own people and
 /// works in its own city instead.
 public final class People {

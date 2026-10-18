@@ -334,6 +334,9 @@ the language, the theme, notifications and the usage statistics. The app is in
 English, Spanish, French, German and Hebrew, and in Hebrew it's laid out from right
 to left.
 
+NOTE: The translations are machine-generated samples, and no native speaker has
+reviewed them. Have them checked before you ship the app in those languages.
+
 .The settings
 image::img/savor-settings.png["The settings screen with the account's profile, verified phone number and password",scaledwidth=40%]
 

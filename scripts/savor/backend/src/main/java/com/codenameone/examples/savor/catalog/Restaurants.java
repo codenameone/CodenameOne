@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.savor.catalog;
 
+import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -503,11 +504,15 @@ public class Restaurants {
                 throw new ResponseStatusException(400, "The photo is not base64");
             }
         }
+        byte[] bytes = Base64.decode(photo.data());
+        if (bytes == null || bytes.length == 0) {
+            throw new ResponseStatusException(400, "The photo is not base64");
+        }
         Photo row = new Photo();
         row.setId(Ids.next());
         row.setRestaurantId(restaurantId);
         row.setContentType(type);
-        row.setData(photo.data());
+        row.setData(bytes);
         row.setCreatedAt(System.currentTimeMillis());
         photos.insert(row);
         return new PhotoDto(row.getId(), type, "");

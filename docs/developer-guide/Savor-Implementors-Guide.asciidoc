@@ -256,9 +256,8 @@ The ways to make Wayline your own carry over: the name, icon and colors, the
 languages, the text-message and push providers, the database, hosting. A few apply
 to food in particular:
 
-* **One restaurant.** A restaurant's own ordering app is Savor with the catalog cut
-  to one row: open the app on its menu instead of the list, and keep the merchant
-  and courier modes for the staff.
+* **One restaurant or a small chain.** Ordering and delivery under the restaurant's
+  own name, which <<savor-own-restaurant>> describes.
 * **Pickup.** An order with no delivery is one the kitchen hands over itself. Mark
   the order as collected, skip `dispatch` when the kitchen accepts it, and let the
   merchant move it from `READY` to `DELIVERED`, which captures the hold.
@@ -267,3 +266,101 @@ to food in particular:
 * **Before it's a product.** A real service needs restaurant payouts, tax rules for
   the places it sells in, menus that change by the hour, allergens and age checks.
   None of them are in the sample.
+
+[[savor-own-restaurant]]
+=== Making it yours: A restaurant's own delivery service
+
+A marketplace takes a share of every order and keeps the customer. A restaurant,
+or a chain of a few, that runs its own ordering and delivery keeps both: the app
+carries its name, the customers' accounts and order history are its own, and the
+couriers are its staff or a courier company it contracts. Savor is most of that
+service already. What changes is that there is one brand instead of many, and
+nobody applies to sell. This section says what to change, and the class each
+change belongs in.
+
+==== One brand, one or a few kitchens
+
+A chain is a restaurant row per branch, each with its own address, hours,
+preparation time and menu. Seed them in place of `catalog/DemoRestaurants`, or
+create them through the admin console. Nothing else in the catalog changes:
+`Catalog.nearby` already answers the branches that deliver to the customer's
+door, nearest first, and the order goes to the branch the customer picked.
+
+The customer's first screen changes. With one kitchen, open its menu instead of
+the list: where `Nav.build` makes the customer's home, call
+`RestaurantForm.show` with the restaurant's id. With a few, keep the list, which
+is now a list of branches, and drop the row of cuisines and the sort above it
+in `CustomerForm`, which only make sense for many restaurants.
+
+The name, the icon and the colors are the ones <<savor-launch>> and Wayline's
+chapter describe. Use the restaurant's own photographs: replace the files in
+`backend/photos`, which the development server reads into the database the first
+time it starts, and name them in the seed. In production, upload them from the
+merchant's menu editor.
+
+==== Nobody applies to sell
+
+Restaurants no longer join, so close that door:
+
+* Remove the restaurant applications from the server's rules and from
+  `Restaurants`: `apply`, `application` and `applicationPhoto`. The admin's
+  **Applications** pane then lists couriers only.
+* Set the commission to zero under **Pricing**, or with
+  `savor.fee.commissionPercent=0`. The commission is what a marketplace keeps of
+  the food; a restaurant selling its own food keeps it all, and the merchant's
+  sales should say so.
+* Make each branch's staff merchants of their branch from the admin console. A
+  merchant account works on one restaurant, the one `Restaurants.mine` finds.
+  An owner who watches several branches needs a branch picker on
+  `MerchantForm` and the restaurant's id in the merchant's calls in place of
+  `mine`.
+
+==== Couriers of its own
+
+A restaurant's couriers are known people, so the courier side works unchanged,
+with the application step done by an admin. Approve couriers from
+**Applications**, or give the role straight from **People**, and remove
+**Deliver with Savor** from the customer's menu in `CustomerForm`, and the
+courier choice from `RegisterForm`, if the public shouldn't apply.
+Offers go to the nearest courier online, as before. With two or three couriers,
+lengthen `savor.offer.seconds` and `savor.search.seconds`, because the one
+courier nearby may be at a door.
+
+Many restaurants deliver only part of the time, or hand deliveries to a courier
+company at busy hours. `Deliveries.dispatch` is the one place a delivery
+starts: send it to the company's API there instead of offering it to couriers,
+and move the delivery with the updates the company sends back.
+
+==== Pickup
+
+A customer who collects the order needs no courier. Mark the order as collected
+at checkout, skip `dispatch` when the kitchen accepts it in `Orders.accept`,
+and let the merchant move it from `READY` to `DELIVERED`, which captures the
+hold the way a delivery does.
+
+==== Booking a table
+
+A restaurant that delivers usually takes bookings too, and the parts are all in
+the sample. A booking isn't in it, so this is the outline:
+
+* **The record.** A `Reservation` entity -- restaurant, account, time, party
+  size, a note and a state of requested, confirmed, declined, seated or
+  cancelled -- in a new migration, with a state machine of conditional moves
+  like the order's, so a guest cancelling while the restaurant confirms can't
+  both win.
+* **The contract.** A `@RestClient` interface in `shared` for the guest's calls
+  (the free times, book, cancel, their own bookings) and calls under
+  `/api/merchant/restaurants/{id}/...` for the staff, behind the same rules as
+  the merchant's other calls.
+* **Free times.** Slots inside the restaurant's opening hours, each with the
+  number of covers the room takes, less the bookings already confirmed.
+* **The staff's screen.** A tab beside the order queue in `MerchantForm`,
+  refreshed by a frame on the live channel when a booking arrives, as a new
+  order is.
+* **Telling the guest.** A text message through `SmsSender` and a push through
+  the `push` package when a booking is confirmed, and a reminder before it.
+
+A deposit for a large party is a card hold, as an order is: authorize when the
+booking is made, capture it for a no-show, and release it when the guest
+arrives.
+

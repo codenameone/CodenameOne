@@ -22,7 +22,7 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
-/// A restaurant's or a dish's picture, as base64 text.
+/// A restaurant's or a dish's picture: the bytes of a JPEG or a PNG.
 @Entity
 public class Photo {
     @Id(autoIncrement = false)
@@ -39,7 +39,7 @@ public class Photo {
     private long createdAt;
 
     @Column(nullable = false)
-    private String data = "";
+    private byte[] data = new byte[0];
 
     public Photo() {
     }
@@ -76,11 +76,11 @@ public class Photo {
         this.createdAt = createdAt;
     }
 
-    public String getData() {
+    public byte[] getData() {
         return data;
     }
 
-    public void setData(String data) {
+    public void setData(byte[] data) {
         this.data = data;
     }
 }
