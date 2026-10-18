@@ -38,6 +38,7 @@ import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /// What a merchant may store, see and leave behind.
@@ -117,6 +118,39 @@ class MerchantGuardsTest {
         }
         assertNull(merchant.customerUsername());
         assertEquals(customer, orders.get(DemoAccounts.ADMIN, true, id).delivery().customerUsername());
+    }
+
+    @Test
+    void aRestaurantWithNoStaffLeftIsNotListedAgain() throws Exception {
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3165, 174.8062);
+        restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, true, "Closing down");
+        // What closing the only merchant's account leaves behind.
+        db.execute("DELETE FROM restaurant_staff WHERE restaurant_id = ?", new Object[] {kitchen.id});
+        assertEquals(409, statusOf(() -> restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, false, "")));
+    }
+
+    @Test
+    void refundedOrdersAreNotCountedAsSales() throws Exception {
+        String customer = People.customer(accounts, "wlg-sales-customer");
+        String courier = People.courier(accounts, "wlg-sales-courier");
+        Trips.Trip trip = Trips.trip(-41.3265, 174.8162, -41.3200, 174.8200);
+        Trips.online(mvc, courier, trip.fromLat, trip.fromLng);
+        String id = (String) Trips.complete(mvc, customer, courier, trip).get("id");
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, trip.fromLat, trip.fromLng);
+        long before = restaurants.summary(kitchen.merchant).salesTodayCents();
+        assertTrue(before > 0L, "the paid order counts");
+        db.execute("UPDATE customer_order SET payment_status = ? WHERE id = ?", new Object[] {"REFUNDED", id});
+        assertEquals(0L, restaurants.summary(kitchen.merchant).salesTodayCents());
+    }
+
+    @Test
+    void aFavoriteOutOfRangeIsNotListed() throws Exception {
+        String customer = People.customer(accounts, "wlg-far-customer");
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3365, 174.8262);
+        catalog.favorite(customer, kitchen.id, true);
+        assertEquals(1, catalog.favorites(customer, kitchen.lat, kitchen.lng).size());
+        // A degree of latitude is over 100 km: far past where anything delivers.
+        assertEquals(0, catalog.favorites(customer, kitchen.lat + 1d, kitchen.lng).size());
     }
 
     @Test

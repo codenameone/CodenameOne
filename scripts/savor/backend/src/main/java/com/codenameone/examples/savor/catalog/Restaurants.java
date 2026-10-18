@@ -45,6 +45,7 @@ import com.codenameone.examples.savor.domain.RestaurantStaff;
 import com.codenameone.examples.savor.geo.Geo;
 import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.order.Quotes;
+import com.codenameone.examples.savor.pay.Payments;
 import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DishOptionRepository;
 import com.codenameone.examples.savor.repository.DishRepository;
@@ -262,6 +263,12 @@ public class Restaurants {
             throw new ResponseStatusException(409, suspended
                     ? "Only a listed restaurant can be suspended" : "That restaurant is not suspended");
         }
+        if (!suspended && staff.findByRestaurantId(restaurant.getId()).isEmpty()) {
+            // Its only merchant may have closed their account while it was
+            // suspended. Listed again, it would take orders nobody can see.
+            throw new ResponseStatusException(409,
+                    "That restaurant has no staff left to take its orders");
+        }
         restaurant.setStatus(suspended ? Catalog.SUSPENDED : Catalog.APPROVED);
         restaurant.setReason(suspended ? Text.required(reason, 255, "why it is suspended") : "");
         restaurant.setUpdatedAt(System.currentTimeMillis());
@@ -319,6 +326,11 @@ public class Restaurants {
         long weekCents = 0L;
         for (int iter = 0; iter < delivered.size(); iter++) {
             CustomerOrder order = delivered.get(iter);
+            // A delivered order whose capture failed, or that was refunded,
+            // took no money: counted only once paid, as the admin's revenue is.
+            if (!Payments.PAID.equals(order.getPaymentStatus())) {
+                continue;
+            }
             long earned = order.getSubtotalCents() - order.getDiscountCents()
                     - order.getCommissionCents();
             weekCents += earned;

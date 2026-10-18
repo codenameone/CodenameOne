@@ -78,7 +78,7 @@ courier carries, and each has its own states:
 |===
 
 The delivery is Wayline's ride, almost unchanged: the pickup is the restaurant and
-the drop-off is the door. Keeping it so let the whole courier side -- offers,
+the drop-off is the door. Keeping it that way let the whole courier side -- offers,
 shifts, the moving marker, earnings, the guards on two answers at once -- come
 across without being rewritten.
 
@@ -249,7 +249,7 @@ the user's guide. `run-web-e2e.sh` does the same for the app in a browser.
 
 === Making it yours
 
-The ways to make Wayline your own carry over: the name, icon and colors, the
+The ways to make Wayline your own apply here too: the name, icon and colors, the
 languages, the text-message and push providers, the database, hosting. A few apply
 to food in particular:
 

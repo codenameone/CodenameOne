@@ -356,7 +356,10 @@ public abstract class E2e extends AbstractTest {
         waitForForm("restaurant");
         click("restaurant-cart");
         waitForForm("checkout");
-        until(() -> text("place").indexOf("$") >= 0, 20000, "the order to be priced");
+        // Enabled, not just showing a total: the button keeps the last total
+        // while a new quote is on its way, and cannot be used until it is in.
+        until(() -> text("place").indexOf("$") >= 0 && findByName("place").isEnabled(), 20000,
+                "the order to be priced");
     }
 
     /// The id of the order the customer has on its way.

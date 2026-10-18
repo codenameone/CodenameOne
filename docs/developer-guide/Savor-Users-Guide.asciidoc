@@ -147,7 +147,7 @@ image::img/savor-analytics-consent.png["The screen that asks whether to share us
 The home screen starts with where the food goes. The address under **Deliver to**
 is the device's position until another is chosen, and tapping it searches for a
 street, a place or a saved address. Under a greeting that follows the time of day
-are the cuisines, the order to list the restaurants in (nearest, top rated, lowest
+are the cuisines, the order to list the restaurants in (nearest, top-rated, lowest
 fee or fastest) and the restaurants themselves: the ones that deliver to the
 address, each with its rating, its time to the door and its delivery fee. A
 restaurant that's closed or paused says so and still shows its menu.
@@ -207,7 +207,7 @@ app or the server.
 image::img/savor-wallet.png["The wallet with one saved card marked as the default, cash, and a button to add a card",scaledwidth=40%]
 
 A receipt shows what was paid, part by part, and takes a tip for the courier
-afterwards, once.
+afterward, once.
 
 === The merchant
 
@@ -245,7 +245,7 @@ Anyone can apply to deliver, from the menu of the customer's home screen.
 ==== Applying to deliver
 
 The application asks for the courier's details, the vehicle, and five photographs:
-an identity document, the licence, a selfie, the vehicle registration and the
+an identity document, the driving license, a selfie, the vehicle registration and the
 insurance. Each can be taken with the camera or picked from the gallery, and the
 application can be left and finished later.
 

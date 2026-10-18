@@ -59,6 +59,10 @@ public final class CheckoutForm {
     private String promoCode;
     private int tipPercent = Prefs.tipPercent();
     private boolean placing;
+    /// Whether the totals shown are the price of the cart as it is now.
+    private boolean quoted;
+    /// The number of the latest quote asked for.
+    private int quotes;
 
     private CheckoutForm(Form previous) {
         this.previous = previous;
@@ -203,11 +207,28 @@ public final class CheckoutForm {
                 note.getText().trim(), promoCode, tipCents(), methodId);
     }
 
+    /// Prices the cart as it is now. Until that price is back the order cannot
+    /// be placed: the button would still show the old total, and the server
+    /// would charge for the changed cart. Only the latest request's answer is
+    /// used; one overtaken by a later change is dropped.
     private void quote() {
+        final int asked = ++quotes;
+        quoted = false;
+        place.setEnabled(false);
         totals.removeAll();
         totals.add(new Skeleton(3));
         form.revalidateLater();
-        Api.orders().quote(cart(), Net.to(this::totals, (status, message) -> {
+        Api.orders().quote(cart(), Net.to(quote -> {
+            if (asked != quotes) {
+                return;
+            }
+            totals(quote);
+            quoted = true;
+            place.setEnabled(!placing);
+        }, (status, message) -> {
+            if (asked != quotes) {
+                return;
+            }
             totals.removeAll();
             totals.add(Ui.text(message, "SvError"));
             form.revalidateLater();
@@ -244,7 +265,7 @@ public final class CheckoutForm {
     }
 
     private void place() {
-        if (placing) {
+        if (placing || !quoted) {
             return;
         }
         if (methodId == null) {
@@ -265,7 +286,7 @@ public final class CheckoutForm {
             }
         }, (status, message) -> {
             placing = false;
-            place.setEnabled(true);
+            place.setEnabled(quoted);
             Ui.fail(status, message);
         }));
     }

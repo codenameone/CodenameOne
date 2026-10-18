@@ -315,6 +315,12 @@ public class Catalog {
             if (restaurant != null && APPROVED.equals(restaurant.getStatus())) {
                 double meters = located ? Quotes.roadMeters(restaurant.getLat(),
                         restaurant.getLng(), lat, lng) : 0d;
+                // Out of range of where the order goes, as nearby() leaves it
+                // out: every quote for it would be refused. It is listed again
+                // once the customer is back within reach.
+                if (meters > Quotes.MAX_METERS) {
+                    continue;
+                }
                 out.add(summary(restaurant, meters, pricing, minute, true));
             }
         }
