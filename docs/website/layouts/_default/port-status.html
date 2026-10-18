@@ -334,8 +334,31 @@
         as the median of interleaved, paired runs; below 1.00x ParparVM is faster or smaller. These are the baselines every
         platform build is gated on: a pull request that moves one past its tolerance, in either direction, fails until the new value is
         recorded in the repository. A platform measured on several runner CPU models shows the median across them and, below it, the range.
+        Green is a workload ParparVM wins by more than 5%, red one it loses by more than 5%, and anything between is shown as even.
       </p>
     </header>
+    {{- /* The bottom line: geometric means over every workload, the only average of
+           ratios that does not depend on which side is the numerator. */ -}}
+    <ul class="cn1-port-status__bottom-line" data-jdk25-bottom-line aria-label="ParparVM against JDK 25, bottom line per platform">
+      {{- range $jdk.platforms }}
+      {{- $logTime := 0.0 -}}{{- $logMemory := 0.0 -}}{{- $count := 0 -}}
+      {{- range $id, $cell := .benchmarks -}}
+        {{- $logTime = add $logTime (math.Log (float $cell.time.median)) -}}
+        {{- $logMemory = add $logMemory (math.Log (float $cell.memory.median)) -}}
+        {{- $count = add $count 1 -}}
+      {{- end -}}
+      {{- if gt $count 0 }}
+      {{- $time := math.Pow 2.718281828459045 (div $logTime (float $count)) -}}
+      {{- $memory := math.Pow 2.718281828459045 (div $logMemory (float $count)) -}}
+      <li data-jdk25-summary="{{ .id }}">
+        <strong>{{ .name }}</strong>
+        {{ partial "port-status-verdict.html" (dict "advantage" (div 1.0 $time) "better" "faster" "worse" "slower" "what" "compute") }}
+        {{ partial "port-status-verdict.html" (dict "advantage" (div 1.0 $memory) "better" "less" "worse" "more" "what" "peak RAM") }}
+        <small>Geometric mean of {{ $count }} workloads</small>
+      </li>
+      {{- end }}
+      {{- end }}
+    </ul>
     <div class="cn1-port-status__matrix cn1-port-status__matrix--performance cn1-port-status__matrix--jdk25" aria-label="ParparVM to JDK 25 ratio matrix">
       <table>
         <thead>
@@ -359,7 +382,7 @@
                     {{- $m := index $cell $metric -}}
                     {{- $lo := printf "%.2f" (float $m.min) -}}
                     {{- $hi := printf "%.2f" (float $m.max) -}}
-                    <span class="cn1-port-status__ratio">{{ if eq $metric "time" }}Time{{ else }}RAM{{ end }} {{ printf "%.2fx" (float $m.median) }}
+                    <span class="cn1-port-status__ratio {{ partial "port-status-outcome.html" (div 1.0 (float $m.median)) }}">{{ if eq $metric "time" }}Time{{ else }}RAM{{ end }} {{ printf "%.2fx" (float $m.median) }}
                       {{- if ne $lo $hi }}<small>{{ $lo }}-{{ $hi }}x</small>{{ end -}}
                     </span>
                   {{- end -}}
@@ -404,8 +427,44 @@
         beneath it are the two measurements, Codename One's first. Start-up and memory are the median of interleaved, paired rounds. The compute rows run the
         ParparVM common workloads in each application, checked against the same checksum, and compare only workloads both sides computed correctly.
         {{- with $bench.generated_at }} Measured {{ . }}{{ end }}{{ with $bench.commit }} from commit <code>{{ substr . 0 10 }}</code>{{ end }}.
+        Green is a row Codename One wins by more than 5%, red one Flutter wins by more than 5%, and anything between is shown as even.
       </p>
+      <dl class="cn1-port-status__glossary">
+        <dt>Executable code</dt><dd>Every native binary in the bundle: the compiled application plus each side's runtime and engine.</dd>
+        <dt>Installed and download size</dt><dd>The whole package as a user installs it, and the same package compressed as a store or website delivers it.</dd>
+        <dt>Cold start</dt><dd>Launching the application until its first frame of content is on screen; the same event is timed on both sides.</dd>
+        <dt>Memory at rest</dt><dd>The application's memory once its first screen is up and it is idle.</dd>
+        <dt>Compute</dt><dd>The same CPU workloads run inside both applications, compared only where both returned the correct checksum.</dd>
+      </dl>
     </header>
+    {{- /* The bottom line per platform, in the words the table's rows support. Only
+           measured rows are stated: a platform the harness cannot time says so in its
+           erratum rather than inheriting a number from somewhere else. */ -}}
+    <ul class="cn1-port-status__bottom-line" data-flutter-benchmark-bottom-line aria-label="Codename One against Flutter, bottom line per platform">
+      {{- range $platformIds }}
+      {{- $platform := index $bench.platforms . -}}
+      {{- if eq $platform.status "measured" }}
+      <li data-flutter-benchmark-summary="{{ . }}">
+        <strong>{{ index $names . | default . }}</strong>
+        {{- with $platform.compute }}{{ if and (eq .status "measured") .geomean }}
+        {{ partial "port-status-verdict.html" (dict "advantage" .geomean "better" "faster" "worse" "slower" "what" "compute") }}
+        {{- end }}{{ end }}
+        {{- with index $platform.metrics "cold_start_ms" }}{{ with .ratio }}
+        {{ partial "port-status-verdict.html" (dict "advantage" . "better" "faster" "worse" "slower" "what" "start-up") }}
+        {{- end }}{{ end }}
+        {{- with index $platform.metrics "idle_memory_bytes" }}{{ with .ratio }}
+        {{ partial "port-status-verdict.html" (dict "advantage" . "better" "less" "worse" "more" "what" "memory") }}
+        {{- end }}{{ end }}
+        {{- with index $platform.metrics "install_bytes" }}{{ with .ratio }}
+        {{ partial "port-status-verdict.html" (dict "advantage" . "better" "smaller" "worse" "larger" "what" "install") }}
+        {{- end }}{{ end }}
+        {{- with index $platform.metrics "code_bytes" }}{{ with .ratio }}
+        {{ partial "port-status-verdict.html" (dict "advantage" . "better" "smaller" "worse" "larger" "what" "executable code") }}
+        {{- end }}{{ end }}
+      </li>
+      {{- end }}
+      {{- end }}
+    </ul>
     <div class="cn1-port-status__matrix cn1-port-status__matrix--performance cn1-port-status__matrix--jdk25" aria-label="Flutter to Codename One ratio matrix">
       <table>
         <thead>
@@ -433,7 +492,7 @@
               <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: {{ $metric.label }}, Flutter / Codename One">
                 {{- /* A measured metric carries its ratio; an unmeasured one is only {"status": "not measured"}. */ -}}
                 {{- if $m.ratio -}}
-                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $m.ratio) }}
+                  <span class="cn1-port-status__ratio {{ partial "port-status-outcome.html" $m.ratio }}">{{ printf "%.2fx" (float $m.ratio) }}
                     {{- if eq $metric.unit "bytes" -}}
                       <small>{{ printf "%.1f" (div (float $m.codenameone) 1048576.0) }} vs {{ printf "%.1f MB" (div (float $m.flutter) 1048576.0) }}</small>
                     {{- else -}}
@@ -459,7 +518,7 @@
               {{- with $platform.compute -}}{{- $c = . -}}{{- end -}}
               <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: compute geometric mean, Flutter / Codename One">
                 {{- if and (eq $c.status "measured") $c.geomean -}}
-                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $c.geomean) }}<small>{{ $c.compared }} workloads</small></span>
+                  <span class="cn1-port-status__ratio {{ partial "port-status-outcome.html" $c.geomean }}">{{ printf "%.2fx" (float $c.geomean) }}<small>{{ $c.compared }} workloads</small></span>
                 {{- else -}}Not measured{{- end -}}
               </td>
             {{- end }}
@@ -482,7 +541,7 @@
               {{- with (index $bench.platforms .).compute -}}{{- with .workloads -}}{{- with index . $workload -}}{{- $w = . -}}{{- end -}}{{- end -}}{{- end -}}
               <td data-flutter-benchmark-cell data-platform="{{ . }}" title="{{ index $names . | default . }}: {{ $workload }}, Flutter / Codename One">
                 {{- if eq $w.status "measured" -}}
-                  <span class="cn1-port-status__ratio">{{ printf "%.2fx" (float $w.ratio) }}<small>{{ $w.codenameone }} vs {{ $w.flutter }} ms</small></span>
+                  <span class="cn1-port-status__ratio {{ partial "port-status-outcome.html" $w.ratio }}">{{ printf "%.2fx" (float $w.ratio) }}<small>{{ $w.codenameone }} vs {{ $w.flutter }} ms</small></span>
                 {{- else -}}Not measured{{- end -}}
               </td>
             {{- end }}
@@ -500,6 +559,27 @@
     <p data-flutter-benchmark-unmeasured="{{ $id }}-compute">{{ .reason }}</p>
     {{- end }}{{ end }}
     {{- end }}
+    {{- end }}
+    {{- $iosPartial := false -}}
+    {{- with index $bench.platforms "ios" -}}
+      {{- if and (in $platformIds "ios") (eq .status "measured") -}}
+        {{- range $id, $m := .metrics -}}{{- if not $m.ratio -}}{{- $iosPartial = true -}}{{- end -}}{{- end -}}
+        {{- with .compute -}}{{- if ne .status "measured" -}}{{- $iosPartial = true -}}{{- end -}}{{- else -}}{{- $iosPartial = true -}}{{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if $iosPartial }}
+    <div class="cn1-port-status__errata-list">
+      <article data-flutter-benchmark-erratum="ios">
+        <h3>Erratum: iOS compares sizes only</h3>
+        <p>
+          Timing either application on iOS needs a signed build on a physical device, and a hosted CI runner has neither the device nor the signing identity.
+          The simulator is no substitute: Flutter refuses to build a release for it, because Dart cannot compile ahead of time for the simulator, so it would run Flutter's
+          debug JIT engine against Codename One's optimized release build. That would flatter Codename One by a margin that says nothing about either framework,
+          so start-up, memory and compute are left unmeasured on iOS instead. The sizes come from release device bundles, which need no signing, and compare like for like.
+          The macOS column runs the same two compilers on the same Apple silicon, and is the closest automated reading of how the iOS builds would perform.
+        </p>
+      </article>
+    </div>
     {{- end }}
     {{- $shownExcluded := slice -}}
     {{- range $excluded -}}{{- if index $bench.platforms . -}}{{- $shownExcluded = $shownExcluded | append . -}}{{- end -}}{{- end -}}
