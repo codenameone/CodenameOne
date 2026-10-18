@@ -674,7 +674,10 @@ public class JsNumericDifferentialApp {
     // They are read out of an array: javac folds "" + 0.1f into a constant.
     static float[] printedFloats = {
         0.1f, 5.0f, 123.456f, 9999999.0f, 0.33333334f, -0.5f, 0.001f,
-        3.4028235E38f, 1.0E10f, 1.6777216E7f, 9.999E-4f, 2.5E-7f, 3.0E9f
+        3.4028235E38f, 1.0E10f, 1.6777216E7f, 9.999E-4f, 2.5E-7f, 3.0E9f,
+        // Exactly midway between two 8-digit candidates: Java takes the
+        // even one, 3924104.2, where toPrecision rounds up to .3.
+        3924104.25f, -3924104.25f
     };
     static double[] printedDoubles = {
         0.1, 5.0, 123.456, 9999999.0, 1.0 / 3.0, -0.5, 0.001, 1.0E10, 2.5E-7, 100.0

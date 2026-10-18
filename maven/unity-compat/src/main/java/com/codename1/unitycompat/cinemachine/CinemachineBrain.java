@@ -52,6 +52,11 @@ public final class CinemachineBrain extends MonoBehaviour {
     }
 
     public Camera get_OutputCamera() {
+        // A camera destroyed since compares equal to null in Unity, so it is
+        // dropped and the object asked again: a replacement takes over.
+        if (camera != null && !com.codename1.unitycompat.unityengine.Object.op_Implicit(camera)) {
+            camera = null;
+        }
         if (camera == null) {
             Object c = GetComponent(Camera.class);
             camera = c instanceof Camera ? (Camera) c : null;

@@ -6221,10 +6221,28 @@ function shortestFloatValue(value) {
   for (let precision = 1; precision <= 9; precision++) {
     const candidate = Number(value.toPrecision(precision));
     if (Math.fround(candidate) === value) {
-      return candidate;
+      return evenAtTie(value, precision, candidate);
     }
   }
   return value;
+}
+// toPrecision rounds a value lying exactly midway between two candidates
+// away from zero; Java's Float.toString takes the one whose last digit is
+// even (3924104.25f prints 3924104.2). A float's exact decimal expansion
+// ends well inside 100 digits wherever such a tie can occur, so the digits
+// past the precision read off toExponential(99) are exact enough to see it.
+function evenAtTie(value, precision, candidate) {
+  const exact = Math.abs(value).toExponential(99).split("e");
+  const digits = exact[0].replace(".", "");
+  if (!/^50*$/.test(digits.substring(precision))) {
+    return candidate;
+  }
+  const kept = digits.substring(0, precision);
+  if ((kept.charCodeAt(precision - 1) - 48) % 2 !== 0) {
+    return candidate;
+  }
+  const truncated = Number(kept.charAt(0) + "." + kept.substring(1) + "e" + exact[1]) * (value < 0 ? -1 : 1);
+  return Math.fround(truncated) === value ? truncated : candidate;
 }
 bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v, scientificNotation) {
   return createJavaString(formatJavaFloating(shortestFloatValue(v), !!scientificNotation));

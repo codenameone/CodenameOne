@@ -159,6 +159,11 @@ public final class String_ {
                                 + " uses alignment or a format string, which is not supported.");
                     }
                     index = index * 10 + (d - '0');
+                    // Past any argument count already: .NET refuses it, and
+                    // going on would wrap ({4294967296} read as {0}).
+                    if (index >= args.length) {
+                        throw new FormatException();
+                    }
                 }
                 if (close == i + 1 || index >= args.length) {
                     throw new FormatException();

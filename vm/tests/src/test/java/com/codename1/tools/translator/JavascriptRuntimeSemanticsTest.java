@@ -229,7 +229,9 @@ class JavascriptRuntimeSemanticsTest {
         //    an alias, which an object literal reads as a key of that name.
         //  - Float.toString printed the digits of the double: 0.1f came out as
         //    0.10000000149011612 and 9999999.0f as 9999999.
-        final int expected = -1502780893;
+        //  - A float midway between two shortest texts took toPrecision's
+        //    round-up: 3924104.25f printed 3924104.3, where Java says .2.
+        final int expected = 295550781;
         WorkerRunResult structured = translateAndRunFixture(config, "JsNumericDifferentialApp.java", "JsNumericDifferentialApp");
         assertEquals(expected, structured.result,
                 "structured emitter: raw=" + structured.rawMessage + " err=" + structured.errorMessage);
