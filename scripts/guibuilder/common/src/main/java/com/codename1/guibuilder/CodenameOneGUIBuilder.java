@@ -5533,6 +5533,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
          * display density gets. A named medium file wins over another medium-classified one.
          */
         private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
+            // The build decodes every PNG of the folder before it picks one, so a corrupt
+            // variant fails the image there even when the display would not select it.
+            for (String listed : files) {
+                String file = stripSlash(listed);
+                if (file.regionMatches(true, file.length() - 4, ".png", 0, 4) && !decodes(load(folder + "/" + file))) {
+                    return null;
+                }
+            }
             for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
                 String match = null;
                 for (String listed : files) {
@@ -5596,6 +5604,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             return name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
         }
 
+        /** An image can decode lazily; reading its pixels is what proves the bytes are a PNG. */
+        private static boolean decodes(com.codename1.ui.Image image) {
+            if (image == null) return false;
+            try {
+                return image.getWidth() > 0 && image.getRGB() != null;
+            } catch (RuntimeException ex) {
+                return false;
+            }
+        }
+
         private static com.codename1.ui.Image load(String path) {
             com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
             String url = ProjectIO.fsUrl(path);
@@ -5605,6 +5623,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 in = fs.openInputStream(url);
                 return com.codename1.ui.Image.createImage(in);
             } catch (IOException ex) {
+                return null;
+            } catch (RuntimeException ex) {
+                // A PNG the decoder cannot read.
                 return null;
             } finally {
                 com.codename1.io.Util.cleanup(in);

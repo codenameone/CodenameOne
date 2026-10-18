@@ -431,15 +431,15 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile("#Constants{ missingImage: nothing.png; }", new MutableResource(), "Theme"));
 
-        // Through a custom property declared after the constants block, quoted or not.
+        // Through a custom property, quoted or not.
         MutableResource viaVar = new MutableResource();
         viaVar.setImage("spinner.png", spinner);
-        new CSSThemeCompiler().compile("#Constants{ infiniteImage: var(--spinner); quotedImage: var(--q); }"
-                + ":root{ --spinner: spinner.png; --q: \"spinner.png\"; }", viaVar, "Theme");
+        new CSSThemeCompiler().compile(":root{ --spinner: spinner.png; --q: \"spinner.png\"; }"
+                + "#Constants{ infiniteImage: var(--spinner); quotedImage: var(--q); }", viaVar, "Theme");
         assertTrue(viaVar.getTheme("Theme").get("@infiniteImage") == spinner);
         assertTrue(viaVar.getTheme("Theme").get("@quotedImage") == spinner);
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
-                .compile("#Constants{ goneImage: var(--x); } :root{ --x: nothing.png; }",
+                .compile(":root{ --x: nothing.png; } #Constants{ goneImage: var(--x); }",
                         new MutableResource(), "Theme"));
     }
 
@@ -469,8 +469,8 @@ public class CSSThemeCompilerTest extends UITestBase {
     public void testColorConstantFromVarIsStoredAsPlainHex() {
         MutableResource resource = new MutableResource();
         new CSSThemeCompiler().compile(":root{--c:#f00;}"
-                + "#Constants{infiniteDefaultColor:var(--c); label:var(--name);}"
-                + ":root{--name:hello;}", resource, "Theme");
+                + ":root{--name:hello;}"
+                + "#Constants{infiniteDefaultColor:var(--c); label:var(--name);}", resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("ff0000", theme.get("@infiniteDefaultColor"));
         assertEquals("hello", theme.get("@label"));
@@ -587,10 +587,13 @@ public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
     public void testCyclicConstantsAreRejected() {
-        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
-                .compile("#Constants{ --a: var(--a); }", new MutableResource(), "Theme"));
-        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
-                .compile("#Constants{ --a: var(--b); --b: var(--a); }", new MutableResource(), "Theme"));
+        // In #Constants a reference sees only what is declared above it, so a self or mutual
+        // reference is undefined, as in the build-time compiler, and the constants are left out.
+        MutableResource cyclic = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ --a: var(--a); --b: var(--c); --c: var(--b); }", cyclic, "Theme");
+        assertFalse(cyclic.getTheme("Theme").containsKey("@a"));
+        assertFalse(cyclic.getTheme("Theme").containsKey("@b"));
+        assertFalse(cyclic.getTheme("Theme").containsKey("@c"));
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
                         new MutableResource(), "Theme"));
@@ -843,7 +846,8 @@ public class CSSThemeCompilerTest extends UITestBase {
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("ff0000", String.valueOf(theme.get("@alias")).toLowerCase());
         assertEquals("0000ff", String.valueOf(theme.get("@accent")).toLowerCase());
-        assertEquals("00ff00", String.valueOf(theme.get("@early")).toLowerCase());
+        // A forward reference is undefined where it is declared.
+        assertFalse(theme.containsKey("@early"));
         assertEquals("#abc", theme.get("@litAlias"));
     }
 
@@ -1011,5 +1015,32 @@ public class CSSThemeCompilerTest extends UITestBase {
         new CSSThemeCompiler().compile("#Constants { --icon: \"first.png\"; navImage: var(--icon); --icon: \"second.png\"; }",
                 res, "Theme");
         assertEquals(3, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
+
+    @Test
+    void testDefaultPropertiesAreAlsoStoredAtTheRoot() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Default{color:#ff0000;font-size:20px;}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("ff0000", theme.get("fgColor"));
+        assertEquals(20f, ((Font) theme.get("font")).getPixelSize(), 0.001f);
+    }
+
+    @Test
+    void testUniversalRulesSetNoFont() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("*{font-size:20px;}", res, "Theme");
+        assertFalse(res.getTheme("Theme").containsKey("Component.font"));
+    }
+
+    @Test
+    void testEscapedIdentifiers() {
+        MutableResource res = new MutableResource();
+        Image icon = Image.createImage(5, 5);
+        res.setImage("my icon", icon);
+        new CSSThemeCompiler().compile("#Constants { emptyImage: my\\ icon; message: foo\\!important; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals(5, ((Image) theme.get("@emptyImage")).getWidth());
+        assertEquals("foo!important", theme.get("@message"));
     }
 }

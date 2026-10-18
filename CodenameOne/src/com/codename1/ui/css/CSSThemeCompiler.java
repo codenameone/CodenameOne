@@ -110,6 +110,12 @@ public class CSSThemeCompiler {
     /// compiler adds only `--name` declarations to its variables, so `var(--name)` does not see
     /// these.
     private HashSet<String> plainConstants = new HashSet<String>();
+    /// While set, resolveVars does not see a constant this compile declares unless it holds it:
+    /// one declared further down is not defined yet. A constant only an earlier compile into the
+    /// same theme declared is visible.
+    private Hashtable<String, String> declaredOnly;
+    /// Every constant and custom property this compile declares, as "@name".
+    private HashSet<String> declaredThisCompile = new HashSet<String>();
     /// Set by resolveVars when it met a var() naming an undefined variable with no fallback.
     private boolean unresolvedVar;
 
@@ -130,6 +136,17 @@ public class CSSThemeCompiler {
         deferredConstants = deferred;
         literalTokens = new Hashtable<String, String>();
         plainConstants = new HashSet<String>();
+        declaredThisCompile = new HashSet<String>();
+        for (Rule rule : rules) {
+            for (Declaration declaration : rule.declarations) {
+                if (rule.constants || rule.legacyConstants) {
+                    String n = declaration.name;
+                    declaredThisCompile.add("@" + (n.startsWith("--") ? n.substring(2) : n));
+                } else if (declaration.name.startsWith("--")) {
+                    declaredThisCompile.add("@" + declaration.name.substring(2));
+                }
+            }
+        }
         // Everything in source order, #Constants blocks included: the build-time parser resolves
         // var() in each declaration as it reads it, and a `--name` inside #Constants enters its
         // variable map only when that block is reached. A rule above the block does not see it.
@@ -170,6 +187,17 @@ public class CSSThemeCompiler {
                 // A constant written as var(--x) is only a color once x is resolved.
                 theme.put(key, constantColor(resolved));
             }
+        }
+        // The build-time compiler also stores every `Default.*` property unprefixed: the
+        // theme's root keys, which UIManager's default style reads.
+        ArrayList<String> defaults = new ArrayList<String>();
+        for (Object k : theme.keySet()) {
+            if (k instanceof String && ((String) k).startsWith("Default.")) {
+                defaults.add((String) k);
+            }
+        }
+        for (String k : defaults) {
+            theme.put(k.substring("Default.".length()), theme.get(k));
         }
         resources.setTheme(themeName, theme);
     }
@@ -322,20 +350,7 @@ public class CSSThemeCompiler {
                 // constant: the caller's own default applies, not an empty string.
                 theme.remove(key);
             } else {
-                String sole = ((String) value).trim();
-                if (sole.startsWith("var(") && closingParen(sole, "var(".length()) == sole.length() - 1) {
-                    // A constant that is one var() takes its value's token type, a fallback's
-                    // too: the build-time compiler stores the string `"hello"` as hello and the
-                    // number 1.50 as 1.5, as it would written directly.
-                    String text = resolved.trim();
-                    String unquoted = unquote(text);
-                    if (!unquoted.equals(text)) {
-                        resolved = unquoted;
-                    } else if (isCssNumber(text)) {
-                        resolved = buildConstant(key.substring(1), text, text);
-                    }
-                }
-                theme.put(key, resolved);
+                theme.put(key, typedAlias(key, (String) value, resolved));
             }
         }
     }
@@ -365,12 +380,29 @@ public class CSSThemeCompiler {
                 // token; a color or number named `...Image` is stored as a color or number. An alias is
                 // resolved where it is declared, as below, so a later redefinition of its
                 // target does not change the image.
-                if (alias && declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
+                if (alias && !legacy && declaration.snapshot == null && !declaration.dropped) {
+                    declaration.snapshot = resolveAtDeclaration(theme, key, value, deferred);
+                    declaration.dropped = declaration.snapshot == null;
+                    declaration.snapshotKind = DEFERRED_IMAGE;
+                } else if (alias && legacy && declaration.snapshot == null
+                        && referencesDeclaredOnly(theme, key, value, deferred)) {
                     declaration.snapshot = resolveVars(theme, value);
                     declaration.snapshotKind = DEFERRED_IMAGE;
                 }
+                if (declaration.dropped) {
+                    theme.remove(key);
+                    deferred.remove(key);
+                    continue;
+                }
                 if (alias && declaration.snapshot != null) {
                     value = declaration.snapshot;
+                }
+                if (!alias && raw.equals(value)) {
+                    // An identifier image name is looked up decoded: `my\ icon` is `my icon`.
+                    String decoded = decodeIdentifier(value);
+                    if (decoded != null) {
+                        value = decoded;
+                    }
                 }
                 deferred.put(key, DEFERRED_IMAGE);
             } else if (!raw.equals(value)) {
@@ -382,7 +414,24 @@ public class CSSThemeCompiler {
                 value = constantColor(value);
             } else if (value.indexOf("var(--") > -1) {
                 String kind = DEFERRED_VAR;
-                if (declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
+                if (!legacy && declaration.snapshot == null && !declaration.dropped) {
+                    String target = aliasTarget(value);
+                    String targetKind = target == null ? null : deferred.get(target);
+                    declaration.snapshotKind = DEFERRED_LITERAL.equals(targetKind) || DEFERRED_TEXT.equals(targetKind)
+                            ? DEFERRED_LITERAL : DEFERRED_VAR;
+                    declaration.snapshot = resolveAtDeclaration(theme, key, value, deferred);
+                    declaration.dropped = declaration.snapshot == null;
+                    if (!declaration.dropped && declaration.snapshot.indexOf("var(--") > -1) {
+                        // Fully resolved here, so a var() still in it came from text.
+                        declaration.snapshotKind = DEFERRED_LITERAL;
+                    }
+                }
+                if (declaration.dropped) {
+                    theme.remove(key);
+                    deferred.remove(key);
+                    continue;
+                }
+                if (legacy && declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
                     // Every name it uses is already declared: the build-time compiler resolves it
                     // right here, so a later redefinition of a target does not reach it. Kept on
                     // the declaration, because the second pass sees the final values.
@@ -406,6 +455,44 @@ public class CSSThemeCompiler {
                 value = buildConstant(name, raw, value);
             }
             theme.put(key, value);
+        }
+    }
+
+    /// A constant that is one var() takes its value's token type, a fallback's too: the
+    /// build-time compiler stores the string `"hello"` as hello and the number 1.50 as 1.5, as
+    /// it would written directly.
+    private static String typedAlias(String key, String original, String resolved) {
+        String sole = original.trim();
+        if (sole.startsWith("var(") && closingParen(sole, "var(".length()) == sole.length() - 1) {
+            String text = resolved.trim();
+            String unquoted = unquote(text);
+            if (!unquoted.equals(text)) {
+                return unquoted;
+            }
+            if (isCssNumber(text)) {
+                return buildConstant(key.substring(1), text, text);
+            }
+        }
+        return resolved;
+    }
+
+    /// Resolves a `#Constants` alias where it is declared, as the build-time compiler does: only
+    /// names declared above it are seen, so `early: var(--later)` is undefined however `later` is
+    /// declared afterwards. Returns null, and the constant is left out, when a reference stays
+    /// undefined without a fallback: the build-time compiler keeps such a var() as a function its
+    /// constants emitter drops.
+    private String resolveAtDeclaration(Hashtable theme, String key, String value, Hashtable<String, String> deferred) {
+        String own = deferred.remove(key);
+        declaredOnly = deferred;
+        unresolvedVar = false;
+        try {
+            String resolved = resolveVars(theme, value);
+            return unresolvedVar ? null : typedAlias(key, value, resolved);
+        } finally {
+            declaredOnly = null;
+            if (own != null) {
+                deferred.put(key, own);
+            }
         }
     }
 
@@ -558,6 +645,7 @@ public class CSSThemeCompiler {
         }
 
         String[] selectorParts = selector(rule.selector);
+        boolean universal = rule.universal;
         String uiid = selectorParts[0];
         String statePrefix = selectorParts[1];
         StringBuilder borderCss = new StringBuilder();
@@ -573,6 +661,13 @@ public class CSSThemeCompiler {
             String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
             if ("cn1-derive".equals(property)) {
                 ownerDerives.put(uiid, value.trim());
+            }
+            if (universal && ("font-family".equals(property) || "font-size".equals(property))) {
+                // The build-time compiler ignores universal rules, so `*` sets no font there.
+                if ("font-size".equals(property)) {
+                    parseFontSize(value);
+                }
+                continue;
             }
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
@@ -1274,7 +1369,9 @@ public class CSSThemeCompiler {
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
             }
-            Object replacement = plainConstants.contains("@" + key) ? null : theme.get("@" + key);
+            Object replacement = plainConstants.contains("@" + key)
+                    || (declaredOnly != null && !declaredOnly.containsKey("@" + key)
+                            && declaredThisCompile.contains("@" + key)) ? null : theme.get("@" + key);
             if (replacement == null && fallback != null) {
                 out.append(value.substring(pos, varPos)).append(resolveVars(theme, fallback, resolving, tokens));
                 pos = end + 1;
@@ -1657,6 +1754,8 @@ public class CSSThemeCompiler {
                 }
                 Rule rule = new Rule();
                 rule.selector = darkContext ? toDarkSelector(selector) : selector;
+                String base = selector.trim();
+                rule.universal = base.startsWith("*") || base.startsWith(":") && !":root".equals(base);
                 rule.declarations = declarations;
                 out.add(rule);
             }
@@ -1816,6 +1915,14 @@ public class CSSThemeCompiler {
             return value;
         }
         int bang = at - 1;
+        // `foo\!important` is an identifier with an escaped bang, not a priority.
+        int slashes = 0;
+        while (bang - 1 - slashes >= 0 && value.charAt(bang - 1 - slashes) == '\\') {
+            slashes++;
+        }
+        if ((slashes & 1) != 0) {
+            return value;
+        }
         while (bang > 0 && value.charAt(bang - 1) <= ' ') {
             bang--;
         }
@@ -1942,9 +2049,13 @@ public class CSSThemeCompiler {
         boolean constants;
         /// An `@constants` block rather than `#Constants`.
         boolean legacyConstants;
+        /// A `*` selector (or a bare state), which the build-time compiler ignores.
+        boolean universal;
     }
 
     private static class Declaration {
+        /// A `#Constants` alias whose reference was undefined where it was declared.
+        boolean dropped;
         /// The name as written; constants and custom properties are case sensitive.
         String name;
         /// The lower case name ordinary CSS properties are matched by.
