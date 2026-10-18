@@ -63,11 +63,12 @@ public final class BackendSqlAccess implements SqlAccess {
             List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
                     new Object[]{table}, new int[1]);
             Object createSql = definition.isEmpty() ? null : definition.get(0)[0];
-            String keyIndex = SessionImpl.sqlitePrimaryKeyIndex(query("PRAGMA index_list(" + quote(table) + ")",
-                    new Object[0], new int[5]));
-            Map<String, String> collations = keyIndex == null ? new HashMap<String, String>()
-                    : SessionImpl.sqliteKeyCollations(query("PRAGMA index_xinfo(" + quote(keyIndex) + ")",
-                            new Object[0], new int[6]));
+            Map<String, String> collations = new HashMap<String, String>();
+            for (String index : SessionImpl.sqliteUniqueIndexes(query("PRAGMA index_list(" + quote(table) + ")",
+                    new Object[0], new int[5]))) {
+                SessionImpl.sqliteKeyCollations(collations, query("PRAGMA index_xinfo(" + quote(index) + ")",
+                        new Object[0], new int[6]));
+            }
             return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
                     createSql instanceof String ? (String) createSql : null, collations);
         }

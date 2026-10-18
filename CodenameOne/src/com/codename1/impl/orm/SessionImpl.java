@@ -32,7 +32,6 @@ import com.codename1.orm.session.SchemaReport;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1374,16 +1373,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
                             attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
-                if (attr.id && attr.kind == Attribute.TEXT && found.length > 5
+                // A unique index refuses the second of two values it finds
+                // equal, so its text columns need the same collation as a key.
+                boolean distinct = attr.id || uniqueIndexed(model, attr);
+                String role = attr.id ? "Identifier " : "Unique column ";
+                if (distinct && attr.kind == Attribute.TEXT && found.length > 5
                         && !distinctKeyCollation((String) found[5])) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
-                            "Identifier " + name + " uses collation " + found[5]
+                            role + name + " uses collation " + found[5]
                             + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
                 }
-                if (attr.id && attr.kind == Attribute.TEXT && blankPadded((String) found[1])) {
+                if (distinct && attr.kind == Attribute.TEXT && blankPadded((String) found[1])) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
-                            "Identifier " + name + " is a blank-padded " + found[1]
+                            role + name + " is a blank-padded " + found[1]
                             + " column, under which \"a\" and \"a \" are one key; keys need VARCHAR or TEXT"));
+                }
+                if (attr.kind == Attribute.TEXT && attr.temporal == 0 && found.length > 5
+                        && !unicodeCharset((String) found[1], (String) found[5])) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            name + " uses collation " + found[5] + ", whose character set cannot hold every String"));
                 }
                 if (found.length > 7) {
                     // An insert omits a generated id and names every other column.
@@ -1488,6 +1496,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Collection key " + name + " uses collation " + found[5]
                         + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
+            }
+            if (attr.kind == Attribute.TEXT && attr.temporal == 0 && found.length > 5
+                    && !unicodeCharset((String) found[1], (String) found[5])) {
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Collection column " + name + " uses collation " + found[5]
+                        + ", whose character set cannot hold every String"));
             }
             if (attr.id && attr.kind == Attribute.TEXT && blankPadded((String) found[1])) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -1608,6 +1622,28 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return " char character nchar bpchar ".contains(" " + token + " ");
     }
+    /// Whether a MySQL text column stores every String the mapping writes. The
+    /// backend talks utf8mb4, and latin1 or the three-byte utf8mb3 refuse (or,
+    /// in permissive mode, replace with `?`) characters outside their range.
+    /// The collation names its character set as its prefix.
+    private boolean unicodeCharset(String type, String collation) {
+        if (collation == null || !"mysql".equals(sql.dialect()) || typeFamily(type) != 2) {
+            return true;
+        }
+        return collation.regionMatches(true, 0, "utf8mb4", 0, 7);
+    }
+    private static boolean uniqueIndexed(EntityModel model, Attribute attr) {
+        for (Index definition : model.indexes()) {
+            if (definition.unique) {
+                for (String field : definition.fields()) {
+                    if (field.equals(attr.field)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
     /// Whether a text key column keeps every value a Java set or map keeps
     /// apart. MySQL: binary, and NO PAD so trailing spaces still differ -- the
     /// collations the backend itself declares. SQLite: BINARY, since NOCASE
@@ -1634,8 +1670,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// Shapes `PRAGMA table_info` rows as [SqlAccess#describe] answers them. A
     /// literal NULL default fills nothing, and the one INTEGER primary key
     /// column is the rowid, which SQLite assigns. `keyCollations` maps each
-    /// primary key column to the collation of the key's index (see
-    /// [#sqlitePrimaryKeyIndex]).
+    /// column of the primary key or a unique index to its collation there (see
+    /// [#sqliteUniqueIndexes]).
     static List<Object[]> sqliteColumns(List<Object[]> raw, String createSql, Map<String, String> keyCollations) {
         int keys = 0;
         for (Object[] row : raw) {
@@ -1676,27 +1712,33 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return result;
     }
-    /// The name of the index SQLite keeps for a table's primary key, from
-    /// `PRAGMA index_list` rows (seq, name, unique, origin, partial), or null
-    /// for a rowid key, which has none.
-    static String sqlitePrimaryKeyIndex(List<Object[]> indexes) {
+    /// The indexes whose columns must keep distinct values apart: the one
+    /// SQLite keeps for a primary key (none for a rowid key) and every unique
+    /// index, from `PRAGMA index_list` rows (seq, name, unique, origin,
+    /// partial).
+    static List<String> sqliteUniqueIndexes(List<Object[]> indexes) {
+        List<String> result = new ArrayList<String>();
         for (Object[] index : indexes) {
-            if ("pk".equals(index[3])) {
-                return String.valueOf(index[1]);
-            }
-        }
-        return null;
-    }
-    /// Key column name to collation, from `PRAGMA index_xinfo` rows
-    /// (seqno, cid, name, desc, coll, key).
-    static Map<String, String> sqliteKeyCollations(List<Object[]> columns) {
-        Map<String, String> result = new HashMap<String, String>();
-        for (Object[] column : columns) {
-            if (column[2] != null && column[5] instanceof Number && ((Number) column[5]).intValue() != 0) {
-                result.put(String.valueOf(column[2]), column[4] == null ? null : String.valueOf(column[4]));
+            if ("pk".equals(index[3]) || index[2] instanceof Number && ((Number) index[2]).intValue() != 0) {
+                result.add(String.valueOf(index[1]));
             }
         }
         return result;
+    }
+    /// Adds each key column's collation from `PRAGMA index_xinfo` rows
+    /// (seqno, cid, name, desc, coll, key). A column in several indexes keeps
+    /// a collation other than BINARY, which is the one that would merge values.
+    static void sqliteKeyCollations(Map<String, String> result, List<Object[]> columns) {
+        for (Object[] column : columns) {
+            if (column[2] != null && column[5] instanceof Number && ((Number) column[5]).intValue() != 0) {
+                String name = String.valueOf(column[2]);
+                String collation = column[4] == null ? null : String.valueOf(column[4]);
+                String known = result.get(name);
+                if (known == null || "binary".equalsIgnoreCase(known)) {
+                    result.put(name, collation);
+                }
+            }
+        }
     }
     private static boolean wordChar(char c) {
         return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$' || c > 127;

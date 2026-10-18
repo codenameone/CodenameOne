@@ -59,13 +59,14 @@ public final class SessionSqlAccess implements SqlAccess {
                         Attribute.INTEGER});
         List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
                 new Object[] {table}, new int[] {Attribute.TEXT});
-        String keyIndex = SessionImpl.sqlitePrimaryKeyIndex(query("PRAGMA index_list(" + quote(table) + ")",
+        Map<String, String> collations = new HashMap<String, String>();
+        for (String index : SessionImpl.sqliteUniqueIndexes(query("PRAGMA index_list(" + quote(table) + ")",
                 new Object[0], new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
-                        Attribute.INTEGER}));
-        Map<String, String> collations = keyIndex == null ? new HashMap<String, String>()
-                : SessionImpl.sqliteKeyCollations(query("PRAGMA index_xinfo(" + quote(keyIndex) + ")",
-                        new Object[0], new int[] {Attribute.INTEGER, Attribute.INTEGER, Attribute.TEXT,
-                                Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER}));
+                        Attribute.INTEGER}))) {
+            SessionImpl.sqliteKeyCollations(collations, query("PRAGMA index_xinfo(" + quote(index) + ")",
+                    new Object[0], new int[] {Attribute.INTEGER, Attribute.INTEGER, Attribute.TEXT,
+                            Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER}));
+        }
         return SessionImpl.sqliteColumns(raw, definition.isEmpty() ? null : (String) definition.get(0)[0],
                 collations);
     }
