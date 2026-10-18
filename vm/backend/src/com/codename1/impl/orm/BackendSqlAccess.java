@@ -29,6 +29,7 @@ import com.codename1.backend.sql.Dialect;
 import com.codename1.orm.session.LockMode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -62,8 +63,13 @@ public final class BackendSqlAccess implements SqlAccess {
             List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                     new Object[]{table}, new int[1]);
             Object createSql = definition.isEmpty() ? null : definition.get(0)[0];
+            String keyIndex = SessionImpl.sqlitePrimaryKeyIndex(query("PRAGMA index_list(" + quote(table) + ")",
+                    new Object[0], new int[5]));
+            Map<String, String> collations = keyIndex == null ? new HashMap<String, String>()
+                    : SessionImpl.sqliteKeyCollations(query("PRAGMA index_xinfo(" + quote(keyIndex) + ")",
+                            new Object[0], new int[6]));
             return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
-                    createSql instanceof String ? (String) createSql : null);
+                    createSql instanceof String ? (String) createSql : null, collations);
         }
         boolean mysql = "mysql".equals(dialect());
         // PostgreSQL: the schema an unqualified name resolves to through the

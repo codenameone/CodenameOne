@@ -222,14 +222,15 @@ public class OrmAnnotationProcessorTest {
         // Mapped over a table the mapping does not fit: a plain Date over a TIMESTAMP
         // column, which would need a conversion, a column nobody created yet, and a
         // DATE mapping over a timestamp column, which would drop the time it reads.
-        // SQLite has no date type, so there the last one fits.
+        // SQLite has no date type, but a declared TIMESTAMP still says the stored
+        // values carry a time, so the last one is reported there too.
         sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
-        sources.put("adopt.Code","package adopt; import com.codename1.annotations.*; @Entity(table=\"legacy_code\") public class Code { @Id(autoIncrement=false) public String code; public Long n; public Byte b; public String label; }");
+        sources.put("adopt.Code","package adopt; import com.codename1.annotations.*; @Entity(table=\"legacy_code\") public class Code { @Id(autoIncrement=false) public String code; public Long n; public Byte b; public String label; public byte[] data; }");
         sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite,int tagIssues) { "
             + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(),tags=new ArrayList<SchemaReport.Issue>(),codes=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().equals(\"legacy_customer_tag\")) tags.add(i); else if(i.getTable().equals(\"legacy_code\")) codes.add(i); else if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
             + "if(tags.size()!=tagIssues || tagIssues>0 && !(tags.get(0).getKind()==(sqlite?SchemaReport.Kind.CONSTRAINT_MISMATCH:SchemaReport.Kind.UNSUPPORTED) && \"tag\".equals(tags.get(0).getColumn()))) throw new AssertionError(\"tag report \"+tags); "
-            + "boolean mysql=!sqlite && tagIssues==1; String report=codes.toString(); if(codes.size()!=(sqlite?0:mysql?3:2) || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.label\") || report.contains(\"legacy_code.b\") || mysql && !report.contains(\"folds case\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.n\") || report.contains(\"CONSTRAINT\") || report.contains(\"MIGRATION\")) throw new AssertionError(\"code report \"+codes); "
-            + "if(mine.size()!=(sqlite?3:4)) throw new AssertionError(\"report \"+mine); "
+            + "boolean mysql=!sqlite && tagIssues==1; String report=codes.toString(); if(codes.size()!=(sqlite?1:mysql?4:2) || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.label\") || mysql != report.contains(\"legacy_code.data\") || report.contains(\"legacy_code.b\") || (sqlite || mysql) && !report.contains(\"folds case\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.n\") || report.contains(\"CONSTRAINT\") || report.contains(\"MIGRATION\")) throw new AssertionError(\"code report \"+codes); "
+            + "if(mine.size()!=4) throw new AssertionError(\"report \"+mine); "
             + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED : \"source\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.CONSTRAINT_MISMATCH; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
             + "s.beginTransaction(); Customer c=new Customer(); c.name(\"Ada\"); c.signedUp(new Date(1709214306789L)); c.birthday(new Date(-14256000000L)); c.lastSeen(new Date(1672628645000L)); "
@@ -247,6 +248,7 @@ public class OrmAnnotationProcessorTest {
             + "Date before=new Date(1709214306000L), dayBefore=new Date(-14256000000L-86400000L), day=new Date(-14256000000L); "
             + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE (SELECT MAX(v.signedUp) FROM adopt.Customer v) > :t\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"subquery parameter\"); "
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE (SELECT MAX(v.signedUp) FROM adopt.Customer v) IN :ts\",Customer.class).setParameter(\"ts\",Arrays.asList(new Date(1709214306789L))).list().size()!=1) throw new AssertionError(\"subquery IN parameter\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE :t BETWEEN c.birthday AND c.signedUp\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"reversed BETWEEN\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
             + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "
@@ -268,7 +270,7 @@ public class OrmAnnotationProcessorTest {
         String dialect=backend ? db.dialect().getName().toLowerCase(java.util.Locale.ROOT) : "sqlite";
         boolean postgres=dialect.startsWith("postgres"), mysql=dialect.startsWith("mysql") || dialect.startsWith("mariadb");
         String[] ddl={
-            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code","CREATE TABLE legacy_code (code VARCHAR(255)"+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : "")+" NOT NULL PRIMARY KEY, n "+(mysql ? "BIGINT UNSIGNED" : "INTEGER")+", b "+(mysql ? "TINYINT" : "SMALLINT")+", label VARCHAR(20))","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
+            "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code","CREATE TABLE legacy_code (code VARCHAR(255)"+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : postgres ? "" : " COLLATE NOCASE")+" NOT NULL PRIMARY KEY, n "+(mysql ? "BIGINT UNSIGNED" : "INTEGER")+", b "+(mysql ? "TINYINT" : "SMALLINT")+", label VARCHAR(20), data "+(postgres ? "BYTEA" : "BLOB")+")","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
             // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the

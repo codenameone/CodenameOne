@@ -27,7 +27,9 @@ import com.codename1.db.Database;
 import com.codename1.db.Row;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// SQLite adapter used by managed sessions; the entity manager owns the database.
 /// Internal connection adapter; not an application API.
@@ -57,7 +59,15 @@ public final class SessionSqlAccess implements SqlAccess {
                         Attribute.INTEGER});
         List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                 new Object[] {table}, new int[] {Attribute.TEXT});
-        return SessionImpl.sqliteColumns(raw, definition.isEmpty() ? null : (String) definition.get(0)[0]);
+        String keyIndex = SessionImpl.sqlitePrimaryKeyIndex(query("PRAGMA index_list(" + quote(table) + ")",
+                new Object[0], new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
+                        Attribute.INTEGER}));
+        Map<String, String> collations = keyIndex == null ? new HashMap<String, String>()
+                : SessionImpl.sqliteKeyCollations(query("PRAGMA index_xinfo(" + quote(keyIndex) + ")",
+                        new Object[0], new int[] {Attribute.INTEGER, Attribute.INTEGER, Attribute.TEXT,
+                                Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER}));
+        return SessionImpl.sqliteColumns(raw, definition.isEmpty() ? null : (String) definition.get(0)[0],
+                collations);
     }
     @Override
     public String quote(String name) {

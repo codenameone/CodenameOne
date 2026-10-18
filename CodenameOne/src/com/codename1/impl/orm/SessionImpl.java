@@ -32,6 +32,7 @@ import com.codename1.orm.session.SchemaReport;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1179,6 +1180,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Attribute attr = model.attributes()[index];
         int family = typeFamily(found);
         if ("sqlite".equals(sql.dialect())) {
+            // TEXT holds either kind; a declared DATE or TIMESTAMP says which
+            // one the stored values are, and a DATE mapping would floor a
+            // timestamp to midnight.
+            if (attr.temporal != 0 && family == 5) {
+                return temporalKind(found) == attr.temporal;
+            }
             return family == typeFamily(expected) || attr.temporal != 0 && family == 2;
         }
         if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && "mysql".equals(sql.dialect())
@@ -1190,6 +1197,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)
                 && !integerFits(found, attr.kind, model.minimumIntegralValue(index),
                         model.maximumIntegralValue(index))) {
+            return false;
+        }
+        if (family == 4 && binaryCapacity(found) < binaryCapacity(expected)) {
+            // The same for bytes: the mapping's LONGBLOB or BYTEA takes more
+            // than a BLOB, TINYBLOB or bounded VARBINARY can hold.
             return false;
         }
         if (family == 2 && textCapacity(found) < (attr.declaredType == null && keyColumn(model, index)
@@ -1400,10 +1412,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                     List<Attribute> expected = new ArrayList<Attribute>();
                     collectionKeys(expected, joinColumns(relation.joinColumn, owner), owner, true);
+                    Attribute element = null;
                     if (relation.element) {
                         boolean keyed = keyedByValue(relation);
-                        expected.add(new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
-                                keyed, false, !keyed, false));
+                        element = new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
+                                keyed, false, !keyed, false);
+                        expected.add(element);
                         if (relation.mapKey.length() > 0) {
                             expected.add(new Attribute("", relation.mapKey, Attribute.TEXT, true, false, false, false));
                         }
@@ -1416,7 +1430,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         expected.add(new Attribute("", relation.orderColumn, Attribute.INTEGER,
                                 !relation.element || relation.mapKey.length() == 0, false, false, false));
                     }
-                    validateCollectionColumns(relation.joinTable, expected, columns, errors);
+                    validateCollectionColumns(relation.joinTable, expected, columns, errors, element,
+                            relation.target);
                 }
             }
         }
@@ -1429,8 +1444,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             expected.add(new Attribute("", names[i], id.kind, primary, false, false, false, id.declaredType));
         }
     }
+    /// `element` is the value column of an element collection, null
+    /// otherwise; it is checked against the range of `elementType`, which is
+    /// narrower than the BIGINT every integral element is stored as.
     private void validateCollectionColumns(String table, List<Attribute> expected, List<Object[]> columns,
-            List<SchemaReport.Issue> errors) {
+            List<SchemaReport.Issue> errors, Attribute element, Class elementType) {
         for (Attribute attr : expected) {
             Object[] found = null;
             for (Object[] column : columns) {
@@ -1466,9 +1484,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
             int family = typeFamily((String) found[1]);
             boolean fits = family != 1 || attr.kind != Attribute.INTEGER && attr.kind != Attribute.BIGINT
-                    || integerFits((String) found[1], attr.kind,
-                    attr.kind == Attribute.INTEGER ? Integer.MIN_VALUE : Long.MIN_VALUE,
-                    attr.kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE);
+                    || integerFits((String) found[1], attr.kind, minimum(attr, element, elementType),
+                    maximum(attr, element, elementType));
             if (family != typeFamily(type) || !fits || family == 2 && textCapacity((String) found[1])
                     < (attr.id && attr.declaredType == null ? Math.min(255, textCapacity(type)) : textCapacity(type))) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -1510,12 +1527,36 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, (String) column[0],
                 "Unmapped NOT NULL column without a default " + table + "." + column[0]));
     }
-    /// Whether a MySQL text key column keeps every value a Java set or map
-    /// keeps apart: binary, and NO PAD so trailing spaces still differ -- the
-    /// collations the backend itself declares. Other engines report no such
-    /// collation here and are accepted.
+    private static long minimum(Attribute attr, Attribute element, Class elementType) {
+        if (attr == element) {
+            if (elementType == Byte.class) {
+                return Byte.MIN_VALUE;
+            }
+            if (elementType == Short.class) {
+                return Short.MIN_VALUE;
+            }
+            if (elementType == Integer.class) {
+                return Integer.MIN_VALUE;
+            }
+        }
+        return attr.kind == Attribute.INTEGER ? Integer.MIN_VALUE : Long.MIN_VALUE;
+    }
+    private static long maximum(Attribute attr, Attribute element, Class elementType) {
+        return -(minimum(attr, element, elementType) + 1);
+    }
+    /// Whether a text key column keeps every value a Java set or map keeps
+    /// apart. MySQL: binary, and NO PAD so trailing spaces still differ -- the
+    /// collations the backend itself declares. SQLite: BINARY, since NOCASE
+    /// folds case and RTRIM ignores trailing spaces. PostgreSQL reports no
+    /// such collation here and is accepted.
     private boolean distinctKeyCollation(String collation) {
-        if (collation == null || !"mysql".equals(sql.dialect())) {
+        if (collation == null) {
+            return true;
+        }
+        if ("sqlite".equals(sql.dialect())) {
+            return "binary".equalsIgnoreCase(collation);
+        }
+        if (!"mysql".equals(sql.dialect())) {
             return true;
         }
         return "utf8mb4_0900_bin".equalsIgnoreCase(collation) || "binary".equalsIgnoreCase(collation)
@@ -1523,8 +1564,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     /// Shapes `PRAGMA table_info` rows as [SqlAccess#describe] answers them. A
     /// literal NULL default fills nothing, and the one INTEGER primary key
-    /// column is the rowid, which SQLite assigns.
-    static List<Object[]> sqliteColumns(List<Object[]> raw, String createSql) {
+    /// column is the rowid, which SQLite assigns. `keyCollations` maps each
+    /// primary key column to the collation of the key's index (see
+    /// [#sqlitePrimaryKeyIndex]).
+    static List<Object[]> sqliteColumns(List<Object[]> raw, String createSql, Map<String, String> keyCollations) {
         int keys = 0;
         for (Object[] row : raw) {
             if (row[5] instanceof Number && ((Number) row[5]).intValue() != 0) {
@@ -1558,8 +1601,31 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // table has none, or the column says NOT NULL.
             boolean key = row[5] instanceof Number && ((Number) row[5]).intValue() != 0;
             Object notNull = key && (rowid || withoutRowid) ? Integer.valueOf(1) : row[3];
-            result.add(new Object[] {row[1], row[2], notNull, row[5], Integer.valueOf(filled || rowid ? 1 : 0), null,
+            result.add(new Object[] {row[1], row[2], notNull, row[5], Integer.valueOf(filled || rowid ? 1 : 0),
+                    keyCollations.get(String.valueOf(row[1])),
                     Integer.valueOf(rowid ? 1 : 0), Integer.valueOf(0)});
+        }
+        return result;
+    }
+    /// The name of the index SQLite keeps for a table's primary key, from
+    /// `PRAGMA index_list` rows (seq, name, unique, origin, partial), or null
+    /// for a rowid key, which has none.
+    static String sqlitePrimaryKeyIndex(List<Object[]> indexes) {
+        for (Object[] index : indexes) {
+            if ("pk".equals(index[3])) {
+                return String.valueOf(index[1]);
+            }
+        }
+        return null;
+    }
+    /// Key column name to collation, from `PRAGMA index_xinfo` rows
+    /// (seqno, cid, name, desc, coll, key).
+    static Map<String, String> sqliteKeyCollations(List<Object[]> columns) {
+        Map<String, String> result = new HashMap<String, String>();
+        for (Object[] column : columns) {
+            if (column[2] != null && column[5] instanceof Number && ((Number) column[5]).intValue() != 0) {
+                result.put(String.valueOf(column[2]), column[4] == null ? null : String.valueOf(column[4]));
+            }
         }
         return result;
     }
@@ -1663,6 +1729,33 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         long bound = width == 8 ? Long.MAX_VALUE : (1L << (8 * width - 1)) - 1;
         return minimum >= -bound - 1 && maximum <= bound;
+    }
+    /// The number of bytes a binary column holds, Integer.MAX_VALUE when the
+    /// type sets no practical bound.
+    private int binaryCapacity(String type) {
+        if ("sqlite".equals(sql.dialect())) {
+            return Integer.MAX_VALUE;
+        }
+        String token = firstTypeToken(type);
+        if ("tinyblob".equals(token)) {
+            return 255;
+        }
+        if ("blob".equals(token)) {
+            return 65535;
+        }
+        if ("mediumblob".equals(token)) {
+            return 16777215;
+        }
+        int open = type.indexOf('(');
+        int close = type.indexOf(')', open + 1);
+        if (open < 0 || close < 0 || token.indexOf("binary") < 0) {
+            return Integer.MAX_VALUE;
+        }
+        try {
+            return Integer.parseInt(type.substring(open + 1, close).trim());
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
     }
     /// The number of characters a text column holds, Integer.MAX_VALUE when
     /// the type sets no practical bound. SQLite enforces no length, and

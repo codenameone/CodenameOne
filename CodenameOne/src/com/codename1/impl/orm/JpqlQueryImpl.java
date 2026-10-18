@@ -733,8 +733,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("IN parameter requires a known left operand storage kind");
                     }
                     Parameter parameter = new Parameter(next().substring(1));
-                    parameter.query = left.query;
-                    parameter.field = left.field;
+                    // A scalar subquery binds through the projected field.
+                    boolean projected = left.query == null && left.subqueryMapping;
+                    parameter.query = projected ? left.projectionQuery : left.query;
+                    parameter.field = projected ? left.projectionField : left.field;
                     parameter.expectedKind = left.kind;
                     parameter.marker = bind(parameter);
                     values = parameter.marker;
