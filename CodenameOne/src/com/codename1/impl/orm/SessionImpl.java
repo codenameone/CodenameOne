@@ -1196,7 +1196,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // would be rejected or coerced. DATETIME is what the mapping needs.
             return false;
         }
-        if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)
+        if (family == 1 && attr.declaredType != null && typeFamily(attr.declaredType) == 1) {
+            // An explicit @Column type is the limit the developer chose; the
+            // column has to be that type, not cover the whole Java range.
+            if (integerWidth(found) != integerWidth(attr.declaredType)
+                    || (asciiLower(found).indexOf("unsigned") >= 0)
+                    != (asciiLower(attr.declaredType).indexOf("unsigned") >= 0)) {
+                return false;
+            }
+        } else if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)
                 && !integerFits(found, attr.kind, model.minimumIntegralValue(index),
                         model.maximumIntegralValue(index))) {
             return false;
