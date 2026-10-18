@@ -168,6 +168,28 @@ public final class LangMembersChecks {
             Bulk.p("zero", f.format(0));
             Bulk.p("one", f.format(1));
         });
+        Bulk.check("Lang.sharpSHasNoSingleUpperCase", () -> {
+            Bulk.p("char", (int) Character.toUpperCase((char) 0xdf));
+            Bulk.p("codePoint", Character.toUpperCase(0xdf));
+        });
+        Bulk.check("Lang.anUnwritableVariantLeavesTheTag", () -> {
+            Bulk.p("space", new java.util.Locale("en", "", "a b").toLanguageTag());
+            Bulk.p("short", new java.util.Locale("en", "", "ab").toLanguageTag());
+        });
+        Bulk.check("Lang.bufferedWrappersRefuseNull", () -> {
+            try {
+                new java.io.BufferedReader((java.io.Reader) null);
+                Bulk.p("reader", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("reader", "npe");
+            }
+            try {
+                new java.io.BufferedWriter((java.io.Writer) null);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

@@ -54,6 +54,9 @@ public class BufferedReader extends Reader {
     /// - `IllegalArgumentException`: when `size` is not positive
     public BufferedReader(Reader in, int size) {
         super(in);
+        if (in == null) {
+            throw new NullPointerException();
+        }
         if (size <= 0) {
             throw new IllegalArgumentException("Buffer size <= 0");
         }

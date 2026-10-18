@@ -428,7 +428,9 @@ public interface List<E> extends Collection<E> {
     /// A view of this list in the opposite order. It reads and writes
     /// through to this list, and its own `reversed()` is this list.
     default List<E> reversed() {
-        return new ReversedList<E>(this);
+        // An indexed list stays one reversed, so RandomAccess-aware code
+        // such as Collections.binarySearch keeps its indexed path.
+        return this instanceof RandomAccess ? new ReversedList.Indexed<E>(this) : new ReversedList<E>(this);
     }
 
     /// An unmodifiable list of no elements.

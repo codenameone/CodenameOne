@@ -26,7 +26,14 @@ package java.util;
 /// `size() - 1 - i` of the backing list, and every read and write goes
 /// through to it. Structural changes made to the backing list directly are
 /// visible here at once, because nothing is copied.
-final class ReversedList<E> extends AbstractList<E> {
+class ReversedList<E> extends AbstractList<E> {
+
+    /// The view of a `RandomAccess` list, which carries the marker too.
+    static final class Indexed<E> extends ReversedList<E> implements RandomAccess {
+        Indexed(List<E> base) {
+            super(base);
+        }
+    }
 
     private final List<E> base;
 

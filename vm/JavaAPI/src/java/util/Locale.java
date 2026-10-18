@@ -267,11 +267,31 @@ public class Locale {
             String tagged = variant.replace('_', '-');
             if (isWellFormedVariant(tagged)) {
                 out.append('-').append(tagged);
-            } else {
+            } else if (isPrivateUseText(tagged)) {
                 out.append("-x-lvariant-").append(tagged);
             }
+            // Anything else ("a b") cannot be written as a subtag at all and is
+            // left out, as the JDK leaves it out.
         }
         return out.toString();
+    }
+
+    /// Whether every `-` separated part is 1 to 8 letters or digits, which
+    /// a private-use subtag requires.
+    private static boolean isPrivateUseText(String tagged) {
+        int start = 0;
+        int n = tagged.length();
+        for (int i = 0; i <= n; i++) {
+            if (i < n && tagged.charAt(i) != '-') {
+                continue;
+            }
+            String part = tagged.substring(start, i);
+            start = i + 1;
+            if (part.length() < 1 || part.length() > 8 || !isAlphanumeric(part)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isWellFormedVariant(String tagged) {

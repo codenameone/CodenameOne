@@ -909,9 +909,12 @@ public class DecimalFormat extends NumberFormat {
             sb.append('E').append(decimalAt - 1);
             doubleResult = Double.parseDouble(sb.toString());
         }
-        // A multiplier of zero formats everything as zero; there is nothing
-        // to divide back by.
-        if (multiplier != 1 && multiplier != 0) {
+        // A multiplier of zero formats everything as zero; undoing it divides
+        // by zero, so zero parses as NaN and anything else as an infinity.
+        if (multiplier == 0) {
+            doubleResult = (gotDouble ? doubleResult : (double) longResult) / 0.0;
+            gotDouble = true;
+        } else if (multiplier != 1) {
             if (gotDouble) {
                 doubleResult = doubleResult / multiplier;
             } else if (longResult % multiplier == 0) {
