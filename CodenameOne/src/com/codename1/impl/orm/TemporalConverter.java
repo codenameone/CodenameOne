@@ -133,7 +133,8 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
             throw c.invalid();
         }
         long millis = 0;
-        if (c.more() && (c.peek() == ' ' || c.peek() == 'T')) {
+        boolean timed = c.more() && (c.peek() == ' ' || c.peek() == 'T');
+        if (timed) {
             c.next();
             long hour = c.digits(2);
             c.expect(':');
@@ -170,6 +171,11 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
         if (c.more()) {
             char sign = c.next();
             if (sign == '+' || sign == '-') {
+                if (!timed) {
+                    // An offset qualifies a time; on a bare date it would
+                    // shift the day.
+                    throw c.invalid();
+                }
                 long offsetHours = c.digits(2);
                 long offsetMinutes = 0;
                 long offsetSeconds = 0;

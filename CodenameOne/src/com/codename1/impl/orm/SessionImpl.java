@@ -132,7 +132,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     String checkedTextKeyAssignment(EntityModel model, int index, String expression) {
         Attribute attribute = model.attributes()[index];
-        if (attribute.kind != Attribute.TEXT || attribute.declaredType != null || !keyColumn(model, index)) {
+        // A @Temporal value is a date to the database, not text to measure.
+        if (attribute.kind != Attribute.TEXT || attribute.temporal != 0 || attribute.declaredType != null
+                || !keyColumn(model, index)) {
             return expression;
         }
         String length = functionName("LENGTH") + "(" + expression + ")";
@@ -1368,6 +1370,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                             "Identifier " + name + " uses collation " + found[5]
                             + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
                 }
+                if (attr.id && attr.kind == Attribute.TEXT && blankPadded((String) found[1])) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            "Identifier " + name + " is a blank-padded " + found[1]
+                            + " column, under which \"a\" and \"a \" are one key; keys need VARCHAR or TEXT"));
+                }
                 if (found.length > 7) {
                     // An insert omits a generated id and names every other column.
                     if (attr.generated && ((Number) found[6]).intValue() == 0) {
@@ -1472,6 +1479,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         "Collection key " + name + " uses collation " + found[5]
                         + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
             }
+            if (attr.id && attr.kind == Attribute.TEXT && blankPadded((String) found[1])) {
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Collection key " + name + " is a blank-padded " + found[1]
+                        + " column, under which \"a\" and \"a \" are one key; keys need VARCHAR or TEXT"));
+            }
             if (attr.id != primary) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Primary key mismatch on collection " + name));
@@ -1528,7 +1540,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 "Unmapped NOT NULL column without a default " + table + "." + column[0]));
     }
     private static long minimum(Attribute attr, Attribute element, Class elementType) {
-        if (attr == element) {
+        if (element != null && attr.column.equals(element.column)) {
             if (elementType == Byte.class) {
                 return Byte.MIN_VALUE;
             }
@@ -1544,6 +1556,28 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private static long maximum(Attribute attr, Attribute element, Class elementType) {
         return -(minimum(attr, element, elementType) + 1);
     }
+    /// Whether a text column pads to a fixed width -- CHAR, NCHAR, PostgreSQL's
+    /// bpchar -- and so compares values that differ only in trailing spaces as
+    /// equal whatever its collation. SQLite does not pad.
+    private boolean blankPadded(String type) {
+        if ("sqlite".equals(sql.dialect())) {
+            return false;
+        }
+        String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
+        if (tokens.length == 0) {
+            return false;
+        }
+        String token = tokens[0];
+        if ("national".equals(token) && tokens.length > 1) {
+            token = tokens[1];
+        }
+        for (String t : tokens) {
+            if ("varying".equals(t)) {
+                return false;
+            }
+        }
+        return " char character nchar bpchar ".contains(" " + token + " ");
+    }
     /// Whether a text key column keeps every value a Java set or map keeps
     /// apart. MySQL: binary, and NO PAD so trailing spaces still differ -- the
     /// collations the backend itself declares. SQLite: BINARY, since NOCASE
@@ -1555,6 +1589,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         if ("sqlite".equals(sql.dialect())) {
             return "binary".equalsIgnoreCase(collation);
+        }
+        if ("postgresql".equals(sql.dialect())) {
+            // The backend marks a nondeterministic collation, under which
+            // distinct strings can compare equal.
+            return !collation.startsWith("nondeterministic ");
         }
         if (!"mysql".equals(sql.dialect())) {
             return true;
@@ -2132,7 +2171,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 first = false;
                 Attribute attribute = target.attributes()[target.index(parts[0])];
                 statement.append(orderBy("t." + q(attribute.column),
-                        !(parts.length > 1 && "DESC".equalsIgnoreCase(parts[1])), attribute.kind));
+                        !(parts.length > 1 && "DESC".equalsIgnoreCase(parts[1])), attribute.sqlKind()));
             }
         } else if (relation.orderColumn.length() > 0) {
             statement.append(" ORDER BY l.").append(q(relation.orderColumn));
