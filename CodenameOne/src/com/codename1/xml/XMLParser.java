@@ -72,6 +72,25 @@ public class XMLParser {
     ParserCallback parserCallback;
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
     private boolean eventParser;
+    private boolean strict;
+    private boolean stripNamespacePrefixes;
+    // Scratch buffers shared by every frame of the recursive descent. Each is
+    // turned into a String before parseTag or parseTagContent recurses, so a
+    // nested call always finds them free. They replace the three
+    // StringBuilders parseTag allocated per tag and the one per text node.
+    private final CharBuf nameBuf = new CharBuf();
+    private final CharBuf attrBuf = new CharBuf();
+    private final CharBuf valueBuf = new CharBuf();
+    private final CharBuf textBuf = new CharBuf();
+    private final CharBuf entityBuf = new CharBuf();
+    // Names and short values repeat endlessly in a document (w:p, w:r, w:val
+    // ...); the pool hands back the instance it already made instead of a new
+    // String each time. Emptied by both entry points.
+    private static final int POOL_SIZE = 1024;
+    private static final int POOL_MAX_LEN = 32;
+    private String[] pool;
+    private char[][] poolChars;
+    private int poolCount;
 
     /// The char entities strings supported in XML. When a char entity is found these will be compared against first.
     ///
@@ -123,6 +142,146 @@ public class XMLParser {
     private void resetBuffer() {
         buffOffset = 0;
         buffSize = -1;
+        if (pool != null) {
+            for (int i = 0; i < POOL_SIZE; i++) {
+                pool[i] = null;
+                poolChars[i] = null;
+            }
+            poolCount = 0;
+        }
+    }
+
+    /// A growable char array. Final, so every call on it is a direct call.
+    private static final class CharBuf {
+        char[] chars = new char[64];
+        int len;
+
+        void clear() {
+            len = 0;
+        }
+
+        void add(char c) {
+            if (len == chars.length) {
+                grow(len + 1);
+            }
+            chars[len++] = c;
+        }
+
+        void add(char[] src, int off, int count) {
+            if (len + count > chars.length) {
+                grow(len + count);
+            }
+            System.arraycopy(src, off, chars, len, count);
+            len += count;
+        }
+
+        void add(CharBuf other) {
+            add(other.chars, 0, other.len);
+        }
+
+        void add(String s) {
+            int count = s.length();
+            if (len + count > chars.length) {
+                grow(len + count);
+            }
+            for (int i = 0; i < count; i++) {
+                chars[len++] = s.charAt(i);
+            }
+        }
+
+        private void grow(int min) {
+            int n = chars.length * 2;
+            if (n < min) {
+                n = min;
+            }
+            char[] a = new char[n];
+            System.arraycopy(chars, 0, a, 0, len);
+            chars = a;
+        }
+
+        @Override
+        public String toString() {
+            return new String(chars, 0, len);
+        }
+    }
+
+    /// Whitespace as the parser sees it. Strict mode never consults the
+    /// overridable isWhiteSpace, so the check is a direct call ParparVM can
+    /// keep cheap.
+    private boolean ws(char ch) {
+        if (strict) {
+            return ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r';
+        }
+        return isWhiteSpace(ch);
+    }
+
+    /// Returns a pooled String for chars[off, off+len).
+    private String pooled(char[] chars, int off, int len) {
+        if (len > POOL_MAX_LEN) {
+            return new String(chars, off, len);
+        }
+        int h = 0;
+        for (int i = 0; i < len; i++) {
+            h = 31 * h + chars[off + i];
+        }
+        if (pool == null) {
+            pool = new String[POOL_SIZE];
+            poolChars = new char[POOL_SIZE][];
+        }
+        int mask = POOL_SIZE - 1;
+        int idx = (h ^ (h >>> 16)) & mask;
+        for (int probe = 0; probe < 8; probe++) {
+            char[] p = poolChars[idx];
+            if (p == null) {
+                String s = new String(chars, off, len);
+                if (poolCount < POOL_SIZE * 3 / 4) {
+                    char[] copy = new char[len];
+                    System.arraycopy(chars, off, copy, 0, len);
+                    poolChars[idx] = copy;
+                    pool[idx] = s;
+                    poolCount++;
+                }
+                return s;
+            }
+            if (p.length == len) {
+                int i = 0;
+                while (i < len && p[i] == chars[off + i]) {
+                    i++;
+                }
+                if (i == len) {
+                    return pool[idx];
+                }
+            }
+            idx = (idx + 1) & mask;
+        }
+        return new String(chars, off, len);
+    }
+
+    private String name(CharBuf b) {
+        int off = 0;
+        if (stripNamespacePrefixes) {
+            for (int i = b.len - 1; i >= 0; i--) {
+                if (b.chars[i] == ':') {
+                    off = i + 1;
+                    break;
+                }
+            }
+        }
+        return pooled(b.chars, off, b.len - off);
+    }
+
+    private String attributeName(CharBuf b) {
+        // xmlns:w names the namespace w itself; without its prefix it would
+        // collide with the default namespace declaration
+        if (stripNamespacePrefixes && b.len > 5 && b.chars[0] == 'x' && b.chars[1] == 'm'
+                && b.chars[2] == 'l' && b.chars[3] == 'n' && b.chars[4] == 's' && b.chars[5] == ':') {
+            return pooled(b.chars, 0, b.len);
+        }
+        return name(b);
+    }
+
+    private String value(CharBuf b) {
+        return pooled(b.chars, 0, b.len);
     }
 
     /// Trims unneeded & and ; from the symbol if exist
@@ -336,7 +495,7 @@ public class XMLParser {
     /// a new instance of the element
     protected Element createNewElement(String name) {
         Element e = new Element(name);
-        e.caseSensitive = caseSensitive;
+        e.caseSensitive = caseSensitive || strict;
         return e;
     }
 
@@ -351,7 +510,7 @@ public class XMLParser {
     /// a new instance of the element
     protected Element createNewTextElement(String text) {
         Element e = new Element(text, true);
-        e.caseSensitive = caseSensitive;
+        e.caseSensitive = caseSensitive || strict;
         return e;
     }
 
@@ -446,45 +605,52 @@ public class XMLParser {
     ///
     /// - `IOException`: if an I/O error in the stream is encountered
     protected void parseTagContent(Element element, Reader is) throws IOException {
-        StringBuilder text = null;
+        // The text and entity buffers belong to the parser, not to this frame:
+        // both are flushed before parseTag recurses, so a nested call always
+        // finds them empty.
+        CharBuf text = textBuf;
+        CharBuf charEntity = entityBuf;
+        boolean inText = false;
+        boolean inEntity = false;
         boolean leadingSpace = false;
+        final boolean keepAllText = strict;
         int val = read(is);
         char c = (char) val;
-        StringBuilder charEntity = null;
 
         while (val != -1) {
             if (c == '<') {
-                if ((includeWhitespacesBetweenTags) && (leadingSpace) && (text == null) && (element != null) && (element.getNumChildren() > 0)) {
+                if ((includeWhitespacesBetweenTags) && (leadingSpace) && (!inText) && (element != null) && (element.getNumChildren() > 0)) {
                     leadingSpace = false;
-                    text = new StringBuilder().append(' ');
+                    text.clear();
+                    text.add(' ');
+                    inText = true;
                 }
 
-                if (text != null) {
+                if (inText) {
                     // Mistakenly "collected" something that is not a char entity, perhaps
                     // misuse of the & character (instead of using &apos;)
-                    if (charEntity != null) {
-                        text.append('&').append(charEntity);
-                        charEntity = null;
+                    if (inEntity) {
+                        text.add('&');
+                        text.add(charEntity);
+                        inEntity = false;
                     }
-                    if (leadingSpace) {
-                        text.insert(0, ' ');
-                    }
+                    String str = text.toString();
                     if (element != null) {
-                        Element textElement = createNewTextElement(text.toString());
+                        Element textElement = createNewTextElement(str);
                         element.addChild(textElement);
                     } else {
-                        textElement(text.toString());
+                        textElement(str);
                     }
-                    text = null;
+                    inText = false;
                     leadingSpace = false;
-
                 }
 
 
                 Element childElement = parseTag(is);
                 if (childElement == END_TAG) {
                     //was actually an ending tag
-                    StringBuilder closingTag = new StringBuilder();
+                    CharBuf closingTag = nameBuf;
+                    closingTag.clear();
                     int i = read(is);
 
                     // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
@@ -493,7 +659,7 @@ public class XMLParser {
                     } else {
                         c = (char) i;
                         while ((c != '>')) {
-                            closingTag.append(c);
+                            closingTag.add(c);
                             i = read(is);
                             c = (char) i;
                             if (i == -1) {
@@ -503,7 +669,7 @@ public class XMLParser {
                         }
                     }
 
-                    String ct = closingTag.toString();
+                    String ct = name(closingTag);
                     if (eventParser) {
                         endTag(ct);
                         if (!isEmptyTag(ct)) {
@@ -514,10 +680,11 @@ public class XMLParser {
                     }
 
                     if (element != null) {
-                        if (ct.equalsIgnoreCase(element.getTagName())) {
+                        String tagName = element.getTagName();
+                        if (strict ? ct.equals(tagName) : ct.equalsIgnoreCase(tagName)) {
                             return;
                         } else if (!isEmptyTag(ct)) {
-                            notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, element.getTagName(), null, null, "Malformed XML - no appropriate closing tag for " + element.getTagName());
+                            notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, tagName, null, null, "Malformed XML - no appropriate closing tag for " + tagName);
                         }
                     }
                 } else {
@@ -525,28 +692,57 @@ public class XMLParser {
                         element.addChild(childElement);
                     }
                 }
-            } else if (text != null) {
-                if (charEntity != null) {
+            } else if (inText) {
+                if (inEntity) {
                     if (c == ';') { //end
-                        text.append(convertCharEntity(charEntity.toString()));
-                        charEntity = null;
+                        text.add(convertCharEntity(charEntity.toString()));
+                        inEntity = false;
                     } else if (isLegalCharEntityCharacter(c)) {
-                        charEntity.append(c);
+                        charEntity.add(c);
                     } else {
-                        text.append('&').append(charEntity).append(c);
-                        charEntity = null;
+                        text.add('&');
+                        text.add(charEntity);
+                        text.add(c);
+                        inEntity = false;
                     }
                 } else if (c == '&') { //start char entity
-                    charEntity = new StringBuilder();
+                    charEntity.clear();
+                    inEntity = true;
                 } else {
-                    text.append(c);
+                    text.add(c);
+                    // Plain text runs to the next markup or entity; copy the
+                    // rest of it out of the read buffer in one go rather than
+                    // a character at a time.
+                    char[] b = buffer;
+                    int start = buffOffset;
+                    int end = start;
+                    int lim = buffSize;
+                    while (end < lim) {
+                        char d = b[end];
+                        if (d == '<' || d == '&') {
+                            break;
+                        }
+                        end++;
+                    }
+                    if (end > start) {
+                        text.add(b, start, end - start);
+                        buffOffset = end;
+                    }
                 }
-            } else if (!isWhiteSpace(c)) {
+            } else if (keepAllText || !isWhiteSpace(c)) {
+                text.clear();
+                inText = true;
+                if (leadingSpace) {
+                    text.add(' ');
+                    leadingSpace = false;
+                }
                 if (c == '&') { //text starts with a character entity (i.e. &nbsp;)
-                    charEntity = new StringBuilder(); // The & is not included in the string we accumulate
-                    text = new StringBuilder(); //Initalize text so it won't be null
+                    // The & is not included in the string we accumulate
+                    charEntity.clear();
+                    inEntity = true;
                 } else {
-                    text = new StringBuilder().append(c);
+                    // re-dispatch through the plain text branch so the bulk copy applies
+                    continue;
                 }
             } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
                 leadingSpace = true;
@@ -586,9 +782,12 @@ public class XMLParser {
     ///
     /// - `IOException`: if an I/O error in the stream is encountered
     protected Element parseTag(Reader is) throws IOException {
-        StringBuilder tagName = new StringBuilder();
-        StringBuilder curAttribute = new StringBuilder();
-        StringBuilder curValue = new StringBuilder();
+        CharBuf tagName = nameBuf;
+        CharBuf curAttribute = attrBuf;
+        CharBuf curValue = valueBuf;
+        tagName.clear();
+        curValue.clear();
+        final boolean fold = !eventParser && !caseSensitive && !strict;
         //boolean procInst=false; // Support for the styleshhet processing instruction was removed, as it is not supported in most browsers, and it causes problems by adding tags before the HTML element (Makign the document with multiple roots)
 
         char c = (char) read(is);
@@ -619,24 +818,20 @@ public class XMLParser {
                 return parseCommentOrXMLDeclaration(is, ">"); //parse doctypes i.e. <!DOCTYPE .... > as comments as well - i.e. ignore them
             }
         } else if (c == '?') {
-            //procInst=true;
-            //c=(char)read(is);
             return parseCommentOrXMLDeclaration(is, ">"); //parse XML declaration i.e. <?xml version="1.0" encoding="ISO-8859-1"?> as comments as well - i.e. ignore them
         }
 
         //read and ignore any whitespaces before tag name
-        while (isWhiteSpace(c)) {
+        while (ws(c)) {
             c = (char) read(is);
         }
 
         //collect tag name
-        while ((!isWhiteSpace(c)) && (c != '>') && (c != '/')) {
-            if (!eventParser) {
-                if (!caseSensitive) {
-                    c = Character.toLowerCase(c);
-                }
+        while ((!ws(c)) && (c != '>') && (c != '/')) {
+            if (fold) {
+                c = Character.toLowerCase(c);
             }
-            tagName.append(c);
+            tagName.add(c);
             int i = read(is);
 
             // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
@@ -647,29 +842,15 @@ public class XMLParser {
         }
 
         //read and ignore any whitespaces after tag name
-        while (isWhiteSpace(c)) {
+        while (ws(c)) {
             c = (char) read(is);
         }
 
         boolean processTag = true;
-        String tn = tagName.toString();
+        String tn = name(tagName);
         if (eventParser) {
             processTag = startTag(tn);
         }
-        // We do not support any processing instructions
-        /*if (procInst) {
-            if ("xml-stylesheet".equals(tagName)) { // The XML processing instruction <?xml-stylesheet ... ?> has the same parameters as <link .. > and behaves the same way
-                tagName="link";
-            } else { // Processing instruction not supported - read till its end
-                c=(char)read(is);
-                while (c!='>') {
-                    c=(char)read(is);
-                }
-                Element procInstElem=createNewElement("unsupported");
-                procInstElem.isComment=true;
-                return procInstElem;
-            }
-        }*/
         Element element = null;
         if (!eventParser) {
             element = createNewElement(tn);
@@ -692,7 +873,8 @@ public class XMLParser {
                     c = (char) i;
                 }
                 if (lastChar != '/') { // If this is an empty tag, no need to search for its closing tag as there's none...
-                    String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
+                    // the name as read, before any namespace prefix was stripped
+                    String endTag = new StringBuilder().append('<').append('/').append(tagName.toString()).append('>').toString();
                     int index = 0;
                     int elen = endTag.length();
                     while (index < elen) {
@@ -704,7 +886,9 @@ public class XMLParser {
                         }
                         c = (char) i;
 
-                        c = Character.toLowerCase(c);
+                        if (!strict) {
+                            c = Character.toLowerCase(c);
+                        }
                         if (c == endTag.charAt(index)) {
                             index++;
                         } else {
@@ -722,7 +906,7 @@ public class XMLParser {
                 parseTagContent(element, is);
             }
             return element;
-        } else if (c == '/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
+        } else if (c == '/') { //closed tag - no content
             c = (char) read(is);
             if (c == '>') {
                 if (eventParser) {
@@ -736,20 +920,19 @@ public class XMLParser {
 
 
         while (true) {
-            curAttribute.delete(0, curAttribute.length()).append(c);
+            curAttribute.clear();
+            curAttribute.add(c);
             c = (char) read(is);
-            while ((!isWhiteSpace(c)) && (c != '=') && (c != '>')) {
-                if (!eventParser) {
-                    if (!caseSensitive) {
-                        c = Character.toLowerCase(c);
-                    }
+            while ((!ws(c)) && (c != '=') && (c != '>')) {
+                if (fold) {
+                    c = Character.toLowerCase(c);
                 }
-                curAttribute.append(c);
+                curAttribute.add(c);
                 c = (char) read(is);
             }
 
             if (c == '>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
-                notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tn, curAttribute.toString(), null, "Unexpected tag closing in tag " + tagName + ", attribute=" + curAttribute);
+                notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tn, curAttribute.toString(), null, "Unexpected tag closing in tag " + tn + ", attribute=" + curAttribute);
                 if (!isEmptyTag(tn)) {
                     parseTagContent(element, is);
                 }
@@ -757,12 +940,12 @@ public class XMLParser {
             }
 
             //read and ignore any whitespaces after attribute name
-            while (isWhiteSpace(c)) {
+            while (ws(c)) {
                 c = (char) read(is);
             }
 
             if (c != '=') {
-                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, "Unexpected character " + c + ", expected '=' after attribute " + curAttribute + " in tag " + tagName);
+                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, "Unexpected character " + c + ", expected '=' after attribute " + curAttribute + " in tag " + tn);
                 if (c == '>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
                     if (!isEmptyTag(tn)) {
                         parseTagContent(element, is);
@@ -776,7 +959,7 @@ public class XMLParser {
 
             c = (char) read(is);
             //read and ignore any whitespaces before attribute value
-            while (isWhiteSpace(c)) {
+            while (ws(c)) {
                 c = (char) read(is);
             }
 
@@ -786,10 +969,11 @@ public class XMLParser {
             if ((c == '"') || (c == '\'')) {
                 quote = c;
             } else {
-                curValue.append(c);
+                curValue.add(c);
             }
 
-            StringBuilder charEntity = null;
+            CharBuf charEntity = entityBuf;
+            boolean inEntity = false;
             boolean ended = false;
             while (!ended) {
                 int i = read(is);
@@ -804,50 +988,55 @@ public class XMLParser {
                         return END_TAG;
                     }
                     c = (char) i;
-                } else if ((quote == ' ') && ((c == '/') || (c == '>') || (isWhiteSpace(c)))) {
+                } else if ((quote == ' ') && ((c == '/') || (c == '>') || (ws(c)))) {
                     ended = true;
                 } else if (c == '&') {
-                    if (charEntity != null) {
-                        curValue.append('&').append(charEntity); // Wasn't a char entit, probably a url as a parameter : i.e. param="/test?p=val&pw=val2&p3=val3
+                    if (inEntity) {
+                        curValue.add('&'); // Wasn't a char entit, probably a url as a parameter : i.e. param="/test?p=val&pw=val2&p3=val3
+                        curValue.add(charEntity);
                     }
-                    charEntity = new StringBuilder();
+                    charEntity.clear();
+                    inEntity = true;
                 } else {
-                    if (charEntity != null) {
+                    if (inEntity) {
                         if (c == ';') {
-                            curValue.append(convertCharEntity(charEntity.toString()));
-                            charEntity = null;
+                            curValue.add(convertCharEntity(charEntity.toString()));
+                            inEntity = false;
                         } else if (isLegalCharEntityCharacter(c)) {
-                            charEntity.append(c);
+                            charEntity.add(c);
                         } else {
-                            curValue.append('&').append(charEntity).append(c);
-                            charEntity = null;
+                            curValue.add('&');
+                            curValue.add(charEntity);
+                            curValue.add(c);
+                            inEntity = false;
                         }
                     } else {
-                        curValue.append(c);
+                        curValue.add(c);
                     }
                 }
             }
 
-            if (charEntity != null) { // Mistaken something else for a char entity - for example an action which is action="http://domain/test.html?param1=val1&param2=val2"
-                curValue.append('&').append(charEntity);
-                charEntity = null;
+            if (inEntity) { // Mistaken something else for a char entity - for example an action which is action="http://domain/test.html?param1=val1&param2=val2"
+                curValue.add('&');
+                curValue.add(charEntity);
             }
 
+            String an = attributeName(curAttribute);
+            String av = value(curValue);
             if (eventParser) {
-                attribute(tn, curAttribute.toString(), curValue.toString());
+                attribute(tn, an, av);
             } else {
-                int error = element.setAttribute(curAttribute.toString(), curValue.toString());
+                int error = element.setAttribute(an, av);
 
                 if (error == ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED) {
-                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' is not supported for tag '" + tagName + "'.");
-                    //notifyError(error, tagName, curAttribute, curValue, "Attribute '"+curAttribute+"' is not supported for tag '"+tagName+"'. Supported attributes: "+element.getSupportedAttributesList());
+                    notifyError(error, tn, an, av, "Attribute '" + an + "' is not supported for tag '" + tn + "'.");
                 } else if (error == ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID) {
-                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' in tag '" + tn + "' has an invalid value (" + curValue + ")");
+                    notifyError(error, tn, an, av, "Attribute '" + an + "' in tag '" + tn + "' has an invalid value (" + av + ")");
                 }
             }
 
             //read and ignore any whitespaces after attribute/value pair
-            while (isWhiteSpace(c)) {
+            while (ws(c)) {
                 int i = read(is);
                 if (i < 0) {
                     return END_TAG;
@@ -860,7 +1049,7 @@ public class XMLParser {
                     parseTagContent(element, is);
                 }
                 return element;
-            } else if (c == '/') { // || ((procInst) && (c=='?'))) { //closed tag - no content
+            } else if (c == '/') { //closed tag - no content
                 int i = read(is);
                 if (i < 0) {
                     return END_TAG;
@@ -874,10 +1063,10 @@ public class XMLParser {
                     }
                     return element;
                 } else {
-                    notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), curValue.toString(), "XML malformed - no > after /");
+                    notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, an, av, "XML malformed - no > after /");
                 }
             }
-            curValue = curValue.delete(0, curValue.length());
+            curValue.clear();
         }
 
     }
@@ -1049,6 +1238,60 @@ public class XMLParser {
     /// - `caseSensitive`: the caseSensitive to set
     public void setCaseSensitive(boolean caseSensitive) {
         this.caseSensitive = caseSensitive;
+    }
+
+    /// Turns strict XML parsing on or off (off by default). The default mode
+    /// keeps the lenient, HTML-flavoured behaviour existing code relies on.
+    /// Strict mode is for well-formed XML such as OOXML, and differs in that:
+    ///
+    /// - names keep their case and are matched exactly, both by the parser
+    ///   (closing tags) and by `Element.getAttribute`, as if
+    ///   `setCaseSensitive(true)` were set;
+    ///
+    /// - text is kept exactly as written: leading whitespace is not collapsed
+    ///   and whitespace-only text between tags is kept as a text element, so
+    ///   `<w:t xml:space="preserve"> </w:t>` keeps its space;
+    ///
+    /// - whitespace is the four XML whitespace characters and `isWhiteSpace`
+    ///   is not consulted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strict`: true for strict XML parsing
+    public void setStrict(boolean strict) {
+        this.strict = strict;
+    }
+
+    /// Returns true if strict XML parsing is on, see `setStrict(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true for strict XML parsing
+    public boolean isStrict() {
+        return strict;
+    }
+
+    /// When on, the namespace prefix is removed from tag and attribute names as
+    /// they are read, so `w:p` is reported as `p` and `w:val` as `val`. Off by
+    /// default because it discards information: `w:t` and `m:t` both become
+    /// `t`. Namespace declarations (`xmlns:w`) keep their name. Works in
+    /// either mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strip`: true to remove namespace prefixes from names
+    public void setStripNamespacePrefixes(boolean strip) {
+        this.stripNamespacePrefixes = strip;
+    }
+
+    /// Returns true if namespace prefixes are removed from names, see
+    /// `setStripNamespacePrefixes(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true if namespace prefixes are removed
+    public boolean isStripNamespacePrefixes() {
+        return stripNamespacePrefixes;
     }
 
 }
