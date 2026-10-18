@@ -877,12 +877,23 @@ public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
     void testLengthAndPercentageConstantsAreRejected() {
-        for (String value : new String[]{"50%", "2mm", "1.5px"}) {
+        for (String value : new String[]{"50%", "2mm", "1.5px", "url(foo.png)", "a b"}) {
             assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                     new CSSThemeCompiler().compile("#Constants { progress: " + value + "; }", new MutableResource(), "Theme"));
         }
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { progress: \"50%\"; }", res, "Theme");
         assertEquals("50%", res.getTheme("Theme").get("@progress"));
+    }
+
+    @Test
+    void testNumericConstantsAreStoredAsTheBuildSerializesThem() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { scale: 1.50; count: 001; whole: 2.0; flag: true; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("1.5", theme.get("@scale"));
+        assertEquals("1", theme.get("@count"));
+        assertEquals("2", theme.get("@whole"));
+        assertEquals("true", theme.get("@flag"));
     }
 }

@@ -329,13 +329,6 @@ public class CSSThemeCompiler {
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);
                 literalTokens.put(key, raw);
-            } else if (!legacy && isDimensionToken(value)) {
-                // The build-time compiler writes string, identifier, number and color constants
-                // only; `50%` or `2mm` is dropped from the built theme without a word, so a
-                // preview that showed it would show a constant the application never gets. The
-                // legacy `@constants` block never reaches the build-time compiler and keeps them.
-                throw new CSSSyntaxException("#Constants does not support a length or percentage: "
-                        + name + ": " + raw + " (quote it to store it as text)");
             } else if (isColorLiteral(value)) {
                 // Stored as plain hex, as the build-time compiler stores it: color constants
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
@@ -357,6 +350,13 @@ public class CSSThemeCompiler {
                     kind = declaration.snapshotKind;
                 }
                 deferred.put(key, kind);
+            } else if (!legacy) {
+                // The build-time compiler writes string, identifier, number and color constants
+                // only; anything else (`50%`, `2mm`, `url(a.png)`, a list of values) is dropped
+                // from the built theme without a word, so a preview that showed it would show a
+                // constant the application never gets. The legacy `@constants` block never
+                // reaches the build-time compiler and keeps such values.
+                value = buildConstant(name, raw, value);
             }
             theme.put(key, value);
         }
@@ -904,18 +904,50 @@ public class CSSThemeCompiler {
         }
     }
 
-    /// A CSS number followed by a unit or `%`: a dimension or percentage token.
-    private static boolean isDimensionToken(String t) {
-        int end = t.length();
-        while (end > 0) {
-            char c = t.charAt(end - 1);
-            if (c == '%' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-                end--;
-            } else {
-                break;
+    /// The value the build-time compiler stores for an unquoted `#Constants` token: a number
+    /// as it serializes the parsed value (`1.50` is `1.5`, `001` is `1`), an identifier as
+    /// written. Every other token type is one it drops, so it is rejected here.
+    private static String buildConstant(String name, String raw, String value) {
+        if (isCssNumber(value)) {
+            boolean integer = value.indexOf('.') < 0 && value.indexOf('e') < 0 && value.indexOf('E') < 0;
+            try {
+                if (integer) {
+                    return String.valueOf(Integer.parseInt(value.charAt(0) == '+' ? value.substring(1) : value));
+                }
+                String real = String.valueOf(Float.parseFloat(value));
+                return real.endsWith(".0") ? real.substring(0, real.length() - 2) : real;
+            } catch (NumberFormatException err) {
+                throw new CSSSyntaxException("Invalid number in #Constants: " + name + ": " + raw, err);
             }
         }
-        return end < t.length() && end > 0 && isCssNumber(t.substring(0, end));
+        if (isIdentifier(value)) {
+            return value;
+        }
+        throw new CSSSyntaxException("#Constants supports strings, identifiers, numbers and colors only: "
+                + name + ": " + raw + " (quote it to store it as text)");
+    }
+
+    /// A CSS identifier: `-`? then a letter, `_` or `-`, then letters, digits, `_` or `-`.
+    private static boolean isIdentifier(String t) {
+        int n = t.length();
+        int i = 0;
+        if (i < n && t.charAt(i) == '-') {
+            i++;
+        }
+        if (i >= n) {
+            return false;
+        }
+        char first = t.charAt(i);
+        if (!(first == '_' || first == '-' || (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z'))) {
+            return false;
+        }
+        for (i++; i < n; i++) {
+            char c = t.charAt(i);
+            if (!(c == '_' || c == '-' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// `[+-]? (digits | digits? . digits) ([eE] [+-]? digits)?`, the CSS number token.

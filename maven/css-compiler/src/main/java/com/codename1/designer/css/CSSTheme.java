@@ -6966,6 +6966,8 @@ public class CSSTheme {
                         case "arial" :
                         case "cursive" :
                         case "fantasy" :
+                        // The platform's own UI font: a generic family, as in the runtime compiler.
+                        case "system-ui" :
                             iFontFace = Font.FACE_SYSTEM;
                             break loop;
                         case "monospace" :
