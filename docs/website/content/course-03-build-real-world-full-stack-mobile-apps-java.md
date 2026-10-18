@@ -6,6 +6,9 @@ layout: "course-hub"
 course_id: "course-03-build-real-world-full-stack-mobile-apps-java"
 ---
 
+For the current ride-hailing application, [start with Wayline](/wayline/) and its [full-stack tutorial](/blog/create-an-uber-clone-in-1-minute/). The Uber Clone module below follows the original project.
+
+
 ![Hero image](/img/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
 
