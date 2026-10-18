@@ -153,7 +153,28 @@ public final class GameObject extends Object {
         ArrayList before = new ArrayList();
         collectLive(this, before, null);
         active = value;
+        if (!value) {
+            // Deactivation stops the coroutines below for good, even if the
+            // object is switched back on before the next coroutine pass.
+            stopCoroutinesBelow(this);
+        }
         UnityRuntime.activeChanged(this, before);
+    }
+
+    private static void stopCoroutinesBelow(GameObject go) {
+        int n = go.components.size();
+        for (int i = 0; i < n; i++) {
+            java.lang.Object c = go.components.get(i);
+            if (c instanceof MonoBehaviour) {
+                UnityRuntime.stopCoroutines((MonoBehaviour) c);
+            }
+        }
+        ArrayList children = go.transform.children;
+        if (children != null) {
+            for (int i = 0; i < children.size(); i++) { // NOPMD ForLoopCanBeForeach
+                stopCoroutinesBelow(((Transform) children.get(i)).gameObject);
+            }
+        }
     }
 
     /// Every live behaviour on `go` and below it, in hierarchy order. With

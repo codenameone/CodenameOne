@@ -748,6 +748,9 @@ public final class ParticleSystem extends Component {
             if (delay > 0f) {
                 return;
             }
+            // Only the part of the step after the delay ran out plays.
+            step = -delay;
+            delay = 0f;
         }
         float before = clock;
         float after = clock + step;

@@ -90,10 +90,18 @@ public final class CinemachineVirtualCamera extends CinemachineVirtualCameraBase
 
     @Override
     void advance(float dt, float aspect) {
-        if (!looked) {
+        // Looked up again whenever the cached body is no longer live: a
+        // disabled or destroyed body must stop moving the camera, and one a
+        // script adds in its place takes over. While there is none the
+        // search runs each frame, which is one walk of a small hierarchy.
+        if (!looked || body == null || !body.get_isActiveAndEnabled()) {
             looked = true;
             Object b = GetComponentInChildren(CinemachineComponentBase.class);
-            body = b instanceof CinemachineComponentBase ? (CinemachineComponentBase) b : null;
+            CinemachineComponentBase found = b instanceof CinemachineComponentBase ? (CinemachineComponentBase) b : null;
+            if (found != body && body != null) { // NOPMD CompareObjectsWithEquals
+                body.lost();
+            }
+            body = found != null && found.get_isActiveAndEnabled() ? found : null;
         }
         Transform target = m_Follow;
         if (body == null || target == null || !target.$live()) {

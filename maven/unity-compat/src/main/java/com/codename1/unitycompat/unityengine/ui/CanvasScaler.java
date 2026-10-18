@@ -93,9 +93,12 @@ public class CanvasScaler extends UIBehaviour {
         } else if (match >= 1f) {
             s = byHeight;
         } else {
-            float gap = byHeight - byWidth;
-            float part = gap * match;
-            s = byWidth + part;
+            // Unity blends the two in log space, so ratios 0.5 and 2 at a
+            // match of 0.5 cancel to 1 rather than averaging to 1.25.
+            double lw = com.codename1.unitycompat.system.Math.Log(byWidth);
+            double lh = com.codename1.unitycompat.system.Math.Log(byHeight);
+            double blend = lw + (lh - lw) * match;
+            s = (float) com.codename1.unitycompat.system.Math.Exp(blend);
         }
         return s > 0f ? s : 1f;
     }
