@@ -896,4 +896,42 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("2", theme.get("@whole"));
         assertEquals("true", theme.get("@flag"));
     }
+
+    @Test
+    void testAKeywordSizeKeepsTheInheritedNativeFamily() {
+        MutableResource resource = new MutableResource();
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        compiler.compile("Label{font-family:'native:MainBold';font-size:2mm;}", resource, "Theme");
+        compiler.compile("Label{font-size:large;}", resource, "Theme");
+        Font font = (Font) resource.getTheme("Theme").get("Label.font");
+        assertEquals("native:MainBold", fontName(font));
+        // Font.derive hands back the cached base font for its own natural height, so the height
+        // is compared rather than the requested pixel size.
+        assertEquals(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight(),
+                font.getHeight());
+    }
+
+    @Test
+    void testUnitlessZeroFontSizeIsAccepted() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-size:0;}", resource, "Theme");
+        assertNotNull(resource.getTheme("Theme").get("Label.font"));
+    }
+
+    @Test
+    void testEscapedAndNonAsciiIdentifierConstants() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { a: caf\u00e9; b: foo\\ bar; c: \\41 x; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("caf\u00e9", theme.get("@a"));
+        assertEquals("foo bar", theme.get("@b"));
+        assertEquals("Ax", theme.get("@c"));
+    }
+
+    @Test
+    void testWhitespaceInsideVarIsAllowed() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--accent:#f00} Label{color:var( --accent )}", res, "Theme");
+        assertEquals("ff0000", res.getTheme("Theme").get("Label.fgColor"));
+    }
 }

@@ -668,6 +668,11 @@ public class CSSThemeCompiler {
             Font font;
             if (inherited != null && family == null && parsed != null && parsed.unit >= 0) {
                 font = inherited.derive(fontSizeInPixels(parsed), inherited.getStyle());
+            } else if (inherited != null && family == null && parsed != null) {
+                // A keyword size (`small`, `medium`, `large`) keeps the inherited family too, at
+                // the height of the system font of that size.
+                font = inherited.derive(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN,
+                        parsed.systemSize).getHeight(), inherited.getStyle());
             } else {
                 if (inherited != null && family != null && parsed == null) {
                     parsed = new FontSize();
@@ -835,6 +840,11 @@ public class CSSThemeCompiler {
             out.unit = Style.UNIT_TYPE_DIPS;
             return out;
         }
+        if (isCssNumber(v) && Float.parseFloat(v) == 0f) {
+            // `0` is a valid length; the build-time compiler reads the bare number as no size
+            // and keeps its default medium sizing.
+            return out;
+        }
         // vmin before in, so the longer suffix wins.
         String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "vmin", "in", "rem", "vw", "vh", "vmax"});
         if (unit == null) {
@@ -920,34 +930,75 @@ public class CSSThemeCompiler {
                 throw new CSSSyntaxException("Invalid number in #Constants: " + name + ": " + raw, err);
             }
         }
-        if (isIdentifier(value)) {
-            return value;
+        String ident = decodeIdentifier(value);
+        if (ident != null) {
+            return ident;
         }
         throw new CSSSyntaxException("#Constants supports strings, identifiers, numbers and colors only: "
                 + name + ": " + raw + " (quote it to store it as text)");
     }
 
-    /// A CSS identifier: `-`? then a letter, `_` or `-`, then letters, digits, `_` or `-`.
-    private static boolean isIdentifier(String t) {
+    /// The decoded value of a CSS identifier token, or null when `t` is not one: `-`? then a
+    /// name-start character (a letter, `_`, `-`, any non-ASCII character or an escape), then name
+    /// characters. An escape is a backslash and 1-6 hex digits (plus one optional whitespace) or
+    /// a backslash and any other character, decoded as the build-time parser stores it.
+    private static String decodeIdentifier(String t) {
         int n = t.length();
+        StringBuilder out = new StringBuilder(n);
         int i = 0;
-        if (i < n && t.charAt(i) == '-') {
+        boolean first = true;
+        while (i < n) {
+            char c = t.charAt(i);
+            if (c == '\\') {
+                if (i + 1 >= n || t.charAt(i + 1) == '\n' || t.charAt(i + 1) == '\r' || t.charAt(i + 1) == '\f') {
+                    return null;
+                }
+                int j = i + 1;
+                int code = 0;
+                while (j < n && j - i <= 6 && Character.digit(t.charAt(j), 16) >= 0) {
+                    code = code * 16 + Character.digit(t.charAt(j), 16);
+                    j++;
+                }
+                if (j == i + 1) {
+                    out.append(t.charAt(j));
+                    i = j + 1;
+                } else {
+                    if (code == 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) {
+                        code = 0xfffd;
+                    }
+                    if (code > 0xffff) {
+                        code -= 0x10000;
+                        out.append((char) (0xd800 + (code >> 10)));
+                        out.append((char) (0xdc00 + (code & 0x3ff)));
+                    } else {
+                        out.append((char) code);
+                    }
+                    if (j < n && (t.charAt(j) == ' ' || t.charAt(j) == '\t' || t.charAt(j) == '\n')) {
+                        j++;
+                    }
+                    i = j;
+                }
+                first = false;
+                continue;
+            }
+            boolean digit = c >= '0' && c <= '9';
+            if (!isNameChar(c) || (first && digit)) {
+                return null;
+            }
+            if (first && c == '-' && out.length() == 0) {
+                // A leading '-' is followed by the real name start.
+                out.append(c);
+                i++;
+                if (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+                    return null;
+                }
+                continue;
+            }
+            out.append(c);
+            first = false;
             i++;
         }
-        if (i >= n) {
-            return false;
-        }
-        char first = t.charAt(i);
-        if (!(first == '_' || first == '-' || (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z'))) {
-            return false;
-        }
-        for (i++; i < n; i++) {
-            char c = t.charAt(i);
-            if (!(c == '_' || c == '-' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) {
-                return false;
-            }
-        }
-        return true;
+        return first ? null : out.toString();
     }
 
     /// `[+-]? (digits | digits? . digits) ([eE] [+-]? digits)?`, the CSS number token.
@@ -1641,6 +1692,40 @@ public class CSSThemeCompiler {
 
     /// Drops a trailing `!important`: the build-time SAC parser reports priority apart from the
     /// value and the compiler ignores it, so `includeNativeBool: true !important` stores `true`.
+    /// `var( --x )` is `var(--x)`: the build-time parser tokenizes function arguments without
+    /// regard to whitespace, while every lookup here searches for `var(--`. Quoted text is left
+    /// as written.
+    private static String tightenVarCalls(String value) {
+        if (value.indexOf("var(") < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        char open = 0;
+        int n = value.length();
+        for (int i = 0; i < n; i++) {
+            char c = value.charAt(i);
+            out.append(c);
+            if (c == '\\' && i + 1 < n) {
+                out.append(value.charAt(++i));
+            } else if (open == 0 && (c == '"' || c == '\'')) {
+                open = c;
+            } else if (c == open) {
+                open = 0;
+            } else if (open == 0 && c == '(' && i >= 3 && value.regionMatches(true, i - 3, "var", 0, 3)
+                    && (i == 3 || !isNameChar(value.charAt(i - 4)))) {
+                while (i + 1 < n && value.charAt(i + 1) <= ' ') {
+                    i++;
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    private static boolean isNameChar(char c) {
+        return c == '-' || c == '_' || c > 127 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9');
+    }
+
     private static String stripPriority(String value) {
         String marker = "!important";
         int at = value.length() - marker.length();
@@ -1682,7 +1767,7 @@ public class CSSThemeCompiler {
             Declaration dec = new Declaration();
             dec.name = trimmed.substring(0, colon).trim();
             dec.property = dec.name.toLowerCase();
-            dec.value = stripPriority(trimmed.substring(colon + 1).trim());
+            dec.value = tightenVarCalls(stripPriority(trimmed.substring(colon + 1).trim()));
             if (dec.property.length() == 0 || dec.value.length() == 0) {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
             }
