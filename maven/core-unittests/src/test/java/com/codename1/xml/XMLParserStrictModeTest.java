@@ -106,4 +106,19 @@ class XMLParserStrictModeTest {
         assertEquals("p", p.getTagName());
         assertEquals("1", p.getAttribute("val"));
     }
+
+    @Test
+    void whitespaceAroundTheRootIsNotARoot() {
+        Element r = parse("<?xml version=\"1.0\"?>\n<doc> <a/> </doc>\n", true, false);
+        assertEquals("doc", r.getTagName());
+        assertEquals(3, r.getNumChildren());
+    }
+
+    @Test
+    void strictTagSearchesAreExact() {
+        Element r = parse("<r><Name>bad</Name><name>good</name></r>", true, false);
+        assertEquals(1, r.getChildrenByTagName("name").size());
+        assertEquals("good", r.getFirstChildByTagName("name").getChildAt(0).getText());
+        assertNull(r.getFirstChildByTagName("NAME"));
+    }
 }

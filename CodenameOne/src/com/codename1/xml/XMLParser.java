@@ -74,6 +74,9 @@ public class XMLParser {
     private boolean eventParser;
     private boolean strict;
     private boolean stripNamespacePrefixes;
+    // How many parseTagContent calls are active. 1 is document level: the
+    // synthetic ROOT of parse(), or no element at all for eventParser.
+    private int contentDepth;
     // Scratch buffers shared by every frame of the recursive descent. Each is
     // turned into a String before parseTag or parseTagContent recurses, so a
     // nested call always finds them free. They replace the three
@@ -142,6 +145,7 @@ public class XMLParser {
     private void resetBuffer() {
         buffOffset = 0;
         buffSize = -1;
+        contentDepth = 0;
         if (pool != null) {
             for (int i = 0; i < POOL_SIZE; i++) {
                 pool[i] = null;
@@ -496,6 +500,7 @@ public class XMLParser {
     protected Element createNewElement(String name) {
         Element e = new Element(name);
         e.caseSensitive = caseSensitive || strict;
+        e.exactTagNames = strict;
         return e;
     }
 
@@ -511,6 +516,7 @@ public class XMLParser {
     protected Element createNewTextElement(String text) {
         Element e = new Element(text, true);
         e.caseSensitive = caseSensitive || strict;
+        e.exactTagNames = strict;
         return e;
     }
 
@@ -605,6 +611,15 @@ public class XMLParser {
     ///
     /// - `IOException`: if an I/O error in the stream is encountered
     protected void parseTagContent(Element element, Reader is) throws IOException {
+        contentDepth++;
+        try {
+            parseTagContentImpl(element, is);
+        } finally {
+            contentDepth--;
+        }
+    }
+
+    private void parseTagContentImpl(Element element, Reader is) throws IOException {
         // The text and entity buffers belong to the parser, not to this frame:
         // both are flushed before parseTag recurses, so a nested call always
         // finds them empty.
@@ -613,7 +628,9 @@ public class XMLParser {
         boolean inText = false;
         boolean inEntity = false;
         boolean leadingSpace = false;
-        final boolean keepAllText = strict;
+        // Whitespace around the root element (after <?xml ...?>, a trailing
+        // newline) is not content; kept, it would become a second root.
+        final boolean keepAllText = strict && contentDepth > 1;
         int val = read(is);
         char c = (char) val;
 

@@ -86,4 +86,11 @@ class ElementAttributesTest {
         assertNull(e.getAttribute("x"));
         assertEquals("seven", e.getAttributes().get(Integer.valueOf(7)));
     }
+
+    @Test
+    void nullKeyIsRejected() {
+        Element e = new Element("e");
+        org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () -> e.setAttribute((String) null, "v"));
+        assertNull(e.getAttributes());
+    }
 }

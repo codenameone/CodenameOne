@@ -37,6 +37,9 @@ public class Element implements Iterable<Element> {
     public static final int DEPTH_INFINITE = Integer.MAX_VALUE;
     boolean isComment;
     boolean caseSensitive;
+    /// Set on elements a strict parser made: tag name searches match exactly.
+    /// Kept apart from caseSensitive, which never affected tag searches.
+    boolean exactTagNames;
     /// True if this is a text element, false otherwise
     private boolean textElement;
     /// The element's name (or text for text elements)
@@ -96,6 +99,9 @@ public class Element implements Iterable<Element> {
     private static boolean cmpTagName(String tagName, Element tag) {
         if ("*".equals(tagName)) {
             return true;
+        }
+        if (tag.exactTagNames) {
+            return tagName.equals(tag.getTagName());
         }
         return tagName.equalsIgnoreCase(tag.getTagName());
     }
@@ -230,8 +236,8 @@ public class Element implements Iterable<Element> {
             attributes.put(id, value);
             return;
         }
-        if (value == null) {
-            // Hashtable.put threw for a null value; keep that contract
+        if (id == null || value == null) {
+            // Hashtable.put threw for a null key or value; keep that contract
             throw new NullPointerException();
         }
         if (attrs == null) {
