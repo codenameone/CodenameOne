@@ -5485,8 +5485,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         private final String cssDir;
 
         ProjectImageResource(String cssFile) {
-            int slash = cssFile == null ? -1 : cssFile.replace('\\', '/').lastIndexOf('/');
-            cssDir = slash < 0 ? null : cssFile.substring(0, slash);
+            String path = cssFile == null ? null : cssFile.replace('\\', '/');
+            int slash = path == null ? -1 : path.lastIndexOf('/');
+            cssDir = slash < 0 ? null : path.substring(0, slash);
         }
 
         @Override
@@ -5494,51 +5495,69 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             com.codename1.ui.Image image = super.getImage(id);
             if (image != null || cssDir == null || id == null) return image;
             // No file of that name beside the stylesheet: the build-time compiler only reads the
-            // multi-image folder, so the canvas must not accept what the build would reject.
-            {
-                com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
-                String res = ProjectIO.fsUrl(cssDir + "/res");
-                try {
-                    if (fs.isDirectory(res)) {
-                        // res/Theme first, as CSSTheme.getResourceImage() does, then the others.
-                        java.util.List<String> themes = new java.util.ArrayList<String>();
-                        themes.add("Theme");
-                        for (String listed : fs.listFiles(res)) {
-                            if (!"Theme".equals(stripSlash(listed))) themes.add(listed);
-                        }
-                        for (String theme : themes) {
-                            String folder = res + "/" + stripSlash(theme) + "/" + id;
-                            if (!fs.isDirectory(folder)) continue;
-                            // Variant names match in any case, as the build-time compiler's do, so
-                            // medium.PNG is still the medium variant and wins over veryhigh.png.
-                            String[] files = fs.listFiles(folder);
-                            for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
-                                for (String file : files) {
-                                    if (density.equalsIgnoreCase(stripSlash(file))) {
-                                        image = load(folder + "/" + file);
-                                        break;
-                                    }
-                                }
-                                if (image != null) break;
-                            }
-                            if (image == null) {
-                                for (String file : files) {
-                                    // Any case, as CSSTheme.getResourceImage() accepts medium.PNG.
-                                    if (file.regionMatches(true, file.length() - 4, ".png", 0, 4)) {
-                                        image = load(folder + "/" + file);
-                                        if (image != null) break;
-                                    }
-                                }
-                            }
-                            if (image != null) break;
-                        }
+            // multi-image folder, so the canvas must not accept what the build would reject. It
+            // looks in the res folder beside the stylesheet, then the one a level up (a Maven
+            // project's src/main/res, an Ant project's own res).
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            int slash = cssDir.lastIndexOf('/');
+            String[] roots = slash < 0 ? new String[]{cssDir + "/res"}
+                    : new String[]{cssDir + "/res", cssDir.substring(0, slash) + "/res"};
+            try {
+                for (int r = 0; r < roots.length && image == null; r++) {
+                    String res = ProjectIO.fsUrl(roots[r]);
+                    if (!fs.isDirectory(res)) continue;
+                    // res/Theme first, as CSSTheme.getResourceImage() does, then the others.
+                    java.util.List<String> themes = new java.util.ArrayList<String>();
+                    themes.add("Theme");
+                    for (String listed : fs.listFiles(res)) {
+                        if (!"Theme".equals(stripSlash(listed))) themes.add(listed);
                     }
-                } catch (IOException ignored) {
-                    // An unreadable folder is an image that is not there.
+                    for (String theme : themes) {
+                        String folder = res + "/" + stripSlash(theme) + "/" + id;
+                        if (!fs.isDirectory(folder)) continue;
+                        image = bestVariant(folder, fs.listFiles(folder));
+                        if (image != null) break;
+                    }
                 }
+            } catch (IOException ignored) {
+                // An unreadable folder is an image that is not there.
             }
             if (image != null) setImage(id, image);
             return image;
+        }
+
+        /**
+         * Classifies every PNG of a multi-image folder the way the build-time compiler does --
+         * a density by its name in any case, any other name as medium -- and loads the one the
+         * display density gets. A named medium file wins over another medium-classified one.
+         */
+        private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
+            for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
+                String match = null;
+                for (String listed : files) {
+                    String file = stripSlash(listed);
+                    if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)) continue;
+                    if (density.equalsIgnoreCase(file)) {
+                        match = file;
+                        break;
+                    }
+                    if ("medium.png".equals(density) && match == null && !isDensityName(file)) {
+                        match = file;
+                    }
+                }
+                if (match != null) {
+                    com.codename1.ui.Image image = load(folder + "/" + match);
+                    if (image != null) return image;
+                }
+            }
+            return null;
+        }
+
+        private static boolean isDensityName(String file) {
+            for (String name : DENSITY_FILES) {
+                if (name.equalsIgnoreCase(file)) return true;
+            }
+            return false;
         }
 
         private static final int[] DENSITIES = {

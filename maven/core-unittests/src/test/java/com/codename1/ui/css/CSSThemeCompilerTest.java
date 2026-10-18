@@ -833,6 +833,18 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("0.5,2,0,10", resource.getTheme("Theme").get("Label.padding"));
     }
 
+    @Test
+    public void testConstantsAliasKeepsTheValueAtItsDeclaration() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#f00;alias:var(--accent);--accent:#00f;"
+                + "early:var(--later);later:#0f0;lit:\"#abc\";litAlias:var(--lit);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", String.valueOf(theme.get("@alias")).toLowerCase());
+        assertEquals("0000ff", String.valueOf(theme.get("@accent")).toLowerCase());
+        assertEquals("00ff00", String.valueOf(theme.get("@early")).toLowerCase());
+        assertEquals("#abc", theme.get("@litAlias"));
+    }
+
     private static String fontName(Font font) {
         try {
             java.lang.reflect.Field id = Font.class.getDeclaredField("fontUniqueId");

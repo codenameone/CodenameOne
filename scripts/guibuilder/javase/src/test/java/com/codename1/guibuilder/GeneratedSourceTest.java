@@ -1854,6 +1854,25 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void anUnnamedVariantCountsAsMediumAndTheParentResIsSearched() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("custom.png").toFile());
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("verylow.png").toFile());
+        java.nio.file.Path css = dir.resolve("css");
+        java.nio.file.Files.createDirectories(css);
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                css.resolve("theme.css").toString()).getImage("play.png");
+        assertNotNull(image, "src/main/res beside src/main/css is searched");
+        int expected = com.codename1.ui.Display.getInstance().getDeviceDensity()
+                >= com.codename1.ui.Display.DENSITY_MEDIUM ? 3 : 2;
+        assertEquals(expected, image.getWidth());
+    }
+
+    @Test
     void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,

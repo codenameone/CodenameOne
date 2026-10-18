@@ -345,10 +345,57 @@ public class CSSThemeCompiler {
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
                 value = constantColor(value);
             } else if (value.indexOf("var(--") > -1) {
-                deferred.put(key, DEFERRED_VAR);
+                String kind = DEFERRED_VAR;
+                if (declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
+                    // Every name it uses is already declared: the build-time compiler resolves it
+                    // right here, so a later redefinition of a target does not reach it. Kept on
+                    // the declaration, because the second pass sees the final values.
+                    String target = aliasTarget(value);
+                    String targetKind = target == null ? null : deferred.get(target);
+                    declaration.snapshotKind = DEFERRED_LITERAL.equals(targetKind) || DEFERRED_TEXT.equals(targetKind)
+                            ? DEFERRED_LITERAL : DEFERRED_VAR;
+                    declaration.snapshot = resolveVars(theme, value);
+                }
+                if (declaration.snapshot != null) {
+                    value = declaration.snapshot;
+                    kind = declaration.snapshotKind;
+                }
+                deferred.put(key, kind);
             }
             theme.put(key, value);
         }
+    }
+
+    /// True when every `var(--x)` in `value` names a constant this compile already declared and
+    /// that is itself settled: not an alias still waiting for a name declared later.
+    private static boolean referencesDeclaredOnly(Hashtable theme, String key, String value,
+                                                  Hashtable<String, String> deferred) {
+        int at = value.indexOf("var(--");
+        while (at > -1) {
+            int end = value.indexOf(')', at);
+            if (end < 0) {
+                return false;
+            }
+            String target = "@" + value.substring(at + "var(--".length(), end).trim();
+            String kind = deferred.get(target);
+            Object current = theme.get(target);
+            // Its own name is never settled: that is a cycle, reported when it is resolved.
+            if (kind == null || target.equals(key) || (DEFERRED_VAR.equals(kind) && current instanceof String
+                    && ((String) current).indexOf("var(--") > -1)) {
+                return false;
+            }
+            at = value.indexOf("var(--", end);
+        }
+        return true;
+    }
+
+    /// `@x` for a value that is exactly `var(--x)`, else null.
+    private static String aliasTarget(String value) {
+        String v = value.trim();
+        if (!v.startsWith("var(--") || v.indexOf(')') != v.length() - 1) {
+            return null;
+        }
+        return "@" + v.substring("var(--".length(), v.length() - 1).trim();
     }
 
     /// UIManager.getThemeImageConstant casts an image constant to Image, and on iOS that cast is
@@ -545,6 +592,12 @@ public class CSSThemeCompiler {
     /// compiler's flattening does: the matching state of the UIID, each `cn1-derive` parent and
     /// finally `*` in turn, then their unselected styles in the same order. A dark style looks at the dark keys
     /// of each UIID before the light ones.
+    ///
+    /// Only the states this compile declares a font property for are built. A font an earlier
+    /// compile into the same theme built is a finished Font, and which parent its family came
+    /// from is not stored, so a later compile that only changes a `cn1-derive` cannot tell which
+    /// earlier fonts depended on it. Compiling the stylesheet whole, as live reload and the GUI
+    /// builder do, rebuilds every font.
     private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
         // A font is a live platform object, so it can only be made with a running Display.
         // Without one -- a tool that only checks that a stylesheet compiles -- every
@@ -1616,6 +1669,11 @@ public class CSSThemeCompiler {
         String value;
         /// The last declaration of its name across every #Constants block.
         boolean winner;
+        /// A #Constants alias resolved where it was declared, and how to type it (an alias of
+        /// text is final text, so it is typed like the quoted constant itself); null when it
+        /// names something declared later and is resolved against the final values instead.
+        String snapshot;
+        String snapshotKind;
     }
 
     private static class Length {
