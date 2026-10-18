@@ -5528,7 +5528,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
         /**
          * Classifies every PNG of a multi-image folder the way the build-time compiler does --
-         * a density by its name in any case, any other name as medium -- and loads the one the
+         * a density by its exact lower-case name, any other name (HIGH.PNG included, which the
+         * build's case-sensitive switch reads as medium) as medium -- and loads the one the
          * display density gets. A named medium file wins over another medium-classified one.
          */
         private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
@@ -5537,7 +5538,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 for (String listed : files) {
                     String file = stripSlash(listed);
                     if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)) continue;
-                    if (density.equalsIgnoreCase(file)) {
+                    if (density.equals(file)) {
                         match = file;
                         break;
                     }
@@ -5555,7 +5556,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
         private static boolean isDensityName(String file) {
             for (String name : DENSITY_FILES) {
-                if (name.equalsIgnoreCase(file)) return true;
+                if (name.equals(file)) return true;
             }
             return false;
         }

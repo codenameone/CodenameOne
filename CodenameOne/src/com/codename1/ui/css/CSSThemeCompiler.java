@@ -130,7 +130,7 @@ public class CSSThemeCompiler {
         // use it from above.
         for (Rule rule : rules) {
             if (rule.legacyConstants) {
-                compileConstants(rule.declarations, theme, deferred);
+                compileConstants(rule.declarations, theme, deferred, true);
             }
         }
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
@@ -140,7 +140,7 @@ public class CSSThemeCompiler {
                 continue;
             }
             if (rule.constants) {
-                compileConstants(rule.declarations, theme, deferred);
+                compileConstants(rule.declarations, theme, deferred, false);
                 continue;
             }
             applyRule(theme, resources, rule, fonts, deferred);
@@ -311,7 +311,7 @@ public class CSSThemeCompiler {
     }
 
     private void compileConstants(Declaration[] declarations, Hashtable theme,
-                                  Hashtable<String, String> deferred) {
+                                  Hashtable<String, String> deferred, boolean legacy) {
         for (Declaration declaration : declarations) {
             String name = declaration.name;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
@@ -329,6 +329,13 @@ public class CSSThemeCompiler {
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);
                 literalTokens.put(key, raw);
+            } else if (!legacy && isDimensionToken(value)) {
+                // The build-time compiler writes string, identifier, number and color constants
+                // only; `50%` or `2mm` is dropped from the built theme without a word, so a
+                // preview that showed it would show a constant the application never gets. The
+                // legacy `@constants` block never reaches the build-time compiler and keeps them.
+                throw new CSSSyntaxException("#Constants does not support a length or percentage: "
+                        + name + ": " + raw + " (quote it to store it as text)");
             } else if (isColorLiteral(value)) {
                 // Stored as plain hex, as the build-time compiler stores it: color constants
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
@@ -895,6 +902,20 @@ public class CSSThemeCompiler {
         } catch (NumberFormatException err) {
             throw new CSSSyntaxException("Invalid number in: " + original, err);
         }
+    }
+
+    /// A CSS number followed by a unit or `%`: a dimension or percentage token.
+    private static boolean isDimensionToken(String t) {
+        int end = t.length();
+        while (end > 0) {
+            char c = t.charAt(end - 1);
+            if (c == '%' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                end--;
+            } else {
+                break;
+            }
+        }
+        return end < t.length() && end > 0 && isCssNumber(t.substring(0, end));
     }
 
     /// `[+-]? (digits | digits? . digits) ([eE] [+-]? digits)?`, the CSS number token.
@@ -1598,17 +1619,20 @@ public class CSSThemeCompiler {
         while (bang > 0 && value.charAt(bang - 1) <= ' ') {
             bang--;
         }
-        // Inside an unterminated quote the marker is text, not a priority.
-        int quotes = 0;
+        // Inside an unterminated quote the marker is text, not a priority. The open delimiter
+        // is tracked, since the other quote character inside a string (`"don't"`) is text.
+        char open = 0;
         for (int i = 0; i < bang; i++) {
             char c = value.charAt(i);
             if (c == '\\') {
                 i++;
-            } else if (c == '"' || c == '\'') {
-                quotes++;
+            } else if (open == 0 && (c == '"' || c == '\'')) {
+                open = c;
+            } else if (c == open) {
+                open = 0;
             }
         }
-        return quotes % 2 == 0 ? value.substring(0, bang).trim() : value;
+        return open == 0 ? value.substring(0, bang).trim() : value;
     }
 
     private Declaration[] parseDeclarations(String body) {

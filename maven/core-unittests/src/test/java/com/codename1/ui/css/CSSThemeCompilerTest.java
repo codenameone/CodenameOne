@@ -867,4 +867,22 @@ public class CSSThemeCompilerTest extends UITestBase {
         }
     }
 
+
+    @Test
+    void testPriorityAfterAStringHoldingTheOtherQuoteIsStripped() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { msg: \"don't\" !important; }", res, "Theme");
+        assertEquals("don't", res.getTheme("Theme").get("@msg"));
+    }
+
+    @Test
+    void testLengthAndPercentageConstantsAreRejected() {
+        for (String value : new String[]{"50%", "2mm", "1.5px"}) {
+            assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                    new CSSThemeCompiler().compile("#Constants { progress: " + value + "; }", new MutableResource(), "Theme"));
+        }
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { progress: \"50%\"; }", res, "Theme");
+        assertEquals("50%", res.getTheme("Theme").get("@progress"));
+    }
 }
