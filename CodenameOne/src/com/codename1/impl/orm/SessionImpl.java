@@ -1201,6 +1201,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         model.maximumIntegralValue(index))) {
             return false;
         }
+        if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && family == 5
+                && temporalKind(found) == Attribute.TEMPORAL_TIMESTAMP && fractionDigits(found) < 3) {
+            // The converter writes milliseconds; DATETIME or TIMESTAMP(0)
+            // rounds them away, so a value does not read back as written.
+            return false;
+        }
         if (family == 4 && binaryCapacity(found) < binaryCapacity(expected)) {
             // The same for bytes: the mapping's LONGBLOB or BYTEA takes more
             // than a BLOB, TINYBLOB or bounded VARBINARY can hold.
@@ -1483,6 +1489,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Collection key " + name + " is a blank-padded " + found[1]
                         + " column, under which \"a\" and \"a \" are one key; keys need VARCHAR or TEXT"));
+            }
+            if (found.length > 7 && ((Number) found[7]).intValue() != 0) {
+                // Collection writes insert every mapped column.
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "The database generates " + name + " and refuses writes the mapping makes"));
             }
             if (attr.id != primary) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -1768,6 +1779,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         long bound = width == 8 ? Long.MAX_VALUE : (1L << (8 * width - 1)) - 1;
         return minimum >= -bound - 1 && maximum <= bound;
+    }
+    /// The fractional-second digits a date/time column keeps: the number in
+    /// its parentheses, else MySQL's default of 0 (PostgreSQL's type always
+    /// carries one; see BackendSqlAccess).
+    private static int fractionDigits(String type) {
+        int open = type.indexOf('(');
+        int close = type.indexOf(')', open + 1);
+        if (open < 0 || close < 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(type.substring(open + 1, close).trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
     /// The number of bytes a binary column holds, Integer.MAX_VALUE when the
     /// type sets no practical bound.

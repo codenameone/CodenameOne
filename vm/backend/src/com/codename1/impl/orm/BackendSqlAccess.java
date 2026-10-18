@@ -89,10 +89,15 @@ public final class BackendSqlAccess implements SqlAccess {
         // equal, which a text key cannot allow; SessionImpl reads the mark.
         String collation = mysql ? "c.collation_name"
                 : "CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_collation pc WHERE pc.collname = c.collation_name AND NOT pc.collisdeterministic) THEN 'nondeterministic ' || c.collation_name ELSE c.collation_name END";
-        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type || COALESCE('(' || c.character_maximum_length || ')', '')") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, " + collation + ", " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
+        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type || COALESCE('(' || c.character_maximum_length || ')', CASE WHEN c.data_type LIKE 'time%' THEN '(' || c.datetime_precision || ')' END, '')") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, " + collation + ", " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
                 + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
-                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
-        return query(statement, mysql ? new Object[]{table} : new Object[]{table, table}, new int[8]);
+                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=?"
+                // MySQL compares catalog strings without case, while
+                // lower_case_table_names=0 (the Linux default) resolves table
+                // names with it: only the table the ORM's SQL reads may match.
+                + (mysql ? " AND (@@lower_case_table_names <> 0 OR BINARY c.table_name = BINARY ?)" : "")
+                + " ORDER BY c.ordinal_position";
+        return query(statement, new Object[]{table, table}, new int[8]);
     }
 
     @Override
