@@ -2,14 +2,72 @@
 <article class="cn1-compare-page">
   <header class="cn1-compare-hero">
     {{ partial "breadcrumbs.html" . }}
-    <p class="cn1-eyebrow">Why Codename One</p>
-    <h1>Native apps from Java, without a browser or scripting bridge.</h1>
-    <p>Codename One runs Java on Android's native runtime and translates Java bytecode to C for a native iOS build. You keep one UI and application codebase, use the Java ecosystem, and ship without royalties or a platform vendor setting the framework agenda.</p>
+    <p class="cn1-eyebrow">Codename One vs Flutter</p>
+    <h1>Flutter’s UI freedom. Less memory. Faster native apps.</h1>
+    <p>Both frameworks give you lightweight, custom-rendered components and one application across iOS, Android, Windows, macOS, Linux, and web. Codename One goes further: builder-managed native integration, direct synchronous calls, and a smaller runtime footprint. In our October 18 Flutter Gallery benchmark, it wins all 26 measured size, startup, and idle-memory comparisons.</p>
     <div class="cn1-action-row">
       {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "compare-project") }}
-      {{ partial "cn1-cta.html" (dict "label" "See the architecture" "href" "#matrix" "variant" "secondary") }}
+      {{ partial "cn1-cta.html" (dict "label" "See the benchmark results" "href" "#flutter-performance" "variant" "secondary") }}
     </div>
   </header>
+
+  <section class="cn1-compare-matrix" id="flutter-performance">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Same Flutter source. Measured in CI.</p>
+      <h2>Faster startup. Lower RAM. Smaller builds.</h2>
+      <p>We build Flutter’s own Gallery from the same Dart source with Flutter and Codename One. Both are release builds, measured on the same runner in nine interleaved rounds. Codename One carries the Flutter compatibility layer in this comparison: these are results for reused Flutter code.</p>
+    </div>
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Android is a major reason to choose Codename One</p>
+      <h2>3.60× faster startup. 42% lower RAM. 77% less executable code.</h2>
+      <p>On Android, Codename One runs application bytecode on ART, the runtime already supplied by the OS. Flutter ships its engine and Dart runtime support alongside its AOT-compiled application. That architectural difference matters: the Gallery run shows a large startup and code-footprint advantage even while Codename One carries the Flutter compatibility layer.</p>
+      <p>For an Android-first product, this puts launch time and memory budget at the center of the framework decision. The measurements below come from an emulator; verify the gains on your target phones and your own screens.</p>
+    </div>
+    <figure>
+      <img src="/img/compare/flutter-android-advantage.svg" width="1000" height="600" style="display:block;width:100%;height:auto" alt="Android Gallery: Codename One uses 27.8% of Flutter’s startup time, 58.2% of its idle RAM, and 22.6% of its executable code size, using the published comparison ratios.">
+      <figcaption>Android’s advantage spans startup, RAM, and executable code. Code size excludes assets; total installed size is 18% lower, not 77% lower.</figcaption>
+    </figure>
+    <figure>
+      <img src="/img/compare/flutter-platform-advantages.svg" width="1000" height="500" loading="lazy" style="display:block;width:100%;height:auto" alt="Startup speedup: Android 3.60×, Windows 1.70×, Linux 1.56×, macOS 1.24×. RAM reductions: 42%, 37%, 63%, and 31%, respectively.">
+      <figcaption>The results are asymmetric: Android has the largest measured startup and executable-code advantage; Linux has the largest idle-RAM reduction. iOS has a smaller code-size gain and no startup or RAM measurement. Flutter leads the measured web compute subset, as the table shows.</figcaption>
+    </figure>
+    <div class="cn1-compare-table-wrap" tabindex="0" role="region" aria-label="Flutter Gallery benchmark results from October 18, 2026">
+      <table>
+        <caption>October 18, 2026 · Flutter 3.35.4 · Codename One d2d7ec3f25</caption>
+        <thead><tr><th scope="col">Target</th><th scope="col">Startup speedup</th><th scope="col">Idle RAM reduction</th><th scope="col">Executable code reduction</th><th scope="col">Compute speedup</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Android emulator</th><td>3.60×</td><td>42%</td><td>77%</td><td>1.39×</td></tr>
+          <tr><th scope="row">Linux</th><td>1.56×</td><td>63%</td><td>14%</td><td>1.94×</td></tr>
+          <tr><th scope="row">Windows</th><td>1.70×</td><td>37%</td><td>22%</td><td>2.03×</td></tr>
+          <tr><th scope="row">macOS</th><td>1.24×</td><td>31%</td><td>33%</td><td>1.83×</td></tr>
+          <tr><th scope="row">iOS device bundle</th><td>Not measured</td><td>Not measured</td><td>13%</td><td>Not measured</td></tr>
+          <tr><th scope="row">Web</th><td>Not measured</td><td>Not measured</td><td>50%</td><td>0.29× (Flutter leads)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Startup measures the first content frame. Startup and RAM comparisons use the median of paired round ratios; reductions are rounded from those ratios. Code reductions use bundle code bytes. Compute is a separate geometric mean of comparable workloads: 11 on Android, Linux, and macOS, 10 on Windows, and 6 on web. Individual workloads can favor Flutter; mismatched or unmeasured results do not enter the mean. These measurements do not establish scrolling or animation performance.</p>
+    <p>iOS sizes use release device bundles; startup, RAM, and compute need a separate device measurement. Android timings are emulator results, not phone timings. Web startup and RAM are unmeasured, and Flutter leads its measured compute subset. The 26 wins cover application size, startup, and idle RAM, not every compute workload.</p>
+    <p><a href="https://github.com/codenameone/CodenameOne/blob/2c2beba40ce177e5e028f0e34961bfbf41c952b8/benchmarks/flutter.json">Read this complete result snapshot</a>, <a href="https://github.com/codenameone/CodenameOne/tree/d2d7ec3f254e68554d4089ec4ff73b53e2fd8234/scripts/flutter-bench">inspect the harness and methodology</a>, or <a href="/port-status/#flutter-benchmark-title">check the latest published results</a>.</p>
+    <p><strong>Performance is a maintained engineering requirement.</strong> The <a href="https://github.com/codenameone/CodenameOne/blob/master/.github/workflows/flutter-bench.yml">benchmark workflow</a> runs nightly and on relevant pull requests. It checks native head-to-head results and Codename One regression baselines. Web head-to-head losses remain visible and report-only; correctness and baseline checks still apply. This makes performance something we keep testing as the framework evolves.</p>
+  </section>
+
+  <section class="cn1-compare-detail" id="flutter-architecture">
+    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">Why the architecture matters</p><h2>Keep the lightweight UI. Remove more platform work.</h2></div>
+    <div class="cn1-compare-detail__grid">
+      <article><h3>The same freedom to own your pixels</h3><p>Flutter widgets and Codename One components both render their own UI instead of wrapping an OS control for every button. Both support shared layouts, animation, input, networking, storage, and native integration. Codename One adds CSS theming and a universal Java simulator. The difference is how much runtime and build machinery you need around that shared UI.</p></article>
+      <article><h3>Builders absorb native project churn</h3><p>Codename One generates the platform projects from your application, dependencies, and build hints. Supported native integrations live in the builders, so fixes to generated manifests, targets, and SDK wiring can be made centrally. Cloud builds also remove local Xcode and Android SDK setup from the normal application workflow. You still control signing, permissions, and platform-specific behavior.</p></article>
+      <article><h3>Widgets and VPNs without hand-built project plumbing</h3><p>The <a href="/blog/widgets-live-activities-dynamic-island/">surfaces API</a> generates supported widget and Live Activity integration. The <a href="/developer-guide/vpn/#_vpn">VPN API</a> and builders handle supported native service and extension wiring. Unused surfaces add no WidgetKit extension or Android receiver. This is build-time generation, not an extra runtime service mediating every call; the native feature itself still has its normal resource costs and OS restrictions.</p></article>
+      <article><h3>Synchronous native APIs stay synchronous</h3><p>Codename One native interfaces can call a synchronous OS API and return its result directly, subject to the platform’s threading rules. That fits ordinary Java, Objective-C, and C APIs without turning every interaction into a request and callback. Flutter’s <a href="https://docs.flutter.dev/platform-integration/platform-channels">platform channels</a> use asynchronous messages. Flutter also has <a href="https://docs.flutter.dev/platform-integration/bind-native-code">FFI and direct native interop</a>; it would be wrong to describe all Flutter calls as asynchronous. Network operations and asynchronous OS APIs still need asynchronous handling in either framework.</p></article>
+      <article><h3>Less runtime to carry</h3><p>Android application code uses the OS’s ART runtime. Native iOS and desktop builds compile Java bytecode through ParparVM to C and native machine code. Imported Flutter screens take that same path without shipping the Flutter engine. The Gallery measurements show the resulting footprint advantage, including the cost of our compatibility layer.</p></article>
+      <article><h3>Broad reach, shared application features</h3><p>Both cover the six main mobile, desktop, and web targets. Codename One also has watch, TV, and vehicle integrations; <a href="/port-status/">port status</a> shows target-specific coverage. Common application capabilities overlap broadly, but OS features and third-party plugins require a target-by-target check. Flutter’s larger plugin ecosystem and established Dart tooling remain reasons to choose it.</p></article>
+    </div>
+  </section>
+
+  <section class="cn1-compare-detail" id="flutter-compatibility">
+    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">Reuse Flutter screens</p><h2>You can keep Flutter widgets and change the runtime.</h2><p>Import a Flutter project or embed a supported widget tree inside an existing Codename One form. Dart is translated to Java at build time. <code>FlutterUI.wrap(widget)</code> returns an ordinary Codename One <code>Container</code>, sharing layout, event dispatch, and accessibility with your Java components. No embedded Flutter engine or separate platform view is required.</p></div>
+    <p>Whole-app import runs the translated Dart entry point; incremental migration lets you mix Java and Dart screens. Java and translated Dart share one runtime, so direct calls between them are ordinary method calls. Supported <code>MethodChannel</code> and <code>EventChannel</code> APIs also help port existing integration code.</p>
+    <p><strong>Flutter compatibility is experimental.</strong> Most widgets render, but some callbacks and parameters are ignored, and validation has centered on the Gallery. Unsupported language constructs and package APIs need work; Flutter plugins are not automatically portable. Test the interactions your app uses. <a href="/developer-guide/flutter-interop/">Read the import and embedding guide</a>.</p>
+  </section>
 
   <section class="cn1-compare-matrix" id="matrix">
     <div class="cn1-v2-section__intro">
@@ -59,7 +117,7 @@
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Flutter</p>
       <h2>A Dart codebase built around the Flutter engine.</h2>
-      <ul><li>Release builds include AOT-compiled Dart code, the Flutter engine, and Flutter runtime support. On Android, Codename One application bytecode runs on ART.</li><li>Moving from Java to Flutter means adopting Dart, pub packages, and a Google-directed framework instead of retaining JVM libraries, Maven, and Java tooling.</li><li>Native integration crosses asynchronous platform channels or embeds Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
+      <ul><li>Release builds include AOT-compiled Dart code, the Flutter engine, and Flutter runtime support. On Android, Codename One application bytecode runs on ART.</li><li>Flutter has an extensive plugin ecosystem and established Dart tooling. Codename One supports incremental reuse of Flutter screens through its experimental Dart-to-Java compatibility layer.</li><li>Native integration uses asynchronous platform channels, direct interop, or Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
     </article>
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Web</p>
