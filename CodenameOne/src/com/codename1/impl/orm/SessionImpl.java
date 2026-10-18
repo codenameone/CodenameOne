@@ -1175,7 +1175,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// the column has to be the same temporal kind: a DATE column drops the
     /// time of a timestamp, and a DATE mapping drops the time it reads from a
     /// timestamp column.
-    private boolean storageCompatible(Attribute attr, String found, String expected) {
+    private boolean storageCompatible(EntityModel model, int index, String found, String expected) {
+        Attribute attr = model.attributes()[index];
         int family = typeFamily(found);
         if ("sqlite".equals(sql.dialect())) {
             return family == typeFamily(expected) || attr.temporal != 0 && family == 2;
@@ -1186,15 +1187,18 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // would be rejected or coerced. DATETIME is what the mapping needs.
             return false;
         }
-        if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)) {
-            // A long over a 32-bit column fails writes, and an int over a
-            // 64-bit column cannot load what is already there. An unsigned
-            // column has neither the negatives nor the range of a Java type.
-            int width = integerWidth(found);
-            if (width != 0 && width != (attr.kind == Attribute.BIGINT ? 8 : 4)
-                    || asciiLower(found).indexOf("unsigned") >= 0) {
-                return false;
-            }
+        if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)
+                && !integerFits(found, attr.kind, model.minimumIntegralValue(index),
+                        model.maximumIntegralValue(index))) {
+            return false;
+        }
+        if (family == 2 && textCapacity(found) < (attr.declaredType == null && keyColumn(model, index)
+                ? Math.min(255, textCapacity(expected)) : textCapacity(expected))) {
+            // A bounded column under a mapping that writes longer text is
+            // rejected by PostgreSQL and strict MySQL, and truncated by
+            // permissive MySQL. Undeclared text keys are held to 255
+            // characters (validateTextKey), so that is all they need.
+            return false;
         }
         return family == typeFamily(expected) && (attr.temporal == 0 || family != 5 || temporalKind(found) == attr.temporal);
     }
@@ -1363,7 +1367,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 }
                 String expected = columnType(model, i);
-                if (!storageCompatible(attr, (String) found[1], expected)) {
+                if (!storageCompatible(model, i, (String) found[1], expected)) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             "Storage type mismatch on " + name + ": the column is " + found[1]
                             + ", the mapping stores " + expected));
@@ -1460,7 +1464,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         + (required ? ": unexpected NOT NULL" : ": missing NOT NULL")));
             }
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
-            if (typeFamily((String) found[1]) != typeFamily(type)) {
+            int family = typeFamily((String) found[1]);
+            boolean fits = family != 1 || attr.kind != Attribute.INTEGER && attr.kind != Attribute.BIGINT
+                    || integerFits((String) found[1], attr.kind,
+                    attr.kind == Attribute.INTEGER ? Integer.MIN_VALUE : Long.MIN_VALUE,
+                    attr.kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE);
+            if (family != typeFamily(type) || !fits || family == 2 && textCapacity((String) found[1])
+                    < (attr.id && attr.declaredType == null ? Math.min(255, textCapacity(type)) : textCapacity(type))) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Storage type mismatch on collection " + name + ": the column is " + found[1]
                         + ", the mapping stores " + type));
@@ -1631,6 +1641,56 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             lower.append(ch >= 'A' && ch <= 'Z' ? (char) (ch + 32) : ch);
         }
         return lower.toString();
+    }
+    /// Whether an integer column holds every value of the mapped Java range
+    /// (a byte or short field reports its own) and nothing wider than the
+    /// attribute's kind can load: a long over a 32-bit column fails writes,
+    /// and an int over a 64-bit column cannot load what is already there. An
+    /// unsigned column lacks the negatives of every Java type.
+    private boolean integerFits(String found, int kind, long minimum, long maximum) {
+        if ("sqlite".equals(sql.dialect())) {
+            return true;
+        }
+        if (asciiLower(found).indexOf("unsigned") >= 0) {
+            return false;
+        }
+        int width = integerWidth(found);
+        if (width == 0) {
+            return true;
+        }
+        if (width > (kind == Attribute.BIGINT ? 8 : 4)) {
+            return false;
+        }
+        long bound = width == 8 ? Long.MAX_VALUE : (1L << (8 * width - 1)) - 1;
+        return minimum >= -bound - 1 && maximum <= bound;
+    }
+    /// The number of characters a text column holds, Integer.MAX_VALUE when
+    /// the type sets no practical bound. SQLite enforces no length, and
+    /// MySQL's TEXT is counted in bytes, so it is sized for four-byte UTF-8.
+    private int textCapacity(String type) {
+        if ("sqlite".equals(sql.dialect())) {
+            return Integer.MAX_VALUE;
+        }
+        String token = firstTypeToken(type);
+        if ("tinytext".equals(token)) {
+            return 63;
+        }
+        if ("text".equals(token)) {
+            return "mysql".equals(sql.dialect()) ? 16383 : Integer.MAX_VALUE;
+        }
+        if ("mediumtext".equals(token)) {
+            return 4194303;
+        }
+        int open = type.indexOf('(');
+        int close = type.indexOf(')', open + 1);
+        if (open < 0 || close < 0 || token.indexOf("char") < 0) {
+            return Integer.MAX_VALUE;
+        }
+        try {
+            return Integer.parseInt(type.substring(open + 1, close).trim());
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
     }
     /// The byte width of an integer column type off SQLite, whose integers are
     /// all 64-bit, or 0 when the type does not say.

@@ -551,7 +551,7 @@ class ManagedSessionTest {
                 com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                     if(method.getName().equals("describe")) {
                         java.util.List<Object[]> rows=new java.util.ArrayList<Object[]>();
-                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?"TEXT":"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
+                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?(dialect==com.codename1.backend.sql.Dialect.MYSQL?"LONGTEXT":"TEXT"):column.equals("position")?dialect.columnType(Attribute.INTEGER):"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
                         else { for(Attribute a:model.attributes()) rows.add(new Object[]{!collection && a.id ? "ID" : a.column,dialect.columnType(a.kind),a.nullable?0:1,a.id?1:0}); }
                         return rows;
                     }
