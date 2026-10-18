@@ -764,7 +764,15 @@ public final class ParticleSystem extends Component {
                 float yy = dy * dy;
                 moved = (float) Math.sqrt(xx + yy);
             }
-            float byTime = pick(RATE_OVER_TIME, along) * step;
+            // A system that does not loop emits only up to its duration: of
+            // a step that crosses it, the part before the end, and as much
+            // of the frame's movement.
+            float emitStep = step;
+            if (!looping && after > duration) {
+                emitStep = duration > before ? duration - before : 0f;
+                moved = step > 0f ? moved * (emitStep / step) : 0f;
+            }
+            float byTime = pick(RATE_OVER_TIME, along) * emitStep;
             float byDistance = pick(RATE_OVER_DISTANCE, along) * moved;
             owed += byTime + byDistance;
             while (owed >= 1f) {

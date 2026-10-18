@@ -406,6 +406,23 @@ public final class Interop {
         return ((double) ((v >>> 1) | (v & 1))) * 2.0;
     }
 
+    /// `conv.u8` of a floating value, saturating as .NET does (measured with
+    /// `dotnet run`): negative and NaN give 0, 2^64 and above give
+    /// `ulong.MaxValue`. `D2L` alone stops at 2^63 - 1, so the upper half of
+    /// the range is converted shifted down and has its top bit put back.
+    public static long doubleToUnsigned(double d) {
+        if (!(d > 0.0)) { // NOPMD LogicInversion
+            return 0L;
+        }
+        if (d >= 18446744073709551616.0) {
+            return -1L;
+        }
+        if (d < 9223372036854775808.0) {
+            return (long) d;
+        }
+        return ((long) (d - 9223372036854775808.0)) ^ Long.MIN_VALUE;
+    }
+
     public static String unsignedToString(long v) {
         if (v >= 0) {
             return Long.toString(v);

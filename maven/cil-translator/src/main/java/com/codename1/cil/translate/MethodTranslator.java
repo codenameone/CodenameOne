@@ -1306,6 +1306,12 @@ final class MethodTranslator implements Opcodes {
                     mv.visitLdcInsn(Long.valueOf(0xFFFFFFFFL));
                     mv.visitInsn(LAND);
                 }
+            } else if (v.kind == Val.R4 && "u8".equals(to)) {
+                // A float widens to double exactly, so one helper serves both.
+                mv.visitInsn(F2D);
+                invoke(INVOKESTATIC, Names.INTEROP, "doubleToUnsigned", "(D)J", false);
+            } else if (v.kind == Val.R8 && "u8".equals(to)) {
+                invoke(INVOKESTATIC, Names.INTEROP, "doubleToUnsigned", "(D)J", false);
             } else if (v.kind == Val.R4) {
                 mv.visitInsn(F2L);
             } else if (v.kind == Val.R8) {

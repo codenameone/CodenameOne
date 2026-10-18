@@ -1448,6 +1448,18 @@ namespace Spike
             }
             Log("null receiver " + ftn + " " + unboxed);
 
+            // conv.u8 of a floating value: the upper half of ulong, and
+            // .NET's saturation either side of the range.
+            double[] wide = { 1e19, 9.3e18, 1e20, -1.0, double.NaN, 3.5 };
+            string u8 = "";
+            for (int i = 0; i < wide.Length; i++)
+            {
+                double dw = wide[i];
+                float fw = (float)dw;
+                u8 += " " + unchecked((ulong)dw) + "/" + unchecked((ulong)fw);
+            }
+            Log("to ulong" + u8);
+
             Log("parse " + Parsed("42") + " " + Parsed("-7") + " " + Parsed(" +19 ") + " " + Parsed("1-") + " "
                 + Parsed("") + " " + Parsed(null) + " " + Parsed("2147483647") + " " + Parsed("2147483648") + " "
                 + Parsed("-2147483648") + " " + Parsed("99999999999999999999") + " " + Parsed("1.5") + " "

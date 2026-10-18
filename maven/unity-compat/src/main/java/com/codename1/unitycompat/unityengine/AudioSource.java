@@ -80,6 +80,10 @@ public final class AudioSource extends Behaviour {
     private float shotsPausedAt;
     private float[] shotScale = new float[0];
     private float[] shotEnd = new float[0];
+    /// The clip and playback speed of each shot, so that a fresh output
+    /// can sound it again from where it has got to.
+    private AudioClip[] shotClip = new AudioClip[0];
+    private float[] shotSpeed = new float[0];
     private int shotCount;
     private boolean playing;
     private boolean paused;
@@ -139,8 +143,9 @@ public final class AudioSource extends Behaviour {
     /// `revoice clip milliseconds`.
     private boolean revoice(AudioOutput o) {
         expire();
+        boolean shotsLeft = revoiceShots(o);
         if (!playing || clip == null) {
-            return false;
+            return shotsLeft;
         }
         float at = get_time();
         voice = newVoice();
@@ -155,6 +160,32 @@ public final class AudioSource extends Behaviour {
             o.pause(voice, true);
         }
         return true;
+    }
+
+    /// Starts the one-shots still to finish again on a new output, each
+    /// where it has got to; false if none is left.
+    private boolean revoiceShots(AudioOutput o) {
+        float t = shotNow();
+        boolean any = false;
+        for (int i = 0; i < shotCount; i++) {
+            float left = shotEnd[i] - t;
+            if (!(left > 0f) || shotClip[i] == null) { // NOPMD LogicInversion
+                continue;
+            }
+            any = true;
+            int v = newVoice();
+            shots[i] = v;
+            o.play(v, shotClip[i], level(shotScale[i]), pitch, false);
+            float speed = shotSpeed[i];
+            float at = shotClip[i].get_length() - (speed > 0f ? left * speed : left);
+            if (at > 0f) {
+                o.seek(v, at);
+            }
+            if (shotsPaused) {
+                o.pause(v, true);
+            }
+        }
+        return any;
     }
 
     /// The clock every source counts on: the game's unscaled one, less the
@@ -678,7 +709,11 @@ public final class AudioSource extends Behaviour {
             }
         }
         float speed = pitch < 0f ? -pitch : pitch;
-        keepShot(v, volumeScale, shotNow() + (speed > 0f ? c.get_length() / speed : c.get_length()));
+        keepShot(v, volumeScale, shotNow() + (speed > 0f ? c.get_length() / speed : c.get_length()), c, speed);
+        // Listed with the sources that have voices, so that a fresh output
+        // reaches its shots even when it plays no clip of its own.
+        unvoice();
+        voiced.add(this);
     }
 
     /// Holds or resumes the one-shots still to finish.
@@ -695,7 +730,7 @@ public final class AudioSource extends Behaviour {
     }
 
     /// Remembers a one-shot, after forgetting those that have ended.
-    private void keepShot(int v, float scale, float end) {
+    private void keepShot(int v, float scale, float end, AudioClip c, float speed) {
         float t = shotNow();
         int n = 0;
         for (int i = 0; i < shotCount; i++) {
@@ -703,6 +738,8 @@ public final class AudioSource extends Behaviour {
                 shots[n] = shots[i];
                 shotScale[n] = shotScale[i];
                 shotEnd[n] = shotEnd[i];
+                shotClip[n] = shotClip[i];
+                shotSpeed[n] = shotSpeed[i];
                 n++;
             }
         }
@@ -714,13 +751,24 @@ public final class AudioSource extends Behaviour {
             System.arraycopy(shots, 0, s2, 0, n);
             System.arraycopy(shotScale, 0, c2, 0, n);
             System.arraycopy(shotEnd, 0, e2, 0, n);
+            AudioClip[] k2 = new AudioClip[size];
+            float[] p2 = new float[size];
+            System.arraycopy(shotClip, 0, k2, 0, n);
+            System.arraycopy(shotSpeed, 0, p2, 0, n);
             shots = s2;
             shotScale = c2;
             shotEnd = e2;
+            shotClip = k2;
+            shotSpeed = p2;
+        }
+        for (int i = n; i < shotCount; i++) {
+            shotClip[i] = null;
         }
         shots[n] = v;
         shotScale[n] = scale;
         shotEnd[n] = end;
+        shotClip[n] = c;
+        shotSpeed[n] = speed;
         shotCount = n + 1;
     }
 

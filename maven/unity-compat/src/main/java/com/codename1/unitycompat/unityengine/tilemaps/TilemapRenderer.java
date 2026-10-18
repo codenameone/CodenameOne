@@ -53,6 +53,11 @@ public final class TilemapRenderer extends Renderer {
         if (!get_enabled()) {
             return;
         }
+        // A tilemap destroyed since is dropped, and the object asked again:
+        // drawing it froze its last cells, and a replacement went unseen.
+        if (map != null && !com.codename1.unitycompat.unityengine.Object.op_Implicit(map)) {
+            map = null;
+        }
         if (map == null) {
             Object m = get_gameObject().GetComponent(TilemapBase.class);
             if (!(m instanceof TilemapBase)) {
