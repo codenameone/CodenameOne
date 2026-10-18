@@ -51,6 +51,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
@@ -81,7 +82,7 @@ public class Initializr extends Lifecycle {
     // UIIDs that have a "...Dark" variant in theme.css. Used to re-skin the whole
     // tree when the host website / system switches between light and dark.
     private static final String[] THEMEABLE = {
-            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar",
+            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar", "InitializrSecondaryButton",
             "InitializrWordmark", "InitializrHero", "InitializrHeroTitle", "InitializrHeroSubtitle",
             "InitializrPill", "InitializrPillDot", "InitializrPillText",
             "InitializrPanel", "InitializrPanelHeader", "InitializrPanelTitle",
@@ -253,6 +254,7 @@ public class Initializr extends Lifecycle {
         // button still carried the default Button style is what painted a white
         // box behind the download glyph.
         FontImage.setMaterialIcon(generateButton, FontImage.MATERIAL_DOWNLOAD);
+        generateButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_DOWNLOAD));
         this.generateButton = generateButton;
         generateButton.addActionListener(e -> {
             if (!validateInputs(appNameField, packageField)) {
@@ -277,10 +279,30 @@ public class Initializr extends Lifecycle {
             }
         });
 
+        // Zero install: open the same app in the browser IDE, where it runs at once
+        // and can be sent to the cloud. The IDE creates it from its own template
+        // with this name, package, kind and build tool (or reopens the project it
+        // already has with this package).
+        final Button browserButton = new Button("Open in browser");
+        browserButton.setUIID("InitializrSecondaryButton");
+        FontImage.setMaterialIcon(browserButton, FontImage.MATERIAL_OPEN_IN_BROWSER);
+        browserButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_OPEN_IN_BROWSER));
+        browserButton.addActionListener(e -> {
+            if (!validateInputs(appNameField, packageField)) {
+                updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
+                ToastBar.showErrorMessage("Please fix validation errors before opening the project.");
+                form.revalidate();
+                return;
+            }
+            String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
+            String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
+            Display.getInstance().execute(browserIdeUrl(appName, packageName, selectedTemplate[0], projectType[0], buildTool[0]));
+        });
+
         Container generateBar = new Container(new BorderLayout());
         generateBar.setUIID("InitializrGenerateBar");
         generateBar.add(BorderLayout.CENTER, bundleInfo);
-        generateBar.add(BorderLayout.EAST, generateButton);
+        generateBar.add(BorderLayout.EAST, FlowLayout.encloseRight(browserButton, generateButton));
 
         Container body = new Container(new BorderLayout());
         body.add(BorderLayout.CENTER, column);
@@ -1068,6 +1090,12 @@ public class Initializr extends Lifecycle {
         String themed = themedUiid(uiid, dark);
         if (!uiid.equals(themed)) {
             component.setUIID(themed);
+            // A material icon is drawn from the style it was made with; remake
+            // it from the new UIID's colours.
+            Object icon = component.getClientProperty(MATERIAL_ICON);
+            if (icon instanceof Character && component instanceof Button) {
+                FontImage.setMaterialIcon((Button) component, ((Character) icon).charValue());
+            }
         }
         if (component instanceof Container) {
             Container cnt = (Container) component;
@@ -1093,6 +1121,23 @@ public class Initializr extends Lifecycle {
         String base = uiid.substring(0, uiid.length() - "Dark".length());
         return isThemeable(base) ? base : uiid;
     }
+
+    /// The browser IDE link for a project: `?new=<kind>&name=&package=&build=`.
+    static String browserIdeUrl(String appName, String packageName, Template template,
+                                ProjectOptions.ProjectType type, ProjectOptions.BuildTool build) {
+        String kind = template.isFullStack() || type == ProjectOptions.ProjectType.APP_WITH_BACKEND ? "fullstack"
+                : type == ProjectOptions.ProjectType.BACKEND_ONLY ? "backend" : "app";
+        return "https://cloud.codenameone.com/ide/?new=" + kind
+                + "&name=" + com.codename1.io.Util.encodeUrl(appName)
+                + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
+                // Full-stack templates (Wayline) are Maven-only (ProjectOptions.forFullStack),
+                // whatever the hidden build-tool choice still holds; an ordinary
+                // App + backend project keeps the Gradle the user picked.
+                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE && !template.isFullStack() ? "gradle" : "maven");
+    }
+
+    /// Client property: the material icon a button carries, so a theme switch can redraw it.
+    private static final String MATERIAL_ICON = "initializr.materialIcon";
 
     private boolean isThemeable(String uiid) {
         for (String s : THEMEABLE) {
