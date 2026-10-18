@@ -571,3 +571,67 @@
         width: 260px;
     }
 }
+
+/* Win / loss colouring for the ratio tables. A ratio within 5% is even and keeps
+   the default text colour (see partials/port-status-outcome.html). */
+.cn1-port-status__ratio.is-win,
+.cn1-port-status__verdict.is-win { color: #1f7a4a; }
+.cn1-port-status__ratio.is-loss,
+.cn1-port-status__verdict.is-loss { color: #c03d3d; }
+/* One ratio per cell in the Flutter table, so the whole cell can carry it; a JDK 25
+   cell holds time and RAM, which often disagree, so only the text is coloured there. */
+.cn1-port-status__flutter-benchmark td:has(> .cn1-port-status__ratio.is-win) { background: color-mix(in srgb, #27955b 8%, transparent); }
+.cn1-port-status__flutter-benchmark td:has(> .cn1-port-status__ratio.is-loss) { background: color-mix(in srgb, #d24c4c 9%, transparent); }
+
+body.dark .cn1-port-status__ratio.is-win,
+body.dark .cn1-port-status__verdict.is-win { color: #5fcf8f; }
+body.dark .cn1-port-status__ratio.is-loss,
+body.dark .cn1-port-status__verdict.is-loss { color: #f07a7a; }
+
+.cn1-port-status__bottom-line {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    list-style: none;
+    margin: 1rem 0;
+    padding: 0;
+}
+
+.cn1-port-status__bottom-line li {
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 8px;
+    margin: 0;
+    padding: .75rem .9rem;
+}
+
+.cn1-port-status__bottom-line strong,
+.cn1-port-status__verdict,
+.cn1-port-status__bottom-line small {
+    display: block;
+}
+
+.cn1-port-status__verdict {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.cn1-port-status__bottom-line small {
+    color: var(--secondary);
+    font-size: .68rem;
+    margin-top: .35rem;
+}
+
+.cn1-port-status__glossary {
+    display: grid;
+    gap: .25rem 1rem;
+    grid-template-columns: max-content 1fr;
+    margin: 1rem 0 0;
+}
+
+.cn1-port-status__glossary dt { font-weight: 700; }
+.cn1-port-status__glossary dd { margin: 0; }
+
+@media (max-width: 640px) {
+    .cn1-port-status__glossary { grid-template-columns: 1fr; }
+    .cn1-port-status__glossary dd { margin-bottom: .5rem; }
+}
