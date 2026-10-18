@@ -154,6 +154,23 @@ public class UnityProjectImporterTest {
         assertTrue("a file the import did not copy is not its to remove", own.isFile());
     }
 
+    /// An asset that turns from a file into a folder, or back, replaces
+    /// the old one instead of failing the copy against it.
+    @Test
+    public void aFileThatBecameAFolderAndBackIsReplaced() throws Exception {
+        write(new File(game, "Assets/Data"), "a file");
+        write(new File(game, "Assets/Levels/One.txt"), "1");
+        importIt();
+        assertTrue(new File(game, "Assets/Data").delete());
+        write(new File(game, "Assets/Data/Two.txt"), "2");
+        assertTrue(new File(game, "Assets/Levels/One.txt").delete());
+        assertTrue(new File(game, "Assets/Levels").delete());
+        write(new File(game, "Assets/Levels"), "now a file");
+        importIt();
+        assertEquals("2", read(new File(unity, "Assets/Data/Two.txt")));
+        assertEquals("now a file", read(new File(unity, "Assets/Levels")));
+    }
+
     /// The record of what was imported is a file in the project; a line
     /// edited into it must not name a file elsewhere for deletion.
     @Test

@@ -121,6 +121,7 @@ hiding base derived base-virt derived-virt base-helper derived-helper base-virt 
 null receiver NullReference NullReference
 to ulong 10000000000000000000/9999999980506447872 9300000000000000000/9300000300729368576 18446744073709551615/18446744073709551615 0/0 0/0 3/3
 tuple equals True False default (0, 0) True array (0, 0) True hash True
+exception text System.InvalidOperationException: outer| ---> System.ArgumentException: inner|   --- End of inner exception stack trace --- / System.Exception: Exception of type 'System.Exception' was thrown. / System.Exception / System.Collections.Generic.KeyNotFoundException: k
 parse True/42 True/-7 True/19 False/0 False/0 False/0 True/2147483647 False/0 True/-2147483648 False/0 False/0 False/0 True/7
 int.Parse 12 format overflow
 grid -3 -1 -1 9

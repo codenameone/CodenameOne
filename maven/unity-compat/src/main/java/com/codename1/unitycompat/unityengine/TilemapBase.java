@@ -92,11 +92,26 @@ public class TilemapBase extends GridLayout {
 
     @Override
     GridLayout layout() {
-        if (grid == null || grid.destroyed) {
+        if (grid == null || grid.destroyed || !above(grid)) {
             java.lang.Object g = gameObject == null ? null : gameObject.GetComponentInParent(Grid.class);
             grid = g instanceof GridLayout ? (GridLayout) g : null;
         }
         return grid == null ? this : grid;
+    }
+
+    /// Whether `g` is still on this tilemap or one of its ancestors: a
+    /// `SetParent` can move the map under another grid, and a cached one
+    /// would keep its cell size. A walk up the hierarchy allocates nothing.
+    private boolean above(GridLayout g) {
+        GameObject owner = g.gameObject;
+        Transform t = gameObject == null ? null : gameObject.get_transform();
+        while (t != null) {
+            if (t.gameObject == owner) { // NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            t = t.get_parent();
+        }
+        return false;
     }
 
     // ------------------------------------------------------- generated code

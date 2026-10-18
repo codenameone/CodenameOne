@@ -1470,6 +1470,11 @@ namespace Spike
                 + " " + boxedNone.Equals((0, 0)) + " array " + pairs[1] + " " + ((object)pairs[0]).Equals((0, 0))
                 + " hash " + (none.GetHashCode() == (0, 0).GetHashCode()));
 
+            // Exception.ToString: the .NET type name and the inner chain.
+            string chained = new InvalidOperationException("outer", new ArgumentException("inner")).ToString();
+            Log("exception text " + chained.Replace("\n", "|") + " / " + new Exception() + " / " + new Exception("")
+                + " / " + new System.Collections.Generic.KeyNotFoundException("k"));
+
             Log("parse " + Parsed("42") + " " + Parsed("-7") + " " + Parsed(" +19 ") + " " + Parsed("1-") + " "
                 + Parsed("") + " " + Parsed(null) + " " + Parsed("2147483647") + " " + Parsed("2147483648") + " "
                 + Parsed("-2147483648") + " " + Parsed("99999999999999999999") + " " + Parsed("1.5") + " "

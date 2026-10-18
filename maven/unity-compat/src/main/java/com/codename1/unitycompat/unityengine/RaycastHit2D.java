@@ -180,17 +180,23 @@ public final class RaycastHit2D implements Struct {
                 && same(h.normalY, normalY) && same(h.distance, distance) && same(h.fraction, fraction);
     }
 
-    /// Bit for bit, which is how .NET compares the fields of a struct.
+    /// `Single.Equals`, which is what `ValueType.Equals` uses for a struct
+    /// with float fields: the two zeros are equal, and so is NaN to itself.
     private static boolean same(float a, float b) {
-        return Float.floatToIntBits(a) == Float.floatToIntBits(b);
+        return a == b || (a != a && b != b);
     }
 
     @Override
     public int hashCode() {
-        int h = Float.floatToIntBits(pointX);
-        h = h * 31 + Float.floatToIntBits(pointY);
-        h = h * 31 + Float.floatToIntBits(distance);
+        int h = bits(pointX);
+        h = h * 31 + bits(pointY);
+        h = h * 31 + bits(distance);
         return h;
+    }
+
+    /// The bits of `v` with both zeros as one, so equal hits hash equally.
+    private static int bits(float v) {
+        return v == 0f ? 0 : Float.floatToIntBits(v);
     }
 
     @Override

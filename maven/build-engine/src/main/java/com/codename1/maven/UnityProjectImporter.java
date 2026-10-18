@@ -129,6 +129,12 @@ public final class UnityProjectImporter {
     }
 
     private void copy(File src, File dest, String path, Set<String> imported, Result r) throws IOException {
+        // An asset that was a file and is now a folder, or the other way
+        // round: the old one is in the way of the new, and stale entries
+        // are only swept after the copy, so it goes first.
+        if (src.isDirectory() ? dest.isFile() : dest.isDirectory()) {
+            deleteTree(dest);
+        }
         if (src.isDirectory()) {
             File[] children = src.listFiles();
             if (children == null) {
@@ -161,6 +167,19 @@ public final class UnityProjectImporter {
                     break;
                 }
             }
+        }
+    }
+
+    private static void deleteTree(File f) throws IOException {
+        // A link is removed, never followed out of the project.
+        File[] children = Files.isSymbolicLink(f.toPath()) ? null : f.listFiles();
+        if (children != null) {
+            for (File c : children) {
+                deleteTree(c);
+            }
+        }
+        if (!f.delete() && f.exists()) {
+            throw new IOException("cannot remove " + f);
         }
     }
 
