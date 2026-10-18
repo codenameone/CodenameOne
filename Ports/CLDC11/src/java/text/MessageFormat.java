@@ -599,10 +599,24 @@ public class MessageFormat extends Format {
 
     /// A copy of this format, built by applying its pattern again:
     /// `Object.clone()` answers `null` on the device for anything but an
-    /// array.
+    /// array. A format installed with `setFormat` that the pattern cannot
+    /// spell is carried over as the same object, since it cannot be copied
+    /// the same way.
     @Override
     public Object clone() {
-        return new MessageFormat(toPattern(), locale);
+        MessageFormat copy = new MessageFormat(toPattern(), locale);
+        for (int i = 0; i < formats.length && i < copy.formats.length; i++) {
+            Format custom = unspelled(formats[i]);
+            if (custom != null) {
+                copy.formats[i] = custom;
+            }
+        }
+        return copy;
+    }
+
+    /// `f` when `toPattern()` cannot spell it, otherwise null.
+    private Format unspelled(Format f) {
+        return f != null && describeFormat(f).length() == 0 ? f : null;
     }
 
     @Override
@@ -617,7 +631,19 @@ public class MessageFormat extends Format {
         if (locale == null ? other.locale != null : !locale.equals(other.locale)) {
             return false;
         }
-        return toPattern().equals(other.toPattern());
+        if (!toPattern().equals(other.toPattern())) {
+            return false;
+        }
+        // An equal pattern spells every format but those it cannot, which
+        // print as a bare argument: compare those as objects.
+        for (int i = 0; i < formats.length && i < other.formats.length; i++) {
+            Format mine = unspelled(formats[i]);
+            Format theirs = other.unspelled(other.formats[i]);
+            if (mine == null ? theirs != null : !mine.equals(theirs)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

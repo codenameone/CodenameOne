@@ -80,7 +80,9 @@ public interface CharSequence {
     /// The sequence's `char` values, zero-extended to `int`. The
     /// characters are read when this is called, not when the stream runs,
     /// which is the same answer as the JDK's for any sequence that is not
-    /// modified between the two.
+    /// modified between the two. Changing a builder after asking for its
+    /// stream and before running it is not supported: a lazy spliterator
+    /// would cost every caller for a pattern that reads as a bug.
     default java.util.stream.IntStream chars() {
         int n = length();
         int[] out = new int[n];

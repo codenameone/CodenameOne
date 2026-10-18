@@ -382,6 +382,12 @@ public class Executors {
                     try {
                         task.run();
                     } catch (Throwable t) {
+                        // Reported, and the worker carries on. The JDK lets the
+                        // thread die and starts another; a device pays for a new
+                        // native thread per failed task for no gain, since
+                        // nothing here keeps per-thread state a failure could
+                        // leave behind, and this is the report the dead thread's
+                        // uncaught-exception handler would have made.
                         JdkHost.get().log(JdkHost.LOG_ERROR,
                                 "Exception in thread \"" + self.getName() + "\" " + t, t);
                     }

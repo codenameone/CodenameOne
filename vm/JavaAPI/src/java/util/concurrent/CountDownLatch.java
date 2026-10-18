@@ -63,6 +63,11 @@ public class CountDownLatch {
     }
 
     public void await() throws InterruptedException {
+        // The JDK throws for an interrupted caller even when the latch is
+        // already open; the future returns at once without looking.
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
         try {
             open.get();
         } catch (ExecutionException e) {
@@ -72,6 +77,11 @@ public class CountDownLatch {
     }
 
     public boolean await(long timeout, TimeUnit unit) throws InterruptedException {
+        // The JDK throws for an interrupted caller even when the latch is
+        // already open; the future returns at once without looking.
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
         try {
             open.get(timeout, unit);
             return true;

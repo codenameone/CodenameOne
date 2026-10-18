@@ -202,7 +202,9 @@ public class Locale {
         int start = 0;
         int index = 0;
         for (int i = 0; i <= n; i++) {
-            if (i < n && languageTag.charAt(i) != '-' && languageTag.charAt(i) != '_') {
+            // Only '-' separates subtags: "en_US" is not a language tag, and the
+            // JDK reads it as the root locale.
+            if (i < n && languageTag.charAt(i) != '-') {
                 continue;
             }
             String part = languageTag.substring(start, i);

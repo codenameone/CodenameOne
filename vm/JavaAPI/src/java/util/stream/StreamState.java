@@ -75,19 +75,27 @@ final class StreamState {
         if (held == null) {
             return;
         }
-        RuntimeException first = null;
+        Throwable first = null;
         for (int i = Math.min(count, held.size()) - 1; i >= 0; i--) {
             Runnable release = held.get(i);
             try {
                 release.run();
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
+                // Errors too: every stage is released whatever the latest one
+                // threw, and later failures ride on the first.
                 if (first == null) {
                     first = e;
+                } else if (e != first) {
+                    first.addSuppressed(e);
                 }
             }
         }
+        if (first instanceof Error) {
+            throw (Error) first;
+        }
         if (first != null) {
-            throw first;
+            // A Runnable throws nothing checked.
+            throw (RuntimeException) first;
         }
     }
 

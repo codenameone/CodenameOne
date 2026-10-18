@@ -384,6 +384,28 @@ public final class ExecutorsChecks {
             Bulk.p("timeouts", timeouts);
             Bulk.p("after", after.get(20, TimeUnit.SECONDS));
         });
+        Bulk.check("Executors.anOpenLatchStillSeesTheInterrupt", () -> {
+            CountDownLatch open = new CountDownLatch(0);
+            Thread.currentThread().interrupt();
+            String untimed;
+            try {
+                open.await();
+                untimed = "returned";
+            } catch (InterruptedException e) {
+                untimed = "interrupted";
+            }
+            Bulk.p("untimed", untimed);
+            Bulk.p("cleared", !Thread.currentThread().isInterrupted());
+            Thread.currentThread().interrupt();
+            String timed;
+            try {
+                timed = String.valueOf(open.await(1, TimeUnit.SECONDS));
+            } catch (InterruptedException e) {
+                timed = "interrupted";
+            }
+            Bulk.p("timed", timed);
+            Thread.interrupted();
+        });
         Bulk.check("Executors.cancelFalseLeavesTheRunnersInterruptAlone", () -> {
             final CountDownLatch started = new CountDownLatch(1);
             final CountDownLatch cancelled = new CountDownLatch(1);

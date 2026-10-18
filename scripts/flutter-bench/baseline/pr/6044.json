@@ -41,7 +41,7 @@
      },
      "reason": "The Java API additions change the translated runtime's code size",
      "runs": 1,
-     "value": 14566018
+     "value": 14570466
     },
     "install_bytes": {
      "from": {
@@ -49,7 +49,7 @@
      },
      "reason": "The Java API additions change the translated runtime's code size",
      "runs": 1,
-     "value": 116493472
+     "value": 116497568
     },
     "wire_bytes": {
      "from": {
@@ -57,7 +57,7 @@
      },
      "reason": "The Java API additions change the translated runtime's code size",
      "runs": 1,
-     "value": 84674458
+     "value": 84679609
     }
    }
   }

@@ -86,6 +86,41 @@ public final class LangMembersChecks {
             Bulk.p("ba", Integer.signum(b.compareTo(a)));
             Bulk.p("aa", a.compareTo(a));
         });
+        Bulk.check("Lang.underscoreIsNotATagSeparator", () -> {
+            Bulk.p("en_US", java.util.Locale.forLanguageTag("en_US").toLanguageTag());
+            Bulk.p("en-US", java.util.Locale.forLanguageTag("en-US").toLanguageTag());
+        });
+        Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
+            java.text.Format shout = new java.text.Format() {
+                @Override
+                public StringBuffer format(Object o, StringBuffer to, java.text.FieldPosition pos) {
+                    return to.append(String.valueOf(o).toUpperCase());
+                }
+
+                @Override
+                public Object parseObject(String s, java.text.ParsePosition pos) {
+                    return null;
+                }
+            };
+            java.text.MessageFormat a = new java.text.MessageFormat("hi {0}");
+            java.text.MessageFormat plain = new java.text.MessageFormat("hi {0}");
+            a.setFormat(0, shout);
+            java.text.MessageFormat copy = (java.text.MessageFormat) a.clone();
+            Bulk.p("copy", copy.format(new Object[] {"bob"}));
+            Bulk.p("equalsPlain", a.equals(plain));
+        });
+        Bulk.check("Lang.flatMappingKeepsTheConsumingFailure", () -> {
+            String got;
+            try {
+                java.util.stream.Stream.of(1).collect(java.util.stream.Collectors.flatMapping(
+                        i -> java.util.stream.Stream.of(i).onClose(() -> { throw new IllegalStateException("close"); }),
+                        java.util.stream.Collectors.reducing(0, v -> { throw new IllegalArgumentException("consume"); }, Integer::sum)));
+                got = "none";
+            } catch (RuntimeException e) {
+                got = e.getMessage() + " suppressed=" + e.getSuppressed().length;
+            }
+            Bulk.p("got", got);
+        });
         Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
     }
 }

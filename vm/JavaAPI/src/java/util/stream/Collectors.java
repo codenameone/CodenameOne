@@ -340,14 +340,21 @@ public final class Collectors {
             public void accept(A a, T t) {
                 Stream<? extends U> mapped = mapper.apply(t);
                 if (mapped != null) {
+                    // try-with-resources by hand: a failure while consuming
+                    // wins, and one from close is attached to it.
                     try {
                         Iterator<? extends U> it = mapped.iterator();
                         while (it.hasNext()) {
                             inner.accept(a, it.next());
                         }
-                    } finally {
-                        mapped.close();
+                    } catch (RuntimeException e) {
+                        closeSuppressed(mapped, e);
+                        throw e;
+                    } catch (Error e) {
+                        closeSuppressed(mapped, e);
+                        throw e;
                     }
+                    mapped.close();
                 }
             }
         }, downstream.combiner(), downstream.finisher());
@@ -781,5 +788,15 @@ public final class Collectors {
             BinaryOperator<U> mergeFunction) {
         return collectingAndThen(Collectors.<T, K, U>toMap(keyMapper, valueMapper, mergeFunction),
                 Collectors.<K, U>unmodifiableMap());
+    }
+
+    private static void closeSuppressed(Stream<?> mapped, Throwable primary) {
+        try {
+            mapped.close();
+        } catch (Throwable t) {
+            if (t != primary) {
+                primary.addSuppressed(t);
+            }
+        }
     }
 }
