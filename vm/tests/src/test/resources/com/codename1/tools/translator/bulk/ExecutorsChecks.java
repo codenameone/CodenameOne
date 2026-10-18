@@ -265,6 +265,18 @@ public final class ExecutorsChecks {
 
     /// Runs the group.
     public static void run() {
+        Bulk.check("Executors.allOfKeepsTheFuturesItWasGiven", () -> {
+            java.util.concurrent.CompletableFuture<?>[] given = {
+                    new java.util.concurrent.CompletableFuture<String>(),
+                    new java.util.concurrent.CompletableFuture<String>()};
+            java.util.concurrent.CompletableFuture<?> first = given[0];
+            java.util.concurrent.CompletableFuture<?> second = given[1];
+            java.util.concurrent.CompletableFuture<Void> all = java.util.concurrent.CompletableFuture.allOf(given);
+            given[0] = null;
+            ((java.util.concurrent.CompletableFuture<String>) first).complete("a");
+            ((java.util.concurrent.CompletableFuture<String>) second).complete("b");
+            Bulk.p("done", all.isDone());
+        });
         Bulk.check("Executors.aFactoryThatThrowsLeavesNoSubmissionBehind", () -> {
             final java.util.concurrent.atomic.AtomicInteger made = new java.util.concurrent.atomic.AtomicInteger();
             final AtomicInteger ran = new AtomicInteger();

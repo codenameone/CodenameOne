@@ -184,8 +184,10 @@ public class FutureTask<V> implements RunnableFuture<V> {
         try {
             c.call();
         } catch (Throwable t) {
-            release();
+            // Failed before released, as in run(): otherwise another run could
+            // claim the still-NEW task and call it again.
             setException(t);
+            release();
             return false;
         }
         release();

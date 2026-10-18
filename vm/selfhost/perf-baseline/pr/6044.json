@@ -39,6 +39,18 @@
       "memory": 0.35
      }
     }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.43,
+      "time": 0.838
+     },
+     "memory": 0.513,
+     "reason": "The translator's RAM ratio moves between about 0.43x and 0.51x across runs (linux-x64 went the other way earlier in this PR); windows-arm64 measured 0.51x on 4ad7d9706e and is recorded as measured",
+     "runs": 1,
+     "time": 0.838
+    }
    }
   },
   "windows-x64@intel64-family-6-model-173-genuineintel": {

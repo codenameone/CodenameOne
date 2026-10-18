@@ -264,8 +264,12 @@ public final class Instant implements Temporal, Comparable<Instant> {
                 return u == ChronoUnit.NANOS ? nanos : nanos / 1000;
             }
             if (u == ChronoUnit.MILLIS) {
-                // Between the two moments each cut to its millisecond.
-                return TimeArithmetic.subtractExact(end.toEpochMilli(), toEpochMilli());
+                // Between the two moments each cut to its millisecond, worked
+                // out from the second and millisecond deltas so instants near
+                // MIN and MAX, whose own epoch milliseconds overflow, still work.
+                long secsDiff = TimeArithmetic.subtractExact(end.epochSecond, epochSecond);
+                long millisDiff = end.nano / 1000000 - nano / 1000000;
+                return TimeArithmetic.addExact(TimeArithmetic.multiplyExact(secsDiff, 1000L), millisDiff);
             }
             return TimeArithmetic.timeUntil(epochSecond, nano, end.epochSecond, end.nano, u);
         }

@@ -75,11 +75,17 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         private final AtomicReference<Delays.Handle> wait = new AtomicReference<Delays.Handle>();
         private final AtomicLong due;
         private final AtomicBoolean running = new AtomicBoolean();
+        private static final int NO_INTERRUPT = 0;
+        private static final int INTERRUPTING = 1;
+        private static final int INTERRUPTED = 2;
         /// The worker inside the work right now, for cancel(true) to interrupt.
         private final AtomicReference<Thread> runner = new AtomicReference<Thread>();
-        /// Whether cancel(true) interrupted [#runner], so the run consumes
-        /// that interrupt and no other.
-        private final AtomicBoolean interruptedRunner = new AtomicBoolean();
+        /// Where cancel(true) is with interrupting [#runner]: NO_INTERRUPT,
+        /// INTERRUPTING while it decides and delivers, INTERRUPTED once it
+        /// has. The run waits out INTERRUPTING when it leaves, so an interrupt
+        /// can never land after the worker has moved on to another task, and
+        /// consumes INTERRUPTED and no other interrupt.
+        private final AtomicInteger interruptedRunner = new AtomicInteger(NO_INTERRUPT);
         /// A fixed rate's firings that have come and not yet run, counting
         /// the one running now. See [#run].
         private final AtomicInteger owed = new AtomicInteger();
@@ -216,7 +222,10 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                 }
             } finally {
                 runner.set(null);
-                if (interruptedRunner.getAndSet(false)) {
+                while (interruptedRunner.get() == INTERRUPTING) {
+                    Thread.yield();
+                }
+                if (interruptedRunner.getAndSet(NO_INTERRUPT) == INTERRUPTED) {
                     // An interrupt cancel(true) aimed at this work is not handed on
                     // to whatever task the worker runs next. Only that one: after
                     // cancel(false) the thread's status is its own.
@@ -265,8 +274,15 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                 // when the cancelled work returns.
                 Thread t = runner.get();
                 if (t != null) {
-                    interruptedRunner.set(true);
-                    t.interrupt();
+                    interruptedRunner.set(INTERRUPTING);
+                    // Re-read under INTERRUPTING: a run that left before this
+                    // point has released the worker and must not be interrupted.
+                    if (runner.get() == t) {
+                        t.interrupt();
+                        interruptedRunner.set(INTERRUPTED);
+                    } else {
+                        interruptedRunner.set(NO_INTERRUPT);
+                    }
                 }
             }
             return cancelled;

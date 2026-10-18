@@ -188,6 +188,10 @@ public final class TimeChecks {
                 }
             }
         });
+        Bulk.check("Time.millisUntilNearTheEndOfTime", () -> {
+            Bulk.p("max", java.time.Instant.MAX.minusSeconds(1).until(java.time.Instant.MAX, java.time.temporal.ChronoUnit.MILLIS));
+            Bulk.p("min", java.time.Instant.MIN.until(java.time.Instant.MIN.plusMillis(1500), java.time.temporal.ChronoUnit.MILLIS));
+        });
         Bulk.check("Time.aRegionIdStartsWithALetter", () -> {
             // Only malformed IDs and real regions: an unknown well-formed one
             // is accepted here on purpose (see ZoneId.of).

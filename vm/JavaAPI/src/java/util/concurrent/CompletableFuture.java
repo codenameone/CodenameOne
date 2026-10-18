@@ -506,7 +506,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return this;
     }
 
-    public static CompletableFuture<Void> allOf(final CompletableFuture<?>... futures) {
+    public static CompletableFuture<Void> allOf(CompletableFuture<?>... given) {
+        // A copy: the caller may reuse its array once allOf has returned.
+        final CompletableFuture<?>[] futures = given.clone();
         final CompletableFuture<Void> all = new CompletableFuture<Void>();
         if (futures.length == 0) {
             all.complete(null);

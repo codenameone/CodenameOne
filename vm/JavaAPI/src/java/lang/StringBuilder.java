@@ -276,6 +276,7 @@ public final class StringBuilder implements CharSequence, Appendable, Comparable
     /// Appends the code point `count` times.
     public StringBuilder repeat(int codePoint, int count) {
         if (count < 0) throw new IllegalArgumentException("count is negative: " + count);
+        if (count == 0) return this;
         Character.checkCodePoint(codePoint);
         for (int i = 0; i < count; i++) appendCodePoint(codePoint);
         return this;
@@ -284,6 +285,7 @@ public final class StringBuilder implements CharSequence, Appendable, Comparable
     /// Appends `cs` (or `"null"`) `count` times.
     public StringBuilder repeat(CharSequence cs, int count) {
         if (count < 0) throw new IllegalArgumentException("count is negative: " + count);
+        if (count == 0) return this;
         String text = String.valueOf(cs);
         for (int i = 0; i < count; i++) append(text);
         return this;
