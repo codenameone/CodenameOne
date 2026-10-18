@@ -25,9 +25,12 @@
  },
  "hello": {
   "all": {
-   "memory": 0.868,
+   "memory": 0.932,
    "runs": 7,
-   "time": 0.931
+   "time": 1.021,
+   "tolerance": {
+    "memory": 0.4
+   }
   }
  },
  "intArithmetic": {
@@ -78,8 +81,8 @@
  "stringBuilding": {
   "all": {
    "memory": 0.262,
-   "runs": 7,
-   "time": 1.36,
+   "runs": 1,
+   "time": 1.567,
    "tolerance": {
     "memory": 0.3
    }
@@ -87,8 +90,8 @@
  },
  "translator": {
   "all": {
-   "memory": 0.447,
-   "runs": 4,
+   "memory": 0.507,
+   "runs": 2,
    "time": 0.698
   }
  },

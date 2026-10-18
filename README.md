@@ -20,6 +20,8 @@ The UI ships with your app, so you control its components and theme. Native inte
 | A native Java service | [Build a backend](https://www.codenameone.com/developer-guide/backend/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=backend) with Spring-style APIs and no JVM in the deployed executable |
 | An app and its backend | [Share models and generated REST clients](https://www.codenameone.com/blog/java-backend-shared-models/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=shared-models) |
 | An existing Android app on more platforms | [Import classic Android application code](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-import), including activities, XML layouts and resources |
+| Existing Flutter screens | [Compile supported Dart and Flutter code to Java](https://www.codenameone.com/developer-guide/flutter-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=flutter-import); experimental compatibility, with interaction limits documented in the guide |
+| A full-stack example to run | [Explore Wayline](https://www.codenameone.com/developer-guide/wayline-implementors-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline): a ride-hailing sample with rider, driver and admin screens, shared Java models and a backend; available as an Initializr template |
 | Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
 
 ### A backend that compiles the wiring into your application
@@ -27,6 +29,8 @@ The UI ships with your app, so you control its components and theme. Native inte
 Write controllers, dependency injection, transactions and scheduled jobs with Spring-style annotations. The build generates routing and wiring as ordinary code, then ParparVM translates Java bytecode to C and the native toolchain compiles the executable. Develop and debug on the JVM; deploy a native service without it.
 
 The backend includes PostgreSQL, MySQL/MariaDB and SQLite access, managed ORM, WebSockets, sessions, an OAuth2/OIDC security stack, database migrations, OpenTelemetry and MCP tools. Initializr offers **App with backend** and **Backend only** project types.
+
+Serve browser pages with [compiled HTML views](https://www.codenameone.com/developer-guide/backend-views/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=backend-views), Java controllers and htmx. The build turns a supported subset of Thymeleaf attributes into Java renderers that compile with the native service.
 
 This is an evolving backend with its own supported API surface. Its annotations live in `com.codename1.backend.annotations`; it is not a drop-in Spring Boot replacement and does not run arbitrary JVM libraries. Start with the [backend guide](https://www.codenameone.com/developer-guide/backend/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=backend-guide) and its compatibility limits.
 
@@ -53,7 +57,7 @@ The Spring comparison measures selected HTTP stacks, not equivalent framework fe
 - **UI you control:** CSS themes, Liquid Glass and Material 3, layouts, animation, vector graphics and custom drawing. Embed platform views where needed.
 - **Shared app and server code:** typed REST contracts, generated clients, entities and persistence APIs, with platform-specific code kept behind explicit boundaries.
 - **Local development:** simulator, device skins, component and network inspectors, live CSS, JUnit and screenshot tests. Maven and Gradle tooling are available.
-- **Coding-agent tools:** generated project instructions and semantic MCP tools for the simulator and JavaSE-hosted tooling.
+- **Coding-agent tools:** generated project instructions and semantic MCP tools for the simulator and JavaSE-hosted tooling. Native development builds can expose the same UI through loopback sockets on supported ports, including Linux; device connections require forwarding. See the [MCP setup and development-build restrictions](https://www.codenameone.com/developer-guide/mcp-headless-api/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=agent-mcp).
 - **Device integration:** camera, notifications, maps, Bluetooth LE, biometrics, secure storage and native SDK access.
 - **Native build options:** use local toolchains or the optional cloud service, including iOS builds from Windows or Linux. The free cloud tier includes 100 build credits per month.
 

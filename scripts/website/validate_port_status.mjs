@@ -148,6 +148,19 @@ function validate() {
                 fail("every Flutter benchmark row must state its ratio");
             }
         }
+        // The web leg is published but deliberately not compared: Flutter's web
+        // build computes wrong results there. A JavaScript column would put those
+        // numbers back on the page, and dropping the erratum would hide why the
+        // column is missing.
+        if (/\bdata-platform=["']?javascript\b/i.test(section)) {
+            fail("the Flutter benchmark must not compare the JavaScript port");
+        }
+        const benchmarkData = path.resolve(publicDirectory, "..", "data", "port_status_flutter_benchmark.json");
+        if (fs.existsSync(benchmarkData) &&
+            JSON.parse(fs.readFileSync(benchmarkData, "utf8")).platforms?.javascript &&
+            !/\bdata-flutter-benchmark-erratum=["']?javascript\b/i.test(section)) {
+            fail("the Flutter benchmark omits JavaScript without its erratum");
+        }
     }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);

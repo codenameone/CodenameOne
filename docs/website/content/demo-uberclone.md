@@ -1,55 +1,22 @@
 ---
-title: "UberClone"
+title: "Uber Clone in Java: Start with Wayline"
 slug: "uberclone"
 categories: ["apps"]
+description: "Looking for the Codename One Uber clone? Start with Wayline, the full-stack Java ride-hailing application with rider, driver, admin and backend source."
 source_url: "https://www.codenameone.com/demos/uberclone.html"
-thumbnail: "/demos/uberclone-uberclone.png"
-images:
-  - "/demos/uberclone-1uc.jpg"
-  - "/demos/uberclone-2uc.jpg"
-  - "/demos/uberclone-3uc.jpg"
-  - "/demos/uberclone-4uc.jpg"
-  - "/demos/uberclone-5uc.jpg"
+thumbnail: "/developer-guide/img/wayline-rider-home.png"
 ---
 
-A clone of the native Uber Application
+## Build your ride-hailing application with Wayline
 
-## Screenshots
+[Wayline](/wayline/) is the current starting point for building a branded ride-hailing application in Java. It includes rider and driver workflows, an administration console and the Java backend, with source you can customize under MIT-0.
 
-![UberClone](/demos/uberclone-1uc.jpg)
+**[Start the Wayline tutorial](/blog/create-an-uber-clone-in-1-minute/)** or **[see what's included](/wayline/)**.
 
-![UberClone](/demos/uberclone-2uc.jpg)
+![Wayline rider home screen](/developer-guide/img/wayline-rider-home.png)
 
-![UberClone](/demos/uberclone-3uc.jpg)
+## The original Uber Clone
 
-![UberClone](/demos/uberclone-4uc.jpg)
+This page previously featured the application from the *Create an Uber Clone* book and course. That older project uses a different architecture. Existing readers can still follow the [original course](/course-03-build-real-world-full-stack-mobile-apps-java/) and [original announcement](/blog/uber/).
 
-![UberClone](/demos/uberclone-5uc.jpg)
-
-
-## UberClone
-
-A clone of the native Uber Application
-
-- [Home](https://www.codenameone.com)
-- UberClone
-
-![](/demos/uberclone-1uc.jpg)
-
-![](/demos/uberclone-2uc.jpg)
-
-![](/demos/uberclone-3uc.jpg)
-
-![](/demos/uberclone-4uc.jpg)
-
-![](/demos/uberclone-5uc.jpg)
-
-#### Uber Clone
-
-The Uber Clone application is available as part of the online course [Build Real World Full Stack Mobile Apps in Java](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java). The course includes almost 5 hours of videos explaining the project and its architecture coupled with the full source code of the client and sever code.
-
-The application makes use of Codename One’s builtin native maps and includes most of the big ticket items required for building a taxi hailing application.
-
-Due to the nature of the application we can’t redistribute it in precompiled demo form.
-
-Blog Post: [link](/blog/uber/)
+For a new project, use the [Wayline user's guide](/developer-guide/wayline-users-guide/) and [implementor's guide](/developer-guide/wayline-implementors-guide/), including the steps needed to configure and validate a live service.

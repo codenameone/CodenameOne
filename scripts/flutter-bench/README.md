@@ -317,10 +317,19 @@ Every run posts the comment on the pull request. A nightly or dispatched run
 on master also publishes the folded results to the `port-status-data` branch
 as `benchmarks/flutter.json`, and the website build resolves that into
 `data/port_status_flutter_benchmark.json`, which the Port Status page renders
-as its own section. That section is the only place the page may name another
+as its own section, below the ParparVM against JDK 25 table and laid out like
+it: one column per platform, the sizes, start-up, memory and compute workloads
+as rows. That section is the only place the page may name another
 framework: `scripts/website/validate_port_status.mjs` still fails any Flutter
 mention outside it, and fails the section if it reuses the compliance matrix's
 counted attributes.
+
+The JavaScript leg is published but not shown. Flutter's web build gets
+several compute workloads wrong or does not run them, and the web adapter
+times neither start-up nor memory, so the page leaves the column out and
+states why in an erratum inside the section. The validator fails a JavaScript
+column, and fails the section if the published data has a JavaScript result
+but the erratum is missing.
 
 ## Known constraints
 

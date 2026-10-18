@@ -40,6 +40,11 @@
     </aside>
 
     <section class="post-content cn1-course-lesson__content">
+      {{ if and (eq .Params.course_id "course-03-build-real-world-full-stack-mobile-apps-java") (eq .Params.module_key "12-creating-an-uber-clone") }}
+      <aside aria-label="Current ride-hailing tutorial">
+        <p><strong>Building a new ride-hailing app?</strong> <a href="/wayline/">Wayline includes the rider, driver, admin console and Java backend</a>. <a href="/blog/create-an-uber-clone-in-1-minute/">Start the current tutorial</a>. This video covers the original Uber Clone project.</p>
+      </aside>
+      {{ end }}
       {{- if not (.Param "disableAnchoredHeadings") -}}
         {{- partial "anchored_headings.html" .Content -}}
       {{- else -}}
