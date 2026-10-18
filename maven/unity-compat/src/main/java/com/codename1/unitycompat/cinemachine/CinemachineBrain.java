@@ -86,7 +86,10 @@ public final class CinemachineBrain extends MonoBehaviour {
             return;
         }
         Transform from = live.get_transform();
+        // The brain drives the camera's position and rotation both, so a cut
+        // to a turned virtual camera turns the view.
         get_transform().$moveTo(from.$worldX(), from.$worldY(), from.$worldZ());
+        get_transform().$rotateTo(from.$worldRotation());
         float size = live.lensSize();
         if (size > 0f) {
             lens.set_orthographicSize(size);

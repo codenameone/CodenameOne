@@ -69,6 +69,11 @@ public final class ParticleSystemRenderer extends Renderer {
         if (!enabled) {
             return;
         }
+        // A system destroyed since is dropped: drawing it froze its last
+        // particles on screen, and hid one added to replace it.
+        if (system != null && system.destroyed) {
+            system = null;
+        }
         if (system == null) {
             java.lang.Object s = gameObject.GetComponent(ParticleSystem.class);
             if (!(s instanceof ParticleSystem)) {

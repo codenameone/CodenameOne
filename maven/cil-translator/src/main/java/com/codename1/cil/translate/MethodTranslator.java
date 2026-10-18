@@ -1569,7 +1569,10 @@ final class MethodTranslator implements Opcodes {
                 if (g == null) {
                     throw fail("rethrow outside a catch block");
                 }
-                mv.visitVarInsn(ALOAD, g.original);
+                // The exception the catch was handed, so that `throw;` keeps
+                // its identity: a JVM exception is wrapped once, here, and an
+                // enclosing catch sees that same object, not a new wrapper.
+                mv.visitVarInsn(ALOAD, g.wrapped);
                 mv.visitInsn(ATHROW);
                 reachable = false;
                 return;

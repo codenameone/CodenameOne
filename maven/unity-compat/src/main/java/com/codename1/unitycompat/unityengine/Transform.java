@@ -249,6 +249,16 @@ public class Transform extends Component implements IEnumerable {
         return wz;
     }
 
+    /// The rotation about z in the world, in degrees, and setting it.
+    public float $worldRotation() {
+        update();
+        return wrot;
+    }
+
+    public void $rotateTo(float degrees) {
+        setWorldRotation(degrees);
+    }
+
     /// The scale every transform above this one and this one give it.
     public float $worldScaleX() {
         update();

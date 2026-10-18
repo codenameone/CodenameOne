@@ -158,9 +158,16 @@ public class TilemapColliderBase extends Collider2D implements TileOutline.Sink 
             turn += 360f;
         }
         int quarter = turn == 0f ? 0 : turn == 90f ? 1 : turn == 180f ? 2 : turn == 270f ? 3 : -1;
-        // Where the pivot is, in pixels of the picture.
-        float pivotAtX = (cx * g.cellWidth + m.anchorX * g.cellWidth + m.variantPlaces[p + 3]) / pixelX;
-        float pivotAtY = (cy * g.cellHeight + m.anchorY * g.cellHeight + m.variantPlaces[p + 4]) / pixelY;
+        // Any other angle is turned back by its sine and cosine; the
+        // quarters stay exact, with no rounding of either.
+        double radians = Math.toRadians(turn);
+        float cos = (float) Math.cos(radians);
+        float sin = (float) Math.sin(radians);
+        // Where the pivot is, in pixels of the picture. A cell is a pitch
+        // -- its size and the grid's gap -- from the one before, as it is
+        // drawn; the anchor is a fraction of the cell itself.
+        float pivotAtX = (cx * (g.cellWidth + g.gapX) + m.anchorX * g.cellWidth + m.variantPlaces[p + 3]) / pixelX;
+        float pivotAtY = (cy * (g.cellHeight + g.gapY) + m.anchorY * g.cellHeight + m.variantPlaces[p + 4]) / pixelY;
         // The sprite's box about its pivot, in units, before it is turned.
         float left = -s.pivotX * s.width / s.pixelsPerUnit * scaleX;
         float right = (1f - s.pivotX) * s.width / s.pixelsPerUnit * scaleX;
@@ -196,9 +203,13 @@ public class TilemapColliderBase extends Collider2D implements TileOutline.Sink 
                         ux = -dy;
                         uy = dx;
                         break;
-                    default:
+                    case 0:
                         ux = dx;
                         uy = dy;
+                        break;
+                    default:
+                        ux = dx * cos + dy * sin;
+                        uy = dy * cos - dx * sin;
                         break;
                 }
                 if (scaleX == 0f || scaleY == 0f) {
@@ -208,8 +219,7 @@ public class TilemapColliderBase extends Collider2D implements TileOutline.Sink 
                 float sy = uy / scaleY * s.pixelsPerUnit + s.pivotY * s.height;
                 int column = GridLayout.floor(sx);
                 int row = s.height - 1 - GridLayout.floor(sy);
-                if (quarter < 0 ? (column >= 0 && row >= 0 && column < s.width && row < s.height)
-                        : s.solidAt(column, row)) {
+                if (s.solidAt(column, row)) {
                     picture.set(x, y);
                 }
             }

@@ -2060,7 +2060,11 @@ public final class UnityRuntime {
         int m = canvases.size();
         for (int i = 0; i < m; i++) {
             Canvas canvas = (Canvas) canvases.get(i);
-            // A canvas inside another is drawn as part of it.
+            // A canvas inside another is drawn as part of it, sorted by the
+            // outer canvas's keys. Unity's `Canvas.overrideSorting`, which
+            // lets a nested canvas sort by its own, is not supported: the
+            // runtime has no such property, so a script that sets it does
+            // not compile, and a scene's serialized override is not read.
             if (!canvas.live() || canvas.renderMode == 2
                     || (canvas.gameObject.transform.parent != null
                     && canvas.gameObject.transform.parent.gameObject.GetComponentInParent(Canvas.class) != null)) {
