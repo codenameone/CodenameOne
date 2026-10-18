@@ -934,4 +934,36 @@ public class CSSThemeCompilerTest extends UITestBase {
         new CSSThemeCompiler().compile(":root{--accent:#f00} Label{color:var( --accent )}", res, "Theme");
         assertEquals("ff0000", res.getTheme("Theme").get("Label.fgColor"));
     }
+
+    @Test
+    void testAConstantWithAnUndefinedVariableIsLeftOut() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { label: var(--missing); other: var(--label); kept: var(--missing, x); }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertFalse(theme.containsKey("@label"));
+        assertFalse(theme.containsKey("@other"));
+        assertEquals("x", theme.get("@kept"));
+    }
+
+    @Test
+    void testUnterminatedVarIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("#Constants { label: var(--name; }", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    void testExponentUnitlessInsetIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("Label{padding:1e2;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    void testFractionalPixelFontSizeTakesTheIntegerPart() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:'native:MainBold';font-size:12.5px;} Small{font-family:'native:MainBold';font-size:0.5px;}",
+                res, "Theme");
+        assertEquals(12f, ((Font) res.getTheme("Theme").get("Label.font")).getPixelSize(), 0.001f);
+        assertEquals(0.5f, ((Font) res.getTheme("Theme").get("Small.font")).getPixelSize(), 0.001f);
+    }
 }

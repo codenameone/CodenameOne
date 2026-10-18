@@ -5542,6 +5542,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                         match = file;
                         break;
                     }
+                    // Several files classified medium: the build keeps whichever File.listFiles()
+                    // returns first, an order the platform does not define, so no preview can
+                    // promise to match it. The named medium.png is the stable choice.
                     if ("medium.png".equals(density) && match == null && !isDensityName(file)) {
                         match = file;
                     }

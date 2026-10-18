@@ -105,6 +105,8 @@ public class CSSThemeCompiler {
     /// uses one gets the string token, not its text: the build-time compiler keeps the token's
     /// type, so `color: var(--accent)` with `--accent: "#f00"` is not a color there either.
     private Hashtable<String, String> literalTokens = new Hashtable<String, String>();
+    /// Set by resolveVars when it met a var() naming an undefined variable with no fallback.
+    private boolean unresolvedVar;
 
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
@@ -306,7 +308,16 @@ public class CSSThemeCompiler {
             if (!(value instanceof String)) {
                 continue;
             }
-            theme.put(key, resolveVars(theme, (String) value));
+            unresolvedVar = false;
+            String resolved = resolveVars(theme, (String) value);
+            if (unresolvedVar) {
+                // The build-time compiler keeps an undefined var() with no fallback as a function
+                // its constants emitter has no branch for, so the built theme has no such
+                // constant: the caller's own default applies, not an empty string.
+                theme.remove(key);
+            } else {
+                theme.put(key, resolved);
+            }
         }
     }
 
@@ -854,6 +865,11 @@ public class CSSThemeCompiler {
         out.value = n;
         if ("px".equals(unit)) {
             out.unit = Style.UNIT_TYPE_PIXELS;
+            // The build-time compiler takes the integer part of a pixel size (12.5px is 12),
+            // and the fraction only when the integer part is 0.
+            if ((int) n != 0) {
+                out.value = (int) n;
+            }
         } else if ("pt".equals(unit)) {
             out.unit = Style.UNIT_TYPE_DIPS;
             out.value = n / 72f * 25.4f;
@@ -999,6 +1015,20 @@ public class CSSThemeCompiler {
             i++;
         }
         return first ? null : out.toString();
+    }
+
+    /// `[+-]? digits`.
+    private static boolean isIntegerSpelling(String t) {
+        int i = t.length() > 0 && (t.charAt(0) == '+' || t.charAt(0) == '-') ? 1 : 0;
+        if (i >= t.length()) {
+            return false;
+        }
+        for (; i < t.length(); i++) {
+            if (t.charAt(i) < '0' || t.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// `[+-]? (digits | digits? . digits) ([eE] [+-]? digits)?`, the CSS number token.
@@ -1190,7 +1220,8 @@ public class CSSThemeCompiler {
         while (varPos > -1) {
             int end = closingParen(value, varPos + "var(".length());
             if (end < 0) {
-                break;
+                // The build-time parser rejects the unmatched parenthesis.
+                throw new CSSSyntaxException("Unterminated var() in: " + value);
             }
             // `var(--name, fallback)`: the build-time compiler takes the fallback when the
             // variable is not defined.
@@ -1207,6 +1238,9 @@ public class CSSThemeCompiler {
                 pos = end + 1;
                 varPos = value.indexOf("var(--", pos);
                 continue;
+            }
+            if (replacement == null) {
+                unresolvedVar = true;
             }
             String replaceValue = replacement == null ? "" : replacement.toString();
             String token = tokens ? literalTokens.get("@" + key) : null;
@@ -1501,9 +1535,9 @@ public class CSSThemeCompiler {
             throw new CSSSyntaxException("Unsupported unit for padding or margin: " + value);
         }
         String unit = unitSuffix(v, new String[]{"px", "pt", "mm", "cm", "rem", "vw", "vh", "vmin", "vmax"});
-        // A bare number must be whole: the build-time compiler takes `1.5` for a dimension
-        // missing its unit and fails the build.
-        if (unit == null && v.indexOf('.') > -1) {
+        // A bare number must be an integer spelling: the build-time compiler takes `1.5` or
+        // `1e2` for a dimension missing its unit and fails the build.
+        if (unit == null && !isIntegerSpelling(v)) {
             throw new CSSSyntaxException("A unitless padding or margin must be a whole number: " + value);
         }
         float n = number(unit == null ? v : v.substring(0, v.length() - unit.length()), value);
