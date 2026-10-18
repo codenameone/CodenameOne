@@ -179,15 +179,16 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
                 long offsetHours = c.digits(2);
                 long offsetMinutes = 0;
                 long offsetSeconds = 0;
-                if (c.more() && c.peek() == ':') {
-                    c.next();
-                }
+                // A separator is always followed by its two digits.
                 if (c.more()) {
-                    offsetMinutes = c.digits(2);
-                    if (c.more() && c.peek() == ':') {
+                    if (c.peek() == ':') {
                         c.next();
                     }
+                    offsetMinutes = c.digits(2);
                     if (c.more()) {
+                        if (c.peek() == ':') {
+                            c.next();
+                        }
                         offsetSeconds = c.digits(2);
                     }
                 }

@@ -336,7 +336,10 @@ final class OrmEnhancer {
                 // Raw accessors from an earlier build are always dropped and,
                 // for the fields still hidden, written again below: a field that
                 // has since become public, transient or gone must not keep one.
-                if(name.startsWith(GET) || name.startsWith(SET) || name.startsWith(CALL)) { changed[0]=true;return null; }
+                // Only the synthetic static ones this enhancer writes: a user
+                // method that merely shares the prefix stays.
+                if((access&Opcodes.ACC_SYNTHETIC)!=0 && (access&Opcodes.ACC_STATIC)!=0
+                        && (name.startsWith(GET) || name.startsWith(SET) || name.startsWith(CALL))) { changed[0]=true;return null; }
                 MethodVisitor method=super.visitMethod(access,name,descriptor,signature,exceptions);
                 if(name.startsWith("__cn1Orm")) return method;
                 return new MethodVisitor(Opcodes.ASM9,method) {

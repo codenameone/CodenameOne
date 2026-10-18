@@ -134,7 +134,7 @@ public class OrmAnnotationProcessorTest {
             + "@DbTransient private int loads; @PostLoad void loaded() { loads++; } public int loads() { return loads; } "
             // Private: a subclass method of the same name does not override it, so it still runs.
             + "@DbTransient private int stamps; @PrePersist private void stamp() { stamps++; } public int stamps() { return stamps; } }");
-        sources.put("hidden.Place","package hidden; import com.codename1.annotations.db.*; @Embeddable public class Place { private String city; private int zip; public Place() {} "
+        sources.put("hidden.Place","package hidden; import com.codename1.annotations.db.*; @Embeddable public class Place { public int __cn1OrmCall_mine() { return 1; } private String city; private int zip; public Place() {} "
             + "public String city() { return city; } public void city(String v) { city=v; } public int zip() { return zip; } public void zip(int v) { zip=v; } }");
         sources.put("hidden.Rider","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hidden_rider\") public class Rider extends hiddenbase.Audited { "
             + "@Id private long id; private String name; int score; protected Boolean active; @Embedded private Place home; "
@@ -176,6 +176,8 @@ public class OrmAnnotationProcessorTest {
         assertTrue(riderMethods.toString(),riderMethods.contains("__cn1OrmCall_defaults") && riderMethods.contains("__cn1OrmCall_touched"));
         assertTrue(methodNames(new File(classes,"hiddenbase/Audited.class")).contains("__cn1OrmCall_loaded"));
         assertTrue(methodNames(new File(classes,"hidden/Place.class")).contains("__cn1OrmGet_zip"));
+        // A method of the developer's that merely shares the prefix is kept.
+        assertTrue(methodNames(new File(classes,"hidden/Place.class")).contains("__cn1OrmCall_mine"));
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
         assertTrue(java.lang.reflect.Modifier.isPrivate(loader.loadClass("hidden.Rider").getDeclaredField("name").getModifiers()));
         assertTrue(java.lang.reflect.Modifier.isPrivate(loader.loadClass("hidden.Rider").getDeclaredMethod("defaults").getModifiers()));
@@ -225,11 +227,11 @@ public class OrmAnnotationProcessorTest {
         // SQLite has no date type, but a declared TIMESTAMP still says the stored
         // values carry a time, so the last one is reported there too.
         sources.put("adopt.Visit","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; @Entity(table=\"legacy_visit\") public class Visit { @Id public long id; public Date happened; public String note; @Temporal(TemporalType.DATE) public Date logged; }");
-        sources.put("adopt.Code","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"legacy_code\") public class Code { @Temporal(TemporalType.TIMESTAMP) public java.util.Date seen; @Id(autoIncrement=false) public String code; public Long n; public Byte b; public String label; public byte[] data; @Column(type=\"INT\") public Long small; }");
+        sources.put("adopt.Code","package adopt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"legacy_code\") public class Code { @Temporal(TemporalType.TIMESTAMP) public java.util.Date seen; @Id(autoIncrement=false) public String code; public Long n; public Byte b; public String label; public byte[] data; @Column(type=\"INT\") public Long small; public Character ch; }");
         sources.put("adopt.Check","package adopt; import com.codename1.orm.session.*; import java.util.*; public class Check { public static void run(Session s,boolean sqlite,boolean mysql,int tagIssues) { boolean postgres=!sqlite && !mysql; "
             + "List<SchemaReport.Issue> mine=new ArrayList<SchemaReport.Issue>(),tags=new ArrayList<SchemaReport.Issue>(),codes=new ArrayList<SchemaReport.Issue>(); for(SchemaReport.Issue i:s.schemaReport().getIssues()) if(i.getTable().equals(\"legacy_customer_tag\")) tags.add(i); else if(i.getTable().equals(\"legacy_code\")) codes.add(i); else if(i.getTable().startsWith(\"legacy_\")) mine.add(i); "
             + "if(tags.size()!=tagIssues || tagIssues>0 && !(tags.get(0).getKind()==(sqlite?SchemaReport.Kind.CONSTRAINT_MISMATCH:SchemaReport.Kind.UNSUPPORTED) && \"tag\".equals(tags.get(0).getColumn()))) throw new AssertionError(\"tag report \"+tags); "
-            + "String report=codes.toString(); if(codes.size()!=(sqlite?1:5) || !sqlite && !report.contains(\"legacy_code.seen\") || postgres != report.contains(\"blank-padded\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.label\") || mysql != report.contains(\"legacy_code.data\") || report.contains(\"legacy_code.b\") || report.contains(\"legacy_code.small\") || !report.contains(\"folds case\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.n\") || report.contains(\"CONSTRAINT\") || report.contains(\"MIGRATION\")) throw new AssertionError(\"code report \"+codes); "
+            + "String report=codes.toString(); if(codes.size()!=(sqlite?1:5) || !sqlite && !report.contains(\"legacy_code.seen\") || postgres != report.contains(\"blank-padded\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.label\") || mysql != report.contains(\"legacy_code.data\") || report.contains(\"legacy_code.b\") || report.contains(\"legacy_code.small\") || report.contains(\"legacy_code.ch\") || !report.contains(\"folds case\") || !sqlite && !report.contains(\"Storage type mismatch on legacy_code.n\") || report.contains(\"CONSTRAINT\") || report.contains(\"MIGRATION\")) throw new AssertionError(\"code report \"+codes); "
             + "if(mine.size()!=4) throw new AssertionError(\"report \"+mine); "
             + "for(SchemaReport.Issue i:mine) { boolean ok=\"happened\".equals(i.getColumn()) || \"logged\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.UNSUPPORTED : \"note\".equals(i.getColumn()) ? i.getKind()==SchemaReport.Kind.MIGRATION_REQUIRED : \"source\".equals(i.getColumn()) && i.getKind()==SchemaReport.Kind.CONSTRAINT_MISMATCH; "
             + "if(!ok || !\"legacy_visit\".equals(i.getTable())) throw new AssertionError(\"classification \"+mine); } "
@@ -273,7 +275,7 @@ public class OrmAnnotationProcessorTest {
             "DROP TABLE IF EXISTS legacy_customer_tag","DROP TABLE IF EXISTS legacy_code",
             // PostgreSQL: a nondeterministic ICU collation finds "A" and "a" equal,
             // and CHAR pads, so "a" and "a " are one key.
-            postgres ? "CREATE COLLATION IF NOT EXISTS legacy_ci (provider = icu, locale = 'und-u-ks-level2', deterministic = false)" : "SELECT 1","CREATE TABLE legacy_code (code "+(postgres ? "CHAR(255)" : "VARCHAR(255)")+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : postgres ? " COLLATE legacy_ci" : " COLLATE NOCASE")+" NOT NULL PRIMARY KEY, n "+(mysql ? "BIGINT UNSIGNED" : "INTEGER")+", b "+(mysql ? "TINYINT" : "SMALLINT")+", label VARCHAR(20), data "+(postgres ? "BYTEA" : "BLOB")+", seen "+(postgres ? "TIMESTAMP(0)" : mysql ? "DATETIME" : "TIMESTAMP")+", small INT)","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
+            postgres ? "CREATE COLLATION IF NOT EXISTS legacy_ci (provider = icu, locale = 'und-u-ks-level2', deterministic = false)" : "SELECT 1","CREATE TABLE legacy_code (code "+(postgres ? "CHAR(255)" : "VARCHAR(255)")+(mysql ? " COLLATE utf8mb4_0900_ai_ci" : postgres ? " COLLATE legacy_ci" : " COLLATE NOCASE")+" NOT NULL PRIMARY KEY, n "+(mysql ? "BIGINT UNSIGNED" : "INTEGER")+", b "+(mysql ? "TINYINT" : "SMALLINT")+", label VARCHAR(20), data "+(postgres ? "BYTEA" : "BLOB")+", seen "+(postgres ? "TIMESTAMP(0)" : mysql ? "DATETIME" : "TIMESTAMP")+", small INT, ch "+(mysql ? "SMALLINT UNSIGNED" : "INTEGER")+")","DROP TABLE IF EXISTS legacy_customer","DROP TABLE IF EXISTS legacy_visit",
             "CREATE TABLE legacy_customer (customer_no "+(postgres ? "BIGSERIAL PRIMARY KEY" : mysql ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT")
                 + ", full_name VARCHAR(100) NOT NULL, signed_up "+(postgres ? "TIMESTAMP(3)" : mysql ? "DATETIME(3)" : "TIMESTAMP")+", birthday DATE, last_seen BIGINT, region VARCHAR(10) NOT NULL DEFAULT 'eu')",
             // SQLite: a composite key column without NOT NULL holds NULL. MySQL: the
@@ -1356,7 +1358,9 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void temporalFieldsRejectAColumnTypeThatCannotHoldThem() throws Exception {
         String[][] cases={{"TIMESTAMP","BIGINT","false"},{"TIMESTAMP","DATE","false"},{"DATE","TIMESTAMP(3)","false"},{"DATE","varchar(20)","false"},
-            {"TIMESTAMP","TIMESTAMP(3)","true"},{"TIMESTAMP","datetime(3)","true"},{"TIMESTAMP","TIMESTAMPTZ","true"},{"DATE","date","true"},{"DATE","TEXT","true"}};
+            {"TIMESTAMP","TIMESTAMP(3)","true"},{"TIMESTAMP","datetime(3)","true"},{"TIMESTAMP","TIMESTAMPTZ","true"},{"DATE","date","true"},{"DATE","TEXT","true"},
+            // Milliseconds survive only with three fractional digits.
+            {"TIMESTAMP","TIMESTAMP(0)","false"},{"TIMESTAMP","DATETIME","false"},{"TIMESTAMP","datetime(6)","true"},{"TIMESTAMP","TIMESTAMP","true"}};
         for(String[] c:cases) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
             sources.put("temporaltype.Entry","package temporaltype; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; "

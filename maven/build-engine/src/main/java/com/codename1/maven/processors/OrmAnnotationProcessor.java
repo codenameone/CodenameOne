@@ -1136,14 +1136,20 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     /// Whether a declared column type holds a @Temporal value of the given kind
-    /// (1 DATE, 2 TIMESTAMP). TEXT holds either: SQLite has no date type and
+    /// (1 DATE, 2 TIMESTAMP), at millisecond precision. TEXT holds either: SQLite has no date type and
     /// schemas written for it declare their dates as TEXT. Mirrors SessionImpl's
     /// check of an existing column.
     static boolean holdsTemporal(String type,int temporal) {
         String token=type.trim().toLowerCase(java.util.Locale.ROOT).split("[\\s(]",2)[0];
         if("text".equals(token)) return true;
         if(temporal==1) return "date".equals(token);
-        return "timestamp".equals(token) || "timestamptz".equals(token) || "datetime".equals(token);
+        if(!"timestamp".equals(token) && !"timestamptz".equals(token) && !"datetime".equals(token)) return false;
+        // The converter writes milliseconds, so the column has to keep three
+        // fractional digits: MySQL's DATETIME defaults to none, PostgreSQL's
+        // TIMESTAMP to six.
+        java.util.regex.Matcher precision=java.util.regex.Pattern.compile("\\(\\s*(\\d+)\\s*\\)").matcher(type);
+        int digits=precision.find() ? Integer.parseInt(precision.group(1)) : "datetime".equals(token) ? 0 : 6;
+        return digits>=3;
     }
 
     private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }

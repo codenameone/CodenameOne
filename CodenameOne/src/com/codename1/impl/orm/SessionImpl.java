@@ -1784,20 +1784,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// (a byte or short field reports its own) and nothing wider than the
     /// attribute's kind can load: a long over a 32-bit column fails writes,
     /// and an int over a 64-bit column cannot load what is already there. An
-    /// unsigned column lacks the negatives of every Java type.
+    /// unsigned column fits only a range without negatives (Boolean,
+    /// Character), and a 64-bit one holds more than a long.
     private boolean integerFits(String found, int kind, long minimum, long maximum) {
         if ("sqlite".equals(sql.dialect())) {
             return true;
         }
-        if (asciiLower(found).indexOf("unsigned") >= 0) {
+        boolean unsigned = asciiLower(found).indexOf("unsigned") >= 0;
+        int width = integerWidth(found);
+        if (unsigned && (minimum < 0 || width == 8)) {
             return false;
         }
-        int width = integerWidth(found);
         if (width == 0) {
             return true;
         }
         if (width > (kind == Attribute.BIGINT ? 8 : 4)) {
             return false;
+        }
+        if (unsigned) {
+            return maximum <= (1L << (8 * width)) - 1;
         }
         long bound = width == 8 ? Long.MAX_VALUE : (1L << (8 * width - 1)) - 1;
         return minimum >= -bound - 1 && maximum <= bound;
