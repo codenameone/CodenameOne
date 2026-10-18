@@ -359,7 +359,19 @@ public class CSSThemeCompiler {
             String value = unquote(raw);
             deferred.put(key, DEFERRED_PLAIN);
             literalTokens.remove(key);
-            if (name.endsWith("Image")) {
+            boolean alias = raw.equals(value) && value.indexOf("var(--") > -1;
+            if (name.endsWith("Image") && (!raw.equals(value) || (!isColorLiteral(value) && !isCssNumber(value)))) {
+                // The build-time compiler looks an image up only for a string or identifier
+                // token; a color or number named `...Image` is stored as a color or number. An alias is
+                // resolved where it is declared, as below, so a later redefinition of its
+                // target does not change the image.
+                if (alias && declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
+                    declaration.snapshot = resolveVars(theme, value);
+                    declaration.snapshotKind = DEFERRED_IMAGE;
+                }
+                if (alias && declaration.snapshot != null) {
+                    value = declaration.snapshot;
+                }
                 deferred.put(key, DEFERRED_IMAGE);
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);

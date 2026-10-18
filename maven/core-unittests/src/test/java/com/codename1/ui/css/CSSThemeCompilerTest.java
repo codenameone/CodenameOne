@@ -994,4 +994,22 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertFalse(theme.containsKey("@alias"));
         assertEquals("00ff00", theme.get("@other"));
     }
+
+    @Test
+    void testAColorNamedImageIsStoredAsAColor() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { placeholderImage: #f00; }", res, "Theme");
+        assertEquals("ff0000", res.getTheme("Theme").get("@placeholderImage"));
+    }
+
+    @Test
+    void testAnImageAliasKeepsTheImageAtItsDeclaration() {
+        MutableResource res = new MutableResource();
+        Image first = Image.createImage(3, 3);
+        res.setImage("first.png", first);
+        res.setImage("second.png", Image.createImage(4, 4));
+        new CSSThemeCompiler().compile("#Constants { --icon: \"first.png\"; navImage: var(--icon); --icon: \"second.png\"; }",
+                res, "Theme");
+        assertEquals(3, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
 }
