@@ -32,7 +32,6 @@ import com.codenameone.examples.savor.api.AdminStatsDto;
 import com.codenameone.examples.savor.api.DayStatsDto;
 import com.codenameone.examples.savor.api.CourierDto;
 import com.codenameone.examples.savor.api.NameCountDto;
-import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.api.StatsSeriesDto;
 import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.net.Api;
@@ -311,6 +310,40 @@ final class Dashboard extends LiveChannel.Adapter {
         return tile;
     }
 
+    /// An order's state as the admin reads it. The counts are of orders
+    /// (Statistics), not deliveries, and the customer's wording ("You
+    /// cancelled it") is not the admin's. Empty for a name it does not know.
+    static String outcome(String name) {
+        if ("PLACED".equals(name)) {
+            return Lang.tr("Waiting for the restaurant");
+        }
+        if ("ACCEPTED".equals(name)) {
+            return Lang.tr("Being prepared");
+        }
+        if ("READY".equals(name)) {
+            return Lang.tr("Ready, waiting for the courier");
+        }
+        if ("PICKED_UP".equals(name)) {
+            return Lang.tr("On its way");
+        }
+        if ("DELIVERED".equals(name)) {
+            return Lang.tr("Delivered");
+        }
+        if ("REJECTED".equals(name)) {
+            return Lang.tr("Rejected");
+        }
+        if ("CANCELLED_BY_CUSTOMER".equals(name)) {
+            return Lang.tr("Cancelled by customer");
+        }
+        if ("CANCELLED_BY_ADMIN".equals(name)) {
+            return Lang.tr("Cancelled by Savor");
+        }
+        if ("NO_COURIERS".equals(name)) {
+            return Lang.tr("No courier was free");
+        }
+        return "";
+    }
+
     /// How a total divides: each part with its count and its share as a bar.
     private static Container shares(String title, List<NameCountDto> parts, boolean states) {
         Container tile = box(title);
@@ -320,7 +353,7 @@ final class Dashboard extends LiveChannel.Adapter {
         }
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
             NameCountDto part = parts.get(iter);
-            String name = states ? Ui.state(DeliveryState.named(part.name())) : part.name();
+            String name = states ? outcome(part.name()) : part.name();
             tile.add(Ui.fact(name.length() == 0 ? part.name() : name,
                     String.valueOf(part.count())));
             // A total of nothing has no shares; the bars are then empty.

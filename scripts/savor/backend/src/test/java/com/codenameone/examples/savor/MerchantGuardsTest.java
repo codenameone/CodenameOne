@@ -150,6 +150,16 @@ class MerchantGuardsTest {
     }
 
     @Test
+    void theOnlyMerchantOfAListedRestaurantIsNotBlocked() throws Exception {
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3195, 174.8092);
+        assertEquals(409, statusOf(() -> accounts.suspend(DemoAccounts.ADMIN, kitchen.merchant,
+                true, "Testing")));
+        // Suspended first, the restaurant takes no orders, and the merchant can be.
+        restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, true, "Closing down");
+        accounts.suspend(DemoAccounts.ADMIN, kitchen.merchant, true, "Testing");
+    }
+
+    @Test
     void aRatingCountsForTheCourierToo() throws Exception {
         String customer = People.customer(accounts, "wlg-rating-customer");
         String courier = People.courier(accounts, "wlg-rating-courier");

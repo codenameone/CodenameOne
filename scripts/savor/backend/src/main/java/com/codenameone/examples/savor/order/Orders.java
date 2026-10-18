@@ -317,7 +317,7 @@ public class Orders {
         end(id, OrderState.CANCELLED_BY_ADMIN, by, why);
         change[0] = deliveries.endForOrder(id, by);
         // On the customer's record, where the admin looking them up next sees it.
-        moderation.record(order.getCustomer(), by, "cancel_order", why);
+        moderation.record(order.getCustomer(), by, Moderation.CANCEL_ORDER, why);
         return null;
     }
 

@@ -317,6 +317,8 @@ public final class UsersForm {
                 : "unflag".equals(action) ? FontImage.MATERIAL_OUTLINED_FLAG
                 : "approve".equals(action) ? FontImage.MATERIAL_CHECK_CIRCLE
                 : "reject".equals(action) ? FontImage.MATERIAL_CANCEL
+                : "listed".equals(action) ? FontImage.MATERIAL_STOREFRONT
+                : "cancel_order".equals(action) ? FontImage.MATERIAL_REMOVE_SHOPPING_CART
                 : FontImage.MATERIAL_MANAGE_ACCOUNTS;
     }
 
@@ -324,7 +326,8 @@ public final class UsersForm {
         return "block".equals(action) ? "Blocked" : "unblock".equals(action) ? "Unblocked"
                 : "flag".equals(action) ? "Flagged" : "unflag".equals(action) ? "Flag removed"
                 : "approve".equals(action) ? "Approved to deliver" : "reject".equals(action)
-                ? "Application sent back" : "Roles changed";
+                ? "Application sent back" : "listed".equals(action) ? "Restaurant listed"
+                : "cancel_order".equals(action) ? "Order cancelled" : "Roles changed";
     }
 
     private static Switch toggle(String name, boolean value) {

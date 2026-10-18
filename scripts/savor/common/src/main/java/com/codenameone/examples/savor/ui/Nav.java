@@ -182,7 +182,7 @@ public final class Nav {
     }
 
     /// A notification about a delivery was opened: the home that shows that delivery,
-    /// as the customer or as the courier the notification was for. Nothing
+    /// as the customer, the courier or the kitchen the notification was for. Nothing
     /// changes when that home is already on screen; it hears of the change
     /// over the live channel too.
     public static void showDelivery(String role) {
@@ -190,7 +190,8 @@ public final class Nav {
         if (user == null) {
             return;
         }
-        String wanted = COURIER.equals(role) && user.courier() ? COURIER : CUSTOMER;
+        String wanted = COURIER.equals(role) && user.courier() ? COURIER
+                : MERCHANT.equals(role) && user.merchant() ? MERCHANT : CUSTOMER;
         if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
             return;
         }

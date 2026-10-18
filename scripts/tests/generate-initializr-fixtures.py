@@ -88,6 +88,21 @@ FULL_STACK = {
 }
 
 
+FIRST_FULL_STACK = next(iter(FULL_STACK))
+LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh')
+
+
+def same_launchers(archive, twin):
+    """Whether `archive` holds exactly the launchers `twin` does, and some."""
+    if not twin.exists():
+        return False
+    with zipfile.ZipFile(archive) as a, zipfile.ZipFile(twin) as b:
+        names = [n for n in a.namelist() if n in LAUNCHERS or n.startswith('.mvn/')]
+        if not names or sorted(names) != sorted(n for n in b.namelist() if n in LAUNCHERS or n.startswith('.mvn/')):
+            return False
+        return all(a.read(n) == b.read(n) for n in names)
+
+
 def check_full_stack_fixture(archive, z, template):
     """A full-stack template: <TEMPLATE>-<layout>-<IDE>.zip. An app, its server and
     the contract module both compile against, all of it renamed to the project."""
@@ -179,6 +194,14 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
             assert '.\\build.bat javascript_cloud' in readme and './build.sh javascript_cloud' in readme
             if archive.name.startswith('ECLIPSE'):
                 assert 'Run/Debug > Launch Configurations' in readme
+        # The full-stack templates are generated from one skeleton, so their
+        # launchers are byte for byte the same: run them for the first template
+        # only and hold every other one to it. Running each again took macOS
+        # past the job's timeout once a second template was added.
+        template = archive.name.split('-')[0]
+        twin = output / archive.name.replace(template + '-', FIRST_FULL_STACK + '-', 1)
+        if template in FULL_STACK and template != FIRST_FULL_STACK and same_launchers(archive, twin):
+            continue
         # The launcher's reason table once, on the default download; the rest of
         # the launcher checks on every archive.
         reasons = ['--reasons'] if archive.name == 'INTELLIJ-JAVA_17.zip' else []

@@ -313,6 +313,12 @@ public class Accounts {
             throw new ResponseStatusException(409,
                     "That account is on a delivery. Block it when the delivery has ended");
         }
+        // Nor the only merchant of a listed restaurant: it would go on taking
+        // orders nobody can accept. The admin suspends the restaurant first.
+        if (suspended && signIn.isEnabled() && cleanup.soleMerchantOfListed(username)) {
+            throw new ResponseStatusException(409,
+                    "That account is its restaurant's only merchant. Suspend the restaurant first");
+        }
         users.updateUser(User.withUserDetails(signIn).disabled(suspended).build());
         if (suspended) {
             cleanup.takeOffLine(username);

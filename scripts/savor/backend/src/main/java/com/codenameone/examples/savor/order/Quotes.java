@@ -60,6 +60,9 @@ import java.util.TimeZone;
 /// fee and the tip.
 @Component
 public class Quotes {
+    /// How long the names of a line's extras may be, together: the width of
+    /// order_line.options.
+    static final int OPTIONS_COLUMN = 500;
     /// Roads are longer than the straight line between two points.
     public static final double ROAD_FACTOR = 1.3d;
     /// About 30 km/h, a courier in town.
@@ -288,6 +291,12 @@ public class Quotes {
                     }
                     names.append(option.getName());
                 }
+            }
+            if (names.length() > OPTIONS_COLUMN) {
+                // Every extra is priced above; only their names are cut, to
+                // the order_line column that keeps them.
+                names.setLength(OPTIONS_COLUMN - 3);
+                names.append("...");
             }
             long cents = unit * line.quantity();
             subtotal += cents;

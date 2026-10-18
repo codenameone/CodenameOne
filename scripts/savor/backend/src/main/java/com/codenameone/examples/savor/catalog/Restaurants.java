@@ -186,7 +186,7 @@ public class Restaurants {
             throw new ResponseStatusException(400, "Fill in the restaurant's details");
         }
         restaurant.setName(Text.required(form.name(), 80, "the restaurant's name"));
-        restaurant.setCuisine(Text.required(form.cuisine(), 40, "the cuisine"));
+        restaurant.setCuisine(Text.required(form.cuisine(), 32, "the cuisine"));
         restaurant.setDescription(Text.optional(form.description(), 500, "the description"));
         restaurant.setAddress(Text.required(form.address(), 255, "the address"));
         if (!Geo.isPoint(form.lat(), form.lng())) {
@@ -253,7 +253,7 @@ public class Restaurants {
             staff.insert(row);
         }
         accounts.setMerchant(applicant, true);
-        moderation.record(applicant, by, "restaurant_approved", restaurant.getName());
+        moderation.record(applicant, by, Moderation.LISTED, restaurant.getName());
         return catalog.detail(restaurant, null, 0d, 0d, true);
     }
 

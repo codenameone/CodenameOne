@@ -43,6 +43,9 @@ public class Moderation {
     public static final String APPROVE = "approve";
     public static final String REJECT = "reject";
     public static final String ROLES = "roles";
+    /// A restaurant application approved; the column holds 16 characters.
+    public static final String LISTED = "listed";
+    public static final String CANCEL_ORDER = "cancel_order";
 
     private final ModerationEventRepository events;
 

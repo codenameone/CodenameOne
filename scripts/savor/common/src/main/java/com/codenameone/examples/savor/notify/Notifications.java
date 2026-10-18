@@ -70,7 +70,15 @@ public final class Notifications {
     public static void signedIn() {
         PushDeviceDto device = device();
         if (device != null && Session.user() != null) {
-            Api.account().registerPush(device, Net.to(saved -> { }, QUIET));
+            final String owner = Session.owner();
+            Api.account().registerPush(device, Net.to(saved -> {
+                // Answered for an account that has since signed out, and
+                // perhaps after the next one's registration: sent again now,
+                // this one lands last and the phone is the current account's.
+                if (Session.user() != null && !owner.equals(Session.owner())) {
+                    signedIn();
+                }
+            }, QUIET));
         }
     }
 
@@ -125,12 +133,13 @@ public final class Notifications {
 
         @Override
         public void onMessage(PushMessage message) {
-            Object delivery = message.getData().get("deliveryId");
+            // OrderPushes names the order; its delivery has the same id.
+            Object order = message.getData().get("orderId");
             Object role = message.getData().get("role");
             // A message with no title is a silent one: the Live Activity
             // moving on, which the push client has already applied.
             String title = message.getTitle();
-            if (delivery != null && title != null && title.length() > 0
+            if (order != null && title != null && title.length() > 0
                     && Session.user() != null) {
                 Nav.showDelivery(role == null ? Nav.CUSTOMER : String.valueOf(role));
             }
