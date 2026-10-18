@@ -63,8 +63,12 @@ final class OrderPane {
         page.setName("merchant-order-page");
         page.add(Ui.plain("#" + Orders.shortId(order.id()) + Ui.DOT + order.customerName(),
                 "SvRestaurantTitle"));
-        page.add(Ui.badge(Orders.state(order.state()), Orders.badge(order.state())));
-        page.add(Ui.plain(Lang.tr("Placed {0}", Ui.when(order.placedAt())), "SvMutedSmall"));
+        // The state rides at the end of the line that says when the order
+        // came in: a pill keeps the space before it that it has after words.
+        Container placed = new Container(new BorderLayout());
+        placed.add(BorderLayout.WEST, Ui.plain(Lang.tr("Placed {0}", Ui.when(order.placedAt())), "SvMutedSmall"));
+        placed.add(BorderLayout.EAST, Ui.badge(Orders.state(order.state()), Orders.badge(order.state())));
+        page.add(placed);
         Ui.section(page, Lang.tr("Items"));
         for (OrderLineDto line : order.lines()) {
             Container item = Ui.fact(line.quantity() + " x " + line.name(),
@@ -77,8 +81,7 @@ final class OrderPane {
         page.add(Ui.fact(Lang.tr("Food"), Ui.money(order.subtotalCents(), order.currency()),
                 "SvTotal"));
         if (order.note() != null && order.note().length() > 0) {
-            page.add(Ui.banner(FontImage.MATERIAL_STICKY_NOTE_2, Lang.tr("Note"), order.note(),
-                    "SvBannerIcon"));
+            page.add(Ui.callout(FontImage.MATERIAL_STICKY_NOTE_2, Lang.tr("Note"), order.note()));
         }
         DeliveryDto delivery = order.delivery();
         if (delivery != null && delivery.courierName() != null) {

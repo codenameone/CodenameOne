@@ -383,6 +383,14 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "the shared module is built ahead of the app");
         assertTrue(rootPom.indexOf("<module>shared</module>") == rootPom.lastIndexOf("<module>shared</module>"),
                 label + "the shared module is in the reactor once");
+        // The README describes the app this template really is: a food-delivery
+        // project once got the ride-hailing accounts and chapters.
+        String readme = getText(entries, "README.md");
+        assertContains(readme, rides ? "ride-hailing app" : "food-delivery app", label + "README names the app");
+        assertContains(readme, (rides ? "`rider@" : "`customer@") + artifact + ".example`",
+                label + "README lists the template's own demo accounts");
+        assertFalse(readme.indexOf(rides ? "courier@" : "rider@") >= 0,
+                label + "README carries no other template's accounts");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",

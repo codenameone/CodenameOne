@@ -121,7 +121,7 @@ public class Orders {
     public OrderDto place(String customer, CartDto cart) throws IOException {
         Quotes.Priced priced = quotes.quote(customer, cart);
         Restaurant restaurant = priced.restaurant;
-        if (!Quotes.open(restaurant, Quotes.minuteOfDay(System.currentTimeMillis()))) {
+        if (!Quotes.open(restaurant, quotes.minuteOfDay(System.currentTimeMillis()))) {
             throw new ResponseStatusException(409, restaurant.getName()
                     + " is not taking orders right now");
         }
@@ -253,7 +253,7 @@ public class Orders {
         if (order == null || !(admin || mayView(viewer, order))) {
             throw new ResponseStatusException(404, "No such order");
         }
-        return toDto(order, viewer, !admin && viewer.equals(order.getCustomer()),
+        return toDto(order, viewer, !admin && viewer.equals(order.getCustomer()), admin,
                 new HashMap<String, Restaurant>());
     }
 
@@ -457,7 +457,7 @@ public class Orders {
     /// The most recent orders, for the admin.
     @Transactional(readOnly = true)
     public List<OrderDto> recent() throws IOException {
-        return list(orders.newest(new PageRequest(0, 100)), "", false);
+        return list(orders.newest(new PageRequest(0, 100)), "", true);
     }
 
     // ------------------------------------------------------------- internals
@@ -525,7 +525,7 @@ public class Orders {
     @Transactional(readOnly = true)
     private OrderDto view(String viewer, boolean admin, String id) throws IOException {
         CustomerOrder order = find(id);
-        return toDto(order, viewer, viewer.equals(order.getCustomer()),
+        return toDto(order, viewer, viewer.equals(order.getCustomer()), admin,
                 new HashMap<String, Restaurant>());
     }
 
@@ -535,12 +535,15 @@ public class Orders {
         List<OrderDto> out = new ArrayList<OrderDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             CustomerOrder order = rows.get(iter);
-            out.add(toDto(order, viewer, viewer.equals(order.getCustomer()), cache));
+            out.add(toDto(order, viewer, viewer.equals(order.getCustomer()), admin, cache));
         }
         return out;
     }
 
-    private OrderDto toDto(CustomerOrder order, String viewer, boolean customer,
+    /// `admin` is whether the order is read for an admin, the only reader its
+    /// delivery shows the customer's sign-in name to; its restaurant's staff
+    /// and its courier are parties, and see what a party sees.
+    private OrderDto toDto(CustomerOrder order, String viewer, boolean customer, boolean admin,
             Map<String, Restaurant> cache) throws IOException {
         Restaurant restaurant = cache.get(order.getRestaurantId());
         if (restaurant == null) {
@@ -557,7 +560,7 @@ public class Orders {
                     line.getQuantity(), line.getUnitCents(), line.getLineCents()));
         }
         Profile who = profiles.findById(order.getCustomer());
-        DeliveryDto delivery = deliveries.forOrder(order.getId(), viewer, customer);
+        DeliveryDto delivery = deliveries.forOrder(order.getId(), viewer, !admin);
         int eta = 0;
         OrderState state = order.getState();
         if (state.isActive() && restaurant != null) {

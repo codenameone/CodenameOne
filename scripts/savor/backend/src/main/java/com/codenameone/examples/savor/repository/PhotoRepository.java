@@ -19,11 +19,19 @@
 package com.codenameone.examples.savor.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.domain.Photo;
+
+import java.util.List;
 
 /// The pictures of restaurants and dishes.
 @Repository(entity = Photo.class, key = String.class)
 public interface PhotoRepository extends CrudRepository<Photo, String> {
     long countByRestaurantId(String restaurantId);
+
+    /// A restaurant's photos as `{id, createdAt}`, without their bytes.
+    @Query("select p.id, p.createdAt from Photo p where p.restaurantId = :restaurantId")
+    List<Object[]> stored(@Param("restaurantId") String restaurantId);
 }

@@ -447,6 +447,10 @@ public class Accounts {
         if (cleanup.hasDeliveryUnderWay(username)) {
             throw new ResponseStatusException(409, "Finish your delivery before closing the account");
         }
+        if (cleanup.soleMerchantOfListed(username)) {
+            throw new ResponseStatusException(409,
+                    "You are your restaurant's only merchant; ask an admin to add another before closing");
+        }
         // Money this courier is owed. The deliveries and the payout ledger outlive
         // the account, but the sign-in and the payout account do not, and
         // the name is retired: once closed, nobody could cash it out. So the

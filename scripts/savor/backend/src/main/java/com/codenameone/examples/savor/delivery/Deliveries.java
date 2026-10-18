@@ -411,7 +411,9 @@ public class Deliveries {
 
     /// The delivery of an order, for showing inside the order, or null when the
     /// kitchen has not accepted it yet. The caller has already decided that
-    /// `viewer` may see the order; `party` is whether they are its customer.
+    /// `viewer` may see the order; `party` is false only for an admin, and true
+    /// for its customer, its courier and its restaurant's staff alike: a
+    /// merchant is not shown the customer's sign-in name.
     @Transactional(readOnly = true)
     public DeliveryDto forOrder(String id, String viewer, boolean party) throws IOException {
         Delivery delivery = find(id);

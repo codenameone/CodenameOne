@@ -20,8 +20,10 @@ package com.codenameone.examples.savor.customer;
 
 import com.codename1.maps.LatLng;
 import com.codename1.maps.Marker;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
@@ -40,6 +42,7 @@ import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.map.CarMarker;
 import com.codenameone.examples.savor.map.MapStage;
 import com.codenameone.examples.savor.map.Maps;
+import com.codenameone.examples.savor.map.Routes;
 import com.codenameone.examples.savor.net.Api;
 import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.pay.ReceiptForm;
@@ -67,6 +70,7 @@ public final class TrackForm extends LiveChannel.Adapter {
     private OrderDto order;
     private Marker kitchen;
     private Marker door;
+    private Maps.Line way;
     private CarMarker courier;
     private boolean framed;
 
@@ -161,9 +165,16 @@ public final class TrackForm extends LiveChannel.Adapter {
         for (int iter = 0; iter < STEPS.length; iter++) {
             Container step = new Container(BoxLayout.y());
             step.setUIID(iter <= reached ? "SvStepDone" : "SvStep");
-            Label bar = new Label("", iter <= reached ? "SvStepBarDone" : "SvStepBar");
+            // An empty Label measures no height, so the bar is a container:
+            // its padding is its size.
+            Container bar = new Container();
+            bar.setUIID(iter <= reached ? "SvStepBarDone" : "SvStepBar");
             step.add(bar);
-            step.add(Ui.plain(Lang.tr(STEPS[iter]), iter <= reached ? "SvStepText" : "SvMutedSmall"));
+            // A quarter of a phone is narrow for "On its way" in German; the
+            // caption wraps under its bar rather than being cut off.
+            SpanLabel caption = Ui.text(Lang.tr(STEPS[iter]), iter <= reached ? "SvStepText" : "SvStepTextTodo");
+            caption.setTextBlockAlign(Component.CENTER);
+            step.add(caption);
             row.add(step);
         }
         if (reached < 0) {
@@ -204,6 +215,13 @@ public final class TrackForm extends LiveChannel.Adapter {
         if (kitchen == null) {
             kitchen = Maps.pickup(stage.map, from);
             door = Maps.dropoff(stage.map, to);
+            // The way the food will come, from the first moment: two pins
+            // and no line between them read as a map that failed to load.
+            Routes.find(from, to, route -> {
+                if (way == null) {
+                    way = Maps.route(stage.map, route.points);
+                }
+            });
         }
         DeliveryDto delivery = order.delivery();
         boolean carried = delivery != null && order.state() == OrderState.PICKED_UP

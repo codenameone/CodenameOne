@@ -42,9 +42,12 @@ import com.codenameone.examples.savor.repository.PromoUseRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 /// What an order costs, worked out on the server from the menu as it stands:
 /// the client sends dish and option ids and quantities, never prices.
@@ -73,6 +76,7 @@ public class Quotes {
     private final PromoRepository promos;
     private final PromoUseRepository promoUses;
     private final PricingDto defaults;
+    private final TimeZone zone;
 
     public Quotes(PricingRepository prices, RestaurantRepository restaurants,
             DishRepository dishes, DishOptionRepository options, PromoRepository promos,
@@ -84,13 +88,20 @@ public class Quotes {
             @Value("${savor.fee.smallOrderFeeCents:200}") int smallOrderFeeCents,
             @Value("${savor.fee.serviceFeePercent:10}") int serviceFeePercent,
             @Value("${savor.fee.taxPercent:8}") int taxPercent,
-            @Value("${savor.fee.commissionPercent:20}") int commissionPercent) {
+            @Value("${savor.fee.commissionPercent:20}") int commissionPercent,
+            @Value("${savor.timezone:}") String timezone) {
         this.prices = prices;
         this.restaurants = restaurants;
         this.dishes = dishes;
         this.options = options;
         this.promos = promos;
         this.promoUses = promoUses;
+        // The zone the restaurants' opening hours are written in: `savor.timezone`
+        // as a zone ID ("America/New_York", "GMT+2"), or the server's own zone
+        // when it is not set. A sample with one city keeps one zone; a real
+        // platform keeps one per restaurant.
+        zone = timezone == null || timezone.trim().length() == 0 ? TimeZone.getDefault()
+                : TimeZone.getTimeZone(timezone.trim());
         defaults = new PricingDto(currency, baseCents, perKmCents, 1d, smallOrderCents,
                 smallOrderFeeCents, serviceFeePercent, taxPercent, commissionPercent);
     }
@@ -187,10 +198,18 @@ public class Quotes {
         return minuteOfDay >= from || minuteOfDay < to;
     }
 
-    /// The minute of the day now, in the server's clock. A sample with one
-    /// city keeps one time zone; a real platform keeps one per restaurant.
-    public static int minuteOfDay(long now) {
-        return (int) ((now % 86400000L) / 60000L);
+    /// The minute of the day at `now`, on the clocks of the configured
+    /// `savor.timezone`: what a restaurant's opening hours are compared with.
+    public int minuteOfDay(long now) {
+        return minuteOfDay(now, zone);
+    }
+
+    /// The minute of the day at `now` on the clocks of `zone`, daylight saving
+    /// included.
+    public static int minuteOfDay(long now, TimeZone zone) {
+        Calendar clock = Calendar.getInstance(zone);
+        clock.setTime(new Date(now));
+        return clock.get(Calendar.HOUR_OF_DAY) * 60 + clock.get(Calendar.MINUTE);
     }
 
     /// A worked-out order, kept together for [Orders] to store.

@@ -92,9 +92,14 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             menu.item(FontImage.MATERIAL_TWO_WHEELER, "Deliver with Savor", "deliver",
                     () -> Nav.switchTo(Nav.COURIER));
         }
+        // The header and the tab bar each reach into the strip the device
+        // keeps clear at their edge, padded by it, so the strip wears their
+        // colour; padding the whole screen left both strips to whatever lay
+        // behind it, and the list showed through under the tabs.
         Container screen = new Container(new BorderLayout());
-        screen.setSafeArea(true);
-        screen.add(BorderLayout.NORTH, header());
+        Container top = header();
+        top.setSafeArea(true);
+        screen.add(BorderLayout.NORTH, top);
         screen.add(BorderLayout.CENTER, body);
         Container south = new Container(BoxLayout.y());
         cart.setName("cart");
@@ -105,6 +110,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
         tab(FontImage.MATERIAL_SEARCH, "Search", "tab-search", 1);
         tab(FontImage.MATERIAL_RECEIPT_LONG, "Orders", "tab-orders", 2);
         tab(FontImage.MATERIAL_FAVORITE_BORDER, "Favorites", "tab-favorites", 3);
+        tabs.setSafeArea(true);
         south.add(tabs);
         screen.add(BorderLayout.SOUTH, south);
         form.add(screen);

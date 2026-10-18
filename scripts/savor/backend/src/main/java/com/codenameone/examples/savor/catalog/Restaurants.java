@@ -43,6 +43,7 @@ import com.codenameone.examples.savor.domain.Photo;
 import com.codenameone.examples.savor.domain.Restaurant;
 import com.codenameone.examples.savor.domain.RestaurantStaff;
 import com.codenameone.examples.savor.geo.Geo;
+import com.codenameone.examples.savor.onboarding.Applications;
 import com.codenameone.examples.savor.order.Quotes;
 import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DishOptionRepository;
@@ -66,6 +67,15 @@ public class Restaurants {
     /// A photo is kept in the database as base64, so it is kept small: the
     /// client scales it down before it uploads.
     static final int MAX_PHOTO_CHARS = 700000;
+
+    /// The most photo rows one restaurant may hold. Every upload is a new
+    /// row, so without a cap one account could grow the database without
+    /// bound; rows nothing uses are pruned first (see [#prune]).
+    static final int MAX_PHOTOS = 300;
+
+    /// How long an uploaded photo nothing uses yet is kept: the app uploads
+    /// a picture and then saves the form naming it.
+    static final long UNUSED_PHOTO_GRACE = 3600000L;
     static final int MAX_DISHES = 300;
     static final int MAX_SECTIONS = 40;
     static final int MAX_OPTIONS = 20;
@@ -508,6 +518,10 @@ public class Restaurants {
         if (bytes == null || bytes.length == 0) {
             throw new ResponseStatusException(400, "The photo is not base64");
         }
+        Applications.checkSize(bytes, type, "The photo is not a JPEG or a PNG");
+        if (prune(restaurantId) >= MAX_PHOTOS) {
+            throw new ResponseStatusException(429, "Too many photos; try again later");
+        }
         Photo row = new Photo();
         row.setId(Ids.next());
         row.setRestaurantId(restaurantId);
@@ -516,5 +530,34 @@ public class Restaurants {
         row.setCreatedAt(System.currentTimeMillis());
         photos.insert(row);
         return new PhotoDto(row.getId(), type, "");
+    }
+
+    /// Deletes the restaurant's photos that neither it nor any of its dishes
+    /// names and that are past [#UNUSED_PHOTO_GRACE], answering how many
+    /// rows remain.
+    private int prune(String restaurantId) {
+        List<String> used = new ArrayList<String>();
+        Restaurant restaurant = restaurants.findById(restaurantId);
+        if (restaurant != null) {
+            used.add(restaurant.getPhotoId());
+        }
+        List<Dish> menu = dishes.findByRestaurantIdOrderByPositionAsc(restaurantId);
+        for (int iter = 0; iter < menu.size(); iter++) {
+            used.add(menu.get(iter).getPhotoId());
+        }
+        long before = System.currentTimeMillis() - UNUSED_PHOTO_GRACE;
+        List<Object[]> stored = photos.stored(restaurantId);
+        int remaining = 0;
+        for (int iter = 0; iter < stored.size(); iter++) {
+            Object id = stored.get(iter)[0];
+            Object at = stored.get(iter)[1];
+            long createdAt = at instanceof Number ? ((Number) at).longValue() : Long.MAX_VALUE;
+            if (id instanceof String && !used.contains(id) && createdAt < before) {
+                photos.deleteById((String) id);
+            } else {
+                remaining++;
+            }
+        }
+        return remaining;
     }
 }

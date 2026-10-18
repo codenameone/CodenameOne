@@ -81,7 +81,7 @@ public class Applications {
     static final int MAX_DOCUMENT_BYTES = 1572864;
 
     /// The most pixels a document may have on a side, read from its header.
-    static final int MAX_DOCUMENT_SIDE = 4096;
+    public static final int MAX_DOCUMENT_SIDE = 4096;
 
     private static final String[] KIND_NAMES = {"a photo of your ID", "a photo of your licence",
         "a selfie", "the vehicle's registration", "proof of insurance"};
@@ -233,13 +233,7 @@ public class Applications {
         // kilobytes can declare a picture of millions of pixels, and an admin's
         // app decoding that runs out of memory: the app sends at most 1280 on
         // a side, so anything far past that is refused.
-        int[] size = "image/png".equals(type) ? pngSize(bytes) : jpegSize(bytes);
-        if (size == null || size[0] <= 0 || size[1] <= 0) {
-            throw new ResponseStatusException(400, "Send a JPEG or a PNG picture");
-        }
-        if (size[0] > MAX_DOCUMENT_SIDE || size[1] > MAX_DOCUMENT_SIDE) {
-            throw new ResponseStatusException(413, "That picture is too large");
-        }
+        checkSize(bytes, type, "Send a JPEG or a PNG picture");
         // Held before it is read. The check below says the application may
         // still be changed, and the picture is stored after it: without the
         // hold, an application handed in between the two had a document
@@ -589,6 +583,20 @@ public class Applications {
                 row.getVehicleColor(), row.getVehiclePlate(), listed,
                 row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
                 row.getReviewedBy());
+    }
+
+    /// Refuses a picture whose header declares no size, or more than
+    /// [#MAX_DOCUMENT_SIDE] pixels on a side, before anyone decodes it.
+    /// `type` is `image/png` or `image/jpeg`; `unreadable` is the message for
+    /// a header that cannot be read.
+    public static void checkSize(byte[] bytes, String type, String unreadable) {
+        int[] size = "image/png".equals(type) ? pngSize(bytes) : jpegSize(bytes);
+        if (size == null || size[0] <= 0 || size[1] <= 0) {
+            throw new ResponseStatusException(400, unreadable);
+        }
+        if (size[0] > MAX_DOCUMENT_SIDE || size[1] > MAX_DOCUMENT_SIDE) {
+            throw new ResponseStatusException(413, "That picture is too large");
+        }
     }
 
     /// Width and height from a PNG's header chunk, or null without one.

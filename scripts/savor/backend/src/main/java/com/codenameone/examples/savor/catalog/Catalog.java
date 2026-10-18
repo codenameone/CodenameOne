@@ -106,7 +106,7 @@ public class Catalog {
                 : dishMatches(box, word);
         Set<String> kept = favoriteIds(viewer);
         PricingDto pricing = quotes.pricing();
-        int minute = Quotes.minuteOfDay(System.currentTimeMillis());
+        int minute = quotes.minuteOfDay(System.currentTimeMillis());
         List<RestaurantSummaryDto> out = new ArrayList<RestaurantSummaryDto>();
         for (int iter = 0; iter < box.size(); iter++) {
             Restaurant restaurant = box.get(iter);
@@ -278,7 +278,7 @@ public class Catalog {
                 restaurant.getPrepMinutes() + (located ? Quotes.travelMinutes(meters) : 0),
                 located ? Quotes.deliveryFee(pricing, meters) : pricing.baseCents(),
                 restaurant.getMinimumCents(),
-                Quotes.open(restaurant, Quotes.minuteOfDay(System.currentTimeMillis())),
+                Quotes.open(restaurant, quotes.minuteOfDay(System.currentTimeMillis())),
                 restaurant.isPaused(), restaurant.getOpensAt(), restaurant.getClosesAt(),
                 restaurant.getPrepMinutes(), favorite, restaurant.getStatus(),
                 restaurant.getReason(), menu);
@@ -308,7 +308,7 @@ public class Catalog {
         List<Favorite> rows = favorites.findByUsernameOrderByCreatedAtDesc(viewer);
         PricingDto pricing = quotes.pricing();
         boolean located = Geo.isPoint(lat, lng);
-        int minute = Quotes.minuteOfDay(System.currentTimeMillis());
+        int minute = quotes.minuteOfDay(System.currentTimeMillis());
         List<RestaurantSummaryDto> out = new ArrayList<RestaurantSummaryDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             Restaurant restaurant = restaurants.findById(rows.get(iter).getRestaurantId());
@@ -343,6 +343,6 @@ public class Catalog {
             favorites.deleteById(key);
         }
         return summary(restaurant, 0d, quotes.pricing(),
-                Quotes.minuteOfDay(System.currentTimeMillis()), keep);
+                quotes.minuteOfDay(System.currentTimeMillis()), keep);
     }
 }

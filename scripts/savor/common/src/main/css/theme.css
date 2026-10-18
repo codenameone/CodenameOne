@@ -32,6 +32,8 @@
        A desktop draws a millimetre in far fewer pixels and is read from
        further away, so every size is a quarter larger there. */
     device-desktop-font-scale: "1.25";
+    /* A line too long for its place ends in an ellipsis, not mid-word. */
+    endsWith3PointsBool: true;
     /* Screens change quickly: nothing waits for an animation. */
     transitionSpeedInt: "200";
     /* The switch, sized from the Switch style's font. */
@@ -889,6 +891,36 @@ SvFactTotal {
     font-size: 3.3mm;
 }
 /* The one thing a screen is about, said large at its top. */
+/* A note to read in the flow of a page: see Ui.callout. */
+SvCallout {
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 2.4mm;
+    margin: 2.4mm 0 1mm 0;
+}
+SvCalloutIcon {
+    color: var(--warning);
+    background-color: transparent;
+    padding: 0.3mm 2.2mm 0 0;
+    margin: 0;
+}
+SvCalloutTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+SvCalloutText {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+}
+
 SvBanner {
     background-color: transparent;
     padding: 5mm 3mm 3mm 3mm;
@@ -1237,13 +1269,16 @@ SvSegment {
     font-family: "native:MainBold";
     font-size: 2.3mm;
     text-align: center;
-    padding: 2mm 0.2mm 2mm 0.2mm;
+    padding: 2mm 1.2mm 2mm 1.2mm;
     margin: 0.3mm;
 }
 
+/* ".selected" is the FOCUSED state in a Codename One theme, not the chosen
+   one: a chosen toggle wears ".pressed". Styled like the chosen option, the
+   focused one looked chosen too, so two options of one row seemed picked. */
 SvSegment.selected {
-    color: var(--text);
-    background-color: var(--surface);
+    color: var(--text-muted);
+    background-color: transparent;
 }
 
 /* A toggle that is on wears the pressed style, so the two say the same. */
@@ -1543,11 +1578,12 @@ SvTab.pressed { color: var(--text); }
 SvTabSelected { color: var(--brand-pressed); background-color: transparent; font-family: "native:MainBold"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
 SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
 SvSteps { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
-SvStep { padding: 0 0.6mm 0 0.6mm; margin: 0; background-color: transparent; }
-SvStepDone { padding: 0 0.6mm 0 0.6mm; margin: 0; background-color: transparent; }
-SvStepBar { background-color: var(--line); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1mm 0; }
-SvStepBarDone { background-color: var(--brand); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1mm 0; }
-SvStepText { color: var(--text); font-family: "native:MainBold"; font-size: 2.1mm; padding: 0; margin: 0; background-color: transparent; }
+SvStep { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
+SvStepDone { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
+SvStepBar { background-color: var(--line); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1.2mm 0; }
+SvStepBarDone { background-color: var(--brand); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1.2mm 0; }
+SvStepText { color: var(--text); font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
+SvStepTextTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
 SvDiscount { color: var(--success); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
 SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
 
@@ -1655,12 +1691,16 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvSection { color: var(--text-dark); }
     SvSegments { background-color: var(--surface-alt-dark); }
     SvSegment { color: var(--text-muted-dark); }
-    SvSegment.selected { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    SvSegment.selected { color: var(--text-muted-dark); background-color: transparent; }
     SvSegment.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); }
     SvList { background-color: var(--surface-dark); }
     SvFactLabel { color: var(--text-muted-dark); }
     SvFactValue { color: var(--text-dark); }
     SvFactTotal { color: var(--text-dark); }
+    SvCallout { background-color: var(--warning-tint-dark); }
+    SvCalloutIcon { color: var(--warning-dark); }
+    SvCalloutTitle { color: var(--text-dark); }
+    SvCalloutText { color: var(--text-dark); }
     SvBannerIcon { background: cn1-round-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     SvBannerIconGood { background: cn1-round-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
     SvBannerIconWarn { background: cn1-round-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }

@@ -1893,13 +1893,22 @@ public class GeneratorModel {
                     .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
         }
         if (template.isFullStack()) {
+            boolean food = template == Template.SAVOR;
+            String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append("This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
+                    .append(food
+                            ? "This project is a working food-delivery app: a customer, a restaurant, a courier "
+                            + "and an admin mode in one "
+                            : "This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append("- `backend/` is the server: accounts and roles, phone verification, driver applications, ")
-                    .append("rides, matching, payments, the live channel and the database migrations.\n")
+                    .append(food
+                            ? "- `backend/` is the server: accounts and roles, phone verification, restaurants and "
+                            + "their menus, orders, courier applications, deliveries, payments, the live channel "
+                            + "and the database migrations.\n"
+                            : "- `backend/` is the server: accounts and roles, phone verification, driver applications, "
+                            + "rides, matching, payments, the live channel and the database migrations.\n")
                     .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
                     .append("radius every screen takes its look from.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
@@ -1908,11 +1917,13 @@ public class GeneratorModel {
                     .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
                     .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
-                    .append("password `").append(toLowerCaseInvariant(appName)).append("-demo`: `rider@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, `driver@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, `admin@")
-                    .append(toLowerCaseInvariant(appName)).append(".example` and `applicant@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, who has applied to drive ")
+                    .append("password `").append(lower).append("-demo`: ")
+                    .append(food
+                            ? "`customer@" + lower + ".example`, `merchant@" + lower + ".example`, who runs the "
+                            + "first restaurant's kitchen, `courier@" + lower + ".example`, `admin@" + lower
+                            + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
+                            : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
+                            + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
                     .append("and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append("configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the ")
@@ -1923,11 +1934,15 @@ public class GeneratorModel {
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append("cover the sample this project started as: \"A ride-hailing app from three sides\" ")
-                    .append("shows it as a rider, a driver and an admin see it, and \"Building on the sample\" ")
-                    .append("explains how it is built and what to change: billing, maps and demo data, native ")
-                    .append("maps and the ")
-                    .append("database.\n\n");
+                    .append(food
+                            ? "cover the sample this project started as: \"A food-delivery app from four sides\" "
+                            + "shows it as a customer, a restaurant, a courier and an admin see it, and "
+                            + "\"Building on the sample\" explains how it is built and what to change, including "
+                            + "running it as a restaurant's own delivery service.\n\n"
+                            : "cover the sample this project started as: \"A ride-hailing app from three sides\" "
+                            + "shows it as a rider, a driver and an admin see it, and \"Building on the sample\" "
+                            + "explains how it is built and what to change: billing, maps and demo data, native "
+                            + "maps and the database.\n\n");
         }
 
         out.append("## Signing\n\n")

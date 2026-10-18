@@ -186,7 +186,7 @@ public final class Session {
     /// to two servers is two accounts, and what one left -- recent places,
     /// a change it has not sent yet -- is not the other's to see or send.
     public static String owner(String username) {
-        return storeKey(base == null ? "" : base) + "/" + username;
+        return storeKey(base == null ? "" : base) + "/" + accountName(username);
     }
 
     /// Picks up the session a previous run left, if it is still good.
@@ -250,6 +250,25 @@ public final class Session {
     }
 
     /// Signs in with an e-mail address and password.
+    /// An e-mail address the way the server names its account: trimmed, with
+    /// its ASCII letters in lower case (`Accounts.email` on the server). Signing
+    /// in as `Driver@Wayline.example` must reach, and record its mode under, the
+    /// same account as `driver@wayline.example`. Folded by hand: `toLowerCase()`
+    /// follows the device locale, and under Turkish the `I` would not fold to `i`.
+    public static String accountName(String email) {
+        if (email == null) {
+            return null;
+        }
+        char[] chars = email.trim().toCharArray();
+        for (int iter = 0; iter < chars.length; iter++) {
+            char c = chars[iter];
+            if (c >= 'A' && c <= 'Z') {
+                chars[iter] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return new String(chars);
+    }
+
     public static void signIn(String email, String password, final Runnable done,
             final Net.Failed failed) {
         // The server can be changed while the sign-in is under way, and
@@ -292,7 +311,7 @@ public final class Session {
         // signIn drops the tokens of a sign-in that outlived its server.
         // 1. The password, for a session.
         final Step login = new Step("POST", base + "/login");
-        login.addArgument("username", email);
+        login.addArgument("username", accountName(email));
         login.addArgument("password", password);
         login.send(() -> {
             if (login.status == 0) {

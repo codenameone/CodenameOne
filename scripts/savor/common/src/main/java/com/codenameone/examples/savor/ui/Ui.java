@@ -68,6 +68,7 @@ public final class Ui {
     public static Form form(String title, String name) {
         Form form = new Form(title, new BorderLayout());
         form.setUIID("SvForm");
+        form.getContentPane().setUIID("SvForm");
         form.setName(name);
         watch(form);
         clearOfTheStatusBar(form);
@@ -133,6 +134,9 @@ public final class Ui {
     public static Form home(String name) {
         Form form = new Form("", new LayeredLayout());
         form.setUIID("SvForm");
+        // The strips the device keeps clear at the top and bottom are the
+        // content pane's; the native theme would paint them its own grey.
+        form.getContentPane().setUIID("SvForm");
         form.setName(name);
         watch(form);
         form.getToolbar().hideToolbar();
@@ -424,10 +428,8 @@ public final class Ui {
     }
 
     public static Container fact(String caption, String value, String valueUiid) {
-        Container fact = new Container(new BorderLayout());
+        Container fact = new FactRow(label(caption, "SvFactLabel"), plain(value, valueUiid));
         fact.setUIID("SvFact");
-        fact.add(BorderLayout.CENTER, label(caption, "SvFactLabel"));
-        fact.add(BorderLayout.EAST, plain(value, valueUiid));
         return fact;
     }
 
@@ -449,6 +451,25 @@ public final class Ui {
             banner.add(words);
         }
         return banner;
+    }
+
+    /// Something to read before acting on what follows -- a customer's note
+    /// for the kitchen: an icon, a bold title and the words, in a tinted box
+    /// in the flow of the page. [#banner] is for a screen with nothing else
+    /// on it, and is far too loud between two sections.
+    public static Container callout(char icon, String title, String text) {
+        Container box = new Container(new BorderLayout());
+        box.setUIID("SvCallout");
+        Label image = new Label("", "SvCalloutIcon");
+        icon(image, icon, 3.6f);
+        box.add(BorderLayout.WEST, FlowLayout.encloseIn(image));
+        Container words = new Container(BoxLayout.y());
+        words.add(label(title, "SvCalloutTitle"));
+        if (text != null && text.length() > 0) {
+            words.add(text(text, "SvCalloutText"));
+        }
+        box.add(BorderLayout.CENTER, words);
+        return box;
     }
 
     public static Container empty(char icon, String title, String text) {
@@ -710,7 +731,7 @@ public final class Ui {
             return "Courier at pickup";
         }
         if (DeliveryState.IN_PROGRESS == state) {
-            return "On the trip";
+            return "On its way";
         }
         if (DeliveryState.COMPLETED == state) {
             return "Completed";

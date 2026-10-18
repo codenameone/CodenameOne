@@ -17,14 +17,14 @@ accounts and restaurants and simulates the cards, the kitchens and a courier:
 
 [source,bash]
 ----
-CN1_PROFILE=dev backend/server.sh run
+include::../demos/common/src/main/snippets/developer-guide/savor.sh[tag=savor-sh-server,indent=0]
 ----
 
 Then run the app in the simulator, from the project's directory:
 
 [source,bash]
 ----
-mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+include::../demos/common/src/main/snippets/developer-guide/savor.sh[tag=savor-sh-simulator,indent=0]
 ----
 
 `backend/server.sh run --web` builds the app for a browser as well and serves it at
@@ -237,10 +237,7 @@ simulated courier stands aside while a real one is online.
 
 [source,bash]
 ----
-mvn -pl shared,backend -Dcodename1.platform=backend test
-mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true
-./run-e2e.sh
-./run-web-e2e.sh
+include::../demos/common/src/main/snippets/developer-guide/savor.sh[tag=savor-sh-tests,indent=0]
 ----
 
 The backend tests run the server on the JVM and then compiled, against the order

@@ -21,6 +21,10 @@ package com.codenameone.examples.savor.account;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.api.OrderState;
+import com.codenameone.examples.savor.catalog.Catalog;
+import com.codenameone.examples.savor.domain.Restaurant;
+import com.codenameone.examples.savor.domain.RestaurantStaff;
+import com.codenameone.examples.savor.repository.RestaurantRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 import com.codenameone.examples.savor.repository.SavedAddressRepository;
 import com.codenameone.examples.savor.repository.FavoriteRepository;
@@ -34,6 +38,8 @@ import com.codenameone.examples.savor.repository.PreferenceRepository;
 import com.codenameone.examples.savor.repository.PushDeviceRepository;
 import com.codenameone.examples.savor.repository.DeliveryActivityRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
+
+import java.util.List;
 
 /// What closing or restricting an account does to the rows other parts of the
 /// server keep under its name.
@@ -69,6 +75,7 @@ public class AccountCleanup {
     private final FavoriteRepository favorites;
     private final SavedAddressRepository addresses;
     private final RestaurantStaffRepository staff;
+    private final RestaurantRepository restaurants;
 
     public AccountCleanup(DeliveryRepository deliveries, CourierStateRepository couriers,
             CourierHoursRepository hours, PreferenceRepository preferences,
@@ -76,7 +83,8 @@ public class AccountCleanup {
             LiveTicketRepository tickets, PushDeviceRepository pushDevices,
             DeliveryActivityRepository activities, CustomerOrderRepository orders,
             FavoriteRepository favorites, SavedAddressRepository addresses,
-            RestaurantStaffRepository staff) {
+            RestaurantStaffRepository staff, RestaurantRepository restaurants) {
+        this.restaurants = restaurants;
         this.deliveries = deliveries;
         this.couriers = couriers;
         this.hours = hours;
@@ -123,6 +131,23 @@ public class AccountCleanup {
         couriers.takeOffLine(username);
     }
 
+    /// True when the account is the only staff of an approved restaurant:
+    /// closing it would leave the restaurant listed and taking orders with
+    /// nobody to cook them, so the closure is refused until an admin adds
+    /// somebody else or the restaurant is no longer approved.
+    public boolean soleMerchantOfListed(String username) {
+        List<RestaurantStaff> mine = staff.findByUsername(username);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            String restaurantId = mine.get(iter).getRestaurantId();
+            Restaurant restaurant = restaurants.findById(restaurantId);
+            if (restaurant != null && Catalog.APPROVED.equals(restaurant.getStatus())
+                    && staff.findByRestaurantId(restaurantId).size() < 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Deletes what an account leaves in the tables that are keyed by it and
     /// belong to nobody's `forget`: its preferences, where it is paid, the
     /// hours it drove, its place on the map, a code it was texted, the
@@ -140,7 +165,8 @@ public class AccountCleanup {
         favorites.deleteByUsername(username);
         addresses.deleteByUsername(username);
         // A merchant's restaurant stays listed, as its orders and its menu do;
-        // an admin hands it to somebody else from the restaurants pane.
+        // an admin hands it to somebody else from the restaurants pane. Only
+        // while somebody else still works there: see [#soleMerchantOfListed].
         staff.deleteByUsername(username);
     }
 }

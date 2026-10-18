@@ -125,7 +125,7 @@ public final class AdminDeliveriesForm {
         page.add(FlowLayout.encloseCenter(state));
         page.add(FlowLayout.encloseCenter(Ui.plain(Ui.when(delivery.requestedAt()), "SvMuted")));
 
-        Ui.section(page, "Trip");
+        Ui.section(page, "Route");
         page.add(Ui.row(FontImage.MATERIAL_TRIP_ORIGIN, delivery.pickupAddress(), null, null));
         page.add(Ui.row(FontImage.MATERIAL_PLACE, delivery.dropoffAddress(),
                 Ui.distance(delivery.distanceMeters()) + Ui.DOT + Ui.minutes(delivery.durationSeconds()),

@@ -369,17 +369,20 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
 
     /// The card at the top: online or off, and what today has made.
     private void header() {
-        Container card = new Container(new BorderLayout());
+        // Two rows: the badge and the day's takings, then what they came from
+        // on a line of its own. Side by side the three did not fit the card at
+        // a large font, and the figures were pushed back over the badge.
+        Container card = new Container(BoxLayout.y());
         card.setUIID("SvStatusCard");
-        card.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
+        Container top = new Container(new BorderLayout());
+        top.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
                 Ui.badge(online ? "Online" : "Offline", online ? "SvBadgeGood" : "SvBadge")));
+        card.add(top);
         if (earnings != null) {
-            Container today = new Container(BoxLayout.y());
-            today.add(Ui.label(Ui.money(earnings.todayCents(), earnings.currency()),
+            top.add(BorderLayout.CENTER, Ui.label(Ui.money(earnings.todayCents(), earnings.currency()),
                     "SvStatusValue"));
-            today.add(Ui.label(Lang.tr("Today, {0} deliveries", String.valueOf(earnings.todayDeliveries())),
+            card.add(Ui.label(Lang.tr("Today, {0} deliveries", String.valueOf(earnings.todayDeliveries())),
                     "SvStatusDetail"));
-            card.add(BorderLayout.EAST, today);
         }
         stage.header(card);
     }

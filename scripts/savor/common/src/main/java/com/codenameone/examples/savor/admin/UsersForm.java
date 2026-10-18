@@ -207,7 +207,7 @@ public final class UsersForm {
                 "userRating");
         page.add(numbers);
         StatRow money = Ui.stats(2);
-        money.stat(Ui.money(detail.spent(), null), "Spent riding", "userSpent");
+        money.stat(Ui.money(detail.spent(), null), "Spent on orders", "userSpent");
         money.stat(Ui.money(detail.earned(), null), "Earned delivering", "userEarned");
         page.add(money);
 
@@ -323,7 +323,7 @@ public final class UsersForm {
     private static String action(String action) {
         return "block".equals(action) ? "Blocked" : "unblock".equals(action) ? "Unblocked"
                 : "flag".equals(action) ? "Flagged" : "unflag".equals(action) ? "Flag removed"
-                : "approve".equals(action) ? "Approved to drive" : "reject".equals(action)
+                : "approve".equals(action) ? "Approved to deliver" : "reject".equals(action)
                 ? "Application sent back" : "Roles changed";
     }
 

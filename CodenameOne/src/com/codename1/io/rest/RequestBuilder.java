@@ -799,10 +799,10 @@ public class RequestBuilder {
     /// `process-annotations` mojo from the `@Mapped` annotation and lives
     /// in `<basePackage>.generated.<Class>Mapper`.
     ///
-    /// If the type has no registered mapper at runtime, the listener
-    /// completes with `null` data and a non-200 response code is *not*
-    /// synthesised -- inspect `response.getResponseCode()` to differentiate
-    /// "server returned an error" from "no mapper registered".
+    /// If the type has no registered mapper at runtime the request fails: the
+    /// `#onError(com.codename1.ui.events.ActionListener)` listeners receive the
+    /// `IllegalStateException`, or, when none is registered, the callback
+    /// completes with response code -1, `null` data and the exception's message.
     ///
     /// #### Parameters
     ///
@@ -814,7 +814,7 @@ public class RequestBuilder {
     /// the Connection Request object so it can be killed if necessary
     public <T> ConnectionRequest fetchAsMapped(final Class<T> type, final OnComplete<Response<T>> callback) {
         final Connection request = createRequest(true);
-        request.addResponseListener(new FetchAsMappedActionListener<T>(request, type, callback));
+        request.addResponseListener(new FetchAsMappedActionListener<T>(request, type, callback, errorCallbacks));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -847,7 +847,7 @@ public class RequestBuilder {
     /// the Connection Request object so it can be killed if necessary
     public <T> ConnectionRequest fetchAsMappedList(final Class<T> type, final OnComplete<Response<List<T>>> callback) {
         final Connection request = createRequest(true);
-        request.addResponseListener(new FetchAsMappedListActionListener<T>(request, type, callback));
+        request.addResponseListener(new FetchAsMappedListActionListener<T>(request, type, callback, errorCallbacks));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -1357,11 +1357,14 @@ public class RequestBuilder {
         private final Connection request;
         private final Class<T> type;
         private final OnComplete<Response<T>> callback;
+        private final List<ActionListener<NetworkEvent>> errorListeners;
 
-        public FetchAsMappedActionListener(Connection request, Class<T> type, OnComplete<Response<T>> callback) {
+        public FetchAsMappedActionListener(Connection request, Class<T> type, OnComplete<Response<T>> callback,
+                List<ActionListener<NetworkEvent>> errorListeners) {
             this.request = request;
             this.type = type;
             this.callback = callback;
+            this.errorListeners = new ArrayList<ActionListener<NetworkEvent>>(errorListeners);
         }
 
         @Override
@@ -1373,10 +1376,38 @@ public class RequestBuilder {
             Map<String, Object> parsed = (Map<String, Object>) evt.getMetaData();
             T result = null;
             if (parsed != null) {
-                result = com.codename1.mapping.Mappers.require(type).fromMap(parsed);
+                com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
+                if (m == null) {
+                    return;
+                }
+                result = m.fromMap(parsed);
             }
             Response<T> res = new Response<T>(evt.getResponseCode(), result, evt.getMessage());
             callback.completed(res);
+        }
+    }
+
+    /// Looks up the mapper for `type`. A missing one is a programming error,
+    /// but thrown from a response listener it would only reach the network
+    /// thread's log while the caller waited forever, so it is delivered as a
+    /// failure instead: to the error listeners when there are any, otherwise
+    /// as a completed response with code -1 and `null` data. Answers `null`
+    /// once the failure has been delivered.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> com.codename1.mapping.Mapper<T> requireMapper(Connection request, Class<T> type,
+            List<ActionListener<NetworkEvent>> errorListeners, OnComplete callback) {
+        try {
+            return com.codename1.mapping.Mappers.require(type);
+        } catch (IllegalStateException err) {
+            if (errorListeners.isEmpty()) {
+                callback.completed(new Response(-1, null, err.getMessage()));
+            } else {
+                NetworkEvent evt = new NetworkEvent(request, err);
+                for (ActionListener<NetworkEvent> l : errorListeners) {
+                    l.actionPerformed(evt);
+                }
+            }
+            return null;
         }
     }
 
@@ -1387,11 +1418,14 @@ public class RequestBuilder {
         private final Connection request;
         private final Class<T> type;
         private final OnComplete<Response<List<T>>> callback;
+        private final List<ActionListener<NetworkEvent>> errorListeners;
 
-        public FetchAsMappedListActionListener(Connection request, Class<T> type, OnComplete<Response<List<T>>> callback) {
+        public FetchAsMappedListActionListener(Connection request, Class<T> type, OnComplete<Response<List<T>>> callback,
+                List<ActionListener<NetworkEvent>> errorListeners) {
             this.request = request;
             this.type = type;
             this.callback = callback;
+            this.errorListeners = new ArrayList<ActionListener<NetworkEvent>>(errorListeners);
         }
 
         @Override
@@ -1409,8 +1443,10 @@ public class RequestBuilder {
             if (raw == null) {
                 out = java.util.Collections.emptyList();
             } else {
-                com.codename1.mapping.Mapper<T> m =
-                        com.codename1.mapping.Mappers.require(type);
+                com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
+                if (m == null) {
+                    return;
+                }
                 out = new ArrayList<T>(raw.size());
                 for (Object e : raw) {
                     if (e instanceof Map) {

@@ -74,6 +74,8 @@ public final class CheckoutForm {
         page.add(Ui.row(FontImage.MATERIAL_PLACE, to == null ? Lang.tr("Current location") : to,
                 null, null));
         note.setName("note");
+        note.setUIID("SvField");
+        note.getHintLabel().setUIID("SvFieldHint");
         page.add(note);
 
         Ui.section(page, Lang.tr("Payment"));
@@ -87,6 +89,8 @@ public final class CheckoutForm {
         Ui.section(page, Lang.tr("Promo"));
         Container promoRow = new Container(new BorderLayout());
         promo.setName("promo");
+        promo.setUIID("SvField");
+        promo.getHintLabel().setUIID("SvFieldHint");
         promoRow.add(BorderLayout.CENTER, promo);
         promoRow.add(BorderLayout.EAST, Ui.link("Apply", "apply-promo", e -> {
             promoCode = promo.getText().trim().length() == 0 ? null : promo.getText().trim();
