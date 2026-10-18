@@ -1550,6 +1550,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, table, (String) column[0],
                 "Unmapped NOT NULL column without a default " + table + "." + column[0]));
     }
+    /// The values an element of `elementType` stores, for the value column
+    /// of an element collection (every integral element is stored as BIGINT).
+    /// Boolean stores 0 and 1, Character its code unit.
     private static long minimum(Attribute attr, Attribute element, Class elementType) {
         if (element != null && attr.column.equals(element.column)) {
             if (elementType == Byte.class) {
@@ -1561,10 +1564,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (elementType == Integer.class) {
                 return Integer.MIN_VALUE;
             }
+            if (elementType == Boolean.class || elementType == Character.class) {
+                return 0;
+            }
         }
         return attr.kind == Attribute.INTEGER ? Integer.MIN_VALUE : Long.MIN_VALUE;
     }
     private static long maximum(Attribute attr, Attribute element, Class elementType) {
+        if (element != null && attr.column.equals(element.column)) {
+            if (elementType == Boolean.class) {
+                return 1;
+            }
+            if (elementType == Character.class) {
+                return 65535;
+            }
+        }
         return -(minimum(attr, element, elementType) + 1);
     }
     /// Whether a text column pads to a fixed width -- CHAR, NCHAR, PostgreSQL's

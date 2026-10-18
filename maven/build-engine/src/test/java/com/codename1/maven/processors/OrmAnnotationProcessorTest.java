@@ -334,6 +334,8 @@ public class OrmAnnotationProcessorTest {
                     {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL, note TEXT NOT NULL DEFAULT ((NULL)))","startup_visit.note"},
                     {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY DESC, happened BIGINT, hits BIGINT NOT NULL)","The database does not generate startup_visit.id"},
                     {"CREATE TABLE startup_visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL) WITHOUT ROWID","The database does not generate startup_visit.id"},
+                    // SQLite resolves names without case, so the definition is found anyway.
+                    {"CREATE TABLE Startup_Visit (id INTEGER PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL) WITHOUT ROWID","The database does not generate startup_visit.id"},
                     // A key that is not the rowid holds NULL unless it says NOT NULL.
                     {"CREATE TABLE startup_visit (id BIGINT PRIMARY KEY, happened BIGINT, hits BIGINT NOT NULL)","Missing NOT NULL on startup_visit.id"}}) {
                 schema(path,c[0]);

@@ -57,7 +57,7 @@ public final class SessionSqlAccess implements SqlAccess {
         List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0],
                 new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
                         Attribute.INTEGER});
-        List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
                 new Object[] {table}, new int[] {Attribute.TEXT});
         String keyIndex = SessionImpl.sqlitePrimaryKeyIndex(query("PRAGMA index_list(" + quote(table) + ")",
                 new Object[0], new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
