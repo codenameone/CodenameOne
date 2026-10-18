@@ -1196,17 +1196,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // would be rejected or coerced. DATETIME is what the mapping needs.
             return false;
         }
-        if (family == 1 && attr.declaredType != null && typeFamily(attr.declaredType) == 1) {
-            // An explicit @Column type is the limit the developer chose; the
-            // column has to be that type, not cover the whole Java range.
-            if (integerWidth(found) != integerWidth(attr.declaredType)
-                    || (asciiLower(found).indexOf("unsigned") >= 0)
-                    != (asciiLower(attr.declaredType).indexOf("unsigned") >= 0)) {
-                return false;
-            }
-        } else if (family == 1 && (attr.kind == Attribute.INTEGER || attr.kind == Attribute.BIGINT)
-                && !integerFits(found, attr.kind, model.minimumIntegralValue(index),
-                        model.maximumIntegralValue(index))) {
+        if (family == 1 && !integralCompatible(found, attr, model.minimumIntegralValue(index),
+                model.maximumIntegralValue(index))) {
+            return false;
+        }
+        if (family == 3 && attr.kind == Attribute.REAL && !model.singlePrecision(index) && singleFloat(found)) {
+            // A double rounds to float precision, or overflows, in a REAL or
+            // FLOAT column.
             return false;
         }
         if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && family == 5
@@ -1514,9 +1510,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
             int family = typeFamily((String) found[1]);
-            boolean fits = family != 1 || attr.kind != Attribute.INTEGER && attr.kind != Attribute.BIGINT
-                    || integerFits((String) found[1], attr.kind, minimum(attr, element, elementType),
-                    maximum(attr, element, elementType));
+            boolean fits = (family != 1 || integralCompatible((String) found[1], attr,
+                    minimum(attr, element, elementType), maximum(attr, element, elementType)))
+                    && (family != 3 || attr.kind != Attribute.REAL || elementType == Float.class
+                    && element != null && attr.column.equals(element.column) || !singleFloat((String) found[1]));
             if (family != typeFamily(type) || !fits || family == 2 && textCapacity((String) found[1])
                     < (attr.id && attr.declaredType == null ? Math.min(255, textCapacity(type)) : textCapacity(type))) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -1786,6 +1783,49 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// and an int over a 64-bit column cannot load what is already there. An
     /// unsigned column fits only a range without negatives (Boolean,
     /// Character), and a 64-bit one holds more than a long.
+    /// Whether an integer column holds the attribute: an explicit @Column type
+    /// is the limit the developer chose, so the column has to be that type
+    /// rather than cover the whole Java range. SQLite stores every integer in
+    /// up to 8 bytes whatever the declaration says.
+    private boolean integralCompatible(String found, Attribute attr, long minimum, long maximum) {
+        if ("sqlite".equals(sql.dialect())) {
+            return true;
+        }
+        if (attr.declaredType != null && typeFamily(attr.declaredType) == 1) {
+            return integerWidth(found) == integerWidth(attr.declaredType)
+                    && (asciiLower(found).indexOf("unsigned") >= 0)
+                    == (asciiLower(attr.declaredType).indexOf("unsigned") >= 0);
+        }
+        return attr.kind != Attribute.INTEGER && attr.kind != Attribute.BIGINT
+                || integerFits(found, attr.kind, minimum, maximum);
+    }
+    /// Whether a floating column keeps only single precision: PostgreSQL's
+    /// REAL, FLOAT4 and FLOAT(1..24), and MySQL's FLOAT unless its precision
+    /// is above 24. SQLite's REAL is always 8 bytes.
+    private boolean singleFloat(String type) {
+        String token = firstTypeToken(type);
+        int open = type.indexOf('(');
+        int precision = -1;
+        if (open >= 0) {
+            int close = type.indexOf(')', open);
+            String digits = (close < 0 ? type.substring(open + 1) : type.substring(open + 1, close)).trim();
+            int comma = digits.indexOf(',');
+            try {
+                precision = Integer.parseInt(comma < 0 ? digits : digits.substring(0, comma).trim());
+            } catch (NumberFormatException e) {
+                precision = -1;
+            }
+        }
+        if ("postgresql".equals(sql.dialect())) {
+            return "real".equals(token) || "float4".equals(token)
+                    || "float".equals(token) && precision >= 1 && precision <= 24;
+        }
+        if ("mysql".equals(sql.dialect())) {
+            // FLOAT(M,D) is single precision whatever M is.
+            return "float".equals(token) && (precision < 0 || precision <= 24 || type.indexOf(',') >= 0);
+        }
+        return false;
+    }
     private boolean integerFits(String found, int kind, long minimum, long maximum) {
         if ("sqlite".equals(sql.dialect())) {
             return true;
@@ -1902,6 +1942,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
         return tokens.length == 0 ? "" : tokens[0];
     }
+    private static boolean sqliteIntegerWord(String name) {
+        String[] tokens = split(name.replace('(', ' ').replace(')', ' '), ' ');
+        for (String token : tokens) {
+            if (token.startsWith("int")) {
+                boolean digits = true;
+                for (int i = 3; i < token.length(); i++) {
+                    char c = token.charAt(i);
+                    if (c < '0' || c > '9') {
+                        digits = false;
+                    }
+                }
+                if (digits) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     private int typeFamily(String type) {
         String name = asciiLower(type);
         String token = firstTypeToken(type);
@@ -1909,6 +1967,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return 6;
         }
         if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
+            return 1;
+        }
+        if ("sqlite".equals(sql.dialect()) && sqliteIntegerWord(name)) {
+            // SQLite gives INTEGER affinity to a declaration containing INT, so
+            // INT64 or UNSIGNED BIG INT store the full long range. INTERVAL and
+            // POINT contain it too but name other types, so only a word that
+            // is INT or INT plus digits counts; the named widths are above.
             return 1;
         }
         if (name.indexOf("char") >= 0 || name.indexOf("text") >= 0 || name.indexOf("clob") >= 0) {
