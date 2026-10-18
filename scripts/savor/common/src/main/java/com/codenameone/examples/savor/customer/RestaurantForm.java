@@ -105,7 +105,7 @@ public final class RestaurantForm implements Cart.Listener {
                     Lang.tr("Open {0} to {1}", hour(found.opensAt()), hour(found.closesAt())),
                     "SvBannerIcon"));
         } else if (found.minimumCents() > 0) {
-            page.add(Ui.plain(Lang.tr("Orders under {0} pay a small-order fee",
+            page.add(Ui.plain(Lang.tr("Orders start at {0}",
                     Ui.money(found.minimumCents(), null)), "SvMutedSmall"));
         }
         Container chips = new Container(BoxLayout.x());

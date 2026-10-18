@@ -46,6 +46,16 @@ public interface RestaurantRepository extends CrudRepository<Restaurant, String>
 
     long countByStatus(String status);
 
+    /// Makes the rest of the transaction wait behind any other that is
+    /// changing the restaurant -- pausing it, suspending it, its hours -- as
+    /// [ProfileRepository#hold] does for an account. Read the restaurant after
+    /// it, not before.
+    ///
+    /// @return 1, or 0 when there is no such restaurant
+    @Modifying
+    @Query("update Restaurant r set r.updatedAt = r.updatedAt where r.id = :id")
+    int hold(@Param("id") String id);
+
     /// Adds a rating to a restaurant's running total, in the database.
     @Modifying
     @Query("update Restaurant r set r.ratingTotal = r.ratingTotal + :stars, "

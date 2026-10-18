@@ -262,7 +262,10 @@ public class DemoOrders {
                 delivery.setDropoffAddress(String.valueOf(DOORS[door][0]));
                 delivery.setFareCents(fee);
                 delivery.setFeeCents(fee);
-                delivery.setTipCents(tip);
+                // As Deliveries.dispatch writes it: the checkout tip is the
+                // order's, and the delivery's own tip is one added after it
+                // arrived -- a receipt adds that one on top.
+                delivery.setTipCents(0L);
                 delivery.setCourierCents(fee + tip);
                 delivery.setCurrency(pricing.currency());
                 delivery.setDistanceMeters(meters);

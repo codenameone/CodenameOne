@@ -65,7 +65,7 @@ final class StoreForm {
         final TextField prep = Ui.field(page, "Usual time to cook, in minutes", "store-prep", "15");
         prep.setConstraint(TextArea.NUMERIC);
         prep.setText(String.valueOf(restaurant.prepMinutes()));
-        final TextField minimum = Ui.field(page, "Smallest order without a surcharge",
+        final TextField minimum = Ui.field(page, "Smallest order",
                 "store-minimum", "10.00");
         minimum.setConstraint(TextArea.DECIMAL);
         minimum.setText(MenuEditor.DishEditor.amount(restaurant.minimumCents()));

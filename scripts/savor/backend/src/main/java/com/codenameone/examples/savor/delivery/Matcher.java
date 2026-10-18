@@ -20,8 +20,11 @@ package com.codenameone.examples.savor.delivery;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.backend.security.GrantedAuthority;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
+import com.codename1.backend.security.core.userdetails.UserDetails;
 import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
+import com.codenameone.examples.savor.Roles;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.domain.CourierApplication;
 import com.codenameone.examples.savor.domain.CourierState;
@@ -196,6 +199,25 @@ public class Matcher {
     boolean enabled(String username) {
         try {
             return users.loadUserByUsername(username).isEnabled();
+        } catch (UsernameNotFoundException gone) {
+            return false;
+        }
+    }
+
+    /// Whether the account exists, is not blocked and still has the courier's
+    /// role, read once as [#enabled] is.
+    boolean mayDeliver(String username) {
+        try {
+            UserDetails user = users.loadUserByUsername(username);
+            if (!user.isEnabled()) {
+                return false;
+            }
+            for (GrantedAuthority authority : user.getAuthorities()) {
+                if (("ROLE_" + Roles.COURIER).equals(authority.getAuthority())) {
+                    return true;
+                }
+            }
+            return false;
         } catch (UsernameNotFoundException gone) {
             return false;
         }

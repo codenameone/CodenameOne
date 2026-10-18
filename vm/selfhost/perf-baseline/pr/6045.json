@@ -1,0 +1,25 @@
+{
+ "pr": 6045,
+ "rebaseline": {
+  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.277,
+      "time": 1.107,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 0.752,
+     "reason": "Master's change lowered hello's RAM on every Windows runner; x64's row was folded on master, this arm64 row was not.",
+     "runs": 1,
+     "time": 1.107,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  }
+ }
+}

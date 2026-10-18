@@ -234,20 +234,26 @@ public class Restaurants {
             throw new ResponseStatusException(409, Catalog.APPROVED.equals(restaurant.getStatus())
                     ? "That restaurant is already listed" : "Only an application can be approved");
         }
+        // Listed without its applicant, it would take orders nobody can see.
+        // The profile is held so a closure cannot land between this and the
+        // staff row below.
+        String applicant = restaurant.getApplicant();
+        if (applicant == null || applicant.length() == 0 || profiles.hold(applicant) == 0
+                || !accounts.exists(applicant)) {
+            throw new ResponseStatusException(409,
+                    "The applicant closed their account; turn the application down instead");
+        }
         restaurant.setStatus(Catalog.APPROVED);
         restaurant.setReason("");
         restaurant.setUpdatedAt(System.currentTimeMillis());
-        String applicant = restaurant.getApplicant();
-        if (applicant != null && applicant.length() > 0 && accounts.exists(applicant)) {
-            if (!staff.existsById(Identifier.of(restaurant.getId(), applicant))) {
-                RestaurantStaff row = new RestaurantStaff();
-                row.setRestaurantId(restaurant.getId());
-                row.setUsername(applicant);
-                staff.insert(row);
-            }
-            accounts.setMerchant(applicant, true);
-            moderation.record(applicant, by, "restaurant_approved", restaurant.getName());
+        if (!staff.existsById(Identifier.of(restaurant.getId(), applicant))) {
+            RestaurantStaff row = new RestaurantStaff();
+            row.setRestaurantId(restaurant.getId());
+            row.setUsername(applicant);
+            staff.insert(row);
         }
+        accounts.setMerchant(applicant, true);
+        moderation.record(applicant, by, "restaurant_approved", restaurant.getName());
         return catalog.detail(restaurant, null, 0d, 0d, true);
     }
 

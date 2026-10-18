@@ -24,6 +24,8 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
+import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
+import com.codename1.backend.security.core.userdetails.UsernameNotFoundException;
 import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.session.Identifier;
 import com.codename1.orm.session.PersistenceException;
@@ -84,6 +86,7 @@ public class Orders {
     private final Payments payments;
     private final Moderation moderation;
     private final OrderNews news;
+    private final JdbcUserDetailsManager users;
     private final long answerMillis;
 
     /// @param answerSeconds how long a kitchen has to accept an order before
@@ -92,7 +95,7 @@ public class Orders {
             RestaurantRepository restaurants, RestaurantStaffRepository staff,
             PromoUseRepository promoUses, ProfileRepository profiles, Quotes quotes,
             OrderEvents events, Deliveries deliveries, Payments payments, OrderNews news,
-            Moderation moderation,
+            Moderation moderation, JdbcUserDetailsManager users,
             @Value("${savor.kitchen.answerSeconds:300}") int answerSeconds) {
         this.orders = orders;
         this.lines = lines;
@@ -106,7 +109,16 @@ public class Orders {
         this.payments = payments;
         this.moderation = moderation;
         this.news = news;
+        this.users = users;
         answerMillis = answerSeconds * 1000L;
+    }
+
+    private boolean enabled(String username) {
+        try {
+            return users.loadUserByUsername(username).isEnabled();
+        } catch (UsernameNotFoundException gone) {
+            return false;
+        }
     }
 
     // -------------------------------------------------------------- customer
@@ -155,6 +167,20 @@ public class Orders {
         // Held first, so two orders placed at once count each other and not
         // just what had committed before either began.
         profiles.hold(customer);
+        // The card was held with no transaction open, and that can take a
+        // while: the account may have been blocked, or the restaurant paused
+        // or suspended, since the checks before it. Asked again under the
+        // locks those changes take, a refusal here lets the hold go.
+        if (!enabled(customer)) {
+            throw new ResponseStatusException(403, "This account is blocked");
+        }
+        Restaurant restaurant = restaurants.hold(priced.restaurant.getId()) == 0 ? null
+                : restaurants.findById(priced.restaurant.getId());
+        if (restaurant == null
+                || !Quotes.open(restaurant, quotes.minuteOfDay(System.currentTimeMillis()))) {
+            throw new ResponseStatusException(409, priced.restaurant.getName()
+                    + " is not taking orders right now");
+        }
         if (orders.countByCustomerAndStateIn(customer, ACTIVE) >= MAX_ACTIVE) {
             throw new ResponseStatusException(409, "You already have " + MAX_ACTIVE
                     + " orders on the way");
@@ -308,7 +334,7 @@ public class Orders {
     }
 
     /// The customer's stars for a delivered order, once; they count toward
-    /// the restaurant's rating.
+    /// the restaurant's rating and its courier's.
     public OrderDto rate(String customer, String id, int stars) throws IOException {
         if (stars < 1 || stars > 5) {
             throw new ResponseStatusException(400, "Give between one and five stars");
@@ -327,6 +353,7 @@ public class Orders {
             throw new ResponseStatusException(409, "That order is already rated");
         }
         restaurants.addRating(order.getRestaurantId(), stars);
+        deliveries.rate(id, customer, stars);
         return null;
     }
 

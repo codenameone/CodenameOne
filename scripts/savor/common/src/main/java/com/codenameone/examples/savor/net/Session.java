@@ -35,6 +35,7 @@ import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.savor.AppConfig;
 import com.codenameone.examples.savor.Prefs;
 import com.codenameone.examples.savor.api.UserDto;
+import com.codenameone.examples.savor.customer.Cart;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -93,7 +94,7 @@ public final class Session {
             }
         }
         base = baseUrl;
-        user = null;
+        setUser(null);
         session++;
         client = OidcClient.create(OidcConfiguration.newBuilder()
                         .issuer(base)
@@ -115,7 +116,7 @@ public final class Session {
         // switch that already asked for one, and nothing of either account is
         // exposed by it.
         authorizer.addSignInRequiredListener((source, reason) -> {
-            user = null;
+            setUser(null);
             session++;
             if (onSignedOut != null) {
                 onSignedOut.run();
@@ -168,7 +169,14 @@ public final class Session {
     }
 
     public static void setUser(UserDto described) {
+        String before = owner();
         user = described;
+        String after = owner();
+        if (before == null ? after != null : !before.equals(after)) {
+            // Signed out, expired, another account or another server: the
+            // cart was picked by whoever was here before.
+            Cart.clear();
+        }
         if (described != null && described.username() != null) {
             // What the device keeps about one person is not the next one's.
             Prefs.ownedBy(owner(described.username()));
@@ -395,7 +403,7 @@ public final class Session {
             // trap the user signed in on a phone with no connection.
             client.revoke(tokens.getRefreshToken());
         }
-        user = null;
+        setUser(null);
         session++;
         authorizer.signOut().ready(new SuccessCallback<Boolean>() {
             @Override

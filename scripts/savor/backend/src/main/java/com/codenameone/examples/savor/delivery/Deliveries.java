@@ -185,6 +185,19 @@ public class Deliveries {
     }
     // end::savor-dispatch[]
 
+    /// The customer's stars for the order, given to its courier too: inside
+    /// the transaction that rates the order. An order that had no courier --
+    /// or whose delivery is already rated -- changes nothing here.
+    public void rate(String id, String customer, int stars) {
+        if (deliveries.rate(id, customer, stars) == 1) {
+            Delivery delivery = find(id);
+            if (delivery != null && delivery.getCourier() != null
+                    && delivery.getCourier().length() > 0) {
+                couriers.addRating(delivery.getCourier(), stars);
+            }
+        }
+    }
+
     /// Ends the delivery of an order an admin cancelled, inside that
     /// transaction, and answers what changed for [#told], or null when the
     /// order had no delivery under way.
@@ -369,10 +382,11 @@ public class Deliveries {
             // allowed: a block that committed meanwhile is seen here, and a
             // block that comes after this commits sees the accepted delivery.
             // Either way no delivery is left with a courier who can no longer
-            // carry it.
+            // carry it. Withdrawing the courier's role holds the same row and
+            // is asked the same way.
             profiles.hold(courier);
-            if (!matcher.enabled(courier)) {
-                throw new ResponseStatusException(403, "This account has been blocked");
+            if (!matcher.mayDeliver(courier)) {
+                throw new ResponseStatusException(403, "This account can no longer deliver");
             }
         }
         owned(id, COURIER, courier);

@@ -34,6 +34,7 @@ import com.codenameone.examples.savor.order.Orders;
 import com.codenameone.examples.savor.order.Quotes;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -135,6 +136,33 @@ class MerchantGuardsTest {
         restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, true, "Closing down");
         db.execute("DELETE FROM restaurant_staff WHERE restaurant_id = ?", new Object[] {kitchen.id});
         assertEquals(409, statusOf(() -> restaurants.approve(DemoAccounts.ADMIN, kitchen.id)));
+    }
+
+    @Test
+    void anApplicationWhoseApplicantIsGoneIsNotListed() throws Exception {
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3185, 174.8082);
+        // What an applicant closing their account leaves: an application
+        // that names nobody who is still here.
+        db.execute("UPDATE restaurant SET status = ?, applicant = ? WHERE id = ?",
+                new Object[] {Catalog.PENDING, "gone@savor.example", kitchen.id});
+        db.execute("DELETE FROM restaurant_staff WHERE restaurant_id = ?", new Object[] {kitchen.id});
+        assertEquals(409, statusOf(() -> restaurants.approve(DemoAccounts.ADMIN, kitchen.id)));
+    }
+
+    @Test
+    void aRatingCountsForTheCourierToo() throws Exception {
+        String customer = People.customer(accounts, "wlg-rating-customer");
+        String courier = People.courier(accounts, "wlg-rating-courier");
+        Trips.Trip trip = Trips.trip(-41.3275, 174.8172, -41.3210, 174.8210);
+        Trips.online(mvc, courier, trip.fromLat, trip.fromLng);
+        String id = (String) Trips.complete(mvc, customer, courier, trip).get("id");
+        orders.rate(customer, id, 4);
+        Map row = db.queryOne("SELECT rating_count AS n, rating_sum AS s FROM courier_state "
+                + "WHERE username = ?", new Object[] {courier});
+        assertEquals(1L, ((Number) row.get("n")).longValue());
+        assertEquals(4L, ((Number) row.get("s")).longValue());
+        assertEquals(4L, ((Number) db.queryOne("SELECT stars FROM delivery WHERE id = ?",
+                new Object[] {id}).get("stars")).longValue());
     }
 
     @Test
