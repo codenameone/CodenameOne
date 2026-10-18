@@ -2824,6 +2824,18 @@
         "url": "https://medium.com/@Codename_One/easy-full-stack-authentication-and-login-in-the-style-of-spring-3d5e67f33fbb?postPublishedType=initial",
         "syndicated_at": "2026-10-17T19:00:31+00:00"
       }
+    },
+    "database-upgrades-without-lost-data": {
+      "hashnode": {
+        "url": "https://debugagent.com/update-db-schema-in-production-with-flyway-like-syntax",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad40c115fa01d385796a751",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-18T00:01:13+00:00"
+      }
     }
   }
 }
