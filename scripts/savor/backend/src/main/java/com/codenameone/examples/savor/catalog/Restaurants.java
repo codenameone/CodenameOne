@@ -171,7 +171,12 @@ public class Restaurants {
     /// A photo for the application waiting for review, which becomes its cover.
     @Transactional
     public PhotoDto applicationPhoto(String username, PhotoDto photo) throws IOException {
-        Restaurant last = restaurants.findFirstByApplicantOrderByCreatedAtDesc(username);
+        Restaurant found = restaurants.findFirstByApplicantOrderByCreatedAtDesc(username);
+        // Held and read again: an approval or a rejection that lands meanwhile
+        // is seen here, and one that comes after waits for this photo, so a
+        // listed restaurant never shows a cover nobody reviewed.
+        Restaurant last = found == null || restaurants.hold(found.getId()) == 0 ? null
+                : restaurants.findById(found.getId());
         if (last == null || !Catalog.PENDING.equals(last.getStatus())) {
             throw new ResponseStatusException(409, "Apply first");
         }
@@ -227,6 +232,9 @@ public class Restaurants {
     /// applicant joins its staff with the merchant role.
     @Transactional(rollbackFor = IOException.class)
     public RestaurantDto approve(String by, String id) throws IOException {
+        // Held before it is read, as an application photo holds it: the two
+        // take turns, so what is approved is what the admin last saw.
+        moderated(id);
         Restaurant restaurant = existing(id);
         // Only an application: a suspended restaurant comes back through
         // suspend(), which checks it still has staff to take its orders.
@@ -242,6 +250,11 @@ public class Restaurants {
                 || !accounts.exists(applicant)) {
             throw new ResponseStatusException(409,
                     "The applicant closed their account; turn the application down instead");
+        }
+        if (!accounts.enabled(applicant)) {
+            // Blocked: listed, it would take orders its merchant cannot see.
+            throw new ResponseStatusException(409,
+                    "The applicant is blocked; unblock them or turn the application down");
         }
         restaurant.setStatus(Catalog.APPROVED);
         restaurant.setReason("");
@@ -259,6 +272,9 @@ public class Restaurants {
 
     @Transactional
     public RestaurantDto reject(String by, String id, String reason) throws IOException {
+        // Held before it is read, as an application photo holds it: the two
+        // take turns, so what is approved is what the admin last saw.
+        moderated(id);
         Restaurant restaurant = existing(id);
         if (!Catalog.PENDING.equals(restaurant.getStatus())) {
             throw new ResponseStatusException(409, "Only an application can be turned down");
@@ -290,6 +306,12 @@ public class Restaurants {
         restaurant.setReason(suspended ? Text.required(reason, 255, "why it is suspended") : "");
         restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, null, 0d, 0d, true);
+    }
+
+    private void moderated(String id) {
+        if (id != null && id.length() <= 32) {
+            restaurants.hold(id);
+        }
     }
 
     private Restaurant existing(String id) {

@@ -341,10 +341,19 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             results.removeAll();
             results.add(new Skeleton(3));
             results.revalidate();
-            Api.catalog().restaurants(to.getLatitude(), to.getLongitude(), null, query, sort,
-                    Net.to(found -> fill(results, found,
-                            Lang.tr("Nothing matches \"{0}\"", query)),
-                            Ui.failed(results, null)));
+            // An answer for an earlier term that arrives late is dropped: the
+            // results are always for what is in the field.
+            final String asked = query;
+            Api.catalog().restaurants(to.getLatitude(), to.getLongitude(), null, asked, sort,
+                    Net.to(found -> {
+                        if (asked.equals(query)) {
+                            fill(results, found, Lang.tr("Nothing matches \"{0}\"", asked));
+                        }
+                    }, (status, message) -> {
+                        if (asked.equals(query)) {
+                            Ui.failed(results, null).failed(status, message);
+                        }
+                    }));
         };
         field.setDoneListener(e -> run.run());
         field.addDataChangedListener((type, index) -> UITimer.timer(400, false, form, () -> {

@@ -109,9 +109,9 @@ public interface CustomerOrderRepository extends CrudRepository<CustomerOrder, S
     int rate(@Param("id") String id, @Param("customer") String customer,
             @Param("stars") int stars, @Param("now") long now);
 
-    /// The orders placed since `since`, counted by restaurant: `{name, count}`.
-    @Query("select o.restaurantName, count(o) from CustomerOrder o where o.placedAt >= :since "
-            + "group by o.restaurantName")
+    /// The orders placed since `since`, counted by restaurant: `{id, count}`.
+    @Query("select o.restaurantId, count(o) from CustomerOrder o where o.placedAt >= :since "
+            + "group by o.restaurantId")
     List<Object[]> countByRestaurant(@Param("since") long since);
 
     long countByPlacedAtGreaterThanEqual(long since);

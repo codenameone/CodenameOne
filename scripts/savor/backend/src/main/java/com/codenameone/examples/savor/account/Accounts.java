@@ -195,6 +195,15 @@ public class Accounts {
         return users.userExists(username);
     }
 
+    /// Whether the account exists and has not been blocked, read once.
+    public boolean enabled(String username) {
+        try {
+            return users.loadUserByUsername(username).isEnabled();
+        } catch (UsernameNotFoundException gone) {
+            return false;
+        }
+    }
+
     /// The account as the app sees it. Answers 404 for a name with no account.
     @Transactional(readOnly = true)
     public UserDto describe(String username) throws IOException {

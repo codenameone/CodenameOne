@@ -160,6 +160,17 @@ class MerchantGuardsTest {
     }
 
     @Test
+    void anApplicationOfABlockedApplicantIsNotListed() throws Exception {
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3205, 174.8102);
+        String applicant = People.customer(accounts, "wlg-blocked-applicant");
+        accounts.suspend(DemoAccounts.ADMIN, applicant, true, "Testing");
+        db.execute("UPDATE restaurant SET status = ?, applicant = ? WHERE id = ?",
+                new Object[] {Catalog.PENDING, applicant, kitchen.id});
+        db.execute("DELETE FROM restaurant_staff WHERE restaurant_id = ?", new Object[] {kitchen.id});
+        assertEquals(409, statusOf(() -> restaurants.approve(DemoAccounts.ADMIN, kitchen.id)));
+    }
+
+    @Test
     void aRatingCountsForTheCourierToo() throws Exception {
         String customer = People.customer(accounts, "wlg-rating-customer");
         String courier = People.courier(accounts, "wlg-rating-courier");

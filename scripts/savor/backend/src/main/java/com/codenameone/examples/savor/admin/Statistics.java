@@ -34,6 +34,7 @@ import com.codenameone.examples.savor.api.StatsSeriesDto;
 import com.codenameone.examples.savor.api.UserDetailDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.domain.CourierState;
+import com.codenameone.examples.savor.domain.Restaurant;
 import com.codenameone.examples.savor.courier.Couriers;
 import com.codenameone.examples.savor.courier.Earnings;
 import com.codenameone.examples.savor.onboarding.Applications;
@@ -42,6 +43,7 @@ import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DeliveryEventRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
+import com.codenameone.examples.savor.repository.RestaurantRepository;
 import com.codenameone.examples.savor.order.Quotes;
 import com.codenameone.examples.savor.delivery.Matcher;
 
@@ -84,13 +86,15 @@ public class Statistics {
     private final Quotes fares;
     private final Applications applications;
     private final Earnings earnings;
+    private final RestaurantRepository restaurants;
 
     public Statistics(ProfileRepository profiles, CourierStateRepository cars,
             DeliveryRepository deliveries, CustomerOrderRepository orders,
             DeliveryEventRepository events, Accounts accounts,
             Couriers couriers, Moderation moderation, Quotes fares, Applications applications,
-            Earnings earnings) {
+            Earnings earnings, RestaurantRepository restaurants) {
         this.earnings = earnings;
+        this.restaurants = restaurants;
         this.profiles = profiles;
         this.cars = cars;
         this.deliveries = deliveries;
@@ -201,8 +205,11 @@ public class Statistics {
         List<NameCountDto> byRestaurant = new ArrayList<NameCountDto>();
         List<Object[]> kitchens = orders.countByRestaurant(since);
         for (int iter = 0; iter < kitchens.size(); iter++) {
-            byRestaurant.add(new NameCountDto(Rows.text(kitchens.get(iter)[0]),
-                    (int) whole(kitchens.get(iter)[1])));
+            // Counted by id, and named as the restaurant is called now: two
+            // kitchens may share a name, and one may have been renamed.
+            Restaurant kitchen = restaurants.findById(Rows.text(kitchens.get(iter)[0]));
+            byRestaurant.add(new NameCountDto(kitchen == null ? Rows.text(kitchens.get(iter)[0])
+                    : kitchen.getName(), (int) whole(kitchens.get(iter)[1])));
         }
         Collections.sort(byRestaurant, (a, b) -> Integer.compare(b.count(), a.count()));
         // Tested before dividing, and not left to an exception: dividing a
