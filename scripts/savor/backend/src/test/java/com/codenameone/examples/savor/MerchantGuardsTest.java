@@ -130,6 +130,14 @@ class MerchantGuardsTest {
     }
 
     @Test
+    void aSuspendedRestaurantIsNotListedThroughApproval() throws Exception {
+        Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.3175, 174.8072);
+        restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, true, "Closing down");
+        db.execute("DELETE FROM restaurant_staff WHERE restaurant_id = ?", new Object[] {kitchen.id});
+        assertEquals(409, statusOf(() -> restaurants.approve(DemoAccounts.ADMIN, kitchen.id)));
+    }
+
+    @Test
     void refundedOrdersAreNotCountedAsSales() throws Exception {
         String customer = People.customer(accounts, "wlg-sales-customer");
         String courier = People.courier(accounts, "wlg-sales-courier");

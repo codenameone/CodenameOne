@@ -104,13 +104,13 @@ public class AdminDesktopTest extends E2e {
         // and there is no drawer to open.
         until(() -> has("nav-applications"), 20000, "the places down the side");
         assertFalse(has("menu-open"), "a wide console has a drawer");
-        until(() -> findByName("chartDeliveries") != null && has("alert-applications"), 20000,
-                "the dashboard to be filled in");
+        until(() -> findByName("chartOrders") != null, 20000, "the dashboard's charts");
+        until(() -> has("alert-applications"), 20000, "the dashboard to say one is waiting");
         // The numbers are one row, and the charts side by side.
         // Waited for: the charts are added when their numbers arrive, and are
         // laid out on the turn of the event thread after that.
-        until(() -> sameRow("deliveriesToday", "revenue"), 10000, "the four numbers to be in one row");
-        until(() -> sameRow("chartDeliveries", "chartRevenue"), 10000, "the charts to be side by side");
+        until(() -> sameRow("ordersToday", "revenue"), 10000, "the four numbers to be in one row");
+        until(() -> sameRow("chartOrders", "chartRevenue"), 10000, "the charts to be side by side");
         shot("admin-desktop-dashboard");
 
         // An application opens beside the list it was picked from.
@@ -162,7 +162,7 @@ public class AdminDesktopTest extends E2e {
                 "the prices");
         shot("admin-desktop-pricing");
         click("nav-home");
-        until(() -> findByName("chartDeliveries") != null, 20000, "the dashboard again");
+        until(() -> findByName("chartOrders") != null, 20000, "the dashboard again");
 
         // A window dragged narrow is laid out as the phone's console, with
         // its drawer, and dragged wide again is this one.
@@ -172,7 +172,7 @@ public class AdminDesktopTest extends E2e {
         window(WIDE, HEIGHT);
         until(() -> has("nav-applications") && !has("menu-open"), 20000,
                 "a wide window to be laid out side by side again");
-        until(() -> findByName("chartDeliveries") != null, 20000, "the dashboard, wide again");
+        until(() -> findByName("chartOrders") != null, 20000, "the dashboard, wide again");
 
         // The map takes the whole window, and comes back to the console.
         click("nav-fleet");

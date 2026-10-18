@@ -51,6 +51,7 @@ import com.codenameone.examples.savor.repository.DishOptionRepository;
 import com.codenameone.examples.savor.repository.DishRepository;
 import com.codenameone.examples.savor.repository.MenuSectionRepository;
 import com.codenameone.examples.savor.repository.PhotoRepository;
+import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 import com.codenameone.examples.savor.Days;
@@ -92,11 +93,13 @@ public class Restaurants {
     private final Accounts accounts;
     private final Moderation moderation;
     private final Quotes quotes;
+    private final ProfileRepository profiles;
 
     public Restaurants(RestaurantRepository restaurants, RestaurantStaffRepository staff,
             MenuSectionRepository sections, DishRepository dishes, DishOptionRepository options,
             PhotoRepository photos, CustomerOrderRepository orders, Catalog catalog,
-            Accounts accounts, Moderation moderation, Quotes quotes) {
+            Accounts accounts, Moderation moderation, Quotes quotes,
+            ProfileRepository profiles) {
         this.restaurants = restaurants;
         this.staff = staff;
         this.sections = sections;
@@ -108,6 +111,7 @@ public class Restaurants {
         this.accounts = accounts;
         this.moderation = moderation;
         this.quotes = quotes;
+        this.profiles = profiles;
     }
 
     /// The restaurant `username` works for; 403 when none.
@@ -130,6 +134,10 @@ public class Restaurants {
     /// merchant role. One application at a time per account.
     @Transactional
     public RestaurantDto apply(String username, RestaurantEditDto form) throws IOException {
+        // Two submissions at once would both find no application below and
+        // both insert one; holding the profile first makes the second wait
+        // and then see the first.
+        profiles.hold(username);
         Restaurant last = restaurants.findFirstByApplicantOrderByCreatedAtDesc(username);
         if (last != null && !Catalog.REJECTED.equals(last.getStatus())) {
             throw new ResponseStatusException(409, Catalog.PENDING.equals(last.getStatus())
@@ -220,8 +228,11 @@ public class Restaurants {
     @Transactional(rollbackFor = IOException.class)
     public RestaurantDto approve(String by, String id) throws IOException {
         Restaurant restaurant = existing(id);
-        if (Catalog.APPROVED.equals(restaurant.getStatus())) {
-            throw new ResponseStatusException(409, "That restaurant is already listed");
+        // Only an application: a suspended restaurant comes back through
+        // suspend(), which checks it still has staff to take its orders.
+        if (!Catalog.PENDING.equals(restaurant.getStatus())) {
+            throw new ResponseStatusException(409, Catalog.APPROVED.equals(restaurant.getStatus())
+                    ? "That restaurant is already listed" : "Only an application can be approved");
         }
         restaurant.setStatus(Catalog.APPROVED);
         restaurant.setReason("");

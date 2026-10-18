@@ -77,8 +77,8 @@ courier carries, and each has its own states:
   `IN_PROGRESS` to the door, `COMPLETED`; or cancelled, or `NO_COURIERS`
 |===
 
-The delivery is Wayline's ride, almost unchanged: the pickup is the restaurant and
-the drop-off is the door. Keeping it that way let the whole courier side -- offers,
+The delivery is Wayline's ride, almost unchanged: it picks up at the restaurant and
+drops off at the door. Keeping it that way let the whole courier side -- offers,
 shifts, the moving marker, earnings, the guards on two answers at once -- come
 across without being rewritten.
 

@@ -235,6 +235,13 @@ public abstract class E2e extends AbstractTest {
         while (!check.ok()) {
             if (System.currentTimeMillis() > deadline) {
                 Form current = Display.getInstance().getCurrent();
+                // What the screen showed, beside the captures: a timeout on CI
+                // is otherwise only its message.
+                try {
+                    capture("timed-out-" + (current == null ? "no-form" : current.getName()));
+                } catch (java.io.IOException err) {
+                    log("Could not capture the timeout: " + err);
+                }
                 throw new RuntimeException("Timed out waiting for " + what + " (on "
                         + (current == null ? "no form" : current.getName()) + ")");
             }
@@ -413,23 +420,35 @@ public abstract class E2e extends AbstractTest {
     /// when it is far off, and a capture fails only when a twentieth of it is.
     /// Text is drawn a little differently from one machine to the next, and
     /// this is here to notice a screen that changed, not a glyph.
+    /// Saves the screen as `name`.png in the captures, and answers it; null
+    /// when the run keeps no captures.
+    private Image capture(String name) throws java.io.IOException {
+        String out = fileUrl(System.getProperty("savor.shots.dir"));
+        if (out == null) {
+            return null;
+        }
+        final Image[] captured = new Image[1];
+        onEdt(() -> captured[0] = Display.getInstance().captureScreen());
+        FileSystemStorage files = FileSystemStorage.getInstance();
+        files.mkdir(out);
+        OutputStream png = files.openOutputStream(out + "/" + name + ".png");
+        try {
+            ImageIO.getImageIO().save(captured[0], png, ImageIO.FORMAT_PNG, 1f);
+        } finally {
+            png.close();
+        }
+        return captured[0];
+    }
+
     protected void shot(String name) {
         String out = fileUrl(System.getProperty("savor.shots.dir"));
         if (out == null) {
             return;
         }
         settle();
-        final Image[] captured = new Image[1];
-        onEdt(() -> captured[0] = Display.getInstance().captureScreen());
         FileSystemStorage files = FileSystemStorage.getInstance();
         try {
-            files.mkdir(out);
-            OutputStream png = files.openOutputStream(out + "/" + name + ".png");
-            try {
-                ImageIO.getImageIO().save(captured[0], png, ImageIO.FORMAT_PNG, 1f);
-            } finally {
-                png.close();
-            }
+            Image[] captured = {capture(name)};
             String goldens = fileUrl(System.getProperty("savor.goldens.dir"));
             String golden = goldens == null ? "" : goldens + "/" + name + ".png";
             if (golden.length() == 0 || !files.exists(golden)) {
