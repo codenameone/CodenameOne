@@ -1404,6 +1404,9 @@ public class DecimalFormat extends NumberFormat {
     }
 
     public void setGroupingSize(int newValue) {
+        // A negative size disables grouping, as JDK 8 through 18 accept it
+        // without complaint; the IllegalArgumentException is a JDK 19 change
+        // and the conformance run compares against JDK 8.
         groupingSize = Math.max(0, newValue);
     }
 

@@ -90,6 +90,58 @@ public final class LangMembersChecks {
             Bulk.p("en_US", java.util.Locale.forLanguageTag("en_US").toLanguageTag());
             Bulk.p("en-US", java.util.Locale.forLanguageTag("en-US").toLanguageTag());
         });
+        Bulk.check("Lang.illFormedLocalePartsLeaveTheTag", () -> {
+            Bulk.p("a-US", new java.util.Locale("a", "US").toLanguageTag());
+            Bulk.p("en-USA", new java.util.Locale("en", "USA").toLanguageTag());
+            Bulk.p("en-419", new java.util.Locale("en", "419").toLanguageTag());
+        });
+        Bulk.check("Lang.aQueryKeepsItsLaterQuestionMarks", () -> {
+            try {
+                java.net.URI u = new java.net.URI("http://h/p?a?b");
+                Bulk.p("path", u.getPath());
+                Bulk.p("query", u.getQuery());
+            } catch (java.net.URISyntaxException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.nullArgumentsAreRefused", () -> {
+            try {
+                new String(new byte[] {65}, (String) null);
+                Bulk.p("newString", "accepted");
+            } catch (Exception e) {
+                Bulk.p("newString", e.getClass().getName());
+            }
+            try {
+                "A".getBytes((String) null);
+                Bulk.p("getBytes", "accepted");
+            } catch (Exception e) {
+                Bulk.p("getBytes", e.getClass().getName());
+            }
+            try {
+                java.time.Clock.fixed(null, java.time.ZoneOffset.UTC);
+                Bulk.p("clockInstant", "accepted");
+            } catch (Exception e) {
+                Bulk.p("clockInstant", e.getClass().getName());
+            }
+            try {
+                java.time.Clock.fixed(java.time.Instant.EPOCH, null);
+                Bulk.p("clockZone", "accepted");
+            } catch (Exception e) {
+                Bulk.p("clockZone", e.getClass().getName());
+            }
+            try {
+                new java.security.SecureRandom((byte[]) null);
+                Bulk.p("seedCtor", "accepted");
+            } catch (Exception e) {
+                Bulk.p("seedCtor", e.getClass().getName());
+            }
+            try {
+                new java.security.SecureRandom().setSeed((byte[]) null);
+                Bulk.p("setSeed", "accepted");
+            } catch (Exception e) {
+                Bulk.p("setSeed", e.getClass().getName());
+            }
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

@@ -697,7 +697,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     
     /// The name the encoding natives know `enc` by: the canonical name of a
     /// charset, so an alias or another case reaches them as the name they
-    /// compare with. `null` stays `null`, which they read as UTF-8.
+    /// compare with. A `null` name throws `NullPointerException`, as the JDK
+    /// does; the natives would have read it as UTF-8 and hidden the mistake.
     ///
     /// UTF-16 and ISO-8859-2 have no `Charset` here but the natives encode them
     /// on Apple platforms, so they are names this runtime knows.
@@ -708,7 +709,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     ///   encoding for, as the JDK throws. The natives used to encode such a
     ///   name as UTF-8 without a word.
     private static String knownEncoding(String enc) throws java.io.UnsupportedEncodingException {
-        if (enc == null || "UTF-8".equals(enc)) {
+        if (enc == null) {
+            throw new NullPointerException("charsetName");
+        }
+        if ("UTF-8".equals(enc)) {
             return enc;
         }
         if (enc.equalsIgnoreCase("UTF-16") || enc.equalsIgnoreCase("UTF16")) {
@@ -1612,6 +1616,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /// The lines of the string, without their terminators: a line feed, a
     /// carriage return, or the two together. A terminator at the very end
     /// starts no empty last line.
+    ///
+    /// The lines are split eagerly, as `CharSequence.chars` is: a lazy
+    /// spliterator would cost more than it saves on the strings an
+    /// application holds, and `lines` is not used to scan huge text here.
     public java.util.stream.Stream<String> lines() {
         return splitLines().stream();
     }

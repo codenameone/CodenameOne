@@ -43,6 +43,9 @@ public class SecureRandom extends Random {
     /// The seed is ignored; see the class description.
     public SecureRandom(byte[] seed) {
         super(0);
+        if (seed == null) {
+            throw new NullPointerException();
+        }
     }
 
     /// The platform's generator, which never blocks.
@@ -57,6 +60,9 @@ public class SecureRandom extends Random {
 
     /// Ignored: see the class description.
     public void setSeed(byte[] seed) {
+        if (seed == null) {
+            throw new NullPointerException();
+        }
     }
 
     public void nextBytes(byte[] bytes) {

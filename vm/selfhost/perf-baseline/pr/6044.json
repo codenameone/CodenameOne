@@ -40,6 +40,28 @@
      }
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-173-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.747,
+      "time": 1.212,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.517,
+     "reason": "Java API additions: windows-x64 hello RAM measured lower on a21e00013b",
+     "runs": 1,
+     "time": 1.212,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
   }
  }
 }

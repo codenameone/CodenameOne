@@ -51,6 +51,9 @@ public abstract class Clock {
     }
 
     public static Clock fixed(Instant fixedInstant, ZoneId zone) {
+        if (fixedInstant == null || zone == null) {
+            throw new NullPointerException();
+        }
         return new FixedClock(fixedInstant, zone);
     }
 

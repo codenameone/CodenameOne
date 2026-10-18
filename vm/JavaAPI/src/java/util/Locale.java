@@ -255,8 +255,12 @@ public class Locale {
     /// root.
     public String toLanguageTag() {
         StringBuilder out = new StringBuilder();
-        out.append(language.length() == 0 ? "und" : language);
-        if (country.length() > 0) {
+        // An ill-formed language or region (the constructors take anything)
+        // is left out of the tag, as the JDK does: "und" for the language,
+        // nothing for the region.
+        boolean wellFormedLanguage = language.length() >= 2 && language.length() <= 8 && isLetters(language);
+        out.append(wellFormedLanguage ? language : "und");
+        if (country.length() == 2 && isLetters(country) || country.length() == 3 && isDigits(country)) {
             out.append('-').append(country);
         }
         if (variant.length() > 0) {

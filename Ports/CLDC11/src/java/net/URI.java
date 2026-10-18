@@ -454,7 +454,7 @@ public class URI {
 		int index;
 		String s = ssp;
 
-		if ((index = s.lastIndexOf(QUERY_MARKER)) != -1) {
+		if ((index = s.indexOf(QUERY_MARKER)) != -1) {
 			setQuery(s.substring(index + 1), encode);
 			s = s.substring(0, index);
 		} else if (getQuerySeparator() == SOCKET_QUERY_SEPARATOR && (index = s.indexOf(SOCKET_QUERY_SEPARATOR)) != -1) {
