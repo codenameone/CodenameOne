@@ -487,10 +487,10 @@ public class CSSThemeCompilerTest extends UITestBase {
         new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} :root{--accent:#00ff00;}"
                 + "Label{color:var(--accent);}", resource, "Theme");
         assertEquals("#00ff00", resource.getTheme("Theme").get("@accent"));
-        // A constant declared after the rule that uses it is still seen by that rule.
-        resource = new MutableResource();
-        new CSSThemeCompiler().compile("Label{color:var(--late);} #Constants{late:#0000ff;}", resource, "Theme");
-        assertEquals("0000ff", resource.getTheme("Theme").get("Label.fgColor"));
+        // A constant declared after the rule that uses it is not seen by that rule: the build-time
+        // parser resolves var() in source order, #Constants blocks included.
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("Label{color:var(--late);} #Constants{--late:#0000ff;}", new MutableResource(), "Theme"));
     }
 
     @Test
@@ -619,7 +619,8 @@ public class CSSThemeCompilerTest extends UITestBase {
                 resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("0000ff", theme.get("@accent"));
-        assertEquals("0000ff", theme.get("Label.fgColor"));
+        // The rule sits between the two blocks, so it sees the first value.
+        assertEquals("ff0000", theme.get("Label.fgColor"));
         // A :root property takes effect where it is declared, as in the build-time parser.
         assertEquals("ff0000", theme.get("Button.bgColor"));
         assertEquals("#00ff00", theme.get("@bg"));
@@ -843,6 +844,17 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("0000ff", String.valueOf(theme.get("@accent")).toLowerCase());
         assertEquals("00ff00", String.valueOf(theme.get("@early")).toLowerCase());
         assertEquals("#abc", theme.get("@litAlias"));
+    }
+
+    @Test
+    public void testVarFallbackIsUsedForAnUndefinedVariable() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{accentColor:var(--missing, #f00);--set:#00f;"
+                + "setColor:var(--set, #f00);} Label{color:var(--nope, rgb(0, 255, 0));}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", String.valueOf(theme.get("@accentColor")).toLowerCase());
+        assertEquals("0000ff", String.valueOf(theme.get("@setColor")).toLowerCase());
+        assertEquals("00ff00", String.valueOf(theme.get("Label.fgColor")).toLowerCase());
     }
 
     private static String fontName(Font font) {

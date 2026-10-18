@@ -6831,6 +6831,13 @@ public class CSSTheme {
                                 ttfSizeType = TTF_SIZE_TYPE_LARGE;
                                 sysSize = Font.SIZE_LARGE;
                                 break outer;
+                            case "medium":
+                                // Without this case `medium` fell through to the pixel branch
+                                // and stored a zero-size font.
+                                iFontSizeType = Font.SIZE_MEDIUM;
+                                ttfSizeType = TTF_SIZE_TYPE_MEDIUM;
+                                sysSize = Font.SIZE_MEDIUM;
+                                break outer;
                                 
                         }
                     }

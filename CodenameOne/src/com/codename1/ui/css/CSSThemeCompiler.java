@@ -122,36 +122,25 @@ public class CSSThemeCompiler {
         Hashtable<String, String> deferred = new Hashtable<String, String>();
         deferredConstants = deferred;
         literalTokens = new Hashtable<String, String>();
-        // #Constants entries first, wherever their block sits, so every rule sees their final
-        // values -- the build-time compiler reads that block before it compiles any rule.
-        Hashtable<String, Declaration> finalConstants = new Hashtable<String, Declaration>();
+        // Everything in source order, #Constants blocks included: the build-time parser resolves
+        // var() in each declaration as it reads it, and a `--name` inside #Constants enters its
+        // variable map only when that block is reached. A rule above the block does not see it.
+        // The legacy `@constants` block is this compiler's own syntax, which the build-time
+        // compiler does not read; it has always been applied before every rule, so a rule may
+        // use it from above.
         for (Rule rule : rules) {
-            if (rule.constants) {
+            if (rule.legacyConstants) {
                 compileConstants(rule.declarations, theme, deferred);
-                for (Declaration declaration : rule.declarations) {
-                    Declaration previous = finalConstants.put(declaration.name, declaration);
-                    if (previous != null) {
-                        previous.winner = false;
-                    }
-                    declaration.winner = true;
-                }
             }
         }
-        // Then source order. A `:root` or in-rule custom property takes effect where it is
-        // declared, as the build-time parser's callbacks do: a rule above it does not see it.
-        // Only the winning declaration of a #Constants name is applied again here, so it still
-        // overrides a custom property declared before it.
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
         ownerDerives = new Hashtable<String, String>();
         for (Rule rule : rules) {
+            if (rule.legacyConstants) {
+                continue;
+            }
             if (rule.constants) {
-                ArrayList<Declaration> winners = new ArrayList<Declaration>();
-                for (Declaration declaration : rule.declarations) {
-                    if (declaration.winner) {
-                        winners.add(declaration);
-                    }
-                }
-                compileConstants(winners.toArray(new Declaration[winners.size()]), theme, deferred);
+                compileConstants(rule.declarations, theme, deferred);
                 continue;
             }
             applyRule(theme, resources, rule, fonts, deferred);
@@ -192,11 +181,11 @@ public class CSSThemeCompiler {
             String target = key;
             while (value instanceof String && !seen.contains(target)) {
                 seen.add(target);
-                String v = ((String) value).trim();
-                if (!v.startsWith("var(--") || v.indexOf(')') != v.length() - 1) {
+                String next = aliasTarget((String) value);
+                if (next == null) {
                     break;
                 }
-                target = "@" + v.substring("var(--".length(), v.length() - 1).trim();
+                target = next;
                 // Across separate compile() calls the theme keeps only final values, and a quoted
                 // "#abc" is stored exactly like an unquoted #abc custom property, so whether an
                 // earlier value was quoted is not recoverable from it. Compiling the stylesheet
@@ -372,11 +361,13 @@ public class CSSThemeCompiler {
                                                   Hashtable<String, String> deferred) {
         int at = value.indexOf("var(--");
         while (at > -1) {
-            int end = value.indexOf(')', at);
+            int end = closingParen(value, at + "var(".length());
             if (end < 0) {
                 return false;
             }
-            String target = "@" + value.substring(at + "var(--".length(), end).trim();
+            String inner = value.substring(at + "var(--".length(), end);
+            int comma = topLevelComma(inner);
+            String target = "@" + (comma < 0 ? inner : inner.substring(0, comma)).trim();
             String kind = deferred.get(target);
             Object current = theme.get(target);
             // Its own name is never settled: that is a cycle, reported when it is resolved.
@@ -389,13 +380,15 @@ public class CSSThemeCompiler {
         return true;
     }
 
-    /// `@x` for a value that is exactly `var(--x)`, else null.
+    /// `@x` for a value that is exactly `var(--x)` or `var(--x, fallback)`, else null.
     private static String aliasTarget(String value) {
         String v = value.trim();
-        if (!v.startsWith("var(--") || v.indexOf(')') != v.length() - 1) {
+        if (!v.startsWith("var(--") || closingParen(v, "var(".length()) != v.length() - 1) {
             return null;
         }
-        return "@" + v.substring("var(--".length(), v.length() - 1).trim();
+        String inner = v.substring("var(--".length(), v.length() - 1);
+        int comma = topLevelComma(inner);
+        return "@" + (comma < 0 ? inner : inner.substring(0, comma)).trim();
     }
 
     /// UIManager.getThemeImageConstant casts an image constant to Image, and on iOS that cast is
@@ -1091,15 +1084,26 @@ public class CSSThemeCompiler {
         StringBuilder out = new StringBuilder();
         int pos = 0;
         while (varPos > -1) {
-            int end = value.indexOf(')', varPos);
+            int end = closingParen(value, varPos + "var(".length());
             if (end < 0) {
                 break;
             }
-            String key = value.substring(varPos + "var(--".length(), end).trim();
+            // `var(--name, fallback)`: the build-time compiler takes the fallback when the
+            // variable is not defined.
+            String inner = value.substring(varPos + "var(--".length(), end);
+            int comma = topLevelComma(inner);
+            String key = (comma < 0 ? inner : inner.substring(0, comma)).trim();
+            String fallback = comma < 0 ? null : inner.substring(comma + 1).trim();
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
             }
             Object replacement = theme.get("@" + key);
+            if (replacement == null && fallback != null) {
+                out.append(value.substring(pos, varPos)).append(resolveVars(theme, fallback, resolving, tokens));
+                pos = end + 1;
+                varPos = value.indexOf("var(--", pos);
+                continue;
+            }
             String replaceValue = replacement == null ? "" : replacement.toString();
             String token = tokens ? literalTokens.get("@" + key) : null;
             if (token != null) {
@@ -1120,6 +1124,58 @@ public class CSSThemeCompiler {
         }
         out.append(value.substring(pos));
         return out.toString();
+    }
+
+    /// The index of the `)` closing the parenthesis opened just before `from`, skipping nested
+    /// parentheses and quoted text; -1 when it is not closed.
+    private static int closingParen(String value, int from) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = from; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                if (depth == 0) {
+                    return i;
+                }
+                depth--;
+            }
+        }
+        return -1;
+    }
+
+    /// The first comma outside parentheses and quotes, or -1.
+    private static int topLevelComma(String value) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private String[] selector(String selector) {
@@ -1394,6 +1450,7 @@ public class CSSThemeCompiler {
                 Rule constants = new Rule();
                 constants.selector = selectors;
                 constants.constants = true;
+                constants.legacyConstants = selectors.startsWith("@");
                 constants.declarations = parseDeclarations(css.substring(open + 1, close));
                 out.add(constants);
                 pos = close + 1;
@@ -1659,6 +1716,8 @@ public class CSSThemeCompiler {
         String selector;
         Declaration[] declarations;
         boolean constants;
+        /// An `@constants` block rather than `#Constants`.
+        boolean legacyConstants;
     }
 
     private static class Declaration {
@@ -1667,11 +1726,9 @@ public class CSSThemeCompiler {
         /// The lower case name ordinary CSS properties are matched by.
         String property;
         String value;
-        /// The last declaration of its name across every #Constants block.
-        boolean winner;
         /// A #Constants alias resolved where it was declared, and how to type it (an alias of
         /// text is final text, so it is typed like the quoted constant itself); null when it
-        /// names something declared later and is resolved against the final values instead.
+        /// names something not declared yet and is resolved against the final values instead.
         String snapshot;
         String snapshotKind;
     }
