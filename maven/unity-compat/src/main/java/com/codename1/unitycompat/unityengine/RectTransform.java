@@ -116,7 +116,10 @@ public final class RectTransform extends Transform {
     /// `#$rect` before the extent is made positive: the parent's width is
     /// recovered by dividing by its scale, which takes the signed one.
     private void signedRect(float canvasWidth, float canvasHeight, float[] out) {
-        boolean root = gameObject.GetComponent(Canvas.class) != null || !(parent instanceof RectTransform);
+        // Only a root canvas fills the screen. A canvas nested under
+        // another one is laid out by its parent like any other element.
+        boolean root = !(parent instanceof RectTransform) || (gameObject.GetComponent(Canvas.class) != null
+                && parent.gameObject.GetComponentInParent(Canvas.class) == null);
         if (root) {
             out[0] = 0f;
             out[1] = 0f;

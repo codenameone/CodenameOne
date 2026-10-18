@@ -2035,9 +2035,17 @@ public final class UnityRuntime {
         if (camera == null) {
             camera = camera(false);
         }
-        if (camera == null) {
-            return drawList;
+        // No camera draws no world, but an overlay canvas needs none: a
+        // menu scene can be a canvas and nothing else.
+        if (camera != null) {
+            renderWorld(camera);
         }
+        renderCanvases();
+        drawList.sort();
+        return drawList;
+    }
+
+    private static void renderWorld(Camera camera) {
         drawList.hasCamera = true;
         drawList.backgroundColor = camera.backgroundArgb();
         Transform eye = camera.gameObject.transform;
@@ -2074,6 +2082,9 @@ public final class UnityRuntime {
                 c.$draw(view);
             }
         }
+    }
+
+    private static void renderCanvases() {
         int m = canvases.size();
         for (int i = 0; i < m; i++) {
             Canvas canvas = (Canvas) canvases.get(i);
@@ -2089,8 +2100,6 @@ public final class UnityRuntime {
             }
             drawCanvas(canvas, canvas.gameObject, canvasScale(canvas));
         }
-        drawList.sort();
-        return drawList;
     }
 
     /// The keys every command of `canvas` is sorted by: an overlay over

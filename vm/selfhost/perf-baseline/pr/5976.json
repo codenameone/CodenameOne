@@ -23,6 +23,26 @@
    }
   },
   "linux-x64@amd-epyc-7763-64-core-processor": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 1.018,
+      "time": 0.847,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.835,
+     "reason": "Linux x64 EPYC 7763 hello RAM failed as IMPROVED at 0.79x on run 39134375957 against a 1.018x row recorded from one run. Master measured 0.88x on the same model in run 39104670527, and this run's rounds span 0.755-0.934x while ParparVM's own peak stayed at 898-944 MB: the spread is JDK 25's peak (1003-1202 MB). This records no improvement: it pools the two runs (0.835x) and widens RAM to 30%. Time is unchanged.",
+     "runs": 2,
+     "time": 0.847,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
    "translator": {
     "all": {
      "from": {

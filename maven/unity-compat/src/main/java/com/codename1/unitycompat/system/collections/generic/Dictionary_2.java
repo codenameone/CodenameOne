@@ -210,6 +210,11 @@ public class Dictionary_2 implements IDictionary_2 {
         return true;
     }
 
+    /// Leaves `version` alone on purpose: .NET (Core 3.0 and later) lets a
+    /// loop remove entries from the dictionary it walks, and `foreach`
+    /// with a `Remove` in it runs to the end there. The walk skips the
+    /// emptied slot, and a later `Add` that reuses it does bump `version`,
+    /// so the next `MoveNext` throws before it could see the new entry.
     @Override
     public boolean Remove(Object key) {
         int at = slot(key);
