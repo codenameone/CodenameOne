@@ -459,9 +459,10 @@ public class CSSThemeCompilerTest extends UITestBase {
         Font pressed = (Font) theme.get("Label.press#font");
         assertEquals(Display.getInstance().convertToPixels(20, true) / 10f, pressed.getPixelSize(), 0.001f);
         assertEquals("native:MainLight", fontName(pressed));
+        // A dark rule is its own element in the build-time compiler: no light family reaches it.
         Font dark = (Font) theme.get("$DarkLabel.dis#font");
         assertEquals(9f, dark.getPixelSize(), 0.001f);
-        assertEquals("native:MainBold", fontName(dark));
+        assertEquals("native:MainRegular", fontName(dark));
     }
 
     @Test
@@ -587,15 +588,15 @@ public class CSSThemeCompilerTest extends UITestBase {
     @Test
     public void testCyclicConstantsAreRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
-                .compile("#Constants{ a: var(--a); }", new MutableResource(), "Theme"));
+                .compile("#Constants{ --a: var(--a); }", new MutableResource(), "Theme"));
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
-                .compile("#Constants{ a: var(--b); b: var(--a); }", new MutableResource(), "Theme"));
+                .compile("#Constants{ --a: var(--b); --b: var(--a); }", new MutableResource(), "Theme"));
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
                         new MutableResource(), "Theme"));
         // Two uses of one constant are not a cycle.
         MutableResource resource = new MutableResource();
-        new CSSThemeCompiler().compile("#Constants{ c: #ff0000; pair: var(--c) var(--c); }", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{ --c: #ff0000; pair: var(--c) var(--c); }", resource, "Theme");
         assertEquals("ff0000 ff0000", resource.getTheme("Theme").get("@pair"));
     }
 
@@ -640,8 +641,8 @@ public class CSSThemeCompilerTest extends UITestBase {
     @Test
     public void testAliasOfAQuotedConstantStaysText() {
         MutableResource resource = new MutableResource();
-        new CSSThemeCompiler().compile("#Constants{literal:\"#abc\"; alias:var(--literal); twice:var(--alias);"
-                + " color:#abc; colorAlias:var(--color);}", resource, "Theme");
+        new CSSThemeCompiler().compile("#Constants{--literal:\"#abc\"; --alias:var(--literal); twice:var(--alias);"
+                + " --color:#abc; colorAlias:var(--color);}", resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("#abc", theme.get("@alias"));
         assertEquals("#abc", theme.get("@twice"));
@@ -838,7 +839,7 @@ public class CSSThemeCompilerTest extends UITestBase {
     public void testConstantsAliasKeepsTheValueAtItsDeclaration() {
         MutableResource resource = new MutableResource();
         new CSSThemeCompiler().compile("#Constants{--accent:#f00;alias:var(--accent);--accent:#00f;"
-                + "early:var(--later);later:#0f0;lit:\"#abc\";litAlias:var(--lit);}", resource, "Theme");
+                + "early:var(--later);--later:#0f0;--lit:\"#abc\";litAlias:var(--lit);}", resource, "Theme");
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("ff0000", String.valueOf(theme.get("@alias")).toLowerCase());
         assertEquals("0000ff", String.valueOf(theme.get("@accent")).toLowerCase());
@@ -965,5 +966,32 @@ public class CSSThemeCompilerTest extends UITestBase {
                 res, "Theme");
         assertEquals(12f, ((Font) res.getTheme("Theme").get("Label.font")).getPixelSize(), 0.001f);
         assertEquals(0.5f, ((Font) res.getTheme("Theme").get("Small.font")).getPixelSize(), 0.001f);
+    }
+
+    @Test
+    void testAFallbackIsStoredByItsTokenType() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { message: var(--missing, \"hello\"); scale: var(--missing, 1.50); }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("hello", theme.get("@message"));
+        assertEquals("1.5", theme.get("@scale"));
+    }
+
+    @Test
+    void testPriorityWithWhitespaceAfterTheBang() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { includeNativeBool: true ! important; }", res, "Theme");
+        assertEquals("true", res.getTheme("Theme").get("@includeNativeBool"));
+    }
+
+    @Test
+    void testAnOrdinaryConstantIsNotACustomProperty() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { accent: #f00; --real: #0f0; alias: var(--accent); other: var(--real); }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertFalse(theme.containsKey("@alias"));
+        assertEquals("00ff00", theme.get("@other"));
     }
 }

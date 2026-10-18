@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.MutableResource;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 
@@ -105,6 +106,10 @@ public class CSSThemeCompiler {
     /// uses one gets the string token, not its text: the build-time compiler keeps the token's
     /// type, so `color: var(--accent)` with `--accent: "#f00"` is not a color there either.
     private Hashtable<String, String> literalTokens = new Hashtable<String, String>();
+    /// `#Constants` entries this compile declared without the `--` prefix. The build-time
+    /// compiler adds only `--name` declarations to its variables, so `var(--name)` does not see
+    /// these.
+    private HashSet<String> plainConstants = new HashSet<String>();
     /// Set by resolveVars when it met a var() naming an undefined variable with no fallback.
     private boolean unresolvedVar;
 
@@ -124,6 +129,7 @@ public class CSSThemeCompiler {
         Hashtable<String, String> deferred = new Hashtable<String, String>();
         deferredConstants = deferred;
         literalTokens = new Hashtable<String, String>();
+        plainConstants = new HashSet<String>();
         // Everything in source order, #Constants blocks included: the build-time parser resolves
         // var() in each declaration as it reads it, and a `--name` inside #Constants enters its
         // variable map only when that block is reached. A rule above the block does not see it.
@@ -316,6 +322,19 @@ public class CSSThemeCompiler {
                 // constant: the caller's own default applies, not an empty string.
                 theme.remove(key);
             } else {
+                String sole = ((String) value).trim();
+                if (sole.startsWith("var(") && closingParen(sole, "var(".length()) == sole.length() - 1) {
+                    // A constant that is one var() takes its value's token type, a fallback's
+                    // too: the build-time compiler stores the string `"hello"` as hello and the
+                    // number 1.50 as 1.5, as it would written directly.
+                    String text = resolved.trim();
+                    String unquoted = unquote(text);
+                    if (!unquoted.equals(text)) {
+                        resolved = unquoted;
+                    } else if (isCssNumber(text)) {
+                        resolved = buildConstant(key.substring(1), text, text);
+                    }
+                }
                 theme.put(key, resolved);
             }
         }
@@ -331,6 +350,11 @@ public class CSSThemeCompiler {
                 name = name.substring(2);
             }
             String key = "@" + name;
+            if (legacy || declaration.name.startsWith("--")) {
+                plainConstants.remove(key);
+            } else {
+                plainConstants.add(key);
+            }
             String raw = declaration.value.trim();
             String value = unquote(raw);
             deferred.put(key, DEFERRED_PLAIN);
@@ -375,7 +399,7 @@ public class CSSThemeCompiler {
 
     /// True when every `var(--x)` in `value` names a constant this compile already declared and
     /// that is itself settled: not an alias still waiting for a name declared later.
-    private static boolean referencesDeclaredOnly(Hashtable theme, String key, String value,
+    private boolean referencesDeclaredOnly(Hashtable theme, String key, String value,
                                                   Hashtable<String, String> deferred) {
         int at = value.indexOf("var(--");
         while (at > -1) {
@@ -386,6 +410,9 @@ public class CSSThemeCompiler {
             String inner = value.substring(at + "var(--".length(), end);
             int comma = topLevelComma(inner);
             String target = "@" + (comma < 0 ? inner : inner.substring(0, comma)).trim();
+            if (plainConstants.contains(target)) {
+                return false;
+            }
             String kind = deferred.get(target);
             Object current = theme.get(target);
             // Its own name is never settled: that is a cycle, reported when it is resolved.
@@ -561,6 +588,7 @@ public class CSSThemeCompiler {
             return false;
         }
         String key = "@" + property.substring(2);
+        plainConstants.remove(key);
         String raw = value.trim();
         String unquoted = unquote(raw);
         // A later custom property replaces a #Constants entry outright, deferred handling included.
@@ -644,8 +672,10 @@ public class CSSThemeCompiler {
                 ArrayList<String> chain = fontChain(theme, own, state, dark);
                 for (int i = 0; i < chain.size() && (family == null || size == null); i++) {
                     String id = chain.get(i);
+                    // A dark rule is its own `$Dark` element in the build-time compiler, with no
+                    // link to the light UIID, so a dark font never takes the light one's half.
                     String[] fallbacks = dark
-                            ? new String[]{"$Dark" + id + "." + lookup, id + "." + lookup}
+                            ? new String[]{"$Dark" + id + "." + lookup}
                             : new String[]{id + "." + lookup};
                     for (String fallback : fallbacks) {
                         String[] other = fonts.get(fallback);
@@ -1232,7 +1262,7 @@ public class CSSThemeCompiler {
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
             }
-            Object replacement = theme.get("@" + key);
+            Object replacement = plainConstants.contains("@" + key) ? null : theme.get("@" + key);
             if (replacement == null && fallback != null) {
                 out.append(value.substring(pos, varPos)).append(resolveVars(theme, fallback, resolving, tokens));
                 pos = end + 1;
@@ -1761,12 +1791,19 @@ public class CSSThemeCompiler {
     }
 
     private static String stripPriority(String value) {
-        String marker = "!important";
+        // `!` then optional whitespace then `important`, as the CSS grammar has it.
+        String marker = "important";
         int at = value.length() - marker.length();
         if (at < 0 || !value.regionMatches(true, at, marker, 0, marker.length())) {
             return value;
         }
-        int bang = at;
+        while (at > 0 && value.charAt(at - 1) <= ' ') {
+            at--;
+        }
+        if (at == 0 || value.charAt(at - 1) != '!') {
+            return value;
+        }
+        int bang = at - 1;
         while (bang > 0 && value.charAt(bang - 1) <= ' ') {
             bang--;
         }
