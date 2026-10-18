@@ -86,9 +86,13 @@ public class InputStreamReader extends java.io.Reader{
         this.enc = cs.name();
     }
 
-    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    /// Set by close: a closed reader has no encoding to report.
+    private boolean closed;
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`,
+    /// or null once the reader is closed.
     public String getEncoding() {
-        return historicalName(enc);
+        return closed ? null : historicalName(enc);
     }
 
     /// The historical name the JDK's `getEncoding` answers for the standard
@@ -124,6 +128,7 @@ public class InputStreamReader extends java.io.Reader{
     public void close() throws java.io.IOException{
         internal.close();
         cbufferOff = -1;
+        closed = true;
     }
 
     /**

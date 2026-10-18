@@ -54,6 +54,9 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
     private char digit = '#';
     private char patternSeparator = ';';
     private String infinity = String.valueOf((char) 0x221E);
+    // U+FFFD is the JDK 8 answer for US English, which the conformance run
+    // compares against; "NaN" arrived with JDK 9's CLDR locale data. A
+    // device whose locale data supplies a NaN symbol replaces this one.
     private String nan = String.valueOf((char) 0xFFFD);
     private char minusSign = '-';
     private String currencySymbol = "$";

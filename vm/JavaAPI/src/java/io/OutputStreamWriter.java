@@ -115,9 +115,10 @@ public class OutputStreamWriter extends java.io.Writer {
         utf8 = isUtf8Name(enc);
     }
 
-    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`,
+    /// or null once the writer is closed.
     public String getEncoding() {
-        return historicalName(enc);
+        return closed ? null : historicalName(enc);
     }
 
     /// The historical name the JDK's `getEncoding` answers for the standard

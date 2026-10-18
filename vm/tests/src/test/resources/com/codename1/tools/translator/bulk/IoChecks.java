@@ -58,6 +58,41 @@ public final class IoChecks {
     /// Runs the group.
     public static void run() {
         // A PrintWriter over a PrintWriter reports the inner one's failure.
+        Bulk.check("Io.aClosedReaderOrWriterHasNoEncoding", () -> {
+            java.io.InputStreamReader r = new java.io.InputStreamReader(new java.io.ByteArrayInputStream(new byte[0]), "UTF-8");
+            java.io.OutputStreamWriter w = new java.io.OutputStreamWriter(new java.io.ByteArrayOutputStream(), "UTF-8");
+            Bulk.p("open", r.getEncoding() + "," + w.getEncoding());
+            r.close();
+            w.close();
+            Bulk.p("closed", r.getEncoding() + "," + w.getEncoding());
+        });
+        Bulk.check("Io.aBufferedWritersFlushFailureWinsOverClose", () -> {
+            java.io.Writer failing = new java.io.Writer() {
+                @Override
+                public void write(char[] c, int off, int len) throws java.io.IOException {
+                    throw new java.io.IOException("write");
+                }
+
+                @Override
+                public void flush() {
+                }
+
+                @Override
+                public void close() throws java.io.IOException {
+                    throw new java.io.IOException("close");
+                }
+            };
+            java.io.BufferedWriter bw = new java.io.BufferedWriter(failing);
+            bw.write("x");
+            String got;
+            try {
+                bw.close();
+                got = "none";
+            } catch (java.io.IOException e) {
+                got = e.getMessage() + " suppressed=" + e.getSuppressed().length;
+            }
+            Bulk.p("got", got);
+        });
         Bulk.check("Io.aNestedPrintWritersErrorIsReported", () -> {
             java.io.Writer failing = new java.io.Writer() {
                 public void write(char[] b, int o, int l) throws java.io.IOException {

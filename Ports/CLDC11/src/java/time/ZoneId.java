@@ -60,8 +60,11 @@ public class ZoneId {
         }
         for (int i = 0; i < zoneId.length(); i++) {
             char c = zoneId.charAt(i);
-            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                    || c == '~' || c == '/' || c == '.' || c == '_' || c == '+' || c == '-';
+            // A region ID starts with a letter, as the JDK's
+            // [A-Za-z][A-Za-z0-9~/._+-]+ requires.
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean ok = letter || i > 0 && ((c >= '0' && c <= '9')
+                    || c == '~' || c == '/' || c == '.' || c == '_' || c == '+' || c == '-');
             if (!ok) {
                 throw new DateTimeException("Invalid ID for region-based ZoneId, invalid format: " + zoneId);
             }

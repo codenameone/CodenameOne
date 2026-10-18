@@ -1355,9 +1355,11 @@ public final class Pattern {
                 highest = 0;
             }
             Piece out;
-            if (min == 0 && piece.max == 0 && piece.deterministic && piece.first instanceof GroupOpen) {
+            if (min == 0 && max != 1 && piece.max == 0 && piece.deterministic && piece.first instanceof GroupOpen) {
                 // A group that can only be empty, repeated from zero times:
-                // the JDK takes no round of it, so the group stays unset.
+                // the JDK takes no round of it, so the group stays unset. Not
+                // for at most one round (? and {0,1}): there the JDK tries its
+                // round, and "(^)?" sets the group to the empty string.
                 out = Piece.empty();
             } else if (piece.first == piece.last && piece.first instanceof Single) { //NOPMD CompareObjectsWithEquals
                 out = new Piece(null, null, lowest, highest);

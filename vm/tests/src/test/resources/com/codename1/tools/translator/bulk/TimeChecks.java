@@ -170,6 +170,19 @@ public final class TimeChecks {
                 }
             }
         });
+        Bulk.check("Time.aRegionIdStartsWithALetter", () -> {
+            // Only malformed IDs and real regions: an unknown well-formed one
+            // is accepted here on purpose (see ZoneId.of).
+            for (String id : new String[] {"/foo", "1a", "~x", "_a", "Europe/Paris", "Etc/GMT+5"}) {
+                String got;
+                try {
+                    got = java.time.ZoneId.of(id).getId();
+                } catch (DateTimeException e) {
+                    got = "malformed";
+                }
+                Bulk.p(id, got);
+            }
+        });
         Bulk.check("Time.aLongDurationDividesExactly", () -> {
             Bulk.p("max/max", java.time.Duration.ofSeconds(Long.MAX_VALUE).dividedBy(Long.MAX_VALUE));
             Bulk.p("max/2", java.time.Duration.ofSeconds(Long.MAX_VALUE, 999999999).dividedBy(2));
