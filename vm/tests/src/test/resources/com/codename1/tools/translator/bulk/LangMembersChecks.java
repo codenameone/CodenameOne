@@ -190,6 +190,26 @@ public final class LangMembersChecks {
                 Bulk.p("writer", "npe");
             }
         });
+        Bulk.check("Lang.spliteratorsReportOrderAndDistinctness", () -> {
+            java.util.List<String> list = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+            java.util.Set<String> set = new java.util.HashSet<String>(list);
+            Bulk.p("listOrdered", list.spliterator().hasCharacteristics(java.util.Spliterator.ORDERED));
+            Bulk.p("setDistinct", set.spliterator().hasCharacteristics(java.util.Spliterator.DISTINCT));
+            Bulk.p("linkedOrdered", new java.util.LinkedList<String>(list).spliterator()
+                    .hasCharacteristics(java.util.Spliterator.ORDERED));
+        });
+        Bulk.check("Lang.aLargeStringWriteGoesThroughTheBuffer", () -> {
+            try {
+                java.io.StringWriter sink = new java.io.StringWriter();
+                java.io.BufferedWriter w = new java.io.BufferedWriter(sink, 3);
+                w.write("abcdefghij", 1, 8);
+                w.write("xy");
+                w.flush();
+                Bulk.p("out", sink.toString());
+            } catch (java.io.IOException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

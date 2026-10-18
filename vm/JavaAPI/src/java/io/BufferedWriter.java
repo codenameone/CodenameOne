@@ -98,9 +98,21 @@ public class BufferedWriter extends Writer {
     @Override
     public void write(String s, int off, int len) throws IOException {
         ensureOpen();
-        char[] c = new char[len];
-        s.getChars(off, off + len, c, 0);
-        write(c, 0, len);
+        if (off < 0 || len < 0 || off > s.length() - len) {
+            throw new IndexOutOfBoundsException();
+        }
+        // Through the buffer a chunk at a time: a copy of the whole range
+        // would double the memory a large write needs.
+        int end = off + len;
+        while (off < end) {
+            if (count == buf.length) {
+                flushBuffer();
+            }
+            int n = Math.min(buf.length - count, end - off);
+            s.getChars(off, off + n, buf, count);
+            count += n;
+            off += n;
+        }
     }
 
     /// Writes a line separator, `\n`.

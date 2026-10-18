@@ -309,4 +309,10 @@ public interface Set<E> extends Collection<E> {
         return ImmutableCollections.setCopyOf(collection);
     }
 
+    /// The elements each once, read from [#iterator()] when the first one is
+    /// asked for: the spliterator reports `DISTINCT`.
+    @Override
+    default Spliterator<E> spliterator() {
+        return Spliterators.spliterator(this, Spliterator.DISTINCT);
+    }
 }

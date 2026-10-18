@@ -500,4 +500,10 @@ public interface List<E> extends Collection<E> {
         return ImmutableCollections.listCopyOf(collection);
     }
 
+    /// The elements in order, read from [#iterator()] when the first one is
+    /// asked for: the spliterator reports `ORDERED`.
+    @Override
+    default Spliterator<E> spliterator() {
+        return Spliterators.spliterator(this, Spliterator.ORDERED);
+    }
 }
