@@ -83,7 +83,7 @@ class TemporalConverterTest {
 
     @Test void refusesWhatItCannotReadExactly() {
         for (String bad : new String[]{"", "1709214306789", "0000-00-00 00:00:00", "2023-02-29", "2024-13-01", "2024-02-29 24:00:00",
-                "2024-02-29 13:60", "2024-02-29 13:45:06.", "2024-02-29 13:45:06.789 PST", "infinity", "2024-2-29", "2024-02-29X13:45", "2024-02-29+02:00", "2024-02-29-05", "2024-01-01T00:00+02:", "2024-01-01T00:00+02:30:",
+                "2024-02-29 13:60", "2024-02-29 13:45:06.", "2024-02-29 13:45:06.789 PST", "infinity", "2024-2-29", "2024-02-29X13:45", "2024-02-29+02:00", "2024-02-29-05", "2024-01-01T00:00+02:", "2024-01-01T00:00+02:30:", "2024-01-01Z", "2024-01-01z",
                 "2024-01-01T00:00+12:60", "2024-01-01T00:00+99:00", "2024-01-01T00:00-18:01", "2024-01-01T00:00+01:00:60"}) {
             IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> TemporalConverter.parse(bad), bad);
             assertTrue(e.getMessage().startsWith("Not a @Temporal value"), e.getMessage());

@@ -170,12 +170,12 @@ public class TemporalConverter implements AttributeConverter<Date, String> {
         }
         if (c.more()) {
             char sign = c.next();
+            if (!timed) {
+                // An offset, Z included, qualifies a time; on a bare date it
+                // would invent midnight or shift the day.
+                throw c.invalid();
+            }
             if (sign == '+' || sign == '-') {
-                if (!timed) {
-                    // An offset qualifies a time; on a bare date it would
-                    // shift the day.
-                    throw c.invalid();
-                }
                 long offsetHours = c.digits(2);
                 long offsetMinutes = 0;
                 long offsetSeconds = 0;
