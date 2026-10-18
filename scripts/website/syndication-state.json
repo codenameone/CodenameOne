@@ -2835,6 +2835,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-18T00:01:13+00:00"
+      },
+      "devto": {
+        "id": 4873050,
+        "url": "https://dev.to/codenameone/update-db-schema-in-production-with-flyway-like-syntax-2lj6",
+        "syndicated_at": "2026-10-18T16:43:55+00:00"
       }
     }
   }
