@@ -39,8 +39,6 @@ public class FutureTask<V> implements RunnableFuture<V> {
     private Callable<V> callable;
     private int state;
     private Object outcome;
-    /// Whether `cancel(true)` interrupted [#runner]. Guarded by `this`.
-    private boolean interruptedRunner;
     /// The thread inside [#run], so that `cancel(true)` can interrupt it.
     private Thread runner;
 
@@ -66,7 +64,6 @@ public class FutureTask<V> implements RunnableFuture<V> {
             state = CANCELLED;
             callable = null;
             if (mayInterruptIfRunning && runner != null) {
-                interruptedRunner = true;
                 runner.interrupt();
             }
             notifyAll();
@@ -165,12 +162,15 @@ public class FutureTask<V> implements RunnableFuture<V> {
         try {
             v = c.call();
         } catch (Throwable t) {
-            release();
+            // The outcome goes in before the runner is released: released
+            // first, a second run() could claim the still-NEW task and call
+            // it again.
             setException(t);
+            release();
             return;
         }
-        release();
         set(v);
+        release();
     }
 
     /// Runs the task without setting a result, leaving the future ready to
@@ -204,20 +204,13 @@ public class FutureTask<V> implements RunnableFuture<V> {
         }
     }
 
-    /// Forgets the runner. A cancel(true) that arrived during the run has
-    /// interrupted this thread; that interrupt is meant for the task, so it
-    /// is consumed here rather than leaking into the next task the thread runs.
-    /// Only that interrupt: after cancel(false), or an interrupt from anyone
-    /// else, the thread's status is left as it is.
+    /// Forgets the runner. An interrupt a cancel(true) delivered is left on
+    /// the thread, as the JDK leaves it: the task may have consumed it and
+    /// been interrupted again by someone else, and nothing here can tell the
+    /// two apart. A pool worker clears its status between tasks.
     private void release() {
-        boolean consume;
         synchronized (this) {
             runner = null;
-            consume = interruptedRunner;
-            interruptedRunner = false;
-        }
-        if (consume) {
-            Thread.interrupted();
         }
     }
 

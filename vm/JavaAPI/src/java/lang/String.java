@@ -1465,6 +1465,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /// The first index of `ch` in `[beginIndex, endIndex)`, or -1.
     public int indexOf(int ch, int beginIndex, int endIndex) {
         checkBoundsBeginEnd(beginIndex, endIndex);
+        if (ch >= 0x10000 && ch <= 0x10FFFF) {
+            // A supplementary code point is searched as its surrogate pair,
+            // which must lie wholly in the range: one whose low surrogate is
+            // at endIndex is outside it. The native char search sees only
+            // single chars.
+            return indexOf(new String(Character.toChars(ch)), beginIndex, endIndex);
+        }
         int found = indexOf(ch, beginIndex);
         return found >= 0 && found < endIndex ? found : -1;
     }

@@ -142,6 +142,27 @@ public final class LangMembersChecks {
                 Bulk.p("setSeed", e.getClass().getName());
             }
         });
+        Bulk.check("Lang.aSplitCodePointIsOutsideTheRange", () -> {
+            String smile = new String(Character.toChars(0x1F600));
+            Bulk.p("cut", smile.indexOf(0x1F600, 0, 1));
+            Bulk.p("whole", smile.indexOf(0x1F600, 0, 2));
+        });
+        Bulk.check("Lang.anOversizedUuidPartIsRefused", () -> {
+            try {
+                Bulk.p("parsed", java.util.UUID.fromString("ffffffffffffffff-0-0-0-0"));
+            } catch (IllegalArgumentException e) {
+                Bulk.p("threw", e instanceof NumberFormatException);
+            }
+            Bulk.p("max", java.util.UUID.fromString("7fffffff-0-0-0-0"));
+        });
+        Bulk.check("Lang.aNullPrintWriterTargetIsRefused", () -> {
+            try {
+                new java.io.PrintWriter((java.io.Writer) null);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

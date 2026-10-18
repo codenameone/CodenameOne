@@ -34,6 +34,9 @@ public class PrintWriter extends Writer {
     }
 
     public PrintWriter(Writer out, boolean autoFlush) {
+        if (out == null) {
+            throw new NullPointerException();
+        }
         this.out = out;
         this.autoFlush = autoFlush;
     }

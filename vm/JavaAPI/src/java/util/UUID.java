@@ -141,6 +141,11 @@ public final class UUID implements Comparable<UUID>, java.io.Serializable {
             if (d < 0 || digits >= 16) {
                 throw new IllegalArgumentException("Invalid UUID string: " + name);
             }
+            if ((value >>> 59) != 0) {
+                // Past Long.MAX_VALUE: the JDK's signed parse refuses it
+                // rather than wrapping into a different UUID.
+                throw new NumberFormatException("Invalid UUID string: " + name);
+            }
             value = (value << 4) | d;
             digits++;
         }

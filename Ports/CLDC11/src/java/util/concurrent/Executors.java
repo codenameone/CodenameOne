@@ -395,6 +395,11 @@ public class Executors {
             public void run() {
                 Thread self = Thread.currentThread();
                 while (true) {
+                    // A shutdownNow() that lands before this worker starts
+                    // still lets it run its own first task, interrupted, and
+                    // leaves it out of the returned list: ThreadPoolExecutor's
+                    // runWorker does the same with its firstTask. The task was
+                    // handed to this worker, not queued, when execute accepted it.
                     Runnable task = first;
                     first = null;
                     if (task == null) {
