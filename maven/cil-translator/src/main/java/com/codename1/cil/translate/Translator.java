@@ -430,6 +430,10 @@ public final class Translator implements Opcodes {
             mv.visitTypeInsn(NEW, c);
             mv.visitInsn(DUP);
             mv.visitMethodInsn(INVOKESPECIAL, c, "<init>", "()V", false);
+            if (tupleArity(f.type) > 0) {
+                mv.visitInsn(DUP);
+                mv.visitMethodInsn(INVOKEVIRTUAL, c, "$defaults", pushTupleDefaults(mv, f.type) + "V", false);
+            }
             mv.visitFieldInsn(isStatic ? PUTSTATIC : PUTFIELD, owner, Names.sanitize(f.name),
                     names.descriptor(f.type));
         }
@@ -1805,6 +1809,66 @@ public final class Translator implements Opcodes {
     }
 
     /// True for an enum this run translates: one that has a `$TYPE`.
+    /// For a constructed `ValueTuple` of two or three items, pushes the
+    /// default of each item and answers the descriptor of what takes them;
+    /// null for any other type, and nothing pushed. The runtime's tuple
+    /// erases its items to `Object`, so `default((int, int))` would hold two
+    /// nulls, and `Equals` and `ToString`, which read the items without a
+    /// type to read them as, answered for nulls: `(, )`, and unequal to
+    /// `(0, 0)`. Where the type arguments are known they are boxed zeros; a
+    /// type variable, a reference type and anything unknown stay null.
+    String pushTupleDefaults(MethodVisitor mv, CilType type) {
+        int arity = tupleArity(type);
+        if (arity == 0) {
+            return null;
+        }
+        StringBuilder d = new StringBuilder("(");
+        for (int i = 0; i < arity; i++) {
+            CilType a = type.args[i];
+            CilType p = names.norm(a);
+            if (Names.isTypeVariable(a)) {
+                mv.visitInsn(ACONST_NULL);
+            } else if (hasEnumType(a)) {
+                if (names.kind(a) == Val.I8) {
+                    mv.visitInsn(LCONST_0);
+                } else {
+                    mv.visitInsn(ICONST_0);
+                    mv.visitInsn(I2L);
+                }
+                mv.visitFieldInsn(GETSTATIC, names.className(a.name), "$TYPE", TYPE_DESCRIPTOR);
+                mv.visitMethodInsn(INVOKESTATIC, TYPE, "$box", "(J" + TYPE_DESCRIPTOR + ")Ljava/lang/Object;", false);
+            } else if (p.isPrimitive()) {
+                Jvm.pushDefault(mv, names.kind(p));
+                Jvm.box(mv, names, p);
+            } else if (names.isStruct(p)) {
+                String c = names.classRef(p);
+                mv.visitTypeInsn(NEW, c);
+                mv.visitInsn(DUP);
+                mv.visitMethodInsn(INVOKESPECIAL, c, "<init>", "()V", false);
+                // A tuple nested in a tuple gets its own defaults.
+                if (tupleArity(p) > 0) {
+                    mv.visitInsn(DUP);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, c, "$defaults", pushTupleDefaults(mv, p) + "V", false);
+                }
+            } else {
+                mv.visitInsn(ACONST_NULL);
+            }
+            d.append("Ljava/lang/Object;");
+        }
+        return d.append(')').toString();
+    }
+
+    /// 2 or 3 for a constructed `ValueTuple` the runtime has, else 0.
+    static int tupleArity(CilType type) {
+        if (type == null || type.kind != CilType.Kind.GENERICINST || type.element == null
+                || type.element.name == null) {
+            return 0;
+        }
+        String n = type.element.name;
+        int arity = "System.ValueTuple`2".equals(n) ? 2 : "System.ValueTuple`3".equals(n) ? 3 : 0;
+        return type.args.length == arity ? arity : 0;
+    }
+
     boolean hasEnumType(CilType type) {
         return names.isEnum(type) && names.isTranslated(type.name);
     }

@@ -816,7 +816,14 @@ final class MethodTranslator implements Opcodes {
             mv.visitIntInsn(NEWARRAY, Jvm.arrayTypeCode(e));
         } else if (names.isStruct(e)) {
             String c = names.classRef(e);
-            invoke(INVOKESTATIC, c, "$newArray", "(I)[L" + c + ";", false);
+            String defaults = host.pushTupleDefaults(mv, element);
+            if (defaults != null) {
+                // Every element starts as the tuple's default, not as nulls.
+                invoke(INVOKESTATIC, c, "$newArray", "(I" + defaults.substring(1, defaults.length() - 1) + ")[L"
+                        + c + ";", false);
+            } else {
+                invoke(INVOKESTATIC, c, "$newArray", "(I)[L" + c + ";", false);
+            }
         } else {
             typeInsn(ANEWARRAY, names.classRef(e));
         }
@@ -1768,7 +1775,12 @@ final class MethodTranslator implements Opcodes {
                     putField(address.field, address.staticField, Val.of(names.kind(address.type), address.type));
                 } else if (names.isStruct(type)) {
                     String c = names.classRef(type);
-                    invoke(INVOKEVIRTUAL, c, "$clear", "()V", false);
+                    String defaults = host.pushTupleDefaults(mv, type);
+                    if (defaults != null) {
+                        invoke(INVOKEVIRTUAL, c, "$defaults", defaults + "V", false);
+                    } else {
+                        invoke(INVOKEVIRTUAL, c, "$clear", "()V", false);
+                    }
                 } else {
                     throw fail("initobj through " + address);
                 }
@@ -2493,7 +2505,12 @@ final class MethodTranslator implements Opcodes {
                 mv.visitInsn(POP);
                 if (struct) {
                     String c = names.classRef(type);
-                    invoke(INVOKEVIRTUAL, c, "$clear", "()V", false);
+                    String defaults = host.pushTupleDefaults(mv, type);
+                    if (defaults != null) {
+                        invoke(INVOKEVIRTUAL, c, "$defaults", defaults + "V", false);
+                    } else {
+                        invoke(INVOKEVIRTUAL, c, "$clear", "()V", false);
+                    }
                 } else {
                     Jvm.pushDefault(mv, names.kind(type));
                 }

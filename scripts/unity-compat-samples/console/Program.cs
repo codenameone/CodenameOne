@@ -1460,6 +1460,16 @@ namespace Spike
             }
             Log("to ulong" + u8);
 
+            // Tuples: the typed Equals overload, and defaults that are zeros.
+            var pairA = (1, 2);
+            var pairB = (1, 2);
+            (int, int) none = default;
+            var pairs = new (int, int)[2];
+            object boxedNone = none;
+            Log("tuple equals " + pairA.Equals(pairB) + " " + pairA.Equals((2, 1)) + " default " + none
+                + " " + boxedNone.Equals((0, 0)) + " array " + pairs[1] + " " + ((object)pairs[0]).Equals((0, 0))
+                + " hash " + (none.GetHashCode() == (0, 0).GetHashCode()));
+
             Log("parse " + Parsed("42") + " " + Parsed("-7") + " " + Parsed(" +19 ") + " " + Parsed("1-") + " "
                 + Parsed("") + " " + Parsed(null) + " " + Parsed("2147483647") + " " + Parsed("2147483648") + " "
                 + Parsed("-2147483648") + " " + Parsed("99999999999999999999") + " " + Parsed("1.5") + " "

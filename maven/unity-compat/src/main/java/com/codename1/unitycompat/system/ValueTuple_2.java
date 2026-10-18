@@ -75,12 +75,34 @@ public final class ValueTuple_2 implements Struct {
         array[index].$assign(value);
     }
 
+    /// `default` of a tuple whose type arguments the translator knows: each
+    /// item its type's default, a boxed zero for a value type, rather than
+    /// the null an erased item would otherwise hold.
+    public void $defaults(Object d1, Object d2) {
+        Item1 = own(d1);
+        Item2 = own(d2);
+    }
+
+    public static ValueTuple_2[] $newArray(int length, Object d1, Object d2) {
+        ValueTuple_2[] array = new ValueTuple_2[length];
+        for (int i = 0; i < length; i++) {
+            array[i] = new ValueTuple_2();
+            array[i].$defaults(d1, d2);
+        }
+        return array;
+    }
+
     public static ValueTuple_2[] $newArray(int length) {
         ValueTuple_2[] array = new ValueTuple_2[length];
         for (int i = 0; i < length; i++) {
             array[i] = new ValueTuple_2();
         }
         return array;
+    }
+
+    /// `Equals(ValueTuple<...>)`, the overload C# picks for two tuples.
+    public boolean Equals(ValueTuple_2 other) {
+        return equals(other);
     }
 
     @Override
