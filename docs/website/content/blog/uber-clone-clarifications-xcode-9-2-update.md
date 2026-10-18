@@ -9,6 +9,9 @@ date: '2018-01-23'
 author: Shai Almog
 ---
 
+> **Starting a new ride-hailing project?** [Meet Wayline](/wayline/), the full-stack Java application with rider, driver, admin and backend source. [Follow the current tutorial](/blog/create-an-uber-clone-in-1-minute/). The article below describes the original Uber Clone.
+
+
 ![Header Image](/blog/uber-clone-clarifications-xcode-9-2-update/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
 The other day I sent out an email alert mentioning the Uber clone release and price change for the course on the 30th. I also mentioned upcoming modules in February which caught some attention. I wanted to clarify some things and answer some of the repeat questions I’ve been getting. I also have a lot of updates to make so I’ll include some of those below.
