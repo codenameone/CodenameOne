@@ -394,6 +394,7 @@ public final class Rigidbody2D extends Component {
         if (colliders == null) {
             return false;
         }
+        PhysicsQuery.begin();
         PhysicsQuery.point(point.x, point.y);
         for (int i = 0; i < colliders.size(); i++) { // NOPMD ForLoopCanBeForeach
             if (PhysicsQuery.overlaps((Collider2D) colliders.get(i))) {

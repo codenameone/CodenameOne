@@ -84,6 +84,10 @@ public final class AudioSource extends Behaviour {
     /// can sound it again from where it has got to.
     private AudioClip[] shotClip = new AudioClip[0];
     private float[] shotSpeed = new float[0];
+    /// For a shot held by a pitch of zero, the seconds of its clip still to
+    /// play: it does not advance, so its end is unknown until the pitch
+    /// moves again, and `shotEnd` holds `Float.MAX_VALUE` meanwhile.
+    private float[] shotLeft = new float[0];
     private int shotCount;
     private boolean playing;
     private boolean paused;
@@ -176,8 +180,7 @@ public final class AudioSource extends Behaviour {
             int v = newVoice();
             shots[i] = v;
             o.play(v, shotClip[i], level(shotScale[i]), pitch, false);
-            float speed = shotSpeed[i];
-            float at = shotClip[i].get_length() - (speed > 0f ? left * speed : left);
+            float at = shotClip[i].get_length() - shotClipLeft(i, t);
             if (at > 0f) {
                 o.seek(v, at);
             }
@@ -398,6 +401,17 @@ public final class AudioSource extends Behaviour {
         pitch = clampPitch(value);
         if (playing && output != null) {
             output.pitch(voice, pitch);
+        }
+        // The one-shots follow the pitch too, and finish when it says.
+        float t = shotNow();
+        float speed = pitch < 0f ? -pitch : pitch;
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                retimeShot(i, t, speed);
+                if (output != null) {
+                    output.pitch(shots[i], pitch);
+                }
+            }
         }
     }
 
@@ -709,7 +723,7 @@ public final class AudioSource extends Behaviour {
             }
         }
         float speed = pitch < 0f ? -pitch : pitch;
-        keepShot(v, volumeScale, shotNow() + (speed > 0f ? c.get_length() / speed : c.get_length()), c, speed);
+        keepShot(v, volumeScale, c, speed);
         // Listed with the sources that have voices, so that a fresh output
         // reaches its shots even when it plays no clip of its own.
         unvoice();
@@ -730,7 +744,7 @@ public final class AudioSource extends Behaviour {
     }
 
     /// Remembers a one-shot, after forgetting those that have ended.
-    private void keepShot(int v, float scale, float end, AudioClip c, float speed) {
+    private void keepShot(int v, float scale, AudioClip c, float speed) {
         float t = shotNow();
         int n = 0;
         for (int i = 0; i < shotCount; i++) {
@@ -740,6 +754,7 @@ public final class AudioSource extends Behaviour {
                 shotEnd[n] = shotEnd[i];
                 shotClip[n] = shotClip[i];
                 shotSpeed[n] = shotSpeed[i];
+                shotLeft[n] = shotLeft[i];
                 n++;
             }
         }
@@ -755,6 +770,9 @@ public final class AudioSource extends Behaviour {
             float[] p2 = new float[size];
             System.arraycopy(shotClip, 0, k2, 0, n);
             System.arraycopy(shotSpeed, 0, p2, 0, n);
+            float[] l2 = new float[size];
+            System.arraycopy(shotLeft, 0, l2, 0, n);
+            shotLeft = l2;
             shots = s2;
             shotScale = c2;
             shotEnd = e2;
@@ -766,10 +784,33 @@ public final class AudioSource extends Behaviour {
         }
         shots[n] = v;
         shotScale[n] = scale;
-        shotEnd[n] = end;
         shotClip[n] = c;
-        shotSpeed[n] = speed;
         shotCount = n + 1;
+        shotSpeed[n] = 0f;
+        shotLeft[n] = c.get_length();
+        retimeShot(n, t, speed);
+    }
+
+    /// The seconds of a shot's clip still to play at `t`.
+    private float shotClipLeft(int i, float t) {
+        if (!(shotSpeed[i] > 0f)) { // NOPMD LogicInversion
+            return shotLeft[i];
+        }
+        float left = (shotEnd[i] - t) * shotSpeed[i];
+        return left > 0f ? left : 0f;
+    }
+
+    /// Plays a shot on at a new speed from where it is. At zero it holds:
+    /// Unity pauses a clip whose pitch is zero, and `isPlaying` stays true.
+    private void retimeShot(int i, float t, float speed) {
+        float left = shotClipLeft(i, t);
+        shotSpeed[i] = speed;
+        if (speed > 0f) {
+            shotEnd[i] = t + left / speed;
+        } else {
+            shotLeft[i] = left;
+            shotEnd[i] = Float.MAX_VALUE;
+        }
     }
 
     /// Applies `volume` and `mute` to the one-shots still sounding.

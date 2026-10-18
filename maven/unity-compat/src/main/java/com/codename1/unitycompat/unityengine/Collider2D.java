@@ -117,7 +117,9 @@ public class Collider2D extends Behaviour {
         if (gameObject == null || !gameObject.registered) {
             return false;
         }
-        PhysicsWorld.flush();
+        // As every other query: the world brought up to date, and moved
+        // transforms applied when `autoSyncTransforms` asks for it.
+        PhysicsQuery.begin();
         return owner != null && owner.body != null && owner.body.isActive() && !fixtures.isEmpty();
     }
 

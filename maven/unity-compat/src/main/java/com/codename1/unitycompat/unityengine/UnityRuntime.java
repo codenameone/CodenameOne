@@ -199,6 +199,9 @@ public final class UnityRuntime {
         float at;
         float repeat;
         boolean cancelled;
+        /// Asked for with no delay before its owner's first `Update`: Unity
+        /// runs such a call in the next Update cycle ahead of `Update`.
+        boolean early;
     }
 
     private static final class Delayed {
@@ -1280,6 +1283,14 @@ public final class UnityRuntime {
     }
 
     private static void destroyObject(GameObject go, boolean detach) {
+        destroyObject(go, detach, null);
+    }
+
+    /// `within` is the transform whose destruction reached this object. A
+    /// descendant stays in its parent's list, which goes with the parent,
+    /// unless an `OnDestroy` on the way moved it under a survivor: that one
+    /// must let go of it, or it keeps a destroyed child for good.
+    private static void destroyObject(GameObject go, boolean detach, Transform within) {
         if (go.destroyed) {
             return;
         }
@@ -1287,7 +1298,7 @@ public final class UnityRuntime {
         if (children != null) {
             java.lang.Object[] below = children.toArray(); // NOPMD UnnecessaryFullyQualifiedName
             for (int i = 0; i < below.length; i++) { // NOPMD ForLoopCanBeForeach
-                destroyObject(((Transform) below[i]).gameObject, false);
+                destroyObject(((Transform) below[i]).gameObject, false, go.transform);
             }
         }
         java.lang.Object[] all = go.components.toArray(); // NOPMD UnnecessaryFullyQualifiedName
@@ -1305,7 +1316,7 @@ public final class UnityRuntime {
             c.unregistered();
         }
         Transform parent = go.transform.parent;
-        if (detach && parent != null && parent.children != null) {
+        if ((detach || parent != within) && parent != null && parent.children != null) { // NOPMD CompareObjectsWithEquals
             parent.children.remove(go.transform);
         }
         if (go.registered) {
@@ -1468,13 +1479,15 @@ public final class UnityRuntime {
             Time.inFixedUpdate = false;
             runStarts();
         }
+        runInvocations(true);
         for (int i = 0; i < behaviours.size(); i++) { // NOPMD ForLoopCanBeForeach
             MonoBehaviour b = (MonoBehaviour) behaviours.get(i);
             if (b.started && b.live()) {
+                b.updated = true;
                 b.$update();
             }
         }
-        runInvocations();
+        runInvocations(false);
         runCoroutines(0);
         tick(tickers, false);
         for (int i = 0; i < behaviours.size(); i++) { // NOPMD ForLoopCanBeForeach
@@ -1950,6 +1963,7 @@ public final class UnityRuntime {
         v.method = method;
         v.at = Time.time + (time > 0f ? time : 0f);
         v.repeat = repeat;
+        v.early = !(time > 0f) && !owner.updated; // NOPMD LogicInversion
         invocations.add(v);
     }
 
@@ -1972,7 +1986,9 @@ public final class UnityRuntime {
         return false;
     }
 
-    private static void runInvocations() {
+    /// Runs the invocations that are due; with `earlyOnly`, just those made
+    /// with no delay before their owner's first `Update`.
+    private static void runInvocations(boolean earlyOnly) {
         int n = invocations.size();
         if (n == 0) {
             return;
@@ -1982,9 +1998,10 @@ public final class UnityRuntime {
             if (v.owner.destroyed) {
                 v.cancelled = true;
             }
-            if (v.cancelled || Time.time < v.at) {
+            if (v.cancelled || Time.time < v.at || (earlyOnly && !v.early)) {
                 continue;
             }
+            v.early = false;
             if (v.repeat > 0f) {
                 v.at += v.repeat;
             } else {

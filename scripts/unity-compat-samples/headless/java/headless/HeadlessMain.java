@@ -135,6 +135,17 @@ public final class HeadlessMain {
             return images.get(resource);
         }
         BufferedImage image = null;
+        if (com.codename1.unitycompat.unityengine.DrawCommand.WHITE.equals(resource)) {
+            int size = com.codename1.unitycompat.unityengine.DrawCommand.WHITE_SIZE;
+            image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    image.setRGB(x, y, 0xffffffff);
+                }
+            }
+            images.put(resource, image);
+            return image;
+        }
         try (InputStream in = HeadlessMain.class.getResourceAsStream("/" + resource)) {
             if (in != null) {
                 BufferedImage read = ImageIO.read(in);

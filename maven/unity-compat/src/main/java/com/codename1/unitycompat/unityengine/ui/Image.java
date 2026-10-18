@@ -23,6 +23,7 @@
 package com.codename1.unitycompat.unityengine.ui;
 
 import com.codename1.unitycompat.unityengine.Component;
+import com.codename1.unitycompat.unityengine.Debug;
 import com.codename1.unitycompat.unityengine.DrawCommand;
 import com.codename1.unitycompat.unityengine.Sprite;
 
@@ -48,6 +49,7 @@ public class Image extends MaskableGraphic {
     private int fillMethod;
     private int fillOrigin;
     private float fillAmount = 1f;
+    private boolean radialWarned;
 
     /// What a scene file sets: the sprite, `Image.Type`, and for a filled
     /// image the `FillMethod`, the origin within it and the amount.
@@ -76,12 +78,18 @@ public class Image extends MaskableGraphic {
     /// pixels from the surface's top left. False when nothing is drawn.
     public boolean $fill(DrawCommand d) {
         if (sprite == null) {
-            return false;
+            // No sprite is a rectangle of the image's color, not nothing.
+            d.sprite = DrawCommand.WHITE;
+            d.sourceX = 0;
+            d.sourceY = 0;
+            d.sourceWidth = DrawCommand.WHITE_SIZE;
+            d.sourceHeight = DrawCommand.WHITE_SIZE;
+        } else {
+            sprite.$source(d);
         }
-        sprite.$source(d);
         d.text = null;
         d.color = $drawColor();
-        if (preserveAspect && sprite.$width() > 0 && sprite.$height() > 0 && d.width > 0f && d.height > 0f) {
+        if (sprite != null && preserveAspect && sprite.$width() > 0 && sprite.$height() > 0 && d.width > 0f && d.height > 0f) {
             float byWidth = d.width / sprite.$width();
             float byHeight = d.height / sprite.$height();
             if (byWidth < byHeight) {
@@ -123,6 +131,15 @@ public class Image extends MaskableGraphic {
             }
             d.sourceHeight = pixels;
             d.height = h;
+        } else if (!radialWarned) {
+            // Radial90, Radial180 and Radial360 are not supported. A draw
+            // command is a rectangle cut from an image, and a radial cut is
+            // a wedge: it needs a clip shape or a masked image the painters
+            // do not have, and a mask made afresh for every fill amount a
+            // cooldown passes through is an allocation and a texture upload
+            // a frame. The whole sprite is drawn, and said so once.
+            radialWarned = true;
+            Debug.LogWarning("Image: radial fill methods are not supported; drawing the whole sprite");
         }
         return d.sourceWidth > 0 && d.sourceHeight > 0;
     }

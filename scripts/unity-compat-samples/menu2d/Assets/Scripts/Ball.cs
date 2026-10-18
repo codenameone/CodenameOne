@@ -60,6 +60,8 @@ public class Ball : MonoBehaviour
     // The source's own voice, at half speed and moved to a place in the clip:
     // `time` is that place whatever the pitch, and it goes on from there at
     // the pitch. Update reads it again a few frames on.
+    // Nine frames on the clip itself has ended, but the bounce's one-shot,
+    // slowed by the same pitch, is still sounding, so isPlaying stays true.
     private void Seek()
     {
         source.clip = beep;

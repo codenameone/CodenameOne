@@ -40,6 +40,12 @@ package com.codename1.unitycompat.unityengine;
 public final class DrawCommand {
     /// The resource name of the image; null for text.
     public String sprite;
+    /// The name of no resource: a plain white image `WHITE_SIZE` pixels
+    /// square that whatever paints makes itself, tinted by `color`. Unity
+    /// draws an `Image` with no sprite that way, as a rectangle of its
+    /// color.
+    public static final String WHITE = "$white";
+    public static final int WHITE_SIZE = 8;
     /// The part of the image, in its pixels from its top left.
     public int sourceX;
     public int sourceY;

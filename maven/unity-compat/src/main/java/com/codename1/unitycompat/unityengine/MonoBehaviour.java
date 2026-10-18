@@ -35,6 +35,9 @@ import com.codename1.unitycompat.system.collections.IEnumerator;
 public class MonoBehaviour extends Behaviour {
     boolean awake;
     boolean started;
+    /// Whether `Update` has been sent once: a zero-delay `Invoke` made
+    /// before it runs ahead of the first `Update`.
+    boolean updated;
     /// `OnEnable` has run and `OnDisable` has not.
     boolean enabledSeen;
 

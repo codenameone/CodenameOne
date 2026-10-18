@@ -92,7 +92,7 @@ audio frame=100 play beep
 audio frame=100 shot beep
 voice 3 frames on: 65ms playing=True
 tick, frame 105 clicks=1 selected=True
-voice 9 frames on: 100ms playing=False
+voice 9 frames on: 100ms playing=True
 audio frame=112 play beep
 listener paused at 33ms playing=True
 audio frame=114 listener paused

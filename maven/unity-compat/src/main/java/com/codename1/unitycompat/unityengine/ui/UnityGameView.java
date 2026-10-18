@@ -1185,6 +1185,11 @@ public class UnityGameView extends GameView {
         if (image != null || missing.containsKey(resource)) {
             return image;
         }
+        if (DrawCommand.WHITE.equals(resource)) {
+            image = Image.createImage(DrawCommand.WHITE_SIZE, DrawCommand.WHITE_SIZE, 0xffffffff);
+            images.put(resource, image);
+            return image;
+        }
         // By stream: `Image.createImage(String)` takes a path in the file
         // system, and only some ports look among the resources for it.
         InputStream in = Display.getInstance().getResourceAsStream(getClass(), "/" + resource);
