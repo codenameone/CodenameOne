@@ -170,6 +170,24 @@ public final class TimeChecks {
                 }
             }
         });
+        Bulk.check("Time.isoParsersRefuseNonIsoForms", () -> {
+            String[] inputs = {"2020-01-01T00:00+01:00", "2020-01-01T00:00+01:00:30",
+                    "2020-01-01T00:00+0100", "2020-01-01T00:00+010030", "2020-01-01T00:00+01"};
+            for (String in : inputs) {
+                try {
+                    Bulk.p(in, java.time.OffsetDateTime.parse(in));
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(in, "refused");
+                }
+            }
+            for (String in : new String[] {"-0000-01-01", "0000-01-01", "-0001-01-01"}) {
+                try {
+                    Bulk.p(in, java.time.LocalDate.parse(in));
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(in, "refused");
+                }
+            }
+        });
         Bulk.check("Time.aRegionIdStartsWithALetter", () -> {
             // Only malformed IDs and real regions: an unknown well-formed one
             // is accepted here on purpose (see ZoneId.of).

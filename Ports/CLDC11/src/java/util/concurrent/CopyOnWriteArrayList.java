@@ -323,9 +323,14 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
     }
 
     public int addAllAbsent(Collection<? extends E> c) {
+        // Snapshot the source before taking this lock, as addAll does: two
+        // lists adding each other would otherwise each wait for the other.
+        Object[] incoming = c.toArray();
         synchronized (lock) {
             int added = 0;
-            for (E e : c) {
+            for (Object o : incoming) {
+                @SuppressWarnings("unchecked")
+                E e = (E) o;
                 if (addIfAbsent(e)) {
                     added++;
                 }

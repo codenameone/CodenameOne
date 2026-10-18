@@ -163,6 +163,11 @@ public final class LangMembersChecks {
                 Bulk.p("writer", "npe");
             }
         });
+        Bulk.check("Lang.anEmptyChoiceIsSkipped", () -> {
+            java.text.ChoiceFormat f = new java.text.ChoiceFormat("0#a||1#b");
+            Bulk.p("zero", f.format(0));
+            Bulk.p("one", f.format(1));
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

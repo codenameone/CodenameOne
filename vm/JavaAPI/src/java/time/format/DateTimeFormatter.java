@@ -650,6 +650,10 @@ public final class DateTimeFormatter {
         if (signed && !negative && p.pos - digitsStart <= 4) {
             p.fail(start);
         }
+        if (negative && year == 0) {
+            // Year zero is written 0000; the formatter never prints -0000.
+            p.fail(start);
+        }
         p.set(F_YEAR, negative ? -year : year);
         p.literal('-');
         p.set(F_MONTH, p.digits(2, 2));
@@ -686,15 +690,15 @@ public final class DateTimeFormatter {
         parseIsoTime(p);
     }
 
-    /// `Z`, or an offset of hours with optional minutes and seconds, with
-    /// or without colons.
+    /// `Z`, or the ISO offset `+HH` with optional `:MM` and `:ss`. The
+    /// compact `+HHMM` is not ISO and is refused, as the JDK refuses it.
     private static void parseOffsetId(Parsed p) {
         if (p.pos < p.text.length() && (p.text.charAt(p.pos) == 'Z' || p.text.charAt(p.pos) == 'z')) {
             p.pos++;
             p.offset = ZoneOffset.UTC;
             return;
         }
-        p.offset = ZoneOffset.ofTotalSeconds(p.offsetSeconds());
+        p.offset = ZoneOffset.ofTotalSeconds(p.offsetSeconds(true, 1, 3));
     }
 
     private static void parseZoneId(Parsed p) {

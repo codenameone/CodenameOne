@@ -407,6 +407,10 @@ public final class Matcher implements MatchResult {
     }
 
     /// The matches of one [#results()].
+    // The iterator does not fail fast when the matcher is reset or moved
+    // mid-stream, where the JDK throws ConcurrentModificationException: that
+    // is misuse, and tracking it would cost a counter on every matcher
+    // operation for code that is already wrong.
     private static final class Results implements Iterator<MatchResult> {
         private final Matcher matcher;
         private MatchResult next;

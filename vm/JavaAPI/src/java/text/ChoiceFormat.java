@@ -92,6 +92,9 @@ public class ChoiceFormat extends NumberFormat {
                 limitText.setLength(0);
                 inFormat = true;
             } else if (ch == '|') {
+                // An empty alternative ("0#a||1#b") repeats the last limit
+                // with an empty format, so format(0) is "": that is what the
+                // JDK 8 the conformance run compares against answers.
                 if (count == limits.length) {
                     double[] moreLimits = new double[count * 2];
                     String[] moreFormats = new String[count * 2];
