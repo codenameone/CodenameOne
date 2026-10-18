@@ -406,6 +406,44 @@ public final class ExecutorsChecks {
             Bulk.p("timed", timed);
             Thread.interrupted();
         });
+        Bulk.check("Executors.listsAddingEachOtherDoNotDeadlock", () -> {
+            final java.util.concurrent.CopyOnWriteArrayList<Integer> a = new java.util.concurrent.CopyOnWriteArrayList<Integer>();
+            final java.util.concurrent.CopyOnWriteArrayList<Integer> b = new java.util.concurrent.CopyOnWriteArrayList<Integer>();
+            a.add(1);
+            b.add(2);
+            Thread t = new Thread(() -> {
+                for (int i = 0; i < 2000; i++) {
+                    a.addAll(b);
+                    while (a.size() > 4) {
+                        a.remove(a.size() - 1);
+                    }
+                }
+            });
+            t.start();
+            for (int i = 0; i < 2000; i++) {
+                b.addAll(0, a);
+                while (b.size() > 4) {
+                    b.remove(b.size() - 1);
+                }
+            }
+            t.join(20000);
+            Bulk.p("finished", !t.isAlive());
+            String index;
+            try {
+                a.addAll(-1, b);
+                index = "accepted";
+            } catch (IndexOutOfBoundsException e) {
+                index = "IOOBE";
+            }
+            Bulk.p("addAll(-1)", index);
+        });
+        Bulk.check("Executors.aHugeDelayIsNotAlreadyDue", () -> {
+            ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor();
+            ScheduledFuture<?> f = ses.schedule(() -> { }, Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+            Bulk.p("positive", f.getDelay(TimeUnit.MILLISECONDS) > 0);
+            f.cancel(false);
+            ses.shutdown();
+        });
         Bulk.check("Executors.cancelFalseLeavesTheRunnersInterruptAlone", () -> {
             final CountDownLatch started = new CountDownLatch(1);
             final CountDownLatch cancelled = new CountDownLatch(1);

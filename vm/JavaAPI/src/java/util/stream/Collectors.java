@@ -110,12 +110,28 @@ public final class Collectors {
     private static <T, A, R> Collector<T, A, R> of(Supplier<A> supplier, BiConsumer<A, ? super T> accumulator,
                                                    BinaryOperator<A> combiner, Function<A, R> finisher) {
         return new Of<T, A, R>(supplier, (BiConsumer<A, T>) accumulator, combiner, finisher,
-                Collections.<Collector.Characteristics>emptySet());
+                finisher == IDENTITY ? ID_FINISH : Collections.<Collector.Characteristics>emptySet());
+    }
+
+    /// The one identity finisher, so a collector built over it can be told
+    /// to report `IDENTITY_FINISH`, as the JDK's do.
+    private static final Function<Object, Object> IDENTITY = Function.identity();
+
+    private static final Set<Collector.Characteristics> ID_FINISH = Collections.unmodifiableSet(
+            new HashSet<Collector.Characteristics>(Collections.singleton(Collector.Characteristics.IDENTITY_FINISH)));
+
+    private static final Set<Collector.Characteristics> UNORDERED_ID_FINISH;
+
+    static {
+        Set<Collector.Characteristics> s = new HashSet<Collector.Characteristics>();
+        s.add(Collector.Characteristics.UNORDERED);
+        s.add(Collector.Characteristics.IDENTITY_FINISH);
+        UNORDERED_ID_FINISH = Collections.unmodifiableSet(s);
     }
 
     @SuppressWarnings("unchecked")
     private static <A, R> Function<A, R> castingIdentity() {
-        return (Function<A, R>) Function.identity();
+        return (Function<A, R>) (Function<?, ?>) IDENTITY;
     }
 
     /// One value being folded, and whether any element reached it yet.
@@ -190,8 +206,8 @@ public final class Collectors {
     }
 
     public static <T> Collector<T, ?, Set<T>> toSet() {
-        return Collectors.<T, Set<T>, Set<T>>of(Collectors.<T>newHashSet(), Collectors.<T, Set<T>>adder(),
-                Collectors.<T, Set<T>>addAll(), Collectors.<Set<T>, Set<T>>castingIdentity());
+        return new Of<T, Set<T>, Set<T>>(Collectors.<T>newHashSet(), Collectors.<T, Set<T>>adder(),
+                Collectors.<T, Set<T>>addAll(), Collectors.<Set<T>, Set<T>>castingIdentity(), UNORDERED_ID_FINISH);
     }
 
     public static <T> Collector<T, ?, Set<T>> toUnmodifiableSet() {

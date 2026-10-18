@@ -236,7 +236,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         }
 
         private void again() {
-            due.set(BlockingWait.now() + delayAfter);
+            due.set(BlockingWait.deadline(delayAfter));
             arm(delayAfter);
         }
 
@@ -362,7 +362,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
             throw new NullPointerException();
         }
         final long millis = Math.max(0, BlockingWait.millis(delay, unit));
-        final Scheduled<V> task = new Scheduled<V>(callable, BlockingWait.now() + millis, false, 0, 0);
+        final Scheduled<V> task = new Scheduled<V>(callable, BlockingWait.deadline(millis), false, 0, 0);
         return accept(task, millis);
     }
 
@@ -382,7 +382,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         final long millis = Math.max(0, BlockingWait.millis(initialDelay, unit));
         final long every = Math.max(1, BlockingWait.millis(period, unit));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                BlockingWait.now() + millis, true, 0, every);
+                BlockingWait.deadline(millis), true, 0, every);
         return accept(task, millis);
     }
 
@@ -397,7 +397,7 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         }
         final long millis = Math.max(0, BlockingWait.millis(initialDelay, unit));
         final Scheduled<Object> task = new Scheduled<Object>(Executors.callable(command, null),
-                BlockingWait.now() + millis, true, Math.max(1, BlockingWait.millis(delay, unit)), 0);
+                BlockingWait.deadline(millis), true, Math.max(1, BlockingWait.millis(delay, unit)), 0);
         return accept(task, millis);
     }
 

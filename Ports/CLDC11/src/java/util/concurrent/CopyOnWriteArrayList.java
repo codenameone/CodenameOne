@@ -337,16 +337,24 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
 
     @Override
     public boolean addAll(Collection<? extends E> c) {
-        synchronized (lock) {
-            return addAll(getArray().length, c);
-        }
+        return insert(Integer.MIN_VALUE, c.toArray());
     }
 
     @Override
     public boolean addAll(int index, Collection<? extends E> c) {
+        return insert(index, c.toArray());
+    }
+
+    /// Inserts `incoming` at `index`, or at the end for `Integer.MIN_VALUE`. The caller takes
+    /// the snapshot before this lock is held: reading another list under it
+    /// would take that list's lock too, and two lists adding each other would
+    /// deadlock.
+    private boolean insert(int index, Object[] incoming) {
         synchronized (lock) {
-            Object[] incoming = c.toArray();
             Object[] elements = getArray();
+            if (index == Integer.MIN_VALUE) {
+                index = elements.length;
+            }
             int len = elements.length;
             if (index > len || index < 0) {
                 throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + len);

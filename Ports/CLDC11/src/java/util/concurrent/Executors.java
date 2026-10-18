@@ -217,47 +217,66 @@ public class Executors {
                 if (shutdown) {
                     throw new RejectedExecutionException("The executor has been shut down");
                 }
-                queue.add(command);
-                if (queue.size() > idle && workers.size() < maxWorkers) {
-                    Thread t;
-                    try {
-                        t = factory.newThread(new Worker());
-                    } catch (RuntimeException e) {
-                        // The submission failed, so it must not stay queued for a
-                        // later worker to run.
-                        queue.removeLast();
-                        throw e;
-                    } catch (Error e) {
-                        queue.removeLast();
-                        throw e;
-                    }
+                if (queue.size() >= idle && workers.size() < maxWorkers) {
+                    // The command goes to the new worker itself, not the
+                    // queue: if its thread then fails to start, no other
+                    // worker can have taken the command, and the failure
+                    // execute() reports is true.
+                    Thread t = factory.newThread(new Worker(command));
                     if (t == null) {
                         if (workers.isEmpty()) {
-                            queue.removeLast();
                             throw new RejectedExecutionException("The thread factory made no thread");
                         }
+                        queue.add(command);
+                        queue.notify();
                     } else {
                         workers.add(t);
                         started = t;
                     }
                 } else {
+                    queue.add(command);
                     queue.notify();
                 }
             }
             if (started != null) {
-                boolean running = false;
-                try {
-                    started.start();
-                    running = true;
-                } finally {
-                    if (!running) {
-                        // A thread that cannot start (one the factory already
-                        // started) must not hold a worker slot it will never
-                        // serve, or the command it was made for waits forever.
-                        synchronized (queue) {
-                            workers.remove(started);
-                            queue.remove(command);
-                            queue.notifyAll();
+                start(started);
+            }
+        }
+
+        /// Starts a worker's thread. One that cannot start (the factory
+        /// handed out a started thread) gives its slot back; a command another
+        /// submission queued meanwhile, counting on that slot, then gets a
+        /// replacement worker, best effort.
+        private void start(Thread worker) {
+            boolean running = false;
+            try {
+                worker.start();
+                running = true;
+            } finally {
+                if (!running) {
+                    Thread replacement = null;
+                    synchronized (queue) {
+                        workers.remove(worker);
+                        if (!queue.isEmpty() && queue.size() > idle && workers.size() < maxWorkers) {
+                            try {
+                                replacement = factory.newThread(new Worker(null));
+                            } catch (Throwable ignored) {
+                                replacement = null;
+                            }
+                            if (replacement != null) {
+                                workers.add(replacement);
+                            }
+                        }
+                        queue.notifyAll();
+                    }
+                    if (replacement != null) {
+                        try {
+                            replacement.start();
+                        } catch (Throwable ignored) {
+                            synchronized (queue) {
+                                workers.remove(replacement);
+                                queue.notifyAll();
+                            }
                         }
                     }
                 }
@@ -366,10 +385,21 @@ public class Executors {
         }
 
         final class Worker implements Runnable {
+            /// The command this worker was started for, run before the queue.
+            private Runnable first;
+
+            Worker(Runnable first) {
+                this.first = first;
+            }
+
             public void run() {
                 Thread self = Thread.currentThread();
                 while (true) {
-                    Runnable task = next(self);
+                    Runnable task = first;
+                    first = null;
+                    if (task == null) {
+                        task = next(self);
+                    }
                     if (task == null) {
                         return;
                     }

@@ -121,6 +121,14 @@ public final class LangMembersChecks {
             }
             Bulk.p("got", got);
         });
+        Bulk.check("Lang.collectorsReportTheirCharacteristics", () -> {
+            java.util.Set<java.util.stream.Collector.Characteristics> set = java.util.stream.Collectors.toSet().characteristics();
+            Bulk.p("toList", java.util.stream.Collectors.toList().characteristics());
+            Bulk.p("toSet", set.contains(java.util.stream.Collector.Characteristics.UNORDERED) + ","
+                    + set.contains(java.util.stream.Collector.Characteristics.IDENTITY_FINISH) + "," + set.size());
+            Bulk.p("toCollection", java.util.stream.Collectors.toCollection(java.util.ArrayList::new).characteristics());
+            Bulk.p("joining", java.util.stream.Collectors.joining().characteristics());
+        });
         Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
     }
 }

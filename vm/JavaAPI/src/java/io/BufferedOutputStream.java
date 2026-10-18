@@ -105,12 +105,31 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (closed) {
             return;
         }
+        // try-with-resources by hand: the failure to write the buffer is the
+        // one reported, with the delegate's close failure attached.
         try {
             flush();
-        } finally {
+        } catch (IOException e) {
             closed = true;
             count = 0;
-            out.close();
+            try {
+                out.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        } catch (RuntimeException e) {
+            closed = true;
+            count = 0;
+            try {
+                out.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
         }
+        closed = true;
+        count = 0;
+        out.close();
     }
 }

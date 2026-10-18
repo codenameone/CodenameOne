@@ -93,6 +93,61 @@ public final class IoChecks {
             }
             Bulk.p("got", got);
         });
+        Bulk.check("Io.aBufferedStreamsFlushFailureWinsOverClose", () -> {
+            java.io.OutputStream failing = new java.io.OutputStream() {
+                @Override
+                public void write(int b) throws java.io.IOException {
+                    throw new java.io.IOException("write");
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) throws java.io.IOException {
+                    throw new java.io.IOException("write");
+                }
+
+                @Override
+                public void close() throws java.io.IOException {
+                    throw new java.io.IOException("close");
+                }
+            };
+            java.io.BufferedOutputStream bos = new java.io.BufferedOutputStream(failing);
+            bos.write(1);
+            String got;
+            try {
+                bos.close();
+                got = "none";
+            } catch (java.io.IOException e) {
+                // JDK 8 makes close's failure the primary one, later JDKs the
+                // write's (as this runtime does): compare both, unordered.
+                java.util.TreeSet<String> both = new java.util.TreeSet<String>();
+                both.add(e.getMessage());
+                for (Throwable t : e.getSuppressed()) {
+                    both.add(t.getMessage());
+                }
+                got = both.toString();
+            }
+            Bulk.p("got", got);
+        });
+        Bulk.check("Io.anInterruptedWriteReInterrupts", () -> {
+            java.io.Writer interrupted = new java.io.Writer() {
+                @Override
+                public void write(char[] c, int off, int len) throws java.io.IOException {
+                    throw new java.io.InterruptedIOException();
+                }
+
+                @Override
+                public void flush() {
+                }
+
+                @Override
+                public void close() {
+                }
+            };
+            java.io.PrintWriter pw = new java.io.PrintWriter(interrupted);
+            pw.write("x");
+            Bulk.p("interrupted", Thread.interrupted());
+            Bulk.p("error", pw.checkError());
+        });
         Bulk.check("Io.aNestedPrintWritersErrorIsReported", () -> {
             java.io.Writer failing = new java.io.Writer() {
                 public void write(char[] b, int o, int l) throws java.io.IOException {

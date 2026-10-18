@@ -82,6 +82,10 @@ public class PrintWriter extends Writer {
         }
         try {
             out.flush();
+        } catch (InterruptedIOException e) {
+            // An interrupted write is a cancellation, not an output error:
+            // hand the interrupt back to the thread, as the JDK does.
+            Thread.currentThread().interrupt();
         } catch (IOException e) {
             trouble = true;
         }
@@ -98,6 +102,10 @@ public class PrintWriter extends Writer {
         }
         try {
             out.close();
+        } catch (InterruptedIOException e) {
+            // An interrupted write is a cancellation, not an output error:
+            // hand the interrupt back to the thread, as the JDK does.
+            Thread.currentThread().interrupt();
         } catch (IOException e) {
             trouble = true;
         } finally {
@@ -113,6 +121,10 @@ public class PrintWriter extends Writer {
         }
         try {
             out.write(c);
+        } catch (InterruptedIOException e) {
+            // An interrupted write is a cancellation, not an output error:
+            // hand the interrupt back to the thread, as the JDK does.
+            Thread.currentThread().interrupt();
         } catch (IOException e) {
             trouble = true;
         }
@@ -126,6 +138,10 @@ public class PrintWriter extends Writer {
         }
         try {
             out.write(buf, off, len);
+        } catch (InterruptedIOException e) {
+            // An interrupted write is a cancellation, not an output error:
+            // hand the interrupt back to the thread, as the JDK does.
+            Thread.currentThread().interrupt();
         } catch (IOException e) {
             trouble = true;
         }
@@ -144,6 +160,10 @@ public class PrintWriter extends Writer {
         }
         try {
             out.write(s, off, len);
+        } catch (InterruptedIOException e) {
+            // An interrupted write is a cancellation, not an output error:
+            // hand the interrupt back to the thread, as the JDK does.
+            Thread.currentThread().interrupt();
         } catch (IOException e) {
             trouble = true;
         }
