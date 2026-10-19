@@ -88,7 +88,8 @@ public class FlutterProjectImporterTest {
         File root = Files.createTempDirectory("flutter-import").toFile();
         File flutterProject = new File(root, "demo");
         write(new File(flutterProject, "pubspec.yaml"), PUBSPEC);
-        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        // imported, so it is a real dependency: one lib/ never imports is not reported
+        write(new File(flutterProject, "lib/main.dart"), "import 'package:some_uncovered_pkg/a.dart';\nvoid main() {}\n");
         write(new File(flutterProject, "lib/pages/home.dart"), "class Home {}\n");
         write(new File(flutterProject, "assets/images/logo.png"), "PNGDATA");
         write(new File(flutterProject, "assets/icons/a.png"), "ICONA");
@@ -103,7 +104,8 @@ public class FlutterProjectImporterTest {
         assertEquals("1.2.3+4", r.appVersion);
         assertTrue(r.covered.toString(), r.covered.get(0).startsWith("flutter ("));
         assertTrue(r.covered.toString(), r.covered.get(1).startsWith("cupertino_icons ("));
-        assertEquals(java.util.Collections.singletonList("some_uncovered_pkg"), r.uncovered);
+        assertEquals(r.uncovered.toString(), 1, r.uncovered.size());
+        assertTrue(r.uncovered.toString(), r.uncovered.get(0).startsWith("some_uncovered_pkg (sources not found"));
         assertTrue(r.missingAssets.toString(), r.missingAssets.isEmpty());
 
         File flutterDir = new File(common, "src/main/flutter");
@@ -660,5 +662,30 @@ public class FlutterProjectImporterTest {
 
     private static String read(File f) throws IOException {
         return new String(Files.readAllBytes(f.toPath()), "UTF-8");
+    }
+
+    @Test
+    public void entryPointForwardsPluginCallbacksOnlyWhenUsed() {
+        String plain = FlutterProjectImporter.entryPointSource("com.example", "Main", "com.example.flutter",
+                java.util.Arrays.asList("flutter", "dio"));
+        assertFalse(plain.contains("implements"));
+        assertFalse(plain.contains("AppLinks"));
+        assertTrue(plain.contains("com.example.flutter.FlutterRegistry.invokeMain();"));
+
+        String all = FlutterProjectImporter.entryPointSource("com.example", "Main", "com.example.flutter",
+                java.util.Arrays.asList("app_links", "flutter_local_notifications", "firebase_messaging"));
+        assertTrue(all.contains("implements com.codename1.notifications.LocalNotificationCallback, "
+                + "com.codename1.push.PushCallback"));
+        assertTrue(all.contains("AppLinks.appStarted();\n        super.start();"));
+        assertTrue(all.contains("FlutterLocalNotificationsPlugin.notificationTapped(notificationId);"));
+        assertTrue(all.contains("FirebaseMessaging.deliver(value, false);"));
+    }
+
+    @Test
+    public void pluginPacksAreCovered() {
+        for (String p : new String[] {"share_plus", "geolocator", "image_picker", "firebase_auth",
+                "firebase_messaging", "google_maps_flutter", "flutter_local_notifications", "app_links"}) {
+            assertTrue(p, FlutterProjectImporter.COVERED.containsKey(p));
+        }
     }
 }

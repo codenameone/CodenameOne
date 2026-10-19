@@ -96,6 +96,31 @@ public final class FlutterProjectImporter {
                 + "extension; MaterialApp.router (plugins.gorouter)");
         COVERED.put("cached_network_image", "CachedNetworkImage/CachedNetworkImageProvider over "
                 + "Image.network (plugins.cachednetworkimage)");
+        COVERED.put("cross_file", "XFile over FileSystemStorage or in-memory bytes (plugins.crossfile)");
+        COVERED.put("share_plus", "SharePlus.instance.share and the static Share API over Display.share "
+                + "(plugins.share)");
+        COVERED.put("package_info_plus", "PackageInfo.fromPlatform from the build properties (plugins.packageinfo)");
+        COVERED.put("device_info_plus", "DeviceInfoPlugin android/ios/deviceInfo from Display properties "
+                + "(plugins.deviceinfo)");
+        COVERED.put("connectivity_plus", "Connectivity.checkConnectivity/onConnectivityChanged over "
+                + "NetworkManager (plugins.connectivity)");
+        COVERED.put("geolocator", "Geolocator positions, permissions and distance/bearing over "
+                + "LocationManager (plugins.geolocator)");
+        COVERED.put("image_picker", "ImagePicker pickImage/pickVideo/pickMedia/pickMultiImage over Capture and "
+                + "the gallery (plugins.imagepicker)");
+        COVERED.put("app_links", "AppLinks initial link and link streams from the AppArg launch property "
+                + "(plugins.applinks)");
+        COVERED.put("flutter_local_notifications", "show/periodicallyShow/zonedSchedule/cancel and tap "
+                + "callbacks over LocalNotification (plugins.notifications)");
+        COVERED.put("firebase_core", "Firebase.initializeApp/FirebaseOptions (plugins.firebase)");
+        COVERED.put("firebase_auth", "FirebaseAuth email/password and anonymous accounts over the Identity "
+                + "Toolkit REST API (plugins.firebase)");
+        COVERED.put("firebase_analytics", "FirebaseAnalytics events logged, screen views to AnalyticsService "
+                + "(plugins.firebase)");
+        COVERED.put("firebase_messaging", "FirebaseMessaging token and foreground onMessage over Codename One "
+                + "push (plugins.firebase)");
+        COVERED.put("google_maps_flutter", "GoogleMap widget with markers, camera and taps over MapView "
+                + "(plugins.googlemaps)");
         // NOT covered, checked and confirmed absent: "collection" (no ListEquality/MapEquality/
         // SetEquality stub -- the one hit on that name is a comment, not an implementation),
         // "flutter_staggered_grid_view" and "nested" (provider's internal composition helper,
@@ -328,7 +353,8 @@ public final class FlutterProjectImporter {
             writePackageName(target, pubspec.name);
 
             if (mainPackage != null && mainClass != null) {
-                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage);
+                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage,
+                        pubspec.dependencies);
             }
             updateSettings(commonDir, pubspec);
 
@@ -742,17 +768,11 @@ public final class FlutterProjectImporter {
         return properties + separator + key + "=" + value + "\n";
     }
 
-    private void writeEntryPoint(File javaDir, String pkg, String cls, String flutterPackage) throws IOException {
+    private void writeEntryPoint(File javaDir, String pkg, String cls, String flutterPackage,
+            java.util.Collection<String> dependencies) throws IOException {
         File f = new File(javaDir, pkg.replace('.', File.separatorChar) + File.separator + cls + ".java");
         f.getParentFile().mkdirs();
-        String src = "package " + pkg + ";\n\n"
-                + "/// The Codename One entry point: starts the imported Flutter application's Dart `main()`.\n"
-                + "public class " + cls + " extends com.codename1.system.Lifecycle {\n"
-                + "    @Override\n"
-                + "    public void runApp() {\n"
-                + "        " + flutterPackage + ".FlutterRegistry.invokeMain();\n"
-                + "    }\n"
-                + "}\n";
+        String src = entryPointSource(pkg, cls, flutterPackage, dependencies);
         byte[] bytes = src.getBytes(Charset.forName("UTF-8"));
         if (f.isFile()) {
             File backup = new File(f.getPath() + ".pre-flutter-import");
@@ -771,6 +791,65 @@ public final class FlutterProjectImporter {
             }
         }
         Files.write(f.toPath(), bytes);
+    }
+
+    /// The entry point's source. The plugin packs that need the platform to call the
+    /// app -- a deep link (app_links), a notification tap (flutter_local_notifications), a
+    /// push (firebase_messaging) -- get their callbacks forwarded here, and only when the
+    /// app depends on them: implementing PushCallback is what turns push on in a build.
+    static String entryPointSource(String pkg, String cls, String flutterPackage,
+            java.util.Collection<String> dependencies) {
+        boolean links = dependencies.contains("app_links");
+        boolean notifications = dependencies.contains("flutter_local_notifications");
+        boolean push = dependencies.contains("firebase_messaging");
+        StringBuilder implementsList = new StringBuilder();
+        if (notifications) {
+            implementsList.append("com.codename1.notifications.LocalNotificationCallback");
+        }
+        if (push) {
+            implementsList.append(implementsList.length() > 0 ? ", " : "").append("com.codename1.push.PushCallback");
+        }
+        StringBuilder b = new StringBuilder();
+        b.append("package ").append(pkg).append(";\n\n")
+                .append("/// The Codename One entry point: starts the imported Flutter application's Dart `main()`.\n")
+                .append("public class ").append(cls).append(" extends com.codename1.system.Lifecycle");
+        if (implementsList.length() > 0) {
+            b.append("\n        implements ").append(implementsList);
+        }
+        b.append(" {\n");
+        if (links) {
+            b.append("    @Override\n")
+                    .append("    public void start() {\n")
+                    .append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n")
+                    .append("        super.start();\n")
+                    .append("    }\n\n");
+        }
+        b.append("    @Override\n")
+                .append("    public void runApp() {\n")
+                .append("        ").append(flutterPackage).append(".FlutterRegistry.invokeMain();\n")
+                .append("    }\n");
+        if (notifications) {
+            b.append("\n    @Override\n")
+                    .append("    public void localNotificationReceived(String notificationId) {\n")
+                    .append("        com.codename1.flutter.plugins.notifications.FlutterLocalNotificationsPlugin")
+                    .append(".notificationTapped(notificationId);\n")
+                    .append("    }\n");
+        }
+        if (push) {
+            b.append("\n    @Override\n")
+                    .append("    public void push(String value) {\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.deliver(value, false);\n")
+                    .append("    }\n\n")
+                    .append("    @Override\n")
+                    .append("    public void registeredForPush(String deviceId) {\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.tokenRegistered(deviceId);\n")
+                    .append("    }\n\n")
+                    .append("    @Override\n")
+                    .append("    public void pushRegistrationError(String error, int errorCode) {\n")
+                    .append("        com.codename1.io.Log.p(\"Push registration failed: \" + error);\n")
+                    .append("    }\n");
+        }
+        return b.append("}\n").toString();
     }
 
     /// The manifest-free minimal record: one `<sha-256> <path>` line per file

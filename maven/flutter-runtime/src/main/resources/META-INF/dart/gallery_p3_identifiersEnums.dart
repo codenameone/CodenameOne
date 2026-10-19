@@ -95,3 +95,7 @@ class Localizations {
   external static T of(BuildContext context, Object type);
   external static Locale localeOf(BuildContext context);
 }
+
+// Flutter's `debugPrint`, the logging call apps use instead of print.
+@JavaName('com.codename1.flutter.foundation.FoundationLib.debugPrint')
+external void debugPrint(String? message, {int? wrapWidth});

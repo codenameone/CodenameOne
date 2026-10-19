@@ -8315,8 +8315,24 @@ public final class JavaEmitter {
             }
             ctx.importClass(cls);
             String simple = cls.substring(cls.lastIndexOf('.') + 1);
-            return new Out(simple + "." + method + "(" + methodArgs(sf.params, c.args, ctx) + ")",
-                    sf.returnType);
+            String call = simple + "." + method + "(" + methodArgs(sf.params, c.args, ctx) + ")";
+            if (!sf.typeParams.isEmpty() && sf.returnType != null) {
+                // showDialog<bool>(...): bind the function's own type parameters -- to the
+                // call's type arguments, else dynamic -- and cast the erased Java result to
+                // match, as a generic stub method's call is.
+                List<TypeRef> bound = new ArrayList<TypeRef>();
+                for (int i = 0; i < sf.typeParams.size(); i++) {
+                    bound.add(i < c.typeArgs.size() && !isTypeVariable(c.typeArgs.get(i), ctx)
+                            ? c.typeArgs.get(i) : TypeRef.DYNAMIC);
+                }
+                TypeRef rt = substituteTypeParam(sf.returnType, sf.typeParams, bound);
+                String jt = javaType(rt, true, ctx);
+                if (jt != null && !jt.equals("Object")) {
+                    return new Out("((" + jt + ") (Object) " + call + ")", rt);
+                }
+                return new Out(call, rt);
+            }
+            return new Out(call, sf.returnType);
         }
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
@@ -8436,15 +8452,23 @@ public final class JavaEmitter {
             }
             ClassDecl pc = program.classes.get(cls);
             if (pc != null) {
+                // The Java name, which is library-prefixed when the class shares its name
+                // with a stub (an app's own User beside firebase_auth's): the raw Dart name
+                // then named the stub, or nothing at all.
+                ClassDecl visible = program.resolveClass(cls, ctx.library());
+                if (visible != null) {
+                    pc = visible;
+                }
+                String jcls = javaClassName(pc);
                 MethodDecl m = pc.method(n);
                 if (m != null && m.isStatic) {
-                    return new Out(cls + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
+                    return new Out(jcls + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
                             m.returnType == null ? TypeRef.DYNAMIC : m.returnType);
                 }
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
                     // named (or named factory) constructor -> static factory
-                    return new Out(cls + "." + n + "(" + canonicalArgs(named, c.args, ctx) + ")",
+                    return new Out(jcls + "." + javaIdent(n) + "(" + canonicalArgs(named, c.args, ctx) + ")",
                             new TypeRef(cls));
                 }
                 diags.error(c, "E0136", "Cannot resolve static member or constructor '" + cls + "." + n + "'");
@@ -8564,7 +8588,7 @@ public final class JavaEmitter {
                 // Narrow a generic method result (declared `T evaluate(...)`) to the
                 // concrete type argument the receiver instantiates.
                 TypeRef sub = stubMemberReturnType(tt, n, false);
-                return stubCallOut(m, c, target.code + "." + n, ctx, sub);
+                return stubCallOut(withReceiverCallbackTypes(m, tt), c, target.code + "." + n, ctx, sub);
             }
         }
         // State<T> lifecycle overrides not present on the minimal State stub surface
@@ -10513,7 +10537,18 @@ public final class JavaEmitter {
         // declares (javac then rejects the local it types). Resolve any of the method's
         // own generics that still appear anywhere in the result.
         result = bindMethodTypeParams(result, m, c, ctx);
-        return new Out(explicitTypeArgs(callee, m, c, result, ctx) + "(" + args + ")", result);
+        String typed = explicitTypeArgs(callee, m, c, result, ctx);
+        if (!typed.equals(callee)) {
+            // javac ignores type arguments on a method that is not generic in Java --
+            // Navigator's push<T> answers Future<Object> -- so the result is also cast
+            // through Object to what the Dart signature promises. An erased cast: the
+            // Java runtime checks only the raw class, which the method already returns.
+            String jt = javaType(result, true, ctx);
+            if (jt != null && !jt.equals("Object")) {
+                return new Out("((" + jt + ") (Object) " + typed + "(" + args + "))", result);
+            }
+        }
+        return new Out(typed + "(" + args + ")", result);
     }
 
     /**
@@ -11457,6 +11492,10 @@ public final class JavaEmitter {
             }
             return simple;
         }
+        Ast.EnumDecl own = visibleProgramEnum(t.name, ctx);
+        if (own != null) {
+            return javaEnumName(own);
+        }
         Ast.EnumDecl se = stubs.enums.get(t.name);
         if (se != null && se.javaName != null) {
             ctx.importClass(se.javaName);
@@ -11573,6 +11612,9 @@ public final class JavaEmitter {
     }
 
     private void importEnum(String dartName, Ctx ctx) {
+        if (visibleProgramEnum(dartName, ctx) != null) {
+            return;
+        }
         Ast.EnumDecl se = stubs.enums.get(dartName);
         if (se != null && se.javaName != null) {
             ctx.importClass(se.javaName);
@@ -11580,12 +11622,42 @@ public final class JavaEmitter {
     }
 
     private String simpleEnumName(String dartName, Ctx ctx) {
+        Ast.EnumDecl own = visibleProgramEnum(dartName, ctx);
+        if (own != null) {
+            return javaEnumName(own);
+        }
         Ast.EnumDecl se = stubs.enums.get(dartName);
         if (se != null && se.javaName != null) {
             return se.javaName.substring(se.javaName.lastIndexOf('.') + 1);
         }
         Ast.EnumDecl pe = programEnum(dartName, ctx);
         return pe != null ? javaEnumName(pe) : dartName;
+    }
+
+    /**
+     * A user enum the emitting library declares or imports directly, which wins over a stub
+     * enum of the same name: stubs are global, so an app's own {@code Priority} or
+     * {@code ResponseType} used to be replaced by flutter_local_notifications' or dio's,
+     * whatever it imported. Null when no such enum is in scope.
+     */
+    private Ast.EnumDecl visibleProgramEnum(String name, Ctx ctx) {
+        Library from = ctx != null ? ctx.library() : null;
+        if (from == null || !stubs.isStubEnum(name)) {
+            return null;
+        }
+        Ast.EnumDecl pe = program.resolveEnum(name, from);
+        if (pe == null || pe.ownerLibrary == null) {
+            return null;
+        }
+        if (pe.ownerLibrary == from) {
+            return pe;
+        }
+        for (String uri : from.imports) {
+            if (program.resolveImportedLibrary(from, uri) == pe.ownerLibrary) {
+                return pe;
+            }
+        }
+        return null;
     }
 
     /** A user enum by simple name, preferring the one the code being emitted can see. */
@@ -12044,6 +12116,87 @@ public final class JavaEmitter {
      * / {@code Animatable<T>}) to {@code Color}. Returns {@code null} when the member
      * is not found on the stub chain (leaving the caller's default type in place).
      */
+    /**
+     * {@code m} with its callback parameters' class type variables replaced by the
+     * receiver's type arguments: {@code Stream<List<int>>.listen} expects a
+     * {@code void Function(List<int>)}, so the closure passed to it types its
+     * parameter and {@code xs.contains(1)} is a typed call. Without it the parameter
+     * was dynamic and every member read went through {@code Dyn}, whose untyped
+     * result javac then rejected. Unbound variables (a raw receiver) become dynamic.
+     * Only callbacks change; value parameters keep their declared types.
+     */
+    private Ast.MethodDecl withReceiverCallbackTypes(Ast.MethodDecl m, TypeRef receiver) {
+        Ast.ClassDecl c = receiver == null ? null : stubs.classes.get(receiver.name);
+        if (c == null || c.typeParams.isEmpty() || !c.methods.contains(m)) {
+            return m;
+        }
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            // A raw receiver comes back as the stub's own `Stream<T>`; that T, like any
+            // type variable, is no type the closure can declare, so it stays dynamic.
+            TypeRef a = i < receiver.args.size() ? receiver.args.get(i) : null;
+            subst.put(c.typeParams.get(i), a != null && isConcreteType(a) ? a : TypeRef.DYNAMIC);
+        }
+        List<Param> params = new ArrayList<Param>();
+        boolean changed = false;
+        for (Param p : m.params) {
+            TypeRef nt = p.type != null && p.type.funcParams != null ? substFunctionType(p.type, subst) : p.type;
+            if (nt != p.type) {
+                Param q = new Param();
+                q.type = nt;
+                q.name = p.name;
+                q.named = p.named;
+                q.required = p.required;
+                q.isThis = p.isThis;
+                q.isSuper = p.isSuper;
+                q.defaultValue = p.defaultValue;
+                params.add(q);
+                changed = true;
+            } else {
+                params.add(p);
+            }
+        }
+        if (!changed) {
+            return m;
+        }
+        Ast.MethodDecl copy = new Ast.MethodDecl();
+        copy.returnType = m.returnType;
+        copy.name = m.name;
+        copy.typeParams = m.typeParams;
+        copy.params = params;
+        copy.isStatic = m.isStatic;
+        copy.isGetter = m.isGetter;
+        copy.isSetter = m.isSetter;
+        copy.isAbstract = m.isAbstract;
+        copy.isAsync = m.isAsync;
+        return copy;
+    }
+
+    /** {@link #substTypeVars}, reaching into an inline function type's signature too. */
+    private TypeRef substFunctionType(TypeRef t, java.util.Map<String, TypeRef> subst) {
+        if (t == null || t.funcParams == null) {
+            return substTypeVars(t, subst);
+        }
+        boolean changed = false;
+        List<TypeRef> fps = new ArrayList<TypeRef>();
+        for (TypeRef fp : t.funcParams) {
+            TypeRef nfp = substFunctionType(fp, subst);
+            changed |= nfp != fp;
+            fps.add(nfp);
+        }
+        TypeRef ret = substFunctionType(t.funcReturn, subst);
+        changed |= ret != t.funcReturn;
+        if (!changed) {
+            return t;
+        }
+        TypeRef nt = new TypeRef(t.name);
+        nt.args.addAll(t.args);
+        nt.nullable = t.nullable;
+        nt.funcParams = fps;
+        nt.funcReturn = ret;
+        return nt;
+    }
+
     private TypeRef stubMemberReturnType(TypeRef receiver, String member, boolean getter) {
         if (receiver == null) {
             return null;

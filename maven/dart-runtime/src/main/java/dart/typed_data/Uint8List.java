@@ -54,6 +54,10 @@ public final class Uint8List {
 
     /** {@code Uint8List.fromList(source)} with a source typed only dynamic. */
     public static Uint8List fromList(Object source) {
+        if (source instanceof Uint8List) {
+            // a Uint8List IS a List<int> in Dart (utf8.encode returns one), but not a java.util.List here
+            return fromBytes(((Uint8List) source).bytes);
+        }
         if (!(source instanceof List)) {
             throw new dart.core.TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
                     + "' is not a subtype of type 'List<int>'");

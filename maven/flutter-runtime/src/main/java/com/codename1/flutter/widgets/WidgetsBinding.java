@@ -55,6 +55,11 @@ public final class WidgetsBinding {
     /** Dart's {@code WidgetsBinding.instance}. */
     public static final WidgetsBinding instance = new WidgetsBinding();
 
+    /** {@code WidgetsFlutterBinding.ensureInitialized()}: the Display is up before main() runs. */
+    public static WidgetsBinding ensureInitialized() {
+        return instance;
+    }
+
     private final PlatformDispatcher platformDispatcher = new PlatformDispatcher();
 
     private WidgetsBinding() {
