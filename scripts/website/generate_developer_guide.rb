@@ -74,6 +74,11 @@ class GuidePages
         fence = '`' * [3, (node.source.scan(/`+/).map(&:length).max || 0) + 1].max
         # A role (cn1-no-try marks server code the inline Playground cannot run)
         # becomes a class on the block's wrapper, where cn1-snippet-runner.js looks.
+        # Hugo honours attributes on a code FENCE with its default configuration;
+        # markup.goldmark.parser.attribute.block is only for other blocks
+        # (paragraphs, lists), so hugo.toml needs nothing for this. Measured with
+        # Hugo 0.151: the fence renders as <div class="highlight cn1-no-try">.
+        # The site has no render-codeblock hook that could drop it.
         attrs = node.role ? %( {class="#{CGI.escapeHTML(node.role)}"}) : ''
         "#{fence}#{node.attr('language')}#{attrs}\n#{node.source}\n#{fence}\n\n"
       else

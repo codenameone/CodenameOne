@@ -151,6 +151,10 @@ def javadoc_snippets():
         for line in out.splitlines():
             if line.strip():
                 r = json.loads(line)
+                # Unpublished, so no page shows these snippets: the same filter
+                # .github/scripts/build_javadocs.sh applies to its source list.
+                if "/com/codename1/impl/" in "/" + r["sourceFile"]:
+                    continue
                 yield r["sourceFile"], r.get("startLine", 0), r.get("code", "")
 
 

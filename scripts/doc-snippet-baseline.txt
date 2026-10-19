@@ -119,8 +119,6 @@ CodenameOne/src/com/codename1/home/TraitReadRequest.java#6e38d4c22738
 CodenameOne/src/com/codename1/home/TraitWrite.java#4b0a8200d030
 CodenameOne/src/com/codename1/home/commissioning/Commissioner.java#2b90b524af03
 CodenameOne/src/com/codename1/home/commissioning/CommissioningRequest.java#5133a9a82da8
-CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java#93e1a7b58036
-CodenameOne/src/com/codename1/impl/SharedWithBackend.java#691e1a06c10f
 CodenameOne/src/com/codename1/intents/IntentContext.java#4385cc2a9514
 CodenameOne/src/com/codename1/intents/IntentResult.java#9dec302c89b0
 CodenameOne/src/com/codename1/intents/Intents.java#76b6c30c8ee4

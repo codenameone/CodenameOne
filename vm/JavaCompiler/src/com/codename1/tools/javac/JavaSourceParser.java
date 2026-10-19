@@ -475,7 +475,10 @@ final class JavaSourceParser {
         boolean memberOnly = false;
         while (true) {
             Kind kind = peek(k).kind;
-            if (kind == Kind.PUBLIC || kind == Kind.PRIVATE || kind == Kind.PROTECTED || kind == Kind.STATIC) {
+            if (kind == Kind.PUBLIC || kind == Kind.PRIVATE || kind == Kind.PROTECTED || kind == Kind.STATIC
+                    || kind == Kind.TRANSIENT || kind == Kind.VOLATILE) {
+                // transient and volatile are field-only modifiers too: a local
+                // cannot carry them, so volatile boolean stopped; is a field.
                 memberOnly = true;
             } else if (kind == Kind.AT && peek(k + 1).kind == Kind.IDENT) {
                 // An annotation (@Deprecated private String value;): @Name or
@@ -493,7 +496,7 @@ final class JavaSourceParser {
                     k = close - p + 1;
                 }
                 continue;
-            } else if (kind != Kind.FINAL && kind != Kind.TRANSIENT && kind != Kind.VOLATILE) {
+            } else if (kind != Kind.FINAL) {
                 break;
             }
             k++;

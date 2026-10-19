@@ -207,6 +207,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "private static final int COUNT = 2;\n"
                 + "String twice() { return greeting + COUNT; }\n"
                 + "root.add(new Label(twice()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "top_level_volatile_transient_field", ui(""
+                + "volatile boolean stopped;\n"
+                + "transient int count = 2;\n"
+                + "root.add(new Label(stopped + \" \" + count));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "top_level_annotated_field", ui(""
                 + "@Deprecated private String greeting = \"hi\";\n"
                 + "@SuppressWarnings(\"unused\") static int count = 2;\n"
