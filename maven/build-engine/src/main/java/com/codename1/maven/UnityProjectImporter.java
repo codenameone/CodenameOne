@@ -257,12 +257,29 @@ public final class UnityProjectImporter {
                 // Only paths under the two copied directories: the record is
                 // a file in the project, and a line edited into it must not
                 // be able to name a file elsewhere for deletion.
-                if (line.indexOf("..") < 0 && (line.startsWith("Assets/") || line.startsWith("ProjectSettings/"))) {
+                if (!hasParentStep(line) && (line.startsWith("Assets/") || line.startsWith("ProjectSettings/"))) {
                     out.add(line);
                 }
             }
         }
         return out;
+    }
+
+    /// True if a component of the path is exactly `..`. A name that only
+    /// contains two dots, `icon..png`, is an ordinary file.
+    private static boolean hasParentStep(String path) {
+        int start = 0;
+        while (start <= path.length()) {
+            int end = path.indexOf('/', start);
+            if (end < 0) {
+                end = path.length();
+            }
+            if (end - start == 2 && path.startsWith("..", start)) {
+                return true;
+            }
+            start = end + 1;
+        }
+        return false;
     }
 
     private static void writeImportRecord(File target, Set<String> imported) throws IOException {

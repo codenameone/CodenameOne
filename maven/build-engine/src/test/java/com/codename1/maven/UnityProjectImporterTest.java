@@ -203,6 +203,19 @@ public class UnityProjectImporterTest {
         assertTrue(outside.isFile());
     }
 
+    /// Two dots inside a name are not a step up: such a file is still
+    /// removed when it leaves the project.
+    @Test
+    public void aNameWithTwoDotsIsMirrored() throws Exception {
+        File dotted = new File(game, "Assets/icon..txt");
+        write(dotted, "x");
+        importIt();
+        assertTrue(new File(unity, "Assets/icon..txt").isFile());
+        assertTrue(dotted.delete());
+        importIt();
+        assertFalse(new File(unity, "Assets/icon..txt").exists());
+    }
+
     @Test
     public void refusesWhatIsNotAUnityProject() throws Exception {
         File notOne = tmp.newFolder("notes");

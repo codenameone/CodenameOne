@@ -1073,6 +1073,11 @@ public class UnityProjectBuilder {
         }
         for (File f : files) {
             String name = f.getName();
+            // A linked directory is not followed, as the importer does not
+            // follow one: a link to an ancestor would recurse without end.
+            if (Files.isSymbolicLink(f.toPath()) && f.isDirectory()) {
+                continue;
+            }
             if (f.isDirectory()) {
                 collectStamped(f, prefix + name + "/", out, md, buffer);
                 continue;
