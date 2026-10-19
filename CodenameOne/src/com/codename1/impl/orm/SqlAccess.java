@@ -43,7 +43,8 @@ public interface SqlAccess {
     /// database reports none or the dialect does not say; then 1 when the
     /// database assigns the column's value on insert (identity, auto-increment,
     /// a sequence default, SQLite's rowid), and 1 when it refuses writes to it
-    /// (a generated column, or an identity GENERATED ALWAYS).
+    /// or rewrites it on its own (a generated column, an identity GENERATED
+    /// ALWAYS, MySQL's ON UPDATE CURRENT_TIMESTAMP).
     List<Object[]> describe(String table) throws IOException;
     /// Quotes a single SQL identifier for this dialect.
     String quote(String name);

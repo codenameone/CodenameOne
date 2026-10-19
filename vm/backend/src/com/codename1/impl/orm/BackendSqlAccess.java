@@ -84,7 +84,10 @@ public final class BackendSqlAccess implements SqlAccess {
                 : "CASE WHEN c.column_default IS NOT NULL AND upper(c.column_default) <> 'NULL' AND upper(c.column_default) NOT LIKE 'NULL::%' OR c.is_identity='YES' OR c.is_generated='ALWAYS' THEN 1 ELSE 0 END";
         String keyGenerated = mysql ? "CASE WHEN c.extra LIKE '%auto_increment%' THEN 1 ELSE 0 END"
                 : "CASE WHEN c.is_identity='YES' OR c.column_default LIKE 'nextval(%' THEN 1 ELSE 0 END";
-        String readOnly = mysql ? "CASE WHEN c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' THEN 1 ELSE 0 END"
+        // ON UPDATE CURRENT_TIMESTAMP rewrites the column on every update the
+        // mapping makes without writing it, so the entity keeps a stale value;
+        // it counts as a column the database writes.
+        String readOnly = mysql ? "CASE WHEN c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' OR c.extra LIKE '%on update%' THEN 1 ELSE 0 END"
                 : "CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' AND c.identity_generation='ALWAYS' THEN 1 ELSE 0 END";
         // PostgreSQL: a nondeterministic collation can find distinct strings
         // equal, which a text key cannot allow; SessionImpl reads the mark.

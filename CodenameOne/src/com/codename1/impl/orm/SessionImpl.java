@@ -1375,6 +1375,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
                 // A unique index refuses the second of two values it finds
                 // equal, so its text columns need the same collation as a key.
+                // Other text columns keep theirs: a case-insensitive default
+                // collation is what most existing MySQL schemas use, and it
+                // changes how a query matches and sorts, not what is stored or
+                // read back, so adopting such a schema keeps its semantics.
                 boolean distinct = attr.id || uniqueIndexed(model, attr);
                 String role = attr.id ? "Identifier " : "Unique column ";
                 if (distinct && attr.kind == Attribute.TEXT && found.length > 5
@@ -1400,7 +1404,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                 "The database does not generate " + name + ", which the mapping leaves to it"));
                     } else if (!attr.generated && ((Number) found[7]).intValue() != 0) {
                         errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
-                                "The database generates " + name + " and refuses writes the mapping makes"));
+                                "The database generates " + name + " itself and refuses or overwrites what the mapping writes"));
                     }
                 }
                 String expected = columnType(model, i);
@@ -1511,7 +1515,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (found.length > 7 && ((Number) found[7]).intValue() != 0) {
                 // Collection writes insert every mapped column.
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
-                        "The database generates " + name + " and refuses writes the mapping makes"));
+                        "The database generates " + name + " itself and refuses or overwrites what the mapping writes"));
             }
             if (attr.id != primary) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -2007,6 +2011,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String token = firstTypeToken(type);
         if ("postgresql".equals(sql.dialect()) && ("bool".equals(token) || "boolean".equals(token))) {
             return 6;
+        }
+        if ("enum".equals(token) || "set".equals(token)) {
+            // MySQL's ENUM and SET take only their listed values, and the
+            // labels can spell any type name, so nothing below may look inside.
+            return 0;
         }
         if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
             return 1;
