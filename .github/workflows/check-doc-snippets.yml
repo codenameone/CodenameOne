@@ -10,7 +10,11 @@ on:
   pull_request:
     paths:
       - 'docs/developer-guide/**'
-      - 'docs/demos/common/src/main/java/**'
+      # Every tree a guide page includes Java from: changing an included file
+      # changes the published snippet without touching the .asciidoc.
+      - 'docs/demos/**'
+      - 'scripts/wayline/**'
+      - 'docs/website/content/blog/**'
       - 'CodenameOne/src/**/*.java'
       - 'Ports/CLDC11/src/**/*.java'
       - 'scripts/cn1playground/common/**'

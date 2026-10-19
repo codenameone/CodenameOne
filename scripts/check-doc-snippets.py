@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Classify every Java snippet in the developer guide and the API reference the
-way the inline Playground treats it when a reader clicks "Try it".
+"""Classify every Java snippet in the developer guide, the API reference and the
+blog the way the inline Playground treats it when a reader clicks "Try it".
 
 Every Java block on those pages carries a "Try it" button that opens it in an
 editor with a live preview (docs/website/static/js/cn1-snippet-runner.js). A
@@ -37,6 +37,7 @@ GUIDE = ROOT / "docs" / "developer-guide"
 CORE = ROOT / "CodenameOne" / "src"
 # The client API reference is rendered from both trees, so both carry "Try it".
 CLDC = ROOT / "Ports" / "CLDC11" / "src"
+BLOG = ROOT / "docs" / "website" / "content" / "blog"
 BASELINE = ROOT / "scripts" / "doc-snippet-baseline.txt"
 PLAYGROUND = ROOT / "scripts" / "cn1playground"
 BUILD_DIR = PLAYGROUND / "common" / "target" / "snippet-cli"
@@ -45,6 +46,12 @@ SOURCE_JAVA = re.compile(r"^\[source,\s*java\b")
 # Server code (the backend chapters, anything included from a backend/src tree) is
 # marked with this role: a client Playground cannot run it, so it gets no button.
 NO_TRY_ROLE = "role=cn1-no-try"
+# A Markdown fence the site renders as Java: ```java, optionally with Hugo
+# attributes ({class="cn1-no-try"} opts a block out, as the guide's role does).
+MD_FENCE = re.compile(r"^(\s*)(`{3,}|~{3,})\s*java\s*(\{.*\})?\s*$")
+# cn1-snippet-runner.js gives no button to code importing the backend API, which
+# the browser Playground does not ship. Keep the two in step.
+BACKEND_IMPORT = re.compile(r"^\s*import\s+(static\s+)?com\.codename1\.backend\b", re.M)
 INCLUDE = re.compile(r"^include::([^\[]+)\[(.*)\]\s*$")
 TAG_MARKER = re.compile(r"(tag|end)::([\w.-]+)\[\]")
 
@@ -115,6 +122,28 @@ def guide_snippets():
             i += 1
 
 
+def blog_snippets():
+    for post in sorted(BLOG.rglob("*.md")):
+        lines = post.read_text(encoding="utf-8").splitlines()
+        i = 0
+        while i < len(lines):
+            m = MD_FENCE.match(lines[i])
+            if not m:
+                i += 1
+                continue
+            indent, fence, attrs = m.group(1), m.group(2), m.group(3) or ""
+            k = i + 1
+            body = []
+            while k < len(lines) and not (lines[k].strip().startswith(fence[0] * len(fence))
+                                          and not lines[k].strip().strip(fence[0])):
+                body.append(lines[k][len(indent):] if lines[k].startswith(indent) else lines[k])
+                k += 1
+            code = "\n".join(body).rstrip()
+            if "cn1-no-try" not in attrs and not BACKEND_IMPORT.search(code):
+                yield str(post.relative_to(ROOT)), i + 1, code
+            i = k + 1
+
+
 def javadoc_snippets():
     for tree in (CORE, CLDC):
         out = subprocess.run([str(ROOT / "scripts" / "extract-javadoc-java-snippets.sh"), str(tree)],
@@ -170,7 +199,7 @@ def main():
     args = ap.parse_args()
 
     snippets, seen = [], set()
-    for src, line, code in list(guide_snippets()) + list(javadoc_snippets()):
+    for src, line, code in list(guide_snippets()) + list(javadoc_snippets()) + list(blog_snippets()):
         if not code.strip():
             continue
         key = f"{src}#{hashlib.sha1(code.encode('utf-8')).hexdigest()[:12]}"
