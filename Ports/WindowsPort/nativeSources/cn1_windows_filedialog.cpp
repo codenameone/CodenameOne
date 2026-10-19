@@ -233,8 +233,16 @@ public:
     IFACEMETHODIMP OnFolderChanging(IFileDialog*, IShellItem*) { return S_OK; }
     IFACEMETHODIMP OnFolderChange(IFileDialog*) { return S_OK; }
     IFACEMETHODIMP OnSelectionChange(IFileDialog*) { return S_OK; }
-    IFACEMETHODIMP OnShareViolation(IFileDialog*, IShellItem*, FDE_SHAREVIOLATION_RESPONSE*) { return S_OK; }
-    IFACEMETHODIMP OnOverwrite(IFileDialog*, IShellItem*, FDE_OVERWRITE_RESPONSE*) { return S_OK; }
+    /* Only the type change matters here; both conflicts keep the shell's own
+     * handling, which needs the response set, not left indeterminate. */
+    IFACEMETHODIMP OnShareViolation(IFileDialog*, IShellItem*, FDE_SHAREVIOLATION_RESPONSE* response) {
+        *response = FDESVR_DEFAULT;
+        return S_OK;
+    }
+    IFACEMETHODIMP OnOverwrite(IFileDialog*, IShellItem*, FDE_OVERWRITE_RESPONSE* response) {
+        *response = FDEOR_DEFAULT;
+        return S_OK;
+    }
 private:
     LONG refs;
     Cn1FdxRequest* req;

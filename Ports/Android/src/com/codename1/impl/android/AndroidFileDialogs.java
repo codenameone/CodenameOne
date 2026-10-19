@@ -464,11 +464,32 @@ final class AndroidFileDialogs {
             cursor.close();
         }
         for (String[] e : entries) {
-            File child = new File(dest, safeName(e[1], "document"));
+            File child = uniqueChild(dest, safeName(e[1], "document"));
             if (android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(e[2])) {
                 copyTreeChildren(resolver, tree, e[0], child);
             } else {
                 copyStream(resolver, android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, e[0]), child);
+            }
+        }
+    }
+
+    /*
+     * A provider (a cloud drive, typically) may list two siblings under one
+     * display name. Each gets its own local name, "name (2).ext" and so on,
+     * rather than the second overwriting the first or merging into it.
+     */
+    private static File uniqueChild(File dir, String name) {
+        File f = new File(dir, name);
+        if (!f.exists()) {
+            return f;
+        }
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        for (int n = 2; ; n++) {
+            f = new File(dir, base + " (" + n + ")" + ext);
+            if (!f.exists()) {
+                return f;
             }
         }
     }

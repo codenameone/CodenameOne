@@ -7035,9 +7035,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (paths == null || paths.length() == 0) {
                     r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
                 } else {
+                    // The native escapes '%' and newline in each path (cn1FileDialogJoin)
                     java.util.List<String> list = StringUtil.tokenize(paths, '\n');
-                    r = new com.codename1.io.filechooser.FileDialogResult(pending.request,
-                            list.toArray(new String[list.size()]), -1, null);
+                    String[] arr = new String[list.size()];
+                    for (int i = 0; i < arr.length; i++) {
+                        arr[i] = StringUtil.replaceAll(StringUtil.replaceAll(list.get(i), "%0a", "\n"), "%25", "%");
+                    }
+                    r = new com.codename1.io.filechooser.FileDialogResult(pending.request, arr, -1, null);
                 }
                 if (pending.tempFile != null) {
                     // Exported as a copy or moved away; either way the staging

@@ -9250,6 +9250,21 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
     return result;
 }
 
+// Newline separates the paths handed to fileDialogResult, and a file name may
+// legally contain one, so each path is escaped first ('%' before '\n', so a
+// literal "%0a" stays literal). IOSImplementation.fileDialogResult undoes it.
+static NSString *cn1FileDialogJoin(NSArray *paths) {
+    if ([paths count] == 0) {
+        return nil;
+    }
+    NSMutableArray *escaped = [NSMutableArray arrayWithCapacity:[paths count]];
+    for (NSString *p in paths) {
+        NSString *e = [p stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        [escaped addObject:[e stringByReplacingOccurrencesOfString:@"\n" withString:@"%0a"]];
+    }
+    return [escaped componentsJoinedByString:@"\n"];
+}
+
 @interface CN1FileDialogDelegate : NSObject <UIDocumentPickerDelegate>
 @property (nonatomic, assign) JAVA_INT requestId;
 @property (nonatomic, assign) BOOL exporting;
@@ -9276,7 +9291,7 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
                 [paths addObject:[url path]];
             }
         }
-        [self finish:controller paths:[paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"]];
+        [self finish:controller paths:cn1FileDialogJoin(paths)];
         return;
     }
     // Delegate callbacks run on the main thread, and an import may copy a
@@ -9291,7 +9306,7 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
                 [paths addObject:p];
             }
         }
-        NSString *joined = [paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"];
+        NSString *joined = cn1FileDialogJoin(paths);
         dispatch_async(dispatch_get_main_queue(), ^{
             [self finish:controller paths:joined];
         });

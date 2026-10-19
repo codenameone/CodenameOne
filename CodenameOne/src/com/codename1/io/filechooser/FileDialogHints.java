@@ -54,12 +54,6 @@ public final class FileDialogHints {
     /// `String`: the folder Windows shows when the user has no recent folder,
     /// as opposed to `FileDialogRequest#initialDirectory`, which always wins.
     public static final String WIN_DEFAULT_FOLDER = "win.defaultFolder";
-    /// `String`: an id under which the browser remembers the last directory
-    /// (`showSaveFilePicker`'s `id`).
-    public static final String WEB_ID = "web.id";
-    /// `String`: a well-known browser directory to start in: `desktop`,
-    /// `documents`, `downloads`, `music`, `pictures` or `videos`.
-    public static final String WEB_START_IN = "web.startIn";
     /// `Boolean`: show hidden files in the GTK chooser and the simulator.
     public static final String DESKTOP_SHOW_HIDDEN = "desktop.showHidden";
 

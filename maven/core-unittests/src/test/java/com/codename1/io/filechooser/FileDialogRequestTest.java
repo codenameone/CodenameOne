@@ -68,12 +68,12 @@ class FileDialogRequestTest {
     void hintsAreTyped() {
         OpenFileRequest r = new OpenFileRequest()
                 .hint(FileDialogHints.MAC_SHOWS_HIDDEN_FILES, Boolean.TRUE)
-                .hint(FileDialogHints.WEB_START_IN, "documents")
+                .hint(FileDialogHints.WIN_DEFAULT_FOLDER, "documents")
                 .hint("x.flag", "TRUE");
         assertTrue(r.getBooleanHint(FileDialogHints.MAC_SHOWS_HIDDEN_FILES, false));
         assertTrue(r.getBooleanHint("x.flag", false));
         assertTrue(r.getBooleanHint("missing", true));
-        assertEquals("documents", r.getStringHint(FileDialogHints.WEB_START_IN));
+        assertEquals("documents", r.getStringHint(FileDialogHints.WIN_DEFAULT_FOLDER));
         assertNull(r.getStringHint("missing"));
     }
 
