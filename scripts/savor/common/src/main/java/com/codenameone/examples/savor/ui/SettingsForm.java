@@ -259,7 +259,8 @@ public final class SettingsForm {
         Container page = Ui.page();
         page.add(Ui.banner(FontImage.MATERIAL_DELETE_FOREVER, "Delete your account?",
                 "Your sign-in, your profile, your saved cards and your settings are removed "
-                + "for good. Deliveries you took stay in the service's records without your name.",
+                + "for good. Deliveries you took stay in the service's records, under the email "
+                + "address you signed in with.",
                 "SvBannerIconBad"));
         // Asked for again, as changing the password asks: being signed in is
         // what a borrowed phone is, too, and the server refuses without it.

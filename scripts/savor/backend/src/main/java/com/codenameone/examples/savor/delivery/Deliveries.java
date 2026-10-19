@@ -892,6 +892,12 @@ public class Deliveries {
         }
         long fareCents = delivery.getFareCents();
         long tip = delivery.getTipCents();
+        // What the customer pays is the order's whole total (food, fees, tax,
+        // discount and the checkout tip) plus a tip given after arrival. The
+        // courier collects exactly this for a cash order, so the fare alone is
+        // far too little. A delivery shares its order's id.
+        CustomerOrder order = orders.findById(delivery.getId());
+        long total = (order == null ? fareCents : order.getTotalCents()) + tip;
         return new DeliveryDto(
                 delivery.getId(),
                 state,
@@ -924,7 +930,7 @@ public class Deliveries {
                 Payments.CASH.equals(delivery.getMethodId()),
                 0L,
                 tip,
-                fareCents + tip,
+                total,
                 courierPhotoInitials,
                 etaMinutes,
                 delivery.getNote(),

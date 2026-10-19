@@ -42,7 +42,8 @@ import com.codename1.annotations.Mapped;
 /// @param cash True when the customer pays the courier in cash, so that the courier's screen can say to
 ///     collect it. The label above is for people and is not compared.
 /// @param serviceFee Cents, like every amount here.
-/// @param total What the customer pays: the fare, the service fee and the tip.
+/// @param total What the customer pays: the order's whole total plus any tip given after arrival.
+///     A courier collects this for a cash order.
 /// @param courierPhotoInitials The courier's initials, for a badge where a photo would go.
 /// @param etaMinutes Minutes until the courier reaches the pickup, or the drop-off once the trip has
 ///     started; 0 when there is nothing to estimate.

@@ -682,9 +682,22 @@ public final class Ui {
         ToastBar.showInfoMessage(Lang.tr(message));
     }
 
+    /// The server's currency, from the payment config; null until it is known.
+    private static String currency;
+
+    /// Records the currency the server prices everything in.
+    public static void setCurrency(String code) {
+        currency = code;
+    }
+
     /// An amount of money. Whole cents in and text out: `$12.40` for dollars,
     /// and the amount followed by the currency's code for anything else.
     public static String money(long cents, String currency) {
+        if (currency == null || currency.length() == 0) {
+            // Menus, options and carts carry no currency of their own: they are
+            // in the one the server is configured for (savor.currency).
+            currency = Ui.currency;
+        }
         long whole = cents / 100;
         long part = Math.abs(cents % 100);
         String amount = whole + "." + (part < 10 ? "0" : "") + part;

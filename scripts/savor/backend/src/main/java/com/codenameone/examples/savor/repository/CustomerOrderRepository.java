@@ -39,7 +39,8 @@ public interface CustomerOrderRepository extends CrudRepository<CustomerOrder, S
     List<CustomerOrder> findByRestaurantIdAndStateInOrderByPlacedAtAsc(String restaurantId,
             OrderState[] states);
 
-    List<CustomerOrder> findTop50ByRestaurantIdOrderByPlacedAtDesc(String restaurantId);
+    List<CustomerOrder> findTop50ByRestaurantIdAndStateInOrderByPlacedAtDesc(String restaurantId,
+            OrderState[] states);
 
     List<CustomerOrder> findByRestaurantIdAndStateAndDeliveredAtGreaterThanEqual(String restaurantId,
             OrderState state, long since);

@@ -61,6 +61,10 @@ public final class CheckoutForm {
     private boolean placing;
     /// Whether the totals shown are the price of the cart as it is now.
     private boolean quoted;
+    /// The food's price as the server last quoted it, or -1 before any quote.
+    /// The cart keeps the prices the menu had when it was read, and a merchant
+    /// may have changed them since.
+    private long pricedSubtotal = -1;
     /// The number of the latest quote asked for.
     private int quotes;
 
@@ -196,7 +200,8 @@ public final class CheckoutForm {
     }
 
     private long tipCents() {
-        return Cart.subtotalCents() * tipPercent / 100;
+        long subtotal = pricedSubtotal >= 0 ? pricedSubtotal : Cart.subtotalCents();
+        return subtotal * tipPercent / 100;
     }
 
     private CartDto cart() {
@@ -220,6 +225,15 @@ public final class CheckoutForm {
         form.revalidateLater();
         Api.orders().quote(cart(), Net.to(quote -> {
             if (asked != quotes) {
+                return;
+            }
+            long before = pricedSubtotal;
+            pricedSubtotal = quote.subtotalCents();
+            if (before != pricedSubtotal && quote.tipCents() != tipCents()) {
+                // The tip was worked out from prices the server no longer
+                // charges: asked again with the percentage of the real food
+                // price, which converges, as the subtotal does not move with it.
+                quote();
                 return;
             }
             totals(quote);

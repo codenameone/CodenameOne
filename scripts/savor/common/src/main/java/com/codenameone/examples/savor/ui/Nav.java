@@ -33,6 +33,8 @@ import com.codenameone.examples.savor.courier.Shift;
 import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.merchant.MerchantForm;
 import com.codenameone.examples.savor.net.Account;
+import com.codenameone.examples.savor.net.Api;
+import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.net.Session;
 import com.codenameone.examples.savor.notify.Notifications;
 import com.codenameone.examples.savor.customer.CustomerForm;
@@ -96,6 +98,9 @@ public final class Nav {
         // Where this phone is to be sent notifications, now that there is
         // someone to send them to.
         Notifications.signedIn();
+        // Menu prices are shown in the server's currency, which only the
+        // payment config says.
+        Api.payments().config(Net.to(config -> Ui.setCurrency(config.currency()), (status, message) -> { }));
         Account.load(() -> {
             Look.apply();
             Lang.apply();

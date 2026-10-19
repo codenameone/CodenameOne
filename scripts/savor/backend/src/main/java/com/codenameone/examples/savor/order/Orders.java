@@ -411,14 +411,22 @@ public class Orders {
 
     @Transactional(readOnly = true)
     public List<OrderDto> kitchenHistory(String restaurantId, String viewer) throws IOException {
-        List<CustomerOrder> rows = orders.findTop50ByRestaurantIdOrderByPlacedAtDesc(restaurantId);
-        List<CustomerOrder> out = new ArrayList<CustomerOrder>();
-        for (int iter = 0; iter < rows.size(); iter++) {
-            if (!inKitchen(rows.get(iter).getState())) {
-                out.add(rows.get(iter));
+        // Filtered by the query, before its limit: dropping the kitchen's own
+        // orders afterwards let fifty current ones push all of the history out.
+        return list(orders.findTop50ByRestaurantIdAndStateInOrderByPlacedAtDesc(restaurantId,
+                history()), viewer, false);
+    }
+
+    /// Every state but the kitchen's, the orders it is done with.
+    private static OrderState[] history() {
+        List<OrderState> out = new ArrayList<OrderState>();
+        OrderState[] all = OrderState.values();
+        for (int iter = 0; iter < all.length; iter++) {
+            if (!inKitchen(all[iter])) {
+                out.add(all[iter]);
             }
         }
-        return list(out, viewer, false);
+        return out.toArray(new OrderState[out.size()]);
     }
 
     private static boolean inKitchen(OrderState state) {

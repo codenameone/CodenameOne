@@ -152,7 +152,9 @@ public final class RestaurantApplicationForm {
             // Approved: the merchant's mode is where it is run from.
             page.add(Ui.text(Lang.tr("Approved. This account runs it now."), "SvMuted"));
             page.add(Ui.primary("Open the restaurant", "apply-open",
-                    e -> Session.refreshUser(Nav::refreshed, Ui::fail)));
+                    // Explicitly into the merchant's mode: the saved mode is still
+                    // the customer's, so a plain refresh would find nothing changed.
+                    e -> Session.refreshUser(() -> Nav.switchTo(Nav.MERCHANT), Ui::fail)));
         }
         form.add(BorderLayout.CENTER, page);
         form.show();
