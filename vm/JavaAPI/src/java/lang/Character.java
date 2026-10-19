@@ -1797,6 +1797,10 @@ public final class Character implements Comparable<Character>{
     }
 
     /// Whether the code point is a CJK ideograph.
+    ///
+    /// The blocks whole, unassigned gaps included: which code points inside
+    /// them are assigned moves with every Unicode release (JDK 8 and JDK 21
+    /// answer differently), and this runtime carries no per-version table.
     public static boolean isIdeographic(int codePoint) {
         return codePoint >= 0x3400 && codePoint <= 0x4dbf || codePoint >= 0x4e00 && codePoint <= 0x9fff
                 || codePoint >= 0xf900 && codePoint <= 0xfaff || codePoint >= 0x20000 && codePoint <= 0x3134a

@@ -755,8 +755,9 @@ public final class DateTimeFormatter {
                 hour = 0;
                 dayAdjust = 1;
             }
-            if (second == 60) {
-                // A leap second reads as the last second of its minute.
+            if (second == 60 && hour == 23 && p.values[F_MINUTE] == 59) {
+                // A leap second reads as the last second of its minute; only
+                // 23:59:60 is one; any other :60 fails in LocalTime.of.
                 second = 59;
             }
             LocalDate date = LocalDate.of((int) p.values[F_YEAR], (int) p.values[F_MONTH], (int) p.values[F_DAY])

@@ -182,5 +182,15 @@ public final class Spliterators {
         public int characteristics() {
             return characteristics;
         }
+
+        /// Natural order when the caller declared SORTED, as the JDK's does:
+        /// an iterator carries no comparator to hand out.
+        @Override
+        public Comparator<? super T> getComparator() {
+            if ((characteristics & SORTED) != 0) {
+                return null;
+            }
+            throw new IllegalStateException();
+        }
     }
 }

@@ -1247,7 +1247,9 @@ public class DecimalFormat extends NumberFormat {
     }
 
     private static String literalAffix(String literal) {
-        if (literal.indexOf(QUOTE) < 0) {
+        // A null affix is stored as given, as JDK 8 stores it, rather than
+        // thrown at half way through a setter.
+        if (literal == null || literal.indexOf(QUOTE) < 0) {
             return literal;
         }
         StringBuilder sb = new StringBuilder();
@@ -1363,8 +1365,8 @@ public class DecimalFormat extends NumberFormat {
     }
 
     public void setPositivePrefix(String newValue) {
-        positivePrefix = newValue;
         posPrefixPattern = literalAffix(newValue);
+        positivePrefix = newValue;
     }
 
     public String getNegativePrefix() {
@@ -1372,8 +1374,8 @@ public class DecimalFormat extends NumberFormat {
     }
 
     public void setNegativePrefix(String newValue) {
-        negativePrefix = newValue;
         negPrefixPattern = literalAffix(newValue);
+        negativePrefix = newValue;
     }
 
     public String getPositiveSuffix() {
@@ -1381,8 +1383,8 @@ public class DecimalFormat extends NumberFormat {
     }
 
     public void setPositiveSuffix(String newValue) {
-        positiveSuffix = newValue;
         posSuffixPattern = literalAffix(newValue);
+        positiveSuffix = newValue;
     }
 
     public String getNegativeSuffix() {
@@ -1390,8 +1392,8 @@ public class DecimalFormat extends NumberFormat {
     }
 
     public void setNegativeSuffix(String newValue) {
-        negativeSuffix = newValue;
         negSuffixPattern = literalAffix(newValue);
+        negativeSuffix = newValue;
     }
 
     public int getMultiplier() {

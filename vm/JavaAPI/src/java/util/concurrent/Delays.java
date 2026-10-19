@@ -87,7 +87,11 @@ final class Delays {
         // A delay too long to add to the clock (Long.MAX_VALUE as "never",
         // say) is due at the end of time rather than wrapping into the past.
         long now = BlockingWait.now();
-        long due = millis > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + Math.max(0, millis);
+        // Overflow-safe whatever the clock's origin.
+        long due = now + Math.max(0, millis);
+        if (due < now) {
+            due = Long.MAX_VALUE;
+        }
         Handle handle = new Handle(due, action);
         synchronized (LOCK) {
             int at = QUEUE.size();

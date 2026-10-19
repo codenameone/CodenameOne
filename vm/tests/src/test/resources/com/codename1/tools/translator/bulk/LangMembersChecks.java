@@ -246,6 +246,49 @@ public final class LangMembersChecks {
                 Bulk.p("threw", e.getClass().getName());
             }
         });
+        Bulk.check("Lang.anEmptyReferenceKeepsAnEmptyPath", () -> {
+            try {
+                java.net.URI base = new java.net.URI("http://h/a/b?x#y");
+                String[] refs = {"?q", "#f", "", "c", "../c", "/d", "//g/p"};
+                for (String r : refs) {
+                    Bulk.p("path[" + r + "]", new java.net.URI(r).getPath());
+                    Bulk.p("resolve[" + r + "]", base.resolve(new java.net.URI(r)).toString());
+                }
+                Bulk.p("hostOnly", new java.net.URI("http://h").getPath());
+                String[] paths = {"/a/b/../c/", "/a/./b/.", "/a/b/..", "/", "a/../b"};
+                for (String n : paths) {
+                    Bulk.p("normalize[" + n + "]", new java.net.URI(n).normalize().toString());
+                }
+            } catch (java.net.URISyntaxException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.aSortedIteratorSpliteratorHasNaturalOrder", () -> {
+            java.util.Spliterator<String> sp = java.util.Spliterators.spliterator(
+                    java.util.Arrays.asList("a", "b").iterator(), 2, java.util.Spliterator.SORTED);
+            Bulk.p("comparator", String.valueOf(sp.getComparator()));
+        });
+        Bulk.check("Lang.aNullAffixLeavesTheFormatAlone", () -> {
+            java.text.DecimalFormat f = new java.text.DecimalFormat("#0");
+            f.setPositivePrefix("+");
+            try {
+                f.setPositivePrefix(null);
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+            Bulk.p("prefix", f.getPositivePrefix());
+            Bulk.p("suffix", f.getPositiveSuffix());
+        });
+        Bulk.check("Lang.onlyTwentyThreeFiftyNineHasALeapSecond", () -> {
+            String[] in = {"2020-12-31T23:59:60Z", "2020-01-01T12:30:60Z"};
+            for (String t : in) {
+                try {
+                    Bulk.p(t, java.time.Instant.parse(t).toString());
+                } catch (java.time.DateTimeException e) {
+                    Bulk.p(t, "rejected");
+                }
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

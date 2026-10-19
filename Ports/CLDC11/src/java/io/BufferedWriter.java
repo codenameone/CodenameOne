@@ -77,6 +77,9 @@ public class BufferedWriter extends Writer {
         buf[count++] = (char) c;
     }
 
+    // Not synchronized on lock, unlike the JDK's: a writer shared between
+    // threads is serialized by its caller, and a monitor on every write is a
+    // cost each single-threaded application on the device would pay.
     @Override
     public void write(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();

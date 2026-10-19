@@ -117,6 +117,28 @@
     }
    }
   },
+  "windows-arm64@armv8-64-bit-family-8-model-d84-microsoft-corporation": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.696,
+      "time": 1.217,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.407,
+     "reason": "Windows arm64 hello RAM on this branch's JavaAPI measures 0.41x; recorded from the CI run",
+     "runs": 1,
+     "time": 1.217,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   }
+  },
   "windows-x64@amd64-family-26-model-2-authenticamd": {
    "hello": {
     "all": {

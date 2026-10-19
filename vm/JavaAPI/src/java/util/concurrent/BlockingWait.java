@@ -79,7 +79,10 @@ abstract class BlockingWait implements Runnable {
         if (millis <= 0) {
             return now;
         }
-        return millis >= FOREVER - now ? FOREVER : now + millis;
+        // Overflow-safe whatever the clock's origin: a negative reading
+        // would make FOREVER - now wrap.
+        long due = now + millis;
+        return due < now ? FOREVER : due;
     }
 
     /// Whether the wait is over. Called holding the monitor.

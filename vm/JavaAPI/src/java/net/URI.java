@@ -557,18 +557,18 @@ public class URI {
         // Only a "//" opens an authority. Without one the remainder is all
         // path: "file:/tmp/x" has no authority at all (not an empty one, which
         // would print back as "file:///tmp/x"), and a relative "a/b" is a
-        // path, not host "a" with path "/b". An empty remainder ("#f", "?q")
-        // leaves the path null, which resolve() reads as "no path given".
+        // path, not host "a" with path "/b". An empty remainder ("#f", "?q",
+        // "http://h") is an empty path, which getPath() answers as "".
         if (!s.startsWith(AUTHORITY_MARKER)) {
-            if (s.length() > 0) {
-                setPath(s, encode);
-            }
+            setPath(s, encode);
             return;
         }
         index = s.indexOf(PATH_SEPARATOR, AUTHORITY_MARKER.length());
         if (index != -1) {
             setPath(s.substring(index), encode);
             s = s.substring(0, index);
+        } else {
+            setPath("", encode);
         }
         setAuthority(s, encode);
     }
@@ -813,7 +813,9 @@ public class URI {
      * @return true if the URI is not a relative URI.
      */
     public boolean isAbsolute() {
-        return absolute;
+        // From the scheme itself: a reference parsed without one ("?q", "c")
+        // never cleared the flag init() sets, so resolve() handed it back.
+        return absolute && scheme != null;
     }
 
     /**
@@ -891,32 +893,28 @@ public class URI {
         if (isOpaque() || uri.isAbsolute()) {
             return uri;
         }
-        String thatPath = uri.getPath();
+        String thatPath = uri.getPath() == null ? "" : uri.getPath();
         String thatQuery = uri.getQuery();
         String thatAuthority = uri.getAuthority();
         String thatFragment = uri.getFragment();
         try {
             // if standalone fragment was passed.
             if (thatFragment != null
-                    && (uri.getScheme() == null && thatPath == null && thatQuery == null && thatAuthority == null)) {
+                    && (uri.getScheme() == null && thatPath.length() == 0 && thatQuery == null && thatAuthority == null)) {
                 return new URI(getScheme(), getAuthority(), getPath(), getQuery(), thatFragment);
             }
             if (thatAuthority != null) {
                 return new URI(getScheme(), thatAuthority, thatPath, thatQuery, thatFragment);
             }
             // an absolute path was passed
-            if (thatPath != null && thatPath.charAt(0) == PATH_SEPARATOR) {
+            if (thatPath.length() > 0 && thatPath.charAt(0) == PATH_SEPARATOR) {
                 return new URI(getScheme(), getAuthority(), thatPath, thatQuery, thatFragment);
             }
-            // a relative path was passed
-            String thisPath = getPath();
-            if (thisPath != null) {
-                int index = thisPath.lastIndexOf(PATH_SEPARATOR);
-                if (index != -1) {
-                    thisPath = thisPath.substring(index);
-                }
-            }
-            thisPath += PATH_SEPARATOR + thatPath;
+            // a relative (or empty, "?q") path replaces the last segment of
+            // this one, as RFC 2396 section 5.2 step 6 and the JDK merge it
+            String thisPath = getPath() == null ? "" : getPath();
+            int index = thisPath.lastIndexOf(PATH_SEPARATOR);
+            thisPath = index == -1 ? thatPath : thisPath.substring(0, index + 1) + thatPath;
             return new URI(getScheme(), getAuthority(), thisPath, thatQuery, thatFragment).normalize();
         } catch (URISyntaxException use) {
             // since both uri's are already validated, should never get here
@@ -932,7 +930,16 @@ public class URI {
      * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29</a>
      */
     public URI normalize() {
+        if (isOpaque()) {
+            return this;
+        }
         String thisPath = getPath();
+        // The slashes come from the path itself: a leading one when it is
+        // absolute, a trailing one when it names a directory ("a/", "a/.",
+        // "a/b/..").
+        boolean leading = thisPath.startsWith("/");
+        boolean trailing = thisPath.endsWith("/") || thisPath.endsWith("/.") || thisPath.endsWith("/..")
+                || thisPath.equals(".") || thisPath.equals("..");
         StringTokenizer st = new StringTokenizer(thisPath, String.valueOf(PATH_SEPARATOR));
         List<String> segments = new ArrayList<String>();
         while (st.hasMoreTokens()) {
@@ -960,7 +967,7 @@ public class URI {
         for (int i = 0; i < segments.size(); i++) {
             String segment = segments.get(i);
             if (i == 0) {
-                if (isAbsolute()) {
+                if (leading) {
                     buffer.append(PATH_SEPARATOR);
                 } else if (segment.indexOf(SCHEME_SEPARATOR) != -1) {
                     buffer.append('.');
@@ -971,6 +978,11 @@ public class URI {
             }
             buffer.append(PATH_SEPARATOR);
             buffer.append(segment);
+        }
+        if (segments.isEmpty() && leading) {
+            buffer.append(PATH_SEPARATOR);
+        } else if (trailing && buffer.length() > 0 && buffer.charAt(buffer.length() - 1) != PATH_SEPARATOR) {
+            buffer.append(PATH_SEPARATOR);
         }
         try {
             return new URI(getScheme(), getUserInfo(), getHost(), getPort(), buffer.toString(), getQuery(),

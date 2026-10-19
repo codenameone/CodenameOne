@@ -53,7 +53,8 @@ public class Charset implements Comparable<Charset> {
     protected Charset(String canonicalName, String[] aliases) {
         checkName(canonicalName);
         name = canonicalName;
-        this.aliases = aliases == null ? new String[0] : aliases;
+        // A copy: the caller's array may change afterwards.
+        this.aliases = aliases == null ? new String[0] : (String[]) aliases.clone();
     }
 
     /// Compares canonical names, ignoring case.
