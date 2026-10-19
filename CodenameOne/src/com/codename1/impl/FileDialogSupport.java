@@ -25,7 +25,6 @@ package com.codename1.impl;
 
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
-import com.codename1.io.Util;
 import com.codename1.io.filechooser.FileDialogOption;
 import com.codename1.io.filechooser.FileDialogResult;
 import com.codename1.io.filechooser.FileTypeFilter;
@@ -195,15 +194,16 @@ final class FileDialogSupport {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
-                OutputStream out = null;
                 try {
-                    out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
-                    request.writeContent(result, out);
+                    OutputStream out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
+                    try {
+                        request.writeContent(result, out);
+                    } finally {
+                        out.close();
+                    }
                 } catch (IOException err) {
                     Log.e(err);
                     result.setError(err);
-                } finally {
-                    Util.cleanup(out);
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     @Override

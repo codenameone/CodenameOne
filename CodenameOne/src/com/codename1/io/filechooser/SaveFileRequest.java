@@ -62,10 +62,6 @@ public class SaveFileRequest extends FileDialogRequest<SaveFileRequest> {
     private String sourceFile;
     private SaveContent content;
 
-    /// Creates a Save request.
-    public SaveFileRequest() {
-    }
-
     /// Sets the file name the dialog suggests, including its extension.
     ///
     /// #### Parameters
@@ -183,7 +179,7 @@ public class SaveFileRequest extends FileDialogRequest<SaveFileRequest> {
         try {
             Util.copyNoClose(in, out, 8192);
         } finally {
-            Util.cleanup(in);
+            in.close();
         }
     }
 }

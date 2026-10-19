@@ -49,10 +49,6 @@ public class OpenFileRequest extends FileDialogRequest<OpenFileRequest> {
     private boolean directories;
     private FilePreviewProvider preview;
 
-    /// Creates an Open request with no filter, accepting every file.
-    public OpenFileRequest() {
-    }
-
     /// Lets the user pick several files. Platforms without
     /// `FileDialogFeatures#MULTI_SELECT` return one.
     ///
