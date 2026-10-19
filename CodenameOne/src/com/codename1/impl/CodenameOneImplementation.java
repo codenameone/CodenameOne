@@ -44,6 +44,10 @@ import com.codename1.io.NetworkTypePlatform;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.filechooser.FileDialogFeatures;
+import com.codename1.io.filechooser.FileDialogResult;
+import com.codename1.io.filechooser.OpenFileRequest;
+import com.codename1.io.filechooser.SaveFileRequest;
 import com.codename1.io.bonjour.BonjourPlatform;
 import com.codename1.io.usb.UsbPlatform;
 import com.codename1.io.wifi.WifiDirectPlatform;
@@ -8888,6 +8892,57 @@ public abstract class CodenameOneImplementation {
         if (c != null) {
             response.actionPerformed(null);
         }
+    }
+
+    /// Shows an Open dialog. The default answers through `#openFileChooser`, so
+    /// a port with a native single-file picker already gets a native dialog;
+    /// ports override this to support the rest of the request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description
+    /// - `callback`: receives the result on the EDT
+    public void showOpenDialog(OpenFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.showOpen(this, request, callback);
+    }
+
+    /// Shows a Save dialog. The default renders a Codename One form that saves
+    /// into the request's initial directory, or the app home.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description
+    /// - `callback`: receives the result on the EDT
+    public void showSaveDialog(SaveFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.showSave(this, request, callback);
+    }
+
+    /// Writes a save request's content to the `FileSystemStorage` path in the
+    /// result off the EDT, then calls back on the EDT. Ports call this once the
+    /// native dialog has returned a writable path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request
+    /// - `result`: the user's choice; its path is the destination
+    /// - `callback`: receives the result, with `FileDialogResult#getError()` set on failure
+    protected void completeSaveDialog(SaveFileRequest request, FileDialogResult result,
+                                      SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.completeSave(request, result, callback);
+    }
+
+    /// Checks a `FileDialogFeatures` capability of this port's file dialogs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `feature`: a `FileDialogFeatures` constant
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature == FileDialogFeatures.INITIAL_DIRECTORY
+                || feature == FileDialogFeatures.SAVE_NAME_EDITING;
     }
 
     /// Opens the device image gallery
