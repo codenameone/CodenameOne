@@ -1147,6 +1147,9 @@ public class Initializr extends Lifecycle {
         return "https://cloud.codenameone.com/ide/?new=" + kind
                 + "&name=" + com.codename1.io.Util.encodeUrl(appName)
                 + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
+                // There is more than one full-stack template, and new=fullstack alone
+                // would give the browser IDE no way to tell which one was chosen.
+                + (template.isFullStack() ? "&template=" + template.name() : "")
                 // Full-stack templates (Wayline) are Maven-only (ProjectOptions.forFullStack),
                 // whatever the hidden build-tool choice still holds; an ordinary
                 // App + backend project keeps the Gradle the user picked.

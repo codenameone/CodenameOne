@@ -184,8 +184,9 @@ public class Orders {
     }
 
     @Transactional
-    private Void store(String id, String customer, CartDto cart, Quotes.Priced priced,
+    private Void store(String id, String customer, CartDto cart, Quotes.Priced charged,
             String[] method, String hold) throws IOException {
+        Quotes.Priced priced = charged;
         // Held first, so two orders placed at once count each other and not
         // just what had committed before either began.
         profiles.hold(customer);
@@ -212,6 +213,16 @@ public class Orders {
             // The courier calls this number from the door.
             throw new ResponseStatusException(403, "Verify your phone number before you order");
         }
+        // The menu was read before the card was held. Priced again under the
+        // restaurant's lock, which every dish edit takes too (Restaurants.editing):
+        // a dish now sold out or gone throws, a price that moved refuses, and either
+        // way the hold is let go rather than charging for a menu that has changed.
+        Quotes.Priced again = quotes.quote(customer, cart);
+        if (again.quote.totalCents() != charged.quote.totalCents()) {
+            throw new ResponseStatusException(409, "The menu changed while you were paying."
+                    + " Check your cart and try again");
+        }
+        priced = again;
         QuoteDto quote = priced.quote;
         long now = System.currentTimeMillis();
         CustomerOrder order = new CustomerOrder();

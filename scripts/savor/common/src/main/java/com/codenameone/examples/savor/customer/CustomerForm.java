@@ -61,6 +61,8 @@ import java.util.List;
 /// cart's button over all of them while something is in it.
 public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home, Cart.Listener {
     private static final Net.Failed QUIET = (status, message) -> { };
+    /// The watcher waiting for the first address, at most one for every home.
+    private static Locator.Watcher locating;
     /// How often an order on its way is asked about while the live channel is
     /// down. With it up, a frame says when to ask.
     private static final int POLL_MILLIS = 15000;
@@ -148,18 +150,31 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             name(Locator.here());
             return;
         }
-        Locator.watch(new Locator.Watcher() {
+        stopLocating();
+        locating = new Locator.Watcher() {
             @Override
             public void located(int state, LatLng where) {
                 if (state == Locator.FOUND) {
-                    Locator.unwatch(this);
+                    stopLocating();
                     name(where);
                 } else if (state == Locator.DENIED || state == Locator.UNAVAILABLE) {
                     // No position to be had: the customer picks an address.
-                    Locator.unwatch(this);
+                    stopLocating();
                 }
             }
-        });
+        };
+        Locator.watch(locating);
+    }
+
+    /// Stops the first-address lookup, if one is still waiting. Nav calls this
+    /// whenever the home is discarded (rebuilt, another mode, signed out), so a
+    /// search that never answered does not keep the receiver running on screens
+    /// that have no use for it, and rebuilt homes do not pile up watchers.
+    public static void stopLocating() {
+        if (locating != null) {
+            Locator.unwatch(locating);
+            locating = null;
+        }
     }
 
     private void name(final LatLng here) {

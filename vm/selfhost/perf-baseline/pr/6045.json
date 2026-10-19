@@ -52,6 +52,26 @@
      "time": 0.838
     }
    }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.526,
+      "time": 0.753,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.526,
+     "reason": "Master's translator runs faster on this runner too, matching the linux-x64 row above; the baseline predates it.",
+     "runs": 1,
+     "time": 0.591,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
   }
  }
 }

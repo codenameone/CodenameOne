@@ -131,6 +131,7 @@ public final class Nav {
     /// for a caller that is about to show something on top of it. Null, and
     /// the welcome screen showing, when nobody is signed in.
     public static Form build() {
+        CustomerForm.stopLocating();
         UserDto user = Session.user();
         if (user == null) {
             WelcomeForm.show();
@@ -226,6 +227,7 @@ public final class Nav {
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
         Shift.leave();
+        CustomerForm.stopLocating();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";
@@ -265,6 +267,7 @@ public final class Nav {
         // notifying it about that account's deliveries.
         Account.flush();
         Shift.leave();
+        CustomerForm.stopLocating();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";

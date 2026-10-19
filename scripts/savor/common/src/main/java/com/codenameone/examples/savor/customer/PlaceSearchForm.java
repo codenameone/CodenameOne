@@ -134,7 +134,9 @@ public final class PlaceSearchForm {
 
     private void search() {
         final String text = query.getText().trim();
-        if (text.length() < 2) {
+        // GeoEndpoint answers nothing below three characters, so searching sooner
+        // would replace the suggestions with a "Nothing found" that is not true.
+        if (text.length() < 3) {
             suggest();
             return;
         }

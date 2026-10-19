@@ -425,6 +425,16 @@ public class Restaurants {
         return new MenuSectionDto(section.getId(), section.getName(), new ArrayList<DishDto>());
     }
 
+    /// The merchant's restaurant, its row locked: a change to what an order can
+    /// contain or cost takes the lock Orders.store takes before it prices the cart
+    /// again, so an order is stored against the menu before the change or after
+    /// it, never against one the customer was not charged for.
+    private Restaurant editing(String username) {
+        Restaurant restaurant = mine(username);
+        restaurants.hold(restaurant.getId());
+        return restaurant;
+    }
+
     private MenuSection ownSection(Restaurant restaurant, String id) {
         MenuSection section = id == null || id.length() > 32 ? null : sections.findById(id);
         if (section == null || !section.getRestaurantId().equals(restaurant.getId())) {
@@ -451,7 +461,7 @@ public class Restaurants {
 
     @Transactional
     public DishDto saveDish(String username, String id, DishDto form) throws IOException {
-        Restaurant restaurant = mine(username);
+        Restaurant restaurant = editing(username);
         Dish dish = ownDish(restaurant, id);
         fill(restaurant, dish, form);
         options.deleteByDishId(id);
@@ -460,7 +470,7 @@ public class Restaurants {
 
     @Transactional
     public DishDto removeDish(String username, String id) {
-        Dish dish = ownDish(mine(username), id);
+        Dish dish = ownDish(editing(username), id);
         options.deleteByDishId(id);
         dishes.deleteById(id);
         return Catalog.dish(dish, null);
@@ -469,7 +479,7 @@ public class Restaurants {
     /// Marks a dish sold out, or back on.
     @Transactional
     public DishDto available(String username, String id, boolean available) {
-        Dish dish = ownDish(mine(username), id);
+        Dish dish = ownDish(editing(username), id);
         dish.setAvailable(available);
         return Catalog.dish(dish, extras(id));
     }
