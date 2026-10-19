@@ -152,6 +152,13 @@ public class BufferedWriter extends Writer {
             } catch (IOException suppressed) {
                 e.addSuppressed(suppressed);
             }
+            throw e;        } catch (Error e) {
+            count = 0;
+            try {
+                out.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
             throw e;
         }
         count = 0;

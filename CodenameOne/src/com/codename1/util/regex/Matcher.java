@@ -407,10 +407,11 @@ public final class Matcher implements MatchResult {
     }
 
     /// The matches of one [#results()].
-    // The iterator does not fail fast when the matcher is reset or moved
-    // mid-stream, where the JDK throws ConcurrentModificationException: that
-    // is misuse, and tracking it would cost a counter on every matcher
-    // operation for code that is already wrong.
+    // Neither this iterator nor the replaceAll/replaceFirst(Function)
+    // callbacks fail fast when the matcher is reset or moved under them,
+    // where the JDK throws ConcurrentModificationException: that is misuse,
+    // and tracking it would cost a counter on every matcher operation for
+    // code that is already wrong.
     private static final class Results implements Iterator<MatchResult> {
         private final Matcher matcher;
         private MatchResult next;
@@ -590,6 +591,7 @@ public final class Matcher implements MatchResult {
             return text.toString();
         }
         StringBuilder sb = new StringBuilder();
+        // A replacer that moves this matcher is not detected; see Results.
         do {
             appendReplacement(sb, replacer.apply(this));
         } while (find());

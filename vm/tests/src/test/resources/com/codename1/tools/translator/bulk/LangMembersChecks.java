@@ -237,6 +237,65 @@ public final class LangMembersChecks {
                 Bulk.p("writer", "npe");
             }
         });
+        Bulk.check("Lang.aContinuedKeyStillTakesItsSeparator", () -> {
+            try {
+                java.util.Properties p = new java.util.Properties();
+                p.load(new java.io.StringReader("key \\\n=value\nk2 \\\n  :v2\nk3=a=b\nk4 x=y\n"));
+                Bulk.p("props", new java.util.TreeMap<Object, Object>(p));
+            } catch (java.io.IOException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
+            final boolean[] closed = new boolean[2];
+            java.io.OutputStream sink = new java.io.OutputStream() {
+                @Override
+                public void write(int b) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void close() {
+                    closed[0] = true;
+                }
+            };
+            java.io.Writer wsink = new java.io.Writer() {
+                @Override
+                public void write(char[] c, int off, int len) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void flush() {
+                }
+
+                @Override
+                public void close() {
+                    closed[1] = true;
+                }
+            };
+            try {
+                java.io.BufferedOutputStream out = new java.io.BufferedOutputStream(sink);
+                out.write(1);
+                out.close();
+            } catch (Throwable t) {
+                Bulk.p("stream", t.getClass().getName());
+            }
+            try {
+                java.io.BufferedWriter out = new java.io.BufferedWriter(wsink);
+                out.write('x');
+                out.close();
+            } catch (Throwable t) {
+                Bulk.p("writer", t.getClass().getName());
+            }
+            Bulk.p("streamClosed", closed[0]);
+            Bulk.p("writerClosed", closed[1]);
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

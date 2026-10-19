@@ -126,6 +126,14 @@ public class BufferedOutputStream extends FilterOutputStream {
             } catch (IOException suppressed) {
                 e.addSuppressed(suppressed);
             }
+            throw e;        } catch (Error e) {
+            closed = true;
+            count = 0;
+            try {
+                out.close();
+            } catch (IOException suppressed) {
+                e.addSuppressed(suppressed);
+            }
             throw e;
         }
         closed = true;

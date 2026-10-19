@@ -1798,17 +1798,19 @@ public final class Pattern {
                 case 'N':
                     throw unsupported("The named character \\N{...}");
                 case 'R': {
-                    // \r\n as one, or any single line end; atomic, so the
-                    // pair is never split to let what follows take the \n.
+                    // \r\n as one, or any single line end. Not atomic: when
+                    // what follows needs the \n, the pair splits and \R takes
+                    // the \r alone, as Java 9 and later do ("\R\R" matches
+                    // "\r\n").
                     Piece crlf = Piece.of(new Char('\r'), 1);
                     crlf.then(Piece.of(new Char('\n'), 1));
                     Piece one = Piece.of(new InClass(vertical()), 1);
                     Pass join = new Pass();
                     crlf.last.next = join;
                     one.last.next = join;
-                    join.next = new SubEnd();
-                    Node atomic = new Atomic(new Branch(new Node[] {crlf.first, one.first}));
-                    return new Piece(atomic, atomic, 1, 2);
+                    Piece lineEnd = new Piece(new Branch(new Node[] {crlf.first, one.first}), join, 1, 2);
+                    lineEnd.deterministic = false;
+                    return lineEnd;
                 }
                 case 'k': {
                     if (at >= p.length() || p.charAt(at) != '<') {

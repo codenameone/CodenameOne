@@ -103,6 +103,9 @@ public class Properties extends Hashtable<Object, Object> {
         int mode = NONE, unicode = 0, count = 0;
         char nextChar, buf[] = new char[40];
         int offset = 0, keyLength = -1, intVal;
+        // Whether this entry's = or : has been read: a key ended by blanks
+        // and a continuation still takes one on the next line.
+        boolean separated = false;
         boolean firstChar = true;
 
         Reader br = in;
@@ -200,6 +203,7 @@ public class Properties extends Hashtable<Object, Object> {
                         put(temp.substring(0, keyLength), temp.substring(keyLength));
                     }
                     keyLength = -1;
+                    separated = false;
                     offset = 0;
                     continue;
                 case '\\':
@@ -210,9 +214,10 @@ public class Properties extends Hashtable<Object, Object> {
                     continue;
                 case ':':
                 case '=':
-                    if (keyLength == -1) { // if parsing the key
+                    if (keyLength == -1 || (!separated && offset == keyLength)) { // if parsing the key
                         mode = NONE;
                         keyLength = offset;
+                        separated = true;
                         // Past the separator nothing starts a comment, not even
                         // for an empty key ("=#token" is the value "#token").
                         firstChar = false;
