@@ -113,6 +113,10 @@ final class JavaSEFileDialogs {
                 || request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false)) {
             return true;
         }
+        if (request instanceof SaveFileRequest && !((SaveFileRequest) request).isConfirmOverwrite()) {
+            // The OS panels behind AWT's FileDialog always ask before replacing
+            return true;
+        }
         if (request.getFilters().length > 0) {
             // A filtered save adds the filter's extension after the panel has
             // closed, so the panel's overwrite check saw a different name; the
@@ -148,8 +152,15 @@ final class JavaSEFileDialogs {
         if (path == null) {
             return null;
         }
-        if (path.startsWith("file://")) {
-            path = path.substring(7);
+        if (path.startsWith("file:")) {
+            // file:///x and the file:/x that getAppHomePath() answers
+            path = path.substring(5);
+            while (path.startsWith("//")) {
+                path = path.substring(1);
+            }
+            if (path.length() > 2 && path.charAt(0) == '/' && path.charAt(2) == ':') {
+                path = path.substring(1); // /C:/dir
+            }
         }
         return new File(path);
     }
@@ -344,9 +355,13 @@ final class JavaSEFileDialogs {
             holder.add(chooser.getAccessory(), BorderLayout.SOUTH);
         }
         chooser.setAccessory(holder);
+        // Selection number, read and written only on the AWT thread: a render
+        // that finishes after the selection moved on is dropped.
+        final int[] generation = new int[1];
         chooser.addPropertyChangeListener(JFileChooser.SELECTED_FILE_CHANGED_PROPERTY, new PropertyChangeListener() {
             public void propertyChange(PropertyChangeEvent evt) {
                 final File f = (File) evt.getNewValue();
+                final int current = ++generation[0];
                 label.setIcon(null);
                 if (f == null || f.isDirectory()) {
                     return;
@@ -356,6 +371,9 @@ final class JavaSEFileDialogs {
                         final java.awt.Image img = renderPreview(provider, toPath(f));
                         EventQueue.invokeLater(new Runnable() {
                             public void run() {
+                                if (current != generation[0]) {
+                                    return;
+                                }
                                 label.setIcon(img == null ? null : new ImageIcon(img));
                             }
                         });

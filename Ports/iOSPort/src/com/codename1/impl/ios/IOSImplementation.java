@@ -6820,6 +6820,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isFileDialogFeatureSupported(int feature) {
+        if (isWatch() || isTV()) {
+            // No document picker on either; the Codename One fallback is used
+            return super.isFileDialogFeatureSupported(feature);
+        }
         if (isMacPlatform()) {
             // No accessory Component or preview: there is no way to host a
             // Codename One peer inside the panel's accessory NSView yet.
@@ -6835,6 +6839,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
                                SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isWatch() || isTV()) {
+            // The document picker natives are compiled out of both targets
+            super.showOpenDialog(request, callback);
+            return;
+        }
         if (isMacPlatform()) {
             showMacDialog(request, false, request.isMultiSelect(), request.isDirectories(), callback);
             return;
@@ -6872,6 +6881,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
                                final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isWatch() || isTV()) {
+            super.showSaveDialog(request, callback);
+            return;
+        }
         if (isMacPlatform()) {
             // NSSavePanel always confirms an overwrite itself; AppKit has no
             // public switch for it, so isConfirmOverwrite(false) is not honoured.

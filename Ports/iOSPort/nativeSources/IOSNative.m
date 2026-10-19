@@ -9325,7 +9325,17 @@ static void cn1FileDialogPresent(UIDocumentPickerViewController *picker, JAVA_IN
     if (popoverSupported()) {
         picker.modalPresentationStyle = UIModalPresentationFormSheet;
     }
-    [cn1PresentingController() presentViewController:picker animated:YES completion:nil];
+    UIViewController *presenter = cn1PresentingController();
+    if (presenter.presentedViewController != nil) {
+        // UIKit does not queue a second presentation: it would be dropped
+        // with no delegate call and this request would never answer. Report
+        // it as cancelled instead (an earlier picker or another modal is up).
+        NSLog(@"Codename One file dialog: another view controller is already presented");
+        delegate.delivered = YES;
+        cn1FileDialogDeliver(nil, requestId);
+        return;
+    }
+    [presenter presentViewController:picker animated:YES completion:nil];
 }
 
 static NSArray *cn1FileDialogSplit(NSString *joined) {

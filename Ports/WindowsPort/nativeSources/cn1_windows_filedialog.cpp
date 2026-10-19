@@ -196,6 +196,50 @@ IShellItem* cn1FdxItem(const WCHAR* path) {
 }
 
 /* Builds the options panel through IFileDialogCustomize. */
+/* Keeps a save dialog's default extension on the selected filter. The shell
+ * appends SetDefaultExtension's value to a bare name, so without this a user
+ * who switches from PDF to PNG and types "report" gets report.pdf, which the
+ * Java side then turns into report.pdf.png. */
+class Cn1FdxEvents : public IFileDialogEvents {
+public:
+    Cn1FdxEvents(Cn1FdxRequest* r) : refs(1), req(r) {}
+    virtual ~Cn1FdxEvents() {}
+    IFACEMETHODIMP QueryInterface(REFIID riid, void** ppv) {
+        if (riid == IID_IUnknown || riid == IID_IFileDialogEvents) {
+            *ppv = static_cast<IFileDialogEvents*>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+    IFACEMETHODIMP_(ULONG) AddRef() { return (ULONG) InterlockedIncrement(&refs); }
+    IFACEMETHODIMP_(ULONG) Release() {
+        LONG n = InterlockedDecrement(&refs);
+        if (n == 0) {
+            delete this;
+        }
+        return (ULONG) n;
+    }
+    IFACEMETHODIMP OnTypeChange(IFileDialog* dlg) {
+        UINT index = 0;
+        if (SUCCEEDED(dlg->GetFileTypeIndex(&index)) && index >= 1 && (int) index <= req->filterCount) {
+            Cn1FdxSplit* f = &req->filters[index - 1];
+            dlg->SetDefaultExtension(f->count > 1 && wcscmp(f->fields[1], L"*") != 0 ? f->fields[1] : L"");
+        }
+        return S_OK;
+    }
+    IFACEMETHODIMP OnFileOk(IFileDialog*) { return S_OK; }
+    IFACEMETHODIMP OnFolderChanging(IFileDialog*, IShellItem*) { return S_OK; }
+    IFACEMETHODIMP OnFolderChange(IFileDialog*) { return S_OK; }
+    IFACEMETHODIMP OnSelectionChange(IFileDialog*) { return S_OK; }
+    IFACEMETHODIMP OnShareViolation(IFileDialog*, IShellItem*, FDE_SHAREVIOLATION_RESPONSE*) { return S_OK; }
+    IFACEMETHODIMP OnOverwrite(IFileDialog*, IShellItem*, FDE_OVERWRITE_RESPONSE*) { return S_OK; }
+private:
+    LONG refs;
+    Cn1FdxRequest* req;
+};
+
 void cn1FdxAddOptions(IFileDialog* dlg, Cn1FdxRequest* r) {
     IFileDialogCustomize* cust = NULL;
     int i, k;
@@ -395,7 +439,22 @@ void cn1FdxRun(Cn1FdxRequest* r) {
     }
     cn1FdxAddOptions(dlg, r);
 
-    if (SUCCEEDED(dlg->Show(cn1Win.hwnd))) {
+    DWORD eventsCookie = 0;
+    Cn1FdxEvents* events = NULL;
+    if (r->save && r->filterCount > 1) {
+        events = new Cn1FdxEvents(r);
+        if (FAILED(dlg->Advise(events, &eventsCookie))) {
+            eventsCookie = 0;
+        }
+    }
+    HRESULT shown = dlg->Show(cn1Win.hwnd);
+    if (events != NULL) {
+        if (eventsCookie != 0) {
+            dlg->Unadvise(eventsCookie);
+        }
+        events->Release();
+    }
+    if (SUCCEEDED(shown)) {
         UINT typeIndex = 0;
         r->accepted = 1;
         r->chosenFilter = -1;

@@ -64,10 +64,11 @@ final class FileDialogSupport {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 Object src = evt == null ? null : evt.getSource();
+                // A port may answer openFileChooser off the EDT; the API promises the EDT.
                 if (src instanceof String) {
-                    callback.onSucess(new FileDialogResult(request, new String[]{(String) src}, -1, null));
+                    deliver(new FileDialogResult(request, new String[]{(String) src}, -1, null), callback);
                 } else {
-                    callback.onSucess(FileDialogResult.cancelled(request));
+                    deliver(FileDialogResult.cancelled(request), callback);
                 }
             }
         }, request.toAcceptString());
@@ -77,6 +78,17 @@ final class FileDialogSupport {
     /// request's options, saving into its initial directory or app home.
     static void showSave(final CodenameOneImplementation impl, final SaveFileRequest request,
                          final SuccessCallback<FileDialogResult> callback) {
+        if (!Display.getInstance().isEdt()) {
+            // The form is modal and must be built on the EDT, which also puts
+            // the cancellation below on the EDT the API promises.
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    showSave(impl, request, callback);
+                }
+            });
+            return;
+        }
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         String dir = request.getInitialDirectory();
         if (dir == null || !fs.isDirectory(dir)) {
