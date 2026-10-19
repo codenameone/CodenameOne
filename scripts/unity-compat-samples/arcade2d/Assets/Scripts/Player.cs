@@ -37,6 +37,8 @@ public class Player : MonoBehaviour
     public Text label;
     public float turnSpeed = 90f;
     public float shotSpeed = 6f;
+    // A C# name that is a Java keyword: the scene's value still reaches it.
+    public int @class = 1;
     public int[] bonus;
     public List<string> words;
     public Color[] tints;
@@ -54,7 +56,7 @@ public class Player : MonoBehaviour
     private void Start()
     {
         angle = startAngle;
-        Debug.Log("player start bonus=" + bonus.Length + ":" + bonus[1] + " words=" + words.Count + ":" + words[1]
+        Debug.Log("player start bonus=" + bonus.Length + ":" + bonus[1] + " class=" + @class + " words=" + words.Count + ":" + words[1]
             + " tints=" + tints.Length + " shot=" + shot.name + " label=" + label.text + " muzzle at "
             + Cm(muzzle.position.x) + "," + Cm(muzzle.position.y));
         Probe.Check();

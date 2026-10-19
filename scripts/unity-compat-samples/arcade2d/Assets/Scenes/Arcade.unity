@@ -113,6 +113,7 @@ MonoBehaviour:
   shots: {fileID: 121}
   label: {fileID: 413}
   turnSpeed: 90
+  class: 7
   shotSpeed: 6
   bonus:
   - 10

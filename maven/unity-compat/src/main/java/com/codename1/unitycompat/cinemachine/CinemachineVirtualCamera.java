@@ -96,12 +96,21 @@ public final class CinemachineVirtualCamera extends CinemachineVirtualCameraBase
         // search runs each frame, which is one walk of a small hierarchy.
         if (!looked || body == null || !body.get_isActiveAndEnabled()) {
             looked = true;
-            Object b = GetComponentInChildren(CinemachineComponentBase.class);
-            CinemachineComponentBase found = b instanceof CinemachineComponentBase ? (CinemachineComponentBase) b : null;
+            // The first enabled one: GetComponentInChildren passes over
+            // inactive objects but not disabled components, so a disabled
+            // body ahead of its replacement would hide it every frame.
+            Object[] all = GetComponentsInChildren(CinemachineComponentBase.class);
+            CinemachineComponentBase found = null;
+            for (int i = 0; i < all.length && found == null; i++) {
+                if (all[i] instanceof CinemachineComponentBase
+                        && ((CinemachineComponentBase) all[i]).get_isActiveAndEnabled()) {
+                    found = (CinemachineComponentBase) all[i];
+                }
+            }
             if (found != body && body != null) { // NOPMD CompareObjectsWithEquals
                 body.lost();
             }
-            body = found != null && found.get_isActiveAndEnabled() ? found : null;
+            body = found;
         }
         Transform target = m_Follow;
         if (body == null || target == null || !target.$live()) {

@@ -2718,7 +2718,7 @@ public final class SceneCompiler {
                         + " dropped, as Unity drops it");
                 continue;
             }
-            assign(origin, n.variable + "." + key, field.type, e.getValue(), nodes, sb);
+            assign(origin, n.variable + "." + TypeMapping.memberName(key), field.type, e.getValue(), nodes, sb);
         }
     }
 
@@ -2930,7 +2930,7 @@ public final class SceneCompiler {
             for (Map.Entry<String, Object> e : map(value).entrySet()) {
                 FieldDef member = def.field(e.getKey());
                 if (member != null && !member.isStatic()) {
-                    assign(origin, target + "." + e.getKey(), member.type, e.getValue(), nodes, sb);
+                    assign(origin, target + "." + TypeMapping.memberName(e.getKey()), member.type, e.getValue(), nodes, sb);
                 }
             }
             return;
@@ -2956,7 +2956,7 @@ public final class SceneCompiler {
             for (Map.Entry<String, Object> e : map(value).entrySet()) {
                 FieldDef member = findField(def, e.getKey());
                 if (member != null && !member.isStatic()) {
-                    assign(origin, target + "." + e.getKey(), member.type, e.getValue(), nodes, sb);
+                    assign(origin, target + "." + TypeMapping.memberName(e.getKey()), member.type, e.getValue(), nodes, sb);
                 }
             }
             depth--;

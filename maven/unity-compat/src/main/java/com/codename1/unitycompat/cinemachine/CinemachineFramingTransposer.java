@@ -122,6 +122,10 @@ public final class CinemachineFramingTransposer extends CinemachineComponentBase
         float shiftX = acrossX * halfWidth;
         float shiftY = acrossY * halfHeight;
         float wantX = tx - shiftX;
+        // Added, not subtracted: m_ScreenY counts from the top of the
+        // screen (the manual's guides are drawn that way), unlike the
+        // bottom-up pixel space of Camera.WorldToScreenPoint. A larger
+        // m_ScreenY puts the target lower, so the camera goes up.
         float wantY = ty + shiftY;
         float z = target.$worldZ() - m_CameraDistance;
         if (!following) {

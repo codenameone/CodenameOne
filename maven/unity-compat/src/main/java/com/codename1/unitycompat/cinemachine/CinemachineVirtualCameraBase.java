@@ -36,6 +36,13 @@ import com.codename1.unitycompat.unityengine.Transform;
 public abstract class CinemachineVirtualCameraBase extends MonoBehaviour {
     public int m_Priority = 10;
 
+    /// Counts enables across every virtual camera, so that the latest
+    /// one activated can be told among cameras of equal priority.
+    private static int enables;
+
+    /// When this camera was last enabled, on the scale of `enables`.
+    int activated;
+
     public int get_Priority() {
         return m_Priority;
     }
@@ -57,6 +64,18 @@ public abstract class CinemachineVirtualCameraBase extends MonoBehaviour {
     @Override
     public int $roles() {
         return TICKS_LATE;
+    }
+
+    /// Cinemachine's manual: among live cameras of the same priority, the
+    /// one most recently activated is the one the brain shows.
+    @Override
+    public void $onEnable() {
+        super.$onEnable();
+        activated = nextEnable();
+    }
+
+    private static int nextEnable() {
+        return ++enables;
     }
 
     @Override

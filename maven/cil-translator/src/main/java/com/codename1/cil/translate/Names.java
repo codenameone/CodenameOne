@@ -93,6 +93,14 @@ final class Names {
         return "$" + sanitize(m.owner.fullName().replace('.', '_').replace('/', '_'));
     }
 
+    private static final Set<String> JAVA_KEYWORDS = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
+            "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float",
+            "for", "goto", "if", "implements", "import", "instanceof", "int", "interface", "long", "native",
+            "new", "package", "private", "protected", "public", "return", "short", "static", "strictfp",
+            "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "void",
+            "volatile", "while", "true", "false", "null", "_"));
+
     static String sanitize(String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (int i = 0; i < name.length(); i++) {
@@ -100,6 +108,13 @@ final class Names {
             boolean plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
                     || c == '$';
             sb.append(plain ? c : '_');
+        }
+        // C# takes a Java keyword as a name when it is written `@class`; the
+        // JVM would accept it, but the scene compiler writes Java source that
+        // names these members. A clash with a real `class_` is the same
+        // build error as any other clash between made-legal names.
+        if (JAVA_KEYWORDS.contains(sb.toString())) {
+            sb.append('_');
         }
         return sb.toString();
     }

@@ -39,6 +39,12 @@ public final class TypeMapping {
         names = new Names(universe, new HashSet<CilAssembly>(translated));
     }
 
+    /// The name a field or method is given in the translated classes, as
+    /// Java source has to spell it.
+    public static String memberName(String name) {
+        return Names.sanitize(name);
+    }
+
     /// The class a type becomes, as Java source spells it.
     public String javaClass(CilType type) {
         return names.classRef(type).replace('/', '.').replace('$', '.');

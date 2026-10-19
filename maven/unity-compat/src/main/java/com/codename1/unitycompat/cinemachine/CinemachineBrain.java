@@ -83,7 +83,8 @@ public final class CinemachineBrain extends MonoBehaviour {
                 continue;
             }
             v.advance(dt, aspect);
-            if (live == null || v.m_Priority > live.m_Priority) {
+            if (live == null || v.m_Priority > live.m_Priority
+                    || v.m_Priority == live.m_Priority && v.activated > live.activated) {
                 live = v;
             }
         }
