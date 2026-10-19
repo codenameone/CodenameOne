@@ -541,9 +541,8 @@ public class CSSThemeCompiler {
                 while (j < value.length() && j - i <= 6 && Character.digit(value.charAt(j), 16) >= 0) {
                     j++;
                 }
-                if (j > i + 1 && j < value.length() && (value.charAt(j) == ' ' || value.charAt(j) == '\t'
-                        || value.charAt(j) == '\n')) {
-                    i = j;
+                if (j > i + 1 && skipEscapeTerminator(value, j) > j) {
+                    i = skipEscapeTerminator(value, j) - 1;
                 } else {
                     i = j > i + 1 ? j - 1 : i + 1;
                 }
@@ -654,6 +653,18 @@ public class CSSThemeCompiler {
         return target != null && literalTokens.get(target) != null;
     }
 
+    /// Past the one whitespace that may end a hex escape: any CSS whitespace, with CR LF as one.
+    private static int skipEscapeTerminator(String value, int j) {
+        if (j >= value.length()) {
+            return j;
+        }
+        char c = value.charAt(j);
+        if (c == '\r' && j + 1 < value.length() && value.charAt(j + 1) == '\n') {
+            return j + 2;
+        }
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ? j + 1 : j;
+    }
+
     /// `@x` for a value that is exactly `var(--x)` or `var(--x, fallback)`, else null.
     private static String aliasTarget(String value) {
         String v = value.trim();
@@ -702,6 +713,15 @@ public class CSSThemeCompiler {
     /// `cn1rgb()` and `cn1rgba()` are the build-time compiler's spellings of `rgb()` and `rgba()`.
     private static String cssColorFunction(String value) {
         return value.regionMatches(true, 0, "cn1rgb", 0, 6) ? value.substring(3) : value;
+    }
+
+    private static String derivedUiid(String value) {
+        String unquoted = unquote(value);
+        if (!unquoted.equals(value)) {
+            return unquoted;
+        }
+        String decoded = decodeIdentifier(value);
+        return decoded != null ? decoded : value;
     }
 
     private static boolean isConstantsSelector(String selector) {
@@ -794,6 +814,11 @@ public class CSSThemeCompiler {
                 continue;
             }
             String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
+            if ("cn1-derive".equals(property)) {
+                // The build-time compiler reads the target with getStringValue(): `"Base"` and
+                // `B\61se` both name the UIID `Base`.
+                value = derivedUiid(value.trim());
+            }
             if ("cn1-derive".equals(property) && !"press#".equals(statePrefix)) {
                 // The build-time compiler's Element.setParent() promotes a derive to the owning
                 // UIID from every state but pressed.
@@ -983,28 +1008,22 @@ public class CSSThemeCompiler {
             chain.add(id);
             // A derive this compile declared, in any state: the last one in source order is the
             // owning UIID's only parent in the build-time compiler, for every state.
-            String owner = dark ? ownerDerives.get("$Dark" + id) : ownerDerives.get(id);
-            if (dark && owner == null && ownerDerives.get(id) != null) {
-                // The build-time compiler makes `$DarkChild` an element of its own with no link
-                // to the light `Child`'s derive, so only a dark derive extends the dark chain.
-                break;
-            }
+            // The build-time compiler makes `$DarkChild` an element of its own with no link to
+            // the light `Child`'s derive, so only a dark derive extends the dark chain.
+            String owner = ownerDerives.get(dark ? "$Dark" + id : id);
             if (owner != null) {
                 id = owner;
                 continue;
             }
-            // Otherwise a derive a previous compile into the same theme stored.
-            Object stateDerive = null;
-            if (state.length() > 0) {
-                stateDerive = dark ? theme.get("$Dark" + id + "." + state + "derive") : null;
-                if (stateDerive == null) {
-                    stateDerive = theme.get(id + "." + state + "derive");
-                }
-            }
+            // Otherwise a derive a previous compile into the same theme stored. For a dark
+            // element only its own `$Dark` keys: a retained light derive is no link either.
+            String prefix = dark ? "$Dark" + id + "." : id + ".";
+            Object stateDerive = state.length() > 0 ? theme.get(prefix + state + "derive") : null;
             if (stateDerive instanceof String) {
                 id = (String) stateDerive;
             } else {
-                id = hoverBase(theme, id, dark);
+                Object base = theme.get(prefix + "derive");
+                id = base instanceof String ? (String) base : null;
                 if (id == null) {
                     id = anyStateDerive(theme, chain.get(chain.size() - 1), dark);
                 }
@@ -1016,17 +1035,14 @@ public class CSSThemeCompiler {
     /// The build-time compiler applies a `cn1-derive` declared in any state to the owning UIID,
     /// so `Child:selected{cn1-derive:Base}` is also where `Child:pressed` inherits from.
     private String anyStateDerive(Hashtable theme, String id, boolean dark) {
-        String recorded = dark ? ownerDerives.get("$Dark" + id) : null;
-        if (recorded == null) {
-            recorded = ownerDerives.get(id);
-        }
+        String recorded = ownerDerives.get(dark ? "$Dark" + id : id);
         if (recorded != null) {
             return recorded;
         }
         // A derive a previous compile into the same theme stored: its order is gone. Pressed is
         // not among them: the build-time compiler does not promote a pressed derive.
         String[] states = {"sel#", "dis#", "hover#"};
-        for (int pass = dark ? 0 : 1; pass < 2; pass++) {
+        for (int pass = dark ? 0 : 1; pass < (dark ? 1 : 2); pass++) {
             String prefix = pass == 0 ? "$Dark" + id + "." : id + ".";
             for (String state : states) {
                 Object derive = theme.get(prefix + state + "derive");
@@ -1293,9 +1309,7 @@ public class CSSThemeCompiler {
                     } else {
                         out.append((char) code);
                     }
-                    if (j < n && (t.charAt(j) == ' ' || t.charAt(j) == '\t' || t.charAt(j) == '\n')) {
-                        j++;
-                    }
+                    j = skipEscapeTerminator(t, j);
                     i = j;
                 }
                 first = false;
@@ -1951,6 +1965,16 @@ public class CSSThemeCompiler {
                 String selector = selectorEntry.trim();
                 if (selector.length() == 0) {
                     throw new CSSSyntaxException("Empty selector in selector list: " + selectors);
+                }
+                if (isConstantsSelector(selector)) {
+                    // `#Constants, Other { ... }`: the build-time compiler still exports the
+                    // constants, and applies the declarations to the other selectors as usual.
+                    Rule constants = new Rule();
+                    constants.selector = selector;
+                    constants.constants = true;
+                    constants.declarations = parseDeclarations(body);
+                    out.add(constants);
+                    continue;
                 }
                 Rule rule = new Rule();
                 rule.selector = darkContext ? toDarkSelector(selector) : selector;

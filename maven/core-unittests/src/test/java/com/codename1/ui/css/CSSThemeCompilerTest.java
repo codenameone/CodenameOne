@@ -1220,6 +1220,42 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testDarkFontIgnoresALightDeriveFromAnEarlierCompile() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Child{cn1-derive:Base;}", res, "Theme");
+        new CSSThemeCompiler().compile("@media (prefers-color-scheme: dark){"
+                + " Base{font-family:native:MainBold;font-size:2mm;} Child{font-size:20px;} }", res, "Theme");
+        assertEquals("native:MainRegular", fontName((Font) res.getTheme("Theme").get("$DarkChild.font")));
+    }
+
+    @Test
+    void testConstantsInASelectorList() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants, Other { accentColor: #ff0000; }", res, "Theme");
+        assertEquals("ff0000", res.getTheme("Theme").get("@accentColor"));
+    }
+
+    @Test
+    void testDeriveTargetIsUnquotedAndDecoded() {
+        for (String target : new String[]{"\"Base\"", "B\\61se"}) {
+            MutableResource res = new MutableResource();
+            new CSSThemeCompiler().compile("Base{font-family:native:MainBold;font-size:2mm;}"
+                    + " Child{cn1-derive:" + target + ";font-size:20px;}", res, "Theme");
+            assertEquals("Base", res.getTheme("Theme").get("Child.derive"), target);
+            assertEquals("native:MainBold", fontName((Font) res.getTheme("Theme").get("Child.font")), target);
+        }
+    }
+
+    @Test
+    void testHexEscapeEndsAtAnyCssWhitespace() {
+        for (String ws : new String[]{"\r", "\f", "\r\n"}) {
+            MutableResource res = new MutableResource();
+            new CSSThemeCompiler().compile("#Constants{a\\62" + ws + "c: hello;}", res, "Theme");
+            assertEquals("hello", res.getTheme("Theme").get("@abc"));
+        }
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));
