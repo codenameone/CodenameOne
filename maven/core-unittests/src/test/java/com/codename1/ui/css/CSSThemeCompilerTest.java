@@ -1181,6 +1181,38 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testImageAliasChainKeepsItsQuotedName() {
+        MutableResource res = new MutableResource();
+        res.setImage("my icon", Image.createImage(5, 5));
+        new CSSThemeCompiler().compile("#Constants { --name: \"my icon\"; --alias: var(--name);"
+                + " navImage: var(--alias); }", res, "Theme");
+        assertEquals(5, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
+
+    @Test
+    void testEscapedSemicolonStaysInTheIdentifier() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { message: foo\\;bar; }", res, "Theme");
+        assertEquals("foo;bar", res.getTheme("Theme").get("@message"));
+    }
+
+    @Test
+    void testDarkFontDoesNotFollowTheLightDerive() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Child{cn1-derive:Base;}"
+                + " @media (prefers-color-scheme: dark){ Base{font-family:native:MainBold;font-size:2mm;}"
+                + " Child{font-size:20px;} }", res, "Theme");
+        assertEquals("native:MainRegular", fontName((Font) res.getTheme("Theme").get("$DarkChild.font")));
+    }
+
+    @Test
+    void testOutOfRangeRgbChannelIsClamped() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { accent: rgb(200%, 300, -5); }", res, "Theme");
+        assertEquals(0xffff00, Integer.parseInt((String) res.getTheme("Theme").get("@accent"), 16));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));

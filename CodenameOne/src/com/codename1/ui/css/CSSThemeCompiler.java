@@ -437,8 +437,7 @@ public class CSSThemeCompiler {
                 if (alias && declaration.snapshot != null) {
                     value = declaration.snapshot;
                     // An alias of a quoted constant names the image by text, as written.
-                    String target = aliasTarget(raw);
-                    fromText = target != null && literalTokens.get(target) != null;
+                    fromText = aliasesQuotedText(raw);
                 }
                 if (alias && declaration.snapshot != null && !fromText
                         && (isColorLiteral(value) || isCssNumber(value))) {
@@ -595,7 +594,7 @@ public class CSSThemeCompiler {
             }
             String text = resolved.trim();
             String first = leadingToken(text);
-            if (first.length() < text.length()) {
+            if (first.length() < text.length() && !aliasesQuotedText(value)) {
                 // `pair: var(--x) bar` is a chain of lexical units, and the build-time
                 // constants emitter writes only the leading one: `@pair` is `foo`.
                 String unquoted = unquote(first);
@@ -639,6 +638,20 @@ public class CSSThemeCompiler {
             at = value.indexOf("var(--", end);
         }
         return true;
+    }
+
+    /// Whether `value` is an alias that ends, through every intermediate alias, at a quoted
+    /// string: `--a: var(--name)` keeps the string `--name` was, as the build-time compiler keeps
+    /// the lexical unit, so `navImage: var(--a)` names the image `my icon`, not `my`.
+    private boolean aliasesQuotedText(String value) {
+        String target = aliasTarget(value);
+        ArrayList<String> seen = new ArrayList<String>();
+        while (target != null && literalTokens.get(target) == null && !seen.contains(target)) {
+            seen.add(target);
+            String next = cssVars.get(target);
+            target = next == null ? null : aliasTarget(next);
+        }
+        return target != null && literalTokens.get(target) != null;
     }
 
     /// `@x` for a value that is exactly `var(--x)` or `var(--x, fallback)`, else null.
@@ -970,9 +983,11 @@ public class CSSThemeCompiler {
             chain.add(id);
             // A derive this compile declared, in any state: the last one in source order is the
             // owning UIID's only parent in the build-time compiler, for every state.
-            String owner = dark ? ownerDerives.get("$Dark" + id) : null;
-            if (owner == null) {
-                owner = ownerDerives.get(id);
+            String owner = dark ? ownerDerives.get("$Dark" + id) : ownerDerives.get(id);
+            if (dark && owner == null && ownerDerives.get(id) != null) {
+                // The build-time compiler makes `$DarkChild` an element of its own with no link
+                // to the light `Child`'s derive, so only a dark derive extends the dark chain.
+                break;
             }
             if (owner != null) {
                 id = owner;
@@ -1794,10 +1809,8 @@ public class CSSThemeCompiler {
         } catch (RuntimeException err) {
             throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value, err);
         }
-        if (out < 0 || out > 255) {
-            throw new CSSSyntaxException("rgb() channel out of range in " + originalColor + ": " + value);
-        }
-        return out;
+        // Out of range is clamped, as CSS specifies and as the build-time compiler does.
+        return Math.max(0, Math.min(255, out));
     }
 
     private boolean isHexColor(String value) {
@@ -2173,6 +2186,9 @@ public class CSSThemeCompiler {
                 } else if (c == quote) {
                     quote = 0;
                 }
+            } else if (c == '\\') {
+                // `foo\;bar` is one identifier, as the build-time parser reads it.
+                i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == ';') {

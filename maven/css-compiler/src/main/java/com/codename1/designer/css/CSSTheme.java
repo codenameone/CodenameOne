@@ -9367,9 +9367,15 @@ public class CSSTheme {
     /// percentage color came out black.
     private static int rgbChannel(ScaledUnit channel) {
         if (channel.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
-            return Math.round(channel.getFloatValue() * 255f / 100f);
+            return clampChannel(Math.round(channel.getFloatValue() * 255f / 100f));
         }
-        return channel.getIntegerValue();
+        return clampChannel(channel.getIntegerValue());
+    }
+
+    /// Out of range is clamped, as CSS specifies: `200%` or `300` is 255, not a value `%02X`
+    /// would write as three digits, breaking the six-digit color.
+    private static int clampChannel(int value) {
+        return Math.max(0, Math.min(255, value));
     }
 
     static String getColorString(LexicalUnit color) {
