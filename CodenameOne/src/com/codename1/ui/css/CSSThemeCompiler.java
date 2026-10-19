@@ -154,6 +154,13 @@ public class CSSThemeCompiler {
             for (Declaration declaration : rule.declarations) {
                 if (rule.constants || rule.legacyConstants) {
                     String n = declaration.name;
+                    if (rule.constants) {
+                        // Decoded, as compileConstants keys it: `--a\62 c` declares `@abc`.
+                        String decoded = decodeIdentifier(n);
+                        if (decoded != null) {
+                            n = decoded;
+                        }
+                    }
                     declaredThisCompile.add("@" + (n.startsWith("--") ? n.substring(2) : n));
                 } else if (declaration.name.startsWith("--")) {
                     declaredThisCompile.add("@" + declaration.name.substring(2));
@@ -441,6 +448,11 @@ public class CSSThemeCompiler {
                     continue;
                 }
                 if (!fromText && raw.equals(value) || alias && !fromText) {
+                    if (!legacy) {
+                        // Of a chain such as `icon extra` the build-time compiler looks up the
+                        // leading unit alone.
+                        value = leadingToken(value);
+                    }
                     // An identifier image name is looked up decoded: `my\ icon` is `my icon`.
                     String decoded = decodeIdentifier(value);
                     if (decoded != null) {
