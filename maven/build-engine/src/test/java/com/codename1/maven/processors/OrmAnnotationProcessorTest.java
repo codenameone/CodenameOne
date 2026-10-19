@@ -123,6 +123,25 @@ public class OrmAnnotationProcessorTest {
         nonPublicFields(false);
         nonPublicFields(true);
     }
+    /// A method of the developer's with the exact name and descriptor of a
+    /// generated accessor would leave the class with two; the build says so.
+    @Test
+    public void exactAccessorCollisionFailsTheBuild() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("clash.Spot","package clash; import com.codename1.annotations.db.*; @Embeddable public class Spot { private String city; public Spot() {} "
+            + "public static String __cn1OrmGet_city(Spot s) { return \"mine\"; } public String city() { return city; } public void city(String v) { city=v; } }");
+        sources.put("clash.Stop","package clash; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"clash_stop\") public class Stop { @Id public long id; @Embedded public Spot spot; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        String failure;
+        try {
+            ProcessorContext ctx=runProcessor(classes,Collections.<String>emptyList());
+            failure=ctx.getErrors().toString();
+        } catch(RuntimeException error) {
+            failure=String.valueOf(error.getMessage());
+        }
+        assertTrue(failure,failure.contains("__cn1OrmGet_city") && failure.contains("rename that method"));
+    }
     private void nonPublicFields(boolean backend) throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
@@ -254,6 +273,7 @@ public class OrmAnnotationProcessorTest {
             + "if(s.query(Customer.class).gt(\"signedUp\",before).le(\"birthday\",day).orderBy(\"signedUp\",false).list().size()!=1) throw new AssertionError(\"builder range\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE (SELECT MAX(v.signedUp) FROM adopt.Customer v) > :t\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"subquery parameter\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE (SELECT MAX(v.signedUp) FROM adopt.Customer v) IN :ts\",Customer.class).setParameter(\"ts\",Arrays.asList(new Date(1709214306789L))).list().size()!=1) throw new AssertionError(\"subquery IN parameter\"); "
+            + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE :t IN (SELECT v.signedUp FROM adopt.Customer v)\",Customer.class).setParameter(\"t\",new Date(1709214306789L)).list().size()!=1) throw new AssertionError(\"parameter IN subquery\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE :t BETWEEN c.birthday AND c.signedUp\",Customer.class).setParameter(\"t\",before).list().size()!=1) throw new AssertionError(\"reversed BETWEEN\"); "
             + "if(s.createQuery(\"SELECT c FROM adopt.Customer c WHERE c.signedUp > :t AND c.birthday BETWEEN :a AND :b ORDER BY c.signedUp DESC, c.birthday\",Customer.class).setParameter(\"t\",before).setParameter(\"a\",dayBefore).setParameter(\"b\",day).list().size()!=1) throw new AssertionError(\"JPQL range\"); "
             + "if(s.createQuery(\"SELECT DISTINCT c.signedUp FROM adopt.Customer c ORDER BY c.signedUp\",Date.class).list().size()!=1) throw new AssertionError(\"distinct\"); "

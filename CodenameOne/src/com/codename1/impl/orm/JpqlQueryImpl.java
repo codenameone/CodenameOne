@@ -746,7 +746,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     if (peek("SELECT") || peek("FROM")) {
                         Plan nested = subquery();
-                        compatible(left, nested.projections.get(0));
+                        Expr projection = nested.projections.get(0);
+                        compatible(left, projection);
+                        // `:at IN (SELECT e.at ...)` binds through the projected
+                        // field's converter, as a scalar subquery does.
+                        if (projection.query == null && projection.projectionQuery != null) {
+                            Expr mapping = new Expr(projection.sql, projection.kind);
+                            mapping.query = projection.projectionQuery;
+                            mapping.field = projection.projectionField;
+                            projection = mapping;
+                        }
+                        bindType(projection, left);
                         values = nested.sql;
                         operands.addAll(nested.correlations);
                     } else {

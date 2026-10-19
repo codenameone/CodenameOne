@@ -340,6 +340,10 @@ final class OrmEnhancer {
                 // method that merely shares the prefix stays.
                 if((access&Opcodes.ACC_SYNTHETIC)!=0 && (access&Opcodes.ACC_STATIC)!=0
                         && (name.startsWith(GET) || name.startsWith(SET) || name.startsWith(CALL))) { changed[0]=true;return null; }
+                // A user method with the exact name and descriptor of one written
+                // below would leave two in the class, which the VM refuses.
+                if(collides(name,descriptor)) throw new IllegalStateException(className.replace('/','.')+" declares "+name+descriptor
+                        +", which the ORM enhancer generates for it; rename that method");
                 MethodVisitor method=super.visitMethod(access,name,descriptor,signature,exceptions);
                 if(name.startsWith("__cn1Orm")) return method;
                 return new MethodVisitor(Opcodes.ASM9,method) {
@@ -374,6 +378,17 @@ final class OrmEnhancer {
                         super.visitFieldInsn(opcode,owner,field,desc);
                     }
                 };
+            }
+            private boolean collides(String name,String descriptor) {
+                String self="L"+className+";";
+                if(accessors!=null) {
+                    for(Map.Entry<String,String> field:accessors.entrySet()) {
+                        if(name.equals(GET+field.getKey()) && descriptor.equals("("+self+")"+field.getValue())) return true;
+                        if(name.equals(SET+field.getKey()) && descriptor.equals("("+self+field.getValue()+")V")) return true;
+                    }
+                }
+                return calls!=null && name.startsWith(CALL) && calls.containsKey(name.substring(CALL.length()))
+                        && descriptor.equals("("+self+")V");
             }
             @Override public void visitEnd() {
                 if(entity!=null && !already[0]) {
