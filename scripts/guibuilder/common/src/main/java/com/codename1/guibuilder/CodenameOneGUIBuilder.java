@@ -5395,7 +5395,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private Set<String> compiledKeys(String declaration) {
         try {
-            MutableResource probe = new MutableResource();
+            // Project-aware, as the real compile is: a cn1-image-id naming an image under
+            // res/Theme/<id>/ applies there, so the probe must find it too.
+            MutableResource probe = new ProjectImageResource(binding == null ? null : binding.cssFile());
             new CSSThemeCompiler().compile("CanvasCssProbe { color: #010203; " + declaration + " }",
                     probe, "Probe");
             Set<String> keys = new LinkedHashSet<>();

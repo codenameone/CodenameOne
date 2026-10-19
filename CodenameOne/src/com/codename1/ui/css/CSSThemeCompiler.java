@@ -379,11 +379,20 @@ public class CSSThemeCompiler {
                 cssVars.put(pendingVar, pendingValue);
                 pendingVar = null;
             }
-            if (!legacy && declaration.name.startsWith("--")) {
-                pendingVar = "@" + declaration.name.substring(2);
+            String declName = declaration.name;
+            if (!legacy) {
+                // The build-time parser takes a declaration name only as an identifier, and
+                // decoded: `1message` is not one, and `a\62 c` is `abc`.
+                declName = decodeIdentifier(declaration.name);
+                if (declName == null) {
+                    throw new CSSSyntaxException("Invalid #Constants name: " + declaration.name);
+                }
+            }
+            if (!legacy && declName.startsWith("--")) {
+                pendingVar = "@" + declName.substring(2);
                 pendingValue = declaration.value.trim();
             }
-            String name = declaration.name;
+            String name = declName;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
             // palette variable as the constant `@accent`.
             if (name.startsWith("--")) {
@@ -391,7 +400,7 @@ public class CSSThemeCompiler {
             }
             String key = "@" + name;
             exportedConstants.add(key);
-            if (legacy || declaration.name.startsWith("--")) {
+            if (legacy || declName.startsWith("--")) {
                 plainConstants.remove(key);
             } else {
                 plainConstants.add(key);
@@ -420,10 +429,14 @@ public class CSSThemeCompiler {
                     deferred.remove(key);
                     continue;
                 }
+                boolean fromText = false;
                 if (alias && declaration.snapshot != null) {
                     value = declaration.snapshot;
+                    // An alias of a quoted constant names the image by text, as written.
+                    String target = aliasTarget(raw);
+                    fromText = target != null && literalTokens.get(target) != null;
                 }
-                if (!alias && raw.equals(value)) {
+                if (!fromText && raw.equals(value) || alias && !fromText) {
                     // An identifier image name is looked up decoded: `my\ icon` is `my icon`.
                     String decoded = decodeIdentifier(value);
                     if (decoded != null) {
@@ -500,6 +513,9 @@ public class CSSThemeCompiler {
                 } else if (c == quote) {
                     quote = 0;
                 }
+            } else if (c == '\\') {
+                // An escaped character, `my\ icon`'s space among them, is part of the token.
+                i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == '(') {
@@ -1053,6 +1069,15 @@ public class CSSThemeCompiler {
     /// Parses a `font-size` with the build-time compiler's conversions: `pt`, `cm` and `in` are
     /// millimetres, a percentage scales the medium (3mm), small (2mm) or large (4mm) size, and
     /// a keyword selects that system font size.
+    /// `digits` unchanged, unless it uses exponent notation: `1e2px` is a dimension with the
+    /// unit `e2px` to the build-time parser, which it does not recognise as a size.
+    private static String fontDigits(String digits, String value) {
+        if (digits.indexOf('e') > -1 || digits.indexOf('E') > -1) {
+            throw new CSSSyntaxException("Exponent notation is not supported for font-size: " + value);
+        }
+        return digits;
+    }
+
     private FontSize parseFontSize(String value) {
         String v = value.trim();
         FontSize out = new FontSize();
@@ -1070,7 +1095,7 @@ public class CSSThemeCompiler {
             return out;
         }
         if (v.endsWith("%")) {
-            out.value = 3f * number(v.substring(0, v.length() - 1), value) / 100f;
+            out.value = 3f * number(fontDigits(v.substring(0, v.length() - 1), value), value) / 100f;
             out.unit = Style.UNIT_TYPE_DIPS;
             return out;
         }
@@ -1084,7 +1109,7 @@ public class CSSThemeCompiler {
         if (unit == null) {
             throw new CSSSyntaxException("Unsupported font-size value: " + value);
         }
-        float n = number(v.substring(0, v.length() - unit.length()), value);
+        float n = number(fontDigits(v.substring(0, v.length() - unit.length()), value), value);
         out.value = n;
         if ("px".equals(unit)) {
             out.unit = Style.UNIT_TYPE_PIXELS;

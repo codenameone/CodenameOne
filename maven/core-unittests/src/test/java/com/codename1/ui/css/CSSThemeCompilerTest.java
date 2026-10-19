@@ -1120,5 +1120,26 @@ public class CSSThemeCompilerTest extends UITestBase {
         Hashtable theme = res.getTheme("Theme");
         assertEquals(5, ((Image) theme.get("@emptyImage")).getWidth());
         assertEquals("foo!important", theme.get("@message"));
+
+        res = new MutableResource();
+        res.setImage("my icon", icon);
+        new CSSThemeCompiler().compile("#Constants { --icon: my\\ icon; navImage: var(--icon); }", res, "Theme");
+        assertEquals(5, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
+
+    @Test
+    void testExponentFontSizeIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));
+        new CSSThemeCompiler().compile("Label{font-size:1rem;}", new MutableResource(), "Theme");
+    }
+
+    @Test
+    void testConstantNameMustBeAnIdentifier() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("#Constants{1message: hello;}", new MutableResource(), "Theme"));
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{a\\62 c: hello;}", res, "Theme");
+        assertEquals("hello", res.getTheme("Theme").get("@abc"));
     }
 }
