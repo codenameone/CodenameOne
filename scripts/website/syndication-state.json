@@ -2845,6 +2845,18 @@
         "url": "https://medium.com/@Codename_One/update-db-schema-in-production-with-flyway-like-syntax-29cb8a390193?postPublishedType=initial",
         "syndicated_at": "2026-10-18T17:01:12+00:00"
       }
+    },
+    "spring-tests-native-backend": {
+      "hashnode": {
+        "url": "https://debugagent.com/how-do-you-test-spring-compatibility",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad55d93cebe3112a9b73d9a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-19T00:01:14+00:00"
+      }
     }
   }
 }
