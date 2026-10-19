@@ -137,14 +137,14 @@ public class BufferedWriter extends Writer {
         }
         closed = true;
         // try-with-resources by hand: the failure to write the buffer is the
-        // one reported, with the delegate's close failure attached.
+        // one reported, with the delegate's close failure, of any kind, attached.
         try {
             flushBuffer();
         } catch (IOException e) {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;
@@ -152,14 +152,15 @@ public class BufferedWriter extends Writer {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
-            throw e;        } catch (Error e) {
+            throw e;
+        } catch (Error e) {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;

@@ -106,7 +106,7 @@ public class BufferedOutputStream extends FilterOutputStream {
             return;
         }
         // try-with-resources by hand: the failure to write the buffer is the
-        // one reported, with the delegate's close failure attached.
+        // one reported, with the delegate's close failure, of any kind, attached.
         try {
             flush();
         } catch (IOException e) {
@@ -114,7 +114,7 @@ public class BufferedOutputStream extends FilterOutputStream {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;
@@ -123,7 +123,7 @@ public class BufferedOutputStream extends FilterOutputStream {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;        } catch (Error e) {
@@ -131,7 +131,7 @@ public class BufferedOutputStream extends FilterOutputStream {
             count = 0;
             try {
                 out.close();
-            } catch (IOException suppressed) {
+            } catch (Throwable suppressed) {
                 e.addSuppressed(suppressed);
             }
             throw e;

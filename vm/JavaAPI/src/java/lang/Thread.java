@@ -74,6 +74,9 @@ public class Thread implements java.lang.Runnable{
     private UncaughtExceptionHandler uncaughtExceptionHandler;
     private static int activeThreads = 0;
     private static long lastId;
+    // Plain, not volatile: the default handler is set once at start-up,
+    // before the threads that read it exist, and a field read on every
+    // uncaught exception is not worth a barrier on each access.
     private static UncaughtExceptionHandler defaultUncaughtExceptionHandler;
 
     /**

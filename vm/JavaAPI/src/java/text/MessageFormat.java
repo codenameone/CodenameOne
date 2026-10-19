@@ -199,6 +199,9 @@ public class MessageFormat extends Format {
         elementTexts = newTexts.toArray(new String[n]);
     }
 
+    // No ceiling on the value, as JDK 8 has none: {999999999} is accepted
+    // and the arrays sized by it fail when used. The 9999 limit is a later
+    // JDK's, and the conformance host is JDK 8.
     private static int parseArgumentNumber(String text) {
         boolean negative = text.startsWith("-");
         int from = negative ? 1 : 0;

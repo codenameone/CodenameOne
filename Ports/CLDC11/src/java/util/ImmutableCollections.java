@@ -181,8 +181,11 @@ final class ImmutableCollections {
         /// of an empty range succeeds, where this list must always refuse.
         @Override
         public List<E> subList(int fromIndex, int toIndex) {
-            if (fromIndex < 0 || toIndex > elements.length || fromIndex > toIndex) {
+            if (fromIndex < 0 || toIndex > elements.length) {
                 throw new IndexOutOfBoundsException();
+            }
+            if (fromIndex > toIndex) {
+                throw new IllegalArgumentException("fromIndex(" + fromIndex + ") > toIndex(" + toIndex + ")");
             }
             Object[] part = new Object[toIndex - fromIndex];
             System.arraycopy(elements, fromIndex, part, 0, part.length);
