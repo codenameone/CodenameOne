@@ -370,15 +370,7 @@ public class CSSThemeCompiler {
 
     private void compileConstants(Declaration[] declarations, Hashtable theme,
                                   Hashtable<String, String> deferred, boolean legacy) {
-        // A `--name` becomes a variable once its own declaration is read, so it cannot
-        // reference itself: it enters cssVars at the start of the next one.
-        String pendingVar = null;
-        String pendingValue = null;
         for (Declaration declaration : declarations) {
-            if (pendingVar != null) {
-                cssVars.put(pendingVar, pendingValue);
-                pendingVar = null;
-            }
             String declName = declaration.name;
             if (!legacy) {
                 // The build-time parser takes a declaration name only as an identifier, and
@@ -389,8 +381,9 @@ public class CSSThemeCompiler {
                 }
             }
             if (!legacy && declName.startsWith("--")) {
-                pendingVar = "@" + declName.substring(2);
-                pendingValue = declaration.value.trim();
+                // The build-time compiler adds the raw variable before it evaluates it, so
+                // `--accent: var(--accent, #f00)` is a cycle there, which fails the build.
+                cssVars.put("@" + declName.substring(2), declaration.value.trim());
             }
             String name = declName;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
@@ -399,7 +392,11 @@ public class CSSThemeCompiler {
                 name = name.substring(2);
             }
             String key = "@" + name;
-            exportedConstants.add(key);
+            if (!legacy) {
+                // Only #Constants is what the build-time compiler exports; a later :root still
+                // replaces a legacy @constants entry, as it always has.
+                exportedConstants.add(key);
+            }
             if (legacy || declName.startsWith("--")) {
                 plainConstants.remove(key);
             } else {
@@ -510,9 +507,6 @@ public class CSSThemeCompiler {
                 }
             }
             theme.put(key, value);
-        }
-        if (pendingVar != null) {
-            cssVars.put(pendingVar, pendingValue);
         }
     }
 
@@ -775,7 +769,9 @@ public class CSSThemeCompiler {
                 continue;
             }
             String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
-            if ("cn1-derive".equals(property)) {
+            if ("cn1-derive".equals(property) && !"press#".equals(statePrefix)) {
+                // The build-time compiler's Element.setParent() promotes a derive to the owning
+                // UIID from every state but pressed.
                 ownerDerives.put(uiid, value.trim());
             }
             if (universal && ("font-family".equals(property) || "font-size".equals(property))) {
@@ -1000,8 +996,9 @@ public class CSSThemeCompiler {
         if (recorded != null) {
             return recorded;
         }
-        // A derive a previous compile into the same theme stored: its order is gone.
-        String[] states = {"sel#", "press#", "dis#", "hover#"};
+        // A derive a previous compile into the same theme stored: its order is gone. Pressed is
+        // not among them: the build-time compiler does not promote a pressed derive.
+        String[] states = {"sel#", "dis#", "hover#"};
         for (int pass = dark ? 0 : 1; pass < 2; pass++) {
             String prefix = pass == 0 ? "$Dark" + id + "." : id + ".";
             for (String state : states) {
@@ -1775,8 +1772,13 @@ public class CSSThemeCompiler {
 
     private int parseRgbChannel(String value, String originalColor) {
         int out;
+        String v = value.trim();
         try {
-            out = Integer.parseInt(value.trim());
+            if (v.endsWith("%")) {
+                out = Math.round(Float.parseFloat(v.substring(0, v.length() - 1)) * 255f / 100f);
+            } else {
+                out = Integer.parseInt(v);
+            }
         } catch (RuntimeException err) {
             throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value, err);
         }

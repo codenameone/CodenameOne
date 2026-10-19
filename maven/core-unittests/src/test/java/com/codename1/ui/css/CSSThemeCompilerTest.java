@@ -589,13 +589,16 @@ public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
     public void testCyclicConstantsAreRejected() {
-        // In #Constants a reference sees only what is declared above it, so a self or mutual
-        // reference is undefined, as in the build-time compiler, and the constants are left out.
+        // The build-time compiler adds a custom property before it evaluates it, so a self or
+        // mutual reference is a cycle that fails the build. A plain name is no variable, so a
+        // reference to it is undefined and the constant is left out instead.
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ --a: var(--a); }", new MutableResource(), "Theme"));
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants{ --b: var(--c); --c: var(--b); }", new MutableResource(), "Theme"));
         MutableResource cyclic = new MutableResource();
-        new CSSThemeCompiler().compile("#Constants{ --a: var(--a); --b: var(--c); --c: var(--b); }", cyclic, "Theme");
+        new CSSThemeCompiler().compile("#Constants{ a: var(--a); }", cyclic, "Theme");
         assertFalse(cyclic.getTheme("Theme").containsKey("@a"));
-        assertFalse(cyclic.getTheme("Theme").containsKey("@b"));
-        assertFalse(cyclic.getTheme("Theme").containsKey("@c"));
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
                         new MutableResource(), "Theme"));
@@ -1137,6 +1140,27 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("1.5", theme.get("@num"));
         assertEquals("ff0000", theme.get("@col"));
         assertEquals("a b", theme.get("@str"));
+    }
+
+    @Test
+    void testLaterRootReplacesALegacyConstant() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("@constants { accent: red; } :root { --accent: blue; }", res, "Theme");
+        assertEquals("blue", res.getTheme("Theme").get("@accent"));
+    }
+
+    @Test
+    void testSelfReferencingCustomPropertyIsACycle() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
+                .compile("#Constants { --accent: var(--accent, #f00); }", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    void testPressedDeriveIsNotPromotedToTheOwner() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:native:MainBold;font-size:2mm;}"
+                + " Child:pressed{cn1-derive:Base;} Child:selected{font-size:20px;}", res, "Theme");
+        assertEquals("native:MainRegular", fontName((Font) res.getTheme("Theme").get("Child.sel#font")));
     }
 
     @Test

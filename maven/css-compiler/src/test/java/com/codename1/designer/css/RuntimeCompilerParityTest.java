@@ -48,6 +48,7 @@ public class RuntimeCompilerParityTest {
             + "    accentColor: #ff2d95;\n"
             + "    shortColor: #abc;\n"
             + "    switchTrackScaleY: 1.5;\n"
+            + "    pctColor: rgb(100%, 0%, 50%);\n"
             + "}\n"
             + "Label { padding: 1px 2px 3px 4px; margin: 1mm 2mm; }\n"
             + "One { padding: 5px; margin: 0.5mm; }\n"
@@ -70,7 +71,7 @@ public class RuntimeCompilerParityTest {
         }
         // Hex case differs between the compilers for every color, not just constants (the
         // build-time one writes upper case); both are read with Integer.parseInt(value, 16).
-        for (String key : new String[]{"@accentColor", "@shortColor"}) {
+        for (String key : new String[]{"@accentColor", "@shortColor", "@pctColor"}) {
             assertEquals(Integer.valueOf(Integer.parseInt((String) standard.get(key), 16)),
                     Integer.valueOf(Integer.parseInt((String) runtime.get(key), 16)), key);
         }
