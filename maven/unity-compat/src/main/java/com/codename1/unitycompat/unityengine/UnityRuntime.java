@@ -902,12 +902,16 @@ public final class UnityRuntime {
             if (go.destroyed || !go.activeInHierarchy()) {
                 continue;
             }
-            if (wantObjects) {
+            // A base type, UnityEngine.Object itself, takes the object and
+            // then its components.
+            if (wantObjects || type.isInstance(go)) {
                 if (out == null) {
                     return go;
                 }
                 out.add(go);
-                continue;
+                if (wantObjects) {
+                    continue;
+                }
             }
             int m = go.components.size();
             for (int j = 0; j < m; j++) {

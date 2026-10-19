@@ -1486,6 +1486,8 @@ namespace Spike
             Log("equatable " + eqCells.ContainsKey(new EqCell(3)) + " " + eqCells.Count + " " + eqList.Contains(new EqCell(4))
                 + " " + ((object)new EqCell(5)).Equals(new EqCell(5)) + " " + (new EqCell(6), 1).Equals((new EqCell(6), 1)));
 
+            Log("equatable linq " + System.Linq.Enumerable.Contains(eqList, new EqCell(4)) + " " + System.Linq.Enumerable.Contains(eqList, new EqCell(5)));
+
             // Array.Clear through a System.Array: struct elements reset, a boxed one in object[] dropped.
             GsVec[] clearVecs = { new GsVec(1, 2), new GsVec(3, 4) };
             Array clearAny = clearVecs;

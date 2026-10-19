@@ -463,6 +463,12 @@ public final class SceneCompiler {
         java.util.Arrays.sort(children);
         for (File f : children) {
             String name = f.getName();
+            // A linked directory is not followed, as the importer and the build's source
+            // digest do not follow one: what it leads to would be compiled
+            // without being stamped, and a link up the tree never ends.
+            if (Files.isSymbolicLink(f.toPath()) && f.isDirectory()) {
+                continue;
+            }
             String lower = name.toLowerCase(java.util.Locale.ROOT);
             if (resources != null && f.isFile() && !lower.endsWith(".meta") && name.lastIndexOf('.') > 0) {
                 ResourceFile r = new ResourceFile();

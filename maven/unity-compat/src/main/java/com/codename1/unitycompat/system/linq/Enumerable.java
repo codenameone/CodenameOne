@@ -204,7 +204,8 @@ public final class Enumerable {
         IEnumerator_1 e = walk(source);
         try {
             while (e.MoveNext()) {
-                if (Interop.areEqual(e.get_Current(), value)) {
+                // EqualityComparer<T>.Default, so an IEquatable<T> is asked.
+                if (Interop.defaultEquals(e.get_Current(), value)) {
                     return true;
                 }
             }
