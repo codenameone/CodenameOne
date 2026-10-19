@@ -2856,6 +2856,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-19T00:01:14+00:00"
+      },
+      "devto": {
+        "id": 4879534,
+        "url": "https://dev.to/codenameone/how-do-you-test-spring-compatibility-1n7m",
+        "syndicated_at": "2026-10-19T19:54:58+00:00"
       }
     }
   }
