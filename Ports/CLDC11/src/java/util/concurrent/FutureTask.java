@@ -165,12 +165,19 @@ public class FutureTask<V> implements RunnableFuture<V> {
             // The outcome goes in before the runner is released: released
             // first, a second run() could claim the still-NEW task and call
             // it again.
-            setException(t);
-            release();
+            // finally: a done() that throws must not keep the runner thread.
+            try {
+                setException(t);
+            } finally {
+                release();
+            }
             return;
         }
-        set(v);
-        release();
+        try {
+            set(v);
+        } finally {
+            release();
+        }
     }
 
     /// Runs the task without setting a result, leaving the future ready to

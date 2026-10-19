@@ -695,7 +695,8 @@ public final class Collectors {
                 }
                 return (M) out;
             }
-        });
+        }, downstream.characteristics().contains(Collector.Characteristics.IDENTITY_FINISH) ? ID_FINISH
+                : Collections.<Collector.Characteristics>emptySet());
     }
 
     public static <T> Collector<T, ?, Map<Boolean, List<T>>> partitioningBy(Predicate<? super T> predicate) {
@@ -710,6 +711,9 @@ public final class Collectors {
         final BiConsumer<A, ? super T> innerAccumulator = downstream.accumulator();
         final BinaryOperator<A> innerCombiner = downstream.combiner();
         final Function<A, D> innerFinisher = downstream.finisher();
+        // Never IDENTITY_FINISH, whatever the downstream reports: the
+        // container is a pair of the downstream's containers, not the map
+        // the finisher builds from them.
         return Collectors.<T, Object[], Map<Boolean, D>>of(new Supplier<Object[]>() {
             @Override
             public Object[] get() {

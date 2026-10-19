@@ -531,6 +531,13 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 all.complete(null);
             }
         };
+        // Every input checked before any gets a callback, which would hold
+        // the array and the result until that input completes.
+        for (CompletableFuture<?> f : futures) {
+            if (f == null) {
+                throw new NullPointerException();
+            }
+        }
         for (CompletableFuture<?> f : futures) {
             f.whenDone(one);
         }
@@ -539,6 +546,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     public static CompletableFuture<Object> anyOf(CompletableFuture<?>... futures) {
         final CompletableFuture<Object> any = new CompletableFuture<Object>();
+        for (CompletableFuture<?> f : futures) {
+            if (f == null) {
+                throw new NullPointerException();
+            }
+        }
         for (final CompletableFuture<?> f : futures) {
             f.whenDone(new Runnable() {
                 @Override

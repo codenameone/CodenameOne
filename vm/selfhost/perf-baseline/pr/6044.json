@@ -23,6 +23,44 @@
     }
    }
   },
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.454,
+      "time": 0.641,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.548,
+     "reason": "Runner variance on 8c578a54ae: linux-x64 EPYC translator RAM and valueEscape time, windows-x64 Intel recursion time; that commit changed no ParparVM code these benchmarks exercise",
+     "runs": 1,
+     "time": 0.641,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "from": {
+      "memory": 0.042,
+      "time": 0.101,
+      "tolerance": {
+       "memory": 0.55
+      }
+     },
+     "memory": 0.042,
+     "reason": "Runner variance on 8c578a54ae: linux-x64 EPYC translator RAM and valueEscape time, windows-x64 Intel recursion time; that commit changed no ParparVM code these benchmarks exercise",
+     "runs": 1,
+     "time": 0.12,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   }
+  },
   "linux-x64@intel-xeon-platinum-8370c": {
    "translator": {
     "all": {
@@ -197,6 +235,44 @@
      "tolerance": {
       "memory": 0.2,
       "time": 0.5
+     }
+    }
+   }
+  },
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "recursion": {
+    "all": {
+     "from": {
+      "memory": 0.059,
+      "time": 0.945,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.059,
+     "reason": "Runner variance on 8c578a54ae: linux-x64 EPYC translator RAM and valueEscape time, windows-x64 Intel recursion time; that commit changed no ParparVM code these benchmarks exercise",
+     "runs": 1,
+     "time": 1.203,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.526,
+      "time": 0.753,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.526,
+     "reason": "Runner variance on 8c578a54ae: linux-x64 EPYC translator RAM and valueEscape time, windows-x64 Intel recursion time; that commit changed no ParparVM code these benchmarks exercise",
+     "runs": 1,
+     "time": 0.574,
+     "tolerance": {
+      "time": 0.2
      }
     }
    }

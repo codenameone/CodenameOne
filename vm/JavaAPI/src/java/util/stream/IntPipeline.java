@@ -358,8 +358,9 @@ final class IntPipeline implements IntStream {
         Objects.requireNonNull(supplier);
         Objects.requireNonNull(accumulator);
         Objects.requireNonNull(combiner);
-        R result = supplier.get();
+        // The stream's state first: a used stream never calls the supplier.
         Iterator<Integer> it = boxed.iterator();
+        R result = supplier.get();
         try {
             while (it.hasNext()) {
                 accumulator.accept(result, unboxNext(it));

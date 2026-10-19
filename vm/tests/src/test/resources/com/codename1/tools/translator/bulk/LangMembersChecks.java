@@ -350,6 +350,26 @@ public final class LangMembersChecks {
             }
             Bulk.p("calls", String.valueOf(calls[0]));
         });
+        Bulk.check("Lang.groupingByKeepsIdentityFinish", () -> {
+            Bulk.p("grouping", String.valueOf(java.util.stream.Collectors.groupingBy((String x) -> x)
+                    .characteristics().contains(java.util.stream.Collector.Characteristics.IDENTITY_FINISH)));
+        });
+        Bulk.check("Lang.sharpSAndInvalidCodePoints", () -> {
+            Bulk.p("upper", Integer.toHexString(Character.toUpperCase(0xdf)));
+            Bulk.p("upperChar", Integer.toHexString(Character.toUpperCase((char) 0xdf)));
+            Bulk.p("indexOf", String.valueOf("A".indexOf(0x10041)));
+        });
+        Bulk.check("Lang.aUsedIntStreamNeverCallsTheSupplier", () -> {
+            java.util.stream.IntStream st = java.util.stream.IntStream.of(1);
+            st.sum();
+            final int[] calls = new int[1];
+            try {
+                st.collect(() -> { calls[0]++; return new StringBuilder(); }, StringBuilder::append, StringBuilder::append);
+            } catch (IllegalStateException e) {
+                Bulk.p("ise", "yes");
+            }
+            Bulk.p("calls", String.valueOf(calls[0]));
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

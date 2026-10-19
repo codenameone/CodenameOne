@@ -54,6 +54,10 @@ public final class StringRegex {
     private static int plain(String regex) {
         if (regex.length() == 1) {
             char c = regex.charAt(0);
+            // A lone surrogate goes to the engine, which never splits a pair.
+            if (c >= 0xd800 && c <= 0xdfff) {
+                return -1;
+            }
             return ".$|()[{^?*+\\".indexOf(c) < 0 ? c : -1;
         }
         if (regex.length() == 2 && regex.charAt(0) == '\\') {

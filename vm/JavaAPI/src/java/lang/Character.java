@@ -610,6 +610,7 @@ public final class Character implements Comparable<Character>{
         // The rest of Latin-1, which this class documents as supported. The
         // sharp s has no single-char upper case and stays; the micro sign and
         // y with diaeresis map outside the range, as they do in the JDK.
+        // (The sharp s is U+00DF, below this range's start.)
         if (codePoint >= 0xe0 && codePoint <= 0xfe && codePoint != 0xf7) {
             return codePoint - 0x20;
         }
