@@ -354,7 +354,7 @@ class ManagedSessionTest {
                 public String table() { return explicit?"bulk_text_explicit":"bulk_text_default"; }
                 public Attribute[] attributes() {
                     Attribute[] attrs=super.attributes().clone();
-                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?"VARCHAR(1024)":null);
+                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?"VARCHAR(512)":null);
                     return attrs;
                 }
                 public com.codename1.impl.orm.Index[] indexes() { return new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("",true,new String[]{"name"})}; }
@@ -551,7 +551,7 @@ class ManagedSessionTest {
                 com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                     if(method.getName().equals("describe")) {
                         java.util.List<Object[]> rows=new java.util.ArrayList<Object[]>();
-                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?"TEXT":"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
+                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?(dialect==com.codename1.backend.sql.Dialect.MYSQL?"LONGTEXT":"TEXT"):column.equals("position")?dialect.columnType(Attribute.INTEGER):"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
                         else { for(Attribute a:model.attributes()) rows.add(new Object[]{!collection && a.id ? "ID" : a.column,dialect.columnType(a.kind),a.nullable?0:1,a.id?1:0}); }
                         return rows;
                     }
@@ -653,8 +653,15 @@ class ManagedSessionTest {
         // Arithmetic widens the expression and must still accept a long operand.
         assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter+:delta=:expected").setParameter("delta",2147483648L).setParameter("expected",2147483648L).list().size());
         for(String expression:new String[]{"2147483648","-2147483649","r.counter+2147483648","r.counter-2147483649",":value","coalesce(:value,r.counter)","(select max(i.counter)+2147483648 from ManagedSessionTest$Record i)"}) {
-            session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression);if(expression.contains(":value")) query.setParameter("value",2147483648L);
-            assertThrows(PersistenceException.class,query::executeUpdate,expression);session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
+            session.beginTransaction();
+            try {
+                com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression);if(expression.contains(":value")) query.setParameter("value",2147483648L);
+                assertThrows(PersistenceException.class,query::executeUpdate,expression);
+            } catch(IllegalArgumentException refused) {
+                // MySQL cannot read the table an UPDATE writes, so the parser refuses the subquery outright.
+                assertTrue(expression.startsWith("(select") && refused.getMessage().startsWith("MySQL bulk subqueries"),refused.getMessage());
+            }
+            session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
         }
         for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE,0}) {
             session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();session.clear();assertEquals(boundary,session.find(Record.class,id).counter);
@@ -690,8 +697,15 @@ class ManagedSessionTest {
         }
         for(String field:new String[]{"narrow","boxed"}) {
             for(String expression:new String[]{"1e100","-1e100","1e-100","-1e-100",":value","r.wide","r.wide*2","coalesce((select max(i.wide) from ManagedSessionTest$RealRecord i),0)"}) {
-                session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"="+expression);if(expression.equals(":value"))query.setParameter("value",1e100);
-                assertThrows(PersistenceException.class,query::executeUpdate,field+"="+expression);session.rollbackTransaction();assertEquals(1f,session.find(RealRecord.class,id).narrow);assertEquals(Float.valueOf(1f),session.find(RealRecord.class,id).boxed);
+                session.beginTransaction();
+                try {
+                    com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"="+expression);if(expression.equals(":value"))query.setParameter("value",1e100);
+                    assertThrows(PersistenceException.class,query::executeUpdate,field+"="+expression);
+                } catch(IllegalArgumentException refused) {
+                    // MySQL cannot read the table an UPDATE writes, so the parser refuses the subquery outright.
+                    assertTrue(expression.contains("(select") && refused.getMessage().startsWith("MySQL bulk subqueries"),refused.getMessage());
+                }
+                session.rollbackTransaction();assertEquals(1f,session.find(RealRecord.class,id).narrow);assertEquals(Float.valueOf(1f),session.find(RealRecord.class,id).boxed);
             }
             for(double boundary:new double[]{0,-0.0,Float.MIN_VALUE,-Float.MIN_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,1e-45,-1e-45}) {
                 session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();session.clear();session.clear();RealRecord loaded=session.find(RealRecord.class,id);assertEquals((float)boundary,field.equals("narrow")?loaded.narrow:loaded.boxed.floatValue(),0.0f);

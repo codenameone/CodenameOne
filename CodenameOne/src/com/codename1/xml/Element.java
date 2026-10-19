@@ -37,6 +37,9 @@ public class Element implements Iterable<Element> {
     public static final int DEPTH_INFINITE = Integer.MAX_VALUE;
     boolean isComment;
     boolean caseSensitive;
+    /// Set on elements a strict parser made: tag name searches match exactly.
+    /// Kept apart from caseSensitive, which never affected tag searches.
+    boolean exactTagNames;
     /// True if this is a text element, false otherwise
     private boolean textElement;
     /// The element's name (or text for text elements)
@@ -45,8 +48,15 @@ public class Element implements Iterable<Element> {
     private ArrayList<Element> children;
     /// This element's parent
     private Element parent;
-    /// A hashtable containing this element's attributes
+    /// The attributes once somebody asked for them as a table (see getAttributes()).
+    /// Until then they live in attrs, and exactly one of the two is in use.
     private Hashtable attributes;
+    /// Attributes as alternating keys and values. A Hashtable per element was
+    /// the largest single cost of parsing a document on ParparVM: every
+    /// Hashtable is synchronized, so each one owns a monitor the collector has
+    /// to tear down under a global lock.
+    private Object[] attrs;
+    private int attrCount;
 
     /// Constructs and Element without specifying a name
     /// This can be used by subclasses that do not require name assigments.
@@ -89,6 +99,9 @@ public class Element implements Iterable<Element> {
     private static boolean cmpTagName(String tagName, Element tag) {
         if ("*".equals(tagName)) {
             return true;
+        }
+        if (tag.exactTagNames) {
+            return tagName.equals(tag.getTagName());
         }
         return tagName.equalsIgnoreCase(tag.getTagName());
     }
@@ -142,7 +155,72 @@ public class Element implements Iterable<Element> {
     ///
     /// the attributes Hashtable
     public Hashtable getAttributes() {
+        if (attrs != null) {
+            // Callers mutate the returned table and expect getAttribute to see
+            // it, so from here on the table is the only store.
+            attributes = toHashtable();
+            attrs = null;
+            attrCount = 0;
+        }
         return attributes;
+    }
+
+    private Hashtable toHashtable() {
+        Hashtable h = new Hashtable();
+        for (int i = 0; i < attrCount; i += 2) {
+            h.put(attrs[i], attrs[i + 1]);
+        }
+        return h;
+    }
+
+    private int indexOfAttr(Object id) {
+        Object[] a = attrs;
+        int count = attrCount;
+        for (int i = 0; i < count; i += 2) {
+            if (a[i] == id) { //NOPMD CompareObjectsWithEquals
+                return i;
+            }
+        }
+        for (int i = 0; i < count; i += 2) {
+            if (a[i].equals(id)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private Object getAttributeValue(Object id) {
+        if (attrs != null) {
+            int i = indexOfAttr(id);
+            return i < 0 ? null : attrs[i + 1];
+        }
+        if (attributes != null) {
+            return attributes.get(id);
+        }
+        return null;
+    }
+
+    private static boolean hasUpper(String s) {
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if ((c >= 'A' && c <= 'Z') || (c > 127 && Character.toLowerCase(c) != c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String foldName(String s) {
+        int len = s.length();
+        char[] out = new char[len];
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            // Character.toLowerCase(char) is what the parser folds names with,
+            // and unlike String.toLowerCase() it ignores the device locale
+            out[i] = c < 128 ? ((c >= 'A' && c <= 'Z') ? (char) (c + 32) : c) : Character.toLowerCase(c);
+        }
+        return new String(out);
     }
 
     /// Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
@@ -154,10 +232,31 @@ public class Element implements Iterable<Element> {
     ///
     /// - `value`: The attribute value
     protected void setAttribute(Object id, String value) {
-        if (attributes == null) {
-            attributes = new Hashtable();
+        if (attributes != null) {
+            attributes.put(id, value);
+            return;
         }
-        attributes.put(id, value);
+        if (id == null || value == null) {
+            // Hashtable.put threw for a null key or value; keep that contract
+            throw new NullPointerException();
+        }
+        if (attrs == null) {
+            attrs = new Object[8];
+        } else {
+            int i = indexOfAttr(id);
+            if (i >= 0) {
+                attrs[i + 1] = value;
+                return;
+            }
+            if (attrCount == attrs.length) {
+                Object[] n = new Object[attrCount * 2];
+                System.arraycopy(attrs, 0, n, 0, attrCount);
+                attrs = n;
+            }
+        }
+        attrs[attrCount] = id;
+        attrs[attrCount + 1] = value;
+        attrCount += 2;
     }
 
     /// Adds the specified Element as a child to this element.
@@ -583,6 +682,19 @@ public class Element implements Iterable<Element> {
     ///
     /// - `id`: The attribute ID
     protected void removeAttribute(Object id) {
+        if (attrs != null) {
+            int i = indexOfAttr(id);
+            if (i >= 0) {
+                System.arraycopy(attrs, i + 2, attrs, i, attrCount - i - 2);
+                attrCount -= 2;
+                attrs[attrCount] = null;
+                attrs[attrCount + 1] = null;
+                if (attrCount == 0) {
+                    attrs = null;
+                }
+            }
+            return;
+        }
         if (attributes != null) {
             attributes.remove(id);
             if (attributes.isEmpty()) {
@@ -625,16 +737,20 @@ public class Element implements Iterable<Element> {
     ///
     /// the attribute value by its name (or null if it wasn't defined for this element)
     public String getAttribute(String name) {
-        if (attributes == null) {
+        if (attributes == null && attrs == null) {
             return null;
         }
-        if (!caseSensitive) {
-            String val = (String) attributes.get(name.toLowerCase());
+        // The lower-cased lookup comes first for compatibility, but a name with
+        // no upper-case letter is its own lower-cased form, so the common case
+        // is one exact lookup with no allocation. The fold is per
+        // character, the same one the parser applies, never the device locale.
+        if (!caseSensitive && hasUpper(name)) {
+            Object val = getAttributeValue(foldName(name));
             if (val != null) {
-                return val;
+                return (String) val;
             }
         }
-        return (String) attributes.get(name);
+        return (String) getAttributeValue(name);
     }
 
     private void setChildParent(Element child) {
@@ -779,10 +895,11 @@ public class Element implements Iterable<Element> {
         StringBuilder str = new StringBuilder(spacing);
         if (!textElement) {
             str.append("<").append(getTagName());
-            if (attributes != null) {
-                for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {
+            Hashtable table = attrs != null ? toHashtable() : attributes;
+            if (table != null) {
+                for (Enumeration e = table.keys(); e.hasMoreElements(); ) {
                     String attrStr = (String) e.nextElement();
-                    String val = (String) attributes.get(attrStr);
+                    String val = (String) table.get(attrStr);
                     str.append(" ").append(attrStr).append("='").append(val).append("'");
                 }
             }

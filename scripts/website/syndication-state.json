@@ -2794,6 +2794,14 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/android-on-ios-web-desktop-efficiently-and-for-free-4bd57cc74625?postPublishedType=initial",
         "syndicated_at": "2026-10-16T19:02:40+00:00"
+      },
+      "foojay": {
+        "id": 135,
+        "url": "https://github.com/foojayio/website/pull/135",
+        "pull_request_url": "https://github.com/foojayio/website/pull/135",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-17T13:44:07+00:00"
       }
     },
     "sign-in-client-server-contract": {
@@ -2806,6 +2814,48 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-17T00:01:10+00:00"
+      },
+      "devto": {
+        "id": 4868310,
+        "url": "https://dev.to/codenameone/easy-full-stack-authentication-and-login-in-the-style-of-spring-455a",
+        "syndicated_at": "2026-10-17T16:27:04+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/easy-full-stack-authentication-and-login-in-the-style-of-spring-3d5e67f33fbb?postPublishedType=initial",
+        "syndicated_at": "2026-10-17T19:00:31+00:00"
+      }
+    },
+    "database-upgrades-without-lost-data": {
+      "hashnode": {
+        "url": "https://debugagent.com/update-db-schema-in-production-with-flyway-like-syntax",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad40c115fa01d385796a751",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-18T00:01:13+00:00"
+      },
+      "devto": {
+        "id": 4873050,
+        "url": "https://dev.to/codenameone/update-db-schema-in-production-with-flyway-like-syntax-2lj6",
+        "syndicated_at": "2026-10-18T16:43:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/update-db-schema-in-production-with-flyway-like-syntax-29cb8a390193?postPublishedType=initial",
+        "syndicated_at": "2026-10-18T17:01:12+00:00"
+      }
+    },
+    "spring-tests-native-backend": {
+      "hashnode": {
+        "url": "https://debugagent.com/how-do-you-test-spring-compatibility",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad55d93cebe3112a9b73d9a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-19T00:01:14+00:00"
       }
     }
   }

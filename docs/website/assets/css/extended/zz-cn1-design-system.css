@@ -1692,3 +1692,78 @@ body.dark .cn1-footer-logo {
     display: block !important;
   }
 }
+
+/* Homepage evidence: real captures, proportional bars and readable build diagrams. */
+.cn1-home-stories { display: grid; gap: 32px; }
+.cn1-home-story { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; align-items: center; padding: 32px; border: 1px solid var(--cn1-border); border-radius: var(--cn1-radius); background: var(--cn1-surface); }
+.cn1-home-story h3 { font-size: clamp(24px, 3vw, 34px); line-height: 1.2; margin: 0 0 18px; }
+.cn1-home-story p { color: var(--cn1-muted); line-height: 1.65; }
+.cn1-home-story a, .cn1-home-visual a, .cn1-home-themes a { text-decoration: underline; text-underline-offset: 4px; }
+.cn1-home-story--reverse > div { order: 2; }
+.cn1-home-caveat { font-size: 14px; }
+.cn1-home-visual { margin: 0; padding: 24px; border-radius: 18px; background: var(--cn1-bg); border: 1px solid var(--cn1-border); min-width: 0; }
+.cn1-home-visual figcaption, .cn1-home-themes figcaption { font-size: 13px; line-height: 1.6; color: var(--cn1-muted); margin-top: 20px; }
+.cn1-home-chart { padding: 8px 0 24px; }
+.cn1-home-chart h4 { margin: 0 0 24px; font-size: 15px; }
+.cn1-home-chart small { display: block; font-size: 12px; font-weight: 400; color: var(--cn1-muted); margin-top: 5px; }
+.cn1-home-bar { margin-top: 18px; }
+.cn1-home-bar span { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.cn1-home-bar b { font-variant-numeric: tabular-nums; }
+.cn1-home-bar i { display: block; width: var(--bar); height: 14px; margin-top: 8px; background: #26b9a5; border-radius: 0 4px 4px 0; }
+.cn1-home-bar--reference i { background: #8896bd; }
+.cn1-home-gallery { background: linear-gradient(135deg, #202b4b, #293956); }
+.cn1-home-gallery__screens { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; align-items: center; }
+.cn1-home-gallery__screens span { display: block; color: #fff; font-size: 12px; margin-bottom: 12px; }
+.cn1-home-gallery__screens img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 12px 24px #0004; }
+.cn1-home-gallery figcaption, .cn1-home-gallery a { color: #e1e8ff; }
+.cn1-home-contract { padding: 20px 0; text-align: center; }
+.cn1-home-contract > span { display: block; color: var(--cn1-muted); font: 13px monospace; }
+.cn1-home-contract > code { display: inline-block; padding: 18px 30px; margin: 12px 0 0; border: 1px solid #26b9a5; border-radius: 12px; }
+.cn1-home-contract__branches { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-top: 44px; position: relative; }
+.cn1-home-contract__branches:before { content: ''; position: absolute; top: 0; left: 25%; width: 50%; height: 44px; border: 1px solid #26b9a5; border-bottom: none; }
+.cn1-home-contract__branches > div { border: 1px solid var(--cn1-border); border-radius: 12px; padding: 16px 8px; }
+.cn1-home-contract small { display: block; font-size: 12px; color: var(--cn1-muted); margin-top: 8px; }
+.cn1-home-themes { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; align-items: center; margin: 0 0 28px; padding: 28px; border-radius: var(--cn1-radius); background: #202b4b; }
+.cn1-home-themes img { width: 100%; height: auto; border-radius: 12px; }
+.cn1-home-themes figcaption { grid-column: 1 / -1; margin: 0; color: #e1e8ff; }
+.cn1-home-themes a { color: inherit; }
+.cn1-home-flow { display: flex; align-items: center; gap: 18px; margin: 0 0 28px; }
+.cn1-home-flow > div { flex: 1; padding: 22px 16px; border: 1px solid var(--cn1-border); border-radius: 14px; background: var(--cn1-surface); text-align: center; }
+.cn1-home-flow small { display: block; font-size: 12px; color: var(--cn1-muted); margin-bottom: 8px; }
+.cn1-home-flow strong { font-size: 16px; }
+.cn1-home-flow > span { color: #26b9a5; font-size: 26px; }
+.cn1-home-agent-loop { align-self: center; }
+.cn1-v2-agent__scope { grid-column: 1 / -1; }
+.cn1-home-agent-loop .cn1-home-flow { margin-bottom: 0; }
+.cn1-home-agent-loop figcaption { text-align: center; }
+@media (max-width: 800px) {
+  .cn1-home-story { grid-template-columns: 1fr; gap: 24px; padding: 24px; }
+  .cn1-home-story--reverse > div { order: 0; }
+  .cn1-home-themes { grid-template-columns: 1fr; }
+  .cn1-home-flow { flex-direction: column; gap: 10px; }
+  .cn1-home-flow > div { width: 100%; }
+  .cn1-home-flow > span { transform: rotate(90deg); }
+}
+@media (max-width: 480px) {
+  .cn1-home-story, .cn1-home-visual { padding: 18px; }
+  .cn1-home-gallery__screens { gap: 10px; }
+  .cn1-home-bar span { font-size: 12px; }
+}
+
+/* Keep the complete 60 fps iOS 27 comparison visible at its original aspect ratio. */
+.cn1-runtime-proof__comparison--ios27 { height: auto; }
+.cn1-runtime-proof__comparison--ios27 > video,
+.cn1-runtime-proof__comparison--ios27 > img { height: auto; aspect-ratio: 1178 / 1024; background: #08142f; }
+.cn1-runtime-proof__comparison--ios27 > p { font-size: 9px; letter-spacing: 0; }
+.cn1-home-platforms { display: block; }
+.cn1-home-platforms .cn1-v2-reach__copy { max-width: 760px; margin-bottom: 32px; }
+.cn1-home-platforms .cn1-platform-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--cn1-border); border-radius: var(--cn1-radius); overflow: hidden; }
+.cn1-home-platforms .cn1-platform-grid li { min-height: 112px; border: 0; border-radius: 0; box-shadow: inset -1px -1px var(--cn1-border); }
+.cn1-home-platforms .cn1-platform-grid strong { font-size: 20px; }
+@media (max-width: 800px) {
+  .cn1-home-platforms .cn1-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 400px) {
+  .cn1-home-platforms .cn1-platform-grid li { padding: 16px; }
+  .cn1-home-platforms .cn1-platform-grid strong { font-size: 17px; }
+}

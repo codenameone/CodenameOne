@@ -9,6 +9,9 @@ date: '2016-09-27'
 author: Shai Almog
 ---
 
+> **Current full-stack tutorial:** [Build a ride-hailing application with Wayline](/wayline/), including rider, driver, admin and Java backend source. The resources below include older book and course material.
+
+
 There are many Codename One resources for building native mobile apps but they are often all over the place, in this blog post I’ll try to concentrate the best resources for people who already know Java and are looking to pick up Codename One. If you don’t know Java yet, please check out [this post](/blog/codapps-io-is-back-java-on-mobile-from-scratch.html) where we discuss resources for beginners to learn Java.
 
 ### Written Docs and Tutorials

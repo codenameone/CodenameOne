@@ -1,0 +1,11 @@
+{{- /* One clause of a bottom line: "4.07x faster start-up", "1.20x larger install", "start-up on par".
+       .advantage is oriented like port-status-outcome (above 1.00 favours
+       Codename One); .better and .worse are the words for each side of it. */ -}}
+{{- $advantage := float .advantage -}}
+{{- $outcome := partial "port-status-outcome.html" $advantage -}}
+{{- $text := "" -}}
+{{- if eq $outcome "is-win" -}}{{- $text = printf "%.2fx %s %s" $advantage .better .what -}}
+{{- else if eq $outcome "is-loss" -}}{{- $text = printf "%.2fx %s %s" (div 1.0 $advantage) .worse .what -}}
+{{- else -}}{{- $text = printf "%s on par" .what -}}
+{{- end -}}
+{{- return (printf "<span class=\"cn1-port-status__verdict %s\">%s</span>" $outcome $text | safeHTML) -}}

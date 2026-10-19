@@ -299,6 +299,7 @@
 
   const acceptConsent = () => {
     setConsent("accepted");
+    window.dispatchEvent?.(new Event("cn1-consent-changed"));
     closeBanner();
     loadCrisp();
     reportOssArrival();
@@ -307,6 +308,7 @@
 
   const declineConsent = () => {
     setConsent("declined");
+    window.dispatchEvent?.(new Event("cn1-consent-changed"));
     clearPendingEvents();
     closeBanner();
     hideCrisp();

@@ -50,7 +50,7 @@ jobs:
     # library. Keep both ARC modes and both AdMob link destinations.
     needs: select
     if: ${{ needs.select.outputs.libraries != '' }}
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6

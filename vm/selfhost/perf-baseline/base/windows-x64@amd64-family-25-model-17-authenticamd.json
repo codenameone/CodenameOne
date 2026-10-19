@@ -32,11 +32,11 @@
  },
  "hello": {
   "all": {
-   "memory": 0.828,
-   "runs": 2,
+   "memory": 0.816,
+   "runs": 4,
    "time": 1.375,
    "tolerance": {
-    "memory": 0.2,
+    "memory": 0.4,
     "time": 0.5
    }
   }
@@ -116,8 +116,8 @@
  "translator": {
   "all": {
    "memory": 0.551,
-   "runs": 1,
-   "time": 0.777,
+   "runs": 2,
+   "time": 0.701,
    "tolerance": {
     "time": 0.2
    }

@@ -74,6 +74,7 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
     private CodenameOneSettings mainApp;
 
     public static void main(String[] args) {
+        CodenameOneSettings.setLegacyMavenInstaller(new MavenLibraryInstaller());
         configureDesktopAppIdentity();
         if (System.getProperty("settings.version") == null) {
             System.setProperty("settings.version", APP_VERSION);

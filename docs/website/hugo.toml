@@ -62,6 +62,12 @@ url = "/compare/"
 weight = 12
 
 [[menu.main]]
+parent = "product"
+name = "Wayline Ride-Hailing App"
+url = "/wayline/"
+weight = 13
+
+[[menu.main]]
 identifier = "docs"
 name = "Docs"
 url = "#"

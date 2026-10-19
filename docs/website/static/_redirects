@@ -17,6 +17,10 @@
 /files/CodenameOne.jar https://download.codenameone.com/files/CodenameOne.jar 302
 /files/JavaSE.jar https://download.codenameone.com/files/JavaSE.jar 302
 
+# Legacy Uber demo URLs now lead to the current full-stack application
+/demos/uberclone.html /wayline/ 301
+/demos/uberclone.html/ /wayline/ 301
+
 # High-priority legacy URL redirects (Cloudflare)
 /videos.html /videos/ 301
 /videos.html/ /videos/ 301

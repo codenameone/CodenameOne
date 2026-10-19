@@ -9,6 +9,9 @@ date: '2018-07-23'
 author: Shai Almog
 ---
 
+> **Starting a new ride-hailing project?** [Meet Wayline](/wayline/), the full-stack Java application with rider, driver, admin and backend source. [Follow the current tutorial](/blog/create-an-uber-clone-in-1-minute/). The article below describes the original Uber Clone.
+
+
 ![Header Image](/blog/uber-book-release-date/create-uber-clone-book-promo-1024.png)
 
 I’ve been working on the new "Create an Uber Clone in 7 Days" book for ages. After so much work this is finally almost done!  

@@ -188,8 +188,7 @@ public final class Mappers {
         if (m == null) {
             throw missing(type);
         }
-        XMLParser p = new XMLParser();
-        Element root = p.parse(new StringReader(xml));
+        Element root = newXmlParser().parse(new StringReader(xml));
         return m.readXml(root);
     }
 
@@ -202,9 +201,18 @@ public final class Mappers {
         if (m == null) {
             throw missing(type);
         }
-        XMLParser p = new XMLParser();
-        Element root = p.parse(xml);
+        Element root = newXmlParser().parse(xml);
         return m.readXml(root);
+    }
+
+    /// The generated readers look names up exactly as `toXml` wrote them and
+    /// read a value as its text, so strict mode suits them: no case folding
+    /// and no whitespace munging, which lets a value with leading or only
+    /// whitespace round-trip, and it is the parser's fast path.
+    private static XMLParser newXmlParser() {
+        XMLParser p = new XMLParser();
+        p.setStrict(true);
+        return p;
     }
 
     private static IllegalStateException missing(Class<?> type) {
