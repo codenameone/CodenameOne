@@ -110,16 +110,16 @@ public class CSSThemeCompiler {
     /// compiler adds only `--name` declarations to its variables, so `var(--name)` does not see
     /// these.
     private HashSet<String> plainConstants = new HashSet<String>();
-    /// A custom property this compile declared whose "@name" a later plain `#Constants` entry
-    /// took over, keyed by "@name": its value, and in shadowedKinds its deferred kind. The
-    /// build-time compiler keeps variables and constants apart, so `var(--accent)` still
-    /// reaches the variable after `accent: blue` exported a different `@accent`.
-    private Hashtable<String, String> shadowedVars = new Hashtable<String, String>();
-    private Hashtable<String, String> shadowedKinds = new Hashtable<String, String>();
+    /// Every custom property this compile has read so far, keyed by "@name", as written: the
+    /// build-time compiler keeps its variables apart from the constants it exports. A variable
+    /// holds its CSS spelling (`#f00`, not the exported `ff0000`, so a border can use it) and an
+    /// alias holds `var(--base)` itself, resolved where it is used, so a later `--base` changes
+    /// it while the exported `@alias` keeps the value it had where it was declared. A later
+    /// plain `#Constants` entry or `:root` property of the same name changes only its own side.
+    private Hashtable<String, String> cssVars = new Hashtable<String, String>();
     /// "@name" of every entry a `#Constants` block of this compile exported. The build-time
     /// compiler adds a custom property to its constants only inside `#Constants`, so a later
-    /// `:root { --name: ... }` changes what `var(--name)` reads (through shadowedVars) and
-    /// leaves the exported `@name` alone.
+    /// `:root { --name: ... }` changes what `var(--name)` reads and leaves `@name` alone.
     private HashSet<String> exportedConstants = new HashSet<String>();
     /// While set, resolveVars does not see a constant this compile declares unless it holds it:
     /// one declared further down is not defined yet. A constant only an earlier compile into the
@@ -147,8 +147,7 @@ public class CSSThemeCompiler {
         deferredConstants = deferred;
         literalTokens = new Hashtable<String, String>();
         plainConstants = new HashSet<String>();
-        shadowedVars = new Hashtable<String, String>();
-        shadowedKinds = new Hashtable<String, String>();
+        cssVars = new Hashtable<String, String>();
         exportedConstants = new HashSet<String>();
         declaredThisCompile = new HashSet<String>();
         for (Rule rule : rules) {
@@ -371,7 +370,19 @@ public class CSSThemeCompiler {
 
     private void compileConstants(Declaration[] declarations, Hashtable theme,
                                   Hashtable<String, String> deferred, boolean legacy) {
+        // A `--name` becomes a variable once its own declaration is read, so it cannot
+        // reference itself: it enters cssVars at the start of the next one.
+        String pendingVar = null;
+        String pendingValue = null;
         for (Declaration declaration : declarations) {
+            if (pendingVar != null) {
+                cssVars.put(pendingVar, pendingValue);
+                pendingVar = null;
+            }
+            if (!legacy && declaration.name.startsWith("--")) {
+                pendingVar = "@" + declaration.name.substring(2);
+                pendingValue = declaration.value.trim();
+            }
             String name = declaration.name;
             // `#Constants { --accent: ...; }` is how the build-time compiler exports a
             // palette variable as the constant `@accent`.
@@ -382,15 +393,7 @@ public class CSSThemeCompiler {
             exportedConstants.add(key);
             if (legacy || declaration.name.startsWith("--")) {
                 plainConstants.remove(key);
-                shadowedVars.remove(key);
-                shadowedKinds.remove(key);
             } else {
-                Object variable = theme.get(key);
-                String variableKind = deferred.get(key);
-                if (!plainConstants.contains(key) && variableKind != null && variable instanceof String) {
-                    shadowedVars.put(key, (String) variable);
-                    shadowedKinds.put(key, variableKind);
-                }
                 plainConstants.add(key);
             }
             String raw = declaration.value.trim();
@@ -479,6 +482,35 @@ public class CSSThemeCompiler {
             }
             theme.put(key, value);
         }
+        if (pendingVar != null) {
+            cssVars.put(pendingVar, pendingValue);
+        }
+    }
+
+    /// The first whitespace- or comma-separated token of `value`, skipping quoted text and
+    /// parentheses: `foo bar` is `foo`, `rgb(1, 2, 3) x` is `rgb(1, 2, 3)`.
+    private static String leadingToken(String value) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (depth == 0 && (c == ',' || c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f')) {
+                return value.substring(0, i);
+            }
+        }
+        return value;
     }
 
     /// A constant that is one var() takes its value's token type, a fallback's too: the
@@ -510,7 +542,21 @@ public class CSSThemeCompiler {
         unresolvedVar = false;
         try {
             String resolved = resolveVars(theme, value);
-            return unresolvedVar ? null : typedAlias(key, value, resolved);
+            if (unresolvedVar) {
+                return null;
+            }
+            String text = resolved.trim();
+            String first = leadingToken(text);
+            if (first.length() < text.length()) {
+                // `pair: var(--x) bar` is a chain of lexical units, and the build-time
+                // constants emitter writes only the leading one: `@pair` is `foo`.
+                String unquoted = unquote(first);
+                if (!unquoted.equals(first)) {
+                    return unquoted;
+                }
+                return isCssNumber(first) ? buildConstant(key.substring(1), first, first) : first;
+            }
+            return typedAlias(key, value, resolved);
         } finally {
             declaredOnly = null;
             if (own != null) {
@@ -617,6 +663,11 @@ public class CSSThemeCompiler {
         int end = len - 1;
         for (int i = 1; i < end; i++) {
             char c = v.charAt(i);
+            if (c == '\n' || c == '\r' || c == '\f') {
+                // A CSS string cannot hold an unescaped newline: the build-time parser rejects
+                // the declaration, so the built theme would not have it.
+                throw new CSSSyntaxException("Unescaped newline in string: " + value);
+            }
             if (c != '\\' || i + 1 >= end) {
                 out.append(c);
                 continue;
@@ -720,16 +771,12 @@ public class CSSThemeCompiler {
         String key = "@" + property.substring(2);
         String raw = value.trim();
         String unquoted = unquote(raw);
+        cssVars.put(key, raw);
         if (exportedConstants.contains(key)) {
             // Only the variable changes; the constant #Constants exported keeps its value.
-            shadowedVars.put(key, unquoted);
-            shadowedKinds.put(key, raw.equals(unquoted) ? DEFERRED_PLAIN : DEFERRED_LITERAL);
-            plainConstants.add(key);
             return true;
         }
         plainConstants.remove(key);
-        shadowedVars.remove(key);
-        shadowedKinds.remove(key);
         // An unquoted var() in it is resolved where it is used, against the final values.
         deferred.put(key, DEFERRED_PLAIN);
         literalTokens.remove(key);
@@ -1414,8 +1461,25 @@ public class CSSThemeCompiler {
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
             }
+            String variable = cssVars.get("@" + key);
+            boolean own = variable != null;
+            if (own) {
+                // A quoted variable is text: its token in a style property, its text elsewhere.
+                String text = unquote(variable);
+                String spelling = tokens || text.equals(variable) ? variable : text;
+                if (!text.equals(variable)) {
+                    out.append(value.substring(pos, varPos)).append(spelling);
+                } else {
+                    resolving.add(key);
+                    out.append(value.substring(pos, varPos)).append(resolveVars(theme, variable, resolving, tokens));
+                    resolving.remove(resolving.size() - 1);
+                }
+                pos = end + 1;
+                varPos = value.indexOf("var(--", pos);
+                continue;
+            }
             boolean shadowed = plainConstants.contains("@" + key);
-            Object replacement = shadowed ? shadowedVars.get("@" + key)
+            Object replacement = shadowed ? null
                     : (declaredOnly != null && !declaredOnly.containsKey("@" + key)
                             && declaredThisCompile.contains("@" + key)) ? null : theme.get("@" + key);
             if (replacement == null && fallback != null) {
@@ -1428,14 +1492,14 @@ public class CSSThemeCompiler {
                 unresolvedVar = true;
             }
             String replaceValue = replacement == null ? "" : replacement.toString();
-            String token = tokens && !shadowed ? literalTokens.get("@" + key) : null;
+            String token = tokens ? literalTokens.get("@" + key) : null;
             if (token != null) {
                 replaceValue = token;
             }
             // A quoted constant is text, also when it is reached through another constant. So
             // is one a previous compile into the same theme left: it is already resolved, and
             // any var() still in it was quoted text there.
-            String kind = shadowed ? shadowedKinds.get("@" + key) : deferredConstants.get("@" + key);
+            String kind = deferredConstants.get("@" + key);
             if (kind != null && !DEFERRED_LITERAL.equals(kind)) {
                 resolving.add(key);
                 replaceValue = resolveVars(theme, replaceValue, resolving, tokens);
@@ -1725,7 +1789,13 @@ public class CSSThemeCompiler {
         if (unit == null && !isIntegerSpelling(v)) {
             throw new CSSSyntaxException("A unitless padding or margin must be a whole number: " + value);
         }
-        float n = number(unit == null ? v : v.substring(0, v.length() - unit.length()), value);
+        String digits = unit == null ? v : v.substring(0, v.length() - unit.length());
+        if (digits.indexOf('e') > -1 || digits.indexOf('E') > -1) {
+            // `1e2px` is a dimension with the unit `e2px` to the build-time parser, which the
+            // inset conversion rejects.
+            throw new CSSSyntaxException("Exponent notation is not supported for padding or margin: " + value);
+        }
+        float n = number(digits, value);
         if (unit == null || "px".equals(unit) || "pt".equals(unit)) {
             out.unit = Style.UNIT_TYPE_PIXELS;
             n = Math.round(n);

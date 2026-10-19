@@ -599,10 +599,11 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                 .compile(":root{ --a: var(--b); } :root{ --b: var(--a); } Label{ color: var(--a); }",
                         new MutableResource(), "Theme"));
-        // Two uses of one constant are not a cycle.
+        // Two uses of one constant are not a cycle. The build-time constants emitter writes only
+        // the leading unit of the chain.
         MutableResource resource = new MutableResource();
         new CSSThemeCompiler().compile("#Constants{ --c: #ff0000; pair: var(--c) var(--c); }", resource, "Theme");
-        assertEquals("ff0000 ff0000", resource.getTheme("Theme").get("@pair"));
+        assertEquals("ff0000", resource.getTheme("Theme").get("@pair"));
     }
 
     @Test
@@ -636,6 +637,48 @@ public class CSSThemeCompilerTest extends UITestBase {
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("ff0000", theme.get("@accent"));
         assertEquals("00ff00", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testVariableAliasIsResolvedWhereItIsUsed() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--base:#f00;--alias:var(--base);--base:#00f;}"
+                + " Label{color:var(--alias);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@alias"));
+        assertEquals("0000ff", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testColorVariableKeepsItsCssSpellingInABorder() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#f00;} Label{border:1px solid var(--accent);}",
+                resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@accent"));
+        assertNotNull(theme.get("Label.border"));
+    }
+
+    @Test
+    public void testMultiTokenAliasExportsItsLeadingToken() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--x:foo; pair:var(--x) bar;}", resource, "Theme");
+        assertEquals("foo", resource.getTheme("Theme").get("@pair"));
+    }
+
+    @Test
+    public void testExponentInsetWithUnitIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("Label{padding:1e2px;}", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testUnescapedNewlineInStringIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("#Constants{message:\"first\nsecond\";}", new MutableResource(), "Theme"));
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{message:\"first\\\nsecond\";}", resource, "Theme");
+        assertEquals("firstsecond", resource.getTheme("Theme").get("@message"));
     }
 
     @Test
@@ -864,12 +907,12 @@ public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
     public void testJavaOnlyNumberSpellingsAreRejected() {
-        for (String bad : new String[]{"1fpx", "NaNpx", "Infinitypx", "1dpx", "0x1p3px", "1.px"}) {
+        for (String bad : new String[]{"1fpx", "NaNpx", "Infinitypx", "1dpx", "0x1p3px", "1.px", "1e1px"}) {
             assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
                     .compile("Label{padding:" + bad + ";}", new MutableResource(), "Theme"), bad);
         }
         MutableResource resource = new MutableResource();
-        new CSSThemeCompiler().compile("Label{padding:.5mm 1e1px +2px -0px;}", resource, "Theme");
+        new CSSThemeCompiler().compile("Label{padding:.5mm 10px +2px -0px;}", resource, "Theme");
         assertEquals("0.5,2,0,10", resource.getTheme("Theme").get("Label.padding"));
     }
 
