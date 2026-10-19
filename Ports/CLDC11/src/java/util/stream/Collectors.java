@@ -113,6 +113,15 @@ public final class Collectors {
                 finisher == IDENTITY ? ID_FINISH : Collections.<Collector.Characteristics>emptySet());
     }
 
+    /// A collector reporting `characteristics`: an adapter keeps those of the
+    /// collector it wraps, UNORDERED and CONCURRENT included.
+    @SuppressWarnings("unchecked")
+    private static <T, A, R> Collector<T, A, R> of(Supplier<A> supplier, BiConsumer<A, ? super T> accumulator,
+                                                   BinaryOperator<A> combiner, Function<A, R> finisher,
+                                                   Set<Collector.Characteristics> characteristics) {
+        return new Of<T, A, R>(supplier, (BiConsumer<A, T>) accumulator, combiner, finisher, characteristics);
+    }
+
     /// The one identity finisher, so a collector built over it can be told
     /// to report `IDENTITY_FINISH`, as the JDK's do.
     private static final Function<Object, Object> IDENTITY = Function.identity();
@@ -330,7 +339,7 @@ public final class Collectors {
             public void accept(A a, T t) {
                 inner.accept(a, mapper.apply(t));
             }
-        }, downstream.combiner(), downstream.finisher());
+        }, downstream.combiner(), downstream.finisher(), downstream.characteristics());
     }
 
     public static <T, A, R> Collector<T, ?, R> filtering(final Predicate<? super T> predicate,
@@ -344,7 +353,7 @@ public final class Collectors {
                     inner.accept(a, t);
                 }
             }
-        }, downstream.combiner(), downstream.finisher());
+        }, downstream.combiner(), downstream.finisher(), downstream.characteristics());
     }
 
     public static <T, U, A, R> Collector<T, ?, R> flatMapping(
@@ -373,7 +382,7 @@ public final class Collectors {
                     mapped.close();
                 }
             }
-        }, downstream.combiner(), downstream.finisher());
+        }, downstream.combiner(), downstream.finisher(), downstream.characteristics());
     }
 
     public static <T, A, R, RR> Collector<T, A, RR> collectingAndThen(Collector<T, A, R> downstream,
@@ -386,7 +395,18 @@ public final class Collectors {
                     public RR apply(A a) {
                         return finisher.apply(first.apply(a));
                     }
-                });
+                }, withoutIdentityFinish(downstream.characteristics()));
+    }
+
+    /// `characteristics` less IDENTITY_FINISH: a finisher added on top means
+    /// the container is no longer the result.
+    private static Set<Collector.Characteristics> withoutIdentityFinish(Set<Collector.Characteristics> characteristics) {
+        if (!characteristics.contains(Collector.Characteristics.IDENTITY_FINISH)) {
+            return characteristics;
+        }
+        Set<Collector.Characteristics> s = new HashSet<Collector.Characteristics>(characteristics);
+        s.remove(Collector.Characteristics.IDENTITY_FINISH);
+        return Collections.unmodifiableSet(s);
     }
 
     // ---- numbers ----

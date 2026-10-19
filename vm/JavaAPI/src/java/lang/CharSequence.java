@@ -126,6 +126,15 @@ public interface CharSequence {
         if (cs1 == cs2) {
             return 0;
         }
+        if (cs1.getClass() == cs2.getClass() && cs1 instanceof Comparable && !(cs1 instanceof String)
+                && !(cs1 instanceof StringBuilder) && !(cs1 instanceof StringBuffer)) {
+            // Two of one Comparable type are put in that type's own order,
+            // as the JDK does. The JDK's own sequences already order by char,
+            // and their compareTo calls back here, so they skip this.
+            @SuppressWarnings("unchecked")
+            Comparable<Object> c1 = (Comparable<Object>) (Object) cs1;
+            return c1.compareTo(cs2);
+        }
         int len1 = cs1.length();
         int len2 = cs2.length();
         int n = len1 < len2 ? len1 : len2;

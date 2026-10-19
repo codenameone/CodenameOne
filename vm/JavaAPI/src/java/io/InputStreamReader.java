@@ -82,6 +82,9 @@ public class InputStreamReader extends java.io.Reader{
         if (cs == null) {
             throw new NullPointerException("charset");
         }
+        if (is == null) {
+            throw new NullPointerException();
+        }
         internal = is;
         this.enc = cs.name();
     }

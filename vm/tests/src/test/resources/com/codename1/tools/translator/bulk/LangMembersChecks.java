@@ -210,6 +210,33 @@ public final class LangMembersChecks {
                 Bulk.p("threw", e.getClass().getName());
             }
         });
+        Bulk.check("Lang.adaptersKeepTheirDownstreamCharacteristics", () -> {
+            java.util.stream.Collector<String, ?, java.util.Set<String>> set = java.util.stream.Collectors.toSet();
+            Bulk.p("mapping", new java.util.TreeSet<Object>(java.util.stream.Collectors.mapping(
+                    java.util.function.Function.<String>identity(), set).characteristics()));
+            Bulk.p("filtering", new java.util.TreeSet<Object>(java.util.stream.Collectors.filtering(
+                    (String x) -> true, set).characteristics()));
+            Bulk.p("andThen", new java.util.TreeSet<Object>(java.util.stream.Collectors.collectingAndThen(
+                    set, java.util.Set::size).characteristics()));
+        });
+        Bulk.check("Lang.comparableCharSequencesUseTheirOwnOrder", () -> {
+            Bulk.p("builders", Integer.signum(CharSequence.compare(new StringBuilder("b"), new StringBuilder("a"))));
+            Bulk.p("mixed", Integer.signum(CharSequence.compare("b", new StringBuilder("a"))));
+        });
+        Bulk.check("Lang.charsetReadersRefuseANullStream", () -> {
+            try {
+                new java.io.InputStreamReader((java.io.InputStream) null, java.nio.charset.StandardCharsets.UTF_8);
+                Bulk.p("reader", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("reader", "npe");
+            }
+            try {
+                new java.io.OutputStreamWriter((java.io.OutputStream) null, java.nio.charset.StandardCharsets.UTF_8);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
         Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
             java.text.Format shout = new java.text.Format() {
                 @Override

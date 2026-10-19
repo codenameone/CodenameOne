@@ -110,6 +110,9 @@ public class OutputStreamWriter extends java.io.Writer {
         if (cs == null) {
             throw new NullPointerException("charset");
         }
+        if (os == null) {
+            throw new NullPointerException();
+        }
         this.os = os;
         this.enc = cs.name();
         utf8 = isUtf8Name(enc);
