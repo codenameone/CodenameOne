@@ -12,6 +12,7 @@ on:
       - 'docs/developer-guide/**'
       - 'docs/demos/common/src/main/java/**'
       - 'CodenameOne/src/**/*.java'
+      - 'Ports/CLDC11/src/**/*.java'
       - 'scripts/cn1playground/common/**'
       - 'vm/JavaCompiler/**'
       - 'scripts/check-doc-snippets.py'

@@ -23,6 +23,8 @@
   var frame = null;
   var frameReady = false;
   var frameCode = null; // the snippet the frame was last given
+  var frameRequestId = 0; // its id; the code in the frame's URL is request 0
+  var nextRequestId = 1;
   var active = null; // { pre, slot, code, status, openLink }
 
   function encode(code) {
@@ -67,6 +69,14 @@
     document.head.appendChild(style);
   }
 
+  // Not sandboxed, deliberately. Without allow-same-origin the frame gets an
+  // opaque origin, and the Playground can no longer fetch its own runtime and
+  // API stubs from /playground-app/ or keep its caches; with it, a sandbox
+  // isolates nothing. What the frame runs is the snippet published on this page
+  // (ours, reviewed like any other script the site serves) or the reader's own
+  // edits of it, which run with the reader's privileges only. The frame accepts
+  // code solely from a same-origin parent (WebsiteThemeNative.js), so another
+  // site that frames the Playground cannot feed it code.
   function ensureFrame(code) {
     if (frame) {
       return false;
@@ -77,6 +87,7 @@
     frame.setAttribute('allow', 'clipboard-write');
     frame.src = playgroundUrl(code, true);
     frameCode = code;
+    frameRequestId = 0;
     document.body.appendChild(frame);
     return true;
   }
@@ -125,11 +136,15 @@
     pre.insertAdjacentElement('afterend', slot);
     bar.tryButton.hidden = true;
     bar.closeButton.hidden = false;
-    active = { pre: pre, slot: slot, code: code, status: bar.status, bar: bar, sourceUrl: '' };
+    active = { pre: pre, slot: slot, code: code, status: bar.status, bar: bar, sourceUrl: '', requestId: -1 };
 
-    if (!ensureFrame(code) && frameReady) {
+    if (ensureFrame(code)) {
+      active.requestId = frameRequestId;
+    } else if (frameReady) {
       // The frame is already up: hand it the new snippet.
       sendCode(code);
+    } else if (code === frameCode) {
+      active.requestId = frameRequestId;
     }
     setStatus(frameReady ? 'Compiling...' : 'Loading the Playground...');
     placeFrame();
@@ -138,11 +153,16 @@
 
   function sendCode(code) {
     frameCode = code;
-    frame.contentWindow.postMessage({ type: 'cn1-playground-inline-code', code: code }, '*');
+    frameRequestId = nextRequestId++;
+    if (active && active.code === code) {
+      active.requestId = frameRequestId;
+    }
+    frame.contentWindow.postMessage({ type: 'cn1-playground-inline-code', id: frameRequestId, code: code },
+      window.location.origin);
   }
 
   function onMessage(evt) {
-    if (!frame || evt.source !== frame.contentWindow) {
+    if (!frame || evt.source !== frame.contentWindow || evt.origin !== window.location.origin) {
       return;
     }
     var data = evt.data || {};
@@ -155,10 +175,16 @@
       }
     } else if (data.type === 'cn1-playground-inline-result') {
       frameReady = true;
-      if (active) {
-        active.sourceUrl = data.sourceUrl || '';
+      // A result for a snippet the reader has since left (it was still
+      // compiling when they opened another one) says nothing about this one.
+      // A Playground deployed before ids existed sends none; take its result.
+      if (!active || (data.id !== undefined && data.id !== active.requestId)) {
+        return;
       }
-      setStatus(data.ok ? 'Running. Edit the code to change it.' : 'Does not compile: ' + data.summary);
+      active.sourceUrl = data.sourceUrl || '';
+      // ok is false for a compile error, a runtime exception, and a script that
+      // returned no Component alike, so the label must not claim which.
+      setStatus(data.ok ? 'Running. Edit the code to change it.' : 'Did not run: ' + data.summary);
     }
   }
 
@@ -174,6 +200,12 @@
     var codeEl = pre.querySelector('code') || pre;
     var code = typeof codeText === 'string' ? codeText : snippetText(codeEl);
     if (!code.trim()) {
+      return;
+    }
+    // Blog posts have no role to carry: server code there is recognized by the
+    // backend API it imports, which the browser Playground does not ship. A
+    // Markdown fence can still opt out with {class="cn1-no-try"}.
+    if (/^\s*import\s+(static\s+)?com\.codename1\.backend\b/m.test(code)) {
       return;
     }
     pre.setAttribute('data-cn1-try', '');

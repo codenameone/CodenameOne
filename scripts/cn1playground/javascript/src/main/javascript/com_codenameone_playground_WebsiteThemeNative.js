@@ -101,24 +101,42 @@ var o = {};
     // Inline mode: the host page posts the snippet to show next. Kept here until
     // the app polls it with takeInlineCode, because the message can arrive
     // before the VM is ready to receive it.
+    //
+    // Code is taken only from the page embedding this frame, and only when that
+    // page is on this origin: inline mode runs whatever it is handed, so another
+    // site framing it must not be able to hand it anything.
+    //
+    // Each message carries the host's request id. The id of the code being
+    // compiled is recorded when the app TAKES it, not when it arrives: a second
+    // snippet can arrive while the first still compiles, and the first one's
+    // result must not be reported as the second's.
     var pendingInlineCode = null;
+    var pendingInlineId = 0;
+    var runningInlineId = 0;
     window.addEventListener("message", function(evt) {
         var data = evt && evt.data;
+        if (!evt || evt.source !== window.parent || window.parent === window || evt.origin !== window.location.origin) {
+            return;
+        }
         if (data && data.type === "cn1-playground-inline-code" && typeof data.code === "string") {
             pendingInlineCode = data.code;
+            pendingInlineId = typeof data.id === "number" ? data.id : 0;
         }
     });
 
     o.takeInlineCode_ = function(callback) {
         var code = pendingInlineCode;
         pendingInlineCode = null;
+        if (code !== null) {
+            runningInlineId = pendingInlineId;
+        }
         callback.complete(code);
     };
 
     o.notifyInlineResult__boolean_java_lang_String_java_lang_String = function(ok, summary, sourceUrl, callback) {
         try {
             if (window.parent && window.parent !== window && window.parent.postMessage) {
-                window.parent.postMessage({ type: "cn1-playground-inline-result", ok: !!ok, summary: summary || "", sourceUrl: sourceUrl || "" }, "*");
+                window.parent.postMessage({ type: "cn1-playground-inline-result", id: runningInlineId, ok: !!ok, summary: summary || "", sourceUrl: sourceUrl || "" }, window.location.origin);
             }
         } catch (ignored) {
             // Ignore cross-origin or sandbox restrictions.

@@ -477,6 +477,22 @@ final class JavaSourceParser {
             Kind kind = peek(k).kind;
             if (kind == Kind.PUBLIC || kind == Kind.PRIVATE || kind == Kind.PROTECTED || kind == Kind.STATIC) {
                 memberOnly = true;
+            } else if (kind == Kind.AT && peek(k + 1).kind == Kind.IDENT) {
+                // An annotation (@Deprecated private String value;): @Name or
+                // @a.b.Name, optionally (...). It alone does not make a field --
+                // a local can carry one too -- the modifiers after it decide.
+                k += 2;
+                while (peek(k).kind == Kind.DOT) {
+                    k += 2;
+                }
+                if (peek(k).kind == Kind.LPAREN) {
+                    int close = matchingParen(p + k);
+                    if (close < 0) {
+                        return false;
+                    }
+                    k = close - p + 1;
+                }
+                continue;
             } else if (kind != Kind.FINAL && kind != Kind.TRANSIENT && kind != Kind.VOLATILE) {
                 break;
             }

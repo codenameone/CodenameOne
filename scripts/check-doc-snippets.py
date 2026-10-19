@@ -35,6 +35,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GUIDE = ROOT / "docs" / "developer-guide"
 CORE = ROOT / "CodenameOne" / "src"
+# The client API reference is rendered from both trees, so both carry "Try it".
+CLDC = ROOT / "Ports" / "CLDC11" / "src"
 BASELINE = ROOT / "scripts" / "doc-snippet-baseline.txt"
 PLAYGROUND = ROOT / "scripts" / "cn1playground"
 BUILD_DIR = PLAYGROUND / "common" / "target" / "snippet-cli"
@@ -102,16 +104,25 @@ def guide_snippets():
                     code = "\n".join(re.sub(r"\s*(//\s*)?<\d+>\s*$", "", l) for l in body).rstrip()
                     yield str(doc.relative_to(ROOT)), i + 1, code
                     i = k
+                elif j < len(lines) and INCLUDE.match(lines[j]):
+                    # An undelimited block: asciidoctor renders the included lines
+                    # themselves as the Java block.
+                    m = INCLUDE.match(lines[j])
+                    inc = include_lines(doc.parent, m.group(1), m.group(2)) or []
+                    code = "\n".join(re.sub(r"\s*(//\s*)?<\d+>\s*$", "", l) for l in inc).rstrip()
+                    yield str(doc.relative_to(ROOT)), i + 1, code
+                    i = j
             i += 1
 
 
 def javadoc_snippets():
-    out = subprocess.run([str(ROOT / "scripts" / "extract-javadoc-java-snippets.sh"), str(CORE)],
-                         cwd=ROOT, text=True, capture_output=True, check=True).stdout
-    for line in out.splitlines():
-        if line.strip():
-            r = json.loads(line)
-            yield r["sourceFile"], r.get("startLine", 0), r.get("code", "")
+    for tree in (CORE, CLDC):
+        out = subprocess.run([str(ROOT / "scripts" / "extract-javadoc-java-snippets.sh"), str(tree)],
+                             cwd=ROOT, text=True, capture_output=True, check=True).stdout
+        for line in out.splitlines():
+            if line.strip():
+                r = json.loads(line)
+                yield r["sourceFile"], r.get("startLine", 0), r.get("code", "")
 
 
 def harness_classpath():
@@ -120,6 +131,11 @@ def harness_classpath():
     pom = str(PLAYGROUND / "common" / "pom.xml")
     # Always rebuilt (incrementally): a stale harness or API stub library would
     # classify the snippets against an API that is no longer the Playground's.
+    # Built through the Playground reactor with -am and installed, the way
+    # tools/run-playground-smoke-tests.sh does: common depends on the cn1lib
+    # modules beside it, and on a fresh runner nothing has installed them yet.
+    subprocess.run(["mvn", "-q", "-B", "-nsu", *args, "-f", str(PLAYGROUND / "pom.xml"),
+                    "-pl", "common", "-am", "-DskipTests", "install"], check=True)
     subprocess.run(["mvn", "-q", "-B", "-nsu", *args, "-f", pom, "-DskipTests", "test-compile"], check=True)
     if not cp_file.is_file():
         BUILD_DIR.mkdir(parents=True, exist_ok=True)
@@ -187,9 +203,15 @@ def main():
                     if l.strip() and not l.startswith("#")}
     new = sorted(k for k in failing if k not in baseline)
     stale = sorted(baseline - set(failing))
+    failed = False
     if stale:
+        # Fatal, not a note: a key left behind would exempt the same broken code
+        # if it were ever restored in that file.
         print(f"{len(stale)} baseline entries no longer fail (fixed or removed); "
-              f"run with --write-baseline to drop them.")
+              f"run with --write-baseline to drop them:")
+        for k in stale:
+            print(f"  {k}")
+        failed = True
     if new:
         print(f"{len(new)} snippets do not run in the inline Playground and are not in the baseline:")
         for k in new:
@@ -197,8 +219,8 @@ def main():
             print(f"  {src}:{line}: {status}: line {err_line}: {message}")
         print("Make each snippet self-contained: it should compile on its own, the way the "
               "Playground compiles it (see scripts/cn1playground/README.md for the shapes it runs).")
-        return 1
-    return 0
+        failed = True
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
