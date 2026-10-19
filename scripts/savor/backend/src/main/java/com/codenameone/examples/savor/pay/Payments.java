@@ -1097,6 +1097,10 @@ public class Payments {
         // Every refund state follows a payment that was made.
         long paidOn = PAID.equals(paid) || (paid != null && paid.startsWith("REFUND"))
                 ? paidAt : 0L;
+        // A tip whose charge was never answered is on the delivery but not on
+        // the card: the receipt says so and offers to ask again, the same
+        // amount under the same key, since nothing else ever retries it.
+        long unanswered = tip > 0 && tipLeftUnknown(delivery, tip) ? tip : 0L;
         String courierName = "";
         String vehicle = "";
         String courier = delivery.getCourier();
@@ -1115,7 +1119,7 @@ public class Payments {
             return new ReceiptDto(delivery.getId(), delivery.getCurrency(), "", 0L,
                     delivery.getFareCents(), 0L, 0L, 0L, 0L, tip, delivery.getFareCents() + tip,
                     delivery.getMethodLabel(), status, paidOn, delivery.getDropoffAddress(),
-                    courierName, vehicle, admin ? delivery.getCustomer() : "");
+                    courierName, vehicle, admin ? delivery.getCustomer() : "", unanswered);
         }
         // The delivery's tip is the one given after the order arrived; the
         // checkout tip is already in the order's total.
@@ -1125,7 +1129,7 @@ public class Payments {
                 order.getSmallOrderCents(), order.getTaxCents(), order.getDiscountCents(),
                 order.getTipCents() + extraTip, order.getTotalCents() + extraTip,
                 order.getMethodLabel(), status, paidOn, order.getDropoffAddress(), courierName,
-                vehicle, admin ? order.getCustomer() : "");
+                vehicle, admin ? order.getCustomer() : "", unanswered);
     }
 
     /// The receipt of an order no delivery has been made for yet: what it
@@ -1140,7 +1144,7 @@ public class Payments {
                 order.getSubtotalCents(), order.getDeliveryFeeCents(), order.getServiceFeeCents(),
                 order.getSmallOrderCents(), order.getTaxCents(), order.getDiscountCents(),
                 order.getTipCents(), order.getTotalCents(), order.getMethodLabel(), held(order),
-                0L, order.getDropoffAddress(), "", "", admin ? order.getCustomer() : "");
+                0L, order.getDropoffAddress(), "", "", admin ? order.getCustomer() : "", 0L);
     }
 
     /// `authorized` while a card is held and not yet charged, `pending` otherwise.

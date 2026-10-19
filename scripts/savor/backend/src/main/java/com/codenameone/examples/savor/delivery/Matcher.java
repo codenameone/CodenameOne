@@ -156,9 +156,10 @@ public class Matcher {
         List<Candidate> near = new ArrayList<Candidate>();
         for (int iter = 0; iter < inReach.size(); iter++) {
             CourierState state = inReach.get(iter);
-            if (cars.get(state.getUsername()) == null) {
-                // The application went between the two queries, and the
-                // approval with it.
+            CourierApplication car = cars.get(state.getUsername());
+            if (car == null || !Applications.APPROVED.equals(car.getStatus())) {
+                // The application went between the two queries, or its
+                // approval was withdrawn: the row stays, rejected.
                 continue;
             }
             if (!enabled(state.getUsername())) {

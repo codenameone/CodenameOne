@@ -38,5 +38,6 @@ public record CartDto(
         String note,
         String promoCode,
         long tipCents,
-        String paymentMethodId) {
+        String paymentMethodId,
+        String attemptId) {
 }

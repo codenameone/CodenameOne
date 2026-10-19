@@ -125,7 +125,9 @@ public final class ReceiptForm {
             final ReceiptDto receipt, final boolean admin) {
         final String currency = receipt.currency();
         boolean settled = "paid".equals(receipt.status()) || "cash".equals(receipt.status());
-        if (!admin && settled && receipt.tip() == 0) {
+        if (!admin && receipt.tipUnanswered() > 0) {
+            unanswered(previous, page, receipt);
+        } else if (!admin && settled && receipt.tip() == 0) {
             tip(form, previous, page, receipt);
         }
         if (admin && "paid".equals(receipt.status())) {
@@ -140,6 +142,19 @@ public final class ReceiptForm {
                         }, Ui::fail));
                     })));
         }
+    }
+
+    /// A tip whose charge never answered: sent again for the same amount,
+    /// which the server charges at most once.
+    private static void unanswered(final Form previous, Container page, final ReceiptDto receipt) {
+        final long cents = receipt.tipUnanswered();
+        page.add(Ui.text(Lang.tr("Your tip of {0} has not gone through yet.",
+                Ui.money(cents, receipt.currency())), "SvMuted"));
+        page.add(Ui.primary("Try the tip again", "retryTip", e ->
+                Api.payments().tip(receipt.orderId(), new TipDto(cents), Net.to(tipped -> {
+                    Ui.say("Thank you. Your tip was sent.");
+                    show(previous, tipped, false);
+                }, Ui::fail))));
     }
 
     /// The tip: three shares of the food to tap, or an amount to type.

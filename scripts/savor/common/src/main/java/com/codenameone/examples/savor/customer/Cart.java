@@ -26,6 +26,7 @@ import com.codenameone.examples.savor.api.RestaurantDto;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /// What the customer is about to order: dishes from one restaurant.
 ///
@@ -83,6 +84,8 @@ public final class Cart {
 
     private static RestaurantDto restaurant;
     private static final List<Line> LINES = new ArrayList<Line>();
+    private static final Random RANDOM = new Random();
+    private static String attempt;
     private static Listener listener;
 
     private Cart() {
@@ -118,6 +121,7 @@ public final class Cart {
             int quantity) {
         if (fromElsewhere(from)) {
             LINES.clear();
+            attempt = null;
         }
         restaurant = from;
         for (int iter = 0; iter < LINES.size(); iter++) {
@@ -145,6 +149,7 @@ public final class Cart {
 
     public static void clear() {
         LINES.clear();
+        attempt = null;
         changed();
     }
 
@@ -178,7 +183,23 @@ public final class Cart {
             lines.add(new CartLineDto(line.dish.id(), line.quantity, ids));
         }
         return new CartDto(restaurant == null ? "" : restaurant.id(), lines, lat, lng, address,
-                note, promo, tipCents, paymentMethodId);
+                note, promo, tipCents, paymentMethodId, attempt());
+    }
+
+    /// The checkout this cart is placed by: 32 hex digits the server uses as
+    /// the order's id. A placement whose answer was lost is sent again with the
+    /// same one, and the server answers with the order it already wrote rather
+    /// than writing and charging a second. A new one is drawn once the cart is
+    /// emptied.
+    static String attempt() {
+        if (attempt == null) {
+            char[] out = new char[32];
+            for (int iter = 0; iter < out.length; iter++) {
+                out[iter] = "0123456789abcdef".charAt(RANDOM.nextInt(16));
+            }
+            attempt = new String(out);
+        }
+        return attempt;
     }
 
     private static void changed() {

@@ -584,6 +584,27 @@ class PaymentsTest {
     }
 
     @Test
+    void aCheckoutSentAgainAnswersWithTheOrderItAlreadyPlaced() throws Exception {
+        // Porto.
+        String customer = People.customer(accounts, "opo-again-customer");
+        String other = People.customer(accounts, "opo-again-other");
+        Trips.addCard(mvc, customer, Trips.VISA);
+        Trips.addCard(mvc, other, Trips.VISA);
+        String attempt = "\"attemptId\":\"0123456789abcdef0123456789abcdef\"";
+        Trips.Trip trip = Trips.trip(41.1579, -8.6291, 41.1679, -8.6191, attempt);
+        String first = (String) Trips.place(mvc, customer, trip).get("id");
+        // The answer was lost and the app asks again: the same order, not a second.
+        assertEquals(first, Trips.place(mvc, customer, trip).get("id"));
+        assertEquals("0123456789abcdef0123456789abcdef", first);
+        Map row = db.queryOne("SELECT COUNT(*) AS n FROM customer_order WHERE customer = ?",
+                new Object[] {customer});
+        assertEquals(1L, ((Number) row.get("n")).longValue());
+        // Nobody else gets that order by sending its id.
+        assertEquals(409, Trips.statusOf(mvc, People.asCustomer(Trips.body(post("/api/orders"),
+                Trips.cart(mvc, trip)), other)));
+    }
+
+    @Test
     void aDeliveryLeftCompletedAndUnpaidIsSettledLater() throws Exception {
         // Lisbon.
         String customer = People.customer(accounts, "lis-pay-customer");

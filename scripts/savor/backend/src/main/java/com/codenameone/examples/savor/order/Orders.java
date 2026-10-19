@@ -131,6 +131,11 @@ public class Orders {
     /// Places an order: prices it from the menu, holds the total on the card,
     /// and writes it. A hold whose order could not be written is let go.
     public OrderDto place(String customer, CartDto cart) throws IOException {
+        String id = attemptOf(cart);
+        CustomerOrder already = find(id);
+        if (already != null) {
+            return placedBefore(customer, already);
+        }
         Quotes.Priced priced = quotes.quote(customer, cart);
         Restaurant restaurant = priced.restaurant;
         if (!Quotes.open(restaurant, quotes.minuteOfDay(System.currentTimeMillis()))) {
@@ -151,12 +156,18 @@ public class Orders {
         // again: two orders placed at once both pass here.
         eligible(customer);
         String[] method = payments.choose(customer, cart.paymentMethodId());
-        String id = Ids.next();
         String hold = payments.authorize(id, customer, method[0], priced.quote.totalCents(),
                 priced.quote.currency());
         try {
             attempt(() -> store(id, customer, cart, priced, method, hold));
         } catch (IOException | RuntimeException failed) {
+            CustomerOrder raced = find(id);
+            if (raced != null && customer.equals(raced.getCustomer())) {
+                // The same checkout sent twice at once: the other one wrote the
+                // order. Its hold was asked for under the same key and may be
+                // this very one, so it is not let go.
+                return view(customer, false, id);
+            }
             // Nothing was written, so the hold is let go by its reference.
             payments.releaseHold(id, hold);
             throw failed;
@@ -164,6 +175,33 @@ public class Orders {
         CustomerOrder order = find(id);
         tell(order);
         return view(customer, false, id);
+    }
+
+    /// The order's id: the checkout's own attempt id when the app sent one, so
+    /// a placement sent again after its answer was lost finds the order it
+    /// wrote instead of writing and charging another. Anything not shaped like
+    /// a server id gets a fresh one.
+    private static String attemptOf(CartDto cart) throws IOException {
+        String attempt = cart.attemptId();
+        if (attempt == null || attempt.length() != 32) {
+            return Ids.next();
+        }
+        for (int iter = 0; iter < attempt.length(); iter++) {
+            char c = attempt.charAt(iter);
+            if (!(c >= '0' && c <= '9' || c >= 'a' && c <= 'f')) {
+                return Ids.next();
+            }
+        }
+        return attempt;
+    }
+
+    /// The answer to a checkout placed again: the order it already wrote. An
+    /// id another customer's order holds is refused without saying whose.
+    private OrderDto placedBefore(String customer, CustomerOrder order) throws IOException {
+        if (!customer.equals(order.getCustomer())) {
+            throw new ResponseStatusException(409, "Start the checkout again");
+        }
+        return view(customer, false, order.getId());
     }
 
     /// The refusals [#store] makes, without its locks. See [#place].

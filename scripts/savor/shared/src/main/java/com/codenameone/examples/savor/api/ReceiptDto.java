@@ -50,5 +50,6 @@ public record ReceiptDto(
         String dropoffName,
         String courierName,
         String vehicle,
-        String customerUsername) {
+        String customerUsername,
+        long tipUnanswered) {
 }
