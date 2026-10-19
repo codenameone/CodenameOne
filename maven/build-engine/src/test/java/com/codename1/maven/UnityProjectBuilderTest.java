@@ -189,6 +189,19 @@ public class UnityProjectBuilderTest {
     }
 
     @Test
+    public void definesTheEditorVersionSymbols() {
+        String d = ";" + UnityProjectBuilder.versionDefines("2021.3.5f1") + ";";
+        assertTrue(d, d.contains(";UNITY_2021;") && d.contains(";UNITY_2021_3;") && d.contains(";UNITY_2021_3_5;"));
+        assertTrue(d, d.contains(";UNITY_5_3_OR_NEWER;") && d.contains(";UNITY_2021_2_OR_NEWER;")
+                && d.contains(";UNITY_2021_3_OR_NEWER;"));
+        assertFalse(d, d.contains("UNITY_2022_1_OR_NEWER") || d.contains("6000"));
+        String six = ";" + UnityProjectBuilder.versionDefines("6000.0.23f1") + ";";
+        assertTrue(six, six.contains(";UNITY_2023_2_OR_NEWER;") && six.contains(";UNITY_6000_0_OR_NEWER;"));
+        assertEquals("", UnityProjectBuilder.versionDefines(null));
+        assertEquals("", UnityProjectBuilder.versionDefines("garbage"));
+    }
+
+    @Test
     public void aProjectWithoutUnitySourcesIsLeftAlone() throws Exception {
         File empty = tmp.newFolder("plain");
         assertFalse(UnityProjectBuilder.isUnityProject(new File(empty, "src/main/unity")));

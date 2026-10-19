@@ -1463,8 +1463,6 @@ public final class UnityRuntime {
         Input.beginFrame(dt);
         runFrameCalls();
         runStarts();
-        routePointer();
-        routeMouse();
         accumulator += scaled;
         float fixed = Time.fixedDeltaTime;
         while (accumulator >= fixed) {
@@ -1500,6 +1498,12 @@ public final class UnityRuntime {
             Time.inFixedUpdate = false;
             runStarts();
         }
+        // Input events come after the physics phase and before Update in
+        // Unity's execution order, and an EventSystem processes its input
+        // module in its own Update: a click that sets a flag is read by
+        // the next frame's FixedUpdate, not this one's.
+        routePointer();
+        routeMouse();
         runInvocations(true);
         for (int i = 0; i < behaviours.size(); i++) { // NOPMD ForLoopCanBeForeach
             MonoBehaviour b = (MonoBehaviour) behaviours.get(i);

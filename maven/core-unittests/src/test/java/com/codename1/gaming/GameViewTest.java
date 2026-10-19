@@ -220,6 +220,28 @@ class GameViewTest extends UITestBase {
     /// would, stopped listening to the form for presses, and after one drag
     /// never heard a press again.
     @Test
+    void aCancelledGestureLetsGoWithoutARelease() {
+        CountingView v = new CountingView();
+        Form f = new Form("Game", new BorderLayout());
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        flushSerialCalls();
+        v.start();
+        int x = v.getAbsoluteX() + 10;
+        int y = v.getAbsoluteY() + 10;
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        d.pointerPressed(new int[] {x}, new int[] {y});
+        flushSerialCalls();
+        assertTrue(v.getInput().isPointerDown(), "the press has to land for this to mean anything");
+        v.frame(1.0 / 60);
+
+        d.pointerCancelled(x, y);
+        flushSerialCalls();
+        assertFalse(v.getInput().isPointerDown(), "a cancelled gesture left the pointer held");
+        assertFalse(v.getInput().wasPointerReleased(), "the user never lifted, so nothing was released");
+    }
+
+    @Test
     void aPressAfterADragIsHeard() {
         CountingView v = new CountingView();
         Form f = new Form("Game", new BorderLayout());

@@ -449,6 +449,22 @@ public final class MetadataReader {
         return new int[] {at + 4, ((first & 0x1F) << 24) | (u1(at + 1) << 16) | (u1(at + 2) << 8) | u1(at + 3)};
     }
 
+    /// The first fixed argument of a custom attribute's value blob when it is
+    /// a string: the prolog 0x0001, then a length-prefixed UTF-8 string, or
+    /// 0xFF for null. Null when the blob holds no such string.
+    public String attributeString(int blobIndex) {
+        int[] b = blob(blobIndex);
+        int at = b[0];
+        if (b[1] < 3 || u2(at) != 1 || u1(at + 2) == 0xFF) {
+            return null;
+        }
+        int[] s = compressedLengthPrefixed(at + 2);
+        if (s[0] + s[1] > b[0] + b[1]) {
+            return null;
+        }
+        return new String(data, s[0], s[1], StandardCharsets.UTF_8);
+    }
+
     /// The string an `ldstr` token names. User strings are UTF-16LE with one
     /// trailing flag byte that is not part of the text.
     public String userString(int token) {

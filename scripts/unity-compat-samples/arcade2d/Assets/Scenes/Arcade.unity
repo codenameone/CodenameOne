@@ -114,6 +114,8 @@ MonoBehaviour:
   label: {fileID: 413}
   turnSpeed: 90
   class: 7
+  lives: 3
+  secret: 9
   shotSpeed: 6
   bonus:
   - 10

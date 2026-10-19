@@ -28,6 +28,7 @@ import com.codename1.cil.metadata.CilAssembly.MethodDef;
 import com.codename1.cil.metadata.CilAssembly.TypeDef;
 import com.codename1.cil.metadata.CilType;
 import com.codename1.cil.metadata.Universe;
+import com.codename1.cil.translate.Translator;
 import com.codename1.cil.translate.TypeMapping;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -2718,15 +2719,51 @@ public final class SceneCompiler {
                 continue;
             }
             FieldDef field = findField(n.script, key);
-            if (field == null || field.isStatic()) {
+            if (field == null) {
+                field = formerlyNamed(n.script, key);
+            }
+            if (field == null || !serialized(n.script, field)) {
                 // Unity ignores data for a field the script no longer has.
-                notes.add(origin + ": " + n.script.fullName() + " has no field " + key + "; its value was"
+                notes.add(origin + ": " + n.script.fullName() + " has no serialized field " + key + "; its value was"
                         + " dropped, as Unity drops it");
                 continue;
             }
-            assign(origin, n.variable + "." + TypeMapping.memberName(key), field.type, e.getValue(), nodes, sb);
+            assign(origin, n.variable + "." + TypeMapping.memberName(field.name), field.type, e.getValue(), nodes, sb);
         }
     }
+
+    /// Whether Unity serializes the field, by the rules `Instantiate` copies
+    /// by: data left in a scene for a field that has since gone private, or
+    /// become readonly or `[NonSerialized]`, is dropped as Unity drops it.
+    private boolean serialized(TypeDef script, FieldDef field) {
+        TypeDef at = script;
+        while (at != null) {
+            if (at.fields.contains(field)) {
+                return Translator.isSerialized(at, field);
+            }
+            at = at.baseType == null ? null : universe.definitionOf(at.baseType);
+        }
+        return false;
+    }
+
+    /// The field, of the script or a base class, that names `old` in a
+    /// `[FormerlySerializedAs]`: data saved before a rename still lands in
+    /// the renamed field.
+    private FieldDef formerlyNamed(TypeDef type, String old) {
+        TypeDef at = type;
+        while (at != null) {
+            for (int i = 0; i < at.fields.size(); i++) {
+                FieldDef f = at.fields.get(i);
+                if (at.assembly.attributeStrings(f.token(), FORMERLY_SERIALIZED_AS).contains(old)) {
+                    return f;
+                }
+            }
+            at = at.baseType == null ? null : universe.definitionOf(at.baseType);
+        }
+        return null;
+    }
+
+    private static final String FORMERLY_SERIALIZED_AS = "UnityEngine.Serialization.FormerlySerializedAsAttribute";
 
     private FieldDef findField(TypeDef type, String name) {
         TypeDef at = type;

@@ -815,7 +815,7 @@ public final class Translator implements Opcodes {
     /// Whether Unity serializes a field, which decides what `Instantiate`
     /// copies: an instance field that is public, or marked
     /// `[SerializeField]`, and neither `readonly` nor `[NonSerialized]`.
-    private boolean isSerialized(TypeDef type, FieldDef f) {
+    public static boolean isSerialized(TypeDef type, FieldDef f) {
         if (f.isStatic() || f.isLiteral() || f.rva != 0 || (f.flags & (FIELD_INIT_ONLY | FIELD_NOT_SERIALIZED)) != 0) {
             return false;
         }

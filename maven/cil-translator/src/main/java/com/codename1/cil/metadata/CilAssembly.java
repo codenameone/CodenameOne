@@ -734,19 +734,9 @@ public final class CilAssembly {
             for (int row = 1; row <= md.rowCount(MetadataReader.CUSTOM_ATTRIBUTE); row++) {
                 int parent = md.codedToken(MetadataReader.HAS_CUSTOM_ATTRIBUTE,
                         md.cell(MetadataReader.CUSTOM_ATTRIBUTE, row, 0));
-                int ctor = md.codedToken(MetadataReader.CUSTOM_ATTRIBUTE_TYPE,
-                        md.cell(MetadataReader.CUSTOM_ATTRIBUTE, row, 1));
-                String attributeType;
-                if (MetadataReader.tokenTable(ctor) == MetadataReader.METHOD_DEF) {
-                    attributeType = methodsByRow[MetadataReader.tokenRow(ctor)].owner.fullName();
-                } else {
-                    int owner = md.codedToken(MetadataReader.MEMBER_REF_PARENT,
-                            md.cell(MetadataReader.MEMBER_REF, MetadataReader.tokenRow(ctor), 0));
-                    int ownerTable = MetadataReader.tokenTable(owner);
-                    if (ownerTable != MetadataReader.TYPE_DEF && ownerTable != MetadataReader.TYPE_REF) {
-                        continue;
-                    }
-                    attributeType = typeNameFromToken(owner);
+                String attributeType = attributeType(row);
+                if (attributeType == null) {
+                    continue;
                 }
                 Integer key = Integer.valueOf(parent);
                 List<String> list = attributes.get(key);
@@ -759,6 +749,41 @@ public final class CilAssembly {
         }
         List<String> found = attributes.get(Integer.valueOf(token));
         return found == null ? Collections.<String>emptyList() : found;
+    }
+
+    /// The string argument of every attribute of one type applied to a type,
+    /// field or method, in the order they are declared; a field renamed
+    /// twice carries two `FormerlySerializedAs`.
+    public List<String> attributeStrings(int token, String type) {
+        List<String> out = new ArrayList<String>();
+        for (int row = 1; row <= md.rowCount(MetadataReader.CUSTOM_ATTRIBUTE); row++) {
+            int parent = md.codedToken(MetadataReader.HAS_CUSTOM_ATTRIBUTE,
+                    md.cell(MetadataReader.CUSTOM_ATTRIBUTE, row, 0));
+            if (parent != token || !type.equals(attributeType(row))) {
+                continue;
+            }
+            String s = md.attributeString(md.cell(MetadataReader.CUSTOM_ATTRIBUTE, row, 2));
+            if (s != null) {
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    /// The full name of the attribute type a custom attribute row applies,
+    /// or null when its constructor is not on a type.
+    private String attributeType(int row) {
+        int ctor = md.codedToken(MetadataReader.CUSTOM_ATTRIBUTE_TYPE, md.cell(MetadataReader.CUSTOM_ATTRIBUTE, row, 1));
+        if (MetadataReader.tokenTable(ctor) == MetadataReader.METHOD_DEF) {
+            return methodsByRow[MetadataReader.tokenRow(ctor)].owner.fullName();
+        }
+        int owner = md.codedToken(MetadataReader.MEMBER_REF_PARENT,
+                md.cell(MetadataReader.MEMBER_REF, MetadataReader.tokenRow(ctor), 0));
+        int ownerTable = MetadataReader.tokenTable(owner);
+        if (ownerTable != MetadataReader.TYPE_DEF && ownerTable != MetadataReader.TYPE_REF) {
+            return null;
+        }
+        return typeNameFromToken(owner);
     }
 
     public MethodDef entryPoint() {

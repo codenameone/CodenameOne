@@ -26,6 +26,7 @@ import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
 import com.codename1.ui.Component;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -83,6 +84,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private ActionListener pressListener;
     private ActionListener dragListener;
     private ActionListener releaseListener;
+    private ActionListener cancelListener;
     private boolean formListenersAdded;
     /// Set once the form has delivered a pointer event to this view directly,
     /// with every finger in it. See `#addFormPointerListeners()`.
@@ -336,10 +338,26 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
                     }
                 }
             };
+            // The platform took the gesture away (an OS swipe, an incoming
+            // call): no release follows, so the pointer and the controls are
+            // let go of here, without the release edge a lift would give.
+            cancelListener = new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (gesture) {
+                        gesture = false;
+                        controls.onTouches(new int[0], new int[0], false);
+                        input.pointer(input.getPointerX(), input.getPointerY(), false, false, false);
+                    }
+                }
+            };
         }
         f.asContainer().addPointerPressedListener(pressListener);
         f.asContainer().addPointerDraggedListener(dragListener);
         f.asContainer().addPointerReleasedListener(releaseListener);
+        if (f.asContainer() instanceof Form) {
+            ((Form) f.asContainer()).addPointerCancelledListener(cancelListener);
+        }
         formListenersAdded = true;
     }
 
@@ -375,6 +393,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             f.asContainer().removePointerPressedListener(pressListener);
             f.asContainer().removePointerDraggedListener(dragListener);
             f.asContainer().removePointerReleasedListener(releaseListener);
+            if (f.asContainer() instanceof Form) {
+                ((Form) f.asContainer()).removePointerCancelledListener(cancelListener);
+            }
         }
         formListenersAdded = false;
     }

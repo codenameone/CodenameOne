@@ -708,7 +708,8 @@ public class UnityProjectBuilder {
             }
         }
         File csproj = new File(cs, "Assembly-CSharp.csproj");
-        write(csproj, csproj(new File(unityDir, "Assets"), netstandard, engine, values));
+        write(csproj, csproj(new File(unityDir, "Assets"), netstandard, engine, values,
+                versionDefines(editorVersion(unityDir))));
 
         log.info("Compiling the C# scripts of " + unityDir);
         tools.compileScripts(csproj, new File(workDir, "dotnet.log"));
@@ -745,7 +746,7 @@ public class UnityProjectBuilder {
     /// implicit framework reference left on, the SDK would download the
     /// `netstandard` targeting pack from NuGet on every clean build, and fail
     /// offline.
-    static String csproj(File assets, File netstandard, File engine, File values) {
+    static String csproj(File assets, File netstandard, File engine, File values, String defines) {
         String a = msbuild(assets.getAbsolutePath());
         return "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
                 + "  <PropertyGroup>\n"
@@ -761,6 +762,8 @@ public class UnityProjectBuilder {
                 + "    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>\n"
                 + "    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>\n"
                 + "    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>\n"
+                + (defines.length() == 0 ? ""
+                        : "    <DefineConstants>$(DefineConstants);" + defines + "</DefineConstants>\n")
                 + "    <NoWarn>$(NoWarn);CS0649;CS0414;CS0169;CS0108;CS0114;CS0618</NoWarn>\n"
                 + "  </PropertyGroup>\n"
                 + "  <ItemGroup>\n"
@@ -771,6 +774,81 @@ public class UnityProjectBuilder {
                 + reference("Codename1.UnityValues", values)
                 + "  </ItemGroup>\n"
                 + "</Project>\n";
+    }
+
+    /// The editor version a project was saved with, `m_EditorVersion` of
+    /// `ProjectSettings/ProjectVersion.txt` (`2021.3.5f1`), or null.
+    static String editorVersion(File unityDir) {
+        File f = new File(unityDir, "ProjectSettings/ProjectVersion.txt");
+        if (!f.isFile()) {
+            return null;
+        }
+        try {
+            for (String line : Files.readAllLines(f.toPath(), StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                if (t.startsWith("m_EditorVersion:")) {
+                    return t.substring("m_EditorVersion:".length()).trim();
+                }
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return null;
+    }
+
+    /// The minors each Unity year was released in, for the
+    /// `UNITY_X_Y_OR_NEWER` symbols of every version up to the project's.
+    private static final int[][] RELEASES = {
+        {5, 3, 6}, {2017, 1, 4}, {2018, 1, 4}, {2019, 1, 4}, {2020, 1, 3}, {2021, 1, 3}, {2022, 1, 3},
+        {2023, 1, 2},
+    };
+
+    /// The symbols Unity defines for the editor version scripts are compiled
+    /// in (docs: Conditional compilation): `UNITY_X`, `UNITY_X_Y`,
+    /// `UNITY_X_Y_Z`, and `UNITY_X_Y_OR_NEWER` from 5.3 up to it. Empty for a
+    /// version that cannot be read, so a guard falls to its fallback as it
+    /// did before.
+    static String versionDefines(String version) {
+        if (version == null) {
+            return "";
+        }
+        int[] v = new int[3];
+        int part = 0;
+        int i = 0;
+        int digits = 0;
+        while (i < version.length() && part < 3) {
+            char c = version.charAt(i++);
+            if (c >= '0' && c <= '9' && digits < 6) {
+                v[part] = v[part] * 10 + (c - '0');
+                digits++;
+            } else if (c == '.' && digits > 0) {
+                part++;
+                digits = 0;
+            } else {
+                break;
+            }
+        }
+        if (part < 1 || (part == 1 && digits == 0)) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder();
+        b.append("UNITY_").append(v[0]).append(";UNITY_").append(v[0]).append('_').append(v[1]);
+        if (part == 2 && digits > 0) {
+            b.append(";UNITY_").append(v[0]).append('_').append(v[1]).append('_').append(v[2]);
+        }
+        for (int r = 0; r < RELEASES.length; r++) {
+            int year = RELEASES[r][0];
+            for (int minor = RELEASES[r][1]; minor <= RELEASES[r][2]; minor++) {
+                if (year < v[0] || (year == v[0] && minor <= v[1])) {
+                    b.append(";UNITY_").append(year).append('_').append(minor).append("_OR_NEWER");
+                }
+            }
+        }
+        // Unity 6 numbers itself 6000.x.
+        for (int minor = 0; v[0] == 6000 && minor <= v[1]; minor++) {
+            b.append(";UNITY_6000_").append(minor).append("_OR_NEWER");
+        }
+        return b.toString();
     }
 
     private static String reference(String name, File assembly) {
