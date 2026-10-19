@@ -6896,16 +6896,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
-                java.io.OutputStream out = null;
                 try {
                     fs.mkdir(dir);
-                    out = fs.openOutputStream(temp);
-                    request.writeContent(new com.codename1.io.filechooser.FileDialogResult(
-                            request, new String[]{temp}, -1, null), out);
-                    out.close();
-                    out = null;
+                    java.io.OutputStream out = fs.openOutputStream(temp);
+                    try {
+                        request.writeContent(new com.codename1.io.filechooser.FileDialogResult(
+                                request, new String[]{temp}, -1, null), out);
+                    } finally {
+                        out.close();
+                    }
                 } catch (final IOException err) {
-                    com.codename1.io.Util.cleanup(out);
                     fs.delete(temp);
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -6951,7 +6951,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         String name = save ? ((com.codename1.io.filechooser.SaveFileRequest) request).getSuggestedName() : null;
         nativeInstance.showMacFileDialog(save, request.getTitle(), request.getMessage(), request.getAcceptLabel(),
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), name,
-                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeFilters(request)),
+                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeFilters(request, true)),
                 request.getSelectedFilter(),
                 joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeOptions(request)),
                 multi, dirs,

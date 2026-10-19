@@ -139,24 +139,27 @@ final class AndroidFileDialogs {
                         }
                     }
                 }
-                if (request.isDirectories()) {
-                    String[] paths = new String[uris.size()];
-                    for (int i = 0; i < paths.length; i++) {
-                        paths[i] = uris.get(i).toString();
-                    }
-                    deliver(callback, new FileDialogResult(request, paths, -1, null));
-                    return;
-                }
                 // Copying can be slow for cloud documents, keep it off the UI thread
                 new Thread(new Runnable() {
                     public void run() {
                         FileDialogResult result;
                         try {
-                            String[] paths = new String[uris.size()];
-                            for (int i = 0; i < paths.length; i++) {
-                                paths[i] = copyToCache(resolver, uris.get(i));
+                            List<String> paths = new ArrayList<String>();
+                            for (Uri u : uris) {
+                                if (request.isDirectories()) {
+                                    // A tree URI is not a path FileSystemStorage can
+                                    // list; copy the folder, as iOS does.
+                                    paths.add(copyTreeToCache(resolver, u));
+                                } else if (acceptedByFilters(request.getFilters(), resolver, u)) {
+                                    paths.add(copyToCache(resolver, u));
+                                }
                             }
-                            result = new FileDialogResult(request, paths, -1, null);
+                            if (paths.isEmpty()) {
+                                result = FileDialogResult.cancelled(request);
+                                result.setError(new IOException("The selected file does not match the dialog's filters"));
+                            } else {
+                                result = new FileDialogResult(request, paths.toArray(new String[paths.size()]), -1, null);
+                            }
                         } catch (IOException e) {
                             result = new FileDialogResult(request, null, -1, null);
                             result.setError(e);
@@ -365,19 +368,118 @@ final class AndroidFileDialogs {
         return null;
     }
 
-    private static String copyToCache(ContentResolver resolver, Uri uri) throws IOException {
-        String name = displayName(resolver, uri);
-        if (name == null || name.length() == 0) {
-            name = "document";
+    /*
+     * The picker filters by MIME type only. An extension the platform cannot map
+     * widens the request to every type (see mimeTypes), so the selection is
+     * checked here: a file passes when some filter accepts its name or its type,
+     * or a filter accepts everything.
+     */
+    private static boolean acceptedByFilters(FileTypeFilter[] filters, ContentResolver resolver, Uri uri) {
+        if (filters.length == 0) {
+            return true;
         }
-        name = name.replace('/', '_').replace('\\', '_');
-        // A directory per pick keeps the display name intact without clobbering an earlier copy
+        String name = displayName(resolver, uri);
+        String type = null;
+        try {
+            type = resolver.getType(uri);
+        } catch (RuntimeException ignored) {
+        }
+        for (FileTypeFilter f : filters) {
+            String[] ext = f.getExtensions();
+            String[] mimes = f.getMimeTypes();
+            if (ext.length == 0 && mimes.length == 0) {
+                return true;
+            }
+            for (String e : ext) {
+                if ("*".equals(e)) {
+                    return true;
+                }
+            }
+            if (ext.length > 0 && f.acceptsName(name)) {
+                return true;
+            }
+            if (type != null && mimeMatches(mimes, type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mimeMatches(String[] mimes, String type) {
+        for (String m : mimes) {
+            if (m.equalsIgnoreCase(type) || "*/*".equals(m)) {
+                return true;
+            }
+            if (m.endsWith("/*") && type.regionMatches(true, 0, m, 0, m.length() - 1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String safeName(String name, String fallback) {
+        if (name == null || name.length() == 0) {
+            return fallback;
+        }
+        return name.replace('/', '_').replace('\\', '_');
+    }
+
+    /** A directory per pick keeps the display name intact without clobbering an earlier copy. */
+    private static File pickDirectory(Uri uri) throws IOException {
         File dir = new File(AndroidNativeUtil.getContext().getCacheDir(),
                 "filedialog" + File.separator + System.currentTimeMillis() + "_" + Integer.toHexString(uri.hashCode()));
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new IOException("Cannot create " + dir);
         }
-        File dest = new File(dir, name);
+        return dir;
+    }
+
+    private static String copyTreeToCache(ContentResolver resolver, Uri tree) throws IOException {
+        String rootId = android.provider.DocumentsContract.getTreeDocumentId(tree);
+        Uri rootDoc = android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, rootId);
+        File dest = new File(pickDirectory(tree), safeName(displayName(resolver, rootDoc), "folder"));
+        copyTreeChildren(resolver, tree, rootId, dest);
+        return "file://" + dest.getAbsolutePath();
+    }
+
+    private static void copyTreeChildren(ContentResolver resolver, Uri tree, String parentId, File dest)
+            throws IOException {
+        if (!dest.isDirectory() && !dest.mkdirs()) {
+            throw new IOException("Cannot create " + dest);
+        }
+        Uri children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
+        List<String[]> entries = new ArrayList<String[]>();
+        Cursor cursor = resolver.query(children, new String[]{
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null);
+        if (cursor == null) {
+            throw new IOException("Cannot list " + tree);
+        }
+        try {
+            while (cursor.moveToNext()) {
+                entries.add(new String[]{cursor.getString(0), cursor.getString(1), cursor.getString(2)});
+            }
+        } finally {
+            cursor.close();
+        }
+        for (String[] e : entries) {
+            File child = new File(dest, safeName(e[1], "document"));
+            if (android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(e[2])) {
+                copyTreeChildren(resolver, tree, e[0], child);
+            } else {
+                copyStream(resolver, android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, e[0]), child);
+            }
+        }
+    }
+
+    private static String copyToCache(ContentResolver resolver, Uri uri) throws IOException {
+        File dest = new File(pickDirectory(uri), safeName(displayName(resolver, uri), "document"));
+        copyStream(resolver, uri, dest);
+        return "file://" + dest.getAbsolutePath();
+    }
+
+    private static void copyStream(ContentResolver resolver, Uri uri, File dest) throws IOException {
         InputStream in = resolver.openInputStream(uri);
         if (in == null) {
             throw new IOException("Cannot open " + uri);
@@ -396,6 +498,5 @@ final class AndroidFileDialogs {
         } finally {
             in.close();
         }
-        return "file://" + dest.getAbsolutePath();
     }
 }

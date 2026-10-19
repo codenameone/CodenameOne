@@ -55,12 +55,36 @@ public final class NativeFileDialogCodec {
     ///
     /// one string per filter
     public static String[] encodeFilters(FileDialogRequest<?> request) {
+        return encodeFilters(request, false);
+    }
+
+    /// Encodes the request's filters, optionally followed by each filter's
+    /// uniform type identifiers. Only the macOS panels take those: their
+    /// `allowedFileTypes` accepts extensions and UTIs alike, so a filter given
+    /// only as `public.png` still restricts the panel. GTK and the Windows
+    /// shell would read a UTI as an extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request
+    ///
+    /// - `includeUtTypes`: true to append the filters' UTIs after the extensions
+    ///
+    /// #### Returns
+    ///
+    /// one string per filter
+    public static String[] encodeFilters(FileDialogRequest<?> request, boolean includeUtTypes) {
         FileTypeFilter[] filters = request.getFilters();
         String[] out = new String[filters.length];
         for (int i = 0; i < filters.length; i++) {
             StringBuilder sb = new StringBuilder(clean(filters[i].getLabel()));
             for (String e : filters[i].getExtensions()) {
                 sb.append('\n').append(clean(e));
+            }
+            if (includeUtTypes) {
+                for (String u : filters[i].getUtTypes()) {
+                    sb.append('\n').append(clean(u));
+                }
             }
             out[i] = sb.toString();
         }

@@ -8941,8 +8941,9 @@ public abstract class CodenameOneImplementation {
     ///
     /// true if supported
     public boolean isFileDialogFeatureSupported(int feature) {
-        return feature == FileDialogFeatures.INITIAL_DIRECTORY
-                || feature == FileDialogFeatures.SAVE_NAME_EDITING;
+        // The default open dialog goes through openFileChooser(), which takes no
+        // starting folder, so INITIAL_DIRECTORY is left to ports that honour it.
+        return feature == FileDialogFeatures.SAVE_NAME_EDITING;
     }
 
     /// Opens the device image gallery

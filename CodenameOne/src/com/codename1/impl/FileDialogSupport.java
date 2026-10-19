@@ -195,9 +195,12 @@ final class FileDialogSupport {
             @Override
             public void run() {
                 try {
-                    if (isSameFile(request.getSourceFile(), result.getPath())) {
-                        // Opening the destination would truncate the source before it
-                        // is read, so the file already holds the content: nothing to do.
+                    if (request.getContent() == null
+                            && isSameFile(request.getSourceFile(), result.getPath())) {
+                        // A plain copy onto its own source: opening the destination
+                        // would truncate the source before it is read, and the file
+                        // already holds the content. A content writer takes
+                        // precedence over the source, so it still runs below.
                         deliver(result, callback);
                         return;
                     }

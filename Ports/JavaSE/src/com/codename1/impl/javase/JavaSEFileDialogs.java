@@ -113,11 +113,25 @@ final class JavaSEFileDialogs {
                 || request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false)) {
             return true;
         }
+        if (request.getFilters().length > 0) {
+            // A filtered save adds the filter's extension after the panel has
+            // closed, so the panel's overwrite check saw a different name; the
+            // Swing path confirms the final name itself. And AWT's
+            // FilenameFilter is documented not to work on Windows at all.
+            if (request instanceof SaveFileRequest || isWindows()) {
+                return true;
+            }
+        }
         if (request instanceof OpenFileRequest) {
             OpenFileRequest o = (OpenFileRequest) request;
             return o.getPreview() != null || o.isDirectories();
         }
         return false;
+    }
+
+    private static boolean isWindows() {
+        String os = System.getProperty("os.name");
+        return os != null && os.regionMatches(true, 0, "windows", 0, 7);
     }
 
     private static Frame parentFrame() {

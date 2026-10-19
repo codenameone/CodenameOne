@@ -9481,7 +9481,8 @@ void com_codename1_impl_ios_IOSNative_showSaveFileDialog___java_lang_String_bool
         if ([e isEqualToString:@"*"]) any = YES;
     }
     // allowedFileTypes is what the existing chooser uses; it takes plain
-    // extensions and avoids linking UniformTypeIdentifiers on the Mac slice.
+    // extensions and UTIs alike (NativeFileDialogCodec appends the filter's
+    // UTIs for the Mac) and avoids linking UniformTypeIdentifiers on the Mac slice.
     self.panel.allowedFileTypes = any ? nil : exts;
 }
 - (void)filterChanged:(id)sender {
