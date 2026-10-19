@@ -1199,6 +1199,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 model.maximumIntegralValue(index))) {
             return false;
         }
+        if (family == 3 && attr.kind == Attribute.REAL && exactDecimal(found)) {
+            // DECIMAL and NUMERIC round to their scale, overflow their
+            // precision and hold no NaN or infinity, whatever the field is.
+            return false;
+        }
         if (family == 3 && attr.kind == Attribute.REAL && !model.singlePrecision(index) && singleFloat(found)) {
             // A double rounds to float precision, or overflows, in a REAL or
             // FLOAT column.
@@ -1531,7 +1536,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             boolean fits = (family != 1 || integralCompatible((String) found[1], attr,
                     minimum(attr, element, elementType), maximum(attr, element, elementType)))
                     && (family != 3 || attr.kind != Attribute.REAL || elementType == Float.class
-                    && element != null && attr.column.equals(element.column) || !singleFloat((String) found[1]));
+                    && element != null && attr.column.equals(element.column) || !singleFloat((String) found[1]))
+                    && (family != 3 || attr.kind != Attribute.REAL || !exactDecimal((String) found[1]));
             if (family != typeFamily(type) || !fits || family == 2 && textCapacity((String) found[1])
                     < (attr.id && attr.declaredType == null ? Math.min(255, textCapacity(type)) : textCapacity(type))) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
@@ -1844,6 +1850,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return attr.kind != Attribute.INTEGER && attr.kind != Attribute.BIGINT
                 || integerFits(found, attr.kind, minimum, maximum);
+    }
+    /// Whether a numeric column is an exact decimal. SQLite's NUMERIC is only
+    /// an affinity and stores a REAL as one, so it is not.
+    private boolean exactDecimal(String type) {
+        if ("sqlite".equals(sql.dialect())) {
+            return false;
+        }
+        String token = firstTypeToken(type);
+        return "decimal".equals(token) || "numeric".equals(token) || "dec".equals(token) || "fixed".equals(token);
     }
     /// Whether a floating column keeps only single precision: PostgreSQL's
     /// REAL, FLOAT4 and FLOAT(1..24), and MySQL's FLOAT unless its precision
