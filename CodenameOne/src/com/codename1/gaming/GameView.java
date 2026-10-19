@@ -25,6 +25,7 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
+import com.codename1.ui.Component;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -314,7 +315,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             pressListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (!touchesArrive && contains(e.getX(), e.getY())) {
+                    if (!touchesArrive && hitsView(e.getX(), e.getY())) {
                         routeFormTouch(e.getX(), e.getY(), true, true, false);
                     }
                 }
@@ -340,6 +341,29 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         f.asContainer().addPointerDraggedListener(dragListener);
         f.asContainer().addPointerReleasedListener(releaseListener);
         formListenersAdded = true;
+    }
+
+    /// Whether a press at `x`, `y` is the game's: it is inside the view, and
+    /// the component the form hit-tests there is the view, is inside it, or
+    /// takes no pointer events of its own. The bounds alone are not enough: a
+    /// host button layered over the view is inside them too, and the form
+    /// dispatches the press to that button as well. A transparent container
+    /// that only lays such a button out does not take the press from the game.
+    private boolean hitsView(int x, int y) {
+        if (!contains(x, y)) {
+            return false;
+        }
+        TopLevelContainer f = getTopLevelContainer();
+        Component hit = f == null ? null : f.asContainer().getComponentAt(x, y);
+        if (hit == null || !hit.respondsToPointerEvents()) {
+            return true;
+        }
+        for (Component c = hit; c != null; c = c.getParent()) {
+            if (c == this) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void removeFormPointerListeners() {

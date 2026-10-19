@@ -331,6 +331,42 @@ class GameViewTest extends UITestBase {
         assertTrue(v.getInput().wasPointerReleased(), "a gesture let go of off the view was not released");
     }
 
+    /// A host button layered over the view is inside the view's bounds, and
+    /// the form gives it the press. The game must not hear that press too,
+    /// while a press on the view beside the button still reaches it.
+    @Test
+    void aPressOnAButtonOverTheViewIsNotTheGames() {
+        CountingView v = new CountingView();
+        com.codename1.ui.Button host = new com.codename1.ui.Button("Pause");
+        Form f = new Form("Game", new com.codename1.ui.layouts.LayeredLayout());
+        f.add(v);
+        f.add(com.codename1.ui.layouts.FlowLayout.encloseIn(host));
+        f.show();
+        flushSerialCalls();
+        v.start();
+        v.getComponentAt(0).setIgnorePointerEvents(false);
+        f.revalidate();
+        int bx = host.getAbsoluteX() + host.getWidth() / 2;
+        int by = host.getAbsoluteY() + host.getHeight() / 2;
+        assertTrue(v.contains(bx, by), "the button is over the view");
+
+        implementation.dispatchPointerPress(bx, by);
+        flushSerialCalls();
+        assertFalse(v.getInput().wasPointerPressed(), "a press on the button over the view reached the game");
+        implementation.dispatchPointerRelease(bx, by);
+        flushSerialCalls();
+        assertFalse(v.getInput().wasPointerReleased(), "the release of the button reached the game");
+        v.frame(1.0 / 60);
+
+        int px = v.getAbsoluteX() + v.getWidth() / 2;
+        int py = v.getAbsoluteY() + v.getHeight() - 5;
+        implementation.dispatchPointerPress(px, py);
+        flushSerialCalls();
+        assertTrue(v.getInput().wasPointerPressed(), "a press on the view beside the button did not reach the game");
+        implementation.dispatchPointerRelease(px, py);
+        flushSerialCalls();
+    }
+
     /// A view taken off its form in the middle of a touch never hears that
     /// touch's release, so it lets go of the controls and the pointer itself;
     /// shown again, it used to come back with the button held.

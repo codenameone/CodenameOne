@@ -71,7 +71,9 @@ public final class AudioSource extends Behaviour {
     /// `Pause`/`UnPause` hold and resume them, all as Unity documents. Stop
     /// and deactivation are left to the main voice, since Unity's
     /// documentation of them speaks of the clip and says nothing of
-    /// one-shots. They are kept with no output too, so that a headless run
+    /// one-shots. That is a reading of the documentation alone: the clean
+    /// room this runtime is written in rules out Unity's reference source
+    /// as evidence either way. They are kept with no output too, so that a headless run
     /// answers `isPlaying` as one with sound does.
     private int[] shots = new int[0];
     /// Whether the shots are paused, and since when: their ends are moved
