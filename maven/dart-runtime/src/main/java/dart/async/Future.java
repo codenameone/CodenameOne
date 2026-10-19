@@ -77,6 +77,16 @@ public class Future<T> {
         }
     }
 
+    /**
+     * The value of a future that has already completed with one, else null. Lets Java
+     * code act on a {@code FutureOr} answer that is ready now without waiting for it.
+     */
+    public T completedValue() {
+        synchronized (lock) {
+            return done && error == null ? value : null;
+        }
+    }
+
     /** An already-completed future. */
     public static <T> Future<T> value(T v) {
         Future<T> f = new Future<T>();

@@ -84,6 +84,41 @@ public class MaterialApp extends StatelessWidget
     private Funcs.Func1<RouteSettings, Route> onUnknownRoute;
     private ScrollBehavior scrollBehavior;
     private Funcs.Func2<DartList<Locale>, DartIterable<Locale>, Locale> localeListResolutionCallback;
+    private com.codename1.flutter.navigation.RouterConfigSource routerConfig;
+
+    /**
+     * Flutter's {@code MaterialApp.router(routerConfig: ...)}. The router stands in
+     * for the route table: it generates every route from its location, and the app
+     * opens on the router's initial location. Arguments are positional here, in the
+     * order the stub declares them.
+     */
+    public static MaterialApp router(Object key, Object routerConfig, String title, ThemeData theme,
+            ThemeData darkTheme, ThemeMode themeMode, Boolean debugShowCheckedModeBanner,
+            Object localizationsDelegates, Object supportedLocales, Locale locale) {
+        MaterialApp app = new MaterialApp();
+        app.routerConfig(routerConfig);
+        app.title(title);
+        app.theme(theme);
+        app.darkTheme(darkTheme);
+        app.themeMode(themeMode);
+        if (debugShowCheckedModeBanner != null) {
+            app.debugShowCheckedModeBanner(debugShowCheckedModeBanner.booleanValue());
+        }
+        app.localizationsDelegates(localizationsDelegates);
+        app.supportedLocales(supportedLocales);
+        app.locale(locale);
+        return app;
+    }
+
+    /** See {@link #router}. A value that is not a router is ignored. */
+    public void routerConfig(Object v) {
+        this.routerConfig = v instanceof com.codename1.flutter.navigation.RouterConfigSource
+                ? (com.codename1.flutter.navigation.RouterConfigSource) v : null;
+        if (routerConfig != null) {
+            this.onGenerateRoute = routerConfig.routeGenerator();
+            this.initialRoute = routerConfig.initialLocation();
+        }
+    }
 
     public void title(String v) {
         this.title = v;
@@ -316,6 +351,9 @@ public class MaterialApp extends StatelessWidget
         // meant opening a study permanently replaced the gallery's.
         boolean rootApp = com.codename1.flutter.navigation.Navigator.installRouteTable(
                 context, routes, onGenerateRoute, onUnknownRoute);
+        if (routerConfig != null) {
+            routerConfig.attached(context);
+        }
 
         Widget content = home;
         // A routing-based app (no home widget) renders its initial route — Flutter

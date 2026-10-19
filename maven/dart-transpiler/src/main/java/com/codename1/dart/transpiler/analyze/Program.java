@@ -446,7 +446,18 @@ public final class Program {
             // package:<own>/x.dart is this project's lib/x.dart; any other package is
             // external (a stub or unsupported) and never a user library.
             int slash = uri.indexOf('/');
-            if (slash < 0 || !ownPackages.contains(uri.substring("package:".length(), slash))) {
+            if (slash < 0) {
+                return null;
+            }
+            if (!ownPackages.contains(uri.substring("package:".length(), slash))) {
+                // A pub package transpiled with the app: cn1:import-flutter-project copies
+                // the files the app reaches to packages/<name>/, beside the app's own.
+                String inPackage = normalizePath("packages/" + uri.substring("package:".length()));
+                for (Ast.Library lib : libraries) {
+                    if (normalizePath(lib.fileName.replace('\\', '/')).equals(inPackage)) {
+                        return lib;
+                    }
+                }
                 return null;
             }
             String rest = normalizePath(uri.substring(slash + 1));

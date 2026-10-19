@@ -58,6 +58,11 @@ class DateTime {
   external static DateTime utc(int year, [int month = 1, int day = 1, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0]);
   external static DateTime fromMillisecondsSinceEpoch(int millisecondsSinceEpoch, {bool isUtc});
   external static DateTime fromMicrosecondsSinceEpoch(int microsecondsSinceEpoch, {bool isUtc});
+  external static DateTime parse(String formattedString);
+  external static DateTime? tryParse(String formattedString);
+  external String toIso8601String();
+  external bool get isUtc;
+  external int get microsecond;
   external int get year;
   external int get month;
   external int get day;

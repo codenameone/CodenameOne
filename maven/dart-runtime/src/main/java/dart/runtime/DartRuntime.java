@@ -680,6 +680,29 @@ public final class DartRuntime {
         return r < 0 ? r + Math.abs(b) : r;
     }
 
+    /// `num.toInt()` on a value typed only num: a boxed Long or Double.
+    public static long numToInt(Object n) {
+        if (n instanceof Double d) {
+            return toInt(d.doubleValue());
+        }
+        if (n instanceof Number num) {
+            return num.longValue();
+        }
+        throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method 'toInt'.");
+    }
+
+    public static double numToDouble(Object n) {
+        if (n instanceof Number num) {
+            return num.doubleValue();
+        }
+        throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method 'toDouble'.");
+    }
+
+    /// `x.hashCode` for an object the emitter has no declaration for.
+    public static long hashCodeOf(Object o) {
+        return o == null ? 0 : o.hashCode();
+    }
+
     /**
      * Dart string conversion used by string interpolation and print:
      * null prints as "null", doubles use Dart's formatting.
@@ -693,6 +716,18 @@ public final class DartRuntime {
         }
         if (v instanceof Float f) {
             return doubleStr(f);
+        }
+        if (v instanceof Enum<?> e) {
+            // Dart prints an enum value qualified -- `ResponseType.json` -- and a runtime
+            // enum's own toString is only the constant. A transpiled enum overrides
+            // toString with its Dart name, which its Java name may not be (a library's
+            // enum renamed to keep two same-named ones apart), so that answer stands.
+            String own = e.toString();
+            return own.equals(e.name()) ? e.getDeclaringClass().getSimpleName() + "." + own : own;
+        }
+        if (v instanceof Class<?> c) {
+            // A Dart Type (`runtimeType`) is a Class here; Dart prints the bare type name.
+            return c.getSimpleName();
         }
         return v.toString();
     }

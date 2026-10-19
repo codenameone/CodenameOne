@@ -1,0 +1,121 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.flutter.plugins.bloc;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import dart.async.Future;
+import dart.runtime.Dyn;
+import dart.runtime.Funcs;
+
+/// bloc's `Bloc<Event, State>`: events go in through [#add], and the handler
+/// registered for that event type with [#on] emits the states that come out.
+///
+/// The Dart `on<E>` type argument is erased in Java, so the transpiler passes it
+/// as `type` (see the stub's `witness` parameter). A handler registered without
+/// one -- `on<E>` inside a generic class -- sees every event.
+public abstract class Bloc<E, S> extends BlocBase<S> {
+
+    /// `Bloc.observer`: the app-wide [BlocObserver].
+    public static BlocObserver observer = new BlocObserver();
+
+    private final List<Class<?>> types = new ArrayList<Class<?>>();
+    private final List<Object> handlers = new ArrayList<Object>();
+
+    protected Bloc(S initialState) {
+        super(initialState);
+    }
+
+    /// `on<T>(handler)`. The handler answers whatever its body does -- a Future for an
+    /// async one -- so it is typed to return Object; Emitter.call answers null so an arrow
+    /// handler that only emits fits too.
+    public <T> void on(Funcs.Func2<T, Emitter<S>, Object> handler, Class<T> type) {
+        types.add(type);
+        handlers.add(handler);
+    }
+
+    public <T> void on(Funcs.Func2<T, Emitter<S>, Object> handler, Object transformer, Class<T> type) {
+        on(handler, type);
+    }
+
+    public void add(E event) {
+        if (isClosed()) {
+            throw new dart.core.StateError("Cannot add new events after calling close");
+        }
+        onEvent(event);
+        boolean handled = false;
+        for (int i = 0; i < handlers.size(); i++) {
+            Class<?> t = types.get(i);
+            if (t != null && !t.isInstance(event)) {
+                continue;
+            }
+            handled = true;
+            final Emitter<S> emitter = new Emitter<S>(this, event);
+            Object result;
+            try {
+                result = Dyn.invoke(handlers.get(i), event, emitter);
+            } catch (RuntimeException err) {
+                emitter.complete();
+                onError(err, null);
+                throw err;
+            }
+            if (result instanceof Future) {
+                ((Future<?>) result).whenComplete(new dart.runtime.Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        emitter.complete();
+                    }
+                });
+            } else {
+                emitter.complete();
+            }
+        }
+        if (!handled) {
+            onError(new dart.core.StateError("add(" + event + ") was called without a registered "
+                    + "event handler. Make sure to register a handler via on<"
+                    + (event == null ? "?" : event.getClass().getSimpleName()) + ">((event, emit) {...})"),
+                    null);
+        }
+    }
+
+    public void onEvent(E event) {
+        observer.onEvent(this, event);
+    }
+
+    public void onTransition(Transition<E, S> transition) {
+        observer.onTransition(this, transition);
+    }
+
+    @SuppressWarnings("unchecked")
+    void emitTransition(Object event, S next) {
+        if (isClosed()) {
+            return;
+        }
+        if (!dart.runtime.DartRuntime.eq(next, state())) {
+            onTransition(new Transition<E, S>(state(), (E) event, next));
+        }
+        emit(next);
+    }
+}

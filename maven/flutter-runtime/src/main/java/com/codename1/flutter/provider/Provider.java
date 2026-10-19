@@ -28,6 +28,8 @@ import com.codename1.flutter.InheritedValueProvider;
 import com.codename1.flutter.Key;
 import com.codename1.flutter.Widget;
 
+import dart.runtime.Dyn;
+
 /**
  * provider's {@code Provider<T>}: publishes {@code value} to its subtree by
  * runtime type. {@link #of(BuildContext, boolean, Class)} walks the element tree
@@ -35,8 +37,8 @@ import com.codename1.flutter.Widget;
  * Dart {@code Provider.of<T>(context)} witness is threaded in as {@code type} by
  * the transpiler.
  *
- * <p>The {@code create} form (a lazily-invoked factory) is accepted for API
- * shape but not exercised by the gallery, which uses the {@code .value} form.</p>
+ * <p>The {@code create} form is run once by the provider's element, with the
+ * element as its context, and the value it returns is disposed with it.</p>
  */
 public class Provider extends SingleChildWidget implements InheritedValueProvider {
 
@@ -54,8 +56,32 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
         this.create = v;
     }
 
+    /**
+     * {@code create: (context) { ... }} written as a block or cascade: the lambda needs
+     * a functional type to be a lambda at all, which the Object overload cannot give it.
+     */
+    public void create(dart.runtime.Funcs.Func1<com.codename1.flutter.BuildContext, Object> v) {
+        this.create = v;
+    }
+
     public void lazy(boolean v) {
         this.lazy = v;
+    }
+
+    protected Object dispose;
+
+    /// provider's `dispose: (context, value) => ...`, run when the element that
+    /// created the value leaves the tree.
+    public void dispose(Object v) {
+        this.dispose = v;
+    }
+
+    /// Releases a value this provider's `create` made. Only a created value: one
+    /// handed in through `.value` belongs to whoever made it.
+    protected void disposeCreated(BuildContext context, Object created) {
+        if (dispose != null) {
+            Dyn.invoke(dispose, context, created);
+        }
     }
 
     public Object getValue() {

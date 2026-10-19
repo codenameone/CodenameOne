@@ -54,9 +54,12 @@ public class BehaviorTest {
     public List<DynamicTest> behaviorCases() {
         List<DynamicTest> tests = new ArrayList<DynamicTest>();
         File[] cases = BEHAVIOR_ROOT.listFiles();
+        // A local convenience: CN1_BEHAVIOR_ONLY=plugin_bloc runs just the cases whose
+        // directory name starts with it. CI never sets it.
+        String only = System.getenv("CN1_BEHAVIOR_ONLY");
         if (cases != null) {
             for (File dir : cases) {
-                if (dir.isDirectory()) {
+                if (dir.isDirectory() && (only == null || dir.getName().startsWith(only))) {
                     tests.add(DynamicTest.dynamicTest(dir.getName(), () -> runCase(dir)));
                 }
             }

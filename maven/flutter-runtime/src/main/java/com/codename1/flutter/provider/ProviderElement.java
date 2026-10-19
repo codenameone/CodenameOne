@@ -28,6 +28,7 @@ import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 import dart.runtime.DartRuntime;
+import dart.runtime.Dyn;
 
 /**
  * Element for a {@link Provider}: when a rebuild hands it a different value, the widgets
@@ -43,9 +44,47 @@ public class ProviderElement extends StatelessElement {
         super(widget);
     }
 
+    /// The value this element made by calling the provider's `create`, kept across
+    /// rebuilds: the parent hands down a new Provider widget every build, and Flutter
+    /// creates once per element, not once per widget.
+    private Object created;
+    private boolean hasCreated;
+
+    @Override
+    protected void firstBuild() {
+        // After Element.mount linked the parent, so create(context) can read the
+        // providers above it -- `create: (c) => Cubit(c.read<Repo>())`.
+        supplyCreated(widget());
+        super.firstBuild();
+    }
+
+    private void supplyCreated(Widget w) {
+        if (!(w instanceof Provider)) {
+            return;
+        }
+        Provider p = (Provider) w;
+        if (p.getValue() != null || p.create == null) {
+            return;
+        }
+        if (!hasCreated) {
+            created = Dyn.invoke(p.create, this);
+            hasCreated = true;
+        }
+        p.value(created);
+    }
+
+    @Override
+    public void unmount() {
+        if (hasCreated && widget() instanceof Provider) {
+            ((Provider) widget()).disposeCreated(this, created);
+        }
+        super.unmount();
+    }
+
     @Override
     public void update(Widget newWidget) {
         Object before = valueOf(widget());
+        supplyCreated(newWidget);
         super.update(newWidget);
         if (!DartRuntime.eq(before, valueOf(widget()))) {
             rebuildProviderDependents();
