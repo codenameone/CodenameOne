@@ -410,6 +410,10 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
             if (n == elements.length) {
                 return false;
             }
+            if (elements != getArray()) {
+                // The predicate changed the list, as in filter() below.
+                throw new java.util.ConcurrentModificationException();
+            }
             Object[] copy = new Object[n];
             System.arraycopy(kept, 0, copy, 0, n);
             setArray(copy);

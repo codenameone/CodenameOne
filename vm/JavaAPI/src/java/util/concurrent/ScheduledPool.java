@@ -111,9 +111,11 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
                 // A fixed rate keeps its beat whatever a run takes.
                 // Saturating: a period near Long.MAX_VALUE is "never again",
                 // not a wrapped deadline in the past.
+                // Overflow-safe whatever the clock's origin.
                 long current = due.get();
-                due.set(rate > Long.MAX_VALUE - current ? Long.MAX_VALUE : current + rate);
-                arm(due.get() - BlockingWait.now());
+                long next = current + rate;
+                due.set(next < current ? Long.MAX_VALUE : next);
+                arm(next < current ? Long.MAX_VALUE : next - BlockingWait.now());
                 // A firing that comes while a run is under way is owed, not
                 // dropped: as with the JDK's scheduleAtFixedRate, an overrun
                 // makes the next runs start late and one after another,
@@ -459,7 +461,9 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         // -- and a task still running forgets itself into an empty array.
         for (Scheduled<?> task : live.getAndSet(NONE)) {
             task.disarm();
-            if (!task.outcome.isDone() && !task.running.get()) {
+            // A fixed-rate firing owed is a wrapper already handed to the
+            // pool, and so already in what pool.shutdownNow() answered.
+            if (!task.outcome.isDone() && !task.running.get() && !(task.rate > 0 && task.owed.get() > 0)) {
                 dropped.add(task);
             }
         }

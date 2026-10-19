@@ -154,6 +154,10 @@ public interface DoubleStream extends BaseStream<Double, DoubleStream> {
 
     /// The elements of `a`, then those of `b`. Closing the result closes both.
     static DoubleStream concat(DoubleStream a, DoubleStream b) {
+        // Both checked before boxed() consumes a: a refused call leaves a usable.
+        if (a == null || b == null) {
+            throw new NullPointerException();
+        }
         return new DoublePipeline(Stream.concat(a.boxed(), b.boxed()));
     }
 }

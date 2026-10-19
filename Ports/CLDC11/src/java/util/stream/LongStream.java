@@ -169,6 +169,10 @@ public interface LongStream extends BaseStream<Long, LongStream> {
 
     /// The elements of `a`, then those of `b`. Closing the result closes both.
     static LongStream concat(LongStream a, LongStream b) {
+        // Both checked before boxed() consumes a: a refused call leaves a usable.
+        if (a == null || b == null) {
+            throw new NullPointerException();
+        }
         return new LongPipeline(Stream.concat(a.boxed(), b.boxed()));
     }
 }

@@ -289,6 +289,15 @@ public final class LangMembersChecks {
                 }
             }
         });
+        Bulk.check("Lang.aRefusedConcatLeavesTheStreamUsable", () -> {
+            java.util.stream.IntStream a = java.util.stream.IntStream.of(1, 2);
+            try {
+                java.util.stream.IntStream.concat(a, null);
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+            Bulk.p("sum", a.sum());
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

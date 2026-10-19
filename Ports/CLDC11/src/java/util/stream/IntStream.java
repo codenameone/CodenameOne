@@ -171,6 +171,10 @@ public interface IntStream extends BaseStream<Integer, IntStream> {
 
     /// The elements of `a`, then those of `b`. Closing the result closes both.
     static IntStream concat(IntStream a, IntStream b) {
+        // Both checked before boxed() consumes a: a refused call leaves a usable.
+        if (a == null || b == null) {
+            throw new NullPointerException();
+        }
         return new IntPipeline(Stream.concat(a.boxed(), b.boxed()));
     }
 }
