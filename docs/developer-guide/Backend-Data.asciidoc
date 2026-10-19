@@ -18,7 +18,7 @@ The server opens a connection pool from `cn1.datasource.url` -- a SQLite path or
 a PostgreSQL or MySQL URL -- and injects it as a `DataSource` into any bean that
 asks for one. It returns rows as the same Java types whichever engine answered:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database,indent=0]
 ----
@@ -49,7 +49,7 @@ The other thing the engines disagree about is the key an insert generated.
 SQLite, `LAST_INSERT_ID()` on MySQL, and `INSERT ... RETURNING` on PostgreSQL,
 which has no last-insert-id concept at all:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-insert,indent=0]
 ----
@@ -57,7 +57,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 Several statements that have to be one go through `inTransaction`, which holds a
 single connection for the whole body and rolls back if it throws:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-transaction,indent=0]
 ----
@@ -65,7 +65,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 Everything each engine spells differently is reachable through `db.dialect()`,
 which is what code that generates schema needs:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-dialect,indent=0]
 ----
@@ -89,7 +89,7 @@ time. The annotations are the ones the SQLite ORM chapter documents, and they
 are the same annotations in the same package, because an entity is the one class
 both halves of an application own:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Reminder.java[tag=backend-orm-entity,indent=0]
 ----
@@ -109,7 +109,7 @@ becomes `userid` rather than `user_i_d`. A name given with `@Entity(table)` or
 `@Column(name)` is used as written on both. Queries keep naming the Java fields;
 only SQL written by hand sees the column names.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-dao,indent=0]
 ----
@@ -118,7 +118,7 @@ The entity manager comes from the entry point, which opens one when the build
 generated at least one entity. A controller asks for it by declaring a
 constructor that takes one, and the generated entry point calls that constructor:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ReminderApi.java[tag=backend-orm-controller,indent=0]
 ----
@@ -137,7 +137,7 @@ binary. Put start-up work in a bean's `@PostConstruct` method.
 Outside the server -- in a unit test, say -- an entity manager is a single call
 over a pool:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-open,indent=0]
 ----
@@ -145,7 +145,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/O
 Queries name JAVA FIELDS rather than columns, and the builder quotes the column
 each one maps to:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-query,indent=0]
 ----
@@ -163,7 +163,7 @@ is handed is pinned to one connection, so every dao reached through it runs insi
 the transaction. Called inside a `@Transactional` method, it joins that
 transaction instead of starting another.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-transaction,indent=0]
 ----
@@ -260,7 +260,7 @@ itself behind, so the server records it as failed and refuses to migrate again
 until someone has looked. Remove what the script left, fix it, and call
 `repair`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-repair,indent=0]
 ----
@@ -362,7 +362,7 @@ include::../demos/common/src/main/snippets/developer-guide/migrations.sh[tag=mig
 
 The same information is available to code:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-info,indent=0]
 ----
@@ -373,7 +373,7 @@ A change that SQL can't express, such as recomputing a column, is a class
 instead of a script. It runs once, in version order with the scripts, inside the
 same transaction a script would get.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NormalizeNotes.java[tag=migrations-java,indent=0]
 ----
@@ -388,7 +388,7 @@ name. The set gets its own history table, so its versions never collide with
 the application's, and it runs before the application's scripts so they can
 refer to its tables.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-library,indent=0]
 ----
@@ -407,7 +407,7 @@ A transaction makes several statements succeed or fail together. `@Transactional
 declares one around a method, and the build writes the code that begins, commits
 and rolls back the transaction around the method's body:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Signups.java[tag=backend-transactional,indent=0]
 ----
@@ -484,7 +484,7 @@ image::img/backend-transaction-propagation.svg["Three timelines: REQUIRED sharin
 `REQUIRES_NEW` suits work that must be kept whatever happens to the caller, an
 audit record being the usual case:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/AuditLog.java[tag=backend-tx-requires-new,indent=0]
 ----
@@ -503,7 +503,7 @@ when several listed types match the thrown one the most specific wins. The
 decision is written into the method as a chain of `instanceof` tests, so nothing
 reads the annotation when the method runs:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Orders.java[tag=backend-tx-rules,indent=0]
 ----
@@ -622,7 +622,7 @@ connection-local behavior when called outside a declarative transaction. Use
 
 Register a `Transactions.Synchronization` within a thread-bound transaction:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-transaction-synchronization,indent=0]
 ----
@@ -669,7 +669,7 @@ for the outer commit; releasing a savepoint never triggers a commit hook.
 rolls back to the savepoint and nothing more, and the outer method can go on and
 commit. That suits a batch in which one bad item shouldn't cost the rest:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Imports.java[tag=backend-tx-nested,indent=0]
 ----
@@ -688,7 +688,7 @@ normally. All three engines support them.
 A bean can inject `com.codename1.orm.session.Session`, the persistence session of
 the ORM, and use it inside a transaction:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ReminderService.java[tag=backend-tx-session,indent=0]
 ----

@@ -309,7 +309,7 @@ final class JavaSourceParser {
                     unit.imports.add(importDeclaration());
                 } else if (scriptTypeDeclarationAhead()) {
                     unit.types.add(classOrInterface(modifiers()));
-                } else if (scriptMethodAhead()) {
+                } else if (scriptMethodAhead() || scriptFieldAhead()) {
                     member(cls);
                 } else {
                     value = scriptStatement(stats);
@@ -460,6 +460,29 @@ final class JavaSourceParser {
         });
         p = start;
         return Boolean.TRUE.equals(yes);
+    }
+
+    /**
+     * A declaration a local variable cannot be: one carrying an access modifier or
+     * {@code static} ({@code private Image icon;}, {@code static final int SIZE = 4;}).
+     * It is a field of the script class, the way a top-level method is a method of it --
+     * documentation shows a class's members on their own, and this lets them be pasted
+     * in. A declaration with no such modifier, {@code final} included, stays a local, so
+     * scripts that only declare locals compile exactly as before.
+     */
+    private boolean scriptFieldAhead() {
+        int k = 0;
+        boolean memberOnly = false;
+        while (true) {
+            Kind kind = peek(k).kind;
+            if (kind == Kind.PUBLIC || kind == Kind.PRIVATE || kind == Kind.PROTECTED || kind == Kind.STATIC) {
+                memberOnly = true;
+            } else if (kind != Kind.FINAL && kind != Kind.TRANSIENT && kind != Kind.VOLATILE) {
+                break;
+            }
+            k++;
+        }
+        return memberOnly && (peek(k).kind == Kind.IDENT || isPrimitive(peek(k).kind));
     }
 
     /**

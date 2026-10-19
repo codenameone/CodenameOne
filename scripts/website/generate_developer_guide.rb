@@ -72,7 +72,10 @@ class GuidePages
         "#{'#' * node.level} #{CGI.escapeHTML(plain(node.title))} {##{node.id}}\n\n" + render_blocks(node.blocks)
       elsif plain_source?(node)
         fence = '`' * [3, (node.source.scan(/`+/).map(&:length).max || 0) + 1].max
-        "#{fence}#{node.attr('language')}\n#{node.source}\n#{fence}\n\n"
+        # A role (cn1-no-try marks server code the inline Playground cannot run)
+        # becomes a class on the block's wrapper, where cn1-snippet-runner.js looks.
+        attrs = node.role ? %( {class="#{CGI.escapeHTML(node.role)}"}) : ''
+        "#{fence}#{node.attr('language')}#{attrs}\n#{node.source}\n#{fence}\n\n"
       else
         raw(node.convert)
       end

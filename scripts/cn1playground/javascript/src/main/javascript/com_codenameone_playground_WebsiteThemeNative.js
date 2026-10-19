@@ -98,6 +98,34 @@ var o = {};
         }
     };
 
+    // Inline mode: the host page posts the snippet to show next. Kept here until
+    // the app polls it with takeInlineCode, because the message can arrive
+    // before the VM is ready to receive it.
+    var pendingInlineCode = null;
+    window.addEventListener("message", function(evt) {
+        var data = evt && evt.data;
+        if (data && data.type === "cn1-playground-inline-code" && typeof data.code === "string") {
+            pendingInlineCode = data.code;
+        }
+    });
+
+    o.takeInlineCode_ = function(callback) {
+        var code = pendingInlineCode;
+        pendingInlineCode = null;
+        callback.complete(code);
+    };
+
+    o.notifyInlineResult__boolean_java_lang_String_java_lang_String = function(ok, summary, sourceUrl, callback) {
+        try {
+            if (window.parent && window.parent !== window && window.parent.postMessage) {
+                window.parent.postMessage({ type: "cn1-playground-inline-result", ok: !!ok, summary: summary || "", sourceUrl: sourceUrl || "" }, "*");
+            }
+        } catch (ignored) {
+            // Ignore cross-origin or sandbox restrictions.
+        }
+        callback.complete();
+    };
+
     o.isSupported_ = function(callback) {
         callback.complete(true);
     };

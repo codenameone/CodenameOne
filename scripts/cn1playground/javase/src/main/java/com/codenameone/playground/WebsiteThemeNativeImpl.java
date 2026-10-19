@@ -15,4 +15,11 @@ public class WebsiteThemeNativeImpl implements WebsiteThemeNative {
     public String locationHref() {
         return null;
     }
+
+    public String takeInlineCode() {
+        return null;
+    }
+
+    public void notifyInlineResult(boolean ok, String summary, String sourceUrl) {
+    }
 }

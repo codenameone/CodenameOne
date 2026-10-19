@@ -58,7 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
       highlighter.highlightElement(target);
     }
     if (isJavaSnippet(className)) {
-      addPlaygroundLink(pre, target.textContent || '');
+      // On codenameone.com the page also loads cn1-snippet-runner.js, which
+      // edits and runs the snippet in place. The downloadable javadocs.zip has
+      // no Playground beside it, so it keeps the link to the hosted one.
+      if (window.Cn1SnippetRunner) {
+        window.Cn1SnippetRunner.attach(pre, target.textContent || '');
+      } else {
+        addPlaygroundLink(pre, target.textContent || '');
+      }
     }
   });
 

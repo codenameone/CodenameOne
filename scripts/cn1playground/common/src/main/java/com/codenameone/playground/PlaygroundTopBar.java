@@ -30,6 +30,8 @@ final class PlaygroundTopBar extends Container {
     private final PlaygroundStatusPill statusPill;
     private final Button shareButton;
     private final Button downloadButton;
+    private final Container rightActions;
+    private Button resetButton;
     private boolean darkMode;
     private boolean compact;
     private boolean mobile;
@@ -101,13 +103,39 @@ final class PlaygroundTopBar extends Container {
         left.add(modeToggle);
         left.add(statusPill);
 
-        Container right = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
-        right.getAllStyles().setBgTransparency(0);
-        right.add(shareButton);
-        right.add(downloadButton);
+        rightActions = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
+        rightActions.getAllStyles().setBgTransparency(0);
+        rightActions.add(shareButton);
+        rightActions.add(downloadButton);
 
         add(BorderLayout.WEST, left);
-        add(BorderLayout.EAST, right);
+        add(BorderLayout.EAST, rightActions);
+    }
+
+    /// Inline mode: the Playground embedded under a code snippet in the developer
+    /// guide or the API reference. Share and Download give way to Reset (back to
+    /// the snippet as the page shows it), and the wordmark is dropped to leave the
+    /// narrow frame to the code. Opening the full Playground is the host page's
+    /// button, not this bar's -- see ``WebsiteThemeNative.notifyInlineResult``.
+    void setInline(Runnable onReset) {
+        wordmark.setVisible(false);
+        wordmark.setHidden(true);
+        rightActions.removeAll();
+        resetButton = createActionButton("Reset", FontImage.MATERIAL_RESTORE, onReset);
+        rightActions.add(resetButton);
+        if (getComponentForm() != null) {
+            revalidate();
+        }
+    }
+
+    private Button createActionButton(String text, char icon, Runnable action) {
+        Button b = new Button(text);
+        b.setUIID(darkMode ? "PlaygroundShareButtonDark" : "PlaygroundShareButton");
+        FontImage.setMaterialIcon(b, icon, 3f);
+        b.setTextPosition(Component.RIGHT);
+        b.setGap(Display.getInstance().convertToPixels(1.3f));
+        b.addActionListener(e -> action.run());
+        return b;
     }
 
     void setMode(String mode) {
@@ -139,14 +167,19 @@ final class PlaygroundTopBar extends Container {
         // which eats ~30 mm of horizontal space on mobile and pushes the
         // Live pill / Share / Download off-screen. setHidden() collapses it
         // to 0 preferred width so the remaining siblings fit.
-        wordmark.setVisible(!compact);
-        wordmark.setHidden(compact);
+        // Inline mode never shows the wordmark, whatever the width.
+        boolean showWordmark = !compact && resetButton == null;
+        wordmark.setVisible(showWordmark);
+        wordmark.setHidden(!showWordmark);
         if (compact) {
             shareButton.setText("");
             downloadButton.setText("");
         } else {
             shareButton.setText("Share");
             downloadButton.setText("Download");
+        }
+        if (resetButton != null) {
+            resetButton.setText(compact ? "" : "Reset");
         }
         if (getComponentForm() != null) {
             revalidate();
@@ -188,6 +221,10 @@ final class PlaygroundTopBar extends Container {
         downloadButton.setUIID(dark ? "PlaygroundDownloadButtonDark" : "PlaygroundDownloadButton");
         FontImage.setMaterialIcon(shareButton, FontImage.MATERIAL_IOS_SHARE, 3f);
         FontImage.setMaterialIcon(downloadButton, FontImage.MATERIAL_DOWNLOAD, 3f);
+        if (resetButton != null) {
+            resetButton.setUIID(dark ? "PlaygroundShareButtonDark" : "PlaygroundShareButton");
+            FontImage.setMaterialIcon(resetButton, FontImage.MATERIAL_RESTORE, 3f);
+        }
         if (getComponentForm() != null) {
             revalidate();
         }

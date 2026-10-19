@@ -13,4 +13,15 @@
 -(void)notifyUiReady{
 }
 
+-(NSString*)locationHref{
+    return nil;
+}
+
+-(NSString*)takeInlineCode{
+    return nil;
+}
+
+-(void)notifyInlineResult:(BOOL)param param1:(NSString*)param1 param2:(NSString*)param2{
+}
+
 @end

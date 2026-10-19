@@ -1,0 +1,56 @@
+name: Documentation snippets run in the Playground
+
+# Every Java snippet in the developer guide and the API reference has a "Try it"
+# button that opens it in the inline Playground. This holds the snippets that do
+# not compile there as they stand against scripts/doc-snippet-baseline.txt, so a
+# new snippet has to be self-contained. Its own workflow because pr.yml's paths
+# filter skips docs/.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/developer-guide/**'
+      - 'docs/demos/common/src/main/java/**'
+      - 'CodenameOne/src/**/*.java'
+      - 'scripts/cn1playground/common/**'
+      - 'vm/JavaCompiler/**'
+      - 'scripts/check-doc-snippets.py'
+      - 'scripts/doc-snippet-baseline.txt'
+      - 'scripts/extract-javadoc-java-snippets.sh'
+      - '.github/workflows/check-doc-snippets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doc-snippets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # The Playground compiles against the in-repo 8.0-SNAPSHOT.
+      - name: Bootstrap local Codename One snapshots
+        run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
+
+      - name: Check documentation snippets
+        run: scripts/check-doc-snippets.py --report doc-snippets.tsv
+
+      - name: Upload snippet report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-snippets
+          path: doc-snippets.tsv
+          if-no-files-found: ignore

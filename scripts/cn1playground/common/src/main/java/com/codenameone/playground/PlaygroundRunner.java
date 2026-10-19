@@ -271,18 +271,28 @@ final class PlaygroundRunner {
     // ------------------------------------------------------------------ compiling
 
     /** Compiles a script (and, for a class-shaped entry, its launcher). */
+    /// How many times a script is recompiled with imports added for the classes it
+    /// names but does not import. Each round can only surface the names javac
+    /// reached, so a snippet needing classes from several packages takes more than one.
+    private static final int AUTO_IMPORT_ROUNDS = 4;
+
     static Compiled compile(String script) throws Exception {
         final StubLibrary api = PlaygroundApi.library();
-        JavaCompiler jc = configure(new JavaCompiler(api));
-        ScriptSpec spec = new ScriptSpec();
-        spec.className = SCRIPT_CLASS;
-        spec.interfaceName = "com.codenameone.playground.PlaygroundEntry";
-        spec.methodName = "run";
-        spec.paramType = CONTEXT;
-        spec.paramName = "ctx";
-        spec.valuesMarker = PlaygroundEntry.SCRIPT_VALUES;
-        jc.addScript("Playground.java", script, spec);
-        JavaCompiler.Result r = jc.compile();
+        // Code copied from the documentation leaves its imports out: the guide and
+        // the API reference show the lines that matter, and a reader who clicks
+        // "Try it" should not have to look up where ConnectionRequest lives. A
+        // name the script uses but cannot resolve is imported when exactly ONE
+        // public class in the API has that simple name; an ambiguous one (List
+        // in java.util and com.codename1.ui) is left to the user, so the error
+        // they see is still javac's.
+        List<String> autoImports = new ArrayList<String>();
+        JavaCompiler.Result r = null;
+        for (int round = 0; round <= AUTO_IMPORT_ROUNDS; round++) {
+            r = compileScript(api, script, autoImports);
+            if (r.isSuccess() || !r.isWellFormed() || !addAutoImports(r.getDiagnostics(), autoImports)) {
+                break;
+            }
+        }
         if (!r.isSuccess()) {
             throw new CompileFailure(toDiagnostics(r.getDiagnostics()), r.isWellFormed());
         }
@@ -309,6 +319,78 @@ final class PlaygroundRunner {
         }
         classes.putAll(lr.getClasses());
         return new Compiled(classes, prefix + LAUNCHER_CLASS);
+    }
+
+    private static JavaCompiler.Result compileScript(StubLibrary api, String script, List<String> autoImports) {
+        JavaCompiler jc = configure(new JavaCompiler(api));
+        for (int i = 0; i < autoImports.size(); i++) {
+            jc.addDefaultImport(autoImports.get(i));
+        }
+        ScriptSpec spec = new ScriptSpec();
+        spec.className = SCRIPT_CLASS;
+        spec.interfaceName = "com.codenameone.playground.PlaygroundEntry";
+        spec.methodName = "run";
+        spec.paramType = CONTEXT;
+        spec.paramName = "ctx";
+        spec.valuesMarker = PlaygroundEntry.SCRIPT_VALUES;
+        jc.addScript("Playground.java", script, spec);
+        return jc.compile();
+    }
+
+    /// Adds an import for every unresolved capitalised name that one API class
+    /// answers to. False when there was nothing new to add, so the caller stops.
+    private static boolean addAutoImports(List<com.codename1.tools.javac.Diagnostic> diagnostics, List<String> autoImports) {
+        boolean added = false;
+        for (int i = 0; i < diagnostics.size(); i++) {
+            String name = missingSymbol(diagnostics.get(i).message);
+            if (name == null) {
+                continue;
+            }
+            String cls = PlaygroundApi.uniqueClassForSimpleName(name);
+            if (cls != null && !autoImports.contains(cls)) {
+                autoImports.add(cls);
+                added = true;
+            }
+        }
+        return added;
+    }
+
+    /// The name in javac's "cannot find symbol ... symbol: class X" (or
+    /// "variable X", for a static call on a class: ``Log.p(...)``), when it is
+    /// capitalised like a class. Parsed by hand: this runs in the browser.
+    static String missingSymbol(String message) {
+        if (message == null) {
+            return null;
+        }
+        int at = message.indexOf("symbol:");
+        if (at < 0) {
+            return null;
+        }
+        int p = skipSpaces(message, at + "symbol:".length());
+        int kindEnd = p;
+        while (kindEnd < message.length() && message.charAt(kindEnd) >= 'a' && message.charAt(kindEnd) <= 'z') {
+            kindEnd++;
+        }
+        String kind = message.substring(p, kindEnd);
+        if (!"class".equals(kind) && !"variable".equals(kind)) {
+            return null;
+        }
+        p = skipSpaces(message, kindEnd);
+        int end = p;
+        while (end < message.length() && Character.isJavaIdentifierPart(message.charAt(end))) {
+            end++;
+        }
+        if (end == p || !Character.isUpperCase(message.charAt(p))) {
+            return null;
+        }
+        return message.substring(p, end);
+    }
+
+    private static int skipSpaces(String s, int p) {
+        while (p < s.length() && (s.charAt(p) == ' ' || s.charAt(p) == '\n' || s.charAt(p) == '\t')) {
+            p++;
+        }
+        return p;
     }
 
     private static JavaCompiler configure(JavaCompiler jc) {

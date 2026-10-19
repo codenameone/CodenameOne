@@ -112,6 +112,32 @@ final class PlaygroundApi {
         return classNames;
     }
 
+    private static Map<String, String> uniqueBySimpleName;
+
+    /// The one public top-level class with this simple name, as a dotted name, or
+    /// null when there is none or more than one. Drives the auto-import of names
+    /// a snippet uses without importing them (``PlaygroundRunner.compile``).
+    static synchronized String uniqueClassForSimpleName(String simpleName) {
+        if (uniqueBySimpleName == null) {
+            StubLibrary lib = libraryOrNull();
+            Map<String, String> unique = new HashMap<String, String>();
+            if (lib != null) {
+                for (String n : lib.classNames()) {
+                    if (n.indexOf('$') >= 0 || !isListed(lib, n)) {
+                        continue;
+                    }
+                    String simple = n.substring(n.lastIndexOf('/') + 1);
+                    String dotted = n.replace('/', '.');
+                    // An empty value marks a name two packages share.
+                    unique.put(simple, unique.containsKey(simple) ? "" : dotted);
+                }
+            }
+            uniqueBySimpleName = unique;
+        }
+        String cls = uniqueBySimpleName.get(simpleName);
+        return cls == null || cls.isEmpty() ? null : cls;
+    }
+
     private static boolean isListed(StubLibrary lib, String internalName) {
         int dollar = internalName.lastIndexOf('$');
         if (dollar >= 0 && dollar + 1 < internalName.length() && Character.isDigit(internalName.charAt(dollar + 1))) {
