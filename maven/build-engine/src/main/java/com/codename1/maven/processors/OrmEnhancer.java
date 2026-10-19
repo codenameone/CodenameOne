@@ -41,7 +41,22 @@ final class OrmEnhancer {
     /// association bridges they do nothing but read or write the field: the
     /// generated model is their only caller and it needs the stored value.
     static final String GET="__cn1OrmGet_",SET="__cn1OrmSet_";
+    /// The accessor for a non-public lifecycle callback,
+    /// `public static void __cn1OrmCall_m(Owner o)`.
+    static final String CALL="__cn1OrmCall_";
     private OrmEnhancer() {}
+
+    /// The non-public lifecycle callbacks of every entity, by declaring class:
+    /// internal name -> method name -> true when the method is private.
+    static Map<String,Map<String,Boolean>> hiddenCallbacks(Map<String,OrmAnnotationProcessor.EntityClass> entities) {
+        Map<String,Map<String,Boolean>> result=new HashMap<String,Map<String,Boolean>>();
+        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) for(String[] method:entity.hiddenCallbacks) {
+            Map<String,Boolean> methods=result.get(method[0]);
+            if(methods==null) { methods=new HashMap<String,Boolean>();result.put(method[0],methods); }
+            methods.put(method[1],Boolean.valueOf("private".equals(method[2])));
+        }
+        return result;
+    }
 
     /// The non-public persistent fields of every entity, by declaring class:
     /// internal name -> field name -> descriptor.
@@ -69,32 +84,43 @@ final class OrmEnhancer {
         return result;
     }
 
-    /// Writes a copy of every class that declares a non-public persistent field,
-    /// with those fields made public, into a fresh temporary directory, for the
-    /// generated sources to compile against. Answers null when no entity has
-    /// such a field. The caller deletes the directory.
+    /// Writes a copy of every class that declares a non-public persistent field
+    /// or lifecycle callback, with those members made public, into a fresh
+    /// temporary directory, for the generated sources to compile against.
+    /// Answers null when no entity has such a member. The caller deletes the
+    /// directory.
     ///
     /// Only javac sees these copies. The bytecode it emits is the same GETFIELD
     /// and PUTFIELD it would emit for a public field, and [#enhance] then
     /// rewrites each one into a call to an accessor the real class gets.
     static File publicStubs(Map<String,OrmAnnotationProcessor.EntityClass> entities,ProcessorContext ctx) throws IOException {
         final Map<String,Map<String,String>> hidden=hiddenFields(entities);
-        if(hidden.isEmpty()) return null;
+        final Map<String,Map<String,Boolean>> callbacks=hiddenCallbacks(entities);
+        if(hidden.isEmpty() && callbacks.isEmpty()) return null;
+        Set<String> declaring=new TreeSet<String>(hidden.keySet());
+        declaring.addAll(callbacks.keySet());
         File stubs=Files.createTempDirectory("cn1-orm-stubs").toFile();
         boolean done=false;
         try {
-            for(final Map.Entry<String,Map<String,String>> owner:hidden.entrySet()) {
-                byte[] original=classBytes(owner.getKey(),ctx);
-                if(original==null) throw new IOException("Cannot find the class file of "+owner.getKey().replace('/','.'));
+            for(final String owner:declaring) {
+                byte[] original=classBytes(owner,ctx);
+                if(original==null) throw new IOException("Cannot find the class file of "+owner.replace('/','.'));
+                final Map<String,String> fields=hidden.containsKey(owner)?hidden.get(owner):Collections.<String,String>emptyMap();
+                final Map<String,Boolean> methods=callbacks.containsKey(owner)?callbacks.get(owner):Collections.<String,Boolean>emptyMap();
                 ClassWriter writer=new ClassWriter(0);
                 new ClassReader(original).accept(new ClassVisitor(Opcodes.ASM9,writer) {
                     @Override public FieldVisitor visitField(int access,String name,String descriptor,String signature,Object value) {
-                        if(owner.getValue().containsKey(name) && (access&Opcodes.ACC_STATIC)==0)
+                        if(fields.containsKey(name) && (access&Opcodes.ACC_STATIC)==0)
                             access=(access&~(Opcodes.ACC_PRIVATE|Opcodes.ACC_PROTECTED))|Opcodes.ACC_PUBLIC;
                         return super.visitField(access,name,descriptor,signature,value);
                     }
+                    @Override public MethodVisitor visitMethod(int access,String name,String descriptor,String signature,String[] exceptions) {
+                        if(methods.containsKey(name) && "()V".equals(descriptor) && (access&Opcodes.ACC_STATIC)==0)
+                            access=(access&~(Opcodes.ACC_PRIVATE|Opcodes.ACC_PROTECTED))|Opcodes.ACC_PUBLIC;
+                        return super.visitMethod(access,name,descriptor,signature,exceptions);
+                    }
                 },0);
-                File out=new File(stubs,owner.getKey()+".class");
+                File out=new File(stubs,owner+".class");
                 Files.createDirectories(out.getParentFile().toPath());
                 Files.write(out.toPath(),writer.toByteArray());
             }
@@ -161,6 +187,7 @@ final class OrmEnhancer {
             if(!found) owner.relations.add(relation);
         }
         final Map<String,Map<String,String>> hidden=hiddenFields(entities);
+        final Map<String,Map<String,Boolean>> callbacks=hiddenCallbacks(entities);
         final Set<String> generated=generatedClasses(entities);
         Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Map<String,byte[]> classes=new LinkedHashMap<String,byte[]>();
@@ -171,7 +198,7 @@ final class OrmEnhancer {
         // The classpath too when an entity there needs weaving: an entity shared
         // by the client and the server lives in a module both depend on, and the
         // woven copy is written over it into this module's output.
-        if(!owners.isEmpty() || !hidden.isEmpty()) for(String path:ctx.getCompileClasspath()) {
+        if(!owners.isEmpty() || !hidden.isEmpty() || !callbacks.isEmpty()) for(String path:ctx.getCompileClasspath()) {
             File file=new File(path);
             if(file.isDirectory()) collect(file,file,classes);
             else if(file.isFile() && file.getName().endsWith(".jar")) {
@@ -191,7 +218,7 @@ final class OrmEnhancer {
         for(Map.Entry<String,byte[]> entry:classes.entrySet()) {
             String actual=new ClassReader(entry.getValue()).getClassName()+".class";
             if(!actual.equals(entry.getKey()) || actual.contains("..") || actual.startsWith("/")) throw new IOException("Invalid class entry: "+entry.getKey());
-            byte[] result=transform(entry.getValue(),owners,hidden,generated,new Resolver(all,hidden));
+            byte[] result=transform(entry.getValue(),owners,hidden,callbacks,generated,new Resolver(all,hidden,callbacks));
             if(result!=null) {
                 Path output=outputPath(ctx.getOutputClassDir(),entry.getKey());
                 Files.createDirectories(output.getParent());Files.write(output,result);
@@ -276,22 +303,26 @@ final class OrmEnhancer {
     }
     static byte[] transform(byte[] original,final Map<String,OrmAnnotationProcessor.EntityClass> owners) {
         Map<String,Map<String,String>> none=Collections.emptyMap();
+        Map<String,Map<String,Boolean>> noCallbacks=Collections.emptyMap();
         Set<String> generated=new HashSet<String>();
         for(String owner:owners.keySet()) {
             generated.add(owner+"Cn1Model");generated.add(owner+"Cn1BackendModel");
             generated.add(owner+"Cn1Dao");generated.add(owner+"Cn1BackendDao");
         }
-        return transform(original,owners,none,generated,new Resolver(Collections.<String,byte[]>emptyMap(),none));
+        return transform(original,owners,none,noCallbacks,generated,
+                new Resolver(Collections.<String,byte[]>emptyMap(),none,noCallbacks));
     }
 
     static byte[] transform(byte[] original,final Map<String,OrmAnnotationProcessor.EntityClass> owners,
-                            final Map<String,Map<String,String>> hidden,Set<String> generatedClasses,final Resolver resolver) {
+                            final Map<String,Map<String,String>> hidden,final Map<String,Map<String,Boolean>> callbacks,
+                            Set<String> generatedClasses,final Resolver resolver) {
         ClassReader reader=new ClassReader(original);
         final String className=reader.getClassName();
         if(generatedClasses.contains(className)) return redirectHidden(reader,resolver);
         final boolean serializer=className.endsWith("Cn1Mapper");
         final OrmAnnotationProcessor.EntityClass entity=owners.get(className);
         final Map<String,String> accessors=hidden.get(className);
+        final Map<String,Boolean> calls=callbacks.get(className);
         final boolean[] changed={false},already={false};
         final ClassWriter writer=new ClassWriter(reader,ClassWriter.COMPUTE_MAXS);
         reader.accept(new ClassVisitor(Opcodes.ASM9,writer) {
@@ -305,7 +336,14 @@ final class OrmEnhancer {
                 // Raw accessors from an earlier build are always dropped and,
                 // for the fields still hidden, written again below: a field that
                 // has since become public, transient or gone must not keep one.
-                if(name.startsWith(GET) || name.startsWith(SET)) { changed[0]=true;return null; }
+                // Only the synthetic static ones this enhancer writes: a user
+                // method that merely shares the prefix stays.
+                if((access&Opcodes.ACC_SYNTHETIC)!=0 && (access&Opcodes.ACC_STATIC)!=0
+                        && (name.startsWith(GET) || name.startsWith(SET) || name.startsWith(CALL))) { changed[0]=true;return null; }
+                // A user method with the exact name and descriptor of one written
+                // below would leave two in the class, which the VM refuses.
+                if(collides(name,descriptor)) throw new IllegalStateException(className.replace('/','.')+" declares "+name+descriptor
+                        +", which the ORM enhancer generates for it; rename that method");
                 MethodVisitor method=super.visitMethod(access,name,descriptor,signature,exceptions);
                 if(name.startsWith("__cn1Orm")) return method;
                 return new MethodVisitor(Opcodes.ASM9,method) {
@@ -341,6 +379,17 @@ final class OrmEnhancer {
                     }
                 };
             }
+            private boolean collides(String name,String descriptor) {
+                String self="L"+className+";";
+                if(accessors!=null) {
+                    for(Map.Entry<String,String> field:accessors.entrySet()) {
+                        if(name.equals(GET+field.getKey()) && descriptor.equals("("+self+")"+field.getValue())) return true;
+                        if(name.equals(SET+field.getKey()) && descriptor.equals("("+self+field.getValue()+")V")) return true;
+                    }
+                }
+                return calls!=null && name.startsWith(CALL) && calls.containsKey(name.substring(CALL.length()))
+                        && descriptor.equals("("+self+")V");
+            }
             @Override public void visitEnd() {
                 if(entity!=null && !already[0]) {
                     writer.visitField(Opcodes.ACC_PRIVATE|Opcodes.ACC_TRANSIENT,"__cn1OrmState",STATE_DESC,null,null).visitEnd();
@@ -362,6 +411,11 @@ final class OrmEnhancer {
                         accessor(writer,className,field.getKey(),field.getValue(),true);
                     }
                 }
+                if(calls!=null) {
+                    changed[0]=true;
+                    for(Map.Entry<String,Boolean> method:new TreeMap<String,Boolean>(calls).entrySet())
+                        callback(writer,className,method.getKey(),method.getValue().booleanValue());
+                }
                 super.visitEnd();
             }
         },0);
@@ -382,10 +436,23 @@ final class OrmEnhancer {
         method.visitMaxs(0,0);method.visitEnd();
     }
 
+    /// `public static void __cn1OrmCall_m(Owner o)`, synthetic like the field
+    /// accessors. A private callback is called with INVOKESPECIAL, the way
+    /// javac calls a private method of its own class; any other one with
+    /// INVOKEVIRTUAL, so a subclass that overrides it still gets its own.
+    private static void callback(ClassWriter writer,String owner,String name,boolean isPrivate) {
+        MethodVisitor method=writer.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC|Opcodes.ACC_SYNTHETIC,
+                CALL+name,"(L"+owner+";)V",null,null);
+        method.visitCode();method.visitVarInsn(Opcodes.ALOAD,0);
+        method.visitMethodInsn(isPrivate?Opcodes.INVOKESPECIAL:Opcodes.INVOKEVIRTUAL,owner,name,"()V",false);
+        method.visitInsn(Opcodes.RETURN);method.visitMaxs(0,0);method.visitEnd();
+    }
+
     /// Rewrites a generated class's GETFIELD and PUTFIELD on a non-public
-    /// persistent field into a call to that field's accessor. The stack shape
-    /// is the same before and after -- the object, then the value for a write
-    /// -- so nothing around the instruction changes.
+    /// persistent field into a call to that field's accessor, and its call of a
+    /// non-public lifecycle callback into a call of that callback's accessor.
+    /// The stack shape is the same before and after -- the object, then the
+    /// value for a write -- so nothing around the instruction changes.
     private static byte[] redirectHidden(ClassReader reader,final Resolver resolver) {
         if(resolver.isEmpty()) return null;
         final boolean[] changed={false};
@@ -405,6 +472,16 @@ final class OrmEnhancer {
                         }
                         super.visitFieldInsn(opcode,owner,field,desc);
                     }
+                    @Override public void visitMethodInsn(int opcode,String owner,String name,String desc,boolean isInterface) {
+                        if(opcode==Opcodes.INVOKEVIRTUAL && !isInterface && "()V".equals(desc)) {
+                            String declaring=resolver.declaringCallback(owner,name);
+                            if(declaring!=null) {
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC,declaring,CALL+name,"(L"+declaring+";)V",false);
+                                changed[0]=true;return;
+                            }
+                        }
+                        super.visitMethodInsn(opcode,owner,name,desc,isInterface);
+                    }
                 };
             }
         },0);
@@ -418,8 +495,36 @@ final class OrmEnhancer {
     static final class Resolver {
         private final Map<String,byte[]> classes;
         private final Map<String,Map<String,String>> hidden;
-        Resolver(Map<String,byte[]> classes,Map<String,Map<String,String>> hidden) { this.classes=classes;this.hidden=hidden; }
-        boolean isEmpty() { return hidden.isEmpty(); }
+        private final Map<String,Map<String,Boolean>> callbacks;
+        Resolver(Map<String,byte[]> classes,Map<String,Map<String,String>> hidden,Map<String,Map<String,Boolean>> callbacks) {
+            this.classes=classes;this.hidden=hidden;this.callbacks=callbacks;
+        }
+        boolean isEmpty() { return hidden.isEmpty() && callbacks.isEmpty(); }
+
+        /// The class holding the accessor of a no-argument callback an
+        /// INVOKEVIRTUAL names, or null when the call reaches a public method.
+        /// Walks up like #declaring: the generated model calls `e.m()` on the
+        /// entity type even when a mapped superclass declares `m`.
+        String declaringCallback(String owner,final String method) {
+            String current=owner;
+            for(int depth=0;current!=null && depth<64;depth++) {
+                Map<String,Boolean> methods=callbacks.get(current);
+                if(methods!=null && methods.containsKey(method)) return current;
+                byte[] bytes=classes.get(current+".class");
+                if(bytes==null) return null;
+                ClassReader reader=new ClassReader(bytes);
+                final boolean[] declares={false};
+                reader.accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override public MethodVisitor visitMethod(int access,String name,String descriptor,String signature,String[] exceptions) {
+                        if(name.equals(method) && "()V".equals(descriptor)) declares[0]=true;
+                        return null;
+                    }
+                },ClassReader.SKIP_CODE|ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);
+                if(declares[0]) return null;
+                current=reader.getSuperName();
+            }
+            return null;
+        }
         String declaring(String owner,final String field) {
             String current=owner;
             for(int depth=0;current!=null && depth<64;depth++) {

@@ -183,6 +183,15 @@ public final class Postgres {
         // makes a failure unreadable in a log written by someone else.
         writeCString(body, "client_encoding");
         writeCString(body, "UTF8");
+        // Dates as ISO text in UTC, whatever postgresql.conf says. Results are
+        // text, and a timestamp's text follows DateStyle and a timestamptz's the
+        // session zone -- so without these the same row read differently on two
+        // servers, and an offset-less @Temporal value written into a timestamptz
+        // column was taken to be in the server's zone.
+        writeCString(body, "DateStyle");
+        writeCString(body, "ISO, YMD");
+        writeCString(body, "TimeZone");
+        writeCString(body, "UTC");
         body.write(0);
         byte[] payload = body.toByteArray();
         wire.writeIntBE(payload.length + 4);
