@@ -53,6 +53,15 @@ public interface CustomerOrderRepository extends CrudRepository<CustomerOrder, S
 
     List<CustomerOrder> findByPaymentStatusAndUpdatedAtLessThan(String paymentStatus, long before);
 
+    /// Orders in one of `states` whose payment is one of `statuses` and has
+    /// not changed since `before`, oldest first: ended orders whose hold was
+    /// never let go.
+    @Query("select o from CustomerOrder o where o.state in :states "
+            + "and o.paymentStatus in :statuses and o.updatedAt < :before "
+            + "order by o.updatedAt asc")
+    List<CustomerOrder> unreleased(@Param("states") OrderState[] states,
+            @Param("statuses") String[] statuses, @Param("before") long before, PageRequest page);
+
     @Query("select o from CustomerOrder o order by o.placedAt desc")
     List<CustomerOrder> newest(PageRequest page);
 

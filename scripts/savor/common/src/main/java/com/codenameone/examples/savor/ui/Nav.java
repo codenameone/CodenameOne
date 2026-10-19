@@ -117,6 +117,16 @@ public final class Nav {
         }
     }
 
+    /// The account was asked about again: back to the home screen only if
+    /// the mode it opens in is no longer the one on screen, so somebody whose
+    /// roles did not change is not pulled out of what they were doing.
+    public static void refreshed() {
+        UserDto user = Session.user();
+        if (user == null || !mode(user).equals(homeMode)) {
+            home();
+        }
+    }
+
     /// Builds the home screen of the mode the user is in, without showing it:
     /// for a caller that is about to show something on top of it. Null, and
     /// the welcome screen showing, when nobody is signed in.

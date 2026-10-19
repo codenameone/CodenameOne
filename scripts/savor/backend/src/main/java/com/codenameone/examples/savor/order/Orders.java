@@ -482,11 +482,34 @@ public class Orders {
             payments.release(id);
             tell(find(id));
         }
+        // Ending an order commits before its hold is let go, so a server
+        // stopped between the two leaves an order that is over with the money
+        // still held, and asking to end it again is refused: it has ended.
+        // Releasing is safe to repeat -- see Payments.release -- so this
+        // finishes what was left, for every way an order ends short of the door.
+        List<CustomerOrder> held = unreleased(System.currentTimeMillis() - UNRELEASED_MILLIS);
+        for (int iter = 0; iter < held.size(); iter++) {
+            payments.release(held.get(iter).getId());
+        }
     }
+
+    /// How long an ended order may hold its money before the sweep lets it go:
+    /// long enough that the request ending it has had its turn.
+    private static final long UNRELEASED_MILLIS = 2L * 60L * 1000L;
+
+    private static final OrderState[] ENDED_SHORT = {OrderState.REJECTED,
+        OrderState.CANCELLED_BY_CUSTOMER, OrderState.CANCELLED_BY_ADMIN, OrderState.NO_COURIERS};
 
     @Transactional(readOnly = true)
     private List<CustomerOrder> late(long before) {
         return orders.findByStateAndPlacedAtLessThan(OrderState.PLACED, before);
+    }
+
+    @Transactional(readOnly = true)
+    private List<CustomerOrder> unreleased(long before) {
+        return orders.unreleased(ENDED_SHORT,
+                new String[] {Payments.AUTHORIZED, Payments.PENDING}, before,
+                new PageRequest(0, 50));
     }
 
     // ----------------------------------------------------------------- admin

@@ -38,6 +38,7 @@ import com.codenameone.examples.savor.api.RestaurantSummaryDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.map.Locator;
+import com.codenameone.examples.savor.merchant.RestaurantApplicationForm;
 import com.codenameone.examples.savor.net.Api;
 import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.net.Session;
@@ -91,6 +92,10 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
         if (user != null && !user.courier()) {
             menu.item(FontImage.MATERIAL_TWO_WHEELER, "Deliver with Savor", "deliver",
                     () -> Nav.switchTo(Nav.COURIER));
+        }
+        if (user != null && !user.merchant()) {
+            menu.item(FontImage.MATERIAL_STOREFRONT, "List your restaurant", "list-restaurant",
+                    () -> RestaurantApplicationForm.show(form));
         }
         // The header and the tab bar each reach into the strip the device
         // keeps clear at their edge, padded by it, so the strip wears their

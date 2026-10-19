@@ -192,11 +192,14 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
             + "and r.state = 'COMPLETED' and r.stars = 0")
     int rate(@Param("id") String id, @Param("customer") String customer, @Param("stars") int stars);
 
-    /// Completed deliveries whose payment has been pending since before `before`
+    /// Completed deliveries whose payment has been pending -- or is still the
+    /// hold made at checkout, never captured because the server stopped
+    /// between completing the delivery and settling it -- since before `before`
     /// and no longer than since `after`, oldest first: the sweep takes one
     /// page at a time, and a backlog read newest first would keep the oldest
     /// behind the new arrivals until they aged out of the window unsettled.
-    @Query("select r from Delivery r where r.state = 'COMPLETED' and r.paymentStatus = 'PENDING' "
+    @Query("select r from Delivery r where r.state = 'COMPLETED' "
+            + "and (r.paymentStatus = 'PENDING' or r.paymentStatus = 'AUTHORIZED') "
             + "and r.updatedAt < :before and r.updatedAt > :after order by r.updatedAt asc")
     List<Delivery> unsettled(@Param("after") long after, @Param("before") long before,
             PageRequest page);

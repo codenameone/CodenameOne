@@ -1,6 +1,26 @@
 {
  "pr": 6045,
  "rebaseline": {
+  "linux-x64@amd-epyc-7763-64-core-processor": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.626,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.519,
+     "reason": "Master's translator runs at the same speed on this runner (0.49x on master run 39185028822); the baseline predates it.",
+     "runs": 1,
+     "time": 0.499,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
    "hello": {
     "all": {
@@ -18,6 +38,18 @@
      "tolerance": {
       "memory": 0.35
      }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.43,
+      "time": 0.838
+     },
+     "memory": 0.506,
+     "reason": "Master's translator uses the same memory on this runner (0.48x-0.51x on master's last three runs, one of them flagged); the baseline predates it.",
+     "runs": 1,
+     "time": 0.838
     }
    }
   }

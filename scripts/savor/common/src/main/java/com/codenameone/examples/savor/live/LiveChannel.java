@@ -26,6 +26,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.savor.net.Api;
 import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.net.Session;
+import com.codenameone.examples.savor.ui.Nav;
 
 import java.io.IOException;
 import java.util.Map;
@@ -149,7 +150,7 @@ public final class LiveChannel {
         socket = WebSocket.build(url)
                 .onConnect(ws -> CN.callSerially(() -> opened(mine)))
                 .onTextMessage((ws, text) -> CN.callSerially(() -> frame(text, mine)))
-                .onClose((ws, code, reason) -> CN.callSerially(() -> lost(mine)))
+                .onClose((ws, code, reason) -> CN.callSerially(() -> closed(mine, code)))
                 .onError((ws, err) -> CN.callSerially(() -> lost(mine)))
                 .connect(10000);
     }
@@ -171,6 +172,21 @@ public final class LiveChannel {
                 socket.send("{\"type\":\"ping\"}");
             }
         });
+    }
+
+    /// The server closes with this code when the account's roles or standing
+    /// changed: an admin withdrew a mode, or blocked the account.
+    private static final int CHANGED = 4403;
+
+    private static void closed(int mine, int code) {
+        if (code == CHANGED && mine == generation && wanted) {
+            // The account the app has cached is no longer the account the
+            // server knows: ask again, and go back home if the answer opens
+            // another mode, so a withdrawn mode is not left open and refused
+            // at every request. Reconnecting below happens as for any loss.
+            Session.refreshUser(Nav::refreshed, (status, message) -> { });
+        }
+        lost(mine);
     }
 
     private static void lost(int mine) {
