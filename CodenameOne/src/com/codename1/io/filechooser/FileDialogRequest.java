@@ -177,8 +177,8 @@ public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
 
     /// Embeds a Codename One component in the dialog, such as a format and
     /// quality panel for an export. Only shown where
-    /// `FileDialogFeatures#ACCESSORY_COMPONENT` is supported (macOS and the
-    /// desktop/simulator port); use `#addOption(FileDialogOption)` for
+    /// `FileDialogFeatures#ACCESSORY_COMPONENT` is supported (the native macOS
+    /// port and the Codename One fallback dialog); use `#addOption(FileDialogOption)` for
     /// controls that must appear on every desktop. The component is still
     /// reachable from the callback, so its state can be read after the dialog
     /// closes.
