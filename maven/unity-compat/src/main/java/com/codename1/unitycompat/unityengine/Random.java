@@ -86,8 +86,14 @@ public final class Random {
     /// Between the two, both possible. The order they are given in does not
     /// matter.
     public static float Range(float minInclusive, float maxInclusive) {
+        float v = get_value();
         float span = maxInclusive - minInclusive;
-        float part = span * get_value();
+        if (span - span != 0f) {
+            // Two finite ends further apart than a float reaches: weigh
+            // each end instead, which never forms the overflowing span.
+            return minInclusive * (1f - v) + maxInclusive * v;
+        }
+        float part = span * v;
         return minInclusive + part;
     }
 

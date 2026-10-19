@@ -42,6 +42,9 @@ import java.util.ArrayList;
 /// ran, in a state that writes defaults -- which is how Unity makes them.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class Animator extends Behaviour {
+    /// The most loops of one clip whose events a single frame replays.
+    private static final int MAX_REPLAYED_ROUNDS = 64;
+
     private RuntimeAnimatorController controller;
     private float speed = 1f;
     private float[] parameters = new float[0];
@@ -533,6 +536,13 @@ public final class Animator extends Behaviour {
         }
         if (first > last) {
             return;
+        }
+        // A clip far shorter than a frame (a stop time of 1e-20, or a huge
+        // speed) would otherwise loop billions of times on the frame
+        // thread. Only the last rounds are replayed; earlier ones are
+        // indistinguishable repeats of the same events.
+        if ((long) last - first >= MAX_REPLAYED_ROUNDS) {
+            first = last - (MAX_REPLAYED_ROUNDS - 1);
         }
         // Left by `round == last` and not by a test of `round <= last`,
         // which the largest int there is would never fail.

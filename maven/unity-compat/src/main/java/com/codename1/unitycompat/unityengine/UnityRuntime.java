@@ -293,6 +293,9 @@ public final class UnityRuntime {
     public static void $fixedTimestep(float seconds) {
         if (seconds > 0f) {
             Time.fixedDeltaTime = seconds;
+            // Awake, OnEnable and the first Start run before any fixed
+            // step, and read the project's interval too.
+            Time.fixedUnscaledDeltaTime = seconds;
         }
     }
 
@@ -2095,6 +2098,12 @@ public final class UnityRuntime {
             }
             Transform t = r.gameObject.transform;
             t.update();
+            // A sheared basis (a turned child of an unevenly scaled parent)
+            // is drawn as its nearest scale and turn: the first axis exact
+            // and the area kept, while TransformPoint uses the exact matrix.
+            // com.codename1.gaming.Sprite is a scaled, turned quad, so the
+            // shear itself needs a skew in that core API and its renderers,
+            // which is a change to the framework, not to this runtime.
             view.$sprite(sprite, t.wx, t.wy, t.wz, t.wsx, t.wsy, t.wrot, r.argb(), r.flipX, r.flipY, r.sortingOrder,
                     r.sortingLayerID);
         }

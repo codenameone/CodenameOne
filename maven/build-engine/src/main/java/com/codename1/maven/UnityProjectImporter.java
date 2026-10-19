@@ -104,6 +104,14 @@ public final class UnityProjectImporter {
             if (target.getCanonicalFile().equals(source.getCanonicalFile())) {
                 throw new BuildException(source + " is already this application's src/main/unity");
             }
+            // A link anywhere from the module down to the import root would
+            // send the copy, the record and the deletions somewhere else;
+            // the check in copy() sees only the names below the root.
+            for (File f = target; f != null && !f.equals(commonDir); f = f.getParentFile()) {
+                if (Files.isSymbolicLink(f.toPath())) {
+                    throw new BuildException(f + " is a symbolic link; replace it with a directory before importing");
+                }
+            }
             Set<String> previous = readImportRecord(target);
             Set<String> imported = new TreeSet<String>();
             for (String name : COPIED) {

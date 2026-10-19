@@ -217,6 +217,20 @@ public class UnityProjectImporterTest {
     }
 
     @Test
+    public void refusesAnImportRootThatIsALink() throws Exception {
+        File elsewhere = tmp.newFolder("elsewhere");
+        assertTrue(unity.getParentFile().mkdirs() || unity.getParentFile().isDirectory());
+        Files.createSymbolicLink(unity.toPath(), elsewhere.toPath());
+        try {
+            importIt();
+            fail();
+        } catch (BuildException e) {
+            assertTrue(e.getMessage(), e.getMessage().contains("is a symbolic link"));
+        }
+        assertEquals("nothing is written through the link", 0, elsewhere.list().length);
+    }
+
+    @Test
     public void refusesWhatIsNotAUnityProject() throws Exception {
         File notOne = tmp.newFolder("notes");
         try {
