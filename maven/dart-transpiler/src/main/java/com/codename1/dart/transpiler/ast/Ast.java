@@ -178,10 +178,13 @@ public final class Ast {
         public boolean isAbstract;
         public boolean isSealed;                  // Dart 3: sealed class C { }
         public boolean isMixin;                   // mixin M { }
+        public List<TypeRef> mixinOn = new ArrayList<TypeRef>();  // mixin M on S1, S2
         public TypeRef extensionOn;               // extension X on T { } — non-null marks an extension
         /** An `extension on T` with no name: no show combinator can import it, no hide drop it. */
         public boolean unnamedExtension;
         public List<TypeRef> mixins = new ArrayList<TypeRef>();  // class C with M1, M2
+        /** {@code class C = S with M;}: C gets a forwarding constructor for each of S's. */
+        public boolean forwardSuperCtors;
         public TypeRef superclass;                // null if none/Object
         public List<TypeRef> interfaces = new ArrayList<TypeRef>();
         public List<String> typeParams = new ArrayList<String>();
@@ -321,6 +324,7 @@ public final class Ast {
         public List<Param> params = new ArrayList<Param>();
         public List<FieldInit> fieldInits = new ArrayList<FieldInit>();  // initializer list entries
         public SuperInit superInit;               // nullable
+        public SuperInit redirect;                // `: this(...)` / `: this.named(...)`; nullable
         public Block body;                        // nullable (";" body)
     }
 
@@ -346,6 +350,7 @@ public final class Ast {
         public boolean isAbstract;                // no body
         public boolean isAsync;
         public boolean isSyncStar;                // sync* generator body
+        public boolean isAsyncStar;               // async* generator body
         public Block body;                        // nullable when isAbstract or expression-bodied
         public Expr exprBody;                     // for `=> expr`
     }
@@ -357,6 +362,7 @@ public final class Ast {
         public boolean isExternal;
         public boolean isAsync;
         public boolean isSyncStar;                // sync* generator body
+        public boolean isAsyncStar;               // async* generator body
         public boolean isGetter;                  // top-level `T get x => ...`
         public boolean isSetter;                  // top-level `set x(v) { ... }`
         public List<String> typeParams = new ArrayList<String>();  // generic function: fn<T>(...)
@@ -419,6 +425,7 @@ public final class Ast {
         public TypeRef varType;                   // may be VAR
         public String varName;
         public Pattern pattern;                   // Dart 3 pattern for-in (destructuring); null for simple var
+        public boolean isAwait;                   // await for (x in stream)
         public Expr iterable;
         public Stmt body;
     }

@@ -1,0 +1,122 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package dart.async;
+
+import dart.runtime.DartRuntime;
+import dart.runtime.Funcs;
+
+/**
+ * Runtime support for {@code async*} generator bodies.
+ *
+ * <p>The body is lowered to a method that takes the generator's {@link Sink}:
+ * {@code yield v} is {@code sink.yield$(v)} and {@code yield* s} is
+ * {@code sink.yieldAll(s)}. As in Dart, the body starts only when the stream is
+ * listened to, and it runs on the event loop, so an {@code await} inside it parks
+ * through {@link Await} like any other async body. When the listener cancels, the
+ * next {@code yield} ends the body the way Dart's does: {@code finally} blocks run
+ * and nothing more is delivered.</p>
+ *
+ * <p>Pause is not modelled: a paused subscription still receives events, which its
+ * subscription buffers.</p>
+ */
+public final class AsyncStar {
+
+    private AsyncStar() {
+    }
+
+    /** Thrown out of a yield after the listener cancelled; ends the body silently. */
+    static final class Cancelled extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Cancelled() {
+            super(null, null, false, false);
+        }
+    }
+
+    /** The yield target an async* body writes to. */
+    public static final class Sink<T> {
+        final StreamController<T> controller = new StreamController<T>();
+        volatile boolean cancelled;
+
+        public void yield$(T value) {
+            if (cancelled) {
+                throw new Cancelled();
+            }
+            controller.add(value);
+        }
+
+        public void yieldAll(Stream<? extends T> source) {
+            if (source == null) {
+                return;
+            }
+            @SuppressWarnings("unchecked")
+            StreamIterator<T> it = new StreamIterator<T>((Stream<T>) source);
+            try {
+                while (it.next()) {
+                    yield$(it.current());
+                }
+            } finally {
+                it.cancel();
+            }
+        }
+    }
+
+    public static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body) {
+        final Sink<T> sink = new Sink<T>();
+        sink.controller.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                // Started from a timer, never inside listen() itself, as Dart does.
+                new Timer(dart.core.Duration.zero, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        run(body, sink);
+                    }
+                });
+            }
+        });
+        sink.controller.onCancel(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                sink.cancelled = true;
+            }
+        });
+        return sink.controller.stream();
+    }
+
+    private static <T> void run(Funcs.VoidFunc1<Sink<T>> body, Sink<T> sink) {
+        try {
+            body.call(sink);
+        } catch (Cancelled c) {
+            // the listener went away; nothing is left to deliver to
+        } catch (Throwable t) {
+            if (!sink.cancelled && !sink.controller.isClosed()) {
+                sink.controller.addError(DartRuntime.caught(t));
+            }
+        }
+        if (!sink.controller.isClosed()) {
+            sink.controller.close();
+        }
+    }
+}

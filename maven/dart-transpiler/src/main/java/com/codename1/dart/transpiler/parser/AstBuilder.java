@@ -242,6 +242,11 @@ public final class AstBuilder {
             pos(cd, mx);
             cd.name = mx.typeIdentifier().getText();
             cd.isMixin = true;
+            if (mx.ON_() != null && mx.typeNotVoidList() != null) {
+                for (Dart2Parser.TypeNotVoidContext t : mx.typeNotVoidList().typeNotVoid()) {
+                    cd.mixinOn.add(buildTypeNotVoid(t));
+                }
+            }
             // `mixin Holder<H>`: dropped, the interface named an undeclared H and every
             // class applying the mixin failed to compile.
             if (mx.typeParameters() != null) {
@@ -421,8 +426,7 @@ public final class AstBuilder {
 
     private ClassDecl buildClass(Dart2Parser.ClassDeclarationContext ctx) {
         if (ctx.mixinApplicationClass() != null) {
-            unsupported(ctx, "E0104", "Mixin application classes are not supported yet (M4)");
-            return null;
+            return buildMixinApplicationClass(ctx, ctx.mixinApplicationClass());
         }
         ClassDecl cd = new ClassDecl();
         pos(cd, ctx);
@@ -461,6 +465,41 @@ public final class AstBuilder {
         for (int i = 0; i < members.size(); i++) {
             buildMember(members.get(i), metas.size() > i ? metas.get(i) : null, cd);
         }
+        return cd;
+    }
+
+    /**
+     * {@code class C<T> = S with M1, M2 implements I;} is the class {@code C<T> extends S with
+     * M1, M2 implements I {}} whose constructors forward to S's. The forwarding constructors
+     * need S's declaration, so Program synthesizes them once every library is registered.
+     */
+    private ClassDecl buildMixinApplicationClass(Dart2Parser.ClassDeclarationContext outer,
+            Dart2Parser.MixinApplicationClassContext ctx) {
+        ClassDecl cd = new ClassDecl();
+        pos(cd, ctx);
+        cd.name = ctx.identifier().getText();
+        Dart2Parser.ClassModifiersContext mods = outer.classModifiers();
+        cd.isAbstract = mods != null && !mods.ABSTRACT_().isEmpty();
+        cd.isSealed = mods != null && !mods.SEALED_().isEmpty();
+        if (cd.isSealed) {
+            cd.isAbstract = true;
+        }
+        if (ctx.typeParameters() != null) {
+            for (Dart2Parser.TypeParameterContext tp : ctx.typeParameters().typeParameter()) {
+                cd.typeParams.add(tp.identifier().getText());
+            }
+        }
+        Dart2Parser.MixinApplicationContext app = ctx.mixinApplication();
+        cd.superclass = buildTypeNotVoid(app.typeNotVoid());
+        for (Dart2Parser.TypeNotVoidContext t : app.mixins().typeNotVoidList().typeNotVoid()) {
+            cd.mixins.add(buildTypeNotVoid(t));
+        }
+        if (app.interfaces() != null) {
+            for (Dart2Parser.TypeNotVoidContext t : app.interfaces().typeNotVoidList().typeNotVoid()) {
+                cd.interfaces.add(buildTypeNotVoid(t));
+            }
+        }
+        cd.forwardSuperCtors = true;
         return cd;
     }
 
@@ -522,7 +561,12 @@ public final class AstBuilder {
                 buildInitializers(d.initializers(), ctor);
             }
             if (d.redirection() != null) {
-                unsupported(d, "E0106", "Redirecting constructors are not supported yet (M2)");
+                Dart2Parser.RedirectionContext r = d.redirection();
+                SuperInit target = new SuperInit();
+                pos(target, r);
+                target.namedCtor = r.identifier() != null ? r.identifier().getText() : null;
+                buildArgs(r.arguments(), target.args);
+                ctor.redirect = target;
             }
             cd.ctors.add(ctor);
             return;
@@ -784,6 +828,8 @@ public final class AstBuilder {
     private void buildFunctionBodyInto(Dart2Parser.FunctionBodyContext body, FunctionDecl fn) {
         if (body.SYNC_() != null && body.ST() != null) {
             fn.isSyncStar = true;
+        } else if (body.ASYNC_() != null && body.ST() != null && body.NATIVE_() == null) {
+            fn.isAsyncStar = true;
         } else {
             fn.isAsync = checkBodyModifiers(body);
         }
@@ -798,6 +844,9 @@ public final class AstBuilder {
         if (body.SYNC_() != null && body.ST() != null) {
             // sync* generator: lowered by the emitter to a list-collecting body.
             m.isSyncStar = true;
+        } else if (body.ASYNC_() != null && body.ST() != null && body.NATIVE_() == null) {
+            // async* generator: lowered by the emitter onto dart.async.AsyncStar.
+            m.isAsyncStar = true;
         } else {
             m.isAsync = checkBodyModifiers(body);
         }
@@ -891,10 +940,35 @@ public final class AstBuilder {
             return p;
         }
         if (ctx.functionFormalParameter() != null) {
-            unsupported(ctx, "E0114", "Function-typed parameter syntax is not supported yet; use a typedef-style type");
-            return null;
+            // `int cb(String s)` is the older spelling of `int Function(String) cb`.
+            Dart2Parser.FunctionFormalParameterContext f = ctx.functionFormalParameter();
+            p.name = f.identifier().getText();
+            p.type = functionTypeOf(f.type(), f.formalParameterPart(), f.QU() != null, f);
+            return p;
         }
         return null;
+    }
+
+    /**
+     * The inline function type a function-typed formal ({@code R name(params)}) declares.
+     * Optional parameters are dropped from the signature, as an inline function type with
+     * only positional parameters is what codegen renders as a Funcs SAM.
+     */
+    private TypeRef functionTypeOf(Dart2Parser.TypeContext ret, Dart2Parser.FormalParameterPartContext part,
+            boolean nullable, ParserRuleContext at) {
+        TypeRef t = new TypeRef("Function");
+        pos(t, at);
+        t.nullable = nullable;
+        t.funcReturn = ret != null ? buildType(ret) : TypeRef.DYNAMIC;
+        t.funcParams = new java.util.ArrayList<TypeRef>();
+        List<Param> params = new ArrayList<Param>();
+        buildParams(part.formalParameterList(), params);
+        for (Param p : params) {
+            if (!p.named && p.defaultValue == null) {
+                t.funcParams.add(p.type == null || p.type == TypeRef.VAR ? TypeRef.DYNAMIC : p.type);
+            }
+        }
+        return t;
     }
 
     private TypeRef buildFinalConstVarOrType(Dart2Parser.FinalConstVarOrTypeContext ctx) {
@@ -1490,14 +1564,15 @@ public final class AstBuilder {
     }
 
     private Stmt buildFor(Dart2Parser.ForStatementContext ctx) {
-        if (ctx.AWAIT_() != null) {
-            unsupported(ctx, "E0302", "await for is not supported yet (M3)");
+        Dart2Parser.ForLoopPartsContext parts = ctx.forLoopParts();
+        if (ctx.AWAIT_() != null && parts.IN_() == null) {
+            unsupported(ctx, "E0302", "await is only valid on a for-in loop");
             return null;
         }
-        Dart2Parser.ForLoopPartsContext parts = ctx.forLoopParts();
         if (parts.IN_() != null) {
             ForInStmt fi = new ForInStmt();
             pos(fi, ctx);
+            fi.isAwait = ctx.AWAIT_() != null;
             if (parts.pattern() != null) {
                 // Dart 3 pattern for-in: `for (final (a, b) in xs)` / `for (var [x] in xs)`
                 fi.pattern = buildPattern(parts.pattern());
@@ -1686,7 +1761,12 @@ public final class AstBuilder {
         if (ctx.conditionalExpression() != null) {
             return buildConditional(ctx.conditionalExpression());
         }
-        unsupported(ctx, "E0118", "throw expressions are not supported yet (M2)");
+        if (ctx.throwExpressionWithoutCascade() != null) {
+            ThrowExpr t = new ThrowExpr();
+            pos(t, ctx);
+            t.value = buildExprWithoutCascade(ctx.throwExpressionWithoutCascade().expressionWithoutCascade());
+            return t;
+        }
         return errExpr(ctx);
     }
 

@@ -1026,6 +1026,14 @@ public final class DartRuntime {
      * Dart's `throw expr` accepts any object; wrap non-throwables so the
      * JVM can propagate them while toString stays Dart-like.
      */
+    /**
+     * `throw` used as an expression (`x ?? (throw ...)`, `=> throw ...`): never returns, but
+     * its generic result lets it stand in any expression position, as Dart's Never does.
+     */
+    public static <T> T throwValue(Object thrown) {
+        throw asError(thrown);
+    }
+
     public static RuntimeException asError(Object thrown) {
         if (thrown instanceof RuntimeException re) {
             return re;

@@ -359,6 +359,7 @@ public final class JavaEmitter {
             mm.isAbstract = m.isAbstract;
             mm.isAsync = m.isAsync;
             mm.isSyncStar = m.isSyncStar;
+            mm.isAsyncStar = m.isAsyncStar;
             mm.returnType = m.returnType;
             mm.params = m.params;
             mm.typeParams = m.typeParams;
@@ -695,6 +696,7 @@ public final class JavaEmitter {
             m.isStatic = true;
             m.isAsync = f.isAsync;
             m.isSyncStar = f.isSyncStar;
+            m.isAsyncStar = f.isAsyncStar;
             m.name = f.name.equals("main") ? "main$" : f.name;
             m.returnType = f.returnType;
             m.params = f.params;
@@ -926,6 +928,7 @@ public final class JavaEmitter {
             mm.isAbstract = m.isAbstract;
             mm.isAsync = m.isAsync;
             mm.isSyncStar = m.isSyncStar;
+            mm.isAsyncStar = m.isAsyncStar;
             mm.returnType = m.returnType;
             // Dart lets a value-returning method override a void one; Java forbids it, so pin the
             // override's return to void to keep it a valid override.
@@ -1368,6 +1371,15 @@ public final class JavaEmitter {
      */
     private void emitInitBody(ClassDecl c, CtorDecl ct, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
+        if (ct.redirect != null) {
+            // `C.a(x) : this.b(x, 0);` runs b's initialization in place of its own: b stores the
+            // fields and calls the superclass, so this one does nothing else.
+            String target = ct.redirect.namedCtor;
+            CtorDecl targetCtor = target != null ? c.namedCtor(target) : c.defaultCtor();
+            w.line("this.$init$" + (target != null ? target : "") + "("
+                    + canonicalArgs(targetCtor, ct.redirect.args, ctx) + ");");
+            return;
+        }
         ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
         for (Param p : ct.params) {
             if (p.isThis) {
@@ -1495,6 +1507,7 @@ public final class JavaEmitter {
         boolean isAbstract;
         boolean isAsync;
         boolean isSyncStar;
+        boolean isAsyncStar;
         TypeRef returnType;
         List<String> typeParams = new ArrayList<String>();
         List<Param> params = new ArrayList<Param>();
@@ -1898,6 +1911,59 @@ public final class JavaEmitter {
                 ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
         ctx.valueCalledLocals.clear();
         ctx.valueCalledLocals.addAll(CaptureScan.valueCalledNames(m.body, m.exprBody));
+        if (m.isAsyncStar && !m.isSetter) {
+            // async* generator. As for sync*, the body moves into a helper, here taking the
+            // generator's AsyncStar.Sink: `yield x` -> sink.yield$(x), `yield* s` ->
+            // sink.yieldAll(s). AsyncStar.asyncStar starts it when the stream is listened to,
+            // on the event loop, where its awaits park like any async body's.
+            ctx.importClass("dart.async.AsyncStar");
+            TypeRef elem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            String sink = ctx.newTemp();
+            String helper = m.name + "$asyncStar";
+            ctx.writer().line("return AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + sink
+                    + ") -> " + helper + "(" + sink + paramNames + "));");
+            sb.append(ctx.popWriter());
+            sb.append("    }\n\n");
+            StringBuilder hb = new StringBuilder("    private ");
+            if (m.isStatic) {
+                hb.append("static ");
+            }
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                hb.append('<');
+                for (int i = 0; i < m.typeParams.size(); i++) {
+                    if (i > 0) {
+                        hb.append(", ");
+                    }
+                    hb.append(m.typeParams.get(i));
+                }
+                hb.append("> ");
+            }
+            hb.append("void ").append(helper).append("(AsyncStar.Sink<").append(ej).append("> ").append(sink)
+                    .append(paramDecls).append(") {\n");
+            ctx.pushWriter(2);
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.inAsyncBody = true;
+            String savedList = ctx.syncStarList;
+            String savedSink = ctx.asyncStarSink;
+            TypeRef savedElem = ctx.syncStarElem;
+            ctx.syncStarList = null;
+            ctx.asyncStarSink = sink;
+            ctx.syncStarElem = elem;
+            if (m.body != null) {
+                emitStatements(m.body, ctx);
+            }
+            ctx.syncStarList = savedList;
+            ctx.asyncStarSink = savedSink;
+            ctx.syncStarElem = savedElem;
+            hb.append(ctx.popWriter());
+            hb.append("    }\n\n");
+            sb.append(hb);
+            ctx.popScope();
+            ctx.methodReturnType = null;
+            ctx.inAsyncBody = false;
+            return sb.toString();
+        }
         if (m.isSyncStar && !rt.is("List") && !m.isSetter) {
             // sync* generator. The body moves into a private helper that yields into the list
             // it is given (`yield x` -> out.add(x), `yield* xs` -> out.addAllIterable(xs), and a
@@ -2342,8 +2408,16 @@ public final class JavaEmitter {
             }
         } else if (s instanceof YieldStmt) {
             YieldStmt y = (YieldStmt) s;
-            if (ctx.syncStarList == null) {
-                diags.error(y, "E0304", "yield outside a sync* generator body");
+            if (ctx.asyncStarSink != null) {
+                if (y.star) {
+                    Out o = emitExpr(y.value, null, ctx);
+                    w.line(ctx.asyncStarSink + ".yieldAll(" + o.code + ");");
+                } else {
+                    Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
+                    w.line(ctx.asyncStarSink + ".yield$(" + coerce(o, ctx.syncStarElem, ctx) + ");");
+                }
+            } else if (ctx.syncStarList == null) {
+                diags.error(y, "E0304", "yield outside a generator body");
             } else if (y.star) {
                 Out o = emitExpr(y.value, null, ctx);
                 w.line(ctx.syncStarList + ".addAllIterable(" + o.code + ");");
@@ -2496,6 +2570,47 @@ public final class JavaEmitter {
                 }
             });
             ctx.popScope();
+        } else if (s instanceof ForInStmt && ((ForInStmt) s).isAwait) {
+            // `await for (x in stream) body`: a StreamIterator whose next() parks like an
+            // await until the next event, and is cancelled however the loop is left.
+            ForInStmt f = (ForInStmt) s;
+            ctx.importClass("dart.async.StreamIterator");
+            Out iter = emitExpr(f.iterable, null, ctx);
+            TypeRef elem = f.varType != null && !f.varType.is("var")
+                    ? f.varType
+                    : (iter.type != null && iter.type.is("Stream") && !iter.type.args.isEmpty()
+                        ? iter.type.arg(0) : TypeRef.DYNAMIC);
+            String ej = javaType(elem, true, ctx);
+            String it = ctx.newTemp();
+            w.line("StreamIterator<" + ej + "> " + it + " = new StreamIterator<" + ej + ">(" + iter.code + ");");
+            w.line("try {");
+            ctx.indent(1);
+            ctx.pushScope();
+            ctx.pushBreakTarget(null);
+            w.line(loopLabel(s) + "while (" + it + ".next()) {");
+            ctx.indent(1);
+            if (f.pattern != null) {
+                String loopVar = ctx.newTemp();
+                w.line(ej + " " + loopVar + " = " + it + ".current();");
+                ctx.declare(loopVar, elem);
+                List<String> binds = new ArrayList<String>();
+                patternMatch(f.pattern, loopVar, elem, ctx, binds);
+                for (String bind : binds) {
+                    w.line(bind);
+                }
+            } else {
+                String loopVar = ctx.declareShadowSafe(f.varName, elem);
+                w.line(ej + " " + loopVar + " = " + it + ".current();");
+            }
+            emitStatement(unwrapBlock(f.body), ctx);
+            ctx.indent(-1);
+            w.line("}");
+            ctx.popBreakTarget();
+            ctx.popScope();
+            ctx.indent(-1);
+            w.line("} finally {");
+            w.line("    " + it + ".cancel();");
+            w.line("}");
         } else if (s instanceof ForInStmt
                 && isIndexedRecordFor(((ForInStmt) s).pattern, ((ForInStmt) s).iterable)) {
             // `for (final (int i, E e) in xs.indexed)` — Dart's Iterable.indexed pairs each
@@ -3800,8 +3915,16 @@ public final class JavaEmitter {
             return new Out(tmp, target.type);
         }
         if (e instanceof ThrowExpr) {
-            diags.error(e, "E0205", "throw is only supported in statement position in M2");
-            return new Out("null", TypeRef.DYNAMIC);
+            // Expression position: a generic helper that never returns, typed as whatever the
+            // context expects (Dart's Never), so it fits a ternary arm, `??` or an arrow body.
+            ctx.importClass("dart.runtime.DartRuntime");
+            Out v = emitExpr(((ThrowExpr) e).value, null, ctx);
+            if (expected != null && !expected.is("void") && !expected.is("dynamic")
+                    && !expected.is("var")) {
+                return new Out("DartRuntime.<" + javaType(expected, true, ctx) + ">throwValue("
+                        + v.code + ")", expected);
+            }
+            return new Out("DartRuntime.throwValue(" + v.code + ")", TypeRef.DYNAMIC);
         }
         if (e instanceof AwaitExpr) {
             Out o = emitExpr(((AwaitExpr) e).operand, null, ctx);
@@ -4961,6 +5084,12 @@ public final class JavaEmitter {
                 }
             }
         }
+        if (cc != null) {
+            Out onSelf = mixinOnSelf(cc, n, true, ctx);
+            if (onSelf != null) {
+                return emitMemberGet(onSelf, n, id, ctx);
+            }
+        }
         Out top = resolveTopLevel(n, ctx);
         if (top != null) {
             return top;
@@ -5151,6 +5280,47 @@ public final class JavaEmitter {
     }
 
     /** Property access driven by the target's static type. */
+    /**
+     * Inside {@code mixin M on S}, a bare member that M does not declare is S's: the mixin is
+     * a Java interface, so it is reached through {@code ((S) this)}. Null when {@code cc} is
+     * not such a mixin or no {@code on} type has the member.
+     */
+    private Out mixinOnSelf(ClassDecl cc, String n, boolean getter, Ctx ctx) {
+        if (!cc.isMixin || cc.mixinOn.isEmpty()) {
+            return null;
+        }
+        for (TypeRef on : cc.mixinOn) {
+            if (hasMember(on.name, n, getter, ctx)) {
+                return new Out("((" + javaType(on, false, ctx) + ") this)", on);
+            }
+        }
+        return null;
+    }
+
+    /** Whether the named program or stub class, or one of its superclasses, has member n. */
+    private boolean hasMember(String cls, String n, boolean getter, Ctx ctx) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String cur = cls;
+        while (cur != null && seen.add(cur)) {
+            ClassDecl pc = program.resolveClass(cur, ctx.library());
+            if (pc == null) {
+                return stubs.isStubClass(cur) && (stubs.findMethod(cur, n, getter) != null
+                        || (getter && stubs.findMethod(cur, n, false) != null));
+            }
+            if (pc.method(n) != null || pc.field(n) != null || (getter && pc.getter(n) != null)) {
+                return true;
+            }
+            for (TypeRef m : pc.mixins) {
+                ClassDecl mx = program.resolveClass(m.name, ctx.library());
+                if (mx != null && (mx.method(n) != null || mx.field(n) != null || mx.getter(n) != null)) {
+                    return true;
+                }
+            }
+            cur = pc.superclass != null ? pc.superclass.name : null;
+        }
+        return false;
+    }
+
     private Out emitMemberGet(Out target, String name, Node posNode, Ctx ctx) {
         TypeRef tt = target.type;
         // A field/param typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
@@ -5426,6 +5596,14 @@ public final class JavaEmitter {
             TypeRef rt = eg == null || eg.returnType == null || eg.returnType.is("var")
                     ? TypeRef.DYNAMIC : eg.returnType;
             return new Out(extSimple + "." + name + "(" + target.code + ")", rt);
+        }
+        // `e.message` on dart:core's errors that declare one. Each maps to a Java exception
+        // built from its message, so getMessage() is that field.
+        if (name.equals("message") && CORE_ERRORS.containsKey(tt.name) && !tt.is("Exception")
+                && !tt.is("TypeError") && !tt.is("ConcurrentModificationError")) {
+            TypeRef str = new TypeRef("String");
+            str.nullable = true;
+            return new Out(target.code + ".getMessage()", str);
         }
         if (tt.is("Stopwatch")) {
             TypeRef rt = name.equals("isRunning") ? TypeRef.BOOL
@@ -7677,6 +7855,12 @@ public final class JavaEmitter {
                         new TypeRef(cc.name)), n, c, ctx);
                 return new Out(fieldRead.code + ".call(" + plainArgs(c.args, ctx) + ")",
                         funcResultType(ff.type));
+            }
+        }
+        if (cc != null) {
+            Out onSelf = mixinOnSelf(cc, n, false, ctx);
+            if (onSelf != null) {
+                return emitMethodCallOn(onSelf, c, ctx);
             }
         }
         // top-level function (user code)
@@ -11406,6 +11590,7 @@ public final class JavaEmitter {
         /** Inside a hashCode/compareTo body: narrow each `return` value to Java int. */
         boolean narrowReturnToInt;
         String syncStarList;                  // non-null inside a sync* body: the result-list temp
+        String asyncStarSink;                 // non-null inside an async* body: the AsyncStar.Sink temp
         /**
          * The expression being emitted as a statement, whose value nobody reads (see
          * {@link #emitStatementExpr}); an assignment through a void setter only needs a
