@@ -613,11 +613,23 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     /// A new stage completed by `step` once this one is complete, on
     /// `executor` when there is one and on the completing thread otherwise.
     private <U> CompletableFuture<U> then(final Executor executor, final Step<U> step) {
+        return then(executor, step, false);
+    }
+
+    /// As above; with `relayFailure` a failed outcome completes the stage
+    /// at once, without asking the executor to run a step that would only
+    /// pass it on (a shut-down executor would replace it with its own
+    /// rejection), as the JDK does for thenApply, thenCompose and the rest.
+    private <U> CompletableFuture<U> then(final Executor executor, final Step<U> step, final boolean relayFailure) {
         final CompletableFuture<U> stage = newIncompleteFuture();
         whenDone(new Runnable() {
             @Override
             public void run() {
                 final Object outcome = result.get();
+                if (relayFailure && outcome instanceof Failure) {
+                    stage.relay(outcome);
+                    return;
+                }
                 Runnable body = new Runnable() {
                     @Override
                     public void run() {
@@ -662,7 +674,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                     stage.complete(fn.apply(CompletableFuture.<T>value(outcome)));
                 }
             }
-        });
+        }, true);
     }
 
     @Override
@@ -757,7 +769,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                     }
                 });
             }
-        });
+        }, true);
     }
 
     @Override

@@ -314,6 +314,18 @@ public final class LangMembersChecks {
                 Bulk.p("npe", "yes");
             }
         });
+        Bulk.check("Lang.aFailureSkipsARejectingExecutor", () -> {
+            java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newSingleThreadExecutor();
+            ex.shutdown();
+            java.util.concurrent.CompletableFuture<Integer> failed = new java.util.concurrent.CompletableFuture<Integer>();
+            failed.completeExceptionally(new IllegalStateException("upstream"));
+            java.util.concurrent.CompletableFuture<Integer> next = failed.thenApplyAsync(v -> v + 1, ex);
+            try {
+                next.join();
+            } catch (java.util.concurrent.CompletionException e) {
+                Bulk.p("cause", e.getCause().getClass().getName() + ":" + e.getCause().getMessage());
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

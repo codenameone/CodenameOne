@@ -131,6 +131,9 @@ public final class Collectors {
 
     private static final Set<Collector.Characteristics> UNORDERED_ID_FINISH;
 
+    private static final Set<Collector.Characteristics> UNORDERED_ONLY = Collections.unmodifiableSet(
+            new HashSet<Collector.Characteristics>(Collections.singleton(Collector.Characteristics.UNORDERED)));
+
     static {
         Set<Collector.Characteristics> s = new HashSet<Collector.Characteristics>();
         s.add(Collector.Characteristics.UNORDERED);
@@ -226,7 +229,7 @@ public final class Collectors {
                     public Set<T> apply(Set<T> c) {
                         return Set.copyOf(c);
                     }
-                });
+                }, UNORDERED_ONLY);
     }
 
     // ---- into a string ----

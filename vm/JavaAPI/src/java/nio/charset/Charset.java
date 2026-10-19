@@ -86,10 +86,10 @@ public class Charset implements Comparable<Charset> {
         return Collections.unmodifiableSet(out);
     }
 
-    /// Whether the charset is registered with IANA; the three this runtime
-    /// has are.
+    /// Whether the charset is registered with IANA: the three this runtime
+    /// has are, and a name with the reserved `X-` prefix never is.
     public final boolean isRegistered() {
-        return true;
+        return !name.regionMatches(true, 0, "X-", 0, 2);
     }
 
     /// Whether the charset can encode; the three this runtime has can.

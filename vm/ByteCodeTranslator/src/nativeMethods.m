@@ -1592,6 +1592,8 @@ JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_
     // Java collapses every NaN to the canonical one, and Double.equals and
     // hashCode depend on it. The hardware does not: x86 produces 0xfff8...
     // for Infinity + -Infinity where ARM produces 0x7ff8...
+    // doubleToRawLongBits shares this native on purpose (see Float's
+    // floatToRawIntBits): a NaN payload is the one thing it cannot report.
     if (n1 != n1) {
         return 0x7ff8000000000000LL;
     }
