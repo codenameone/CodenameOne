@@ -198,6 +198,15 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
         return to == null ? Locator.here() : new LatLng(to.lat(), to.lng());
     }
 
+    /// Whether [#destination] is a real place to send food: a chosen address,
+    /// or a fix the phone really has. Without either it is the demo city
+    /// [Locator] falls back on, which is fine for browsing and wrong for an
+    /// order. The simulator's made-up position counts as found.
+    public static boolean located() {
+        return Prefs.deliverTo() != null || Locator.simulated()
+                || Locator.state() == Locator.FOUND;
+    }
+
     /// The chosen address in words, or null with none chosen.
     public static String destinationName() {
         PlaceDto to = Prefs.deliverTo();

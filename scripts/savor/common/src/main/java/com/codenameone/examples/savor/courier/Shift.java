@@ -57,6 +57,7 @@ public final class Shift {
 
     private static boolean on;
     private static boolean taken;
+    private static boolean checking;
     private static boolean background;
     private static long sentAt;
     private static LatLng sentFrom;
@@ -98,6 +99,7 @@ public final class Shift {
         }
         on = false;
         taken = false;
+        checking = false;
         Locator.unwatch(WATCHER);
         Locator.track(false);
         RUNNING.set(false);
@@ -126,12 +128,25 @@ public final class Shift {
     /// server refuses to put such a courier off line, so leaving the courier's
     /// side then would stop the reports the customer is following while the
     /// delivery stays open: Nav refuses to switch mode or sign out instead.
+    ///
+    /// Until the courier's side has asked the server, it is not known: a
+    /// restarted app may be mid-delivery. That counts as taken, see
+    /// [#checking].
     public static boolean taken() {
-        return taken;
+        return taken || checking;
     }
 
     public static void setTaken(boolean busy) {
         taken = busy;
+        checking = false;
+    }
+
+    /// The courier's side is asking the server whether a delivery is under
+    /// way; leaving waits for the answer. A failed lookup ends the wait: a
+    /// phone that cannot reach the server cannot learn more, and keeping the
+    /// courier from signing out for good would be worse.
+    public static void checking(boolean asking) {
+        checking = asking;
     }
 
     public static boolean isOn() {

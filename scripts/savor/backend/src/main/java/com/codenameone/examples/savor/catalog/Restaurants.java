@@ -408,7 +408,10 @@ public class Restaurants {
         section.setId(sectionId());
         section.setRestaurantId(restaurant.getId());
         section.setName(Text.required(form == null ? null : form.name(), 60, "the section's name"));
-        section.setPosition((int) sections.countByRestaurantId(restaurant.getId()));
+        // After the last one, not at the count: removing a section leaves a gap,
+        // and the count would then tie with a later section's position.
+        List<MenuSection> before = sections.findByRestaurantIdOrderByPositionAsc(restaurant.getId());
+        section.setPosition(before.isEmpty() ? 0 : before.get(before.size() - 1).getPosition() + 1);
         sections.insert(section);
         return new MenuSectionDto(section.getId(), section.getName(), new ArrayList<DishDto>());
     }
@@ -466,7 +469,9 @@ public class Restaurants {
         dish.setId(Ids.next());
         dish.setRestaurantId(restaurant.getId());
         dish.setAvailable(true);
-        dish.setPosition((int) dishes.countByRestaurantId(restaurant.getId()));
+        // After the last one; see addSection.
+        List<Dish> before = dishes.findByRestaurantIdOrderByPositionAsc(restaurant.getId());
+        dish.setPosition(before.isEmpty() ? 0 : before.get(before.size() - 1).getPosition() + 1);
         fill(restaurant, dish, form);
         dishes.insert(dish);
         return writeOptions(dish, form);

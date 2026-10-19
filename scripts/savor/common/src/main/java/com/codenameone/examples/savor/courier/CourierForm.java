@@ -138,6 +138,8 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     public void start() {
         display();
         // Picks up where the courier left off: still online, perhaps mid-delivery.
+        // Nothing leaves the courier's side until that is known.
+        Shift.checking(true);
         Api.courier().me(Net.to(me -> {
             // Too late: the user has left for another mode or signed out, and
             // Shift was ended then. Starting it again here would report a
@@ -150,7 +152,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             showing = "";
             display();
             refresh();
-        }, QUIET));
+        }, (status, message) -> Shift.checking(false)));
         loadEarnings();
     }
 
@@ -234,7 +236,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     }
 
     private void refresh() {
-        Api.courier().active(Net.to(this::update, QUIET));
+        Api.courier().active(Net.to(this::update, (status, message) -> Shift.checking(false)));
     }
 
     /// Keeps the phone reporting in the background exactly while the server

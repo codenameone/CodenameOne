@@ -78,7 +78,13 @@ public final class Notifications {
                 if (Session.user() != null && !owner.equals(Session.owner())) {
                     signedIn();
                 }
-            }, QUIET));
+            }, (status, message) -> {
+                // A failure may be a lost answer to a registration that did
+                // commit, so it is reconciled the same way.
+                if (Session.user() != null && !owner.equals(Session.owner())) {
+                    signedIn();
+                }
+            }));
         }
     }
 

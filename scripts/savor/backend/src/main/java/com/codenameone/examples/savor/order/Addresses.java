@@ -26,6 +26,7 @@ import com.codenameone.examples.savor.Text;
 import com.codenameone.examples.savor.api.SavedAddressDto;
 import com.codenameone.examples.savor.domain.SavedAddress;
 import com.codenameone.examples.savor.geo.Geo;
+import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.SavedAddressRepository;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,9 +38,11 @@ public class Addresses {
     static final int MAX = 20;
 
     private final SavedAddressRepository addresses;
+    private final ProfileRepository profiles;
 
-    public Addresses(SavedAddressRepository addresses) {
+    public Addresses(SavedAddressRepository addresses, ProfileRepository profiles) {
         this.addresses = addresses;
+        this.profiles = profiles;
     }
 
     @Transactional(readOnly = true)
@@ -62,6 +65,12 @@ public class Addresses {
         if (form.id() != null && form.id().length() > 0) {
             row = own(username, form.id());
         } else {
+            // Under the account's lock, which closing it takes too: an address
+            // written as the account closes would outlive it, under a retired
+            // name, with nobody left to remove it.
+            if (profiles.hold(username) == 0) {
+                throw new ResponseStatusException(404, "No such account");
+            }
             if (addresses.countByUsername(username) >= MAX) {
                 throw new ResponseStatusException(409, "That is enough saved addresses");
             }

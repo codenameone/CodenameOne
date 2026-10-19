@@ -221,6 +221,12 @@ public final class CheckoutForm {
         quoted = false;
         place.setEnabled(false);
         totals.removeAll();
+        if (!CustomerForm.located()) {
+            // Priced, and then placed, against the fallback city otherwise.
+            totals.add(Ui.plain(Lang.tr("Choose where the food goes"), "SvMuted"));
+            form.revalidateLater();
+            return;
+        }
         totals.add(new Skeleton(3));
         form.revalidateLater();
         Api.orders().quote(cart(), Net.to(quote -> {
@@ -280,6 +286,10 @@ public final class CheckoutForm {
 
     private void place() {
         if (placing || !quoted) {
+            return;
+        }
+        if (!CustomerForm.located()) {
+            Ui.say("Choose where the food goes");
             return;
         }
         if (methodId == null) {
