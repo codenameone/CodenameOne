@@ -110,6 +110,12 @@ public class CSSThemeCompiler {
     /// compiler adds only `--name` declarations to its variables, so `var(--name)` does not see
     /// these.
     private HashSet<String> plainConstants = new HashSet<String>();
+    /// A custom property this compile declared whose "@name" a later plain `#Constants` entry
+    /// took over, keyed by "@name": its value, and in shadowedKinds its deferred kind. The
+    /// build-time compiler keeps variables and constants apart, so `var(--accent)` still
+    /// reaches the variable after `accent: blue` exported a different `@accent`.
+    private Hashtable<String, String> shadowedVars = new Hashtable<String, String>();
+    private Hashtable<String, String> shadowedKinds = new Hashtable<String, String>();
     /// While set, resolveVars does not see a constant this compile declares unless it holds it:
     /// one declared further down is not defined yet. A constant only an earlier compile into the
     /// same theme declared is visible.
@@ -136,6 +142,8 @@ public class CSSThemeCompiler {
         deferredConstants = deferred;
         literalTokens = new Hashtable<String, String>();
         plainConstants = new HashSet<String>();
+        shadowedVars = new Hashtable<String, String>();
+        shadowedKinds = new Hashtable<String, String>();
         declaredThisCompile = new HashSet<String>();
         for (Rule rule : rules) {
             for (Declaration declaration : rule.declarations) {
@@ -367,7 +375,15 @@ public class CSSThemeCompiler {
             String key = "@" + name;
             if (legacy || declaration.name.startsWith("--")) {
                 plainConstants.remove(key);
+                shadowedVars.remove(key);
+                shadowedKinds.remove(key);
             } else {
+                Object variable = theme.get(key);
+                String variableKind = deferred.get(key);
+                if (!plainConstants.contains(key) && variableKind != null && variable instanceof String) {
+                    shadowedVars.put(key, (String) variable);
+                    shadowedKinds.put(key, variableKind);
+                }
                 plainConstants.add(key);
             }
             String raw = declaration.value.trim();
@@ -696,6 +712,8 @@ public class CSSThemeCompiler {
         }
         String key = "@" + property.substring(2);
         plainConstants.remove(key);
+        shadowedVars.remove(key);
+        shadowedKinds.remove(key);
         String raw = value.trim();
         String unquoted = unquote(raw);
         // A later custom property replaces a #Constants entry outright, deferred handling included.
@@ -1369,8 +1387,9 @@ public class CSSThemeCompiler {
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
             }
-            Object replacement = plainConstants.contains("@" + key)
-                    || (declaredOnly != null && !declaredOnly.containsKey("@" + key)
+            boolean shadowed = plainConstants.contains("@" + key);
+            Object replacement = shadowed ? shadowedVars.get("@" + key)
+                    : (declaredOnly != null && !declaredOnly.containsKey("@" + key)
                             && declaredThisCompile.contains("@" + key)) ? null : theme.get("@" + key);
             if (replacement == null && fallback != null) {
                 out.append(value.substring(pos, varPos)).append(resolveVars(theme, fallback, resolving, tokens));
@@ -1382,14 +1401,14 @@ public class CSSThemeCompiler {
                 unresolvedVar = true;
             }
             String replaceValue = replacement == null ? "" : replacement.toString();
-            String token = tokens ? literalTokens.get("@" + key) : null;
+            String token = tokens && !shadowed ? literalTokens.get("@" + key) : null;
             if (token != null) {
                 replaceValue = token;
             }
             // A quoted constant is text, also when it is reached through another constant. So
             // is one a previous compile into the same theme left: it is already resolved, and
             // any var() still in it was quoted text there.
-            String kind = deferredConstants.get("@" + key);
+            String kind = shadowed ? shadowedKinds.get("@" + key) : deferredConstants.get("@" + key);
             if (kind != null && !DEFERRED_LITERAL.equals(kind)) {
                 resolving.add(key);
                 replaceValue = resolveVars(theme, replaceValue, resolving, tokens);

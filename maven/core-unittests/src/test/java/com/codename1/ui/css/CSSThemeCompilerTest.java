@@ -604,6 +604,16 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    public void testPlainConstantDoesNotHideAVariableOfTheSameName() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#f00;} #Constants{accent:blue;}"
+                + " Label{color:var(--accent);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("blue", theme.get("@accent"));
+        assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
     public void testQuotedVarTextIsNotResolved() {
         MutableResource resource = new MutableResource();
         new CSSThemeCompiler().compile(":root{ --name: world; --rootQuoted: \"var(--name)\"; }"
