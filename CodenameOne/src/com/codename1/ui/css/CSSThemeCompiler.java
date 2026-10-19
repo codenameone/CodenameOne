@@ -487,11 +487,20 @@ public class CSSThemeCompiler {
                 deferred.put(key, kind);
             } else if (!legacy) {
                 // The build-time compiler writes string, identifier, number and color constants
-                // only; anything else (`50%`, `2mm`, `url(a.png)`, a list of values) is dropped
-                // from the built theme without a word, so a preview that showed it would show a
-                // constant the application never gets. The legacy `@constants` block never
-                // reaches the build-time compiler and keeps such values.
-                value = buildConstant(name, raw, value);
+                // only; anything else (`50%`, `2mm`, `url(a.png)`) is dropped from the built
+                // theme without a word, so a preview that showed it would show a constant the
+                // application never gets. Of a chain such as `foo bar` it writes the leading unit
+                // alone. The legacy `@constants` block never reaches the build-time compiler and
+                // keeps such values.
+                String first = leadingToken(value);
+                String unquotedFirst = unquote(first);
+                if (first.length() < value.length() && !unquotedFirst.equals(first)) {
+                    value = unquotedFirst;
+                } else if (first.length() < value.length() && isColorLiteral(first)) {
+                    value = constantColor(first);
+                } else {
+                    value = buildConstant(name, first, first);
+                }
             }
             theme.put(key, value);
         }
@@ -514,8 +523,18 @@ public class CSSThemeCompiler {
                     quote = 0;
                 }
             } else if (c == '\\') {
-                // An escaped character, `my\ icon`'s space among them, is part of the token.
-                i++;
+                // An escaped character, `my\ icon`'s space among them, is part of the token, and
+                // so is the one whitespace ending a hex escape (`\41 x` is `Ax`).
+                int j = i + 1;
+                while (j < value.length() && j - i <= 6 && Character.digit(value.charAt(j), 16) >= 0) {
+                    j++;
+                }
+                if (j > i + 1 && j < value.length() && (value.charAt(j) == ' ' || value.charAt(j) == '\t'
+                        || value.charAt(j) == '\n')) {
+                    i = j;
+                } else {
+                    i = j > i + 1 ? j - 1 : i + 1;
+                }
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == '(') {

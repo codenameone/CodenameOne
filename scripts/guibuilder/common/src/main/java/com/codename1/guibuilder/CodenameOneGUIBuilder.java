@@ -5534,12 +5534,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
          * build's case-sensitive switch reads as medium) as medium -- and loads the one the
          * display density gets. A named medium file wins over another medium-classified one.
          */
+        private static boolean isDirectory(String path) {
+            return com.codename1.io.FileSystemStorage.getInstance().isDirectory(path);
+        }
+
         private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
             // The build decodes every PNG of the folder before it picks one, so a corrupt
             // variant fails the image there even when the display would not select it.
             for (String listed : files) {
                 String file = stripSlash(listed);
-                if (file.regionMatches(true, file.length() - 4, ".png", 0, 4) && !decodes(load(folder + "/" + file))) {
+                // The build skips anything that is not a file, a directory named x.png included.
+                if (file.regionMatches(true, file.length() - 4, ".png", 0, 4) && !isDirectory(folder + "/" + file)
+                        && !decodes(load(folder + "/" + file))) {
                     return null;
                 }
             }
@@ -5547,7 +5553,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 String match = null;
                 for (String listed : files) {
                     String file = stripSlash(listed);
-                    if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)) continue;
+                    if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)
+                            || isDirectory(folder + "/" + file)) continue;
                     if (density.equals(file)) {
                         match = file;
                         break;

@@ -1856,6 +1856,18 @@ class GeneratedSourceTest {
     }
 
     @Test
+    void aDirectoryNamedLikeAPngIsSkippedLikeTheBuild() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder.resolve("high.png"));
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(3, image.getWidth());
+    }
+
+    @Test
     void aCorruptVariantFailsTheWholeFolderLikeTheBuild() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");

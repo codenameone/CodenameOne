@@ -960,7 +960,7 @@ public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
     void testLengthAndPercentageConstantsAreRejected() {
-        for (String value : new String[]{"50%", "2mm", "1.5px", "url(foo.png)", "a b"}) {
+        for (String value : new String[]{"50%", "2mm", "1.5px", "url(foo.png)"}) {
             assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                     new CSSThemeCompiler().compile("#Constants { progress: " + value + "; }", new MutableResource(), "Theme"));
         }
@@ -1125,6 +1125,18 @@ public class CSSThemeCompilerTest extends UITestBase {
         res.setImage("my icon", icon);
         new CSSThemeCompiler().compile("#Constants { --icon: my\\ icon; navImage: var(--icon); }", res, "Theme");
         assertEquals(5, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
+
+    @Test
+    void testDirectMultiTokenConstantExportsItsLeadingToken() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{ pair: foo bar; num: 1.50 2; col: #f00 x; str: \"a b\" c; }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("foo", theme.get("@pair"));
+        assertEquals("1.5", theme.get("@num"));
+        assertEquals("ff0000", theme.get("@col"));
+        assertEquals("a b", theme.get("@str"));
     }
 
     @Test
