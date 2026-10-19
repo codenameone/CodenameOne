@@ -1213,6 +1213,13 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testEscapedQuoteOutsideAStringOpensNoString() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { message: foo\\\"bar; } Label{padding:1px;}", res, "Theme");
+        assertEquals("foo\"bar", res.getTheme("Theme").get("@message"));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));

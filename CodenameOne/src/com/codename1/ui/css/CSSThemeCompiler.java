@@ -1601,6 +1601,9 @@ public class CSSThemeCompiler {
                 } else if (c == quote) {
                     quote = 0;
                 }
+            } else if (c == '\\') {
+                // An escape outside a string: `foo\"bar` is one identifier, not a string start.
+                i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == '(') {
@@ -1627,6 +1630,9 @@ public class CSSThemeCompiler {
                 } else if (c == quote) {
                     quote = 0;
                 }
+            } else if (c == '\\') {
+                // An escape outside a string: `foo\"bar` is one identifier, not a string start.
+                i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == '(') {
@@ -1971,6 +1977,9 @@ public class CSSThemeCompiler {
                 } else if (c == quote) {
                     quote = 0;
                 }
+            } else if (c == '\\') {
+                // An escape outside a string: `foo\"bar` is one identifier, not a string start.
+                i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
             } else if (c == '{') {
@@ -2033,6 +2042,12 @@ public class CSSThemeCompiler {
                     quote = 0;
                 }
                 i++;
+                continue;
+            }
+            if (c == '\\' && i + 1 < css.length()) {
+                // An escaped quote outside a string, as in `foo\"bar`, opens no string.
+                out.append(c).append(css.charAt(i + 1));
+                i += 2;
                 continue;
             }
             if (c == '"' || c == '\'') {
