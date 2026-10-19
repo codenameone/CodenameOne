@@ -1459,7 +1459,15 @@ public final class UnityRuntime {
         accumulator += scaled;
         float fixed = Time.fixedDeltaTime;
         while (accumulator >= fixed) {
-            accumulator -= fixed;
+            float rest = accumulator - fixed;
+            if (!(rest < accumulator)) { // NOPMD LogicInversion: no progress
+                // A step too small to change the float it is taken from
+                // (fixedDeltaTime = 1e-20f) would loop for ever; what is
+                // left is spent at once.
+                accumulator = 0f;
+                break;
+            }
+            accumulator = rest;
             fixedSteps++;
             Time.fixedTime += fixed;
             // A step is `fixed` seconds of game time, which the scale
@@ -1784,11 +1792,10 @@ public final class UnityRuntime {
         c.owner = owner;
         c.routine = routine;
         // Unity runs a coroutine up to its first yield before StartCoroutine
-        // returns.
+        // returns. It is listed first, so that a StopAllCoroutines in that
+        // step finds it and marks it done; runCoroutines drops it then.
+        coroutines.add(c);
         boolean ended = advance(c);
-        if (!c.done) {
-            coroutines.add(c);
-        }
         // A routine that came to its end without one yield never was a
         // coroutine to wait for or to stop, and Unity documents the answer:
         // "If the coroutine runs to completion without yielding ...

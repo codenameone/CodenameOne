@@ -2884,8 +2884,12 @@ public final class SceneCompiler {
                 line(sb, target + " = (int) " + integer(value, "0") + "L;");
                 return;
             case I8:
-            case U8:
                 line(sb, target + " = " + integer(value, "0") + "L;");
+                return;
+            case U8:
+                // Above Long.MAX_VALUE the text is unsigned; the JVM keeps
+                // the same 64 bits as a signed long.
+                line(sb, target + " = " + unsignedLong(value) + "L;");
                 return;
             case STRING:
                 line(sb, target + " = " + string(text(value)) + ";");
@@ -3737,6 +3741,15 @@ public final class SceneCompiler {
 
     static String f(Object o, String fallback) {
         return number(o, fallback) + "f";
+    }
+
+    static String unsignedLong(Object o) {
+        String s = text(o);
+        try {
+            return Long.toString(s.length() == 0 ? 0L : Long.parseUnsignedLong(s));
+        } catch (NumberFormatException e) {
+            return integer(o, "0");
+        }
     }
 
     static String integer(Object o, String fallback) {

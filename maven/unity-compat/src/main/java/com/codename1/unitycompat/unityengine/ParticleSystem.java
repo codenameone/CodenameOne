@@ -799,7 +799,13 @@ public final class ParticleSystem extends Component {
                     owed -= 1f;
                     bear(phase);
                 }
-                left -= seg;
+                float rest = left - seg;
+                if (!(rest < left)) { // NOPMD LogicInversion: no progress
+                    // A duration too small to change the float it is taken
+                    // from (1e-20f) would loop for ever: the rest is done.
+                    break;
+                }
+                left = rest;
                 from = 0f;
             }
             fireBursts(before, after, along);
