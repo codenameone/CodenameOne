@@ -139,7 +139,9 @@ public final class UnityProjectImporter {
         // An asset that was a file and is now a folder, or the other way
         // round: the old one is in the way of the new, and stale entries
         // are only swept after the copy, so it goes first.
-        if (src.isDirectory() ? dest.isFile() : dest.isDirectory()) {
+        // A link already at the destination is removed, never written
+        // through: it could lead out of the project.
+        if (Files.isSymbolicLink(dest.toPath()) || (src.isDirectory() ? dest.isFile() : dest.isDirectory())) {
             deleteTree(dest);
         }
         if (src.isDirectory()) {
@@ -268,6 +270,11 @@ public final class UnityProjectImporter {
     /// True if a component of the path is exactly `..`. A name that only
     /// contains two dots, `icon..png`, is an ordinary file.
     private static boolean hasParentStep(String path) {
+        // A backslash is a separator on Windows, so `Assets/..\\x` would
+        // step out there; no imported path is written with one.
+        if (path.indexOf('\\') >= 0) {
+            return true;
+        }
         int start = 0;
         while (start <= path.length()) {
             int end = path.indexOf('/', start);

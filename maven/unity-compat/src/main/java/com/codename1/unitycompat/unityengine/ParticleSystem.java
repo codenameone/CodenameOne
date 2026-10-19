@@ -795,7 +795,18 @@ public final class ParticleSystem extends Component {
                 float phase = duration > 0f ? from / duration : 0f;
                 float share = emitStep > 0f ? movedTotal * (seg / emitStep) : 0f;
                 owed += pick(RATE_OVER_TIME, phase) * seg + pick(RATE_OVER_DISTANCE, phase) * share;
+                // An infinite or NaN rate makes nothing: the loop below would
+                // never end on it. What cannot be born because the system is
+                // full is dropped, not queued, so a huge rate costs no more
+                // than maxParticles births.
+                if (Float.isNaN(owed) || Float.isInfinite(owed)) {
+                    owed = 0f;
+                }
                 while (owed >= 1f) {
+                    if (count >= maxParticles) {
+                        owed -= (float) Math.floor(owed);
+                        break;
+                    }
                     owed -= 1f;
                     bear(phase);
                 }

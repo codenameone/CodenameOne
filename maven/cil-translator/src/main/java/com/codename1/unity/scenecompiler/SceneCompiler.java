@@ -3729,7 +3729,16 @@ public final class SceneCompiler {
             return fallback;
         }
         try {
-            double d = Double.parseDouble(s);
+            double d;
+            if (s.startsWith("0x")) {
+                // Unity may write a float as its IEEE bits, `0x3f800000(1)`,
+                // with the decimal reading after it in parentheses.
+                int open = s.indexOf('(');
+                String bits = open > 0 ? s.substring(2, open) : s.substring(2);
+                d = Float.intBitsToFloat((int) Long.parseLong(bits, 16));
+            } else {
+                d = Double.parseDouble(s);
+            }
             if (Double.isNaN(d) || Double.isInfinite(d)) {
                 return fallback;
             }

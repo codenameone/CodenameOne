@@ -1257,6 +1257,12 @@ public final class UnityRuntime {
             delayed.add(d);
             return;
         }
+        // Only queued: Object.Destroy's reference says destruction "is always
+        // delayed until after the current Update loop", and the coroutine
+        // manual says only that a destroyed behaviour's coroutines stop, not
+        // whether one due later in the same frame still runs. Its coroutines
+        // stop at the flush, with the rest of it, until documented or
+        // observed behaviour says they stop at the request.
         if (!obj.doomed) {
             obj.doomed = true;
             doomed.add(obj);
