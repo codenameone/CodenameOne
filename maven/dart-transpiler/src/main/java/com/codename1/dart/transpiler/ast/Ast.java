@@ -680,6 +680,9 @@ public final class Ast {
 
     public static class Lambda extends Expr {
         public boolean isAsync;
+        public boolean isSyncStar;                // () sync* { ... }
+        public boolean isAsyncStar;               // () async* { ... }
+        public List<String> typeParams = new ArrayList<String>();  // <T>(T x) => ... (erased)
         public List<Param> params = new ArrayList<Param>();
         public Block body;                        // nullable
         public Expr exprBody;                     // for `=> expr`

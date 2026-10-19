@@ -572,7 +572,7 @@ public final class AstBuilder {
             return;
         }
         if (d.redirectingFactoryConstructorSignature() != null) {
-            unsupported(d, "E0106", "Redirecting factory constructors are not supported yet");
+            cd.ctors.add(buildRedirectingFactory(d.redirectingFactoryConstructorSignature(), cd));
             return;
         }
         if (d.factoryConstructorSignature() != null) {
@@ -1778,8 +1778,10 @@ public final class AstBuilder {
             return id;
         }
         if (ctx.SUPER_() != null) {
-            unsupported(ctx, "E0119", "Assignment through 'super' is not supported");
-            return errExpr(ctx);
+            // `super.x = v` / `super[i] = v`: the inherited setter or index operator.
+            SuperExpr sup = new SuperExpr();
+            pos(sup, ctx);
+            return applyUnconditional(sup, ctx.unconditionalAssignableSelector());
         }
         // primary assignableSelectorPart : selector* assignableSelector
         Expr base = buildPrimary(ctx.primary());
@@ -2197,18 +2199,106 @@ public final class AstBuilder {
         return text;
     }
 
+    /** {@code t} with every reference to one of {@code names} replaced by dynamic. */
+    private static TypeRef eraseTypeParams(TypeRef t, List<String> names) {
+        if (t == null) {
+            return null;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && names.contains(t.name)) {
+            return TypeRef.DYNAMIC;
+        }
+        for (int i = 0; i < t.args.size(); i++) {
+            t.args.set(i, eraseTypeParams(t.args.get(i), names));
+        }
+        if (t.funcParams != null) {
+            for (int i = 0; i < t.funcParams.size(); i++) {
+                t.funcParams.set(i, eraseTypeParams(t.funcParams.get(i), names));
+            }
+            t.funcReturn = eraseTypeParams(t.funcReturn, names);
+        }
+        return t;
+    }
+
+    /**
+     * {@code factory C.x(params) = D.y;} is a factory whose body is
+     * {@code return D.y(params);}, every parameter passed on as it was declared: positional
+     * ones in order, named ones by name. freezed generates one per model class.
+     */
+    private CtorDecl buildRedirectingFactory(Dart2Parser.RedirectingFactoryConstructorSignatureContext sig,
+            ClassDecl cd) {
+        CtorDecl ctor = new CtorDecl();
+        pos(ctor, sig);
+        ctor.isFactory = true;
+        ctor.isConst = sig.CONST_() != null;
+        buildCtorName(sig.constructorName(), ctor, cd);
+        buildParams(sig.formalParameterList(), ctor.params);
+        Dart2Parser.ConstructorDesignationContext des = sig.constructorDesignation();
+        CtorCall call = new CtorCall();
+        pos(call, des);
+        String className;
+        if (des.typeName() != null) {
+            className = withoutImportPrefix(des.typeName().getText());
+            call.ctorName = des.identifier() != null ? des.identifier().getText() : null;
+        } else {
+            String text = withoutImportPrefix(des.getText());
+            int dot = text.indexOf('.');
+            className = dot < 0 ? text : text.substring(0, dot);
+            call.ctorName = dot < 0 ? null : text.substring(dot + 1);
+        }
+        call.type = new TypeRef(className);
+        pos(call.type, des);
+        if (des.typeArguments() != null) {
+            for (Dart2Parser.TypeContext a : des.typeArguments().typeList().type()) {
+                call.type.args.add(buildType(a));
+            }
+        }
+        for (Param p : ctor.params) {
+            Ident id = new Ident();
+            pos(id, des);
+            id.name = p.name;
+            if (p.named) {
+                NamedArg na = new NamedArg();
+                na.name = p.name;
+                na.value = id;
+                call.args.named.add(na);
+            } else {
+                call.args.positional.add(id);
+            }
+        }
+        ReturnStmt ret = new ReturnStmt();
+        pos(ret, des);
+        ret.value = call;
+        ctor.body = new Block();
+        pos(ctor.body, des);
+        ctor.body.statements.add(ret);
+        return ctor;
+    }
+
     private Expr buildLambda(Dart2Parser.FunctionExpressionContext ctx) {
         Lambda l = new Lambda();
         pos(l, ctx);
-        if (ctx.formalParameterPart().typeParameters() != null) {
-            unsupported(ctx, "E0112", "Generic closures are not supported");
-        }
         buildParams(ctx.formalParameterPart().formalParameterList(), l.params);
-        Dart2Parser.FunctionExpressionBodyContext body = ctx.functionExpressionBody();
-        if (body.SYNC_() != null || body.ST() != null) {
-            unsupported(body, "E0303", "Generator closures are not supported");
+        if (ctx.formalParameterPart().typeParameters() != null) {
+            // A generic closure (`<T>(T x) => ...`) cannot be a generic Java lambda; its type
+            // parameters are erased to dynamic, which is what an uninstantiated call sees.
+            for (Dart2Parser.TypeParameterContext tp : ctx.formalParameterPart().typeParameters().typeParameter()) {
+                l.typeParams.add(tp.identifier().getText());
+            }
+            for (Param p : l.params) {
+                p.type = eraseTypeParams(p.type, l.typeParams);
+            }
         }
-        l.isAsync = body.ASYNC_() != null;
+        Dart2Parser.FunctionExpressionBodyContext body = ctx.functionExpressionBody();
+        if (body.ST() != null) {
+            if (body.block() == null) {
+                unsupported(body, "E0303", "A generator closure needs a block body");
+            } else if (body.SYNC_() != null) {
+                l.isSyncStar = true;
+            } else {
+                l.isAsyncStar = true;
+            }
+        }
+        l.isAsync = body.ASYNC_() != null && body.ST() == null;
         if (body.block() != null) {
             l.body = buildBlock(body.block());
         } else if (body.expr() != null) {
@@ -2775,6 +2865,9 @@ public final class AstBuilder {
         }
         if (op.equals(">>")) {
             return "$shr";
+        }
+        if (op.equals(">>>")) {
+            return "$ushr";
         }
         return null;
     }

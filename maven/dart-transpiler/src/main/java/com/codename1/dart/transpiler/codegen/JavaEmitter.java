@@ -1108,8 +1108,14 @@ public final class JavaEmitter {
             }
         }
         for (CtorDecl ct : c.ctors) {
-            if (ct.isFactory || !ct.params.isEmpty() || !ct.fieldInits.isEmpty()
-                    || ct.superInit != null || ct.body != null) {
+            // A factory is a static method, so extending the class inherits nothing from
+            // it: `abstract class Shape { factory Shape.circle(..) = Circle; }` stays an
+            // interface, which is the shape every freezed model has.
+            if (ct.isFactory) {
+                continue;
+            }
+            if (!ct.params.isEmpty() || !ct.fieldInits.isEmpty()
+                    || ct.superInit != null || ct.redirect != null || ct.body != null) {
                 return false;
             }
         }
@@ -1273,11 +1279,30 @@ public final class JavaEmitter {
      * the class; unnamed factories become {@code $create} and call sites
      * route through it.
      */
+    /**
+     * A generic class's static constructor method cannot see the class's type variables, so
+     * it declares its own of the same names: {@code public static <T> Box<T> of(T v)}.
+     */
+    private static String staticTypeParams(ClassDecl c) {
+        if (c.typeParams.isEmpty()) {
+            return "";
+        }
+        return "<" + String.join(", ", c.typeParams) + "> ";
+    }
+
+    private static String staticTypeArgs(ClassDecl c) {
+        if (c.typeParams.isEmpty()) {
+            return "";
+        }
+        return "<" + String.join(", ", c.typeParams) + ">";
+    }
+
     private String emitFactoryCtor(ClassDecl c, CtorDecl ct, Ctx ctx) {
         StringBuilder sb = new StringBuilder();
         String name = ct.name == null ? "$create" : javaIdent(ct.name);
         ctx.pushScope();
-        sb.append("    public static ").append(javaClassName(c)).append(' ').append(name).append('(');
+        sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
+                .append(staticTypeArgs(c)).append(' ').append(name).append('(');
         appendParams(sb, c, ct.params, ctx);
         sb.append(") {\n");
         ctx.pushWriter(2);
@@ -1314,7 +1339,8 @@ public final class JavaEmitter {
             paramSig.append(javaType(pt, false, ctx)).append(' ').append(jn);
             argList.append(jn);
         }
-        sb.append("    public static ").append(javaClassName(c)).append(' ').append(javaIdent(ct.name))
+        sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
+                .append(staticTypeArgs(c)).append(' ').append(javaIdent(ct.name))
                 .append('(').append(paramSig).append(") {\n");
         sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
         sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
@@ -7419,7 +7445,46 @@ public final class JavaEmitter {
         List<TypeRef> outerReturns = ctx.lambdaReturns;
         List<TypeRef> returns = new ArrayList<TypeRef>();
         TypeRef exprType = null;
-        if (asyncValue) {
+        if ((l.isAsyncStar || l.isSyncStar) && l.body != null) {
+            // A generator closure: the lambda returns the generator, whose body is a nested
+            // lambda fed the AsyncStar.Sink (async*) or the result list (sync*), as a
+            // generator method's helper is.
+            boolean async = l.isAsyncStar;
+            TypeRef gen = lambdaReturn;
+            TypeRef elem = gen != null && (gen.is(async ? "Stream" : "Iterable")) && !gen.args.isEmpty()
+                    ? gen.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            String target = ctx.newTemp();
+            String savedSink = ctx.asyncStarSink;
+            String savedList = ctx.syncStarList;
+            TypeRef savedElem = ctx.syncStarElem;
+            ctx.asyncStarSink = async ? target : null;
+            ctx.syncStarList = async ? null : target;
+            ctx.syncStarElem = elem;
+            ctx.inAsyncBody = async;
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.pushWriter(ctx.currentIndent() + 2);
+            ctx.lambdaReturns = returns;
+            emitStatements(l.body, ctx);
+            ctx.lambdaReturns = outerReturns;
+            String body = ctx.popWriter();
+            ctx.asyncStarSink = savedSink;
+            ctx.syncStarList = savedList;
+            ctx.syncStarElem = savedElem;
+            String ind = indentStr(ctx.currentIndent());
+            // What an untyped closure local infers its SAM from: the generator's type.
+            exprType = TypeRef.of(async ? "Stream" : "Iterable", elem);
+            if (async) {
+                ctx.importClass("dart.async.AsyncStar");
+                code = head + " -> AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + target
+                        + ") -> {\n" + body + ind + "    })";
+            } else {
+                ctx.importClass("dart.core.DartList");
+                ctx.importClass("dart.core.DartIterable");
+                code = head + " -> DartIterable.syncStar((DartList<" + ej + "> " + target + ") -> {\n"
+                        + body + ind + "    })";
+            }
+        } else if (asyncValue) {
             code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
                     + indentStr(ctx.currentIndent()) + "}";
         } else if (l.body != null) {
