@@ -1,5 +1,14 @@
 # Agent Instructions
 
+## LinkedIn Page coordination
+
+All Codename One Page publication, including ad hoc promotions, goes through the
+existing social publishing chat and its private Page calendar. Do not publish
+directly from another task or the legacy browser syndicator. Submit exact-copy
+candidates for approval; a repository queue entry is not a calendar reservation
+or a new approval. Read `scripts/website/SOCIAL_OPERATIONS.md` before proposing or
+executing Page writes. Keep drafts, approvals and calendar data outside this repo.
+
 ## Scope
 These instructions apply to the entire repository. They are aimed at helping Codex agents build and run the core unit tests that live under `maven/core-unittests`.
 
