@@ -84,6 +84,17 @@ public class Transform extends Component implements IEnumerable {
     float wrot;
     float wcos = 1f;
     float wsin;
+    /// True when the world basis is not a rotation times a scale along its
+    /// own axes: a rotated transform under a parent scaled unevenly, or a
+    /// mirrored one. `Rp * Sp * Rc` is not `R(p + c) * (Sp * Sc)` then, and
+    /// the basis below is the exact one. `wrot`, `wsx` and `wsy` are still
+    /// kept, as the nearest rotation and scale, for what draws a sprite or
+    /// shapes a collider: like Unity's `lossyScale`, they cannot hold a skew.
+    boolean general;
+    float m00 = 1f;
+    float m01;
+    float m10;
+    float m11 = 1f;
 
     // ---------------------------------------------------------- world cache
 
@@ -102,22 +113,38 @@ public class Transform extends Component implements IEnumerable {
             wsy = scaleY;
             wsz = scaleZ;
             wrot = rotationZ;
+            general = false;
         } else {
             p.update();
             // Every product is stored before it is added to: a compiler that
             // fuses a multiply into the add after it rounds once where the
             // JVM rounds twice, and two targets would then disagree in the
             // last bit.
-            float px = x * p.wsx;
-            float py = y * p.wsy;
-            float a = px * p.wcos;
-            float b = py * p.wsin;
-            float c = px * p.wsin;
-            float d = py * p.wcos;
+            if (p.general) {
+                float a = x * p.m00;
+                float b = y * p.m01;
+                float c = x * p.m10;
+                float d = y * p.m11;
+                wx = p.wx + (a + b);
+                wy = p.wy + (c + d);
+            } else {
+                float px = x * p.wsx;
+                float py = y * p.wsy;
+                float a = px * p.wcos;
+                float b = py * p.wsin;
+                float c = px * p.wsin;
+                float d = py * p.wcos;
+                wx = p.wx + (a - b);
+                wy = p.wy + (c + d);
+            }
             float dz = z * p.wsz;
-            wx = p.wx + (a - b);
-            wy = p.wy + (c + d);
             wz = p.wz + dz;
+            if (p.general || (rotationZ != 0f && Float.compare(p.wsx, p.wsy) != 0)) {
+                general = true;
+                compose(p);
+                return;
+            }
+            general = false;
             wsx = p.wsx * scaleX;
             wsy = p.wsy * scaleY;
             wsz = p.wsz * scaleZ;
@@ -131,6 +158,64 @@ public class Transform extends Component implements IEnumerable {
             wcos = (float) Math.cos(r);
             wsin = (float) Math.sin(r);
         }
+    }
+
+    /// The world basis as the parent's times this one's rotation and scale,
+    /// and the nearest rotation and scale read back out of it.
+    private void compose(Transform p) {
+        float p00;
+        float p01;
+        float p10;
+        float p11;
+        if (p.general) {
+            p00 = p.m00;
+            p01 = p.m01;
+            p10 = p.m10;
+            p11 = p.m11;
+        } else {
+            p00 = p.wcos * p.wsx;
+            p01 = -(p.wsin * p.wsy);
+            p10 = p.wsin * p.wsx;
+            p11 = p.wcos * p.wsy;
+        }
+        double r = rotationZ * DEG2RAD;
+        float cr = (float) Math.cos(r);
+        float sr = (float) Math.sin(r);
+        float l00 = cr * scaleX;
+        float l01 = -(sr * scaleY);
+        float l10 = sr * scaleX;
+        float l11 = cr * scaleY;
+        float a = p00 * l00;
+        float b = p01 * l10;
+        m00 = a + b;
+        a = p00 * l01;
+        b = p01 * l11;
+        m01 = a + b;
+        a = p10 * l00;
+        b = p11 * l10;
+        m10 = a + b;
+        a = p10 * l01;
+        b = p11 * l11;
+        m11 = a + b;
+        float xx = m00 * m00;
+        float yy = m10 * m10;
+        float len = (float) Math.sqrt(xx + yy);
+        wsz = p.wsz * scaleZ;
+        if (len == 0f) {
+            wsx = 0f;
+            wsy = 0f;
+            wrot = p.wrot + rotationZ;
+            wcos = 1f;
+            wsin = 0f;
+            return;
+        }
+        a = m00 * m11;
+        b = m01 * m10;
+        wsx = len;
+        wsy = (a - b) / len;
+        wcos = m00 / len;
+        wsin = m10 / len;
+        wrot = (float) (com.codename1.unitycompat.system.Math.Atan2(m10, m00) * RAD2DEG);
     }
 
     /// Marks this and everything below it stale. A stale transform's
@@ -157,6 +242,14 @@ public class Transform extends Component implements IEnumerable {
             p.update();
             float dx = nx - p.wx;
             float dy = ny - p.wy;
+            if (p.general) {
+                float[] l = p.unbasis(dx, dy);
+                x = l[0];
+                y = l[1];
+                z = p.wsz != 0f ? (nz - p.wz) / p.wsz : 0f;
+                invalidate();
+                return;
+            }
             float a = dx * p.wcos;
             float b = dy * p.wsin;
             float c = dy * p.wcos;
@@ -666,8 +759,41 @@ public class Transform extends Component implements IEnumerable {
 
     // ---------------------------------------------------------- conversions
 
+    private final float[] local = new float[2];
+
+    /// A world offset taken back through the general basis; a basis with
+    /// no inverse puts everything at the origin, as a zero scale does.
+    float[] unbasis(float dx, float dy) {
+        float a = m00 * m11;
+        float b = m01 * m10;
+        float det = a - b;
+        if (det == 0f) {
+            local[0] = 0f;
+            local[1] = 0f;
+            return local;
+        }
+        a = m11 * dx;
+        b = m01 * dy;
+        local[0] = (a - b) / det;
+        a = m00 * dy;
+        b = m10 * dx;
+        local[1] = (a - b) / det;
+        return local;
+    }
+
     public Vector3 TransformPoint(Vector3 position, Vector3 ret) {
         update();
+        if (general) {
+            float a = position.x * m00;
+            float b = position.y * m01;
+            float c = position.x * m10;
+            float d = position.y * m11;
+            float dz = position.z * wsz;
+            ret.x = wx + (a + b);
+            ret.y = wy + (c + d);
+            ret.z = wz + dz;
+            return ret;
+        }
         float px = position.x * wsx;
         float py = position.y * wsy;
         float a = px * wcos;
@@ -685,6 +811,13 @@ public class Transform extends Component implements IEnumerable {
         update();
         float dx = position.x - wx;
         float dy = position.y - wy;
+        if (general) {
+            float[] l = unbasis(dx, dy);
+            ret.x = l[0];
+            ret.y = l[1];
+            ret.z = wsz != 0f ? (position.z - wz) / wsz : 0f;
+            return ret;
+        }
         float a = dx * wcos;
         float b = dy * wsin;
         float c = dy * wcos;

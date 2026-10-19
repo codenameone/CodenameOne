@@ -22,6 +22,7 @@
  */
 package com.codename1.unitycompat.unityengine;
 
+import UnityEngine.Vector3;
 import com.codename1.gaming.physics.box2d.collision.shapes.ChainShape;
 import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
 import com.codename1.gaming.physics.box2d.collision.shapes.EdgeShape;
@@ -88,6 +89,12 @@ final class PhysicsQuery {
     private static final double[] cy = new double[8];
     private static int cn;
     private static double cr;
+    /// From the query's origin to the centre of the shape it casts: the
+    /// collider's offset, for `Collider2D.Cast`, and nothing otherwise.
+    private static final Vector3 OFFSET = new Vector3();
+    private static final Vector3 OFFSET_AT = new Vector3();
+    private static double centroidShiftX;
+    private static double centroidShiftY;
     private static double originX;
     private static double originY;
 
@@ -148,6 +155,8 @@ final class PhysicsQuery {
 
     static void point(float x, float y) {
         originX = x;
+        centroidShiftX = 0d;
+        centroidShiftY = 0d;
         originY = y;
         cx[0] = x;
         cy[0] = y;
@@ -163,6 +172,8 @@ final class PhysicsQuery {
     /// A box of a size, turned by degrees about its centre.
     static void box(float x, float y, float width, float height, float angle) {
         originX = x;
+        centroidShiftX = 0d;
+        centroidShiftY = 0d;
         originY = y;
         double hw = (width < 0f ? -width : width) * 0.5d;
         double hh = (height < 0f ? -height : height) * 0.5d;
@@ -194,6 +205,8 @@ final class PhysicsQuery {
     /// than it is wide is a circle.
     static void capsule(float x, float y, float width, float height, int direction, float angle) {
         originX = x;
+        centroidShiftX = 0d;
+        centroidShiftY = 0d;
         originY = y;
         double w = width < 0f ? -width : width;
         double h = height < 0f ? -height : height;
@@ -780,6 +793,14 @@ final class PhysicsQuery {
         t.update();
         originX = t.wx;
         originY = t.wy;
+        // RaycastHit2D.centroid is the centre of the cast shape, which an
+        // offset collider is not at its transform's position.
+        OFFSET.x = collider.$offsetX;
+        OFFSET.y = collider.$offsetY;
+        OFFSET.z = 0f;
+        Vector3 at = t.TransformPoint(OFFSET, OFFSET_AT);
+        centroidShiftX = at.x - t.wx;
+        centroidShiftY = at.y - t.wy;
         skip = collider;
         skipOwner = ignoreSiblings ? collider.owner : null;
         for (int k = 0; k < collider.fixtures.size(); k++) {
@@ -836,8 +857,8 @@ final class PhysicsQuery {
         to.collider = found[i];
         to.distance = (float) t;
         to.fraction = length > 0d && length < Double.POSITIVE_INFINITY ? (float) (t / length) : 0f;
-        to.centroidX = (float) (originX + t * dx);
-        to.centroidY = (float) (originY + t * dy);
+        to.centroidX = (float) (originX + centroidShiftX + t * dx);
+        to.centroidY = (float) (originY + centroidShiftY + t * dy);
         to.pointX = (float) fpx[i];
         to.pointY = (float) fpy[i];
         to.normalX = (float) fnx[i];

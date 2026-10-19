@@ -140,6 +140,30 @@ public class Probe : MonoBehaviour
             + (c.tagged != a.tagged));
         Destroy(c.gameObject);
         Transform copied = copy.transform.GetChild(0);
+        // A rotated child under a parent scaled unevenly or mirrored: the
+        // world basis is the parent's times the child's, not the sum of
+        // the angles times the product of the scales.
+        GameObject stretch = new GameObject("stretch");
+        stretch.transform.localScale = new Vector3(2f, 1f, 1f);
+        GameObject stretchChild = new GameObject("stretchChild");
+        stretchChild.transform.SetParent(stretch.transform, false);
+        stretchChild.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        Vector3 stretched = stretchChild.transform.TransformPoint(new Vector3(1f, 0f, 0f));
+        GameObject mirror = new GameObject("mirror");
+        mirror.transform.localScale = new Vector3(-1f, 1f, 1f);
+        GameObject mirrorChild = new GameObject("mirrorChild");
+        mirrorChild.transform.SetParent(mirror.transform, false);
+        mirrorChild.transform.localRotation = Quaternion.Euler(0f, 0f, 30f);
+        GameObject mirrorTip = new GameObject("mirrorTip");
+        mirrorTip.transform.SetParent(mirrorChild.transform, false);
+        mirrorTip.transform.localPosition = new Vector3(2f, 0f, 0f);
+        Vector3 tip = mirrorTip.transform.position;
+        Vector3 back = mirrorChild.transform.InverseTransformPoint(tip);
+        Debug.Log("probe basis " + Mathf.RoundToInt(stretched.x * 100f) + "," + Mathf.RoundToInt(stretched.y * 100f)
+            + " " + Mathf.RoundToInt(tip.x * 100f) + "," + Mathf.RoundToInt(tip.y * 100f)
+            + " " + Mathf.RoundToInt(back.x * 100f) + "," + Mathf.RoundToInt(back.y * 100f));
+        Destroy(stretch);
+        Destroy(mirror);
         Debug.Log("probe struct targets " + (b.link.target == copied) + (b.links[0].target == copied)
             + (b.chain[0].target == copied) + " own " + (b.link.stats != a.link.stats)
             + (b.links[0].stats != a.links[0].stats) + (b.chain[0].stats != a.chain[0].stats) + " weight "

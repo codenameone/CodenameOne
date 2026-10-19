@@ -22,6 +22,7 @@
  */
 package com.codename1.unitycompat.cinemachine;
 
+import UnityEngine.Vector3;
 import com.codename1.unitycompat.unityengine.Component;
 import com.codename1.unitycompat.unityengine.Transform;
 
@@ -38,6 +39,8 @@ import com.codename1.unitycompat.unityengine.Transform;
 /// implemented.
 @SuppressWarnings({"PMD.MethodNamingConventions", "PMD.FieldNamingConventions"}) // C# member names
 public final class CinemachineFramingTransposer extends CinemachineComponentBase {
+    private final Vector3 offset = new Vector3();
+    private final Vector3 turned = new Vector3();
     public float m_TrackedObjectOffsetX;
     public float m_TrackedObjectOffsetY;
     public float m_XDamping = 1f;
@@ -114,8 +117,14 @@ public final class CinemachineFramingTransposer extends CinemachineComponentBase
 
     @Override
     void follow(Transform camera, Transform target, float dt, float halfWidth, float halfHeight) {
-        float tx = target.$worldX() + m_TrackedObjectOffsetX;
-        float ty = target.$worldY() + m_TrackedObjectOffsetY;
+        // The offset is in the target's own axes (the API reference:
+        // "in target-local co-ordinates"), so it turns with the target.
+        offset.x = m_TrackedObjectOffsetX;
+        offset.y = m_TrackedObjectOffsetY;
+        offset.z = 0f;
+        target.TransformDirection(offset, turned);
+        float tx = target.$worldX() + turned.x;
+        float ty = target.$worldY() + turned.y;
         // Where the camera has to be for the target to be at its place.
         float acrossX = (m_ScreenX - 0.5f) * 2f;
         float acrossY = (m_ScreenY - 0.5f) * 2f;
