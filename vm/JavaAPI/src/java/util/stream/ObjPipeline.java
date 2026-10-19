@@ -626,8 +626,9 @@ final class ObjPipeline<T> implements Stream<T> {
         Objects.requireNonNull(supplier);
         Objects.requireNonNull(accumulator);
         Objects.requireNonNull(combiner);
-        R result = supplier.get();
+        // The stream's state first: a used stream never calls the supplier.
         Iterator<T> it = take();
+        R result = supplier.get();
         try {
             while (it.hasNext()) {
                 accumulator.accept(result, it.next());
@@ -641,9 +642,9 @@ final class ObjPipeline<T> implements Stream<T> {
     @Override
     public <R, A> R collect(Collector<? super T, A, R> collector) {
         Objects.requireNonNull(collector);
+        Iterator<T> it = take();
         A container = collector.supplier().get();
         BiConsumer<A, ? super T> accumulator = collector.accumulator();
-        Iterator<T> it = take();
         try {
             while (it.hasNext()) {
                 accumulator.accept(container, it.next());

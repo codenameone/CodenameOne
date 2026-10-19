@@ -263,14 +263,33 @@ public class Locale {
             out.append('-').append(country);
         }
         if (variant.length() > 0) {
-            String tagged = variant.replace('_', '-');
-            if (isWellFormedVariant(tagged)) {
-                out.append('-').append(tagged);
-            } else if (isPrivateUseText(tagged)) {
-                out.append("-x-lvariant-").append(tagged);
+            // As JDK 8 writes it: the leading well-formed variant subtags as
+            // they are, the rest private-use ("POSIX_AB" is
+            // "POSIX-x-lvariant-AB"), stopping at the first part that cannot
+            // be a subtag at all ("a b", nine letters), which is left out
+            // with everything after it.
+            List<String> split = new ArrayList<String>();
+            int from = 0;
+            for (int j = 0; j <= variant.length(); j++) {
+                if (j == variant.length() || variant.charAt(j) == '_' || variant.charAt(j) == '-') {
+                    split.add(variant.substring(from, j));
+                    from = j + 1;
+                }
             }
-            // Anything else ("a b") cannot be written as a subtag at all and is
-            // left out, as the JDK leaves it out.
+            String[] parts = split.toArray(new String[split.size()]);
+            int i = 0;
+            while (i < parts.length && isWellFormedVariant(parts[i])) {
+                out.append('-').append(parts[i]);
+                i++;
+            }
+            StringBuilder rest = new StringBuilder();
+            while (i < parts.length && parts[i].length() > 0 && isPrivateUseText(parts[i])) {
+                rest.append('-').append(parts[i]);
+                i++;
+            }
+            if (rest.length() > 0) {
+                out.append("-x-lvariant").append(rest);
+            }
         }
         return out.toString();
     }

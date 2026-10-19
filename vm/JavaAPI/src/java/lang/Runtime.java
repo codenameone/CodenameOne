@@ -105,6 +105,8 @@ public class Runtime {
             if (shuttingDown) {
                 throw new IllegalStateException("Shutdown in progress");
             }
+            // Only a running hook is refused: JDK 8 accepts one that has
+            // already terminated too (its isAlive() is false as well).
             if (hook.isAlive()) {
                 throw new IllegalArgumentException("Hook already running");
             }

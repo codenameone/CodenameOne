@@ -255,7 +255,7 @@ public final class LangMembersChecks {
                     Bulk.p("resolve[" + r + "]", base.resolve(new java.net.URI(r)).toString());
                 }
                 Bulk.p("hostOnly", new java.net.URI("http://h").getPath());
-                String[] paths = {"/a/b/../c/", "/a/./b/.", "/a/b/..", "/", "a/../b"};
+                String[] paths = {"/a/b/../c/", "/a/./b/.", "/a/b/..", "/", "a/../b", "..", "/..", "a/..", "./", "a/./"};
                 for (String n : paths) {
                     Bulk.p("normalize[" + n + "]", new java.net.URI(n).normalize().toString());
                 }
@@ -325,6 +325,30 @@ public final class LangMembersChecks {
             } catch (java.util.concurrent.CompletionException e) {
                 Bulk.p("cause", e.getCause().getClass().getName() + ":" + e.getCause().getMessage());
             }
+        });
+        Bulk.check("Lang.aVariantKeepsItsWellFormedPrefix", () -> {
+            Bulk.p("ab", new java.util.Locale("en", "", "POSIX_AB").toLanguageTag());
+            Bulk.p("long", new java.util.Locale("en", "", "POSIX_AB_abcdefghij").toLanguageTag());
+            Bulk.p("plain", new java.util.Locale("en", "US", "POSIX").toLanguageTag());
+        });
+        Bulk.check("Lang.aDateArgumentChecksItsLiterals", () -> {
+            try {
+                Object[] r = new java.text.MessageFormat("{0,date,yyyy-MM-dd}").parse("2020/01/02");
+                Bulk.p("parsed", String.valueOf(r.length));
+            } catch (java.text.ParseException e) {
+                Bulk.p("rejected", "yes");
+            }
+        });
+        Bulk.check("Lang.aUsedStreamNeverCallsTheSupplier", () -> {
+            java.util.stream.Stream<String> st = java.util.stream.Stream.of("a");
+            st.count();
+            final int[] calls = new int[1];
+            try {
+                st.collect(() -> { calls[0]++; return new StringBuilder(); }, StringBuilder::append, StringBuilder::append);
+            } catch (IllegalStateException e) {
+                Bulk.p("ise", "yes");
+            }
+            Bulk.p("calls", String.valueOf(calls[0]));
         });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];

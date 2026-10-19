@@ -383,6 +383,10 @@ public class SimpleDateFormat extends DateFormat {
 			switch (patternChar) {
 				case LITERAL_LETTER :
 					s = readLiteral(source, startIndex, token);
+					// A literal must be there as written: yyyy-MM-dd refuses 2020/01/02.
+					if (!s.equals(token)) {
+						throwInvalid("literal", startIndex);
+					}
 					break;
 				case AMPM_LETTER :
 					s = readAmPmMarker(source, startIndex);

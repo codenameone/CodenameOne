@@ -150,13 +150,31 @@
        "time": 0.5
       }
      },
-     "memory": 0.456,
-     "reason": "windows-x64 hello RAM measured 0.46x on e7cc77a921 on a new runner CPU; recorded as measured",
+     "memory": 0.684,
+     "reason": "windows-x64 on the AMD family 26 runner: its only baseline was one sample from this PR (hello RAM 0.46x); b851af7c99 measured 0.68x RAM and translator 0.90x time, with no ParparVM change in between",
      "runs": 1,
      "time": 1.41,
      "tolerance": {
       "memory": 0.35,
       "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.467,
+      "time": 0.729,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.467,
+     "reason": "windows-x64 on the AMD family 26 runner: its only baseline was one sample from this PR (hello RAM 0.46x); b851af7c99 measured 0.68x RAM and translator 0.90x time, with no ParparVM change in between",
+     "runs": 1,
+     "time": 0.897,
+     "tolerance": {
+      "time": 0.2
      }
     }
    }

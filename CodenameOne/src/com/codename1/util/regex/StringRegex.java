@@ -65,14 +65,17 @@ public final class StringRegex {
     }
 
     public static boolean matches(String s, String regex) {
+        receiver(s);
         return pattern(regex).matcher(s).matches();
     }
 
     public static String[] split(String s, String regex) {
+        receiver(s);
         return split(s, regex, 0);
     }
 
     public static String[] split(String s, String regex, int limit) {
+        receiver(s);
         int c = plain(regex);
         if (c < 0) {
             return pattern(regex).split(s, limit);
@@ -104,10 +107,20 @@ public final class StringRegex {
     }
 
     public static String replaceAll(String s, String regex, String replacement) {
+        receiver(s);
         return pattern(regex).matcher(s).replaceAll(replacement);
     }
 
     public static String replaceFirst(String s, String regex, String replacement) {
+        receiver(s);
         return pattern(regex).matcher(s).replaceFirst(replacement);
+    }
+
+    /// The null check the JVM made on the String these calls were rewritten
+    /// from, before anything looks at the regex.
+    private static void receiver(String s) {
+        if (s == null) {
+            throw new NullPointerException();
+        }
     }
 }

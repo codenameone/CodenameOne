@@ -936,10 +936,9 @@ public class URI {
         String thisPath = getPath();
         // The slashes come from the path itself: a leading one when it is
         // absolute, a trailing one when it names a directory ("a/", "a/.",
-        // "a/b/..").
+        // "a/b/.."). An unmatched ".." stays as written, with no slash added.
         boolean leading = thisPath.startsWith("/");
-        boolean trailing = thisPath.endsWith("/") || thisPath.endsWith("/.") || thisPath.endsWith("/..")
-                || thisPath.equals(".") || thisPath.equals("..");
+        boolean trailing = thisPath.endsWith("/") || thisPath.endsWith("/.") || thisPath.equals(".");
         StringTokenizer st = new StringTokenizer(thisPath, String.valueOf(PATH_SEPARATOR));
         List<String> segments = new ArrayList<String>();
         while (st.hasMoreTokens()) {
@@ -958,6 +957,10 @@ public class URI {
                     continue;
                 }
             }
+        }
+        int last = segments.size() - 1;
+        if (last >= 0 && segments.get(last).equals("..") && removals.contains(Integer.valueOf(last))) {
+            trailing = true;
         }
         Iterator<Integer> iter = removals.iterator();
         while (iter.hasNext()) {
