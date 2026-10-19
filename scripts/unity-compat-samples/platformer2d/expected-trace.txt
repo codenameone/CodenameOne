@@ -4,7 +4,7 @@ wall=True centre 850,-150 corner 800,-200 post=False sign=Start follows=Hero
 bounds with a far tile -9,-3+40x10 without -9,-3+20x5 far=False wall=True
 particle children play=True pause=True stop=False,3 clear=0
 copied rig follows its copy=True the original=False looks at Hero priority=-100
-frame 1 state none -> Idle sprite=hero_0
+frame 1 state none -> Idle sprite=hero_0 path=True,True
 frame 1 hero -700,-150 camera 0,0 size=500
 frame 1 objects=15 drawn=15 text="Start" text="Steps 0"
 draw frame=1 commands=15 background=ff1a1f33
@@ -26,11 +26,11 @@ draw frame=1 commands=15 background=ff1a1f33
   dot.png src=0,0+4x4 layer=0 order=1 at=31250,18750 size=1875x1875 anchor=50,50 rotation=0 color=ffffffff flip=00
   hero.png src=24,0+8x8 layer=0 order=2 at=20000,18750 size=3750x3750 anchor=50,50 rotation=0 color=ffffffff flip=00
   text "Steps 0" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
-frame 2 state Idle -> Jump sprite=hero_3
+frame 2 state Idle -> Jump sprite=hero_3 path=True,True
 frame 3 hero stands on Ground points=some normal=yes
-frame 3 state Jump -> Idle sprite=hero_0
+frame 3 state Jump -> Idle sprite=hero_0 path=True,True
 input frame=20 key=275 down
-frame 21 state Idle -> Run sprite=hero_2
+frame 21 state Idle -> Run sprite=hero_2 path=True,True
 frame 28 Pebble met Ground at 150
 Pebble turned back at 150
 frame 59 run at 253 sprite=hero_3
@@ -44,7 +44,7 @@ frame 95 Ball met Platform at 38
 input frame=100 key=32 down
 frame 100 jump 1 from -164
 input frame=102 key=32 up
-frame 103 state Run -> Jump sprite=hero_3
+frame 103 state Run -> Jump sprite=hero_3 path=True,True
 frame 120 objects=15 drawn=20 text="Start" text="Steps 5"
 frame 121 hero -28,37 camera -124,22 size=400
 frame 130 objects=15 drawn=20 text="Start" text="Steps 5"
@@ -68,14 +68,14 @@ draw frame=130 commands=20 background=ff1a1f33
   text "Start" layer=0 order=0 at=-7812,7772 size=15000x3750 font=2250 fit=0 min=6750 max=27000 align=4 style=0 wrap=1 color=ffffe666
   text "Steps 5" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
 frame 154 landed on Ground at 196
-frame 155 state Jump -> Idle sprite=hero_0
+frame 155 state Jump -> Idle sprite=hero_0 path=True,True
 frame 158 dust particles=6 playing=True
 frame 166 bowed after 1 steps=5
-frame 168 state Idle -> Proud sprite=hero_2
-frame 170 state Proud -> Idle sprite=hero_0
-frame 171 state Idle -> Run sprite=hero_2
+frame 168 state Idle -> Proud sprite=hero_2 path=True,True
+frame 170 state Proud -> Idle sprite=hero_0 path=True,True
+frame 171 state Idle -> Run sprite=hero_2 path=True,True
 frame 177 ran into Thorn
-frame 178 state Run -> Hurt sprite=hero_1
+frame 178 state Run -> Hurt sprite=hero_1 path=True,True
 frame 180 objects=15 drawn=25 text="Steps 5"
 frame 181 hero 372,-149 camera 276,32 size=400
 hurt 6 green=59 red=100 hat=83
@@ -104,20 +104,20 @@ draw frame=200 commands=19 background=ff1a1f33
   text "Steps 5" layer=0 order=0 at=1000,1000 size=20000x3000 font=2000 fit=0 min=1800 max=7200 align=3 style=0 wrap=1 color=ffffe666
 hurt 24 green=42 red=100 hat=77
 hurt 30 green=93 red=100 hat=97
-frame 208 state Hurt -> Idle sprite=hero_0
-frame 209 state Idle -> Run sprite=hero_2
+frame 208 state Hurt -> Idle sprite=hero_0 path=True,True
+frame 209 state Idle -> Run sprite=hero_2 path=True,True
 frame 240 blocked at 759 slowest before=400 green=100 hat=25
 frame 240 objects=15 drawn=19 text="Steps 7"
 frame 241 hero 759,-148 camera 673,32 size=400
 input frame=270 key=275 up
-frame 271 state Run -> Idle sprite=hero_0
+frame 271 state Run -> Idle sprite=hero_0 path=True,True
 frame 286 idle events blink breath blink breath blink
 input frame=288 key=276 down
 frame 288 hero stands on Ground points=some normal=yes
-frame 289 state Idle -> Run sprite=hero_2
+frame 289 state Idle -> Run sprite=hero_2 path=True,True
 frame 290 hero stands on Ground points=some normal=yes
 input frame=291 key=276 up
 frame 291 hero stands on Ground points=some normal=yes
 frame 292 hero stands on Ground points=some normal=yes
-frame 292 state Run -> Idle sprite=hero_0
+frame 292 state Run -> Idle sprite=hero_0 path=True,True
 frame 300 objects=15 drawn=18 text="Steps 9"

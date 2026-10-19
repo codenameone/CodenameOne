@@ -58,6 +58,10 @@ public class RuntimeAnimatorController extends Object {
     int stateCount;
     String[] stateNames = new String[4];
     int[] stateHashes = new int[4];
+    /// Each state's hash with the layer in front, `fullPathHash`.
+    int[] statePathHashes = new int[4];
+    /// The played layer's name, which a full path starts with.
+    String layerName = "Base Layer";
     float[] stateSpeeds = new float[4];
     AnimationClip[] stateClips = new AnimationClip[4];
     boolean[] stateWritesDefaults = new boolean[4];
@@ -124,6 +128,11 @@ public class RuntimeAnimatorController extends Object {
         parameterCount++;
     }
 
+    /// Names the layer that is played; it comes before its states.
+    public void $layer(String name) {
+        layerName = name;
+    }
+
     /// Adds a state and answers its index. A state with no clip holds
     /// whatever was there for a second at a time.
     public int $state(String stateName, float speed, AnimationClip clip, boolean writesDefaults) {
@@ -131,18 +140,21 @@ public class RuntimeAnimatorController extends Object {
             int n = stateCount * 2;
             String[] names = new String[n];
             int[] hashes = new int[n];
+            int[] pathHashes = new int[n];
             float[] speeds = new float[n];
             AnimationClip[] clips = new AnimationClip[n];
             boolean[] writes = new boolean[n];
             int[][] slots = new int[n][];
             System.arraycopy(stateNames, 0, names, 0, stateCount);
             System.arraycopy(stateHashes, 0, hashes, 0, stateCount);
+            System.arraycopy(statePathHashes, 0, pathHashes, 0, stateCount);
             System.arraycopy(stateSpeeds, 0, speeds, 0, stateCount);
             System.arraycopy(stateClips, 0, clips, 0, stateCount);
             System.arraycopy(stateWritesDefaults, 0, writes, 0, stateCount);
             System.arraycopy(stateSlots, 0, slots, 0, stateCount);
             stateNames = names;
             stateHashes = hashes;
+            statePathHashes = pathHashes;
             stateSpeeds = speeds;
             stateClips = clips;
             stateWritesDefaults = writes;
@@ -150,6 +162,7 @@ public class RuntimeAnimatorController extends Object {
         }
         stateNames[stateCount] = stateName;
         stateHashes[stateCount] = hash(stateName);
+        statePathHashes[stateCount] = hash(layerName + "." + stateName);
         stateSpeeds[stateCount] = speed;
         stateClips[stateCount] = clip;
         stateWritesDefaults[stateCount] = writesDefaults;

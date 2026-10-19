@@ -173,7 +173,9 @@ public class Hero : MonoBehaviour
         }
         if (now != state)
         {
-            Debug.Log("frame " + Time.frameCount + " state " + state + " -> " + now + " sprite=" + shown.sprite.name);
+            Debug.Log("frame " + Time.frameCount + " state " + state + " -> " + now + " sprite=" + shown.sprite.name
+                + " path=" + (info.fullPathHash == Animator.StringToHash("Base Layer." + now)) + ","
+                + (info.shortNameHash == Animator.StringToHash(now)));
             state = now;
             hurtFrames = 0;
         }

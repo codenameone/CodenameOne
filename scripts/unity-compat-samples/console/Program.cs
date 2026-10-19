@@ -1486,6 +1486,16 @@ namespace Spike
             Log("equatable " + eqCells.ContainsKey(new EqCell(3)) + " " + eqCells.Count + " " + eqList.Contains(new EqCell(4))
                 + " " + ((object)new EqCell(5)).Equals(new EqCell(5)) + " " + (new EqCell(6), 1).Equals((new EqCell(6), 1)));
 
+            // Array.Clear through a System.Array: struct elements reset, a boxed one in object[] dropped.
+            GsVec[] clearVecs = { new GsVec(1, 2), new GsVec(3, 4) };
+            Array clearAny = clearVecs;
+            Array.Clear(clearAny, 0, 2);
+            clearVecs[1].x = 5;
+            object[] clearBoxes = { new GsVec(6, 7) };
+            Array clearBoxAny = clearBoxes;
+            Array.Clear(clearBoxAny, 0, 1);
+            Log("array clear erased " + clearVecs[0].x + " " + clearVecs[1].x + " " + clearVecs[1].y + " " + (clearBoxes[0] == null));
+
             // Exception.ToString: the .NET type name and the inner chain.
             string chained = new InvalidOperationException("outer", new ArgumentException("inner")).ToString();
             Log("exception text " + chained.Replace("\n", "|") + " / " + new Exception() + " / " + new Exception("")

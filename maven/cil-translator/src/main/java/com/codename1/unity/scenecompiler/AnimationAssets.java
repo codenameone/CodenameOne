@@ -314,6 +314,10 @@ final class AnimationAssets {
             warnings.add(label + ": the controller has sub-state machines, which are not supported; their states"
                     + " are never entered");
         }
+        String layerName = SceneCompiler.text(SceneCompiler.map(layers.get(0)).get("m_Name"));
+        if (layerName.length() > 0) {
+            sb.append("            ").append(v).append(".$layer(").append(SceneCompiler.string(layerName)).append(");\n");
+        }
         // Every state first, so that a transition can name one further on.
         Map<Long, Integer> stateIndex = new HashMap<Long, Integer>();
         List<UnityYaml.Document> states = new ArrayList<UnityYaml.Document>();

@@ -1545,6 +1545,12 @@ public final class UnityRuntime {
     /// The control an event on `go` belongs to: the nearest at or above
     /// it. That is what makes a click on a button's label a click on the
     /// button.
+    ///
+    /// A disabled control is passed over, so the event reaches the next one
+    /// above. Whether Unity instead stops at a disabled child is not in its
+    /// public documentation; the only evidence offered for that was uGUI's
+    /// source, which this clean-room runtime does not read. It stays as is
+    /// until documented or observed behaviour says otherwise.
     private static Selectable control(GameObject go) {
         Transform t = go.transform;
         while (t != null) {

@@ -29,6 +29,9 @@ import com.codename1.unitycompat.system.Struct;
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
 public final class AnimatorStateInfo implements Struct {
     int nameHash;
+    /// The hash of the layer and state, "Base Layer.Run", where `nameHash`
+    /// is of the state alone.
+    int pathHash;
     float normalizedTime;
     float length;
     float speed;
@@ -40,7 +43,7 @@ public final class AnimatorStateInfo implements Struct {
     }
 
     public int get_fullPathHash() {
-        return nameHash;
+        return pathHash;
     }
 
     /// How many times over the state has played: the whole part counts the
@@ -82,6 +85,7 @@ public final class AnimatorStateInfo implements Struct {
 
     public void $assign(AnimatorStateInfo other) {
         nameHash = other.nameHash;
+        pathHash = other.pathHash;
         normalizedTime = other.normalizedTime;
         length = other.length;
         speed = other.speed;
@@ -92,6 +96,7 @@ public final class AnimatorStateInfo implements Struct {
     @Override
     public void $clear() {
         nameHash = 0;
+        pathHash = 0;
         normalizedTime = 0f;
         length = 0f;
         speed = 0f;
@@ -117,7 +122,7 @@ public final class AnimatorStateInfo implements Struct {
             return false;
         }
         AnimatorStateInfo s = (AnimatorStateInfo) o;
-        return s.nameHash == nameHash && s.normalizedTime == normalizedTime && s.length == length
+        return s.nameHash == nameHash && s.pathHash == pathHash && s.normalizedTime == normalizedTime && s.length == length
                 && s.speed == speed && s.loop == loop;
     }
 

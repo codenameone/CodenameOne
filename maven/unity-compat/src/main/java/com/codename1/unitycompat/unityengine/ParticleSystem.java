@@ -690,8 +690,13 @@ public final class ParticleSystem extends Component {
         Transform t = gameObject.transform;
         t.update();
         // The particles there are grow older and move.
-        float gravity = curveMode[GRAVITY] == 0 && curveMax[GRAVITY] == 0f ? 0f
-                : over(GRAVITY, duration > 0f ? clock / duration : 0f, 0.5f) * PhysicsWorld.gravityY;
+        // Gravity is read over the system's duration. Between two constants or
+        // two curves each particle takes its own place in the range, the
+        // number it drew at birth, so the variation holds for its whole life.
+        float gravityAt = duration > 0f ? clock / duration : 0f;
+        boolean gravityDrawn = curveMode[GRAVITY] == 2 || curveMode[GRAVITY] == 3;
+        float gravity = gravityDrawn || curveMode[GRAVITY] == 0 && curveMax[GRAVITY] == 0f ? 0f
+                : over(GRAVITY, gravityAt, 0f) * PhysicsWorld.gravityY;
         boolean pushed = (modules & VELOCITY_OVER_LIFETIME) != 0;
         boolean spins = (modules & ROTATION_OVER_LIFETIME_MODULE) != 0;
         int kept = 0;
@@ -701,7 +706,8 @@ public final class ParticleSystem extends Component {
                 continue;
             }
             float at = life[i] > 0f ? older / life[i] : 1f;
-            float nvy = vy[i] + gravity * step;
+            float pull = gravityDrawn ? over(GRAVITY, gravityAt, chance[i]) * PhysicsWorld.gravityY : gravity;
+            float nvy = vy[i] + pull * step;
             float mx = vx[i];
             float my = nvy;
             if (pushed) {

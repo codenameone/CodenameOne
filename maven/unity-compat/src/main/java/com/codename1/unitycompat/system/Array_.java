@@ -211,6 +211,18 @@ public final class Array_ {
         }
         range(vectorLength(array), index, count);
         int end = index + count;
+        // A struct array that reached here through a `System.Array` the
+        // translator could not see past: its elements are cleared in place,
+        // as $clearStructs does, since a null element is no struct. The
+        // test is on the array's type, not the elements', so a boxed struct
+        // in an `object[]` is still dropped to null rather than altered.
+        if (array instanceof Struct[]) {
+            Object[] a = (Object[]) array;
+            for (int i = index; i < end; i++) {
+                ((Struct) a[i]).$clear();
+            }
+            return;
+        }
         if (array instanceof Object[]) {
             Object[] a = (Object[]) array;
             for (int i = index; i < end; i++) {

@@ -296,6 +296,7 @@ public final class Animator extends Behaviour {
         }
         float length = controller.length(at);
         ret.nameHash = controller.stateHashes[at];
+        ret.pathHash = controller.statePathHashes[at];
         ret.stateName = controller.stateNames[at];
         ret.length = length;
         ret.speed = controller.stateSpeeds[at];

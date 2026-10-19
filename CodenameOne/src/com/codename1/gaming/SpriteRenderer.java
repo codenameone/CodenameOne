@@ -271,7 +271,11 @@ public class SpriteRenderer implements Renderer {
         double dt = hasLast ? (now - lastTime) / 1000.0 : 0;
         lastTime = now;
         hasLast = true;
-        if (dt > 0.25) {
+        // The wall clock can be set back (by the user, or a time sync); a
+        // frame never runs backwards, it just takes no time.
+        if (dt < 0) {
+            dt = 0;
+        } else if (dt > 0.25) {
             dt = 0.25;
         }
 
