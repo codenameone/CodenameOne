@@ -35,7 +35,7 @@ import java.util.List;
  * {@code base64} and {@code base64Url}. A byte input may be a {@link Uint8List} or any
  * {@code List<int>}; byte outputs are {@link Uint8List}, as in Dart.
  */
-public final class ByteCodec {
+public final class ByteCodec implements dart.async.StreamTransformer<Object, Object> {
 
     static final int UTF8 = 0;
     static final int ASCII = 1;
@@ -81,6 +81,64 @@ public final class ByteCodec {
             return Uint8List.fromBytes(unbase64((String) input));
         }
         return text(bytesOf(input));
+    }
+
+    /**
+     * {@code stream.transform(utf8.decoder)}: chunk by chunk. A UTF-8 sequence split
+     * across two chunks is held back until the rest of it arrives.
+     */
+    @Override
+    public dart.async.Stream<Object> bind(final dart.async.Stream<Object> source) {
+        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<Object>>() {
+            @Override
+            public void call(dart.async.AsyncStar.Sink<Object> sink) {
+                dart.async.StreamIterator<Object> it = new dart.async.StreamIterator<Object>(source);
+                byte[] carry = new byte[0];
+                try {
+                    while (it.next()) {
+                        Object chunk = it.current();
+                        if (kind != UTF8 || chunk instanceof String) {
+                            sink.yield$(convert(chunk));
+                            continue;
+                        }
+                        byte[] in = bytesOf(chunk);
+                        byte[] all = new byte[carry.length + in.length];
+                        System.arraycopy(carry, 0, all, 0, carry.length);
+                        System.arraycopy(in, 0, all, carry.length, in.length);
+                        int cut = completeUtf8Prefix(all);
+                        byte[] head = new byte[cut];
+                        System.arraycopy(all, 0, head, 0, cut);
+                        carry = new byte[all.length - cut];
+                        System.arraycopy(all, cut, carry, 0, carry.length);
+                        if (cut > 0) {
+                            sink.yield$(text(head));
+                        }
+                    }
+                    if (carry.length > 0) {
+                        sink.yield$(text(carry));
+                    }
+                } finally {
+                    it.cancel();
+                }
+            }
+        });
+    }
+
+    /** The length of the longest prefix of {@code b} that ends on a whole UTF-8 sequence. */
+    static int completeUtf8Prefix(byte[] b) {
+        int n = b.length;
+        int i = n - 1;
+        int back = 0;
+        while (i >= 0 && back < 3 && (b[i] & 0xC0) == 0x80) {
+            i--;
+            back++;
+        }
+        if (i < 0) {
+            return n;
+        }
+        int lead = b[i] & 0xFF;
+        int need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+        return n - i >= need ? n : i;
     }
 
     public ByteCodec encoder() {
@@ -143,7 +201,7 @@ public final class ByteCodec {
         }
     }
 
-    static byte[] bytesOf(Object input) {
+    public static byte[] bytesOf(Object input) {
         if (input instanceof Uint8List) {
             return ((Uint8List) input).toBytes();
         }

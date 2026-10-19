@@ -26,7 +26,7 @@ package dart.convert;
 import dart.core.DartList;
 
 /** {@code LineSplitter}: splits on \n, \r\n and \r, dropping the terminators. */
-public final class LineSplitter {
+public final class LineSplitter implements dart.async.StreamTransformer<String, String> {
 
     public static DartList<String> split(String lines) {
         return ByteCodec.splitLines(lines);
@@ -34,5 +34,51 @@ public final class LineSplitter {
 
     public DartList<String> convert(String data) {
         return ByteCodec.splitLines(data);
+    }
+
+    /** {@code stream.transform(const LineSplitter())}: a line split across chunks is joined. */
+    @Override
+    public dart.async.Stream<String> bind(final dart.async.Stream<String> source) {
+        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<String>>() {
+            @Override
+            public void call(dart.async.AsyncStar.Sink<String> sink) {
+                dart.async.StreamIterator<String> it = new dart.async.StreamIterator<String>(source);
+                StringBuilder pending = new StringBuilder();
+                try {
+                    while (it.next()) {
+                        String chunk = it.current();
+                        if (chunk == null) {
+                            continue;
+                        }
+                        pending.append(chunk);
+                        int start = 0;
+                        for (int i = 0; i < pending.length(); i++) {
+                            char c = pending.charAt(i);
+                            if (c == '\n' || c == '\r') {
+                                if (c == '\r' && i + 1 == pending.length()) {
+                                    // A CR at the end of a chunk may be half of a CRLF.
+                                    break;
+                                }
+                                sink.yield$(pending.substring(start, i));
+                                if (c == '\r' && pending.charAt(i + 1) == '\n') {
+                                    i++;
+                                }
+                                start = i + 1;
+                            }
+                        }
+                        pending.delete(0, start);
+                    }
+                    String rest = pending.toString();
+                    if (rest.endsWith("\r")) {
+                        rest = rest.substring(0, rest.length() - 1);
+                        sink.yield$(rest);
+                    } else if (rest.length() > 0) {
+                        sink.yield$(rest);
+                    }
+                } finally {
+                    it.cancel();
+                }
+            }
+        });
     }
 }

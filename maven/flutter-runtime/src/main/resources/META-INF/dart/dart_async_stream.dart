@@ -48,6 +48,47 @@ abstract class Stream<T> {
       {Object? onError, Object? onDone, bool? cancelOnError});
   external Stream<R> map<R>(Object transform);
   external Stream<T> where(Object test);
+  // Named constructors, as static factories with a raw return (see broadcast below).
+  external static Stream fromIterable(Iterable elements);
+  external static Stream value(Object? value);
+  external static Stream empty();
+  external static Stream error(Object error);
+  external static Stream fromFuture(Future future);
+  external static Stream fromFutures(Iterable futures);
+  external static Stream periodic(Duration period, [Object? computation]);
+  external Stream<R> expand<R>(Object convert);
+  external Stream<R> asyncMap<R>(Object convert);
+  external Stream<T> take(int count);
+  external Stream<T> skip(int count);
+  external Stream<T> takeWhile(Object test);
+  external Stream<T> skipWhile(Object test);
+  external Stream<T> distinct([Object? equals]);
+  external Stream<T> handleError(Object onError, {Object? test});
+  external Stream<R> transform<R>(Object streamTransformer);
+  external Stream<R> cast<R>();
+  external Stream<T> asBroadcastStream({Object? onListen, Object? onCancel});
+  external bool get isBroadcast;
+  external Future<List<T>> toList();
+  external Future<Set<T>> toSet();
+  external Future<void> forEach(Object action);
+  external Future drain([Object? futureValue]);
+  external Future<int> get length;
+  external Future<bool> get isEmpty;
+  external Future<T> get first;
+  external Future<T> get last;
+  external Future<T> firstWhere(Object test, {Object? orElse});
+  external Future<bool> any(Object test);
+  external Future<bool> every(Object test);
+  external Future<bool> contains(Object? needle);
+  external Future<String> join([String separator = ""]);
+  external Future<S> fold<S>(S initialValue, Object combine);
+  external Future<T> reduce(Object combine);
+  external Future<T> elementAt(int index);
+}
+
+@JavaName('dart.async.StreamTransformer')
+abstract class StreamTransformer<S, T> {
+  external Stream<T> bind(Stream<S> stream);
 }
 
 @JavaName('dart.async.StreamController')

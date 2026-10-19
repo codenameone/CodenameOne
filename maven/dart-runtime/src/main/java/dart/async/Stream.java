@@ -662,4 +662,669 @@ public class Stream<T> {
             return sub.pauseCount > 0;
         }
     }
+
+    // ------------------------------------------------------------------
+    // Factories, terminal operations and derived streams.
+    //
+    // Derived streams are async* generators over a StreamIterator, so they
+    // inherit its cancellation and start from a timer, as Dart's do. Terminal
+    // operations listen and complete a future; none of them blocks.
+    // ------------------------------------------------------------------
+
+    /** Dart's {@code Stream.fromIterable}: each element in turn, then done. */
+    public static <T> Stream<T> fromIterable(final Iterable<? extends T> elements) {
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+            @Override
+            public void call(AsyncStar.Sink<T> s) {
+                if (elements != null) {
+                    for (T e : elements) {
+                        s.yield$(e);
+                    }
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code Stream.value}. */
+    public static <T> Stream<T> value(T v) {
+        return fromIterable(java.util.Collections.singletonList(v));
+    }
+
+    /** Dart's {@code Stream.empty}. */
+    public static <T> Stream<T> empty() {
+        return fromIterable(java.util.Collections.<T>emptyList());
+    }
+
+    /** Dart's {@code Stream.error}. */
+    public static <T> Stream<T> error(final Object error) {
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+            @Override
+            public void call(AsyncStar.Sink<T> s) {
+                throw dart.runtime.DartRuntime.asError(error);
+            }
+        });
+    }
+
+    /** Dart's {@code Stream.fromFuture}: the future's value as one event. */
+    public static <T> Stream<T> fromFuture(final Future<T> future) {
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+            @Override
+            public void call(AsyncStar.Sink<T> s) {
+                s.yield$(Await.await$(future));
+            }
+        });
+    }
+
+    /** Dart's {@code Stream.fromFutures}: each value in the order the futures are listed. */
+    public static <T> Stream<T> fromFutures(final Iterable<? extends Future<T>> futures) {
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+            @Override
+            public void call(AsyncStar.Sink<T> s) {
+                for (Future<T> f : futures) {
+                    s.yield$(Await.await$(f));
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code Stream.periodic}; a null computation yields nulls. */
+    public static <T> Stream<T> periodic(final dart.core.Duration period, final Funcs.Func1<Long, T> computation) {
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+            @Override
+            public void call(AsyncStar.Sink<T> s) {
+                for (long i = 0;; i++) {
+                    Await.await$(Future.delayed(period));
+                    s.yield$(computation == null ? null : computation.call(Long.valueOf(i)));
+                }
+            }
+        });
+    }
+
+    /** A derived stream: {@code body} reads this stream through an iterator and yields. */
+    private <R> Stream<R> derive(final Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>> body) {
+        final Stream<T> self = this;
+        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<R>>() {
+            @Override
+            public void call(AsyncStar.Sink<R> s) {
+                StreamIterator<T> it = new StreamIterator<T>(self);
+                try {
+                    body.call(it, s);
+                } finally {
+                    it.cancel();
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code expand}. */
+    public final <R> Stream<R> expand(final Funcs.Func1<T, ? extends Iterable<? extends R>> convert) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
+                while (it.next()) {
+                    Iterable<? extends R> items = convert.call(it.current());
+                    if (items != null) {
+                        for (R r : items) {
+                            s.yield$(r);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code asyncMap}: a callback returning a Future is awaited before the next event. */
+    @SuppressWarnings("unchecked")
+    public final <R> Stream<R> asyncMap(final Funcs.Func1<T, Object> convert) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
+                while (it.next()) {
+                    s.yield$((R) Await.awaitAny(convert.call(it.current())));
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code take}. */
+    public final Stream<T> take(final long count) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                for (long i = 0; i < count && it.next(); i++) {
+                    s.yield$(it.current());
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code skip}. */
+    public final Stream<T> skip(final long count) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                long i = 0;
+                while (it.next()) {
+                    if (i++ >= count) {
+                        s.yield$(it.current());
+                    }
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code takeWhile}. */
+    public final Stream<T> takeWhile(final Funcs.Func1<T, Boolean> test) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                while (it.next() && test.call(it.current()).booleanValue()) {
+                    s.yield$(it.current());
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code skipWhile}. */
+    public final Stream<T> skipWhile(final Funcs.Func1<T, Boolean> test) {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                boolean skipping = true;
+                while (it.next()) {
+                    if (skipping && test.call(it.current()).booleanValue()) {
+                        continue;
+                    }
+                    skipping = false;
+                    s.yield$(it.current());
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code distinct()}: drops an event equal to the one before it. */
+    public final Stream<T> distinct() {
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                boolean first = true;
+                T last = null;
+                while (it.next()) {
+                    T v = it.current();
+                    if (first || !(v == null ? last == null : v.equals(last))) {
+                        s.yield$(v);
+                    }
+                    first = false;
+                    last = v;
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code distinct(equals)}. */
+    public final Stream<T> distinct(final Funcs.Func2<T, T, Boolean> equals) {
+        if (equals == null) {
+            return distinct();
+        }
+        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+            @Override
+            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
+                boolean first = true;
+                T last = null;
+                while (it.next()) {
+                    T v = it.current();
+                    if (first || !equals.call(last, v).booleanValue()) {
+                        s.yield$(v);
+                    }
+                    first = false;
+                    last = v;
+                }
+            }
+        });
+    }
+
+    /** Dart's {@code handleError}: errors go to the handler and the stream goes on. */
+    public final Stream<T> handleError(final Object onError) {
+        return handleError0(onError, null);
+    }
+
+    private Stream<T> handleError0(final Object onError, final Object test) {
+        final Stream<T> self = this;
+        final StreamController<T> out = new StreamController<T>();
+        out.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                final StreamSubscription<T> sub = self.listen(new Funcs.VoidFunc1<T>() {
+                    @Override
+                    public void call(T v) {
+                        out.add(v);
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        if (test == null || dart.runtime.Dyn.invoke(test, e) == Boolean.TRUE) {
+                            deliverError(onError, e);
+                        } else {
+                            out.addError(e);
+                        }
+                    }
+                }, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        out.close();
+                    }
+                });
+                out.onCancel(new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        sub.cancel();
+                    }
+                });
+            }
+        });
+        return out.stream();
+    }
+
+    /** Dart's {@code transform}: a converter such as {@code utf8.decoder} or {@code LineSplitter()}. */
+    @SuppressWarnings("unchecked")
+    public final <R> Stream<R> transform(Object transformer) {
+        if (transformer instanceof StreamTransformer) {
+            return ((StreamTransformer<T, R>) transformer).bind(this);
+        }
+        throw new dart.core.UnsupportedError("Not a stream transformer: " + transformer);
+    }
+
+    /** Dart's {@code cast}; elements are not checked. */
+    @SuppressWarnings("unchecked")
+    public final <R> Stream<R> cast() {
+        return (Stream<R>) (Stream<?>) this;
+    }
+
+    /** Dart's {@code asBroadcastStream}; every stream here already accepts several listeners. */
+    public final Stream<T> asBroadcastStream() {
+        return this;
+    }
+
+    /** {@code asBroadcastStream(onListen:, onCancel:)}; the callbacks are not called. */
+    public final Stream<T> asBroadcastStream(Object onListen, Object onCancel) {
+        return this;
+    }
+
+    /** {@code handleError(onError, test:)}; an error {@code test} rejects is passed on. */
+    public final Stream<T> handleError(final Object onError, final Object test) {
+        return handleError0(onError, test);
+    }
+
+    /** Dart's {@code join()}. */
+    public final Future<String> join() {
+        return join("");
+    }
+
+    /** Dart's {@code isBroadcast}. */
+    public boolean isBroadcast() {
+        return true;
+    }
+
+    /**
+     * Listens to the end, folding every event into {@code step}; the future
+     * completes with {@code finish}'s value, or with the stream's first error.
+     */
+    private <R> Future<R> collect(final Funcs.Func1<T, Boolean> step, final Funcs.Func0<R> finish) {
+        final Completer<R> c = new Completer<R>();
+        final StreamSubscription<?>[] holder = new StreamSubscription<?>[1];
+        final boolean[] stopped = new boolean[1];
+        holder[0] = listen(new Funcs.VoidFunc1<T>() {
+            @Override
+            public void call(T v) {
+                if (stopped[0]) {
+                    return;
+                }
+                try {
+                    if (!step.call(v).booleanValue()) {
+                        stopped[0] = true;
+                        if (holder[0] != null) {
+                            holder[0].cancel();
+                        }
+                        c.complete(finish.call());
+                    }
+                } catch (Throwable t) {
+                    stopped[0] = true;
+                    c.completeError(dart.runtime.DartRuntime.caught(t));
+                }
+            }
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                if (!stopped[0]) {
+                    stopped[0] = true;
+                    if (holder[0] != null) {
+                        holder[0].cancel();
+                    }
+                    c.completeError(e);
+                }
+            }
+        }, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (!stopped[0]) {
+                    stopped[0] = true;
+                    try {
+                        c.complete(finish.call());
+                    } catch (Throwable t) {
+                        c.completeError(dart.runtime.DartRuntime.caught(t));
+                    }
+                }
+            }
+        });
+        if (stopped[0]) {
+            holder[0].cancel();
+        }
+        return c.future();
+    }
+
+    /** Dart's {@code toList}. */
+    public final Future<dart.core.DartList<T>> toList() {
+        final dart.core.DartList<T> out = new dart.core.DartList<T>();
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                out.add(v);
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<dart.core.DartList<T>>() {
+            @Override
+            public dart.core.DartList<T> call() {
+                return out;
+            }
+        });
+    }
+
+    /** Dart's {@code toSet}. */
+    public final Future<dart.core.DartSet<T>> toSet() {
+        final dart.core.DartSet<T> out = new dart.core.DartSet<T>();
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                out.add(v);
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<dart.core.DartSet<T>>() {
+            @Override
+            public dart.core.DartSet<T> call() {
+                return out;
+            }
+        });
+    }
+
+    /** Dart's {@code forEach}. */
+    public final Future<Object> forEach(final Funcs.VoidFunc1<T> action) {
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                action.call(v);
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return null;
+            }
+        });
+    }
+
+    /** Dart's {@code drain}. */
+    public final Future<Object> drain() {
+        return forEach(new Funcs.VoidFunc1<T>() {
+            @Override
+            public void call(T v) {
+            }
+        });
+    }
+
+    /** Dart's {@code drain(futureValue)}. */
+    public final Future<Object> drain(final Object futureValue) {
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return futureValue;
+            }
+        });
+    }
+
+    /** Dart's {@code length}. */
+    public final Future<Long> length() {
+        final long[] n = new long[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                n[0]++;
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<Long>() {
+            @Override
+            public Long call() {
+                return Long.valueOf(n[0]);
+            }
+        });
+    }
+
+    /** Dart's {@code isEmpty}. */
+    public final Future<Boolean> isEmpty() {
+        final boolean[] any = new boolean[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                any[0] = true;
+                return Boolean.FALSE;
+            }
+        }, new Funcs.Func0<Boolean>() {
+            @Override
+            public Boolean call() {
+                return Boolean.valueOf(!any[0]);
+            }
+        });
+    }
+
+    /** Dart's {@code first}: a StateError when the stream is empty. */
+    public final Future<T> first() {
+        final java.util.List<T> seen = new java.util.ArrayList<T>(1);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                seen.add(v);
+                return Boolean.FALSE;
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (seen.isEmpty()) {
+                    throw new dart.core.StateError("No element");
+                }
+                return seen.get(0);
+            }
+        });
+    }
+
+    /** Dart's {@code last}: a StateError when the stream is empty. */
+    public final Future<T> last() {
+        final java.util.List<T> seen = new java.util.ArrayList<T>(1);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                seen.clear();
+                seen.add(v);
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (seen.isEmpty()) {
+                    throw new dart.core.StateError("No element");
+                }
+                return seen.get(0);
+            }
+        });
+    }
+
+    /** Dart's {@code firstWhere(test, {orElse})}. */
+    public final Future<T> firstWhere(final Funcs.Func1<T, Boolean> test, final Funcs.Func0<T> orElse) {
+        final java.util.List<T> seen = new java.util.ArrayList<T>(1);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                if (test.call(v).booleanValue()) {
+                    seen.add(v);
+                    return Boolean.FALSE;
+                }
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (!seen.isEmpty()) {
+                    return seen.get(0);
+                }
+                if (orElse != null) {
+                    return orElse.call();
+                }
+                throw new dart.core.StateError("No element");
+            }
+        });
+    }
+
+    /** Dart's {@code any}. */
+    public final Future<Boolean> any(final Funcs.Func1<T, Boolean> test) {
+        final boolean[] hit = new boolean[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                hit[0] = test.call(v).booleanValue();
+                return Boolean.valueOf(!hit[0]);
+            }
+        }, new Funcs.Func0<Boolean>() {
+            @Override
+            public Boolean call() {
+                return Boolean.valueOf(hit[0]);
+            }
+        });
+    }
+
+    /** Dart's {@code every}. */
+    public final Future<Boolean> every(final Funcs.Func1<T, Boolean> test) {
+        final boolean[] miss = new boolean[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                miss[0] = !test.call(v).booleanValue();
+                return Boolean.valueOf(!miss[0]);
+            }
+        }, new Funcs.Func0<Boolean>() {
+            @Override
+            public Boolean call() {
+                return Boolean.valueOf(!miss[0]);
+            }
+        });
+    }
+
+    /** Dart's {@code contains}. */
+    public final Future<Boolean> contains(final Object needle) {
+        return any(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                return Boolean.valueOf(needle == null ? v == null : needle.equals(v));
+            }
+        });
+    }
+
+    /** Dart's {@code join([separator])}. */
+    public final Future<String> join(final String separator) {
+        final StringBuilder sb = new StringBuilder();
+        final boolean[] started = new boolean[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                if (started[0] && separator != null) {
+                    sb.append(separator);
+                }
+                started[0] = true;
+                sb.append(dart.runtime.DartRuntime.str(v));
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<String>() {
+            @Override
+            public String call() {
+                return sb.toString();
+            }
+        });
+    }
+
+    /** Dart's {@code fold}. */
+    @SuppressWarnings("unchecked")
+    public final <R> Future<R> fold(final R initial, final Funcs.Func2<R, T, Object> combine) {
+        final Object[] acc = {initial};
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                acc[0] = (R) combine.call((R) acc[0], v);
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<R>() {
+            @Override
+            public R call() {
+                return (R) acc[0];
+            }
+        });
+    }
+
+    /** Dart's {@code reduce}. */
+    @SuppressWarnings("unchecked")
+    public final Future<T> reduce(final Funcs.Func2<T, T, Object> combine) {
+        final Object[] acc = new Object[1];
+        final boolean[] started = new boolean[1];
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                acc[0] = started[0] ? (T) combine.call((T) acc[0], v) : v;
+                started[0] = true;
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (!started[0]) {
+                    throw new dart.core.StateError("No element");
+                }
+                return (T) acc[0];
+            }
+        });
+    }
+
+    /** Dart's {@code elementAt}. */
+    public final Future<T> elementAt(final long index) {
+        final long[] i = new long[1];
+        final java.util.List<T> seen = new java.util.ArrayList<T>(1);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                if (i[0]++ == index) {
+                    seen.add(v);
+                    return Boolean.FALSE;
+                }
+                return Boolean.TRUE;
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (seen.isEmpty()) {
+                    throw new dart.core.RangeError("Index out of range: " + index);
+                }
+                return seen.get(0);
+            }
+        });
+    }
 }

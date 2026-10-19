@@ -24,7 +24,7 @@
 package dart.convert;
 
 /** {@code JsonDecoder}. */
-public final class JsonDecoder {
+public final class JsonDecoder implements dart.async.StreamTransformer<String, Object> {
     private final Object reviver;
 
     public JsonDecoder() {
@@ -37,5 +37,16 @@ public final class JsonDecoder {
 
     public Object convert(String input) {
         return new JsonCodec().decode(input, reviver);
+    }
+
+    /** {@code stream.transform(json.decoder)}: the whole text, decoded once it has all arrived. */
+    @Override
+    public dart.async.Stream<Object> bind(final dart.async.Stream<String> source) {
+        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<Object>>() {
+            @Override
+            public void call(dart.async.AsyncStar.Sink<Object> sink) {
+                sink.yield$(convert(dart.async.Await.await$(source.join(""))));
+            }
+        });
     }
 }

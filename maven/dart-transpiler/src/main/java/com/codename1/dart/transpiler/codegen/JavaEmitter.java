@@ -8994,11 +8994,24 @@ public final class JavaEmitter {
         if (tt.is("Future")) {
             ctx.importClass("dart.async.Future");
             if (n.equals("then")) {
-                Out cb = emitExpr(pos.get(0), null, ctx);
+                // `getUrl(u).then((r) => r.close())`: an untyped callback parameter takes
+                // the future's value type, as Dart infers it, so members of a runtime class
+                // resolve statically -- through dynamic dispatch they could not resolve.
+                TypeRef valueType = tt.args.size() == 1 ? tt.arg(0) : null;
+                Expr cbExpr = pos.get(0);
+                boolean typedCb = valueType != null && !isDynamicType(valueType) && isFullyConcrete(valueType)
+                        && !valueType.is("int") && !valueType.is("double") && !valueType.is("bool")
+                        && !valueType.is("num") && !valueType.is("void") && !valueType.is("Null")
+                        && cbExpr instanceof Lambda && ((Lambda) cbExpr).params.size() == 1
+                        && ((Lambda) cbExpr).typeParams.isEmpty()
+                        && (((Lambda) cbExpr).params.get(0).type == null || ((Lambda) cbExpr).params.get(0).type.is("var"));
+                Out cb = emitExpr(cbExpr, typedCb ? inlineFuncType(valueType, TypeRef.DYNAMIC) : null, ctx);
+                String vj = typedCb ? javaType(boxType(valueType), true, ctx) : null;
                 // A lambda fits BOTH then overloads (Func1 / VoidFunc1) when it is void- or
                 // throw-bodied, which javac reports as ambiguous; pin those to VoidFunc1.
-                String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
-                        "dart.runtime.Funcs.VoidFunc1");
+                String cbCode = pinnedHandler(cbExpr, cb, typedCb,
+                        typedCb ? "dart.runtime.Funcs.Func1<" + vj + ", Object>" : "dart.runtime.Funcs.Func1",
+                        typedCb ? "dart.runtime.Funcs.VoidFunc1<" + vj + ">" : "dart.runtime.Funcs.VoidFunc1");
                 // then(onValue, onError: handler): the handler was dropped, so a failure
                 // skipped it and the chain stayed failed.
                 for (NamedArg na : c.args.named) {
