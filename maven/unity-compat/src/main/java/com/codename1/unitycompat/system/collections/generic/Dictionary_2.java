@@ -328,6 +328,10 @@ public class Dictionary_2 implements IDictionary_2 {
         int version;
         /// One more than the slot of the current entry: 0 is none.
         int current;
+        // What MoveNext yielded, kept: a Remove or a replaced value after it
+        // leaves Current as it was.
+        Object key;
+        Object value;
 
         public Enumerator $copy() {
             Enumerator e = new Enumerator();
@@ -345,6 +349,8 @@ public class Dictionary_2 implements IDictionary_2 {
             index = other.index;
             version = other.version;
             current = other.current;
+            key = other.key;
+            value = other.value;
         }
 
         @Override
@@ -353,6 +359,8 @@ public class Dictionary_2 implements IDictionary_2 {
             index = 0;
             version = 0;
             current = 0;
+            key = null;
+            value = null;
         }
 
         @Override
@@ -360,6 +368,8 @@ public class Dictionary_2 implements IDictionary_2 {
             // An enumerator nothing filled in walks nothing.
             index = dictionary == null ? 0 : dictionary.advance(index, version) + 1;
             current = index;
+            key = current == 0 ? null : dictionary.keys[current - 1];
+            value = current == 0 ? null : dictionary.values[current - 1];
             if (index == 0) {
                 index = Integer.MAX_VALUE;
             }
@@ -376,8 +386,8 @@ public class Dictionary_2 implements IDictionary_2 {
             if (current == 0) {
                 pair.$clear();
             } else {
-                pair.key = dictionary.keys[current - 1];
-                pair.value = dictionary.values[current - 1];
+                pair.key = key;
+                pair.value = value;
             }
             return pair;
         }
@@ -428,6 +438,10 @@ public class Dictionary_2 implements IDictionary_2 {
             int index;
             int version;
             int current;
+            // What MoveNext yielded, kept: a Remove or a replaced value after it
+            // leaves Current as it was.
+            Object key;
+            Object value;
 
             public Enumerator $copy() {
                 Enumerator e = new Enumerator();
@@ -445,6 +459,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 index = other.index;
                 version = other.version;
                 current = other.current;
+                key = other.key;
+                value = other.value;
             }
 
             @Override
@@ -453,6 +469,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 index = 0;
                 version = 0;
                 current = 0;
+                key = null;
+                value = null;
             }
 
             @Override
@@ -460,6 +478,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 // An enumerator nothing filled in walks nothing.
                 index = dictionary == null ? 0 : dictionary.advance(index, version) + 1;
                 current = index;
+                key = current == 0 ? null : dictionary.keys[current - 1];
+                value = current == 0 ? null : dictionary.values[current - 1];
                 if (index == 0) {
                     index = Integer.MAX_VALUE;
                 }
@@ -468,7 +488,7 @@ public class Dictionary_2 implements IDictionary_2 {
 
             @Override
             public Object get_Current() {
-                return current == 0 ? null : dictionary.keys[current - 1];
+                return current == 0 ? null : key;
             }
 
             @Override
@@ -517,6 +537,10 @@ public class Dictionary_2 implements IDictionary_2 {
             int index;
             int version;
             int current;
+            // What MoveNext yielded, kept: a Remove or a replaced value after it
+            // leaves Current as it was.
+            Object key;
+            Object value;
 
             public Enumerator $copy() {
                 Enumerator e = new Enumerator();
@@ -534,6 +558,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 index = other.index;
                 version = other.version;
                 current = other.current;
+                key = other.key;
+                value = other.value;
             }
 
             @Override
@@ -542,6 +568,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 index = 0;
                 version = 0;
                 current = 0;
+                key = null;
+                value = null;
             }
 
             @Override
@@ -549,6 +577,8 @@ public class Dictionary_2 implements IDictionary_2 {
                 // An enumerator nothing filled in walks nothing.
                 index = dictionary == null ? 0 : dictionary.advance(index, version) + 1;
                 current = index;
+                key = current == 0 ? null : dictionary.keys[current - 1];
+                value = current == 0 ? null : dictionary.values[current - 1];
                 if (index == 0) {
                     index = Integer.MAX_VALUE;
                 }
@@ -557,7 +587,7 @@ public class Dictionary_2 implements IDictionary_2 {
 
             @Override
             public Object get_Current() {
-                return current == 0 ? null : dictionary.values[current - 1];
+                return current == 0 ? null : value;
             }
 
             @Override

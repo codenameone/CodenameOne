@@ -1498,6 +1498,23 @@ namespace Spike
             Array.Clear(clearBoxAny, 0, 1);
             Log("array clear erased " + clearVecs[0].x + " " + clearVecs[1].x + " " + clearVecs[1].y + " " + (clearBoxes[0] == null));
 
+            // Array.Clone through a System.Array still copies each struct.
+            Array cloneAny = new GsVec[] { new GsVec(1, 2) };
+            GsVec[] cloned = (GsVec[])cloneAny.Clone();
+            cloned[0].x = 9;
+            Log("array clone erased " + ((GsVec[])cloneAny)[0].x + " " + cloned[0].x);
+
+            // Current keeps the entry MoveNext yielded after a Remove and a replaced value.
+            var snapDict = new Dictionary<string, int> { { "a", 1 }, { "b", 2 } };
+            var snapEnum = snapDict.GetEnumerator();
+            snapEnum.MoveNext();
+            string snapKey = snapEnum.Current.Key;
+            snapDict.Remove(snapKey);
+            var snapAfterRemove = snapEnum.Current;
+            snapEnum.MoveNext();
+            snapDict[snapEnum.Current.Key] = 7;
+            Log("dictionary current kept " + snapAfterRemove.Key + "=" + snapAfterRemove.Value + " " + snapEnum.Current.Key + "=" + snapEnum.Current.Value);
+
             // Exception.ToString: the .NET type name and the inner chain.
             string chained = new InvalidOperationException("outer", new ArgumentException("inner")).ToString();
             Log("exception text " + chained.Replace("\n", "|") + " / " + new Exception() + " / " + new Exception("")

@@ -135,11 +135,15 @@ public final class Array_ {
         return new Object[0];
     }
 
-    /// `Array.Clone()` of anything but a one-dimensional array of structs,
-    /// which goes to [#$cloneStructs]: a shallow copy.
+    /// `Array.Clone()`: a shallow copy, except that a struct array copies its
+    /// elements. The translator sends a typed struct array to
+    /// [#$cloneStructs]; one reached through a `System.Array` comes here.
     public static Object Clone(Object array) {
         if (array instanceof MdArray) {
             return ((MdArray) array).copy();
+        }
+        if (array instanceof Struct[]) {
+            return $cloneStructs(array);
         }
         if (array instanceof Object[]) {
             return ((Object[]) array).clone();
