@@ -81,6 +81,47 @@ public final class Uint8List {
         return bytes.length;
     }
 
+    /** {@code bytes[i]}: the unsigned byte, as Dart reads a Uint8List. */
+    public long $index(long index) {
+        dart.core.RangeError.checkValidIndex(index, bytes.length);
+        return bytes[(int) index] & 0xff;
+    }
+
+    public void $indexSet(long index, long value) {
+        dart.core.RangeError.checkValidIndex(index, bytes.length);
+        bytes[(int) index] = (byte) value;
+    }
+
+    public dart.core.DartList<Long> toList() {
+        dart.core.DartList<Long> out = new dart.core.DartList<Long>();
+        for (byte b : bytes) {
+            out.add(Long.valueOf(b & 0xff));
+        }
+        return out;
+    }
+
+    public Uint8List sublist(long start) {
+        return sublist(start, null);
+    }
+
+    public Uint8List sublist(long start, Long end) {
+        int e = end == null ? bytes.length : (int) end.longValue();
+        if (start < 0 || start > e || e > bytes.length) {
+            throw new dart.core.RangeError("Invalid range " + start + ".." + e);
+        }
+        byte[] out = new byte[e - (int) start];
+        System.arraycopy(bytes, (int) start, out, 0, out.length);
+        return new Uint8List(out);
+    }
+
+    public boolean isEmpty() {
+        return bytes.length == 0;
+    }
+
+    public boolean isNotEmpty() {
+        return bytes.length != 0;
+    }
+
     /** The raw backing array (used by image decoders). */
     public byte[] toBytes() {
         return bytes;

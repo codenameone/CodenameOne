@@ -174,6 +174,12 @@ class Uint8List {
   external Uint8List(int length);
   external static Uint8List fromList(List<int> elements);
   external int get length;
+  external int operator [](int index);
+  external void operator []=(int index, int value);
+  external List<int> toList();
+  external Uint8List sublist(int start, [int? end]);
+  external bool get isEmpty;
+  external bool get isNotEmpty;
 }
 
 @JavaName('dart.typed_data.ByteData')

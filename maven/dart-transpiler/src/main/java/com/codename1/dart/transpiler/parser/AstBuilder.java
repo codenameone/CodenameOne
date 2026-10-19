@@ -177,7 +177,7 @@ public final class AstBuilder {
      * a platform without that library.
      */
     private static final java.util.Set<String> SUPPORTED_DART_LIBRARIES = new java.util.HashSet<String>(
-            java.util.Arrays.asList("core", "async", "collection", "math", "typed_data", "ui"));
+            java.util.Arrays.asList("core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
 
     /**
      * Picks the uri a configurable import/export names on this platform: the first
@@ -737,6 +737,15 @@ public final class AstBuilder {
             buildCtorName(sig.factoryConstructorSignature().constructorName(), ctor, cd);
             buildParams(sig.factoryConstructorSignature().formalParameterList(), ctor.params);
             ctor.body = buildBodyBlock(body);
+            // `factory X.f(...) => expr;` returns expr; a generative constructor's arrow
+            // body is a statement, which is how buildBodyBlock reads every arrow body.
+            if (body != null && body.expr() != null && ctor.body != null
+                    && ctor.body.statements.size() == 1 && ctor.body.statements.get(0) instanceof ExprStmt) {
+                ReturnStmt r = new ReturnStmt();
+                pos(r, body);
+                r.value = ((ExprStmt) ctor.body.statements.get(0)).expr;
+                ctor.body.statements.set(0, r);
+            }
             cd.ctors.add(ctor);
             return;
         }
