@@ -9434,6 +9434,219 @@ void com_codename1_impl_ios_IOSNative_showSaveFileDialog___java_lang_String_bool
 #endif
 }
 
+// macOS open/save panels for Display.showOpenDialog/showSaveDialog. Filters
+// and options arrive in NativeFileDialogCodec's form, records separated by
+// the RS control character (0x1e); the answer goes back the same way.
+#if TARGET_OS_OSX
+@interface CN1MacFileDialogFilterTarget : NSObject
+@property (nonatomic, assign) NSSavePanel *panel;
+@property (nonatomic, retain) NSArray *filterExtensions;
+- (void)filterChanged:(id)sender;
+- (void)applyFilter:(NSInteger)index;
+@end
+
+@implementation CN1MacFileDialogFilterTarget
+- (void)applyFilter:(NSInteger)index {
+    if (index < 0 || index >= (NSInteger)self.filterExtensions.count) {
+        return;
+    }
+    NSArray *exts = [self.filterExtensions objectAtIndex:index];
+    BOOL any = exts.count == 0;
+    for (NSString *e in exts) {
+        if ([e isEqualToString:@"*"]) any = YES;
+    }
+    // allowedFileTypes is what the existing chooser uses; it takes plain
+    // extensions and avoids linking UniformTypeIdentifiers on the Mac slice.
+    self.panel.allowedFileTypes = any ? nil : exts;
+}
+- (void)filterChanged:(id)sender {
+    [self applyFilter:[(NSPopUpButton *)sender indexOfSelectedItem]];
+}
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_filterExtensions release];
+    [super dealloc];
+}
+#endif
+@end
+
+static NSArray *cn1MacSplitRecords(NSString *s) {
+    if (s == nil || s.length == 0) return [NSArray array];
+    return [s componentsSeparatedByString:@"\x1e"];
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_showMacFileDialog___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_java_lang_String_boolean_boolean_boolean_boolean_boolean_boolean_boolean_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN save, JAVA_OBJECT title, JAVA_OBJECT message, JAVA_OBJECT prompt, JAVA_OBJECT initialDirectory, JAVA_OBJECT suggestedName, JAVA_OBJECT filters, JAVA_INT selectedFilter, JAVA_OBJECT options, JAVA_BOOLEAN multiSelect, JAVA_BOOLEAN directories, JAVA_BOOLEAN showsTagField, JAVA_BOOLEAN canCreateDirectories, JAVA_BOOLEAN showsHiddenFiles, JAVA_BOOLEAN canSelectHiddenExtension, JAVA_BOOLEAN treatsPackagesAsDirectories, JAVA_INT requestId) {
+#if TARGET_OS_OSX
+    NSString *nsTitle = title == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    NSString *nsMessage = message == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG message);
+    NSString *nsPrompt = prompt == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG prompt);
+    NSString *nsDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+    NSString *nsName = suggestedName == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG suggestedName);
+    NSArray *filterRecords = cn1MacSplitRecords(filters == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG filters));
+    NSArray *optionRecords = cn1MacSplitRecords(options == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG options));
+#ifndef CN1_USE_ARC
+    [nsTitle retain]; [nsMessage retain]; [nsPrompt retain]; [nsDir retain]; [nsName retain];
+    [filterRecords retain]; [optionRecords retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSSavePanel *panel;
+        if (save) {
+            panel = [NSSavePanel savePanel];
+            if (nsName.length > 0) panel.nameFieldStringValue = nsName;
+            panel.showsTagField = showsTagField;
+            panel.canSelectHiddenExtension = canSelectHiddenExtension;
+        } else {
+            NSOpenPanel *open = [NSOpenPanel openPanel];
+            open.allowsMultipleSelection = multiSelect;
+            open.canChooseDirectories = directories;
+            open.canChooseFiles = !directories;
+            panel = open;
+        }
+        if (nsTitle.length > 0) panel.title = nsTitle;
+        if (nsMessage.length > 0) panel.message = nsMessage;
+        if (nsPrompt.length > 0) panel.prompt = nsPrompt;
+        if (nsDir.length > 0) panel.directoryURL = [NSURL fileURLWithPath:nsDir isDirectory:YES];
+        panel.canCreateDirectories = canCreateDirectories;
+        panel.showsHiddenFiles = showsHiddenFiles;
+        panel.treatsFilePackagesAsDirectories = treatsPackagesAsDirectories;
+
+        NSStackView *stack = [NSStackView stackViewWithViews:[NSArray array]];
+        stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+        stack.alignment = NSLayoutAttributeLeading;
+        stack.edgeInsets = NSEdgeInsetsMake(8, 16, 8, 16);
+
+        CN1MacFileDialogFilterTarget *target = [[CN1MacFileDialogFilterTarget alloc] init];
+#ifndef CN1_USE_ARC
+        [target autorelease];
+#endif
+        target.panel = panel;
+        NSPopUpButton *filterPopup = nil;
+        if (filterRecords.count > 0 && !directories) {
+            NSMutableArray *exts = [NSMutableArray array];
+            filterPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 240, 26) pullsDown:NO];
+#ifndef CN1_USE_ARC
+            [filterPopup autorelease];
+#endif
+            for (NSString *rec in filterRecords) {
+                NSArray *parts = [rec componentsSeparatedByString:@"\n"];
+                [filterPopup addItemWithTitle:[parts objectAtIndex:0]];
+                NSMutableArray *e = [NSMutableArray array];
+                for (NSUInteger i = 1; i < parts.count; i++) {
+                    NSString *x = [parts objectAtIndex:i];
+                    if ([x hasPrefix:@"."]) x = [x substringFromIndex:1];
+                    if (x.length > 0) [e addObject:x];
+                }
+                [exts addObject:e];
+            }
+            target.filterExtensions = exts;
+            NSInteger sel = selectedFilter >= 0 && selectedFilter < (JAVA_INT)filterRecords.count ? selectedFilter : 0;
+            [filterPopup selectItemAtIndex:sel];
+            filterPopup.target = target;
+            filterPopup.action = @selector(filterChanged:);
+            [target applyFilter:sel];
+            if (filterRecords.count > 1) {
+                [stack addArrangedSubview:filterPopup];
+            }
+        }
+
+        // One control per option, in order: type 1 checkbox, 2 choice, 3 text.
+        NSMutableArray *optionControls = [NSMutableArray array];
+        for (NSString *rec in optionRecords) {
+            NSArray *parts = [rec componentsSeparatedByString:@"\n"];
+            if (parts.count < 4) { [optionControls addObject:[NSNull null]]; continue; }
+            int type = [[parts objectAtIndex:0] intValue];
+            NSString *label = [parts objectAtIndex:2];
+            NSString *def = [parts objectAtIndex:3];
+            NSView *control;
+            if (type == 1) {
+                NSButton *b = [NSButton checkboxWithTitle:label target:nil action:nil];
+                b.state = [def isEqualToString:@"true"] ? NSControlStateValueOn : NSControlStateValueOff;
+                control = b;
+                [stack addArrangedSubview:b];
+            } else {
+                NSTextField *l = [NSTextField labelWithString:label];
+                NSView *field;
+                if (type == 2) {
+                    NSPopUpButton *p = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 200, 26) pullsDown:NO];
+#ifndef CN1_USE_ARC
+                    [p autorelease];
+#endif
+                    for (NSUInteger i = 4; i < parts.count; i++) [p addItemWithTitle:[parts objectAtIndex:i]];
+                    if (def.length > 0 && [p indexOfItemWithTitle:def] >= 0) [p selectItemWithTitle:def];
+                    field = p;
+                } else {
+                    NSTextField *t = [NSTextField textFieldWithString:def];
+                    [t.widthAnchor constraintGreaterThanOrEqualToConstant:200].active = YES;
+                    field = t;
+                }
+                control = field;
+                [stack addArrangedSubview:[NSStackView stackViewWithViews:[NSArray arrayWithObjects:l, field, nil]]];
+            }
+            [optionControls addObject:control];
+        }
+        if (stack.arrangedSubviews.count > 0) {
+            [stack layoutSubtreeIfNeeded];
+            NSSize fit = stack.fittingSize;
+            stack.frame = NSMakeRect(0, 0, MAX(fit.width, 300), fit.height);
+            panel.accessoryView = stack;
+            if ([panel isKindOfClass:[NSOpenPanel class]]) {
+                ((NSOpenPanel *)panel).accessoryViewDisclosed = YES;
+            }
+        }
+
+        NSWindow *owner = [CN1MacKeyRenderingHostView() window];
+        void (^completed)(NSModalResponse) = ^(NSModalResponse response) {
+            POOL_BEGIN();
+            NSString *answer = nil;
+            if (response == NSModalResponseOK) {
+                NSMutableArray *out = [NSMutableArray array];
+                [out addObject:[NSString stringWithFormat:@"%ld", (long)(filterPopup == nil ? -1 : [filterPopup indexOfSelectedItem])]];
+                for (id c in optionControls) {
+                    // NSPopUpButton is an NSButton subclass, so it is tested first.
+                    if ([c isKindOfClass:[NSPopUpButton class]]) {
+                        NSString *t = [(NSPopUpButton *)c titleOfSelectedItem];
+                        [out addObject:t == nil ? @"" : t];
+                    } else if ([c isKindOfClass:[NSButton class]]) {
+                        [out addObject:((NSButton *)c).state == NSControlStateValueOn ? @"true" : @"false"];
+                    } else if ([c isKindOfClass:[NSTextField class]]) {
+                        [out addObject:((NSTextField *)c).stringValue];
+                    } else {
+                        [out addObject:@""];
+                    }
+                }
+                NSArray *urls = [panel isKindOfClass:[NSOpenPanel class]] ? ((NSOpenPanel *)panel).URLs
+                        : (panel.URL == nil ? [NSArray array] : [NSArray arrayWithObject:panel.URL]);
+                for (NSURL *u in urls) [out addObject:[u path]];
+                if (urls.count > 0) answer = [out componentsJoinedByString:@"\x1e"];
+            }
+            // The popup holds its target weakly; this capture keeps it alive
+            // until the panel closes.
+            [target self];
+            [panel orderOut:nil];
+            if (owner != nil && owner.visible) [owner makeKeyAndOrderFront:nil];
+            struct ThreadLocalData *threadStateData = getThreadLocalData();
+            com_codename1_impl_ios_IOSImplementation_macFileDialogResult___java_lang_String_int(
+                threadStateData, answer == nil ? JAVA_NULL : fromNSString(threadStateData, answer), requestId);
+            POOL_END();
+        };
+        if (owner != nil) {
+            [panel beginSheetModalForWindow:owner completionHandler:completed];
+        } else {
+            [panel beginWithCompletionHandler:completed];
+        }
+#ifndef CN1_USE_ARC
+        [nsTitle release]; [nsMessage release]; [nsPrompt release]; [nsDir release]; [nsName release];
+        [filterRecords release]; [optionRecords release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_macFileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+#endif
+}
+
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 

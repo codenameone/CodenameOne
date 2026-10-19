@@ -6821,7 +6821,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isFileDialogFeatureSupported(int feature) {
         if (isMacPlatform()) {
-            return super.isFileDialogFeatureSupported(feature);
+            // No accessory Component or preview: there is no way to host a
+            // Codename One peer inside the panel's accessory NSView yet.
+            return feature != com.codename1.io.filechooser.FileDialogFeatures.ACCESSORY_COMPONENT
+                    && feature != com.codename1.io.filechooser.FileDialogFeatures.PREVIEW;
         }
         return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
                 || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
@@ -6833,8 +6836,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
                                SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
         if (isMacPlatform()) {
-            // The Mac port answers through its NSOpenPanel chooser.
-            super.showOpenDialog(request, callback);
+            showMacDialog(request, false, request.isMultiSelect(), request.isDirectories(), callback);
             return;
         }
         java.util.ArrayList<String> uts = new java.util.ArrayList<String>();
@@ -6871,7 +6873,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
                                final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
         if (isMacPlatform()) {
-            super.showSaveDialog(request, callback);
+            // NSSavePanel always confirms an overwrite itself; AppKit has no
+            // public switch for it, so isConfirmOverwrite(false) is not honoured.
+            showMacDialog(request, true, false, false, callback);
             return;
         }
         String name = request.getSuggestedName();
@@ -6920,6 +6924,84 @@ public class IOSImplementation extends CodenameOneImplementation {
                         stripFileScheme(request.getInitialDirectory()), id);
             }
         });
+    }
+
+    /// Record separator between the codec's strings on the Mac native boundary
+    /// (ASCII RS); the codec's own records use newlines internally.
+    private static final char MAC_DIALOG_RS = (char) 30;
+
+    private static String joinRecords(String[] values) {
+        if (values.length == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                sb.append(MAC_DIALOG_RS);
+            }
+            sb.append(values[i].replace(MAC_DIALOG_RS, ' '));
+        }
+        return sb.toString();
+    }
+
+    private void showMacDialog(com.codename1.io.filechooser.FileDialogRequest<?> request, boolean save,
+                               boolean multi, boolean dirs,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        int id = registerFileDialog(new PendingFileDialog(request, callback, null));
+        String name = save ? ((com.codename1.io.filechooser.SaveFileRequest) request).getSuggestedName() : null;
+        nativeInstance.showMacFileDialog(save, request.getTitle(), request.getMessage(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), name,
+                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeFilters(request)),
+                request.getSelectedFilter(),
+                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeOptions(request)),
+                multi, dirs,
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_SHOWS_TAG_FIELD, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_CAN_CREATE_DIRECTORIES, true),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_SHOWS_HIDDEN_FILES, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_CAN_SELECT_HIDDEN_EXTENSION, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_TREATS_PACKAGES_AS_DIRECTORIES, false),
+                id);
+    }
+
+    /// Native completion of showMacFileDialog: the codec's answer joined with
+    /// RS, or null when cancelled. Called on the AppKit main thread.
+    public static void macFileDialogResult(final String answer, final int requestId) {
+        final PendingFileDialog pending;
+        synchronized (fileDialogRequests) {
+            pending = fileDialogRequests.remove(requestId);
+        }
+        if (pending == null) {
+            return; // Duplicate or unknown completion.
+        }
+        Runnable delivery = new Runnable() {
+            @Override
+            public void run() {
+                String[] parts = null;
+                if (answer != null) {
+                    // Split by hand: an empty text option is a real, positional value.
+                    java.util.ArrayList<String> list = new java.util.ArrayList<String>();
+                    int start = 0;
+                    for (int i = 0; i <= answer.length(); i++) {
+                        if (i == answer.length() || answer.charAt(i) == MAC_DIALOG_RS) {
+                            list.add(answer.substring(start, i));
+                            start = i + 1;
+                        }
+                    }
+                    parts = list.toArray(new String[list.size()]);
+                }
+                com.codename1.io.filechooser.FileDialogResult r =
+                        com.codename1.impl.NativeFileDialogCodec.decode(pending.request, parts);
+                if (!r.isCancelled() && pending.request instanceof com.codename1.io.filechooser.SaveFileRequest) {
+                    instance.completeSaveDialog(
+                            (com.codename1.io.filechooser.SaveFileRequest) pending.request, r, pending.callback);
+                    return;
+                }
+                pending.callback.onSucess(r);
+            }
+        };
+        if (!deliverPickerResultOnEdt(delivery)) {
+            delivery.run();
+        }
     }
 
     /// Native completion of showOpenFileDialog and showSaveFileDialog. `paths`
