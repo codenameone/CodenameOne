@@ -368,19 +368,19 @@ final class AndroidFileDialogs {
         if (in == null) {
             throw new IOException("Cannot open " + uri);
         }
-        OutputStream out = null;
         try {
-            out = new FileOutputStream(dest);
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = in.read(buffer)) > -1) {
-                out.write(buffer, 0, read);
+            OutputStream out = new FileOutputStream(dest);
+            try {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > -1) {
+                    out.write(buffer, 0, read);
+                }
+            } finally {
+                out.close();
             }
         } finally {
             in.close();
-            if (out != null) {
-                out.close();
-            }
         }
         return "file://" + dest.getAbsolutePath();
     }
