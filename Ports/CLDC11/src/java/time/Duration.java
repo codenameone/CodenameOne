@@ -295,6 +295,8 @@ public final class Duration implements TemporalAmount, Comparable<Duration> {
         return Collections.unmodifiableList(units);
     }
 
+    /// A zero duration hands `temporal` back untouched, null included:
+    /// JDK 8, the conformance host, does the same and throws nothing.
     @Override
     public Temporal addTo(Temporal temporal) {
         if (seconds != 0) {

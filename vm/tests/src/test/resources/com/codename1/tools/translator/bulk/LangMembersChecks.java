@@ -370,6 +370,24 @@ public final class LangMembersChecks {
             }
             Bulk.p("calls", String.valueOf(calls[0]));
         });
+        Bulk.check("Lang.prefixedZoneIdsKeepRegionSyntax", () -> {
+            StringBuilder out = new StringBuilder();
+            String[] ids = {"UTC?", "GMT0", "UT!", "GMT+x"};
+            for (String id : ids) {
+                try {
+                    out.append(java.time.ZoneId.of(id).getId());
+                } catch (java.time.DateTimeException e) {
+                    out.append("DTE");
+                }
+                out.append(',');
+            }
+            Bulk.p("ids", out.toString());
+        });
+        Bulk.check("Lang.yieldKeepsTheInterruptStatus", () -> {
+            Thread.currentThread().interrupt();
+            Thread.yield();
+            Bulk.p("interrupted", String.valueOf(Thread.interrupted()));
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

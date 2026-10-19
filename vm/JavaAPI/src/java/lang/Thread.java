@@ -432,7 +432,10 @@ public class Thread implements java.lang.Runnable{
     public static void yield(){
         try {
             sleep(1); 
-        } catch(InterruptedException i) {}
+        } catch(InterruptedException i) {
+            // sleep cleared the status to throw; a yield must leave it set.
+            currentThread().interrupt();
+        }
     }
 
     protected void finalize() {

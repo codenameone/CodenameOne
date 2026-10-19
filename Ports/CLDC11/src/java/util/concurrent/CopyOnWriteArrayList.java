@@ -296,14 +296,15 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
                     kept[n++] = elements[i];
                 }
             }
-            if (n == elements.length) {
-                return false;
-            }
             if (elements != getArray()) {
                 // The predicate changed the list (the lock is reentrant):
                 // publishing the filtered snapshot would silently undo that,
-                // so keep its change and report it, as the JDK does.
+                // so keep its change and report it, as the JDK does. Checked
+                // before the nothing-removed return, as removeIf is.
                 throw new java.util.ConcurrentModificationException();
+            }
+            if (n == elements.length) {
+                return false;
             }
             Object[] copy = new Object[n];
             System.arraycopy(kept, 0, copy, 0, n);

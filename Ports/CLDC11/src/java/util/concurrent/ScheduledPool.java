@@ -459,7 +459,9 @@ final class ScheduledPool extends AbstractExecutorService implements ScheduledEx
         // -- and a task still running forgets itself into an empty array.
         for (Scheduled<?> task : live.getAndSet(NONE)) {
             task.disarm();
-            if (!task.outcome.isDone() && !task.running.get()) {
+            // A fixed-rate firing owed is a wrapper already handed to the
+            // pool, and so already in what pool.shutdownNow() answered.
+            if (!task.outcome.isDone() && !task.running.get() && !(task.rate > 0 && task.owed.get() > 0)) {
                 dropped.add(task);
             }
         }

@@ -58,17 +58,7 @@ public class ZoneId {
         if (zoneId.startsWith("UT")) {
             return ofPrefixed(zoneId, 2);
         }
-        for (int i = 0; i < zoneId.length(); i++) {
-            char c = zoneId.charAt(i);
-            // A region ID starts with a letter, as the JDK's
-            // [A-Za-z][A-Za-z0-9~/._+-]+ requires.
-            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-            boolean ok = letter || i > 0 && ((c >= '0' && c <= '9')
-                    || c == '~' || c == '/' || c == '.' || c == '_' || c == '+' || c == '-');
-            if (!ok) {
-                throw new DateTimeException("Invalid ID for region-based ZoneId, invalid format: " + zoneId);
-            }
-        }
+        checkRegionSyntax(zoneId);
         // A well-formed region ID is accepted without checking it names a
         // real region, where the JDK throws ZoneRulesException. That is
         // deliberate: a device has no zone database to check against -- the
@@ -81,6 +71,21 @@ public class ZoneId {
         return new ZoneId(zoneId, null);
     }
 
+    /// Throws unless `zoneId` has the JDK's region-ID syntax.
+    private static void checkRegionSyntax(String zoneId) {
+        for (int i = 0; i < zoneId.length(); i++) {
+            char c = zoneId.charAt(i);
+            // A region ID starts with a letter, as the JDK's
+            // [A-Za-z][A-Za-z0-9~/._+-]+ requires.
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean ok = letter || i > 0 && ((c >= '0' && c <= '9')
+                    || c == '~' || c == '/' || c == '.' || c == '_' || c == '+' || c == '-');
+            if (!ok) {
+                throw new DateTimeException("Invalid ID for region-based ZoneId, invalid format: " + zoneId);
+            }
+        }
+    }
+
     private static ZoneId ofPrefixed(String zoneId, int prefixLength) {
         String prefix = zoneId.substring(0, prefixLength);
         if (zoneId.length() == prefixLength) {
@@ -88,7 +93,9 @@ public class ZoneId {
         }
         char sign = zoneId.charAt(prefixLength);
         if (sign != '+' && sign != '-') {
-            // GMT0 and the like: a region of its own.
+            // GMT0 and the like: a region of its own, held to the same
+            // syntax as any other.
+            checkRegionSyntax(zoneId);
             return of0(zoneId);
         }
         ZoneOffset offset;
