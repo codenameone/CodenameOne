@@ -436,6 +436,13 @@ public class CSSThemeCompiler {
                     String target = aliasTarget(raw);
                     fromText = target != null && literalTokens.get(target) != null;
                 }
+                if (alias && declaration.snapshot != null && !fromText
+                        && (isColorLiteral(value) || isCssNumber(value))) {
+                    // The alias resolved to a color or a number: the build-time compiler types
+                    // the evaluated value, so it is that, not an image named `#f00`.
+                    theme.put(key, isColorLiteral(value) ? constantColor(value) : buildConstant(name, value, value));
+                    continue;
+                }
                 if (!fromText && raw.equals(value) || alias && !fromText) {
                     // An identifier image name is looked up decoded: `my\ icon` is `my icon`.
                     String decoded = decodeIdentifier(value);
@@ -2102,6 +2109,19 @@ public class CSSThemeCompiler {
         return open == 0 ? value.substring(0, bang).trim() : value;
     }
 
+    /// The first `:` not escaped by a backslash: `a\:b: hello` names the constant `a:b`.
+    private static int unescapedColon(String declaration) {
+        for (int i = 0; i < declaration.length(); i++) {
+            char c = declaration.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == ':') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private Declaration[] parseDeclarations(String body) {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
         String[] segments = splitDeclarations(body);
@@ -2110,7 +2130,7 @@ public class CSSThemeCompiler {
             if (trimmed.length() == 0) {
                 continue;
             }
-            int colon = trimmed.indexOf(':');
+            int colon = unescapedColon(trimmed);
             if (colon <= 0 || colon == trimmed.length() - 1) {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
             }

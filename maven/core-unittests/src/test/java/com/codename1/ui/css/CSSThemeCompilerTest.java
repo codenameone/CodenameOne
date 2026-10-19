@@ -1153,5 +1153,18 @@ public class CSSThemeCompilerTest extends UITestBase {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants{a\\62 c: hello;}", res, "Theme");
         assertEquals("hello", res.getTheme("Theme").get("@abc"));
+        res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{a\\:b: hello;}", res, "Theme");
+        assertEquals("hello", res.getTheme("Theme").get("@a:b"));
+    }
+
+    @Test
+    void testImageAliasOfAColorOrNumberIsNotAnImage() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --tone: #f00; --n: 3; placeholderImage: var(--tone);"
+                + " countImage: var(--n); }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@placeholderImage"));
+        assertEquals("3", theme.get("@countImage"));
     }
 }
