@@ -359,7 +359,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
             return true;
         }
         for (Component c = hit; c != null; c = c.getParent()) {
-            if (c == this) {
+            if (c == this) { // NOPMD CompareObjectsWithEquals: identity is the question
                 return true;
             }
         }

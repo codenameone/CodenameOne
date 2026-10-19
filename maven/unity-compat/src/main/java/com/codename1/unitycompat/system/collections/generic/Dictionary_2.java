@@ -24,6 +24,7 @@ package com.codename1.unitycompat.system.collections.generic;
 
 import com.codename1.unitycompat.system.ArgumentException;
 import com.codename1.unitycompat.system.ArgumentNullException;
+import com.codename1.unitycompat.system.IEquatable_1;
 import com.codename1.unitycompat.system.Interop;
 import com.codename1.unitycompat.system.InvalidOperationException;
 import com.codename1.unitycompat.system.Struct;
@@ -117,8 +118,41 @@ public class Dictionary_2 implements IDictionary_2 {
         return key;
     }
 
+    /// What a key is looked up by in the `HashMap`: [Interop#hashKey], or
+    /// for a class that implements `IEquatable<T>` a holder whose `equals`
+    /// asks that, since .NET's default comparer does and `HashMap` would
+    /// otherwise ask only `equals(Object)`. A struct is not wrapped: its
+    /// `equals` already compares by value, and a key looked up every frame
+    /// must not allocate.
+    private static Object slotKey(Object key) {
+        if (key instanceof IEquatable_1 && !(key instanceof Struct)) {
+            return new Equatable(key);
+        }
+        return Interop.hashKey(key);
+    }
+
+    /// A key compared through `IEquatable<T>.Equals`, hashed by its own
+    /// `GetHashCode`.
+    private static final class Equatable {
+        private final Object key;
+
+        Equatable(Object key) {
+            this.key = key;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Equatable && ((IEquatable_1) key).Equals(((Equatable) o).key);
+        }
+
+        @Override
+        public int hashCode() {
+            return key.hashCode();
+        }
+    }
+
     private int slot(Object key) {
-        Integer at = slots.get(Interop.hashKey(key(key)));
+        Integer at = slots.get(slotKey(key(key)));
         return at == null ? -1 : at.intValue();
     }
 
@@ -145,7 +179,7 @@ public class Dictionary_2 implements IDictionary_2 {
         keys[at] = key;
         values[at] = value;
         next[at] = LIVE;
-        slots.put(Interop.hashKey(key), Integer.valueOf(at));
+        slots.put(slotKey(key), Integer.valueOf(at));
         version++;
     }
 
@@ -169,7 +203,7 @@ public class Dictionary_2 implements IDictionary_2 {
 
     public boolean ContainsValue(Object value) {
         for (int i = 0; i < high; i++) {
-            if (next[i] == LIVE && Interop.areEqual(values[i], value)) {
+            if (next[i] == LIVE && Interop.defaultEquals(values[i], value)) {
                 return true;
             }
         }
@@ -221,7 +255,7 @@ public class Dictionary_2 implements IDictionary_2 {
         if (at < 0) {
             return false;
         }
-        slots.remove(Interop.hashKey(key));
+        slots.remove(slotKey(key));
         keys[at] = null;
         values[at] = null;
         next[at] = free;

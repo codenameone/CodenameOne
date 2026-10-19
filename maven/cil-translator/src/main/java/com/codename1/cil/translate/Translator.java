@@ -936,16 +936,61 @@ public final class Translator implements Opcodes {
 
     /// The class of a field Unity serializes inline, as part of the object
     /// that holds it, and that `Instantiate` therefore gives each copy an
-    /// instance of its own; or null. An abstract class cannot be made, and
-    /// neither can one without a constructor that takes nothing, since
-    /// there is no reflection to make it with: a field of either is shared
-    /// by the copy, as every such field once was.
+    /// instance of its own; or null. An abstract class cannot be made. One
+    /// with only constructors that take arguments is made through the blank
+    /// constructor (see #hasBlankConstructor); a class that cannot have one
+    /// either is shared by the copy, as every such field once was.
     private TypeDef inlineClass(CilType t) {
         if (t == null || t.kind != CilType.Kind.CLASS) {
             return null;
         }
         TypeDef def = universe.find(t.name);
-        return copiesSerialized(def) && !def.isAbstract() && hasDefaultConstructor(def) ? def : null;
+        return copiesSerialized(def) && !def.isAbstract() && (hasDefaultConstructor(def) || hasBlankConstructor(def))
+                ? def : null;
+    }
+
+    /// The marker type of the blank constructor's one parameter, which no
+    /// C# constructor can take: it is a runtime class of no C# name.
+    static final String BLANK = Names.RUNTIME + "system/Blank";
+
+    /// Whether a serializable class gets `<init>(Blank)`: a constructor that
+    /// runs none of the class's own code and only allocates its struct
+    /// fields, for `$instantiate` to make a copy with when the class
+    /// declares no constructor that takes nothing. Unity's serializer
+    /// writes such a class inline all the same, and every serialized field
+    /// is copied into the instance right after. It chains to the base
+    /// class's blank constructor, or to the constructor that takes nothing
+    /// of a base that is not serializable; a base with neither has none.
+    private boolean hasBlankConstructor(TypeDef def) {
+        if (!copiesSerialized(def)) {
+            return false;
+        }
+        if (def.baseType == null || "System.Object".equals(def.baseType.name)) {
+            return true;
+        }
+        TypeDef base = universe.definitionOf(def.baseType);
+        if (base == null || base.genericParamCount > 0) {
+            return false;
+        }
+        return copiesSerialized(base) ? hasBlankConstructor(base) : hasDefaultConstructor(base);
+    }
+
+    private void emitBlankConstructor(ClassWriter cw, TypeDef type) {
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "(L" + BLANK + ";)V", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(ALOAD, 0);
+        TypeDef base = type.baseType == null ? null : universe.definitionOf(type.baseType);
+        String b = type.baseType == null ? Names.OBJECT : names.classRef(type.baseType);
+        if (copiesSerialized(base)) {
+            mv.visitInsn(ACONST_NULL);
+            mv.visitMethodInsn(INVOKESPECIAL, b, "<init>", "(L" + BLANK + ";)V", false);
+        } else {
+            mv.visitMethodInsn(INVOKESPECIAL, b, "<init>", "()V", false);
+        }
+        emitInstanceStructFields(type, mv);
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
     }
 
     /// Whether a struct gets a `$copySerialized` and an `$instantiate`: a
@@ -1066,7 +1111,11 @@ public final class Translator implements Opcodes {
         mv.visitMaxs(0, 0);
         mv.visitEnd();
 
-        if (type.isAbstract() || !hasDefaultConstructor(type)) {
+        boolean blank = !hasDefaultConstructor(type) && hasBlankConstructor(type);
+        if (blank) {
+            emitBlankConstructor(cw, type);
+        }
+        if (type.isAbstract() || !(hasDefaultConstructor(type) || blank)) {
             return;
         }
         mv = cw.visitMethod(ACC_PUBLIC | ACC_STATIC, "$instantiate", "(" + self + "I)" + self, null, null);
@@ -1078,7 +1127,12 @@ public final class Translator implements Opcodes {
         mv.visitJumpInsn(IFLE, none);
         mv.visitTypeInsn(NEW, name);
         mv.visitInsn(DUP);
-        mv.visitMethodInsn(INVOKESPECIAL, name, "<init>", "()V", false);
+        if (blank) {
+            mv.visitInsn(ACONST_NULL);
+            mv.visitMethodInsn(INVOKESPECIAL, name, "<init>", "(L" + BLANK + ";)V", false);
+        } else {
+            mv.visitMethodInsn(INVOKESPECIAL, name, "<init>", "()V", false);
+        }
         mv.visitInsn(DUP);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitVarInsn(ILOAD, 1);

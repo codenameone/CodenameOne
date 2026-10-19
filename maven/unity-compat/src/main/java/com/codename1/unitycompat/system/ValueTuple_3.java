@@ -116,7 +116,7 @@ public final class ValueTuple_3 implements Struct {
             return false;
         }
         ValueTuple_3 t = (ValueTuple_3) o;
-        return Interop.areEqual(Item1, t.Item1) && Interop.areEqual(Item2, t.Item2) && Interop.areEqual(Item3, t.Item3);
+        return Interop.defaultEquals(Item1, t.Item1) && Interop.defaultEquals(Item2, t.Item2) && Interop.defaultEquals(Item3, t.Item3);
     }
 
     @Override

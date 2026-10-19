@@ -104,7 +104,7 @@ public class List_1 implements ICollection_1 {
     public int IndexOf(Object value) {
         for (int i = 0; i < size; i++) {
             // Not `equals` alone: 0f and -0f are one value to .NET.
-            if (Interop.areEqual(value, items[i])) {
+            if (Interop.defaultEquals(value, items[i])) {
                 return i;
             }
         }

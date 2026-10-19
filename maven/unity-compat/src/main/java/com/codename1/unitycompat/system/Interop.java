@@ -622,6 +622,16 @@ public final class Interop {
         return a == b || (a != null && (a.equals(b) || bothZero(a, b))); // NOPMD CompareObjectsWithEquals
     }
 
+    /// `EqualityComparer<T>.Default.Equals`, which the collections and the
+    /// tuples compare with: a type that implements `IEquatable<T>` is asked
+    /// through it, whether or not it overrides `Equals(object)` as well.
+    public static boolean defaultEquals(Object a, Object b) {
+        if (a instanceof IEquatable_1 && a != b) { // NOPMD CompareObjectsWithEquals
+            return b != null && ((IEquatable_1) a).Equals(b);
+        }
+        return areEqual(a, b);
+    }
+
     private static boolean bothZero(Object a, Object b) {
         if (a instanceof Float) {
             return b instanceof Float && ((Float) a).floatValue() == 0f && ((Float) b).floatValue() == 0f;

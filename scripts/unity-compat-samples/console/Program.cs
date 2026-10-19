@@ -89,6 +89,15 @@ namespace Spike
     }
 
     // A field of a type argument that nothing assigns.
+    /// Equal by IEquatable alone: Equals(object) is not overridden.
+    public class EqCell : IEquatable<EqCell>
+    {
+        public int X;
+        public EqCell(int x) { X = x; }
+        public bool Equals(EqCell other) { return other != null && other.X == X; }
+        public override int GetHashCode() { return X; }
+    }
+
     public class Slot<T>
     {
         public T held;
@@ -1469,6 +1478,13 @@ namespace Spike
             Log("tuple equals " + pairA.Equals(pairB) + " " + pairA.Equals((2, 1)) + " default " + none
                 + " " + boxedNone.Equals((0, 0)) + " array " + pairs[1] + " " + ((object)pairs[0]).Equals((0, 0))
                 + " hash " + (none.GetHashCode() == (0, 0).GetHashCode()));
+
+            // The default comparer asks IEquatable<T>, not Equals(object).
+            var eqCells = new System.Collections.Generic.Dictionary<EqCell, int>();
+            eqCells[new EqCell(3)] = 7;
+            var eqList = new System.Collections.Generic.List<EqCell> { new EqCell(4) };
+            Log("equatable " + eqCells.ContainsKey(new EqCell(3)) + " " + eqCells.Count + " " + eqList.Contains(new EqCell(4))
+                + " " + ((object)new EqCell(5)).Equals(new EqCell(5)) + " " + (new EqCell(6), 1).Equals((new EqCell(6), 1)));
 
             // Exception.ToString: the .NET type name and the inner chain.
             string chained = new InvalidOperationException("outer", new ArgumentException("inner")).ToString();

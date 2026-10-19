@@ -54,6 +54,20 @@ public class Probe : MonoBehaviour
         }
     }
 
+    // A [Serializable] class with no constructor that takes nothing is
+    // written into its holder by value as well: the copy is its own.
+    [Serializable]
+    public class Tagged
+    {
+        public int level;
+        public Vector2 at;
+
+        public Tagged(int level)
+        {
+            this.level = level;
+        }
+    }
+
     // A [Serializable] struct is written into its holder too, and what it
     // holds by reference with it: a Unity object inside the copied tree
     // leads to the copy, a serializable class is the copy's own. In a field,
@@ -67,6 +81,7 @@ public class Probe : MonoBehaviour
     }
 
     public Stats stats = new Stats();
+    public Tagged tagged = new Tagged(2);
     public Stats[] squad;
     public List<Stats> reserve;
     public Link link;
@@ -116,6 +131,14 @@ public class Probe : MonoBehaviour
             + (b.stats.owner == copy.transform) + (a.stats.owner == source.transform) + " own "
             + (b.stats != a.stats) + (b.stats.inner != a.stats.inner) + (b.squad[0] != a.squad[0])
             + (b.reserve[0] != a.reserve[0]));
+        a.tagged.at = new Vector2(3f, 0f);
+        Probe c = Instantiate(source).GetComponent<Probe>();
+        int tookLevel = c.tagged.level;
+        c.tagged.level = 9;
+        c.tagged.at.x = 4f;
+        Debug.Log("probe blank " + tookLevel + " " + c.tagged.level + " " + a.tagged.level + " " + a.tagged.at.x + " own "
+            + (c.tagged != a.tagged));
+        Destroy(c.gameObject);
         Transform copied = copy.transform.GetChild(0);
         Debug.Log("probe struct targets " + (b.link.target == copied) + (b.links[0].target == copied)
             + (b.chain[0].target == copied) + " own " + (b.link.stats != a.link.stats)

@@ -772,12 +772,29 @@ public final class ParticleSystem extends Component {
                 emitStep = duration > before ? duration - before : 0f;
                 moved = step > 0f ? moved * (emitStep / step) : 0f;
             }
-            float byTime = pick(RATE_OVER_TIME, along) * emitStep;
-            float byDistance = pick(RATE_OVER_DISTANCE, along) * moved;
-            owed += byTime + byDistance;
-            while (owed >= 1f) {
-                owed -= 1f;
-                bear(along);
+            // A looping step that crosses the duration is split at every
+            // boundary it crosses, and each part reads the rate curves at its
+            // own cycle's phase: the part after the end belongs to a cycle
+            // that started over. Read whole at the old phase, a curve low at
+            // its end and high at its start held back the new cycle's
+            // particles. The frame's movement is shared out by time.
+            float from = before;
+            float left = emitStep;
+            float movedTotal = moved;
+            while (left > 0f) {
+                float seg = left;
+                if (looping && duration > 0f && duration - from < seg) {
+                    seg = duration - from > 0f ? duration - from : left;
+                }
+                float phase = duration > 0f ? from / duration : 0f;
+                float share = emitStep > 0f ? movedTotal * (seg / emitStep) : 0f;
+                owed += pick(RATE_OVER_TIME, phase) * seg + pick(RATE_OVER_DISTANCE, phase) * share;
+                while (owed >= 1f) {
+                    owed -= 1f;
+                    bear(phase);
+                }
+                left -= seg;
+                from = 0f;
             }
             fireBursts(before, after, along);
         }
