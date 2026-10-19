@@ -304,14 +304,10 @@ public class Orders {
 
     @Transactional(readOnly = true)
     public List<OrderDto> history(String customer) throws IOException {
-        List<CustomerOrder> rows = orders.findTop50ByCustomerOrderByPlacedAtDesc(customer);
-        List<CustomerOrder> ended = new ArrayList<CustomerOrder>();
-        for (int iter = 0; iter < rows.size(); iter++) {
-            if (!rows.get(iter).getState().isActive()) {
-                ended.add(rows.get(iter));
-            }
-        }
-        return list(ended, customer, false);
+        // Filtered by the query, before its limit, as kitchenHistory is: active
+        // orders taking slots would leave fewer than fifty ended ones.
+        return list(orders.findTop50ByCustomerAndStateInOrderByPlacedAtDesc(customer, ended()),
+                customer, false);
     }
 
     /// An order, for its customer, its restaurant's staff, its courier, or an
@@ -415,6 +411,18 @@ public class Orders {
         // orders afterwards let fifty current ones push all of the history out.
         return list(orders.findTop50ByRestaurantIdAndStateInOrderByPlacedAtDesc(restaurantId,
                 history()), viewer, false);
+    }
+
+    /// Every state an order has ended in.
+    private static OrderState[] ended() {
+        List<OrderState> out = new ArrayList<OrderState>();
+        OrderState[] all = OrderState.values();
+        for (int iter = 0; iter < all.length; iter++) {
+            if (!all[iter].isActive()) {
+                out.add(all[iter]);
+            }
+        }
+        return out.toArray(new OrderState[out.size()]);
     }
 
     /// Every state but the kitchen's, the orders it is done with.

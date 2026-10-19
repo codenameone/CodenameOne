@@ -135,6 +135,34 @@ public class AccountCleanup {
     /// closing it would leave the restaurant listed and taking orders with
     /// nobody to cook them, so the closure is refused until an admin adds
     /// somebody else or the restaurant is no longer approved.
+    /// Whether a restaurant `username` is the only merchant of still has orders
+    /// the kitchen has to see through. Closing that account would take it off
+    /// the app (see [#removeEverythingOf]) with nobody left to cook them.
+    public boolean soleMerchantWithOpenOrders(String username) {
+        List<RestaurantStaff> mine = staff.findByUsername(username);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            String restaurantId = mine.get(iter).getRestaurantId();
+            if (staff.findByRestaurantId(restaurantId).size() < 2
+                    && !orders.findByRestaurantIdAndStateInOrderByPlacedAtAsc(restaurantId, OPEN).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final OrderState[] OPEN = open();
+
+    private static OrderState[] open() {
+        java.util.List<OrderState> out = new java.util.ArrayList<OrderState>();
+        OrderState[] all = OrderState.values();
+        for (int iter = 0; iter < all.length; iter++) {
+            if (all[iter].isActive()) {
+                out.add(all[iter]);
+            }
+        }
+        return out.toArray(new OrderState[out.size()]);
+    }
+
     public boolean soleMerchantOfListed(String username) {
         List<RestaurantStaff> mine = staff.findByUsername(username);
         for (int iter = 0; iter < mine.size(); iter++) {
@@ -164,9 +192,22 @@ public class AccountCleanup {
         activities.deleteByUsername(username);
         favorites.deleteByUsername(username);
         addresses.deleteByUsername(username);
-        // A merchant's restaurant stays listed, as its orders and its menu do;
-        // an admin hands it to somebody else from the restaurants pane. Only
-        // while somebody else still works there: see [#soleMerchantOfListed].
+        // A restaurant somebody else still works at stays listed, as its orders
+        // and its menu do. One left with nobody is taken off the app: there is
+        // no screen that hands a restaurant to another account, and
+        // Restaurants.suspend will not list it again until it has staff who can
+        // sign in. Its orders and menu stay for the records.
+        List<RestaurantStaff> mine = staff.findByUsername(username);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            String restaurantId = mine.get(iter).getRestaurantId();
+            Restaurant restaurant = restaurants.findById(restaurantId);
+            if (restaurant != null && Catalog.APPROVED.equals(restaurant.getStatus())
+                    && staff.findByRestaurantId(restaurantId).size() < 2) {
+                restaurant.setStatus(Catalog.SUSPENDED);
+                restaurant.setReason("Its only merchant closed their account");
+                restaurant.setUpdatedAt(System.currentTimeMillis());
+            }
+        }
         staff.deleteByUsername(username);
     }
 }

@@ -34,7 +34,8 @@ import java.util.List;
 public interface CustomerOrderRepository extends CrudRepository<CustomerOrder, String> {
     List<CustomerOrder> findByCustomerAndStateInOrderByPlacedAtDesc(String customer, OrderState[] states);
 
-    List<CustomerOrder> findTop50ByCustomerOrderByPlacedAtDesc(String customer);
+    List<CustomerOrder> findTop50ByCustomerAndStateInOrderByPlacedAtDesc(String customer,
+            OrderState[] states);
 
     List<CustomerOrder> findByRestaurantIdAndStateInOrderByPlacedAtAsc(String restaurantId,
             OrderState[] states);

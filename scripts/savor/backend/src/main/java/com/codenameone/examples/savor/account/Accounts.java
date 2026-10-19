@@ -462,17 +462,28 @@ public class Accounts {
         if (cleanup.hasDeliveryUnderWay(username)) {
             throw new ResponseStatusException(409, "Finish your delivery before closing the account");
         }
-        if (cleanup.soleMerchantOfListed(username)) {
+        // The only merchant of a restaurant may close, and the restaurant is then
+        // taken off the app (AccountCleanup.removeEverythingOf), but not while
+        // its kitchen still has orders to finish.
+        if (cleanup.soleMerchantWithOpenOrders(username)) {
             throw new ResponseStatusException(409,
-                    "You are your restaurant's only merchant; ask an admin to add another before closing");
+                    "Finish your restaurant's open orders before closing the account");
         }
         // Money this courier is owed. The deliveries and the payout ledger outlive
         // the account, but the sign-in and the payout account do not, and
         // the name is retired: once closed, nobody could cash it out. So the
         // courier cashes out first. No delivery is under way, so nothing can add
-        // to the balance between this check and the commit.
-        if (earnings.balance(username) > 0L) {
+        // to the balance between this check and the commit. Below zero is a
+        // debt: a delivery refunded after it was cashed out. Closing deletes the
+        // payout ledger it is computed from, so that is refused too and settled
+        // by support first, outside the app, as cash is (see Earnings).
+        long balance = earnings.balance(username);
+        if (balance > 0L) {
             throw new ResponseStatusException(409, "Cash out your earnings before closing the account");
+        }
+        if (balance < 0L) {
+            throw new ResponseStatusException(409,
+                    "A refund left your earnings below zero; contact support to settle it before closing");
         }
         payments.forget(username);
         applications.forget(username);

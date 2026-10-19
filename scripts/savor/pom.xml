@@ -9,10 +9,10 @@
   <url>https://www.codenameone.com</url>
   <licenses>
     <license>
-      <name>GPL v2 With Classpath Exception</name>
-      <url>https://openjdk.java.net/legal/gplv2+ce.html</url>
+      <name>MIT No Attribution</name>
+      <url>https://opensource.org/license/mit-0</url>
       <distribution>repo</distribution>
-      <comments>A business-friendly OSS license</comments>
+      <comments>The same terms as the LICENSE file beside this pom</comments>
     </license>
   </licenses>
   <modules>

@@ -167,8 +167,11 @@ public final class SettingsForm {
                         + "sent and no money changes hands.", null)));
         about.add(Ui.tap(Ui.row(FontImage.MATERIAL_POLICY, "Privacy policy", null, chevron()),
                 "privacy", e -> legal(form, "Privacy policy",
-                        "Your position is sent only to the server you signed in to: to show "
+                        "Your position is sent to the server you signed in to: to show "
                         + "what delivers to you and, while you deliver, to offer you orders. "
+                        + "Two public map services see points too: the app asks OSRM for the "
+                        + "route between the two ends of a delivery, and the server asks Photon "
+                        + "to find the addresses you search for and to name the place you are at. "
                         + "Your settings are kept with your account on that server.",
                         "With usage statistics turned on, the app also counts which screens "
                         + "are opened and which features are used, and reports that to "

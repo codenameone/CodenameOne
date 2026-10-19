@@ -61,10 +61,15 @@ import java.util.Set;
 /// of it.
 ///
 /// Payouts are a ledger and no more: a row says the money was sent, and no
-/// bank is asked to send it. For the same reason a cash delivery is counted like
-/// any other, although its courier was handed the money in the car. A service
-/// that moves real money settles cash deliveries the other way, and that sum
-/// belongs with the transfer this sample does not make.
+/// bank is asked to send it.
+///
+/// A cash delivery counts toward what a courier earned, but never toward what
+/// they can cash out: the customer handed them the whole order in cash, their
+/// share and any tip included, so paying that share again would pay it twice,
+/// and a cash tip, which no processor ever charged, would become a payout. What
+/// the courier owes the service from that cash (the order less their share)
+/// is settled outside the app; a service that moves real money would net it
+/// against the transfer this sample does not make.
 @Component
 public class Earnings {
     private static final int DAYS = 14;
@@ -248,12 +253,13 @@ public class Earnings {
         return toDto(row);
     }
 
-    /// Everything earned less everything paid out.
-    ///
-    /// The dashboard's totals count the same deliveries as [#earned]. Closing an
-    /// account asks it too, and is refused while it is above zero.
+    /// What the service holds for the courier: the card-paid part of [#earned]
+    /// less everything paid out. Cash deliveries are left out; see the class
+    /// comment. A refund after a cash-out takes it below zero. Closing an
+    /// account asks it too, and is refused unless it is zero.
     public long balance(String courier) {
-        return earned(courier) - Rows.number(payouts.paidOut(courier));
+        return Rows.number(deliveries.cardShare(courier)) + Rows.number(deliveries.chargedTips(courier))
+                - Rows.number(payouts.paidOut(courier));
     }
 
     /// Everything a courier has earned, before anything was paid out: their

@@ -279,6 +279,12 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
             + "and r.state = 'COMPLETED' and r.paymentStatus = 'PAID'")
     Long courierShare(@Param("courier") String courier);
 
+    /// [#courierShare] for the deliveries paid by card only: what the service
+    /// holds for the courier. A cash delivery's money is in the courier's hand.
+    @Query("select coalesce(sum(r.courierCents), 0) from Delivery r where r.courier = :courier "
+            + "and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' and r.methodId <> 'cash'")
+    Long cardShare(@Param("courier") String courier);
+
     /// The tips handed to a courier in cash.
     @Query("select coalesce(sum(r.tipCents), 0) from Delivery r where r.courier = :courier "
             + "and r.state = 'COMPLETED' and r.methodId = 'cash'")

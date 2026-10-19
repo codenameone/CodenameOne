@@ -310,18 +310,20 @@ public final class Session {
         final boolean web = AppConfig.pageOrigin() != null;
         final String redirect = AppConfig.redirectUri();
 
-        // The steps read `base` as they go rather than pinning it. Changing
-        // the server in the middle of a sign-in hands the next step to the new
-        // server, which can do nothing with what it gets: a session cookie and
-        // a code that only the first server honours, single use and good for
-        // minutes. A server the user chose is trusted with more than that --
-        // the password in step 1 goes to it -- and the last check in
-        // signIn drops the tokens of a sign-in that outlived its server.
+        // Every step goes to the server the sign-in started with, and none goes
+        // anywhere once the user has changed server: the session cookie of
+        // step 1 and the verifier of step 3 are only for the first server, and
+        // a new one that received them could replay them there for tokens.
+        final String server = base;
         // 1. The password, for a session.
-        final Step login = new Step("POST", base + "/login");
+        final Step login = new Step("POST", server + "/login");
         login.addArgument("username", accountName(email));
         login.addArgument("password", password);
         login.send(() -> {
+            if (!server.equals(base)) {
+                failed.failed(0, "The server changed. Sign in again.");
+                return;
+            }
             if (login.status == 0) {
                 failed.failed(0, "Could not reach the server. Check your connection.");
                 return;
@@ -335,7 +337,7 @@ public final class Session {
                 return;
             }
             // 2. The session, for an authorization code.
-            final Step authorize = new Step("GET", base + "/oauth2/authorize");
+            final Step authorize = new Step("GET", server + "/oauth2/authorize");
             if (web) {
                 // Or a session that did not take is answered with a page.
                 authorize.addRequestHeader("Accept", "application/json");
@@ -350,6 +352,10 @@ public final class Session {
             authorize.addArgument("code_challenge", pkce.getChallenge());
             authorize.addArgument("code_challenge_method", pkce.getMethod());
             authorize.send(() -> {
+                if (!server.equals(base)) {
+                    failed.failed(0, "The server changed. Sign in again.");
+                    return;
+                }
                 String code = web ? authorize.answer("code")
                         : parameter(authorize.location, "code");
                 String returned = web ? authorize.answer("state")
@@ -361,13 +367,17 @@ public final class Session {
                     return;
                 }
                 // 3. The code, for tokens.
-                final Step token = new Step("POST", base + "/oauth2/token");
+                final Step token = new Step("POST", server + "/oauth2/token");
                 token.addArgument("grant_type", "authorization_code");
                 token.addArgument("code", code);
                 token.addArgument("redirect_uri", redirect);
                 token.addArgument("code_verifier", pkce.getVerifier());
                 token.addArgument("client_id", AppConfig.CLIENT_ID);
                 token.send(() -> {
+                    if (!server.equals(base)) {
+                        failed.failed(0, "The server changed. Sign in again.");
+                        return;
+                    }
                     OidcTokens tokens = token.status == 200 ? token.tokens() : null;
                     if (tokens == null || tokens.getAccessToken() == null) {
                         failed.failed(token.status, "Signing in failed. Try again.");
@@ -378,7 +388,7 @@ public final class Session {
                     // would go on signing this user in to whoever sat down
                     // next. Nothing waits on the answer; the tokens stand
                     // without it.
-                    Step end = new Step("POST", base + "/logout");
+                    Step end = new Step("POST", server + "/logout");
                     if (!web) {
                         end.addRequestHeader("Cookie", login.session);
                     }

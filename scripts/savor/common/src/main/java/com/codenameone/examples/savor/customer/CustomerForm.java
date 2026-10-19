@@ -376,6 +376,11 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
         Runnable run = () -> {
             query = field.getText().trim();
             if (query.length() < 2) {
+                // Back to the empty search: results for a longer term would no
+                // longer match what the field shows.
+                results.removeAll();
+                results.add(Ui.empty(FontImage.MATERIAL_SEARCH, Lang.tr("Find something to eat"), null));
+                results.revalidate();
                 return;
             }
             LatLng to = destination();

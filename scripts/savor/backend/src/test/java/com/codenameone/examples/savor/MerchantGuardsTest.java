@@ -100,9 +100,14 @@ class MerchantGuardsTest {
     }
 
     @Test
-    void theOnlyMerchantCannotCloseTheAccount() throws Exception {
+    void theOnlyMerchantClosingTakesTheRestaurantOffTheApp() throws Exception {
         Trips.Kitchen kitchen = Trips.kitchen(mvc, -41.2965, 174.7862);
-        assertEquals(409, statusOf(() -> accounts.close(kitchen.merchant, People.PASSWORD)));
+        accounts.close(kitchen.merchant, People.PASSWORD);
+        // No longer listed: only a listed restaurant can be suspended...
+        assertEquals(409, statusOf(() -> restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, true,
+                "Again")));
+        // ...and with nobody left on its staff it is not listed again.
+        assertEquals(409, statusOf(() -> restaurants.suspend(DemoAccounts.ADMIN, kitchen.id, false, "")));
     }
 
     @Test
