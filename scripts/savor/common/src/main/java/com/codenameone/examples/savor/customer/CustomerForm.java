@@ -135,8 +135,29 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             return;
         }
         // No address chosen yet: the one the phone is at, in words, once the
-        // server has put a name on it.
-        final LatLng here = Locator.here();
+        // server has put a name on it. Only a position the device reported
+        // counts: until then Locator.here() is the middle of the demo city,
+        // and saving that would send the food there. Made-up positions are
+        // the exception, since they are all there is.
+        if (Locator.simulated()) {
+            name(Locator.here());
+            return;
+        }
+        Locator.watch(new Locator.Watcher() {
+            @Override
+            public void located(int state, LatLng where) {
+                if (state == Locator.FOUND) {
+                    Locator.unwatch(this);
+                    name(where);
+                } else if (state == Locator.DENIED || state == Locator.UNAVAILABLE) {
+                    // No position to be had: the customer picks an address.
+                    Locator.unwatch(this);
+                }
+            }
+        });
+    }
+
+    private void name(final LatLng here) {
         Api.geo().reverse(here.getLatitude(), here.getLongitude(), Net.to(place -> {
             if (place != null && Prefs.deliverTo() == null) {
                 Prefs.setDeliverTo(new PlaceDto(place.name(), place.address(),

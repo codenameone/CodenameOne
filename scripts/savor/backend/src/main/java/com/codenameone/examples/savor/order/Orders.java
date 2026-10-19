@@ -145,6 +145,11 @@ public class Orders {
                 && priced.promo == null) {
             throw new ResponseStatusException(400, priced.quote.promoMessage());
         }
+        // The same refusals store() makes under its locks, asked first without
+        // them so an order that could never be accepted puts no hold on the
+        // card and costs no call to the payment processor. store() still asks
+        // again: two orders placed at once both pass here.
+        eligible(customer);
         String[] method = payments.choose(customer, cart.paymentMethodId());
         String id = Ids.next();
         String hold = payments.authorize(id, customer, method[0], priced.quote.totalCents(),
@@ -159,6 +164,23 @@ public class Orders {
         CustomerOrder order = find(id);
         tell(order);
         return view(customer, false, id);
+    }
+
+    /// The refusals [#store] makes, without its locks. See [#place].
+    @Transactional(readOnly = true)
+    private Void eligible(String customer) {
+        if (!enabled(customer)) {
+            throw new ResponseStatusException(403, "This account is blocked");
+        }
+        if (orders.countByCustomerAndStateIn(customer, ACTIVE) >= MAX_ACTIVE) {
+            throw new ResponseStatusException(409, "You already have " + MAX_ACTIVE
+                    + " orders on the way");
+        }
+        Profile profile = profiles.findById(customer);
+        if (profile == null || !profile.isPhoneVerified()) {
+            throw new ResponseStatusException(403, "Verify your phone number before you order");
+        }
+        return null;
     }
 
     @Transactional

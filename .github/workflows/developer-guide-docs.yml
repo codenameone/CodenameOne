@@ -127,6 +127,10 @@ jobs:
               - 'Ports/JavaSE/**'
               - 'maven/core/**'
               - 'maven/javase/**'
+              # The Wayline and Savor chapters include these trees by tag, so a
+              # renamed or deleted tag there has to reach the snippet check.
+              - 'scripts/wayline/**'
+              - 'scripts/savor/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

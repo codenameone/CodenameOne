@@ -28,10 +28,12 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.savor.Prefs;
 import com.codenameone.examples.savor.api.PlaceDto;
+import com.codenameone.examples.savor.api.SavedAddressDto;
 import com.codenameone.examples.savor.net.Api;
 import com.codenameone.examples.savor.net.Net;
 import com.codenameone.examples.savor.ui.Ui;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /// Finds a place by name.
@@ -54,6 +56,8 @@ public final class PlaceSearchForm {
     private final Form previous;
     private final Picked picked;
     private int typed;
+    /// The account's saved addresses, once the server has answered.
+    private List<PlaceDto> saved = new ArrayList<PlaceDto>();
 
     private PlaceSearchForm(Form previous, LatLng near, Picked picked) {
         this.previous = previous;
@@ -78,6 +82,20 @@ public final class PlaceSearchForm {
         form.add(BorderLayout.NORTH, top);
         form.add(BorderLayout.CENTER, results);
         suggest();
+        // Saved on the account rather than on this device, so they follow the
+        // customer to every phone they sign in on.
+        Api.orders().addresses(Net.to(found -> {
+            List<PlaceDto> places = new ArrayList<PlaceDto>();
+            for (int iter = 0; found != null && iter < found.size(); iter++) {
+                SavedAddressDto address = found.get(iter);
+                places.add(new PlaceDto(address.label(), address.address(),
+                        address.lat(), address.lng()));
+            }
+            saved = places;
+            if (query.getText().trim().length() < 2) {
+                suggest();
+            }
+        }, (status, message) -> { }));
     }
 
     /// Before anything is typed: the places already known, which are most of
@@ -86,6 +104,9 @@ public final class PlaceSearchForm {
         results.removeAll();
         int count = 0;
         count = known(FontImage.MATERIAL_PLACE, Prefs.deliverTo(), count);
+        for (int iter = 0; iter < saved.size(); iter++) {
+            count = known(FontImage.MATERIAL_BOOKMARK, saved.get(iter), count);
+        }
         List<PlaceDto> recents = Prefs.recents();
         for (int iter = 0; iter < recents.size(); iter++) {
             count = known(FontImage.MATERIAL_SCHEDULE, recents.get(iter), count);

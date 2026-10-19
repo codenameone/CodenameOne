@@ -377,6 +377,15 @@ public class SecurityConfig {
             .rateLimit("/api/onboarding/application/documents",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 3600))
+            // Restaurant photos are the other way to fill the database with
+            // pictures: an application's own and a listed menu's. Each route
+            // gets its own limiter, for the reason given above.
+            .rateLimit("/api/restaurants/application/photo",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(60, 3600))
+            .rateLimit("/api/merchant/photos",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(60, 3600))
             // Every card setup is a session made at the payment processor.
             // `Payments` caps how many an account has open; this caps how
             // often it may start one, so abandoning setups in a loop is slow.
