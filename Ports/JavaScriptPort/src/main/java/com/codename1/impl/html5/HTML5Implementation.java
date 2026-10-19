@@ -6584,6 +6584,85 @@ public class HTML5Implementation extends CodenameOneImplementation {
         chooser.showDialog();
     }
 
+    // File dialogs. Opening uses the browser's own <input type=file> picker.
+    // Saving downloads the content: showSaveFilePicker would let the user pick
+    // a folder, but it needs a user gesture on the main thread and the content
+    // is only ready after the worker has written it, so the gesture is gone
+    // by then. The download keeps the suggested name and the selected
+    // filter's extension.
+    @Override
+    public void showOpenDialog(final com.codename1.io.filechooser.OpenFileRequest request,
+                               final com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        StringBuilder accept = new StringBuilder();
+        for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
+            for (String e : f.getExtensions()) {
+                accept.append(accept.length() == 0 ? "." : ",.").append(e);
+            }
+            for (String m : f.getMimeTypes()) {
+                accept.append(accept.length() == 0 ? "" : ",").append(m);
+            }
+        }
+        com.codename1.teavm.ext.usermedia.FileChooser chooser = new com.codename1.teavm.ext.usermedia.FileChooser(
+                new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        Object src = evt == null ? null : evt.getSource();
+                        String[] paths = null;
+                        if (src instanceof String[]) {
+                            paths = (String[]) src;
+                        } else if (src instanceof String) {
+                            paths = new String[]{(String) src};
+                        }
+                        callback.onSucess(new com.codename1.io.filechooser.FileDialogResult(request, paths, -1, null));
+                    }
+                }, accept.length() == 0 ? null : accept.toString(), null);
+        chooser.setMultiple(request.isMultiSelect());
+        chooser.showDialog();
+    }
+
+    @Override
+    public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
+                               final com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        String name = request.getSuggestedName();
+        if (name == null || name.length() == 0) {
+            name = "download";
+        }
+        int sel = request.getSelectedFilter();
+        if (sel >= 0) {
+            com.codename1.io.filechooser.FileTypeFilter f = request.getFilters()[sel];
+            if (!f.acceptsName(name) && f.getExtensions().length > 0) {
+                name = name + "." + f.getExtensions()[0];
+            }
+        }
+        final String fileName = name;
+        final com.codename1.io.filechooser.FileDialogResult result =
+                new com.codename1.io.filechooser.FileDialogResult(request, new String[]{fileName}, sel, null);
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                try {
+                    request.writeContent(result, out);
+                    if (!downloadBytesAsFile(fileName, out.toByteArray())) {
+                        result.setError(new IOException("The browser refused the download"));
+                    }
+                } catch (IOException err) {
+                    Log.e(err);
+                    result.setError(err);
+                }
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        callback.onSucess(result);
+                    }
+                });
+            }
+        });
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
+                || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT;
+    }
+
     @Override
     public void captureVideo(ActionListener response) {
         new com.codename1.teavm.ext.usermedia.FileChooser(response, "video/*", "camcorder").showDialog();
