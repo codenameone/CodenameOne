@@ -487,7 +487,9 @@ public class CSSThemeCompilerTest extends UITestBase {
         resource = new MutableResource();
         new CSSThemeCompiler().compile("#Constants{--accent:#ff0000;} :root{--accent:#00ff00;}"
                 + "Label{color:var(--accent);}", resource, "Theme");
-        assertEquals("#00ff00", resource.getTheme("Theme").get("@accent"));
+        // Only #Constants exports: the later :root changes var(--accent), not @accent.
+        assertEquals("ff0000", resource.getTheme("Theme").get("@accent"));
+        assertEquals("00ff00", resource.getTheme("Theme").get("Label.fgColor"));
         // A constant declared after the rule that uses it is not seen by that rule: the build-time
         // parser resolves var() in source order, #Constants blocks included.
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler()
@@ -611,6 +613,29 @@ public class CSSThemeCompilerTest extends UITestBase {
         Hashtable theme = resource.getTheme("Theme");
         assertEquals("blue", theme.get("@accent"));
         assertEquals("ff0000", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    public void testEscapedFontFamilyIdentifierIsDecoded() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:native\\:MainBold;font-size:2mm;}", resource, "Theme");
+        assertEquals("native:MainBold", fontName((Font) resource.getTheme("Theme").get("Label.font")));
+    }
+
+    @Test
+    public void testExponentConstantIsRejected() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("#Constants{ scale: 1e2; }", new MutableResource(), "Theme"));
+    }
+
+    @Test
+    public void testLaterRootPropertyChangesTheVariableNotTheConstant() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants{--accent:#f00;} :root{--accent:#0f0;}"
+                + " Label{color:var(--accent);}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("ff0000", theme.get("@accent"));
+        assertEquals("00ff00", theme.get("Label.fgColor"));
     }
 
     @Test

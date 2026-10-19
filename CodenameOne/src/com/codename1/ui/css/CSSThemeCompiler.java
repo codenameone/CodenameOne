@@ -116,6 +116,11 @@ public class CSSThemeCompiler {
     /// reaches the variable after `accent: blue` exported a different `@accent`.
     private Hashtable<String, String> shadowedVars = new Hashtable<String, String>();
     private Hashtable<String, String> shadowedKinds = new Hashtable<String, String>();
+    /// "@name" of every entry a `#Constants` block of this compile exported. The build-time
+    /// compiler adds a custom property to its constants only inside `#Constants`, so a later
+    /// `:root { --name: ... }` changes what `var(--name)` reads (through shadowedVars) and
+    /// leaves the exported `@name` alone.
+    private HashSet<String> exportedConstants = new HashSet<String>();
     /// While set, resolveVars does not see a constant this compile declares unless it holds it:
     /// one declared further down is not defined yet. A constant only an earlier compile into the
     /// same theme declared is visible.
@@ -144,6 +149,7 @@ public class CSSThemeCompiler {
         plainConstants = new HashSet<String>();
         shadowedVars = new Hashtable<String, String>();
         shadowedKinds = new Hashtable<String, String>();
+        exportedConstants = new HashSet<String>();
         declaredThisCompile = new HashSet<String>();
         for (Rule rule : rules) {
             for (Declaration declaration : rule.declarations) {
@@ -373,6 +379,7 @@ public class CSSThemeCompiler {
                 name = name.substring(2);
             }
             String key = "@" + name;
+            exportedConstants.add(key);
             if (legacy || declaration.name.startsWith("--")) {
                 plainConstants.remove(key);
                 shadowedVars.remove(key);
@@ -711,12 +718,18 @@ public class CSSThemeCompiler {
             return false;
         }
         String key = "@" + property.substring(2);
+        String raw = value.trim();
+        String unquoted = unquote(raw);
+        if (exportedConstants.contains(key)) {
+            // Only the variable changes; the constant #Constants exported keeps its value.
+            shadowedVars.put(key, unquoted);
+            shadowedKinds.put(key, raw.equals(unquoted) ? DEFERRED_PLAIN : DEFERRED_LITERAL);
+            plainConstants.add(key);
+            return true;
+        }
         plainConstants.remove(key);
         shadowedVars.remove(key);
         shadowedKinds.remove(key);
-        String raw = value.trim();
-        String unquoted = unquote(raw);
-        // A later custom property replaces a #Constants entry outright, deferred handling included.
         // An unquoted var() in it is resolved where it is used, against the final values.
         deferred.put(key, DEFERRED_PLAIN);
         literalTokens.remove(key);
@@ -919,6 +932,14 @@ public class CSSThemeCompiler {
             String[] families = splitOnComma(familyList);
             for (String entry : families) {
                 String family = unquote(entry);
+                if (family.equals(entry.trim())) {
+                    // An identifier is read decoded, as the build-time parser reads it:
+                    // `native\:MainBold` is `native:MainBold`.
+                    String decoded = decodeIdentifier(family);
+                    if (decoded != null) {
+                        family = decoded;
+                    }
+                }
                 // The build-time compiler walks on past a native font, so a later one, or a later
                 // monospace, wins; only a generic family or monospace ends the walk.
                 if (family.startsWith("native:")) {
@@ -1089,6 +1110,12 @@ public class CSSThemeCompiler {
     /// as it serializes the parsed value (`1.50` is `1.5`, `001` is `1`), an identifier as
     /// written. Every other token type is one it drops, so it is rejected here.
     private static String buildConstant(String name, String raw, String value) {
+        if (isCssNumber(value) && (value.indexOf('e') > -1 || value.indexOf('E') > -1)) {
+            // The build-time parser reads `1e2` as a dimension, a token its constants emitter
+            // drops, so the built theme has no such constant.
+            throw new CSSSyntaxException("#Constants does not support exponent notation: "
+                    + name + ": " + raw + " (write the number out, or quote it to store it as text)");
+        }
         if (isCssNumber(value)) {
             boolean integer = value.indexOf('.') < 0 && value.indexOf('e') < 0 && value.indexOf('E') < 0;
             try {
