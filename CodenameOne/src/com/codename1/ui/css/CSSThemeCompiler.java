@@ -701,7 +701,7 @@ public class CSSThemeCompiler {
     private String constantColor(String value) {
         value = cssColorFunction(value);
         if (value.regionMatches(true, 0, "rgba(", 0, 5) && value.endsWith(")")) {
-            String[] parts = splitOnComma(value.substring(5, value.length() - 1));
+            String[] parts = colorArguments(value.substring(5, value.length() - 1), value);
             if (parts.length != 4) {
                 throw new CSSSyntaxException("rgba() must have exactly 4 components: " + value);
             }
@@ -1283,6 +1283,12 @@ public class CSSThemeCompiler {
         StringBuilder out = new StringBuilder(n);
         int i = 0;
         boolean first = true;
+        if (t.startsWith("--")) {
+            // A custom property: anything may follow the double hyphen, `--1accent` included.
+            out.append("--");
+            i = 2;
+            first = false;
+        }
         while (i < n) {
             char c = t.charAt(i);
             if (c == '\\') {
@@ -1546,6 +1552,11 @@ public class CSSThemeCompiler {
             String inner = value.substring(varPos + "var(--".length(), end);
             int comma = topLevelComma(inner);
             String key = (comma < 0 ? inner : inner.substring(0, comma)).trim();
+            // Decoded, as the declaration was: `var(--a\62 c)` is `--abc`.
+            String decodedKey = decodeIdentifier("--" + key);
+            if (decodedKey != null) {
+                key = decodedKey.substring(2);
+            }
             String fallback = comma < 0 ? null : inner.substring(comma + 1).trim();
             if (resolving.contains(key)) {
                 throw new CSSSyntaxException("Cyclic variable reference: var(--" + key + ")");
@@ -1740,7 +1751,7 @@ public class CSSThemeCompiler {
             if (!value.endsWith(")")) {
                 throw new CSSSyntaxException("Malformed rgb() color: " + cssColor);
             }
-            String[] parts = splitOnComma(value.substring(4, value.length() - 1));
+            String[] parts = colorArguments(value.substring(4, value.length() - 1), cssColor);
             if (parts.length != 3) {
                 throw new CSSSyntaxException("rgb() must have exactly 3 components: " + cssColor);
             }
@@ -2250,6 +2261,24 @@ public class CSSThemeCompiler {
             start = i + 1;
         }
         out.add(input.substring(start));
+        return out.toArray(new String[out.size()]);
+    }
+
+    /// The arguments of `rgb()` or `rgba()`. Unlike a font family list, an empty one is an error:
+    /// the build-time parser rejects `rgb(255,,0,0)` rather than reading it as red.
+    private static String[] colorArguments(String input, String color) {
+        ArrayList<String> out = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i <= input.length(); i++) {
+            if (i == input.length() || input.charAt(i) == ',') {
+                String part = input.substring(start, i).trim();
+                if (part.length() == 0) {
+                    throw new CSSSyntaxException("Empty component in color: " + color);
+                }
+                out.add(part);
+                start = i + 1;
+            }
+        }
         return out.toArray(new String[out.size()]);
     }
 

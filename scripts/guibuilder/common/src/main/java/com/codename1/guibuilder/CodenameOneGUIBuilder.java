@@ -5377,7 +5377,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (open.isEmpty()) return false;
         String selector = open.get(open.size() - 1);
-        return "#Constants".equalsIgnoreCase(selector) || "@constants".equalsIgnoreCase(selector);
+        if ("@constants".equalsIgnoreCase(selector)) return true;
+        // `#Constants, Other { ... }` exports its constants too, as the compiler reads it.
+        int start = 0;
+        for (int i = 0; i <= selector.length(); i++) {
+            if (i == selector.length() || selector.charAt(i) == ',') {
+                if ("#Constants".equalsIgnoreCase(selector.substring(start, i).trim())) return true;
+                start = i + 1;
+            }
+        }
+        return false;
     }
 
     /** True for the characters a CSS property name is made of. */
@@ -5542,16 +5551,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
 
         private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
-            // The build decodes every PNG of the folder before it picks one, so a corrupt
-            // variant fails the image there even when the display would not select it.
-            for (String listed : files) {
-                String file = stripSlash(listed);
-                // The build skips anything that is not a file, a directory named x.png included.
-                if (file.regionMatches(true, file.length() - 4, ".png", 0, 4) && !isDirectory(folder + "/" + file)
-                        && !decodes(load(folder + "/" + file))) {
-                    return null;
-                }
-            }
+            // The build stores each variant's bytes with EncodedImage.create(), which does not
+            // decode them, so a corrupt variant fails nothing there. The canvas only has to
+            // show one: a selected variant that does not decode falls through to the next.
             for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
                 String match = null;
                 for (String listed : files) {
@@ -5571,7 +5573,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 }
                 if (match != null) {
                     com.codename1.ui.Image image = load(folder + "/" + match);
-                    if (image != null) return image;
+                    if (decodes(image)) return image;
                 }
             }
             return null;

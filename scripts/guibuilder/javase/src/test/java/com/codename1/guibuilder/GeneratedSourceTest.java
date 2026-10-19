@@ -1794,6 +1794,11 @@ class GeneratedSourceTest {
         java.util.List<Object> constants = (java.util.List<Object>) unsupported.invoke(builder,
                 "#Constants {\n  message: \"a}b\";\n  includeNativeBool: true;\n}\nLabel { color: #ff0000; }\n");
         assertTrue(constants.isEmpty(), "a #Constants entry is not a dropped declaration: " + constants);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> listed = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants, Other {\n  accentColor: #ff0000;\n}\n");
+        assertTrue(listed.isEmpty(), "#Constants in a selector list exports its constants: " + listed);
     }
 
     @Test
@@ -1868,15 +1873,19 @@ class GeneratedSourceTest {
     }
 
     @Test
-    void aCorruptVariantFailsTheWholeFolderLikeTheBuild() throws Exception {
+    void aCorruptVariantDoesNotFailTheFolderLikeTheBuild() throws Exception {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
         java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
         java.nio.file.Files.createDirectories(folder);
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
                 java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
         java.nio.file.Files.write(folder.resolve("high.png"), new byte[]{1, 2, 3, 4});
-        assertNull(new CodenameOneGUIBuilder.ProjectImageResource(dir.resolve("theme.css").toString())
-                .getImage("play.png"));
+        // The build stores the variants undecoded, so the folder is an image; the canvas
+        // shows the variant that decodes.
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertNotNull(image);
+        assertEquals(3, image.getWidth());
     }
 
     @Test

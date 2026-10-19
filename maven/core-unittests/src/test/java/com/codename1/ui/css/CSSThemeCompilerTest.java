@@ -1256,6 +1256,28 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testEscapedVarReferenceIsDecoded() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --a\\62 c: red; alias: var(--a\\62 c); }", res, "Theme");
+        assertEquals("red", res.getTheme("Theme").get("@alias"));
+    }
+
+    @Test
+    void testCustomPropertyMayStartWithADigit() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --1accent: red; }", res, "Theme");
+        assertEquals("red", res.getTheme("Theme").get("@1accent"));
+    }
+
+    @Test
+    void testEmptyColorComponentIsRejected() {
+        for (String color : new String[]{"rgb(255,,0)", "rgb(255,0,)", "rgba(255,,0,0)"}) {
+            assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () -> new CSSThemeCompiler().compile(
+                    "#Constants { accent: " + color + "; }", new MutableResource(), "Theme"), color);
+        }
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));
