@@ -6767,6 +6767,195 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.openFileChooser(accept);
         }
     }
+
+    /// Pending native file dialogs, keyed by the id handed to the native side.
+    /// Reached from the EDT, the save writer task and the native completion
+    /// (UIKit main thread), so it follows the macFileChooserRequests discipline.
+    private static final java.util.HashMap<Integer, PendingFileDialog> fileDialogRequests =
+            new java.util.HashMap<Integer, PendingFileDialog>();
+    private static int fileDialogSequence;
+
+    private static final class PendingFileDialog {
+        final com.codename1.io.filechooser.FileDialogRequest<?> request;
+        final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback;
+        final String tempFile;
+
+        PendingFileDialog(com.codename1.io.filechooser.FileDialogRequest<?> request,
+                          SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback,
+                          String tempFile) {
+            this.request = request;
+            this.callback = callback;
+            this.tempFile = tempFile;
+        }
+    }
+
+    private static int registerFileDialog(PendingFileDialog pending) {
+        synchronized (fileDialogRequests) {
+            int id = ++fileDialogSequence;
+            fileDialogRequests.put(id, pending);
+            return id;
+        }
+    }
+
+    private static String joinLines(java.util.List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (String v : values) {
+            if (v == null || v.length() == 0) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(v);
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    private static String stripFileScheme(String path) {
+        if (path != null && path.startsWith("file://")) {
+            return path.substring(7);
+        }
+        return path;
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        if (isMacPlatform()) {
+            return super.isFileDialogFeatureSupported(feature);
+        }
+        return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
+                || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
+                || feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
+                || feature == com.codename1.io.filechooser.FileDialogFeatures.INITIAL_DIRECTORY;
+    }
+
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isMacPlatform()) {
+            // The Mac port answers through its NSOpenPanel chooser.
+            super.showOpenDialog(request, callback);
+            return;
+        }
+        java.util.ArrayList<String> uts = new java.util.ArrayList<String>();
+        java.util.ArrayList<String> exts = new java.util.ArrayList<String>();
+        for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
+            String[] u = f.getUtTypes();
+            if (u != null && u.length > 0) {
+                for (String s : u) {
+                    uts.add(s);
+                }
+                continue;
+            }
+            String[] e = f.getExtensions();
+            if (e != null) {
+                for (String s : e) {
+                    if (s != null && s.startsWith(".")) {
+                        s = s.substring(1);
+                    }
+                    // Not case folded: UTType resolves extensions case
+                    // insensitively, and toLowerCase is locale sensitive.
+                    exts.add(s);
+                }
+            }
+        }
+        int id = registerFileDialog(new PendingFileDialog(request, callback, null));
+        nativeInstance.showOpenFileDialog(joinLines(uts), joinLines(exts),
+                request.isMultiSelect(), request.isDirectories(),
+                stripFileScheme(request.getInitialDirectory()),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.IOS_SHOWS_FILE_EXTENSIONS, false),
+                id);
+    }
+
+    @Override
+    public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
+                               final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isMacPlatform()) {
+            super.showSaveDialog(request, callback);
+            return;
+        }
+        String name = request.getSuggestedName();
+        if (name == null || name.length() == 0) {
+            name = "Untitled";
+        }
+        // A separator in the suggested name would escape the staging folder.
+        name = name.replace('/', '_');
+        String caches = nativeInstance.getCachesDir();
+        if (!caches.endsWith("/")) {
+            caches = caches + "/";
+        }
+        final String dir = caches + "cn1-export-" + System.currentTimeMillis() + "/";
+        final String temp = dir + name;
+        // The document picker exports a file that already exists, so the
+        // content is staged first, off the EDT.
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+                java.io.OutputStream out = null;
+                try {
+                    fs.mkdir(dir);
+                    out = fs.openOutputStream(temp);
+                    request.writeContent(new com.codename1.io.filechooser.FileDialogResult(
+                            request, new String[]{temp}, -1, null), out);
+                    out.close();
+                    out = null;
+                } catch (final IOException err) {
+                    com.codename1.io.Util.cleanup(out);
+                    fs.delete(temp);
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            com.codename1.io.filechooser.FileDialogResult r =
+                                    com.codename1.io.filechooser.FileDialogResult.cancelled(request);
+                            r.setError(err);
+                            callback.onSucess(r);
+                        }
+                    });
+                    return;
+                }
+                int id = registerFileDialog(new PendingFileDialog(request, callback, temp));
+                nativeInstance.showSaveFileDialog(temp,
+                        !request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.IOS_EXPORT_AS_MOVE, false),
+                        stripFileScheme(request.getInitialDirectory()), id);
+            }
+        });
+    }
+
+    /// Native completion of showOpenFileDialog and showSaveFileDialog. `paths`
+    /// is newline separated, null when cancelled. Called on the UIKit main
+    /// thread; the callback is delivered on the EDT.
+    public static void fileDialogResult(final String paths, final int requestId) {
+        final PendingFileDialog pending;
+        synchronized (fileDialogRequests) {
+            pending = fileDialogRequests.remove(requestId);
+        }
+        if (pending == null) {
+            return; // Duplicate or unknown completion.
+        }
+        Runnable delivery = new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.io.filechooser.FileDialogResult r;
+                if (paths == null || paths.length() == 0) {
+                    r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
+                } else {
+                    java.util.List<String> list = StringUtil.tokenize(paths, '\n');
+                    r = new com.codename1.io.filechooser.FileDialogResult(pending.request,
+                            list.toArray(new String[list.size()]), -1, null);
+                }
+                if (pending.tempFile != null) {
+                    // Exported as a copy or moved away; either way the staging
+                    // file is no longer needed.
+                    com.codename1.io.FileSystemStorage.getInstance().delete(pending.tempFile);
+                }
+                pending.callback.onSucess(r);
+            }
+        };
+        if (!deliverPickerResultOnEdt(delivery)) {
+            delivery.run();
+        }
+    }
     
     
     

@@ -9192,6 +9192,248 @@ void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_i
 #endif
 }
 
+// ---- FileDialogRequest support (showOpenDialog / showSaveDialog) ----------
+// Each dialog gets its own delegate carrying the Java request id, so it never
+// shares the single-slot fileChooserResult path openFileChooser uses. The
+// controller's delegate property is weak; the delegate is kept alive by an
+// associated-object reference on the controller it serves.
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+#import <objc/runtime.h>
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#define CN1_FILE_DIALOG_HAS_UTTYPE 1
+#endif
+
+static char cn1FileDialogDelegateKey;
+
+static void cn1FileDialogDeliver(NSString *paths, JAVA_INT requestId) {
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(
+        threadStateData, paths == nil ? JAVA_NULL : fromNSString(threadStateData, paths), requestId);
+}
+
+// Copies a picked item (file or folder) into the app's tmp directory, the way
+// the single-file chooser does, so the app can read it after the
+// security-scoped access ends.
+static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
+    if (url == nil) {
+        return nil;
+    }
+    BOOL securityScoped = [url startAccessingSecurityScopedResource];
+    NSString *result = nil;
+    @try {
+        NSString *fileName = [url lastPathComponent];
+        if (fileName == nil || [fileName length] == 0) {
+            fileName = @"selected-file";
+        }
+        NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        [fileManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *destinationPath = [folder stringByAppendingPathComponent:fileName];
+        NSURL *destinationURL = [NSURL fileURLWithPath:destinationPath];
+        NSError *error = nil;
+        if ([url isFileURL] && [fileManager copyItemAtURL:url toURL:destinationURL error:&error]) {
+            result = destinationPath;
+        } else {
+            NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
+            if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&error]) {
+                result = destinationPath;
+            } else {
+                NSLog(@"Codename One file dialog failed to copy selected item: %@", error);
+            }
+        }
+    } @finally {
+        if (securityScoped) {
+            [url stopAccessingSecurityScopedResource];
+        }
+    }
+    return result;
+}
+
+@interface CN1FileDialogDelegate : NSObject <UIDocumentPickerDelegate>
+@property (nonatomic, assign) JAVA_INT requestId;
+@property (nonatomic, assign) BOOL exporting;
+@property (nonatomic, assign) BOOL delivered;
+@end
+
+@implementation CN1FileDialogDelegate
+- (void)finish:(UIDocumentPickerViewController *)controller paths:(NSString *)paths {
+    if (!self.delivered) {
+        self.delivered = YES;
+        cn1FileDialogDeliver(paths, self.requestId);
+    }
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    NSMutableArray *paths = [NSMutableArray array];
+    for (NSURL *url in urls) {
+        // An export reports where the file went; it is not copied back.
+        NSString *p = self.exporting ? [url path] : cn1FileDialogCopyToTemp(url);
+        if (p != nil) {
+            [paths addObject:p];
+        }
+    }
+    [self finish:controller paths:[paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"]];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    [self documentPicker:controller didPickDocumentsAtURLs:url == nil ? @[] : @[url]];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    [self finish:controller paths:nil];
+}
+@end
+
+static void cn1FileDialogPresent(UIDocumentPickerViewController *picker, JAVA_INT requestId, BOOL exporting, NSString *initialDirectory) {
+#ifndef CN1_USE_ARC
+    CN1FileDialogDelegate *delegate = [[[CN1FileDialogDelegate alloc] init] autorelease];
+#else
+    CN1FileDialogDelegate *delegate = [[CN1FileDialogDelegate alloc] init];
+#endif
+    delegate.requestId = requestId;
+    delegate.exporting = exporting;
+    objc_setAssociatedObject(picker, &cn1FileDialogDelegateKey, delegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    picker.delegate = delegate;
+    if (initialDirectory != nil && [initialDirectory length] > 0) {
+        if (@available(iOS 13.0, *)) {
+            picker.directoryURL = [NSURL fileURLWithPath:initialDirectory isDirectory:YES];
+        }
+    }
+    if (popoverSupported()) {
+        picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    }
+    [cn1PresentingController() presentViewController:picker animated:YES completion:nil];
+}
+
+static NSArray *cn1FileDialogSplit(NSString *joined) {
+    NSMutableArray *out = [NSMutableArray array];
+    if (joined == nil) {
+        return out;
+    }
+    for (NSString *token in [joined componentsSeparatedByString:@"\n"]) {
+        NSString *t = [token stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if ([t length] > 0) {
+            [out addObject:t];
+        }
+    }
+    return out;
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_showOpenFileDialog___java_lang_String_java_lang_String_boolean_boolean_java_lang_String_boolean_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT utTypes, JAVA_OBJECT extensions, JAVA_BOOLEAN multiSelect, JAVA_BOOLEAN directories, JAVA_OBJECT initialDirectory, JAVA_BOOLEAN showExtensions, JAVA_INT requestId) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSArray *utList = cn1FileDialogSplit(utTypes == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG utTypes));
+    NSArray *extList = cn1FileDialogSplit(extensions == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG extensions));
+    NSString *initialDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+#ifndef CN1_USE_ARC
+    [utList retain];
+    [extList retain];
+    [initialDir retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        UIDocumentPickerViewController *picker = nil;
+#ifdef CN1_FILE_DIALOG_HAS_UTTYPE
+        if (@available(iOS 14.0, *)) {
+            NSMutableArray<UTType *> *types = [NSMutableArray array];
+            if (directories) {
+                [types addObject:UTTypeFolder];
+            } else {
+                for (NSString *identifier in utList) {
+                    UTType *t = [UTType typeWithIdentifier:identifier];
+                    if (t != nil) [types addObject:t];
+                }
+                for (NSString *ext in extList) {
+                    UTType *t = [UTType typeWithFilenameExtension:ext];
+                    if (t != nil) [types addObject:t];
+                }
+                if ([types count] == 0) {
+                    [types addObject:UTTypeItem];
+                }
+            }
+            // asCopy:YES imports a copy we own; the folder case needs the
+            // original, which is then copied below like any file.
+            picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:!directories];
+#ifndef CN1_USE_ARC
+            [picker autorelease];
+#endif
+        }
+#endif
+        if (picker == nil) {
+            NSMutableArray *legacy = [NSMutableArray array];
+            if (directories) {
+                [legacy addObject:(NSString *)kUTTypeFolder];
+            } else {
+                [legacy addObjectsFromArray:utList];
+                if ([legacy count] == 0) {
+                    [legacy addObject:(NSString *)kUTTypeItem];
+                }
+            }
+            picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:legacy
+                inMode:(directories ? UIDocumentPickerModeOpen : UIDocumentPickerModeImport)];
+#ifndef CN1_USE_ARC
+            [picker autorelease];
+#endif
+        }
+        if (@available(iOS 11.0, *)) {
+            picker.allowsMultipleSelection = multiSelect ? YES : NO;
+        }
+        if (@available(iOS 13.0, *)) {
+            picker.shouldShowFileExtensions = showExtensions ? YES : NO;
+        }
+        cn1FileDialogPresent(picker, requestId, NO, initialDir);
+#ifndef CN1_USE_ARC
+        [utList release];
+        [extList release];
+        [initialDir release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_showSaveFileDialog___java_lang_String_boolean_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_BOOLEAN asCopy, JAVA_OBJECT initialDirectory, JAVA_INT requestId) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSString *filePath = path == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString *initialDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+    if (filePath == nil) {
+        com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+        return;
+    }
+#ifndef CN1_USE_ARC
+    [filePath retain];
+    [initialDir retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSURL *url = [NSURL fileURLWithPath:filePath];
+        UIDocumentPickerViewController *picker = nil;
+        if (@available(iOS 14.0, *)) {
+            picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url] asCopy:(asCopy ? YES : NO)];
+        } else {
+            picker = [[UIDocumentPickerViewController alloc] initWithURL:url inMode:UIDocumentPickerModeExportToService];
+        }
+#ifndef CN1_USE_ARC
+        [picker autorelease];
+#endif
+        cn1FileDialogPresent(picker, requestId, YES, initialDir);
+#ifndef CN1_USE_ARC
+        [filePath release];
+        [initialDir release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+#endif
+}
+
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 
