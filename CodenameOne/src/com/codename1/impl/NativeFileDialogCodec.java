@@ -27,6 +27,8 @@ import com.codename1.io.filechooser.FileDialogOption;
 import com.codename1.io.filechooser.FileDialogRequest;
 import com.codename1.io.filechooser.FileDialogResult;
 import com.codename1.io.filechooser.FileTypeFilter;
+import com.codename1.ui.Display;
+import com.codename1.util.SuccessCallback;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -149,6 +151,23 @@ public final class NativeFileDialogCodec {
             paths[0] = FileDialogSupport.withExtension(paths[0], f);
         }
         return new FileDialogResult(request, paths, filter, values);
+    }
+
+    /// Delivers a result through `Display.callSerially()`, so the callback runs
+    /// on the EDT even when the dialog was requested from another thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the dialog's callback
+    ///
+    /// - `result`: the result to deliver
+    public static void deliver(final SuccessCallback<FileDialogResult> callback, final FileDialogResult result) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                callback.onSucess(result);
+            }
+        });
     }
 
     private static String clean(String s) {

@@ -134,59 +134,78 @@ public class FileChooser {
         if (capture != null) {
             fileEl.setAttribute("capture", capture);
         }
+        // A dismissed picker fires "cancel" rather than "change" (Chrome 113+,
+        // Firefox 91+, Safari 16.4+). It runs the same path with no files, so
+        // the response hears about a cancellation instead of never hearing at all.
+        fileEl.addEventListener("cancel", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                selectionFinished();
+            }
+        });
         fileEl.addEventListener("change", new EventListener() {
 
             @Override
             public void handleEvent(Event evt) {
-                // Run synchronously on the current (green) thread via run() rather
-                // than start(): a java.lang.Thread never executes on the
-                // single-threaded HTML5 worker, so the response listener (and the
-                // invokeAndBlock'd Capture.capturePhoto() that waits on it) would
-                // otherwise hang forever. The body only does cooperative,
-                // host-bridge work, so it's safe inline.
-                //
-                // The selected <input>.files live on the MAIN thread; on the
-                // worker port fileEl is a host-ref proxy with no real .files, so
-                // we read the chosen file bytes through the host bridge
-                // (nativeSelectedFileCount / nativeSelectedFile) and write them to
-                // FileSystemStorage as ordinary files the app can open normally.
-                new Thread() {
-                    public void run() {
-                        if (clickBtn != null) {
-                            clickBtn.getParentNode().removeChild(clickBtn);
-                            clickBtn = null;
-                        }
-                        int count = nativeSelectedFileCount(fileEl);
-                        final String[] paths = readSelectedFiles(count);
-                        if (fileEl.getParentNode() != null) {
-                            fileEl.getParentNode().removeChild(fileEl);
-                        }
-                        if (count <= 0 || paths == null) {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    response.actionPerformed(new ActionEvent(null));
-                                }
-                            });
-                        } else if (multiple) {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    response.actionPerformed(new ActionEvent(paths));
-                                }
-                            });
-                        } else {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    response.actionPerformed(new ActionEvent(paths[0]));
-                                }
-                            });
-                        }
-                    }
-                }.run();
+                selectionFinished();
             }
 
         });
         return fileEl;
         
+    }
+
+    private boolean answered;
+
+    private void selectionFinished() {
+        if (answered) {
+            return;
+        }
+        answered = true;
+        // Run synchronously on the current (green) thread via run() rather
+        // than start(): a java.lang.Thread never executes on the
+        // single-threaded HTML5 worker, so the response listener (and the
+        // invokeAndBlock'd Capture.capturePhoto() that waits on it) would
+        // otherwise hang forever. The body only does cooperative,
+        // host-bridge work, so it's safe inline.
+        //
+        // The selected <input>.files live on the MAIN thread; on the
+        // worker port fileEl is a host-ref proxy with no real .files, so
+        // we read the chosen file bytes through the host bridge
+        // (nativeSelectedFileCount / nativeSelectedFile) and write them to
+        // FileSystemStorage as ordinary files the app can open normally.
+        new Thread() {
+            public void run() {
+                if (clickBtn != null) {
+                    clickBtn.getParentNode().removeChild(clickBtn);
+                    clickBtn = null;
+                }
+                int count = nativeSelectedFileCount(fileEl);
+                final String[] paths = readSelectedFiles(count);
+                if (fileEl.getParentNode() != null) {
+                    fileEl.getParentNode().removeChild(fileEl);
+                }
+                if (count <= 0 || paths == null) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            response.actionPerformed(new ActionEvent(null));
+                        }
+                    });
+                } else if (multiple) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            response.actionPerformed(new ActionEvent(paths));
+                        }
+                    });
+                } else {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            response.actionPerformed(new ActionEvent(paths[0]));
+                        }
+                    });
+                }
+            }
+        }.run();
     }
     
     

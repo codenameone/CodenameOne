@@ -766,6 +766,49 @@ static int cn1FdxSplit(char* spec, char** fields, int max) {
     return n;
 }
 
+/* Appends the filter's first extension to a save path that carries none of
+ * its extensions, the same rule as FileDialogSupport.withExtension, so the
+ * overwrite check sees the file that will really be written. The filter
+ * string was already split by cn1FdxSplit into n NUL separated fields: the
+ * label, then the extensions. Returns 1 when the path was changed. */
+static int cn1FdxAddExtension(GSList* paths, const char* filter, int n) {
+    const char* path = (const char*) paths->data;
+    const char* field = filter + strlen(filter) + 1;
+    const char* first = 0;
+    size_t len = strlen(path);
+    int j;
+    for (j = 1; j < n; j++) {
+        size_t el = strlen(field);
+        if (!first) {
+            first = field;
+        }
+        if (len > el + 1 && path[len - el - 1] == '.'
+                && g_ascii_strcasecmp(path + len - el, field) == 0) {
+            return 0;
+        }
+        field += el + 1;
+    }
+    if (!first || !*first) {
+        return 0;
+    }
+    paths->data = g_strconcat(path, ".", first, NULL);
+    g_free((gpointer) path);
+    return 1;
+}
+
+static int cn1FdxConfirmReplace(GtkWidget* parent, const char* path) {
+    GtkWidget* q;
+    int answer;
+    gchar* base = g_path_get_basename(path);
+    q = gtk_message_dialog_new(GTK_WINDOW(parent), GTK_DIALOG_MODAL,
+            GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+            "A file named \"%s\" already exists. Do you want to replace it?", base);
+    answer = gtk_dialog_run(GTK_DIALOG(q));
+    gtk_widget_destroy(q);
+    g_free(base);
+    return answer == GTK_RESPONSE_YES;
+}
+
 static void cn1FileDialogExOnMain(void* p) {
     CN1FileDlgEx* d = (CN1FileDlgEx*) p;
     GtkFileChooserAction action;
@@ -773,6 +816,7 @@ static void cn1FileDialogExOnMain(void* p) {
     GtkWidget* extra = 0;
     GtkWidget* entries[CN1_FDX_MAX_ITEMS];
     GtkFileFilter* filters[CN1_FDX_MAX_ITEMS];
+    int filterFields[CN1_FDX_MAX_ITEMS];
     int i;
     if (d->save) {
         action = GTK_FILE_CHOOSER_ACTION_SAVE;
@@ -797,6 +841,7 @@ static void cn1FileDialogExOnMain(void* p) {
         char* fields[CN1_FDX_MAX_ITEMS];
         int n = cn1FdxSplit(d->filters[i], fields, CN1_FDX_MAX_ITEMS);
         int j;
+        filterFields[i] = n;
         filters[i] = gtk_file_filter_new();
         gtk_file_filter_set_name(filters[i], n > 0 ? fields[0] : "");
         for (j = 1; j < n; j++) {
@@ -864,7 +909,7 @@ static void cn1FileDialogExOnMain(void* p) {
         gtk_widget_show_all(extra);
         gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), extra);
     }
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+    while (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         GtkFileFilter* chosen = gtk_file_chooser_get_filter(GTK_FILE_CHOOSER(dialog));
         d->accepted = 1;
         d->chosenFilter = -1;
@@ -885,6 +930,23 @@ static void cn1FileDialogExOnMain(void* p) {
             d->values[i] = v ? strdup(v) : 0;
         }
         d->paths = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
+        if (d->save && d->paths && d->chosenFilter >= 0
+                && cn1FdxAddExtension(d->paths, d->filters[d->chosenFilter], filterFields[d->chosenFilter])
+                && d->confirmOverwrite
+                && g_file_test((const char*) d->paths->data, G_FILE_TEST_EXISTS)
+                && !cn1FdxConfirmReplace(dialog, (const char*) d->paths->data)) {
+            /* GTK confirmed the typed name, not the one with the extension
+             * added; the user declined replacing that one, so ask again */
+            for (i = 0; i < d->optionCount; i++) {
+                free(d->values[i]);
+                d->values[i] = 0;
+            }
+            g_slist_free_full(d->paths, g_free);
+            d->paths = 0;
+            d->accepted = 0;
+            continue;
+        }
+        break;
     }
     gtk_widget_destroy(dialog);
 }

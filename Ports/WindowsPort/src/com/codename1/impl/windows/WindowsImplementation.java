@@ -2642,7 +2642,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 com.codename1.impl.NativeFileDialogCodec.encodeOptions(request),
                 request.getStringHint(com.codename1.io.filechooser.FileDialogHints.WIN_CLIENT_GUID),
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getStringHint(com.codename1.io.filechooser.FileDialogHints.WIN_DEFAULT_FOLDER)));
-        callback.onSucess(com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
     }
 
     @Override
@@ -2659,7 +2659,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getStringHint(com.codename1.io.filechooser.FileDialogHints.WIN_DEFAULT_FOLDER)));
         com.codename1.io.filechooser.FileDialogResult result = com.codename1.impl.NativeFileDialogCodec.decode(request, answer);
         if (result.isCancelled()) {
-            callback.onSucess(result);
+            com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
         } else {
             completeSaveDialog(request, result, callback);
         }

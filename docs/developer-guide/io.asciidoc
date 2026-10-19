@@ -138,7 +138,7 @@ No photo-library or media permissions are added by this API. On Android the syst
 
 ==== Open and save dialogs
 
-`openFileChooser()` picks one file. Desktop applications usually need more: a *Save* dialog with a suggested name and a choice of formats, several named filters, extra controls such as "Include charts", and a live preview while the user browses. `Display.showOpenDialog()` and `Display.showSaveDialog()` cover these cases. Each takes a request object from `com.codename1.io.filechooser` and a callback that runs on the EDT, including when the user cancels.
+`openFileChooser()` picks one file. Desktop applications usually need more: a *Save* dialog with a suggested name and a choice of formats, several named filters, extra controls such as an *Include charts* checkbox, and a live preview while the user browses. `Display.showOpenDialog()` and `Display.showSaveDialog()` cover these cases. Each takes a request object from `com.codename1.io.filechooser` and a callback that runs on the EDT, including when the user cancels.
 
 [source,java]
 ----

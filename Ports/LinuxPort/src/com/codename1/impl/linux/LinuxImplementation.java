@@ -2620,7 +2620,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 request.isMultiSelect(), request.isDirectories(), false,
                 request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false),
                 com.codename1.impl.NativeFileDialogCodec.encodeOptions(request));
-        callback.onSucess(com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
     }
 
     @Override
@@ -2636,7 +2636,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
         com.codename1.io.filechooser.FileDialogResult result =
                 com.codename1.impl.NativeFileDialogCodec.decode(request, answer);
         if (result.isCancelled()) {
-            callback.onSucess(result);
+            com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
         } else {
             completeSaveDialog(request, result, callback);
         }

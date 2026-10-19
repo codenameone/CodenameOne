@@ -195,6 +195,7 @@ public class FrameworkChromeNeverWindowsTest extends UITestBase {
                 // right: a file chooser, a crash report, a signature pad, a share sheet and
                 // a country list are dialogs, not chrome placed against a control.
                 "com/codename1/impl/CodenameOneImplementation.java",
+                "com/codename1/impl/FileDialogSupport.java",
                 "com/codename1/system/DefaultCrashReporter.java",
                 "com/codename1/components/SignatureComponent.java",
                 "com/codename1/components/ShareButton.java",

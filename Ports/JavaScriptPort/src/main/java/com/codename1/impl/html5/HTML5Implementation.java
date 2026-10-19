@@ -6638,15 +6638,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 new com.codename1.io.filechooser.FileDialogResult(request, new String[]{fileName}, sel, null);
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
+                // The content is buffered whole: a download reaches the page as a
+                // base64 data URL because a worker-side Blob does not survive the
+                // worker->main bridge (see downloadBytesAsFile), so there is no
+                // stream to write into. A document too large for the heap must
+                // still answer the callback, hence the OutOfMemoryError catch.
                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
                 try {
                     request.writeContent(result, out);
-                    if (!downloadBytesAsFile(fileName, out.toByteArray())) {
+                    byte[] data = out.toByteArray();
+                    out = null;
+                    if (!downloadBytesAsFile(fileName, data)) {
                         result.setError(new IOException("The browser refused the download"));
                     }
                 } catch (IOException err) {
                     Log.e(err);
                     result.setError(err);
+                } catch (OutOfMemoryError err) {
+                    out = null;
+                    result.setError(new IOException("The document is too large to download from the browser"));
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {

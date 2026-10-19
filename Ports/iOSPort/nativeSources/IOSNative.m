@@ -9268,15 +9268,34 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
-    NSMutableArray *paths = [NSMutableArray array];
-    for (NSURL *url in urls) {
+    if (self.exporting) {
         // An export reports where the file went; it is not copied back.
-        NSString *p = self.exporting ? [url path] : cn1FileDialogCopyToTemp(url);
-        if (p != nil) {
-            [paths addObject:p];
+        NSMutableArray *paths = [NSMutableArray array];
+        for (NSURL *url in urls) {
+            if ([url path] != nil) {
+                [paths addObject:[url path]];
+            }
         }
+        [self finish:controller paths:[paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"]];
+        return;
     }
-    [self finish:controller paths:[paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"]];
+    // Delegate callbacks run on the main thread, and an import may copy a
+    // whole folder or wait for a cloud download; copying here would freeze
+    // the UI. The copy takes and releases security-scoped access itself, and
+    // the blocks keep the controller and the URLs alive until it is done.
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSMutableArray *paths = [NSMutableArray array];
+        for (NSURL *url in urls) {
+            NSString *p = cn1FileDialogCopyToTemp(url);
+            if (p != nil) {
+                [paths addObject:p];
+            }
+        }
+        NSString *joined = [paths count] == 0 ? nil : [paths componentsJoinedByString:@"\n"];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self finish:controller paths:joined];
+        });
+    });
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
@@ -9369,6 +9388,12 @@ void com_codename1_impl_ios_IOSNative_showOpenFileDialog___java_lang_String_java
                 [legacy addObject:(NSString *)kUTTypeFolder];
             } else {
                 [legacy addObjectsFromArray:utList];
+                // Before iOS 14 there is no UTType class, so an extension-only
+                // filter is converted to its legacy UTI here; without that the
+                // picker would fall back to every document.
+                for (NSString *ext in extList) {
+                    cn1AddFileChooserDocumentType(legacy, kUTTagClassFilenameExtension, ext);
+                }
                 if ([legacy count] == 0) {
                     [legacy addObject:(NSString *)kUTTypeItem];
                 }

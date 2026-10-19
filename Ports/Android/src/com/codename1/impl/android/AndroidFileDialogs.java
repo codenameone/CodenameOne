@@ -71,8 +71,11 @@ final class AndroidFileDialogs {
             case FileDialogFeatures.DIRECTORIES:
                 return Build.VERSION.SDK_INT >= 21;
             case FileDialogFeatures.INITIAL_DIRECTORY:
-                // Only through the FileDialogHints.ANDROID_INITIAL_URI hint; SAF has no file paths
-                return Build.VERSION.SDK_INT >= 26;
+                // The portable initialDirectory(path) is ignored: SAF starts from a
+                // document URI and a file path has no general mapping to one. The
+                // FileDialogHints.ANDROID_INITIAL_URI hint (API 26+) is the Android
+                // equivalent, and a hint is not what this feature reports.
+                return false;
             default:
                 return false;
         }
@@ -240,6 +243,17 @@ final class AndroidFileDialogs {
         if (AndroidNativeUtil.getActivity() == null) {
             FileDialogResult r = FileDialogResult.cancelled(request);
             r.setError(new IOException("No activity to show the file dialog"));
+            deliver(callback, r);
+            return;
+        }
+        android.app.Activity activity = AndroidNativeUtil.getActivity();
+        if (activity instanceof CodenameOneActivity && ((CodenameOneActivity) activity).isWaitingForResult()) {
+            // The activity has ONE result channel and setIntentResultListener
+            // silently refuses a new listener while another flow (camera,
+            // gallery, VPN consent) is outstanding; launching anyway would send
+            // the picker's result to that flow and never answer this dialog.
+            FileDialogResult r = FileDialogResult.cancelled(request);
+            r.setError(new IOException("Another activity result is outstanding"));
             deliver(callback, r);
             return;
         }

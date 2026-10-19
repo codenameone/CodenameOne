@@ -195,6 +195,12 @@ final class FileDialogSupport {
             @Override
             public void run() {
                 try {
+                    if (isSameFile(request.getSourceFile(), result.getPath())) {
+                        // Opening the destination would truncate the source before it
+                        // is read, so the file already holds the content: nothing to do.
+                        deliver(result, callback);
+                        return;
+                    }
                     OutputStream out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
                     try {
                         request.writeContent(result, out);
@@ -205,13 +211,37 @@ final class FileDialogSupport {
                     Log.e(err);
                     result.setError(err);
                 }
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        callback.onSucess(result);
-                    }
-                });
+                deliver(result, callback);
             }
         });
+    }
+
+    private static void deliver(final FileDialogResult result, final SuccessCallback<FileDialogResult> callback) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                callback.onSucess(result);
+            }
+        });
+    }
+
+    /// True when the save's source file and destination name the same path,
+    /// ignoring a `file://` prefix on either.
+    static boolean isSameFile(String source, String destination) {
+        if (source == null || destination == null) {
+            return false;
+        }
+        return stripFileScheme(source).equals(stripFileScheme(destination));
+    }
+
+    private static String stripFileScheme(String path) {
+        String p = path;
+        if (p.startsWith("file://")) {
+            p = p.substring(7);
+        }
+        while (p.startsWith("//")) {
+            p = p.substring(1);
+        }
+        return p;
     }
 }
