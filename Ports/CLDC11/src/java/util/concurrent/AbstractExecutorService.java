@@ -76,8 +76,16 @@ public abstract class AbstractExecutorService implements ExecutorService {
         List<Future<T>> futures = new ArrayList<Future<T>>(tasks.size());
         boolean done = false;
         try {
+            // Every task is wrapped (and a null refused) before any runs.
+            List<RunnableFuture<T>> tasksToRun = new ArrayList<RunnableFuture<T>>(tasks.size());
             for (Callable<T> t : tasks) {
-                RunnableFuture<T> f = newTaskFor(t);
+                if (t == null) {
+                    throw new NullPointerException();
+                }
+                tasksToRun.add(newTaskFor(t));
+            }
+            for (int i = 0; i < tasksToRun.size(); i++) {
+                RunnableFuture<T> f = tasksToRun.get(i);
                 futures.add(f);
                 execute(f);
             }

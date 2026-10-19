@@ -41,6 +41,9 @@ public class PrintWriter extends Writer {
         this.autoFlush = autoFlush;
     }
 
+    // Not synchronized on lock, unlike the JDK's, for the reason
+    // BufferedWriter gives: a println shared between threads is serialized
+    // by its caller rather than paid for by every single-threaded app.
     public PrintWriter(OutputStream out) {
         this(out, false);
     }
@@ -50,6 +53,9 @@ public class PrintWriter extends Writer {
     }
 
     private static Writer utf8(OutputStream out) {
+        if (out == null) {
+            throw new NullPointerException();
+        }
         try {
             return new OutputStreamWriter(out, "UTF-8");
         } catch (UnsupportedEncodingException e) {

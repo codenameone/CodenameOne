@@ -311,6 +311,9 @@ public final class Period implements TemporalAmount {
     /// a date at the end of a month stays valid in between.
     @Override
     public Temporal addTo(Temporal temporal) {
+        if (temporal == null) {
+            throw new NullPointerException("temporal");
+        }
         if (months == 0) {
             if (years != 0) {
                 temporal = temporal.plus(years, ChronoUnit.YEARS);
@@ -329,6 +332,9 @@ public final class Period implements TemporalAmount {
 
     @Override
     public Temporal subtractFrom(Temporal temporal) {
+        if (temporal == null) {
+            throw new NullPointerException("temporal");
+        }
         if (months == 0) {
             if (years != 0) {
                 temporal = temporal.minus(years, ChronoUnit.YEARS);

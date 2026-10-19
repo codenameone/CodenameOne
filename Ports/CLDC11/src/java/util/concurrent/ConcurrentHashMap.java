@@ -214,6 +214,9 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     }
 
     @Override
+    // A mapping function that itself computes the same key is not detected
+    // (JDK 8 does not detect it either; the IllegalStateException is a JDK 9
+    // addition): the outer result wins, and the conformance host is JDK 8.
     public synchronized V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         requireNonNull(key);
         requireNonNull(mappingFunction);

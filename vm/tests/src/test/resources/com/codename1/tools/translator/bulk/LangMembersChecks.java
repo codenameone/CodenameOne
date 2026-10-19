@@ -298,6 +298,22 @@ public final class LangMembersChecks {
             }
             Bulk.p("sum", a.sum());
         });
+        Bulk.check("Lang.aNullStreamIsRefusedByPrintWriter", () -> {
+            try {
+                new java.io.PrintWriter((java.io.OutputStream) null);
+                Bulk.p("built", "yes");
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+        });
+        Bulk.check("Lang.aZeroPeriodRefusesANullTemporal", () -> {
+            try {
+                java.time.Period.ZERO.addTo(null);
+                Bulk.p("added", "yes");
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

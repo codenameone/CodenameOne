@@ -177,6 +177,18 @@ final class ImmutableCollections {
             this.elements = elements;
         }
 
+        /// An immutable copy, not AbstractList's view: the view's clear()
+        /// of an empty range succeeds, where this list must always refuse.
+        @Override
+        public List<E> subList(int fromIndex, int toIndex) {
+            if (fromIndex < 0 || toIndex > elements.length || fromIndex > toIndex) {
+                throw new IndexOutOfBoundsException();
+            }
+            Object[] part = new Object[toIndex - fromIndex];
+            System.arraycopy(elements, fromIndex, part, 0, part.length);
+            return new ImmutableList<E>(part);
+        }
+
         @Override
         @SuppressWarnings("unchecked")
         public E get(int index) {
