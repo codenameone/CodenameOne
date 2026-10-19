@@ -192,6 +192,10 @@ public final class Nav {
 
     /// The user chose `mode` from the menu.
     public static void switchTo(String mode) {
+        if (Shift.taken()) {
+            Ui.say("Finish the delivery you took first");
+            return;
+        }
         UserDto user = Session.user();
         AppConfig.setMode(mode, user == null ? "" : Session.owner(user.username()));
         home();
@@ -211,11 +215,19 @@ public final class Nav {
         if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
             return;
         }
+        if (Shift.taken() && !COURIER.equals(wanted)) {
+            // A notification is no reason to leave a delivery half done.
+            return;
+        }
         AppConfig.setMode(wanted, Session.owner(user.username()));
         home();
     }
 
     public static void signOut() {
+        if (Shift.taken()) {
+            Ui.say("Finish the delivery you took first");
+            return;
+        }
         leave("user", true);
     }
 

@@ -87,6 +87,11 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
     private final CarMarker car;
 
     private LatLng here = Locator.here();
+    /// A status report is waiting for its answer; see [#report].
+    private boolean reporting;
+    /// The report asked for while one was in flight, null for none.
+    private Boolean wantedNext;
+    private Net.Failed failedNext;
     private double heading;
     private boolean online;
     private DeliveryDto delivery;
@@ -162,25 +167,70 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             return;
         }
         move();
-        report(true, QUIET);
+        // A heartbeat only while staying online is still what the courier
+        // wants; one sent after "Go offline" would put them back on line.
+        if (!reporting && wantedNext == null) {
+            report(true, QUIET);
+        }
         if (!LiveChannel.connected() || ticks % 3 == 0) {
             refresh();
         }
     }
 
     /// Tells the server where the car is, and whether it is taking deliveries.
-    private void report(final boolean wanted, Net.Failed failed) {
+    /// One report at a time: two in flight could reach the server in either
+    /// order, and a heartbeat landing after "Go offline" would undo it. A report
+    /// asked for meanwhile waits and goes when the one in flight answers, and
+    /// the latest wish replaces any earlier one still waiting.
+    private void report(final boolean wanted, final Net.Failed failed) {
+        if (reporting) {
+            wantedNext = Boolean.valueOf(wanted);
+            failedNext = failed;
+            return;
+        }
+        reporting = true;
         final CourierStatusDto status = new CourierStatusDto(wanted, here.getLatitude(),
                 here.getLongitude(), heading);
         Api.courier().status(status, Net.to(me -> {
-            if (online != me.online()) {
+            reported();
+            if (wantedNext == null && online != me.online()) {
                 online = me.online();
                 shift();
                 Telemetry.courierOnline(online);
                 showing = "";
                 display();
             }
-        }, failed));
+        }, (code, message) -> {
+            reported();
+            failed.failed(code, message);
+        }));
+    }
+
+    /// The report in flight answered: the one waiting, if any, goes now.
+    private void reported() {
+        reporting = false;
+        if (wantedNext != null) {
+            boolean next = wantedNext.booleanValue();
+            Net.Failed then = failedNext;
+            wantedNext = null;
+            failedNext = null;
+            report(next, then);
+        }
+    }
+
+    /// "Go online": only from a position the phone really reported. Until there
+    /// is one, Locator.here() is the middle of the demo city, and the server
+    /// would offer this courier deliveries there. Made-up positions are the
+    /// exception, since they are all there is.
+    private void goOnline() {
+        if (!Locator.simulated()) {
+            if (Locator.state() != Locator.FOUND) {
+                Ui.say("Waiting for your location");
+                return;
+            }
+            here = Locator.here();
+        }
+        report(true, Ui::fail);
     }
 
     private void refresh() {
@@ -210,6 +260,9 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             Ui.say("The customer cancelled");
         }
         delivery = none ? null : latest;
+        Shift.setTaken(delivery != null && (DeliveryState.ACCEPTED == delivery.state()
+                || DeliveryState.ARRIVED == delivery.state()
+                || DeliveryState.IN_PROGRESS == delivery.state()));
         if (delivery != null) {
             lastFare = null;
         }
@@ -403,7 +456,7 @@ public class CourierForm extends LiveChannel.Adapter implements Nav.Home {
             peek.add(Ui.label("Go online to start taking deliveries.", "SvMuted"));
             Button go = new Button("GO", "SvGo");
             go.setName("goOnline");
-            go.addActionListener(e -> report(true, Ui::fail));
+            go.addActionListener(e -> goOnline());
             peek.add(FlowLayout.encloseCenter(go));
         }
         if (earnings != null) {

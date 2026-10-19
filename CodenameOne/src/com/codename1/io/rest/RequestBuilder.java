@@ -1350,9 +1350,9 @@ public class RequestBuilder {
     }
 
     /// Routes a JSON-object response through the build-time POJO mapping
-    /// framework. Returns a `null` typed result when no mapper is registered
-    /// for `type` (typical cause: forgot `@Mapped` on the class, or the
-    /// process-annotations Mojo didn't run).
+    /// framework. A type with no registered mapper (typical cause: forgot
+    /// `@Mapped` on the class, or the process-annotations Mojo didn't run)
+    /// fails the request, whatever the body.
     private static class FetchAsMappedActionListener<T> implements ActionListener<NetworkEvent> {
         private final Connection request;
         private final Class<T> type;
@@ -1373,15 +1373,14 @@ public class RequestBuilder {
             if (request.errorCode) {
                 return;
             }
-            Map<String, Object> parsed = (Map<String, Object>) evt.getMetaData();
-            T result = null;
-            if (parsed != null) {
-                com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
-                if (m == null) {
-                    return;
-                }
-                result = m.fromMap(parsed);
+            // Looked up before the body is: a missing mapper fails the request
+            // even when the answer is null or empty, which would otherwise hide it.
+            com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
+            if (m == null) {
+                return;
             }
+            Map<String, Object> parsed = (Map<String, Object>) evt.getMetaData();
+            T result = parsed == null ? null : m.fromMap(parsed);
             Response<T> res = new Response<T>(evt.getResponseCode(), result, evt.getMessage());
             callback.completed(res);
         }
@@ -1434,6 +1433,11 @@ public class RequestBuilder {
             if (request.errorCode) {
                 return;
             }
+            // As in FetchAsMappedActionListener: the mapper first, whatever the body.
+            com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
+            if (m == null) {
+                return;
+            }
             Map parsed = (Map) evt.getMetaData();
             List raw = null;
             if (parsed != null && parsed.get("root") instanceof List) {
@@ -1443,10 +1447,6 @@ public class RequestBuilder {
             if (raw == null) {
                 out = java.util.Collections.emptyList();
             } else {
-                com.codename1.mapping.Mapper<T> m = requireMapper(request, type, errorListeners, callback);
-                if (m == null) {
-                    return;
-                }
                 out = new ArrayList<T>(raw.size());
                 for (Object e : raw) {
                     if (e instanceof Map) {

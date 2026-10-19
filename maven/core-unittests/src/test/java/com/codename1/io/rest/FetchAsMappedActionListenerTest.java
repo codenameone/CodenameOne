@@ -78,6 +78,17 @@ class FetchAsMappedActionListenerTest extends UITestBase {
         assertTrue(response.getResponseErrorMessage().contains("@Mapped"), response.getResponseErrorMessage());
     }
 
+    @Test
+    void unregisteredTypeFailsEvenForANullBody() {
+        // The mapper is asked for before the body, so a JSON null cannot hide it.
+        prepareJson(BASE_URL + "/unmapped-null", "null");
+
+        Response<Unmapped> response = fetch(BASE_URL + "/unmapped-null", Unmapped.class);
+        assertNotNull(response, "the callback must still run so the caller does not hang");
+        assertEquals(-1, response.getResponseCode());
+        assertTrue(response.getResponseErrorMessage().contains("@Mapped"), response.getResponseErrorMessage());
+    }
+
     private <T> Response<T> fetch(String url, Class<T> type) {
         RequestBuilder builder = new RequestBuilder("GET", url);
         final AtomicReference<Response<T>> holder = new AtomicReference<Response<T>>();

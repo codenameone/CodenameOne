@@ -107,6 +107,11 @@ public final class Cart {
         return !LINES.isEmpty() && !restaurant.id().equals(other.id());
     }
 
+    /// The most of one line the server takes (Quotes.MAX_QUANTITY). Adding the
+    /// same dish again, or stepping it up, stops here rather than building a
+    /// cart that can be neither priced nor placed.
+    public static final int MAX_QUANTITY = 50;
+
     /// Adds `quantity` of `dish` with `options`, emptying a cart from another
     /// restaurant first. The same dish with the same options is one line.
     public static void add(RestaurantDto from, DishDto dish, List<DishOptionDto> options,
@@ -117,21 +122,23 @@ public final class Cart {
         restaurant = from;
         for (int iter = 0; iter < LINES.size(); iter++) {
             if (LINES.get(iter).same(dish, options)) {
-                LINES.get(iter).quantity += quantity;
+                LINES.get(iter).quantity = Math.min(MAX_QUANTITY,
+                        LINES.get(iter).quantity + quantity);
                 changed();
                 return;
             }
         }
-        LINES.add(new Line(dish, options, quantity));
+        LINES.add(new Line(dish, options, Math.min(MAX_QUANTITY, quantity)));
         changed();
     }
 
     /// Changes how many of `line` there are; none takes it out.
     public static void set(Line line, int quantity) {
+        // Callers may ask for more; MAX_QUANTITY is what one line can hold.
         if (quantity <= 0) {
             LINES.remove(line);
         } else {
-            line.quantity = quantity;
+            line.quantity = Math.min(MAX_QUANTITY, quantity);
         }
         changed();
     }
