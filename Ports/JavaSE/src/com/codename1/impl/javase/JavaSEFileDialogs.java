@@ -113,6 +113,10 @@ final class JavaSEFileDialogs {
                 || request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false)) {
             return true;
         }
+        if (request.getAcceptLabel() != null) {
+            // FileDialog has no way to set the button text; JFileChooser does
+            return true;
+        }
         if (request instanceof SaveFileRequest && !((SaveFileRequest) request).isConfirmOverwrite()) {
             // The OS panels behind AWT's FileDialog always ask before replacing
             return true;

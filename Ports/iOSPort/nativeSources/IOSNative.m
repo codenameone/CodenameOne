@@ -9300,13 +9300,24 @@ static NSString *cn1FileDialogJoin(NSArray *paths) {
     // the blocks keep the controller and the URLs alive until it is done.
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSMutableArray *paths = [NSMutableArray array];
+        BOOL copyFailed = NO;
+        NSString *failed = nil;
         for (NSURL *url in urls) {
             NSString *p = cn1FileDialogCopyToTemp(url);
-            if (p != nil) {
-                [paths addObject:p];
+            if (p == nil) {
+                copyFailed = YES;
+                failed = [url lastPathComponent];
+                break;
             }
+            [paths addObject:p];
         }
-        NSString *joined = cn1FileDialogJoin(paths);
+        // A copy that failed (a cloud download, a full disk) fails the whole
+        // import rather than quietly dropping the item. Paths are absolute, so
+        // a leading '!' can only be this marker; fileDialogResult reads the
+        // rest as the error message.
+        NSString *joined = copyFailed
+                ? [NSString stringWithFormat:@"!Could not import %@", failed == nil ? @"the selected item" : failed]
+                : cn1FileDialogJoin(paths);
         dispatch_async(dispatch_get_main_queue(), ^{
             [self finish:controller paths:joined];
         });
@@ -9670,7 +9681,16 @@ void com_codename1_impl_ios_IOSNative_showMacFileDialog___boolean_java_lang_Stri
                 NSArray *urls = [panel isKindOfClass:[NSOpenPanel class]] ? ((NSOpenPanel *)panel).URLs
                         : (panel.URL == nil ? [NSArray array] : [NSArray arrayWithObject:panel.URL]);
                 for (NSURL *u in urls) [out addObject:[u path]];
-                if (urls.count > 0) answer = [out componentsJoinedByString:@"\x1e"];
+                if (urls.count > 0) {
+                    // A Mac file name may contain the separator itself, so every
+                    // field is escaped ('%' first); macFileDialogResult undoes it.
+                    NSMutableArray *escaped = [NSMutableArray arrayWithCapacity:out.count];
+                    for (NSString *f in out) {
+                        NSString *e = [f stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+                        [escaped addObject:[e stringByReplacingOccurrencesOfString:@"\x1e" withString:@"%1e"]];
+                    }
+                    answer = [escaped componentsJoinedByString:@"\x1e"];
+                }
             }
             // The popup holds its target weakly; this capture keeps it alive
             // until the panel closes.

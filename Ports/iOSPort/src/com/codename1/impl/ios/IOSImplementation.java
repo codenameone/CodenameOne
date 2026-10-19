@@ -6996,7 +6996,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     int start = 0;
                     for (int i = 0; i <= answer.length(); i++) {
                         if (i == answer.length() || answer.charAt(i) == MAC_DIALOG_RS) {
-                            list.add(answer.substring(start, i));
+                            // The native escapes '%' and the separator in each field
+                            list.add(StringUtil.replaceAll(StringUtil.replaceAll(
+                                    answer.substring(start, i), "%1e", "\u001e"), "%25", "%"));
                             start = i + 1;
                         }
                     }
@@ -7034,6 +7036,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 com.codename1.io.filechooser.FileDialogResult r;
                 if (paths == null || paths.length() == 0) {
                     r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
+                } else if (paths.charAt(0) == '!') {
+                    // The native could not import a picked item (never a path: paths are absolute)
+                    r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
+                    r.setError(new IOException(paths.substring(1)));
                 } else {
                     // The native escapes '%' and newline in each path (cn1FileDialogJoin)
                     java.util.List<String> list = StringUtil.tokenize(paths, '\n');
