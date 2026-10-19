@@ -5332,11 +5332,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (property.length() == 0 || value.length() == 0 || property.startsWith("@")) continue;
             // A #Constants entry is a theme constant, not a style property a probe rule could show.
             if (isInConstantsBlock(masked, at)) continue;
-            Boolean supported = judged.get(property);
+            // Keyed by the value too: whether a declaration applies can depend on it, as a
+            // cn1-image-id naming a project image that exists or not does.
+            String judgedKey = property + ":" + value;
+            Boolean supported = judged.get(judgedKey);
             if (supported == null) {
                 Set<String> withProperty = compiledKeys(property + ": " + value + ";");
                 supported = Boolean.valueOf(withProperty == null || !withProperty.equals(baseline));
-                judged.put(property, supported);
+                judged.put(judgedKey, supported);
             }
             if (!supported.booleanValue()) {
                 out.add(new CodeDiagnostic(line, nameStart - lineStartBefore(masked, nameStart) + 1,
