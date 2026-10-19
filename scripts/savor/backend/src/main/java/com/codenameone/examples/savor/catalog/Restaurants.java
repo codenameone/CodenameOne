@@ -296,9 +296,11 @@ public class Restaurants {
             throw new ResponseStatusException(409, suspended
                     ? "Only a listed restaurant can be suspended" : "That restaurant is not suspended");
         }
-        if (!suspended && staff.findByRestaurantId(restaurant.getId()).isEmpty()) {
+        if (!suspended && !staffed(restaurant.getId())) {
             // Its only merchant may have closed their account while it was
-            // suspended. Listed again, it would take orders nobody can see.
+            // suspended, or been blocked: the sole-merchant guard protects
+            // listed restaurants only. Listed again, it would take orders
+            // nobody can see.
             throw new ResponseStatusException(409,
                     "That restaurant has no staff left to take its orders");
         }
@@ -306,6 +308,17 @@ public class Restaurants {
         restaurant.setReason(suspended ? Text.required(reason, 255, "why it is suspended") : "");
         restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, null, 0d, 0d, true);
+    }
+
+    /// Whether anybody on the restaurant's staff can still sign in.
+    private boolean staffed(String restaurantId) {
+        List<RestaurantStaff> rows = staff.findByRestaurantId(restaurantId);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            if (accounts.enabled(rows.get(iter).getUsername())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void moderated(String id) {

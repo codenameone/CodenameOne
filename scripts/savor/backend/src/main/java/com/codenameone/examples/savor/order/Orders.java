@@ -222,6 +222,16 @@ public class Orders {
             throw new ResponseStatusException(409, "The menu changed while you were paying."
                     + " Check your cart and try again");
         }
+        // The minimum may have been raised while the card was held, and it
+        // leaves the total alone, so the comparison above does not see it.
+        if (again.quote.subtotalCents() < restaurant.getMinimumCents()) {
+            throw new ResponseStatusException(400, restaurant.getName()
+                    + " needs a bigger order");
+        }
+        // The card may have been removed while it was held: Payments.remove
+        // takes the profile lock held here and found no active order then.
+        // Asked again, a card that is gone refuses with 400.
+        payments.choose(customer, method[0]);
         priced = again;
         QuoteDto quote = priced.quote;
         long now = System.currentTimeMillis();
