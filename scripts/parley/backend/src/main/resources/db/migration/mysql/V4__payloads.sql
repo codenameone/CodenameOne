@@ -48,6 +48,6 @@ CREATE TABLE conversation_photo (
 -- candidates -- for a callee whose phone connects only after the ring.
 CREATE TABLE call_setup (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
-    offer MEDIUMTEXT NOT NULL,
-    candidates MEDIUMTEXT NOT NULL
+    offer LONGTEXT NOT NULL,
+    candidates LONGTEXT NOT NULL
 );

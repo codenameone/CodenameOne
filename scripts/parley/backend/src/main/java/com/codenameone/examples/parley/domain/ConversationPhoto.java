@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class ConversationPhoto {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String conversationId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String contentType = "";
 
     @Column(nullable = false)

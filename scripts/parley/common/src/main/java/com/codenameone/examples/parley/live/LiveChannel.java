@@ -116,6 +116,23 @@ public final class LiveChannel {
         admin = current;
     }
 
+    /// Connects again at once, dropping any connection there is: a push
+    /// says something is waiting, and a socket the phone kept while asleep
+    /// may be dead without knowing it.
+    public static void reconnect() {
+        if (!wanted) {
+            return;
+        }
+        connected = false;
+        generation++;
+        if (socket != null) {
+            socket.close();
+            socket = null;
+        }
+        attempts = 0;
+        connect();
+    }
+
     public static boolean connected() {
         return connected;
     }

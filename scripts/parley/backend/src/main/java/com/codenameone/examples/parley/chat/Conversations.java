@@ -20,6 +20,7 @@ package com.codenameone.examples.parley.chat;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.Transactions;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.parley.Ids;
@@ -602,7 +603,19 @@ public class Conversations {
         Map<String, Object> frame = new LinkedHashMap<String, Object>();
         frame.put("type", "conversation");
         frame.put("id", id);
-        live.toUsers(to, frame);
+        // The apps fetch the conversation the moment they hear this, so they
+        // must not hear it before the change is committed: a fast one would
+        // read the old row and get no later frame to correct it.
+        if (Transactions.isActive()) {
+            Transactions.registerSynchronization(new Transactions.Synchronization() {
+                @Override
+                public void afterCommit() {
+                    live.toUsers(to, frame);
+                }
+            });
+        } else {
+            live.toUsers(to, frame);
+        }
     }
 
     private String name(String username) {

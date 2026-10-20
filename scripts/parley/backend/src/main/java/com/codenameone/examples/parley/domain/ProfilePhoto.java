@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class ProfilePhoto {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String contentType = "";
 
     @Column(nullable = false)

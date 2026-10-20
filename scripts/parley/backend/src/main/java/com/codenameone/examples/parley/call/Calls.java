@@ -43,6 +43,7 @@ import com.codenameone.examples.parley.repository.CallRecordRepository;
 import com.codenameone.examples.parley.repository.CallSetupRepository;
 import com.codenameone.examples.parley.repository.CallLineRepository;
 import com.codenameone.examples.parley.repository.ContactBlockRepository;
+import com.codenameone.examples.parley.repository.DeviceRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 import com.codenameone.examples.parley.chat.Messages;
 
@@ -100,6 +101,7 @@ public class Calls {
     private final ContactBlockRepository blocks;
     private final Conversations conversations;
     private final LiveHub live;
+    private final DeviceRepository devices;
     private final MessagePushes pushes;
     private final String stun;
     private final String turn;
@@ -109,7 +111,7 @@ public class Calls {
     public Calls(CallRecordRepository calls, CallLineRepository lines,
             CallSetupRepository setups, ProfileRepository profiles,
             ContactBlockRepository blocks, Conversations conversations, LiveHub live,
-            MessagePushes pushes,
+            MessagePushes pushes, DeviceRepository devices,
             @Value("${parley.ice.stun:stun:stun.l.google.com:19302}") String stun,
             @Value("${parley.ice.turn:}") String turn,
             @Value("${parley.ice.secret:}") String turnSecret,
@@ -122,6 +124,7 @@ public class Calls {
         this.conversations = conversations;
         this.live = live;
         this.pushes = pushes;
+        this.devices = devices;
         this.stun = stun;
         this.turn = turn;
         this.turnSecret = turnSecret;
@@ -200,6 +203,20 @@ public class Calls {
                 row.getCaller(), row.isVideo());
     }
 
+    /// Rings a device that has just connected for every call still ringing
+    /// for its account. A phone woken by a push has no socket when the ring
+    /// frame goes out, and the push itself says only which call: this is
+    /// where it learns who is calling and that the call is still live.
+    @Transactional(readOnly = true)
+    public void ringDevice(String username, String device) throws IOException {
+        for (CallRecord row : calls.liveOf(username)) {
+            if (username.equals(row.getCallee()) && RINGING.equals(row.getState())
+                    && blocks.findById(Messages.blockId(row.getCallee(), row.getCaller())) == null) {
+                live.toDevice(device, frame(row, "ring"));
+            }
+        }
+    }
+
     /// Passes a signal to the other side of the call, and moves the call on
     /// for those that do that.
     @Transactional(rollbackFor = IOException.class)
@@ -221,6 +238,12 @@ public class Calls {
         }
         boolean caller = username.equals(row.getCaller());
         String device = signal.fromDevice() == null ? "" : signal.fromDevice();
+        // The device becomes where the other side's signals are routed, and
+        // device ids are visible to everyone in a conversation: one that is
+        // not the sender's own would steer the call to a stranger's phone.
+        if (device.length() > 0 && devices.findByIdAndUsername(device, username) == null) {
+            throw new ResponseStatusException(400, "That is not one of your devices");
+        }
         String type = signal.type();
         long now = System.currentTimeMillis();
         if (OFFER.equals(type) && caller) {
@@ -304,6 +327,9 @@ public class Calls {
                 live.toUsers(Arrays.asList(row.getCaller(), row.getCallee()), frame(row, "signal"));
             } else if (row.getAnsweredAt() < now - STALE_MILLIS) {
                 end(row, ENDED, now);
+                // Both apps still hold the call; without this they keep it
+                // open and turn every later call away as busy.
+                live.toUsers(Arrays.asList(row.getCaller(), row.getCallee()), frame(row, "signal"));
             }
         }
     }

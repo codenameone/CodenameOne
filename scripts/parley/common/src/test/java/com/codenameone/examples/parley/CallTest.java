@@ -61,8 +61,10 @@ public class CallTest extends E2e {
     }
 
     private void signal(Actor actor, String call, String type, String payload) {
+        // Bob signs in with no device of his own here, so he names none: the
+        // server refuses a device that is not the signaller's.
         actor.post("/api/calls/" + call + "/signal", "{\"callId\":\"" + call + "\",\"type\":\""
-                + type + "\",\"payload\":\"" + payload + "\",\"fromDevice\":\"e2e-bob\"}");
+                + type + "\",\"payload\":\"" + payload + "\",\"fromDevice\":\"\"}");
         assertEqual(200, actor.status, "the " + type + " signal");
     }
 

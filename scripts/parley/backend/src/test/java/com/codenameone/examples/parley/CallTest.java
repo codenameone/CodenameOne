@@ -69,6 +69,11 @@ class CallTest {
         assertEquals("RINGING", call.get("state"));
         assertEquals(bob, call.get("callee"));
         signal(alice, id, "OFFER", alices);
+        // A device that is not the signaller's own is refused, or the call
+        // would be routed to it.
+        assertEquals(400, Chat.statusOf(mvc, People.asUser(Chat.body(
+                post("/api/calls/" + id + "/signal"), Chat.map("callId", id, "type", "ACCEPT",
+                        "payload", "", "fromDevice", alices)), bob)));
         assertEquals("ACCEPTED", signal(bob, id, "ACCEPT", bobs).get("state"));
         signal(bob, id, "ANSWER", bobs);
         assertEquals("ENDED", signal(alice, id, "END", alices).get("state"));

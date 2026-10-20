@@ -28,28 +28,28 @@ import com.codename1.annotations.Id;
 @Entity
 public class Device {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String name = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String platform = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(200)")
     private String identityKey = "";
 
     @Column(nullable = false)
     private int signedPreKeyId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(200)")
     private String signedPreKey = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(200)")
     private String signedPreKeySignature = "";
 
     @Column(nullable = false)

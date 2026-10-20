@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class MediaBlob {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String owner = "";
 
     @Column(nullable = false)

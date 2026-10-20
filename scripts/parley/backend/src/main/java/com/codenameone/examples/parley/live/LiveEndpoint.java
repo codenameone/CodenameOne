@@ -23,6 +23,7 @@ import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.annotations.WebSocketMapping;
 import com.codenameone.examples.parley.account.Accounts;
 import com.codenameone.examples.parley.api.UserDto;
+import com.codenameone.examples.parley.call.Calls;
 import com.codenameone.examples.parley.device.Devices;
 
 /// The live channel: `/ws/live?ticket=...&device=...`.
@@ -37,12 +38,15 @@ public class LiveEndpoint implements WebSocket {
     private final Accounts accounts;
     private final Devices devices;
     private final LiveHub hub;
+    private final Calls calls;
 
-    public LiveEndpoint(LiveTickets tickets, Accounts accounts, Devices devices, LiveHub hub) {
+    public LiveEndpoint(LiveTickets tickets, Accounts accounts, Devices devices, LiveHub hub,
+            Calls calls) {
         this.tickets = tickets;
         this.accounts = accounts;
         this.devices = devices;
         this.hub = hub;
+        this.calls = calls;
     }
 
     @Override
@@ -71,6 +75,7 @@ public class LiveEndpoint implements WebSocket {
         }
         devices.seen(username, device);
         session.sendText("{\"type\":\"ready\"}");
+        calls.ringDevice(username, device);
     }
 
     @Override

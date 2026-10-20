@@ -244,8 +244,27 @@ public final class Calls {
         }
     }
 
+    /// The PushKit token registered for the account signed in, so signing
+    /// out can take it back; null when none was registered.
+    private static String voipToken;
+
+    /// Removes this phone's PushKit token from the account before it signs
+    /// out, then runs `then`. Left behind, it would keep ringing a phone
+    /// nobody is signed in on, with the caller's name on its screen.
+    public static void signingOut(Runnable then) {
+        String token = voipToken;
+        voipToken = null;
+        if (token == null || Session.user() == null) {
+            then.run();
+            return;
+        }
+        Api.account().unregisterPush(new PushDeviceDto("apns", token, "ios-voip"),
+                Net.to(gone -> then.run(), (status, message) -> then.run()));
+    }
+
     private static void registerVoip(String token) {
         if (token != null && token.length() > 0 && Session.user() != null) {
+            voipToken = token;
             Api.account().registerPush(new PushDeviceDto("apns", token, "ios-voip"),
                     Net.to(saved -> { }, (status, message) -> Log.p("VoIP push: " + message)));
         }
@@ -594,7 +613,11 @@ public final class Calls {
 
     private static void ring(Map<String, Object> frame, String id) {
         if (current != null) {
-            if (current.id.length() == 0 || current.id.equals(id)) {
+            // Only a call a VoIP push started is filled in: it knows its id
+            // but not its conversation. A ring the server replays when the
+            // socket reconnects names a call this phone already shows.
+            if (current.conversationId.length() == 0
+                    && (current.id.length() == 0 || current.id.equals(id))) {
                 // Woken by a VoIP push, now with the details.
                 Call pushed = new Call(id, text(frame, "uuid"), text(frame, "conversationId"),
                         text(frame, "callerName"), Boolean.TRUE.equals(frame.get("video"))

@@ -26,34 +26,34 @@ import com.codename1.annotations.Id;
 @Entity
 public class Report {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String reporter = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String subject = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String conversationId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String reason = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(4000)")
     private String evidence = "";
 
     @Column(nullable = false)
     private long createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String resolvedBy = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String outcome = "";
 
     public Report() {

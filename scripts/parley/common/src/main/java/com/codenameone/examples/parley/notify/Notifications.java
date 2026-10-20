@@ -28,7 +28,9 @@ import com.codenameone.examples.parley.AppConfig;
 import com.codenameone.examples.parley.api.PushDeviceDto;
 import com.codenameone.examples.parley.net.Api;
 import com.codenameone.examples.parley.net.Net;
+import com.codenameone.examples.parley.chat.Calls;
 import com.codenameone.examples.parley.chat.Messenger;
+import com.codenameone.examples.parley.live.LiveChannel;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.ui.Nav;
 
@@ -92,7 +94,12 @@ public final class Notifications {
     /// Someone is signing out: the server forgets this phone for them, and
     /// then `then` runs. It runs whether or not the server could be reached;
     /// signing out never waits on a notification.
-    public static void signingOut(Runnable then) {
+    public static void signingOut(Runnable after) {
+        // The PushKit token iOS rings calls through is a row of its own.
+        Calls.signingOut(() -> unregister(after));
+    }
+
+    private static void unregister(Runnable then) {
         PushDeviceDto device = device();
         if (device == null || Session.user() == null) {
             then.run();
@@ -147,6 +154,12 @@ public final class Notifications {
             if ("sync".equals(type) && Session.user() != null) {
                 Messenger.sync();
                 Nav.home();
+            } else if ("call".equals(type) && Session.user() != null) {
+                // Android rings a phone with no socket this way. The ring
+                // itself comes over the socket: the server replays every
+                // call still ringing to a device the moment it connects, so
+                // connect now rather than wait out the retry backoff.
+                LiveChannel.reconnect();
             }
         }
 

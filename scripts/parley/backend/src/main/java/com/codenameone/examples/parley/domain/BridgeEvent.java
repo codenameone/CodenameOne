@@ -28,7 +28,7 @@ import com.codename1.annotations.Id;
 @Entity
 public class BridgeEvent {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(240)")
     private String id = "";
 
     @Column(nullable = false)

@@ -29,19 +29,19 @@ import com.codename1.annotations.Id;
 @Entity
 public class Profile {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String displayName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String phone = "";
 
     @Column(nullable = false)
     private boolean phoneVerified;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String about = "";
 
     @Column(nullable = false)
@@ -53,13 +53,13 @@ public class Profile {
     @Column(nullable = false)
     private long lastSeenAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(8)")
     private String language = "";
 
     @Column(nullable = false)
     private boolean flagged;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String flagReason = "";
 
     public Profile() {

@@ -26,13 +26,13 @@ import com.codename1.annotations.Id;
 @Entity
 public class ContactBlock {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String blocker = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String blocked = "";
 
     @Column(nullable = false)

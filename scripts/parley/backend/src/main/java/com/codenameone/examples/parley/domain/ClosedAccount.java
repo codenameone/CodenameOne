@@ -27,7 +27,7 @@ import com.codename1.annotations.Id;
 @Entity
 public class ClosedAccount {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String usernameHash = "";
 
     @Column(nullable = false)

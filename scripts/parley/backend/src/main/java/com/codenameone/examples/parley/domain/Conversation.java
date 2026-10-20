@@ -26,16 +26,16 @@ import com.codename1.annotations.Id;
 @Entity
 public class Conversation {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String kind = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String title = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String about = "";
 
     @Column(nullable = false)
@@ -47,7 +47,7 @@ public class Conversation {
     @Column(nullable = false)
     private boolean hasPhoto;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String createdBy = "";
 
     @Column(nullable = false)
@@ -56,7 +56,7 @@ public class Conversation {
     @Column(nullable = false)
     private long lastActivityAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(400)")
     private String directKey = "";
 
     public Conversation() {

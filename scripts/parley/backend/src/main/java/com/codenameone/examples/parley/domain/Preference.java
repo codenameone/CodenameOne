@@ -27,10 +27,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class Preference {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(8)")
     private String theme = "";
 
     @Column(nullable = false)
@@ -48,10 +48,10 @@ public class Preference {
     @Column(nullable = false)
     private boolean typingIndicators;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String lastSeen = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String profilePhoto = "";
 
     @Column(nullable = false)
