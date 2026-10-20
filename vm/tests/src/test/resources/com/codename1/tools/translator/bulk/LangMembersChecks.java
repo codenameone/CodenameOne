@@ -607,6 +607,25 @@ public final class LangMembersChecks {
             Bulk.p("time", java.time.LocalTime.NOON.isSupported(unit));
             Bulk.p("dateTime", java.time.LocalDateTime.of(2020, 1, 1, 0, 0).isSupported(unit));
         });
+        Bulk.check("Lang.anEmptyToListRejectsEveryMutation", () -> {
+            java.util.List<String> l = java.util.stream.Stream.<String>empty().toList();
+            try { l.removeIf(x -> true); Bulk.p("removeIf", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("removeIf", "uoe"); }
+            try { l.replaceAll(x -> x); Bulk.p("replaceAll", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("replaceAll", "uoe"); }
+            try { l.sort(null); Bulk.p("sort", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("sort", "uoe"); }
+        });
+        Bulk.check("Lang.aReversedStreamRangeIsOutOfBounds", () -> {
+            try { java.util.Arrays.stream(new int[2], 1, 0); Bulk.p("reversed", "ok"); } catch (ArrayIndexOutOfBoundsException e) { Bulk.p("reversed", "aioobe"); }
+            try { java.util.Arrays.stream(new int[2], 0, 3); Bulk.p("past", "ok"); } catch (ArrayIndexOutOfBoundsException e) { Bulk.p("past", "aioobe"); }
+        });
+        Bulk.check("Lang.aSuppressedThrowableIsPrinted", () -> {
+            Exception main = new Exception("main");
+            main.addSuppressed(new Exception("closing"));
+            java.io.StringWriter w = new java.io.StringWriter();
+            main.printStackTrace(new java.io.PrintWriter(w, true));
+            Bulk.p("suppressed", w.toString().indexOf("\tSuppressed: java.lang.Exception: closing") >= 0);
+            StringBuffer sb = new StringBuffer("x");
+            Bulk.p("self", sb.compareTo(sb));
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

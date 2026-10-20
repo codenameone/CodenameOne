@@ -113,22 +113,55 @@ public class Throwable{
     }
 
     /// The whole text `printStackTrace` prints, in the JDK's shape: the first
-    /// line is `toString()`, then this throwable's frames, then each cause
-    /// as `Caused by: ` followed by the cause's own text.
+    /// line is `toString()`, then this throwable's frames, then each
+    /// suppressed throwable as a tab-indented `Suppressed: ` block, then each
+    /// cause as `Caused by: ` followed by the cause's own text. A throwable
+    /// already printed is named as a circular reference instead.
     private String printedStack() {
         StringBuilder sb = new StringBuilder();
+        appendStack(sb, "", "", new java.util.ArrayList<Throwable>());
+        return sb.toString();
+    }
+
+    private void appendStack(StringBuilder sb, String caption, String prefix, java.util.List<Throwable> seen) {
         Throwable t = this;
-        int depth = 0;
-        while (t != null && depth < 64) {
-            if (depth > 0) {
-                sb.append('\n').append("Caused by: ");
+        String cap = caption;
+        while (t != null) {
+            for (int i = 0; i < seen.size(); i++) {
+                if (seen.get(i) == t) {
+                    sb.append('\n').append(prefix).append(cap)
+                            .append("[CIRCULAR REFERENCE: ").append(t.toString()).append(']');
+                    return;
+                }
             }
-            sb.append(t.headedStack());
+            seen.add(t);
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            String text = t.headedStack();
+            int start = 0;
+            while (true) {
+                int nl = text.indexOf('\n', start);
+                sb.append(prefix);
+                if (start == 0) {
+                    sb.append(cap);
+                }
+                sb.append(nl < 0 ? text.substring(start) : text.substring(start, nl));
+                if (nl < 0) {
+                    break;
+                }
+                sb.append('\n');
+                start = nl + 1;
+            }
+            if (t.suppressed != null) {
+                for (int i = 0; i < t.suppressed.size(); i++) {
+                    t.suppressed.get(i).appendStack(sb, "Suppressed: ", prefix + "\t", seen);
+                }
+            }
             Throwable next = t.cause;
             t = next == t ? null : next;
-            depth++;
+            cap = "Caused by: ";
         }
-        return sb.toString();
     }
 
     /// [#renderedStack()] with `toString()` as its first line. The native

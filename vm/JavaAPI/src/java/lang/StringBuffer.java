@@ -459,7 +459,11 @@ public final class StringBuffer implements CharSequence, Appendable, Comparable<
     public int compareTo(StringBuffer another) {
         // Snapshot the other buffer under its own lock first: holding this
         // one while reading that one would deadlock against a thread
-        // comparing the pair the other way around.
+        // comparing the pair the other way around. Identity is answered
+        // first, so a buffer always compares equal to itself.
+        if (another == this) {
+            return 0;
+        }
         String theirs = another.toString();
         synchronized (this) {
             return CharSequence.compare(this, theirs);

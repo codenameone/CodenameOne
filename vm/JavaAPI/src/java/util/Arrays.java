@@ -4134,6 +4134,10 @@ public class Arrays {
         return java.util.stream.DoubleStream.of(array).skip(startInclusive).limit(endExclusive - startInclusive);
     }
 
+    // A reversed range is an ArrayIndexOutOfBoundsException, not an
+    // IllegalArgumentException: that is what the JDK's Arrays.stream
+    // documents and throws (Spliterators.checkFromToBounds), and HotSpot
+    // answers the same in the bulk conformance run.
     private static void checkStreamRange(int length, int startInclusive, int endExclusive) {
         if (startInclusive < 0 || endExclusive > length || startInclusive > endExclusive) {
             throw new ArrayIndexOutOfBoundsException("origin(" + startInclusive + ") > fence(" + endExclusive + ")");
