@@ -72,6 +72,21 @@ final class ClientCredentials {
                     throw new IOException("The PKCS#12 client certificate could not be "
                             + "read: the password is wrong or the archive is damaged", err);
                 }
+                // An archive with only certificates in it loads, and an empty
+                // key manager initialises from it, so the request would go out
+                // presenting nothing -- and succeed anonymously against a server
+                // that asks for a certificate without requiring one.
+                boolean hasKey = false;
+                for (java.util.Enumeration aliases = store.aliases(); aliases.hasMoreElements();) {
+                    if (store.isKeyEntry((String) aliases.nextElement())) {
+                        hasKey = true;
+                        break;
+                    }
+                }
+                if (!hasKey) {
+                    throw new IOException("The PKCS#12 client certificate contains no "
+                            + "private key");
+                }
             } else {
                 Certificate[] chain = certificates(credential.getCertificate());
                 PrivateKey key = privateKey(credential.getKey(), credential.getPassword());
@@ -91,6 +106,17 @@ final class ClientCredentials {
         } catch (GeneralSecurityException err) {
             throw new IOException("The client certificate could not be used: "
                     + err.getClass().getSimpleName(), err);
+        }
+    }
+
+    /// Default trust and no key, in a context of its own; see Web.TRANSPORTS.
+    static SSLSocketFactory defaultSocketFactory() throws IOException {
+        try {
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, null, null);
+            return context.getSocketFactory();
+        } catch (GeneralSecurityException err) {
+            throw new IOException("TLS is not available: " + err.getClass().getSimpleName(), err);
         }
     }
 

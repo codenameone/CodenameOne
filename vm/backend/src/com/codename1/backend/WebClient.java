@@ -74,6 +74,7 @@ public final class WebClient {
     private boolean reuseConnections = true;
     private boolean used;
     private boolean closed;
+    private int inFlight;
 
     /// The runtime's per-client transport (a connection pool), created by Web on
     /// first use and released by close().
@@ -187,18 +188,39 @@ public final class WebClient {
                 throw new IOException("This WebClient has been closed");
             }
             used = true;
+            // Registered under the monitor close() takes, so a close that
+            // lands before Web reaches transport() waits for this request
+            // instead of pulling the transport out from under it.
+            inFlight++;
         }
-        return Web.request(this, method, url, headers, body);
+        try {
+            return Web.request(this, method, url, headers, body);
+        } finally {
+            Object released = null;
+            synchronized (this) {
+                inFlight--;
+                if (closed && inFlight == 0) {
+                    released = transport;
+                    transport = null;
+                }
+            }
+            if (released != null) {
+                Web.closeTransport(released);
+            }
+        }
     }
 
     /// Releases the client's pooled connections. A request made after this
-    /// fails; one already running finishes first.
+    /// fails; one already running finishes first, and the last of them
+    /// releases the connections.
     public void close() {
-        Object released;
+        Object released = null;
         synchronized (this) {
             closed = true;
-            released = transport;
-            transport = null;
+            if (inFlight == 0) {
+                released = transport;
+                transport = null;
+            }
         }
         if (released != null) {
             Web.closeTransport(released);
@@ -206,11 +228,9 @@ public final class WebClient {
     }
 
     /// The transport Web keeps for this client, created by `factory` the first
-    /// time. Null once closed.
+    /// time. Only called by a request registered in request(), which close()
+    /// waits for, so it is never asked for one after the release.
     synchronized Object transport(Web.TransportFactory factory) throws IOException {
-        if (closed) {
-            throw new IOException("This WebClient has been closed");
-        }
         if (transport == null) {
             transport = factory.create(this);
         }

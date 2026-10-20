@@ -938,7 +938,14 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
        wrong in; a NULL method is libcurl's own default GET. */
     safeMethod = methodCopy == NULL || strcmp(methodCopy, "GET") == 0
             || strcmp(methodCopy, "HEAD") == 0;
-    if(!callerHeaders && bodyLength == 0 && safeMethod) {
+    /* A CLIENT CERTIFICATE IS A CREDENTIAL TOO. The blob stays on this handle
+       across a redirect, so following one freely presents the certificate to
+       whatever host the Location names, and a TLS server there that asks for
+       one authenticates this caller. A certificate therefore restricts the
+       redirect policy exactly as a caller's header does. The Java SE twin keeps
+       its socket factory across a redirect for the same reason and decides the
+       same way. */
+    if(!callerHeaders && bodyLength == 0 && safeMethod && certificate == JAVA_NULL) {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     } else {
         /* This #ifdef may never fire, for the same reason the PATH_AS_IS one
@@ -983,7 +990,10 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
                1s one. Documented on WebClient.setReadTimeoutMillis. */
             curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME,
-                    (long)((readTimeoutMillis + 999) / 1000));
+                    /* Widened first: a JAVA_INT near its maximum would wrap when
+                       999 is added and hand libcurl a negative time, which it
+                       rejects -- leaving no stall bound at all. */
+                    ((long)readTimeoutMillis + 999L) / 1000L);
         }
         if(requestTimeoutMillis > 0) {
             curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)requestTimeoutMillis);

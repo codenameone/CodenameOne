@@ -255,9 +255,19 @@ public final class Web {
         @Override
         public Object create(WebClient client) throws IOException {
             ClientCertificate credential = client.getClientCertificate();
-            return new Transport(credential == null ? null : ClientCredentials.socketFactory(credential));
+            // A factory per client even without a certificate: the keep-alive
+            // cache keys HTTPS connections by it, so a shared default factory
+            // would let certificate-less clients hand each other connections.
+            // Plain http:// carries no factory and the JDK's cache cannot be
+            // split for it; there is no credential on such a connection to
+            // confuse, and the packaged arm's pools are separate either way.
+            return new Transport(credential == null ? ClientCredentials.defaultSocketFactory()
+                    : ClientCredentials.socketFactory(credential));
         }
     };
+
+    /// Enforces WebClient request timeouts; see perform().
+    private static final java.util.Timer DEADLINES = new java.util.Timer("cn1-web-deadlines", true);
 
     static void closeTransport(Object transport) {
         // Nothing to release: the JDK owns its keep-alive cache, and idle
@@ -349,6 +359,21 @@ public final class Web {
             throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage(), err);
         }
         boolean keepAlive = false;
+        // Shortening each step bounds connects and reads, but not a write: a
+        // server that stops reading an upload blocks OutputStream.write() and
+        // setReadTimeout() never applies to it. The watchdog closes the
+        // connection at the deadline, which fails whatever step is blocked.
+        java.util.TimerTask watchdog = null;
+        if (deadline != 0) {
+            final HttpURLConnection watched = connection;
+            watchdog = new java.util.TimerTask() {
+                @Override
+                public void run() {
+                    watched.disconnect();
+                }
+            };
+            DEADLINES.schedule(watchdog, Math.max(1, deadline - System.currentTimeMillis()));
+        }
         if (sockets != null && connection instanceof HttpsURLConnection) {
             ((HttpsURLConnection) connection).setSSLSocketFactory(sockets);
         }
@@ -411,8 +436,13 @@ public final class Web {
             // wrong in. A null method means GET on both arms.
             boolean safeMethod = method == null || "GET".equals(method)
                     || "HEAD".equals(method);
+            // AND A CLIENT CERTIFICATE. HttpURLConnection keeps this
+            // connection's socket factory when it follows an HTTPS redirect, so
+            // the certificate would be presented to the new host; the packaged
+            // arm keeps its blob on the handle and restricts it the same way.
+            boolean credential = client != null && client.getClientCertificate() != null;
             connection.setInstanceFollowRedirects((headers == null || headers.isEmpty())
-                    && (body == null || body.length == 0) && safeMethod);
+                    && (body == null || body.length == 0) && safeMethod && !credential);
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             List lines = headers;
             if (trace != null) {
@@ -541,7 +571,18 @@ public final class Web {
             }
             throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
                     + err.getMessage(), err);
+        } catch (IOException err) {
+            // The watchdog's disconnect surfaces as whatever the blocked step
+            // makes of a closed socket; name the real cause.
+            if (deadline != 0 && System.currentTimeMillis() >= deadline) {
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: it "
+                        + "did not complete within its " + requestTimeout + "ms request timeout", err);
+            }
+            throw err;
         } finally {
+            if (watchdog != null) {
+                watchdog.cancel();
+            }
             if (!keepAlive) {
                 connection.disconnect();
             }
