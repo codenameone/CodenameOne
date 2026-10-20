@@ -353,25 +353,30 @@ final class JavaScriptDesktopChrome {
 
     /// The element a row's items go in: the menu's own list for a one-segment path, otherwise a
     /// nested submenu created on its first row, which keeps it at its place among the items.
+    /// A submenu is a `details` element that expands in place: a flyout beside the panel would
+    /// be clipped by the panel's scrolling, and `summary` is focusable and opens with Enter or
+    /// Space, so a keyboard reaches the items without a handler of its own.
     private HTMLElement containerFor(Map<String, HTMLElement> containers, String[] path) {
         HTMLElement parent = containers.get("");
         StringBuilder key = new StringBuilder();
         for (int p = 1; p < path.length; p++) {
-            key.append('/').append(path[p]);
+            // Joined by the unit separator, which no segment can contain: a slash would make
+            // "A//B" (one segment "A/B") collide with the two segments "A" and "B".
+            key.append('\u001f').append(path[p]);
             String k = key.toString();
             HTMLElement sub = containers.get(k);
             if (sub == null) {
-                HTMLElement wrap = document.createElement("div");
+                HTMLElement wrap = document.createElement("details");
                 wrap.setAttribute("class", "cn1-chrome-submenu");
                 wrap.setAttribute("role", "none");
-                HTMLElement head = document.createElement("div");
+                HTMLElement head = document.createElement("summary");
                 head.setAttribute("class", "cn1-chrome-submenu-title");
                 head.setAttribute("role", "menuitem");
                 head.setAttribute("aria-haspopup", "menu");
                 head.setTextContent(path[p]);
                 wrap.appendChild(head);
                 sub = document.createElement("div");
-                sub.setAttribute("class", "cn1-chrome-menu-items cn1-chrome-submenu-items");
+                sub.setAttribute("class", "cn1-chrome-submenu-items");
                 sub.setAttribute("role", "menu");
                 wrap.appendChild(sub);
                 parent.appendChild(wrap);

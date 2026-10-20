@@ -544,8 +544,25 @@ public class Window extends Container implements TopLevelContainer {
         if (nativePeer == null) {
             return;
         }
+        Command.settleRadioGroups(commands);
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));
+    }
+
+    /// The commands this window shows in its native menu, empty while it has no native peer.
+    java.util.List<Command> publishedNativeMenuCommands() {
+        if (nativePeer == null) {
+            return new ArrayList<Command>();
+        }
+        return commands;
+    }
+
+    /// Republishes the commands, so a change in their enabled or checked state reaches the
+    /// window's native menu, see `Display#refreshNativeMenu()`.
+    void republishNativeMenu() {
+        if (nativePeer != null && !commands.isEmpty()) {
+            publishCommands();
+        }
     }
 
     /// {@inheritDoc}

@@ -2885,11 +2885,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         final com.codename1.impl.NativeMenuEncoder encoded = encodeMenu(snapshot);
-        final java.util.Map<Integer, java.awt.Image> icons = menuIcons(encoded);
         StringBuilder sig = new StringBuilder(encoded.toWireFormat(false));
-        for (Integer k : icons.keySet()) {
-            sig.append('\n').append(k);
-        }
+        // The icon bytes go into the signature, so replacing one icon with another rebuilds.
+        final java.util.Map<Integer, java.awt.Image> icons = menuIcons(encoded, sig);
         final String signature = sig.toString();
         if (signature.equals(lastNativeMenuSignature)) {
             return;
@@ -2904,10 +2902,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
-    /// Builds a Swing menu bar from the given Codename One commands, grouping them into top-level
-    /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
-    /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
-    /// Codename One EDT before invoking the command's action.
     /// Builds a menu bar for a secondary desktop window's commands.
     ///
     /// Same builder as the main window's, with the owning window passed through so
@@ -2918,17 +2912,32 @@ public class JavaSEPort extends CodenameOneImplementation {
     ///
     /// #### Parameters
     ///
-    /// - `commands`: the window's named commands
+    /// - `menu`: the window's menu, from `#encodeWindowMenu(java.util.List)`
     ///
     /// - `owner`: the window these commands belong to
     ///
     /// #### Returns
     ///
     /// the menu bar to install on the window
-    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands,
-            com.codename1.ui.Window owner) {
+    JMenuBar buildWindowMenuBar(Object[] menu, com.codename1.ui.Window owner) {
+        return buildNativeMenuBar((com.codename1.impl.NativeMenuEncoder) menu[0],
+                (java.util.Map<Integer, java.awt.Image>) menu[1], null, owner);
+    }
+
+    /// Encodes a secondary window's menu and renders its icons. Called on the Codename One
+    /// EDT, which owns the commands and their images; the result is handed to
+    /// `#buildWindowMenuBar(Object[], com.codename1.ui.Window)` on the AWT EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the window's named commands
+    ///
+    /// #### Returns
+    ///
+    /// the encoded menu and its icons
+    Object[] encodeWindowMenu(java.util.List<com.codename1.ui.Command> commands) {
         com.codename1.impl.NativeMenuEncoder encoded = encodeMenu(commands);
-        return buildNativeMenuBar(encoded, menuIcons(encoded), null, owner);
+        return new Object[]{encoded, menuIcons(encoded, null)};
     }
 
     private static com.codename1.impl.NativeMenuEncoder encodeMenu(java.util.List<com.codename1.ui.Command> commands) {
@@ -2941,7 +2950,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// The menu icons as AWT images keyed by row id. Rendered on the Codename One EDT, which
     /// owns the images, and read on the AWT EDT.
-    private static java.util.Map<Integer, java.awt.Image> menuIcons(com.codename1.impl.NativeMenuEncoder encoded) {
+    private static java.util.Map<Integer, java.awt.Image> menuIcons(com.codename1.impl.NativeMenuEncoder encoded,
+            StringBuilder signature) {
         java.util.Map<Integer, java.awt.Image> out = new java.util.HashMap<Integer, java.awt.Image>();
         for (com.codename1.impl.NativeMenuEncoder.Row r : encoded.getRows()) {
             if (r.getCommand() == null) {
@@ -2950,6 +2960,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             String png = com.codename1.impl.NativeMenuEncoder.iconPngBase64(r.getCommand());
             if (png == null) {
                 continue;
+            }
+            if (signature != null) {
+                signature.append('\n').append(r.getId()).append('=').append(png);
             }
             try {
                 java.awt.image.BufferedImage bi = javax.imageio.ImageIO.read(

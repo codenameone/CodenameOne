@@ -257,6 +257,12 @@ public final class NativeMenuEncoder {
             }
             node.children.add(c);
         }
+        // Top-level menus are batched by the hint as written. A port that maps two hints to one
+        // physical menu (File and Preferences both land in File on Windows and Linux, the
+        // application-menu aliases on macOS) lists the second hint's items after the first's,
+        // each batch in its own order. Putting the batches back in one insertion order would need
+        // each port's mapping in core, and interleaving two hints in one menu is unusual: use one
+        // hint, with groups, to control the order of a menu exactly.
         for (int r = 0; r < roots.size(); r++) {
             Node root = roots.get(r);
             e.emit(root, new String[]{root.segment});
@@ -271,25 +277,55 @@ public final class NativeMenuEncoder {
         return ((Command) o).getDesktopMenuGroup();
     }
 
+    private static boolean isSeparator(Object o) {
+        return o instanceof Command && ((Command) o).isDesktopSeparator();
+    }
+
     private void emit(Node node, String[] path) {
+        // An explicit separator sorts with the item added before it (the one after it when it
+        // comes first), so it stays at the spot it was added rather than moving with its own
+        // group, which is always the default.
+        int count = node.children.size();
+        int[] groups = new int[count];
+        int prev = Integer.MIN_VALUE;
+        for (int i = 0; i < count; i++) {
+            Object o = node.children.get(i);
+            if (isSeparator(o)) {
+                groups[i] = prev;
+            } else {
+                groups[i] = groupOf(o);
+                prev = groups[i];
+            }
+        }
+        int next = Integer.MIN_VALUE;
+        for (int i = count - 1; i >= 0; i--) {
+            Object o = node.children.get(i);
+            if (!isSeparator(o)) {
+                next = groups[i];
+            } else if (groups[i] == Integer.MIN_VALUE) {
+                groups[i] = next;
+            }
+        }
         // Stable sort by group: insertion order wins within a group.
         List<Object> sorted = new ArrayList<Object>(node.children);
-        for (int i = 1; i < sorted.size(); i++) {
+        for (int i = 1; i < count; i++) {
             Object cur = sorted.get(i);
-            int g = groupOf(cur);
+            int g = groups[i];
             int j = i - 1;
-            while (j >= 0 && groupOf(sorted.get(j)) > g) {
+            while (j >= 0 && groups[j] > g) {
                 sorted.set(j + 1, sorted.get(j));
+                groups[j + 1] = groups[j];
                 j--;
             }
             sorted.set(j + 1, cur);
+            groups[j + 1] = g;
         }
         boolean anyItem = false;
         boolean pendingSeparator = false;
         int lastGroup = 0;
         for (int i = 0; i < sorted.size(); i++) {
             Object o = sorted.get(i);
-            if (o instanceof Command && ((Command) o).isDesktopSeparator()) {
+            if (isSeparator(o)) {
                 pendingSeparator = anyItem;
                 continue;
             }

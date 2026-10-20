@@ -195,4 +195,42 @@ class NativeMenuEncoderTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(implementation.getLastNativeCommands().contains(c));
     }
+
+    @FormTest
+    void anExplicitSeparatorStaysWhereItWasAddedInAGroupedMenu() {
+        Command a = new Command("A").setDesktopMenu("Edit").setDesktopMenuGroup(1);
+        Command b = new Command("B").setDesktopMenu("Edit").setDesktopMenuGroup(1);
+        NativeMenuEncoder e = NativeMenuEncoder.encode(vec(a, Command.createDesktopSeparator("Edit"), b), 0);
+        assertEquals("Edit:A|Edit:---|Edit:B|", describe(e.getRows()));
+    }
+
+    @FormTest
+    void clearingTheRadioGroupMakesAnOrdinaryItem() {
+        Command c = new Command("Small").setDesktopRadioGroup("size");
+        assertTrue(c.isDesktopCheckable());
+        c.setDesktopRadioGroup(null);
+        assertFalse(c.isDesktopCheckable());
+        assertEquals(NativeMenuEncoder.FLAG_ENABLED, NativeMenuEncoder.encode(vec(c), 0).getRows().get(0).getFlags());
+    }
+
+    @FormTest
+    void aRadioGroupCheckedWhileUnpublishedKeepsTheLatestCheck() {
+        // Neither command is on a published surface, so checking b cannot see a yet.
+        Command a = new Command("A").setDesktopRadioGroup("g").setDesktopChecked(true);
+        Command b = new Command("B").setDesktopRadioGroup("g").setDesktopChecked(true);
+        Vector v = vec(a, b);
+        Command.settleRadioGroups(v);
+        assertFalse(a.isDesktopChecked());
+        assertTrue(b.isDesktopChecked());
+    }
+
+    @FormTest
+    void checkingARadioOnAnotherSurfaceLeavesTheShownGroupAlone() {
+        Form shown = Display.getInstance().getCurrent();
+        Command visible = new Command("Visible").setDesktopRadioGroup("g").setDesktopChecked(true);
+        shown.addCommand(visible);
+        Command elsewhere = new Command("Elsewhere").setDesktopRadioGroup("g");
+        elsewhere.setDesktopChecked(true);
+        assertTrue(visible.isDesktopChecked(), "a command not on the shown form is another group");
+    }
 }

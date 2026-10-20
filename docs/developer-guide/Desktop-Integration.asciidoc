@@ -266,11 +266,11 @@ action reads the new value from `isDesktopChecked()`.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DesktopMenuStructure.java[tag=desktop-menu-structure,indent=0]
 -----
 
-Changing a command's enabled or checked state updates the menu that's on screen. After changing
+Changing a command's enabled or checked state updates the visible menu. After changing
 anything else about a published command, such as its name or icon, call
 `Display.getInstance().refreshNativeMenu()`.
 
-Each platform draws these its own way. macOS and Mac Catalyst show a radio item with the same
+Each platform draws these items in its own style. macOS and Mac Catalyst show a radio item with the same
 checkmark as a check item, as every Mac application does. Windows draws a bullet. The Windows
 and Linux menus show no icons: Win32 menu bitmaps need a decoder that port doesn't have, and GTK 3
 deprecated menu item images, so no GNOME application shows them.

@@ -982,11 +982,14 @@ public class JavaSEWindowManager extends WindowManager {
                 }
             }
         }
+        // Encoded and rendered here, on the Codename One EDT that owns the commands and their
+        // icons; only the Swing menu is built on AWT.
+        final Object[] menu = named.isEmpty() ? null : port.encodeWindowMenu(named);
         runOnAwt(new Runnable() {
             @Override
             public void run() {
-                javax.swing.JMenuBar bar = named.isEmpty()
-                        ? null : port.buildWindowMenuBar(named, owner);
+                javax.swing.JMenuBar bar = menu == null
+                        ? null : port.buildWindowMenuBar(menu, owner);
                 if (p.frame instanceof javax.swing.JFrame) {
                     ((javax.swing.JFrame) p.frame).setJMenuBar(bar);
                 } else if (p.frame instanceof javax.swing.JDialog) {

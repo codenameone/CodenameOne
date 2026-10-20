@@ -535,6 +535,7 @@ public class Command implements ActionListener<ActionEvent> {
         }
         putClientProperty(DESKTOP_CHECKED, b);
         if (checked) {
+            stampDesktopCheck();
             clearRadioSiblings();
         }
         Display.refreshNativeMenuIfPublished();
@@ -573,13 +574,17 @@ public class Command implements ActionListener<ActionEvent> {
     /// this command, for chaining
     public Command setDesktopRadioGroup(String group) {
         putClientProperty(DESKTOP_RADIO_GROUP, group);
-        if (group != null) {
-            if (getClientProperty(DESKTOP_CHECKED) == null) {
-                putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
-            } else if (isDesktopChecked()) {
-                clearRadioSiblings();
-            }
+        if (group == null) {
+            // The checked state was created for the radio item; without it the command is an
+            // ordinary item again rather than a check item.
+            putClientProperty(DESKTOP_CHECKED, null);
+        } else if (getClientProperty(DESKTOP_CHECKED) == null) {
+            putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
+        } else if (isDesktopChecked()) {
+            stampDesktopCheck();
+            clearRadioSiblings();
         }
+        Display.refreshNativeMenuIfPublished();
         return this;
     }
 
@@ -593,22 +598,77 @@ public class Command implements ActionListener<ActionEvent> {
         return o instanceof String ? (String) o : null;
     }
 
+    // Orders the checks of radio items, so the most recently checked member of a group wins
+    // wherever the group's commands meet. A field rather than a client property, since
+    // equals() compares client properties.
+    private static int desktopCheckCounter;
+    private int desktopCheckStamp;
+
+    private void stampDesktopCheck() {
+        desktopCheckStamp = ++desktopCheckCounter;
+    }
+
+    /// Unchecks the other members of this command's radio group on the native menu surfaces
+    /// that publish this command: the current form and open windows. A group on a surface that
+    /// is not published (a form still being built, say) is settled when that surface is
+    /// published, by `#settleRadioGroups(java.util.List)`, which keeps the most recently
+    /// checked member. There is deliberately no registry of all commands: it would hold every
+    /// command, and through their listeners every form, for the life of the application.
     private void clearRadioSiblings() {
         String group = getDesktopRadioGroup();
         if (group == null) {
             return;
         }
-        // The group is found among the commands the current form publishes rather than in a
-        // registry of its own: a static registry would hold every command, and through their
-        // listeners every form, for the life of the application.
-        java.util.Vector members = Display.getInstance().getCurrentNativeMenuCommands();
-        for (int i = 0; i < members.size(); i++) {
-            Object o = members.elementAt(i);
+        java.util.List<java.util.List> surfaces = Display.getInstance().getPublishedNativeMenuSurfaces();
+        for (int s = 0; s < surfaces.size(); s++) {
+            java.util.List members = surfaces.get(s);
+            if (!members.contains(this)) {
+                // Same group name on another surface is another group.
+                continue;
+            }
+            for (int i = 0; i < members.size(); i++) {
+                Object o = members.get(i);
+                if (!(o instanceof Command)) {
+                    continue;
+                }
+                Command c = (Command) o;
+                if (c != this && group.equals(c.getDesktopRadioGroup()) && c.isDesktopChecked()) { //NOPMD CompareObjectsWithEquals
+                    c.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
+                }
+            }
+        }
+    }
+
+    /// Leaves at most one checked member in each radio group among the given commands, the
+    /// most recently checked one. Called on every surface as it is published, which settles a
+    /// group whose members were checked while the surface was not published.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands one surface publishes; entries that are not commands are
+    /// ignored
+    static void settleRadioGroups(java.util.List commands) {
+        java.util.HashMap<String, Command> winners = null;
+        for (int i = 0; i < commands.size(); i++) {
+            Object o = commands.get(i);
             if (!(o instanceof Command)) {
                 continue;
             }
             Command c = (Command) o;
-            if (c != this && group.equals(c.getDesktopRadioGroup()) && c.isDesktopChecked()) { //NOPMD CompareObjectsWithEquals
+            String group = c.getDesktopRadioGroup();
+            if (group == null || !c.isDesktopChecked()) {
+                continue;
+            }
+            if (winners == null) {
+                winners = new java.util.HashMap<String, Command>();
+            }
+            Command w = winners.get(group);
+            if (w == null) {
+                winners.put(group, c);
+            } else if (c.desktopCheckStamp > w.desktopCheckStamp) {
+                w.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
+                winners.put(group, c);
+            } else {
                 c.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
             }
         }

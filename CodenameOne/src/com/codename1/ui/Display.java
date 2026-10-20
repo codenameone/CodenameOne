@@ -5123,14 +5123,18 @@ public final class Display extends CN1Constants {
 
     private static boolean nativeMenuRefreshPending;
 
-    /// Republishes the current form's commands to the platform's native menu bar, so the menu
-    /// shows their current label, enabled and checked state. Commands already do this when
+    /// Republishes the commands of the current form and of open windows to their native menus, so
+    /// each menu shows their current label, enabled and checked state. Commands already do this when
     /// `Command#setEnabled(boolean)` or `Command#setDesktopChecked(boolean)` change them; call
     /// it after changing anything else about a command that is in the menu, such as its name
     /// or icon. Does nothing on a platform without a native menu bar.
     public void refreshNativeMenu() {
         if (impl == null || !impl.isNativeCommandsSupported()) {
             return;
+        }
+        Window[] windows = Desktop.getInstance().getWindows();
+        for (int i = 0; i < windows.length; i++) {
+            windows[i].republishNativeMenu();
         }
         Form f = getCurrent();
         if (f == null || !f.isInitialized()) {
@@ -5158,11 +5162,23 @@ public final class Display extends CN1Constants {
         });
     }
 
-    /// The commands the current form publishes to the native menu, never null.
-    Vector getCurrentNativeMenuCommands() {
-        Form f = impl == null ? null : getCurrent();
+    /// The command lists of every published native menu surface: the current form's and each
+    /// open window's.
+    java.util.List<java.util.List> getPublishedNativeMenuSurfaces() {
+        java.util.ArrayList<java.util.List> out = new java.util.ArrayList<java.util.List>();
+        if (impl == null) {
+            return out;
+        }
+        Form f = getCurrent();
         Vector v = f == null ? null : f.nativeMenuCommands();
-        return v == null ? new Vector() : v;
+        if (v != null) {
+            out.add(v);
+        }
+        Window[] windows = Desktop.getInstance().getWindows();
+        for (int i = 0; i < windows.length; i++) {
+            out.add(windows[i].publishedNativeMenuCommands());
+        }
+        return out;
     }
 
     /// Exits the application...

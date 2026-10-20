@@ -437,13 +437,16 @@ div#cn1-video-capture > video {
     flex-shrink: 0;
 }
 /* A submenu flies out to the right of its title while the pointer or focus is inside it. */
-#cn1-desktop-chrome .cn1-chrome-submenu {
-    position: relative;
-}
+/* Submenus expand in place under their title. A flyout beside the panel would be clipped:
+   the panel scrolls (overflow-y: auto), which makes its other axis clip too. */
 #cn1-desktop-chrome .cn1-chrome-submenu-title {
+    list-style: none;
     padding: 6px 10px;
     border-radius: 4px;
     cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title::-webkit-details-marker {
+    display: none;
 }
 #cn1-desktop-chrome .cn1-chrome-submenu-title::after {
     content: "\25B8";
@@ -451,19 +454,17 @@ div#cn1-video-capture > video {
     margin-left: 24px;
     opacity: 0.6;
 }
-#cn1-desktop-chrome .cn1-chrome-submenu:hover > .cn1-chrome-submenu-title,
-#cn1-desktop-chrome .cn1-chrome-submenu:focus-within > .cn1-chrome-submenu-title {
+#cn1-desktop-chrome .cn1-chrome-submenu[open] > .cn1-chrome-submenu-title::after {
+    content: "\25BE";
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title:hover,
+#cn1-desktop-chrome .cn1-chrome-submenu-title:focus-visible {
     background: rgba(0, 0, 0, 0.07);
 }
 #cn1-desktop-chrome .cn1-chrome-submenu-items {
-    display: none;
-    position: absolute;
-    left: 100%;
-    top: -5px;
-}
-#cn1-desktop-chrome .cn1-chrome-submenu:hover > .cn1-chrome-submenu-items,
-#cn1-desktop-chrome .cn1-chrome-submenu:focus-within > .cn1-chrome-submenu-items {
     display: flex;
+    flex-direction: column;
+    padding-left: 12px;
 }
 #cn1-desktop-chrome .cn1-chrome-icon {
     display: inline-flex;

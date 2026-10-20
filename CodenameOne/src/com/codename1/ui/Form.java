@@ -3317,13 +3317,16 @@ public class Form extends Container implements TopLevelContainer {
         if (getParent() != null) {
             return null;
         }
+        java.util.Vector v = null;
         if (isDesktopNativeChrome() && toolbar != null) {
-            return toolbar.getAllNativeMenuCommands();
+            v = toolbar.getAllNativeMenuCommands();
+        } else if (Display.getInstance().isNativeCommands()) {
+            v = menuBar.getCommands();
         }
-        if (Display.getInstance().isNativeCommands()) {
-            return menuBar.getCommands();
+        if (v != null) {
+            Command.settleRadioGroups(v);
         }
-        return null;
+        return v;
     }
 
     /// {@inheritDoc}
