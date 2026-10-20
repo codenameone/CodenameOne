@@ -161,7 +161,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     @Override
     public QueryImpl<T> like(String field, String pattern) {
-        if (kind(field) != Attribute.TEXT) {
+        if (sqlKind(field) != Attribute.TEXT) {
             throw new IllegalArgumentException("LIKE requires text storage: " + field);
         }
         Object converted = builderParameter(field, pattern);
@@ -227,7 +227,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         if (order.length() > 0) {
             order.append(", ");
         }
-        order.append(session.orderBy(name, ascending, kind(field)));
+        order.append(session.orderBy(name, ascending, sqlKind(field)));
         return this;
     }
     @Override
@@ -270,7 +270,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                 selection.append(", ");
             }
             String column = rootAlias + "." + session.q(attributes[i].column);
-            selection.append(pluralJoin ? session.orderValue(column, attributes[i].kind) : column);
+            selection.append(pluralJoin ? session.orderValue(column, attributes[i].sqlKind()) : column);
         }
         String sql = selection + from() + where() + (order.length() == 0 ? "" : " ORDER BY " + order) +
                      session.limit(max, offset);
@@ -315,7 +315,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         }
         String name = column(field);
         if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
-            name = session.orderValue(name, kind(field));
+            name = session.orderValue(name, sqlKind(field));
         }
         conjunction();
         predicates.append(name).append(' ').append(op);
@@ -530,6 +530,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         Field resolved = validatePath(field, true);
         return resolved.join.model.attributes()[resolved.index].kind;
     }
+    /// See Attribute#sqlKind.
+    int sqlKind(String field) {
+        Field resolved = validatePath(field, true);
+        return resolved.join.model.attributes()[resolved.index].sqlKind();
+    }
     String rootColumns() {
         return rootColumns(false);
     }
@@ -540,7 +545,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                 result.append(", ");
             }
             String column = rootAlias + "." + session.q(a.column);
-            result.append(distinct ? session.orderValue(column, a.kind) : column);
+            result.append(distinct ? session.orderValue(column, a.sqlKind()) : column);
         }
         return result.toString();
     }

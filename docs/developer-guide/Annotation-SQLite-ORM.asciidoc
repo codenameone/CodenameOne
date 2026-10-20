@@ -53,6 +53,9 @@ write a loaded value into it.
                      `float/double -> REAL`, `boolean -> INTEGER`,
                      `java.util.Date -> INTEGER` (epoch millis),
                      `byte[] -> BLOB`).
+| `@Temporal`      | Stores a `java.util.Date` in a native date or time
+                     column instead of epoch milliseconds. See
+                     <<orm-native-dates>>.
 | `@Column(nullable=false)`| Adds `NOT NULL` to the column declaration.
 | `@DbTransient`   | Excludes the field from the table.
 |===
@@ -280,8 +283,13 @@ Fluent and JPQL predicates require Boolean inputs for ordinary Boolean fields;
 fields with converters accept their declared domain values. Boolean values use numeric
 storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
 
-Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
-`@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
+No-argument void instance methods can receive `@PrePersist`, `@PostPersist`,
+`@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks,
+whatever their access: a `private`, `protected`, or package-private callback
+works, including one inherited from a mapped superclass in another package. The
+build weaves a static accessor for a non-public callback into the class that
+declares it, as it does for fields, so no reflection is involved. Static and
+abstract callback methods fail the build.
 Entities with lifecycle callbacks require `openSession()`, even without relationships or version fields.
 Relationships added by `@PrePersist`, `@PostPersist`, or `@PreUpdate` follow `PERSIST` cascades in the current
 flush, including newly created collections.
@@ -360,7 +368,14 @@ the target key field, update the Java map keys as well.
 `@ElementCollection` stores owned scalar values in a separate table. It supports
 List, Set, and Map with String keys. Values may be String, boxed primitive types,
 or `java.util.Date`. Lists preserve order and duplicate values. Map columns can
-be named with `@MapKeyColumn`; `@JoinTable` names the collection table.
+be named with `@MapKeyColumn`; `@JoinTable` names the collection table and its
+owner column, and `@ElementCollection(column=...)` names the value column.
+A List or Set table has an `element_position` column by default.
+`@ElementCollection(positionColumn="")` maps a Set to a table with no position
+column, keyed by owner and value, which is the usual shape of an existing tag
+table. Such a Set rejects null values, and its text values accept at most 255
+Unicode code points. A Set of `Double` or `Float` keeps its position column:
+SQL treats `0.0` and `-0.0` as one key, while a Java Set holds both.
 Element-map keys accept at most 255 Unicode code points on every database.
 `query.containsElement("tags", "important")` tests membership without loading
 the collection. Changing a mutable Date value is detected during flush.
@@ -375,14 +390,100 @@ indexes. Generated text keys, indexed fields, and foreign keys accept at most
 255 Unicode code points during managed inserts, updates, and bulk assignments on every database. Specify
 `@Column(type=...)` to control the SQL type and its value limits yourself.
 
-`session.validateSchema()` checks mapped entity columns, storage-type families,
-whether null values are allowed, and primary-key membership in entity and
-collection tables. It doesn't migrate
-schemas or validate every database-specific constraint. Existing tables are
+`session.schemaReport()` compares the mappings with the tables that exist and
+returns a `SchemaReport`. It reads the database and never changes it. Each
+issue has one of three kinds:
+
+[cols="1,3", options="header"]
+|===
+| Kind                  | Meaning
+| `MIGRATION_REQUIRED`  | A table or column the mapping needs is missing. A
+                          migration that adds it fixes the issue.
+| `UNSUPPORTED`         | The column exists, but the mapping can't use it as it
+                          is: a storage type that would need a conversion, such
+                          as a plain `Date` field over a `TIMESTAMP` column, or a
+                          primary key that differs from the mapping. Change the
+                          mapping, or convert the column.
+| `CONSTRAINT_MISMATCH` | The column's `NOT NULL` differs from the mapping, or a
+                          `NOT NULL` column the mapping doesn't write has no
+                          default. A column stricter than its mapping is a
+                          legitimate design. A missing `NOT NULL` lets a row hold
+                          a null that a primitive field can't load.
+|===
+
+`session.validateSchema()` runs the same checks and throws a
+`PersistenceException` whose message is the report. These calls don't migrate
+schemas or check every database-specific constraint. Existing tables are
 left to <<client-schema-migrations,migrations>>, which `EntityManager.open(name)`
 applies before it returns. In particular, a legacy client DAO's text char
 columns need migration to the managed layer's numeric UTF-16 storage when moving
 to a managed schema.
+
+A backend server validates the schema at startup, after migrations and
+`cn1.orm.createTables`, and refuses to start on a `MIGRATION_REQUIRED` or
+`UNSUPPORTED` issue, so a mapping the database can't serve fails before the
+first request rather than on the requests that touch it. It also refuses a
+`CONSTRAINT_MISMATCH` that would fail at runtime: a missing `NOT NULL`, or a
+required column the mapping doesn't fill. A column stricter than its mapping
+is only logged. Set `cn1.orm.validateSchema=false` to start
+anyway.
+
+[[orm-native-dates]]
+==== Native date and time columns
+
+A `java.util.Date` field is stored as epoch milliseconds in an integer column by
+default, and that mapping doesn't change. `@Temporal` opts a field into a native
+column instead:
+
+[cols="1,1,1,1", options="header"]
+|===
+| Annotation                      | PostgreSQL     | MySQL/MariaDB  | SQLite
+| `@Temporal(TemporalType.TIMESTAMP)` | `TIMESTAMP(3)` | `DATETIME(3)` | `TIMESTAMP`, stored as text
+| `@Temporal(TemporalType.DATE)`  | `DATE`         | `DATE`         | `DATE`, stored as text
+|===
+
+A `Date` is an instant, and a temporal column holds it in UTC: the backend
+connects with its session time zone set to UTC on both PostgreSQL and MySQL, so
+the server's own time zone never shifts a value. Precision is milliseconds,
+which is all a `Date` carries; digits beyond that read from an existing column
+are dropped toward the earlier instant. A `DATE` column holds the UTC day, and
+reads back as midnight UTC. SQLite has no date type, so it stores
+`2024-02-29 13:45:06.789` and `2024-02-29` as text, which sorts in time order.
+Writes outside the years 1000 to 9999 (MySQL's range), zero dates, and other values the column can't
+represent exactly are rejected rather than converted. A value whose text carries
+a time-zone offset, such as one read from a PostgreSQL `timestamptz` column,
+reads as the instant it names.
+
+`@Temporal` applies to entity fields of type `java.util.Date`. It can't be
+combined with `@Convert`, used on an identifier or version, or applied to
+element-collection values. A field with `@Temporal` requires `openSession()`.
+An explicit `@Column(type)` on one must name a matching date type, such as
+`TIMESTAMP(3)` or `DATE`, or `TEXT`. Queries order and compare the field as a
+date, so `LIKE` and the text functions don't apply to it. The schema report
+marks a `DATE` column under a `TIMESTAMP` mapping, or the reverse, as
+`UNSUPPORTED`, because one of them drops the time of day.
+
+[[orm-existing-schema]]
+==== Adopting an existing schema
+
+Explicit names map an entity onto tables that existed before the application.
+This entity uses a key the database generates, native timestamp and date
+columns, a legacy epoch-milliseconds column, and a tag table:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/orm/LegacyCustomer.java[tag=existing-schema-entity,indent=0]
+----
+<1> `@Id` defaults to `autoIncrement=true`, so the existing `BIGSERIAL`,
+    `AUTO_INCREMENT`, or `INTEGER PRIMARY KEY` column assigns the key, and
+    `@Column` keeps its name.
+<2> A native `TIMESTAMP(3)` or `DATETIME(3)` column.
+<3> An existing `BIGINT` column of epoch milliseconds keeps the default mapping.
+<4> A `legacy_customer_tag (customer_no, tag)` table keyed by both columns.
+<5> Callbacks and fields can stay private.
+
+Leave `cn1.orm.createTables` off for adopted tables, and check
+`session.schemaReport()` against the real database before the first deployment.
 
 Backend sessions support `find(type, id, LockMode.PESSIMISTIC_READ)` and
 `PESSIMISTIC_WRITE`, or `lock(entity, mode)`, inside a transaction. PostgreSQL and
@@ -394,7 +495,9 @@ are rejected before pending changes are flushed.
 
 This API provides managed persistence through CN1 annotations; it's not a JPA
 provider or a Hibernate binary replacement. Entity access is by field, whether the field is public or private.
-Getter/setter access mappings, property-backed associations, joined/table-per-class
+Getter/setter access mappings aren't supported: a private field already keeps the
+entity encapsulated, and reading a field directly is what lets the build generate
+the access code without reflection. Property-backed associations, joined/table-per-class
 inheritance, embeddable element collections, and independently stored entity-map
 keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL
 projections are also outside the current query subset. Use the builder's

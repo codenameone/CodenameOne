@@ -238,6 +238,23 @@ public final class EntityManager {
         }
     }
 
+    /// Compares every generated mapping with the tables that already exist,
+    /// without changing the database. See [com.codename1.orm.session.SchemaReport]
+    /// for how a difference is classified.
+    public com.codename1.orm.session.SchemaReport schemaReport() throws IOException {
+        if (transactionScoped) {
+            throw new IllegalStateException("Read the schema report on the outer manager");
+        }
+        com.codename1.orm.session.Session session = openSession();
+        try {
+            return session.schemaReport();
+        } catch (com.codename1.orm.session.PersistenceException error) {
+            throw new IOException("Could not read the schema: " + error.getMessage(), error);
+        } finally {
+            session.close();
+        }
+    }
+
     /// Runs `body` inside one transaction on one connection.
     ///
     /// The entity manager the body is handed is pinned to that connection, so

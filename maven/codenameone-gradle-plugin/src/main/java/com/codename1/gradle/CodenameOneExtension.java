@@ -52,6 +52,7 @@ public abstract class CodenameOneExtension {
     public abstract MapProperty<String, String> getBuildHints();
 
     /// Whether a generated Xcode or Android Studio project is opened when a
-    /// `*-source` build finishes. Defaults to true; CI sets `-Pcodename1.open=false`.
+    /// `*-source` build finishes. Unset, it opens unless an AI coding agent or CI
+    /// is driving the build; `-Pcodename1.open=true|false` decides explicitly.
     public abstract Property<Boolean> getOpenGeneratedProjects();
 }

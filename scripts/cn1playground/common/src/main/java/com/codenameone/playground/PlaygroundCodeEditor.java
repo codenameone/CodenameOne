@@ -192,9 +192,10 @@ final class PlaygroundCodeEditor {
         // Java pane. After `receiver.` offer that type's members (faux reflection over the CN1
         // access index) and nothing else -- global names are irrelevant in a member position.
         PlaygroundCompletionModel model = PlaygroundCompletionModel.get();
-        String receiver = model.findReceiver(code, cursor);
-        if (receiver.length() > 0) {
-            String type = model.inferType(receiver, code, model.visibleTypes(code));
+        // An unresolved receiver offers nothing rather than global names, which are
+        // never right after a dot.
+        String type = model.receiverType(code, cursor);
+        if (type != null) {
             for (String member : model.memberSignatures(type)) {
                 add(out, seen, member, prefix, "member", insertFor(member));
             }

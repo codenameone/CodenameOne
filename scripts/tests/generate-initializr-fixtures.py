@@ -81,10 +81,34 @@ def check_maven_layout_fixture(archive, z):
     return True
 
 
-def check_wayline_fixture(archive, z):
-    """The full-stack template: WAYLINE-<layout>-<IDE>.zip. An app, its server and
+# What each full-stack template's fixture must hold: its contract, and one screen.
+FULL_STACK = {
+    'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
+    'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
+}
+
+
+FIRST_FULL_STACK = next(iter(FULL_STACK))
+LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh')
+
+
+def same_launchers(archive, twin):
+    """Whether `archive` holds exactly the launchers `twin` does, and some."""
+    if not twin.exists():
+        return False
+    with zipfile.ZipFile(archive) as a, zipfile.ZipFile(twin) as b:
+        names = [n for n in a.namelist() if n in LAUNCHERS or n.startswith('.mvn/')]
+        if not names or sorted(names) != sorted(n for n in b.namelist() if n in LAUNCHERS or n.startswith('.mvn/')):
+            return False
+        return all(a.read(n) == b.read(n) for n in names)
+
+
+def check_full_stack_fixture(archive, z, template):
+    """A full-stack template: <TEMPLATE>-<layout>-<IDE>.zip. An app, its server and
     the contract module both compile against, all of it renamed to the project."""
     names = set(z.namelist())
+    contract, screen = FULL_STACK[template]
+    token = template.lower()
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
@@ -94,12 +118,12 @@ def check_wayline_fixture(archive, z):
         assert '<artifactId>launcherprobe-shared</artifactId>' in z.read(module + '/pom.xml').decode(), \
             (archive.name, module)
     assert ('javase/pom.xml' in names) == full, archive.name
-    for name in ['shared/src/main/java/com/example/probe/api/RiderApi.java',
+    for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',
                  'backend/src/main/resources/db/migration/V1__accounts.sql',
                  'backend/server.sh',
                  'common/src/main/java/com/example/probe/LauncherProbe.java',
-                 'common/src/main/java/com/example/probe/rider/RiderForm.java']:
+                 'common/src/main/java/com/example/probe/' + screen]:
         assert name in names, (archive.name, name)
     # The generic server every other project gets is replaced, not merged with.
     assert 'backend/src/main/java/com/example/probe/Greeter.java' not in names, archive.name
@@ -111,11 +135,11 @@ def check_wayline_fixture(archive, z):
     assert 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
     assert '## The app and its server' in z.read('README.md').decode(), archive.name
     for name in names:
-        assert 'wayline' not in name.lower(), (archive.name, name)
+        assert token not in name.lower(), (archive.name, name)
         if name.endswith(('.png', '.jar', '.res', '.ttf')):
             continue
         text = z.read(name).decode('utf-8', 'replace')
-        assert 'wayline' not in text.lower() and 'myappname' not in text.lower(), (archive.name, name)
+        assert token not in text.lower() and 'myappname' not in text.lower(), (archive.name, name)
 
 
 with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
@@ -162,13 +186,22 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
                 continue
             if archive.name.startswith('MAVEN-') and not check_maven_layout_fixture(archive, z):
                 continue
-            if archive.name.startswith('WAYLINE-'):
-                check_wayline_fixture(archive, z)
+            template = archive.name.split('-')[0]
+            if template in FULL_STACK:
+                check_full_stack_fixture(archive, z, template)
             readme = z.read('README.md').decode()
             assert 'JDK ' + ('8' if 'JAVA_8' in archive.name else '17') + ' or newer' in readme
             assert '.\\build.bat javascript_cloud' in readme and './build.sh javascript_cloud' in readme
             if archive.name.startswith('ECLIPSE'):
                 assert 'Run/Debug > Launch Configurations' in readme
+        # The full-stack templates are generated from one skeleton, so their
+        # launchers are byte for byte the same: run them for the first template
+        # only and hold every other one to it. Running each again took macOS
+        # past the job's timeout once a second template was added.
+        template = archive.name.split('-')[0]
+        twin = output / archive.name.replace(template + '-', FIRST_FULL_STACK + '-', 1)
+        if template in FULL_STACK and template != FIRST_FULL_STACK and same_launchers(archive, twin):
+            continue
         # The launcher's reason table once, on the default download; the rest of
         # the launcher checks on every archive.
         reasons = ['--reasons'] if archive.name == 'INTELLIJ-JAVA_17.zip' else []

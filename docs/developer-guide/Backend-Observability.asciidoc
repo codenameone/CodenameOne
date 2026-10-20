@@ -14,7 +14,7 @@ A server can report every request it serves to any OpenTelemetry collector, and
 the reporting needs no code in the handlers. Turn it on at build time with the
 annotation, on any class in the backend module:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-annotation,indent=0]
 ----
@@ -180,7 +180,7 @@ recorded with status 500.
 The application's own metrics follow the JMX model -- attributes to watch and
 operations to call -- with Spring's annotations for it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/PriceCache.java[tag=backend-managed,indent=0]
 ----
@@ -222,7 +222,7 @@ into the method at build time, so a call through `this` is measured too.
 `Metrics.counter`, `Metrics.histogram` and `Metrics.gauge` create an instrument
 for anything the annotations don't cover:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/OrderMetrics.java[tag=backend-metrics-custom,indent=0]
 ----

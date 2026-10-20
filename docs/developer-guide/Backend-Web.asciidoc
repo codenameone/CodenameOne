@@ -13,7 +13,7 @@ A `@RestController` is a class whose methods answer requests. It's also a bean,
 so its constructor receives whatever it depends on, as <<backend-beans>>
 describes. Each mapped method names a verb and a path:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Products.java[tag=backend-web-mappings,indent=0]
 ----
@@ -128,7 +128,7 @@ final status between 200 and 599.
 A method that returns its own type can't return a refusal, because its return
 type is the body of a success. It throws one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RefusalSnippets.java[tag=backend-web-refusal,indent=0]
 ----
@@ -147,17 +147,17 @@ and the build writes the JSON codec for that class and for every class its field
 reach. There is no reflection at run time: the codec is ordinary code that reads
 and writes each field by name, so it costs what the hand-written version would.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/Order.java[tag=backend-dto-json,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrderLine.java[tag=backend-dto-json,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrdersApi.java[tag=backend-dto-json,indent=0]
 ----
@@ -236,7 +236,7 @@ care how the client encoded it. The query string wins when both have the name,
 as it does in a servlet container. `@RequestPart` binds one part of a multipart
 body, which is the way to a file:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Uploads.java[tag=backend-request-part,indent=0]
 ----
@@ -443,7 +443,7 @@ project of the build. A backend-only project has no app to build, so its
 A test that needs the app served names the directory, since a test runs in the
 module directory and not in `target`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/HostedAppTest.java[tag=backend-web-hosted-test,indent=0]
 ----
@@ -453,7 +453,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/t
 The hosted app and its API share an origin, so the app needs no server address
 compiled in. In the browser the address of the page is the address of the server:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/HostedAppSnippets.java[tag=backend-web-hosted-origin,indent=0]
 ----
@@ -522,7 +522,7 @@ request, which is 1800 unless set.
 This is where having the same language on both ends stops being a slogan. An
 interface annotated for the REST client generates the app's client:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesApi.java[tag=backend-contract,indent=0]
 ----
@@ -532,7 +532,7 @@ from that same interface: `NotesApiServer`, a synchronous interface the backend
 implements, and `NotesApiDispatcher`, which routes a method, path and body to it
 and binds the path and query parameters.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesEndpoint.java[tag=backend-contract-server,indent=0]
 ----
@@ -584,14 +584,14 @@ other half of it.
 
 An endpoint implements `com.codename1.backend.WebSocket`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-echo,indent=0]
 ----
 
 The build finds it, the way it finds a `@RestController`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-annotated,indent=0]
 ----
@@ -640,7 +640,7 @@ block, and a slow one slows down its own client and nobody else's.
 Sending is the other way round: a session may be written to from any thread, which
 is what makes a broadcast possible.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-broadcast,indent=0]
 ----
@@ -657,7 +657,7 @@ pool rather than from the receiving thread.
 
 An endpoint that speaks more than one protocol lists them best first:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-subprotocol,indent=0]
 ----
@@ -727,6 +727,48 @@ Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They'
 excluded rather than tolerated: accepting their result as a pass would also accept
 it for a case that used to work.
 
+[[backend-web-client]]
+=== Calling other services
+
+`Web` makes an outbound HTTP or HTTPS request: `Web.get`, `Web.getJson`,
+`Web.postJson` and `Web.request`. The server's certificate and its host name are
+always verified, and there is no option to turn that off. A `WebClient` is the
+same request with settings of its own:
+
+* a client certificate, for a service that authenticates its callers with mutual
+  TLS. `ClientCertificate.pem` takes a PEM certificate and key, and
+  `ClientCertificate.pkcs12` takes a `.p12` archive and its password.
+* `setRequireHttp2(true)`, which makes the request over HTTP/2 or fails it. A
+  server that only speaks HTTP/1.1 never receives the request.
+* a connect timeout, a read timeout (how long the transfer may stall) and a
+  request timeout (the whole request).
+* a pool of connections, so the next request to the same server skips the TCP
+  and TLS handshakes. `setReuseConnections(false)` opens a new connection for
+  each request.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/PartnerApi.java[tag=backend-web-client,indent=0]
+----
+
+Create a client once and share it between requests. Its settings are fixed by its
+first request, and two clients never share a connection, so a connection
+authenticated with one certificate is never used for a request made with another.
+`close()` releases the pool.
+
+`Web.Result.getProtocol()` names the protocol the response used. Without the
+requirement, the packaged server offers HTTP/2 and uses HTTP/1.1 when the other
+side declines.
+
+The local Java SE runtime speaks HTTP/1.1 only, so there a client that requires
+HTTP/2 fails every request with an exception that says so. It reads PKCS#12
+archives, and PEM keys in unencrypted PKCS#8 or RSA form. The packaged server also
+reads encrypted PEM keys. A PKCS#12 archive works the same in both.
+
+A static binary in a `scratch` image has no certificate store. Copy a
+`ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or
+`SSL_CERT_FILE`.
+
 [[backend-push]]
 === Sending push notifications
 
@@ -746,7 +788,7 @@ in the app.
 `CloudPush` sends, `PushNotification` builds the message, and `PushTarget` names a
 device:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-send,indent=0]
 ----
@@ -772,7 +814,7 @@ helpers build the command:
   with a last state.
 * `PushNotification.widget(kind, timelineJson)` publishes new widget content.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/RideNotifications.java[tag=backend-push-live-activity,indent=0]
 ----

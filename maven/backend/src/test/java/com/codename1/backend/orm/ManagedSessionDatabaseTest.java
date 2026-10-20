@@ -58,9 +58,8 @@ class ManagedSessionDatabaseTest {
         boolean mysql="mysql".equals(db.dialect().getName());
         String schema="cn1_orm_test_"+Long.toHexString(System.nanoTime());
         String quoted=db.dialect().quote(schema);
-        String selectSchema=(mysql?"USE ":"SET search_path TO ")+quoted;
         db.execute((mysql?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
-        db.execute(selectSchema,new Object[0]);
+        db=inSchema(db,url,mysql,schema);
         Models.register(new ManagedSessionTest.Model() {
             public int generation() { return 2; }
             public String generator() { return "Record_Sequence"; }
@@ -190,7 +189,7 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);
             CountDownLatch attempting=new CountDownLatch(1);
             Future<Long> waiting=workers.submit(()-> {
-                Database other=Database.open(url);other.execute(selectSchema,new Object[0]);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=inSchema(Database.open(url),url,mysql,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try {
                     s.beginTransaction();attempting.countDown();
                     ManagedSessionTest.Record locked=s.find(ManagedSessionTest.Record.class,entity.id,LockMode.PESSIMISTIC_WRITE);
@@ -201,7 +200,7 @@ class ManagedSessionDatabaseTest {
             assertThrows(TimeoutException.class,()->waiting.get(100,TimeUnit.MILLISECONDS));
             session.commitTransaction();assertEquals(1L,waiting.get(5,TimeUnit.SECONDS).longValue());
             Callable<Void> increment=()-> {
-                Database other=Database.open(url);other.execute(selectSchema,new Object[0]);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=inSchema(Database.open(url),url,mysql,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try { for(int i=0;i<5;i++) { s.beginTransaction();assertTrue(s.increment(ManagedSessionTest.Record.class,entity.id,"counter",1));s.commitTransaction(); }return null; }
                 finally { s.close();em.close(); }
             };
@@ -228,5 +227,18 @@ class ManagedSessionDatabaseTest {
             try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }
             finally { manager.close(); }
         }
+    }
+    /// A connection whose unqualified names resolve in the test's own schema. MySQL
+    /// is reconnected to that database rather than sent `USE`: the backend executes
+    /// statements as prepared statements, and MySQL refuses `USE` in that protocol.
+    private static Database inSchema(Database db,String url,boolean mysql,String schema) throws Exception {
+        if(!mysql) {
+            db.execute("SET search_path TO "+db.dialect().quote(schema),new Object[0]);
+            return db;
+        }
+        db.close();
+        int path=url.indexOf('/',url.indexOf("//")+2);
+        int query=url.indexOf('?',path);
+        return Database.open(url.substring(0,path+1)+schema+(query<0?"":url.substring(query)));
     }
 }

@@ -36,6 +36,14 @@ import static org.junit.Assert.assertTrue;
 /// naturally completed one kept its target alive for good.
 public class AutoCancelReleaseTest {
 
+    // Releasing a cancelled animator asks ActivityThread for the visible form,
+    // which needs a display. Run first, this class used to find none and fail
+    // with a NullPointerException; it passed only after an activity test.
+    @org.junit.BeforeClass
+    public static void startDisplay() {
+        com.codename1.androidcompat.testing.AndroidTestSupport.context();
+    }
+
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
