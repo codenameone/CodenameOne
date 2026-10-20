@@ -588,6 +588,11 @@ typedef struct {
        server chose instead ("" for none). */
     int refused;
     char chosen[32];
+    /* https: the request is TLS, so the ALPN answer must be read. */
+    int tls;
+    /* Set when the TLS backend could not report ALPN, so nothing could be
+       verified before sending -- refused rather than sent unchecked. */
+    int unverifiable;
 } CN1WebH2Check;
 
 #if LIBCURL_VERSION_NUM >= 0x075000
@@ -604,9 +609,9 @@ typedef struct {
  *
  * Only an OpenSSL libcurl exposes that answer (CURLINFO_TLS_SSL_PTR hands out
  * the SSL*). With another TLS backend -- a macOS host build on SecureTransport --
- * this cannot tell and lets the transfer go on; the check after the transfer
- * still refuses an HTTP/1.1 response, but the request has gone out by then.
- * Both packaging targets are OpenSSL. Plain http:// is not checked here either:
+ * this cannot tell, and it REFUSES rather than letting the request go out
+ * unverified: "the request was not sent" is the guarantee, and a check after
+ * the transfer cannot give it. Both packaging targets are OpenSSL. Plain http:// is not checked here either:
  * prior knowledge sends the HTTP/2 preface first, and an HTTP/1.1 server reads
  * that as the unknown method PRI, not as the caller's request. */
 static int cn1WebRequireH2Prereq(void* clientp, char* primaryIp, char* localIp,
@@ -614,10 +619,15 @@ static int cn1WebRequireH2Prereq(void* clientp, char* primaryIp, char* localIp,
     CN1WebH2Check* check = (CN1WebH2Check*)clientp;
     struct curl_tlssessioninfo* info = NULL;
     (void)primaryIp; (void)localIp; (void)primaryPort; (void)localPort;
+    if(!check->tls) {
+        return CURL_PREREQFUNC_OK;
+    }
     if(curl_easy_getinfo(check->curl, CURLINFO_TLS_SSL_PTR, &info) != CURLE_OK
             || info == NULL || info->backend != CURLSSLBACKEND_OPENSSL
             || info->internals == NULL) {
-        return CURL_PREREQFUNC_OK;
+        check->refused = 1;
+        check->unverifiable = 1;
+        return CURL_PREREQFUNC_ABORT;
     }
     {
         const unsigned char* alpn = NULL;
@@ -836,6 +846,16 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
     }
     memset(&h2check, 0, sizeof(h2check));
     h2check.curl = curl;
+    /* Case-blind by hand: a scheme is ASCII, and strncasecmp is not on every
+       target this file builds for. */
+    if(urlCopy != NULL) {
+        const char* https = "https:";
+        int k = 0;
+        while(k < 6 && urlCopy[k] != 0 && (urlCopy[k] | 0x20) == (https[k] | 0x20)) {
+            k++;
+        }
+        h2check.tls = k == 6;
+    }
     curl_easy_setopt(curl, CURLOPT_URL, urlCopy);
     /* HTTP AND HTTPS, AND NOTHING ELSE, on the first request and on every
        redirect. libcurl otherwise speaks whatever its build enabled, and the
@@ -1075,6 +1095,25 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
         free(urlCopy); free(methodCopy); free(bodyCopy);
         return (JAVA_LONG)(intptr_t)r;
     }
+#if LIBCURL_VERSION_NUM < 0x075000
+    /* No CURLOPT_PREREQFUNCTION before 7.80, so nothing can read ALPN before
+       the request is written, and prior knowledge alone falls back to
+       HTTP/1.1 over TLS (see cn1WebRequireH2Prereq). Refused up front rather
+       than sent to the peer the caller ruled out. */
+    if((flags & CN1_WEB_FLAG_REQUIRE_HTTP2) && h2check.tls) {
+        strncpy(r->error, "HTTP/2 is required, and this binary's libcurl is too old "
+                "(before 7.80) to verify it before sending; the request was not sent",
+                CURL_ERROR_SIZE - 1);
+        r->status = -1;
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
+        free(urlCopy); free(methodCopy); free(bodyCopy);
+        return (JAVA_LONG)(intptr_t)r;
+    }
+#endif
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "codenameone-backend");
     /* CN1_WEB_VERBOSE=1 makes libcurl narrate the exchange on stderr. Off by
@@ -1167,7 +1206,11 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
             strncpy(r->error, msg == NULL ? "transfer failed" : msg, CURL_ERROR_SIZE - 1);
         }
     }
-    if(rc != CURLE_OK && h2check.refused) {
+    if(rc != CURLE_OK && h2check.unverifiable) {
+        strncpy(r->error, "HTTP/2 is required, and this libcurl's TLS backend cannot "
+                "report the negotiated protocol before sending (OpenSSL is needed); "
+                "the request was not sent", CURL_ERROR_SIZE - 1);
+    } else if(rc != CURLE_OK && h2check.refused) {
         snprintf(r->error, CURL_ERROR_SIZE, "HTTP/2 is required, and the server "
                 "negotiated %s%s; the request was not sent",
                 h2check.chosen[0] == 0 ? "no protocol (no ALPN answer)" : h2check.chosen,

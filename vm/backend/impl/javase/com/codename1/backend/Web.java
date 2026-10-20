@@ -359,8 +359,27 @@ public final class Web {
         }
     };
 
-    /// Enforces WebClient request timeouts; see perform().
-    private static final java.util.Timer DEADLINES = new java.util.Timer("cn1-web-deadlines", true);
+    /// Enforces WebClient request timeouts; see perform(). A scheduler that
+    /// removes a task when it is cancelled: java.util.Timer only marks it, so a
+    /// burst of fast requests with a long timeout kept every task, and the
+    /// connection it captured, queued until its deadline.
+    private static final java.util.concurrent.ScheduledThreadPoolExecutor DEADLINES =
+            deadlineScheduler();
+
+    private static java.util.concurrent.ScheduledThreadPoolExecutor deadlineScheduler() {
+        java.util.concurrent.ScheduledThreadPoolExecutor scheduler =
+                new java.util.concurrent.ScheduledThreadPoolExecutor(1,
+                        new java.util.concurrent.ThreadFactory() {
+                            @Override
+                            public Thread newThread(Runnable task) {
+                                Thread thread = new Thread(task, "cn1-web-deadlines");
+                                thread.setDaemon(true);
+                                return thread;
+                            }
+                        });
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
+    }
 
     static void closeTransport(Object transport) {
         // Runs once no request of the client is in flight (WebClient.close),
@@ -459,16 +478,16 @@ public final class Web {
         // server that stops reading an upload blocks OutputStream.write() and
         // setReadTimeout() never applies to it. The watchdog closes the
         // connection at the deadline, which fails whatever step is blocked.
-        java.util.TimerTask watchdog = null;
+        java.util.concurrent.ScheduledFuture watchdog = null;
         if (deadline != 0) {
             final HttpURLConnection watched = connection;
-            watchdog = new java.util.TimerTask() {
+            watchdog = DEADLINES.schedule(new Runnable() {
                 @Override
                 public void run() {
                     watched.disconnect();
                 }
-            };
-            DEADLINES.schedule(watchdog, Math.max(1, deadline - System.currentTimeMillis()));
+            }, Math.max(1, deadline - System.currentTimeMillis()),
+                    java.util.concurrent.TimeUnit.MILLISECONDS);
         }
         if (sockets != null && connection instanceof HttpsURLConnection) {
             ((HttpsURLConnection) connection).setSSLSocketFactory(sockets);
@@ -677,7 +696,7 @@ public final class Web {
             throw err;
         } finally {
             if (watchdog != null) {
-                watchdog.cancel();
+                watchdog.cancel(false);
             }
             if (!keepAlive) {
                 connection.disconnect();
