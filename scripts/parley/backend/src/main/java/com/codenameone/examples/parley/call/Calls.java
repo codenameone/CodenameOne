@@ -340,6 +340,6 @@ public class Calls {
     static CallDto toDto(CallRecord row) {
         return new CallDto(row.getId(), row.getConversationId(), row.getCaller(),
                 row.getCallee(), row.isVideo(), row.getState(), row.getStartedAt(),
-                row.getAnsweredAt(), row.getEndedAt());
+                row.getAnsweredAt(), row.getEndedAt(), uuid(row.getId()));
     }
 }

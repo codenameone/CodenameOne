@@ -181,6 +181,7 @@ public final class Messenger implements LiveChannel.Handler {
 
     private void started() {
         LiveChannel.start(Identity.deviceId(), this);
+        Calls.signedIn();
         refreshConversations();
         sync();
         topUpPreKeys();

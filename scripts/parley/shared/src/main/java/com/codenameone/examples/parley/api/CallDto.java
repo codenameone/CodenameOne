@@ -31,6 +31,7 @@ import com.codename1.annotations.Mapped;
 /// @param startedAt When it was placed.
 /// @param answeredAt When it was answered, 0 if it never was.
 /// @param endedAt When it ended, 0 while live.
+/// @param uuid The call's UUID, which both ends report to the system call screen.
 @Mapped
 public record CallDto(
         String id,
@@ -41,5 +42,6 @@ public record CallDto(
         String state,
         long startedAt,
         long answeredAt,
-        long endedAt) {
+        long endedAt,
+        String uuid) {
 }
