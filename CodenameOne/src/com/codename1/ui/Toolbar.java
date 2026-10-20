@@ -1502,7 +1502,10 @@ public class Toolbar extends Container {
         Form host = getHostForm();
         if (host != null && host.isDesktopNativeChrome() && host.isInitialized() && host.getParent() == null
                 && Display.getInstance().getCurrent() == host) { //NOPMD CompareObjectsWithEquals
-            Display.impl.setNativeCommands(getAllNativeMenuCommands());
+            Vector published = getAllNativeMenuCommands();
+            // A command added after show publishes here, not through Form.nativeMenuCommands().
+            Command.settleRadioGroups(published);
+            Display.impl.setNativeCommands(published);
         }
     }
 

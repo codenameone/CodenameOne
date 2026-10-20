@@ -491,6 +491,9 @@ public class MenuBar extends Container implements ActionListener {
             // CodenameOneImplementation.setCommandBehavior normalises NATIVE away on a
             // platform that does not, because returning here without one drops every
             // command silently.
+            // Settled here too: a command added after show publishes through this path, not
+            // through Form.nativeMenuCommands().
+            Command.settleRadioGroups(commands);
             Display.getInstance().getImplementation().setNativeCommands(commands);
             return;
         }

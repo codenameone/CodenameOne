@@ -334,10 +334,8 @@ public final class NativeMenuEncoder {
                 pendingSeparator = true;
             }
             // A separator is only written between two items, never leading, trailing or twice.
-            if (pendingSeparator) {
-                rows.add(new Row(path, "", FLAG_SEPARATOR, null, nextId++));
-                pendingSeparator = false;
-            }
+            // A submenu is emitted first and the separator put in front of it afterwards, so a
+            // submenu that turns out empty leaves no separator behind.
             if (o instanceof Node) {
                 Node n = (Node) o;
                 String[] sub = new String[path.length + 1];
@@ -348,7 +346,15 @@ public final class NativeMenuEncoder {
                 if (rows.size() == before) {
                     continue;
                 }
+                if (pendingSeparator) {
+                    rows.add(before, new Row(path, "", FLAG_SEPARATOR, null, nextId++));
+                    pendingSeparator = false;
+                }
             } else {
+                if (pendingSeparator) {
+                    rows.add(new Row(path, "", FLAG_SEPARATOR, null, nextId++));
+                    pendingSeparator = false;
+                }
                 Command c = (Command) o;
                 int flags = 0;
                 if (c.isEnabled()) {

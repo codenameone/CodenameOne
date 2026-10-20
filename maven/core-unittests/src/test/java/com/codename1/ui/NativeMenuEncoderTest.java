@@ -260,4 +260,32 @@ class NativeMenuEncoderTest extends UITestBase {
         twin.setDesktopChecked(true);
         assertTrue(visible.isDesktopChecked(), "an equal command elsewhere cleared the shown group");
     }
+
+    @FormTest
+    void aSubmenuThatEncodesToNothingLeavesNoSeparator() {
+        Command a = new Command("A").setDesktopMenu("Edit");
+        Command emptySub = Command.createDesktopSeparator("Edit/Sub").setDesktopMenuGroup(5);
+        NativeMenuEncoder e = NativeMenuEncoder.encode(vec(a, emptySub), 0);
+        assertEquals("Edit:A|", describe(e.getRows()));
+    }
+
+    @FormTest
+    void radiosAddedAfterShowAreSettled() {
+        implementation.setDesktop(true);
+        implementation.setDesktopTitleBarMode("native");
+        Toolbar.setGlobalToolbar(true);
+        Form f = new Form("Doc");
+        f.addCommand(new Command("Other").setDesktopMenu("View"));
+        f.show();
+        DisplayTest.flushEdt();
+        Command a = new Command("A").setDesktopMenu("View").setDesktopRadioGroup("g").setDesktopChecked(true);
+        Command b = new Command("B").setDesktopMenu("View").setDesktopRadioGroup("g").setDesktopChecked(true);
+        // Through the Toolbar, which republishes the shown form's menu directly.
+        f.getToolbar().addCommandToOverflowMenu(a);
+        f.getToolbar().addCommandToOverflowMenu(b);
+        DisplayTest.flushEdt();
+        assertTrue(implementation.getLastNativeCommands().contains(b), "the new commands were published");
+        assertFalse(a.isDesktopChecked() && b.isDesktopChecked(), "two members of one group stayed checked");
+        assertTrue(b.isDesktopChecked(), "the most recent check wins");
+    }
 }
