@@ -94,7 +94,8 @@ mvn -pl common cn1:generate-graphql \
 mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
 
 # Local Xcode project, no cloud. See Xcode prerequisites below.
-mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+# -Dopen=false: generate the sources without launching Xcode (see below).
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 
 # Native Mac app (AOT-compiled, shares the iOS pipeline so the Mac slice
 # is rendered + compiled the same way as the iOS one). Cloud-built.
@@ -102,7 +103,7 @@ mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
 
 # Local Xcode project for the Mac slice. Open the project in Xcode and
 # select the Mac Catalyst destination to run.
-mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source -Dopen=false
 
 # Native Android APK/AAB. Cloud-built by default.
 mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
@@ -129,8 +130,8 @@ A Gradle project applies the `com.codenameone` plugin from `settings.gradle.kts`
 ./gradlew cn1Css                   # compile theme.css into theme.res without running the app
 ./gradlew generateNativeInterfaces # stubs under src/<platform>/<lang>/ for every NativeInterface
 ./gradlew buildJavascriptLocal     # web bundle, locally
-./gradlew buildIosXcodeProject     # local Xcode project (macOS)
-./gradlew buildAndroidGradleProject # local Android Studio project
+./gradlew buildIosXcodeProject -Pcodename1.open=false     # local Xcode project (macOS)
+./gradlew buildAndroidGradleProject -Pcodename1.open=false # local Android Studio project
 ./gradlew settings                 # Codename One Settings; also guibuilder, certificateWizard
 ./gradlew cn1Update                # move settings.gradle.kts to the latest Codename One
 
@@ -213,9 +214,25 @@ Credentials must already be set:
 
 > **Tier requirement**: `-Dautomated=true` and the API-token-based, non-interactive build flow require a **Codename One Enterprise** subscription. Free/community accounts can use the regular cloud build (which opens a browser for login) but not the unattended automated mode.
 
+## Generating native projects without opening an IDE
+
+The `*-source` targets (`ios-source`, `mac-source`, `android-source`, and the
+`buildIosXcodeProject` / `buildAndroidGradleProject` goals and tasks) open the
+generated project in Xcode or Android Studio when they finish. That is meant for
+a person at the keyboard. **As an agent, always pass `-Dopen=false`** (Gradle:
+`-Pcodename1.open=false`): every build you run would otherwise leave another IDE
+window on the user's screen.
+
+The build also skips opening on its own when it sees an agent or CI environment
+(`CLAUDECODE`, `CODEX_SANDBOX`, `CURSOR_AGENT`, `GEMINI_CLI`, `AGENT`, `CI`), and
+logs that it did. Do not rely on that: your tool may set none of them. Pass the
+flag. To build the generated Xcode project headlessly, use `xcodebuild` on the
+`.xcworkspace` (or `.xcodeproj`) under `ios/target/<finalName>-ios-source/` (the build logs the exact path);
+for Android, run `./gradlew assembleDebug` inside the generated project.
+
 ## Local iOS builds (`ios-source`) prerequisites
 
-`-Dcodename1.buildTarget=ios-source` skips the build server and emits an Xcode project under `ios/target/codenameone/ios/dist/<App>-src/`. You can open it in Xcode and produce an `.ipa` locally. Requirements:
+`-Dcodename1.buildTarget=ios-source` skips the build server and emits an Xcode project under `ios/target/<finalName>-ios-source/` (the build logs the exact path). You can open it in Xcode (or build it with `xcodebuild`) and produce an `.ipa` locally. Requirements:
 
 | Requirement | Notes |
 | --- | --- |

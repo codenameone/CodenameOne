@@ -66,8 +66,10 @@ public abstract class Cn1BuildTask extends Cn1Task {
     @Input
     public abstract Property<Boolean> getStageOnly();
 
-    /// Open a generated Xcode or Android Studio project.
+    /// Open a generated Xcode or Android Studio project; absent means "unless an
+    /// agent or CI is driving the build".
     @Input
+    @org.gradle.api.tasks.Optional
     public abstract Property<Boolean> getOpen();
 
     /// What is uploaded, in order: the compiled classes and resources, the
@@ -115,7 +117,7 @@ public abstract class Cn1BuildTask extends Cn1Task {
                 .buildTarget(getBuildTarget().get())
                 .automated(getAutomated().get())
                 .stageOnly(getStageOnly().get())
-                .open(getOpen().get());
+                .open(getOpen().getOrNull());
         try {
             builder.execute();
         } catch (BuildFailureException ex) {

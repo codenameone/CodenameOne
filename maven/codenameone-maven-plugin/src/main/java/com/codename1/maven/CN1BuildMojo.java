@@ -118,10 +118,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private org.eclipse.aether.RepositorySystem resolverSystem;
 
     /**
-     * Flag of whether to open the xcode/android studio project.
+     * Flag of whether to open the xcode/android studio project. Unset, it opens
+     * unless an AI coding agent or CI is driving the build.
      */
-    @Parameter(property = "open", defaultValue = "true")
-    private boolean open;
+    @Parameter(property = "open")
+    private Boolean open;
 
     @Override
     protected String helpStep() {
