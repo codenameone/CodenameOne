@@ -66,7 +66,7 @@ The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generat
 Before you write any platform code, run the target you care about so you can see the stubs in the generated build:
 
 ```bash
-# iOS — produces an Xcode project under ios/target/codenameone/ios/dist/ without
+# iOS — produces an Xcode project under ios/target/<finalName>-ios-source/ without
 # launching Xcode. Confirm the stub files appear and that the project builds
 # (xcodebuild; no missing-symbol errors).
 mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false

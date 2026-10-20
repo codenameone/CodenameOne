@@ -27,6 +27,12 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true)
     private MavenProject project;
 
+    /// Forwarded to the child build, which otherwise never sees it: without this,
+    /// `mvn cn1:buildIosXcodeProject -Dopen=false` still opened Xcode. Unset, the
+    /// child decides (it skips opening under an agent or CI).
+    @Parameter(property = "open")
+    private Boolean open;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (!project.isExecutionRoot()) {
@@ -42,6 +48,9 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
         properties.setProperty("codename1.platform", getPlatform());
         if (getBuildTarget() != null) {
             properties.setProperty("codename1.buildTarget", getBuildTarget());
+        }
+        if (open != null) {
+            properties.setProperty("open", open.toString());
         }
         request.setProperties(properties);
 

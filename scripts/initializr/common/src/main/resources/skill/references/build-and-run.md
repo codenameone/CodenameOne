@@ -227,12 +227,12 @@ The build also skips opening on its own when it sees an agent or CI environment
 (`CLAUDECODE`, `CODEX_SANDBOX`, `CURSOR_AGENT`, `GEMINI_CLI`, `AGENT`, `CI`), and
 logs that it did. Do not rely on that: your tool may set none of them. Pass the
 flag. To build the generated Xcode project headlessly, use `xcodebuild` on the
-`.xcworkspace` (or `.xcodeproj`) under `ios/target/codenameone/ios/dist/<App>-src/`;
+`.xcworkspace` (or `.xcodeproj`) under `ios/target/<finalName>-ios-source/` (the build logs the exact path);
 for Android, run `./gradlew assembleDebug` inside the generated project.
 
 ## Local iOS builds (`ios-source`) prerequisites
 
-`-Dcodename1.buildTarget=ios-source` skips the build server and emits an Xcode project under `ios/target/codenameone/ios/dist/<App>-src/`. You can open it in Xcode (or build it with `xcodebuild`) and produce an `.ipa` locally. Requirements:
+`-Dcodename1.buildTarget=ios-source` skips the build server and emits an Xcode project under `ios/target/<finalName>-ios-source/` (the build logs the exact path). You can open it in Xcode (or build it with `xcodebuild`) and produce an `.ipa` locally. Requirements:
 
 | Requirement | Notes |
 | --- | --- |
