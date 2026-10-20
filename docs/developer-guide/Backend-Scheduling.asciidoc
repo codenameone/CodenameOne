@@ -12,7 +12,7 @@ each chooses between platform and virtual threads.
 
 The annotations are Spring's, on ordinary bean methods:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Reports.java[tag=backend-background,indent=0]
 ----
@@ -132,7 +132,7 @@ belongs on `PLATFORM`. `PLATFORM` stays the default, as a pool is in Spring.
 
 `Tasks` runs a single piece of work without a bean method:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Digest.java[tag=backend-tasks,indent=0]
 ----
@@ -144,7 +144,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 A `@Scheduled` method takes no arguments and gives exactly one of `cron`,
 `fixedRate` or `fixedDelay`. Any of them can come from configuration:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Digest.java[tag=backend-scheduled-config,indent=0]
 ----

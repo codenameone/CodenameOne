@@ -97,25 +97,224 @@ final class PlaygroundCompletionModel {
         }
     }
 
-    /// The identifier immediately before a trailing `receiver.` at the cursor, or "" if the cursor is
-    /// not positioned after a member-access dot.
-    String findReceiver(String code, int cursor) {
+    /// The qualified type whose members belong at the cursor, when the cursor is in a
+    /// member position -- right after `expr.`, optionally with part of a name typed.
+    /// Answers null when it is not in a member position, and "" when it is but the
+    /// type cannot be worked out: the caller then offers nothing, because names that
+    /// are not members of the receiver are wrong there, not merely unhelpful.
+    ///
+    /// The receiver is read as a chain, left to right: a variable, global or type
+    /// (`b`, `ctx`, `Style`), a constructor call (`new Button("x")`) or a string
+    /// literal, followed by any number of `.field` and `.method(args)` steps, each
+    /// typed from the API's own class files ([PlaygroundApi#memberType]). So
+    /// `b.getAllStyles().` offers [com.codename1.ui.plaf.Style]'s members. A method's
+    /// overloads are told apart by argument count only.
+    String receiverType(String code, int cursor) {
         int end = Math.max(0, Math.min(cursor, code.length()));
-        String prefix = code.substring(0, end);
-        int dot = prefix.lastIndexOf('.');
-        if (dot < 0) {
-            return "";
+        int p = end;
+        while (p > 0 && isIdentPart(code.charAt(p - 1))) {
+            p--;
         }
-        for (int i = dot + 1; i < prefix.length(); i++) {
-            if (!isIdentPart(prefix.charAt(i))) {
+        int dot = skipSpaceBack(code, p);
+        if (dot == 0 || code.charAt(dot - 1) != '.') {
+            return null;
+        }
+        dot--;
+        if (dot > 0 && (code.charAt(dot - 1) >= '0' && code.charAt(dot - 1) <= '9') && numberEndsAt(code, dot)) {
+            return null; // a decimal point, as in 1.5
+        }
+        // Steps right to left: {kind, name, argc}. kind: n(ew), s(tring), c(all), f(ield/identifier).
+        List<String[]> steps = new ArrayList<String[]>();
+        int i = skipSpaceBack(code, dot);
+        while (true) {
+            if (i == 0) {
+                return "";
+            }
+            char c = code.charAt(i - 1);
+            int start;
+            if (c == '"') {
+                int open = stringStart(code, i - 1);
+                if (open < 0) {
+                    return "";
+                }
+                steps.add(new String[] {"s", "", ""});
+                break;
+            } else if (c == ')') {
+                int open = matchingOpenParen(code, i - 1);
+                if (open < 0) {
+                    return "";
+                }
+                int argc = argumentCount(code.substring(open + 1, i - 1));
+                int nameEnd = skipSpaceBack(code, open);
+                if (nameEnd > 0 && code.charAt(nameEnd - 1) == '>') {
+                    nameEnd = skipTypeArgumentsBack(code, nameEnd);
+                }
+                start = nameEnd;
+                while (start > 0 && isIdentPart(code.charAt(start - 1))) {
+                    start--;
+                }
+                if (start == nameEnd) {
+                    return ""; // a cast or a parenthesized expression
+                }
+                String name = code.substring(start, nameEnd);
+                int before = skipSpaceBack(code, start);
+                if (before >= 3 && code.startsWith("new", before - 3)
+                        && (before == 3 || !isIdentPart(code.charAt(before - 4)))) {
+                    steps.add(new String[] {"n", name, ""});
+                    break;
+                }
+                steps.add(new String[] {"c", name, String.valueOf(argc)});
+            } else if (isIdentPart(c)) {
+                start = i;
+                while (start > 0 && isIdentPart(code.charAt(start - 1))) {
+                    start--;
+                }
+                steps.add(new String[] {"f", code.substring(start, i), ""});
+            } else {
+                return "";
+            }
+            int prev = skipSpaceBack(code, start);
+            if (prev == 0 || code.charAt(prev - 1) != '.') {
+                break;
+            }
+            i = skipSpaceBack(code, prev - 1);
+        }
+
+        Map<String, String> visible = visibleTypes(code);
+        String type = "";
+        for (int k = steps.size() - 1; k >= 0; k--) {
+            String[] step = steps.get(k);
+            boolean first = k == steps.size() - 1;
+            if (first) {
+                if ("s".equals(step[0])) {
+                    type = "java.lang.String";
+                } else if ("n".equals(step[0])) {
+                    type = qualify(step[1], visible);
+                } else if ("f".equals(step[0])) {
+                    type = inferType(step[1], code, visible);
+                } else {
+                    type = ""; // a script method; its return type is not looked up
+                }
+            } else if ("c".equals(step[0])) {
+                type = PlaygroundApi.memberType(type, step[1] + "/" + step[2]);
+            } else {
+                type = PlaygroundApi.memberType(type, step[1]);
+            }
+            if (type.length() == 0) {
                 return "";
             }
         }
-        int i = dot;
-        while (i > 0 && isIdentPart(prefix.charAt(i - 1))) {
-            i--;
+        return type;
+    }
+
+    private String qualify(String simple, Map<String, String> visible) {
+        String fqcn = visible.get(simple);
+        if (fqcn == null) {
+            fqcn = simpleToQualified.get(simple);
         }
-        return prefix.substring(i, dot);
+        return fqcn == null ? "" : fqcn;
+    }
+
+    /// True when the digits ending at `end` are a whole number token, not the tail of
+    /// an identifier such as `label2`.
+    private static boolean numberEndsAt(String code, int end) {
+        int k = end;
+        while (k > 0 && code.charAt(k - 1) >= '0' && code.charAt(k - 1) <= '9') {
+            k--;
+        }
+        return k == 0 || !isIdentPart(code.charAt(k - 1));
+    }
+
+    /// The index of the quote opening the string literal whose closing quote is at
+    /// `close`, or -1.
+    private static int stringStart(String code, int close) {
+        for (int k = close - 1; k >= 0; k--) {
+            if (code.charAt(k) == '"' && !escaped(code, k)) {
+                return k;
+            }
+            if (code.charAt(k) == '\n') {
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean escaped(String code, int at) {
+        int slashes = 0;
+        for (int k = at - 1; k >= 0 && code.charAt(k) == '\\'; k--) {
+            slashes++;
+        }
+        return (slashes & 1) == 1;
+    }
+
+    /// The `(` matching the `)` at `close`, skipping string and char literals, or -1.
+    private static int matchingOpenParen(String code, int close) {
+        int depth = 0;
+        for (int k = close; k >= 0; k--) {
+            char c = code.charAt(k);
+            if ((c == '"' || c == '\'') && !escaped(code, k)) {
+                int q = k - 1;
+                while (q >= 0 && !(code.charAt(q) == c && !escaped(code, q))) {
+                    q--;
+                }
+                if (q < 0) {
+                    return -1;
+                }
+                k = q;
+            } else if (c == ')') {
+                depth++;
+            } else if (c == '(') {
+                depth--;
+                if (depth == 0) {
+                    return k;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /// Skips `<...>` ending at `end` (exclusive), as in `new ArrayList<String>(`.
+    private static int skipTypeArgumentsBack(String code, int end) {
+        int depth = 0;
+        for (int k = end - 1; k >= 0; k--) {
+            char c = code.charAt(k);
+            if (c == '>') {
+                depth++;
+            } else if (c == '<') {
+                depth--;
+                if (depth == 0) {
+                    return skipSpaceBack(code, k);
+                }
+            }
+        }
+        return end;
+    }
+
+    /// The number of arguments in an argument list's text: top-level commas, outside
+    /// literals and nested brackets, plus one -- or zero for an empty list.
+    private static int argumentCount(String args) {
+        if (args.trim().length() == 0) {
+            return 0;
+        }
+        int n = 1;
+        int depth = 0;
+        for (int k = 0; k < args.length(); k++) {
+            char c = args.charAt(k);
+            if (c == '"' || c == '\'') {
+                int q = k + 1;
+                while (q < args.length() && !(args.charAt(q) == c && !escaped(args, q))) {
+                    q++;
+                }
+                k = q;
+            } else if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /// Simple-name -> qualified-name for every type in scope (default imports, explicit imports and
