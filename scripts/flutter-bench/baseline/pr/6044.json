@@ -39,9 +39,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "java-api-additions: java.time and CompletableFuture review fixes grew linux code by 64 bytes",
+     "reason": "java-api-additions: round 28 runtime fixes (script letter table, date conflicts) grew linux code by 1 KB",
      "runs": 1,
-     "value": 14571378
+     "value": 14572498
     },
     "install_bytes": {
      "from": {
@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "java-api-additions: java.time and CompletableFuture review fixes grew linux code by 64 bytes",
+     "reason": "java-api-additions: round 28 runtime fixes (script letter table, date conflicts) grew linux code by 1 KB",
      "runs": 1,
-     "value": 84689106
+     "value": 84690108
     }
    }
   }

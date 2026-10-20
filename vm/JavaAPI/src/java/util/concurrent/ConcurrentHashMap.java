@@ -592,6 +592,14 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
             return key != null && value != null && owner.remove(key, value);
         }
 
+        /// Writes through, as the JDK's view does: the mapping is put (a
+        /// present key gets the new value) and the answer is whether the key
+        /// was absent. addAll comes from AbstractCollection over this.
+        @Override
+        public boolean add(Map.Entry<K, V> e) {
+            return owner.put(e.getKey(), e.getValue()) == null;
+        }
+
         @Override
         public void clear() {
             owner.clear();

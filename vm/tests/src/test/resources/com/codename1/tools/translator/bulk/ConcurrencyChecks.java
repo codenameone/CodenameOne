@@ -319,11 +319,16 @@ public final class ConcurrencyChecks {
                     return "async";
                 });
                 Bulk.expectEquals("done", f.get(), "the future");
+                // The async stage usually finishes while f.get() waits for the
+                // latch it releases; only a join that really waits goes
+                // through blockUi, so the count expected follows that.
+                int expected = cf.isDone() ? 1 : 2;
                 Bulk.expectEquals("async", cf.join(), "the completable future");
                 Bulk.expect(go.await(1, TimeUnit.SECONDS), "the latch");
                 pool.shutdown();
                 Bulk.expect(pool.awaitTermination(20, TimeUnit.SECONDS), "the pool did not stop");
-                Bulk.expect(host.blocked.get() >= 2, "blockUi was used " + host.blocked.get() + " times");
+                Bulk.expect(host.blocked.get() >= expected, "blockUi was used " + host.blocked.get()
+                        + " times, expected " + expected);
             } finally {
                 JdkHost.install(null);
                 stop(pool);

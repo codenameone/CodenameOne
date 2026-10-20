@@ -564,6 +564,25 @@ public final class LangMembersChecks {
                 Bulk.p(Integer.toHexString(c), Character.isLetter(c) + "/" + Character.isJavaIdentifierStart(c));
             }
         });
+        Bulk.check("Lang.extendedLanguageSubtags", () -> {
+            for (String t : new String[]{"zh-cmn-Hans-CN", "zh-yue-HK", "ar-aao-EG", "zh-cmn-abc-def-CN", "en-abc", "zh-Hans-CN"}) {
+                java.util.Locale l = java.util.Locale.forLanguageTag(t);
+                Bulk.p(t, l.getLanguage() + "|" + l.getCountry() + "|" + l.getVariant());
+            }
+        });
+        Bulk.check("Lang.concurrentEntrySetAddsWriteThrough", () -> {
+            java.util.concurrent.ConcurrentHashMap<String, Integer> m = new java.util.concurrent.ConcurrentHashMap<>();
+            Bulk.p("first", m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("a", 1)));
+            Bulk.p("again", m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("a", 2)));
+            Bulk.p("all", m.entrySet().addAll(java.util.Arrays.asList(new java.util.AbstractMap.SimpleEntry<>("b", 3))));
+            Bulk.p("map", new java.util.TreeMap<>(m).toString());
+            try {
+                m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("c", null));
+                Bulk.p("null", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("null", "NPE");
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

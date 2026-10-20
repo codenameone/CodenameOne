@@ -76,7 +76,10 @@ public class Thread implements java.lang.Runnable{
     private static long lastId;
     // Plain, not volatile: the default handler is set once at start-up,
     // before the threads that read it exist, and a field read on every
-    // uncaught exception is not worth a barrier on each access.
+    // uncaught exception is not worth a barrier on each access. Replacing it
+    // later from another thread is not a supported pattern: Codename One
+    // code runs on the EDT, and a worker sees the new handler after its
+    // next synchronization (a start, a monitor, a queue hand-off) anyway.
     private static UncaughtExceptionHandler defaultUncaughtExceptionHandler;
 
     /**

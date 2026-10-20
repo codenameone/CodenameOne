@@ -95,6 +95,26 @@
     }
    }
   },
+  "linux-x64@intel-xeon-6973p-c": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.399,
+      "time": 0.658,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.468,
+     "reason": "translator self-hosting RAM measured 0.47x vs 0.40x on linux x64 Xeon 6973P-C; this row moves both ways between runs of this PR",
+     "runs": 1,
+     "time": 0.658,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   }
+  },
   "linux-x64@intel-xeon-platinum-8370c": {
    "translator": {
     "all": {

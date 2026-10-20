@@ -66,6 +66,12 @@ public class Runtime {
             }
         }
         if (run != null) {
+            // In order, on this thread, never started: Codename One is not the
+            // JDK. Exit is called from the EDT on every port, a platform may
+            // end the process the moment it returns, and starting threads
+            // there is what would leave a hook half run. Hooks that wait on
+            // one another (one awaiting a latch the next counts down) are
+            // therefore not supported; each hook must finish on its own.
             for (int i = 0; i < run.length; i++) {
                 Thread hook = run[i];
                 try {

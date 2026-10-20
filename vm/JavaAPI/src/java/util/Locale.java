@@ -201,6 +201,8 @@ public class Locale {
         int n = languageTag.length();
         int start = 0;
         int index = 0;
+        int extlangs = 0;
+        int baseLanguageLength = 0;
         for (int i = 0; i <= n; i++) {
             // Only '-' separates subtags: "en_US" is not a language tag, and the
             // JDK reads it as the root locale.
@@ -214,6 +216,7 @@ public class Locale {
                     break;
                 }
                 language = "und".equals(asciiLower(part)) ? "" : part;
+                baseLanguageLength = part.length();
             } else if (part.length() == 1 || part.length() == 0) {
                 // "x-lvariant-" carries a variant that is not well formed BCP 47,
                 // which is how toLanguageTag writes one; the JDK reads it back.
@@ -229,6 +232,16 @@ public class Locale {
                     }
                 }
                 break;
+            } else if (index == 1 && extlangs < 3 && part.length() == 3 && isLetters(part)
+                    && baseLanguageLength >= 2 && baseLanguageLength <= 3) {
+                // An extended language subtag ("zh-cmn-Hans-CN"): the JDK takes
+                // the first as the language and goes on to the script and
+                // region. The index stays put so a script may still follow.
+                if (extlangs == 0) {
+                    language = part;
+                }
+                extlangs++;
+                continue;
             } else if (index == 1 && part.length() == 4 && isLetters(part)) {
                 // a script
                 index++;
