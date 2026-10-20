@@ -376,23 +376,44 @@ final class UnityYaml {
         return text;
     }
 
+    /// YAML's single-character escapes; any other character stands for
+    /// itself, which covers the escaped quote, slash, backslash and space.
+    private static char escaped(char n) {
+        switch (n) {
+            case '0': return '\0';
+            case 'a': return '\u0007';
+            case 'b': return '\b';
+            case 't': return '\t';
+            case 'n': return '\n';
+            case 'v': return '\u000b';
+            case 'f': return '\f';
+            case 'r': return '\r';
+            case 'e': return '\u001b';
+            case 'N': return '\u0085';
+            case '_': return '\u00a0';
+            case 'L': return '\u2028';
+            case 'P': return '\u2029';
+            default: return n;
+        }
+    }
+
     private static String unescape(String s) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == '\\' && i + 1 < s.length()) {
                 char n = s.charAt(++i);
-                int digits = n == 'u' ? 4 : n == 'x' ? 2 : 0;
+                int digits = n == 'U' ? 8 : n == 'u' ? 4 : n == 'x' ? 2 : 0;
                 if (digits > 0 && i + digits < s.length()) {
                     try {
-                        sb.append((char) Integer.parseInt(s.substring(i + 1, i + 1 + digits), 16));
+                        sb.appendCodePoint(Integer.parseInt(s.substring(i + 1, i + 1 + digits), 16));
                         i += digits;
                         continue;
-                    } catch (NumberFormatException e) {
-                        // Not an escape after all; keep the letter.
+                    } catch (IllegalArgumentException e) {
+                        // Not an escape after all (or past U+10FFFF); keep the letter.
                     }
                 }
-                sb.append(n == 'n' ? '\n' : n == 't' ? '\t' : n == 'r' ? '\r' : n);
+                sb.append(escaped(n));
             } else {
                 sb.append(c);
             }

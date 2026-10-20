@@ -712,9 +712,13 @@ public final class AudioSource extends Behaviour {
         PlayOneShot(c, 1f);
     }
 
+    /// A negative scale is clamped to silence, as Unity documents.
     public void PlayOneShot(AudioClip c, float volumeScale) {
         if (c == null || !live()) {
             return;
+        }
+        if (volumeScale < 0f) {
+            volumeScale = 0f;
         }
         record("shot", c);
         int v = newVoice();

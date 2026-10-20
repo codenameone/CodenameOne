@@ -1892,6 +1892,15 @@ public final class SceneCompiler {
         for (Object removed : list(modification.get("m_RemovedComponents"))) {
             source.removeAll(targets(source, removed));
         }
+        // A removed GameObject goes with its components and every object
+        // under its transform. The parent's m_Children entry is left
+        // dangling, which the hierarchy pass skips as it skips any object
+        // the file does not have.
+        for (Object removed : list(modification.get("m_RemovedGameObjects"))) {
+            for (UnityYaml.Document go : targets(source, removed)) {
+                removeSubtree(source, go);
+            }
+        }
         Object parent = modification.get("m_TransformParent");
         for (UnityYaml.Document d : source) {
             if ((d.classId == 4 || d.classId == 224) && fileId(d.properties.get("m_Father")).longValue() == 0
@@ -1903,6 +1912,40 @@ public final class SceneCompiler {
     }
 
     /// The documents a `{fileID, guid}` of an override names.
+    /// Removes a GameObject, its components and, through its transform's
+    /// children, every GameObject below it.
+    private static void removeSubtree(List<UnityYaml.Document> source, UnityYaml.Document go) {
+        if (!source.remove(go)) {
+            return;
+        }
+        for (Object entry : list(go.properties.get("m_Component"))) {
+            UnityYaml.Document c = byFileId(source, fileId(map(entry).get("component")));
+            if (c == null) {
+                continue;
+            }
+            source.remove(c);
+            if (c.classId == 4 || c.classId == 224) {
+                for (Object child : list(c.properties.get("m_Children"))) {
+                    UnityYaml.Document t = byFileId(source, fileId(child));
+                    UnityYaml.Document owner = t == null ? null
+                            : byFileId(source, fileId(t.properties.get("m_GameObject")));
+                    if (owner != null) {
+                        removeSubtree(source, owner);
+                    }
+                }
+            }
+        }
+    }
+
+    private static UnityYaml.Document byFileId(List<UnityYaml.Document> source, Long id) {
+        for (UnityYaml.Document d : source) {
+            if (d.fileId == id.longValue()) {
+                return d;
+            }
+        }
+        return null;
+    }
+
     private static List<UnityYaml.Document> targets(List<UnityYaml.Document> source, Object target) {
         String key = text(map(target).get("guid")) + "/" + fileId(target);
         List<UnityYaml.Document> found = new ArrayList<UnityYaml.Document>();

@@ -72,6 +72,20 @@ public class UnityPomUpdaterTest {
         assertEquals(current, u.pom);
     }
 
+    /// A runtime named only in a comment or in dependency management is not
+    /// a dependency of the build, so the profile still goes in.
+    @Test
+    public void aManagedOrCommentedRuntimeIsNotADependency() throws Exception {
+        String legacy = read("src/test/resources/android-pom/legacy-common-pom.xml");
+        String mention = "<!-- <artifactId>codenameone-unity-compat</artifactId> -->\n"
+                + "<dependencyManagement><dependencies><dependency><groupId>com.codenameone</groupId>"
+                + "<artifactId>codenameone-unity-compat</artifactId></dependency></dependencies>"
+                + "</dependencyManagement>\n";
+        int at = legacy.indexOf("<dependencies>");
+        UnityPomUpdater u = new UnityPomUpdater(legacy.substring(0, at) + mention + legacy.substring(at));
+        assertTrue(u.pom.contains("<id>unity-compat</id>"));
+    }
+
     /// Android compatibility wired in first must not confuse this one, nor
     /// the other way around: both edit the same two places of the pom.
     @Test

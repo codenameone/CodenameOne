@@ -70,9 +70,30 @@ final class UnityPomUpdater {
     final List<String> manual = new ArrayList<String>();
     boolean changed;
 
+    /// The pom without comments and `<dependencyManagement>` blocks: a
+    /// runtime named only there is no dependency of the build.
+    static String effective(String pom) {
+        StringBuilder sb = new StringBuilder();
+        int at = 0;
+        while (at < pom.length()) {
+            int comment = pom.indexOf("<!--", at);
+            int managed = pom.indexOf("<dependencyManagement>", at);
+            int next = comment < 0 ? managed : managed < 0 ? comment : Math.min(comment, managed);
+            if (next < 0) {
+                sb.append(pom, at, pom.length());
+                break;
+            }
+            sb.append(pom, at, next);
+            String close = next == comment ? "-->" : "</dependencyManagement>";
+            int end = pom.indexOf(close, next);
+            at = end < 0 ? pom.length() : end + close.length();
+        }
+        return sb.toString();
+    }
+
     UnityPomUpdater(String pom) {
         String p = pom;
-        if (p.indexOf("<artifactId>codenameone-unity-compat</artifactId>") < 0) {
+        if (effective(p).indexOf("<artifactId>codenameone-unity-compat</artifactId>") < 0) {
             int profiles = p.lastIndexOf("</profiles>");
             if (profiles < 0) {
                 manual.add("the codenameone-unity-compat dependency, e.g. as this profile:\n" + PROFILE);
