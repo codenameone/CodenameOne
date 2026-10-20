@@ -5768,7 +5768,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A Dialog is painted inside the form rather than owning the window; letting it retitle
         // the bar would leave the wrong title behind once it is dismissed.
         if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            desktopChrome.setTitle(f.getTitle());
+            desktopChrome.setTitle(getNativeWindowTitle(f));
         }
     }
 
@@ -13146,7 +13146,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            desktopChrome.setTitle(f.getTitle());
+            desktopChrome.setTitle(getNativeWindowTitle(f));
         }
         applyTextSelectionHint(f);
         // A form built before the last scheme or density change still holds the styles it

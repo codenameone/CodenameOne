@@ -197,6 +197,7 @@ public class Window extends Container implements TopLevelContainer {
     private final EventDispatcher windowListeners = new EventDispatcher();
 
     private String pendingTitle = "";
+    private boolean documentModified;
     private int pendingX;
     private int pendingY;
     /// Whether the application chose a position. A negative coordinate is a perfectly
@@ -492,8 +493,43 @@ public class Window extends Container implements TopLevelContainer {
             @Override
             public void run() {
                 manager().setTitle(nativePeer, title);
+                if (documentModified) {
+                    // Again over the title just set: a port that marks the state in the
+                    // title (the default) has to mark the new one.
+                    manager().setDocumentModified(nativePeer, true, title);
+                }
             }
         });
+    }
+
+    /// Marks the document this window shows as having unsaved changes, the way the platform
+    /// shows it: the dot in the close button on macOS, a leading `*` in the title elsewhere.
+    /// `#getTitle()` keeps answering the title as set. Commands that follow the modified
+    /// state (the `Command#DESKTOP_ROLE_SAVE` role by default) are enabled while it is set
+    /// and disabled once it is cleared, see `Command#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modified`: true while the document has unsaved changes
+    public void setDocumentModified(final boolean modified) {
+        documentModified = modified;
+        Command.followDocumentModified(commands, modified);
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setDocumentModified(nativePeer, modified, pendingTitle);
+            }
+        });
+    }
+
+    /// True while the window's document has unsaved changes, see
+    /// `#setDocumentModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// the modified state
+    public boolean isDocumentModified() {
+        return documentModified;
     }
 
     /// {@inheritDoc}
@@ -2391,6 +2427,9 @@ public class Window extends Container implements TopLevelContainer {
             windowGraphics = Desktop.getInstance().createWindowGraphics(this);
             if (windowIcon != null) {
                 wm.setIcon(nativePeer, windowIcon);
+            }
+            if (documentModified) {
+                wm.setDocumentModified(nativePeer, true, pendingTitle);
             }
             if (alwaysOnTop) {
                 wm.setAlwaysOnTop(nativePeer, true);

@@ -25,6 +25,7 @@
 package com.codename1.ui;
 
 import com.codename1.compat.java.util.Objects;
+import com.codename1.impl.NativeMenuConventions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -397,13 +398,17 @@ public class Command implements ActionListener<ActionEvent> {
     /// segment keeps the meaning above. Write {@code //} for a slash that is part of a title.
     public static final String DESKTOP_MENU = "DesktopMenu";
 
-    /// Standard desktop menu placement: the application menu (macOS app menu / a leading menu).
+    /// Standard desktop menu placement: the macOS application menu. Platforms without one put
+    /// these commands in File.
     public static final String DESKTOP_MENU_APP = "App";
-    /// Standard desktop menu placement: an "About" item, conventionally in the application menu.
+    /// The About standard command, read as `#DESKTOP_ROLE_ABOUT`: placed where each platform
+    /// keeps it, see `#setDesktopRole(String)`.
     public static final String DESKTOP_MENU_ABOUT = "About";
-    /// Standard desktop menu placement: a "Preferences"/"Settings" item in the application menu.
+    /// The Settings standard command, read as `#DESKTOP_ROLE_SETTINGS`: placed where each
+    /// platform keeps it, see `#setDesktopRole(String)`.
     public static final String DESKTOP_MENU_PREFERENCES = "Preferences";
-    /// Standard desktop menu placement: a "Quit"/"Exit" item in the application menu.
+    /// The Quit standard command, read as `#DESKTOP_ROLE_QUIT`: placed where each platform
+    /// keeps it, see `#setDesktopRole(String)`.
     public static final String DESKTOP_MENU_QUIT = "Quit";
     /// Standard desktop menu placement: the File menu.
     public static final String DESKTOP_MENU_FILE = "File";
@@ -645,6 +650,26 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
+    /// Enables or disables the commands that follow a surface's document-modified state, see
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands of one form or window; entries that are not commands are
+    /// ignored
+    ///
+    /// - `modified`: the new modified state
+    static void followDocumentModified(java.util.List commands, boolean modified) {
+        if (commands == null) {
+            return;
+        }
+        for (Object o : commands) {
+            if (o instanceof Command && ((Command) o).isDesktopEnabledWhenModified()) {
+                ((Command) o).setEnabled(modified);
+            }
+        }
+    }
+
     /// Leaves at most one checked member in each radio group among the given commands, the
     /// most recently checked one. Called on every surface as it is published, which settles a
     /// group whose members were checked while the surface was not published.
@@ -753,6 +778,212 @@ public class Command implements ActionListener<ActionEvent> {
     public int getDesktopShortcutModifiers() {
         Object o = getClientProperty(DESKTOP_SHORTCUT_MODIFIERS);
         return o == null ? 0 : ((Integer) o).intValue();
+    }
+
+    /// Client property key carrying the standard desktop role of this command, one of the
+    /// `DESKTOP_ROLE_*` constants. See `#setDesktopRole(String)`.
+    public static final String DESKTOP_ROLE = "DesktopRole";
+
+    /// Standard command: shows the application's About information. In the application menu
+    /// on macOS, at the foot of Help on Windows and Linux.
+    public static final String DESKTOP_ROLE_ABOUT = "about";
+    /// Standard command: opens the application's settings. "Settings" in the application menu
+    /// on macOS, "Options" under Tools on Windows, "Preferences" at the foot of Edit on Linux.
+    public static final String DESKTOP_ROLE_SETTINGS = "settings";
+    /// Standard command: quits the application. "Quit" on macOS and Linux, "Exit" on Windows,
+    /// and absent from a browser page, which cannot quit.
+    public static final String DESKTOP_ROLE_QUIT = "quit";
+    /// Standard command: hides the application. macOS only.
+    public static final String DESKTOP_ROLE_HIDE_APP = "hide";
+    /// Standard command: creates a new document.
+    public static final String DESKTOP_ROLE_NEW = "new";
+    /// Standard command: opens a document.
+    public static final String DESKTOP_ROLE_OPEN = "open";
+    /// Standard command: saves the document. Follows the document-modified state of its form
+    /// or window, see `Form#setDocumentModified(boolean)`.
+    public static final String DESKTOP_ROLE_SAVE = "save";
+    /// Standard command: saves the document under a new name.
+    public static final String DESKTOP_ROLE_SAVE_AS = "saveAs";
+    /// Standard command: closes the document or window.
+    public static final String DESKTOP_ROLE_CLOSE = "close";
+    /// Standard command: prints.
+    public static final String DESKTOP_ROLE_PRINT = "print";
+    /// Standard command: undo.
+    public static final String DESKTOP_ROLE_UNDO = "undo";
+    /// Standard command: redo.
+    public static final String DESKTOP_ROLE_REDO = "redo";
+    /// Standard command: cut.
+    public static final String DESKTOP_ROLE_CUT = "cut";
+    /// Standard command: copy.
+    public static final String DESKTOP_ROLE_COPY = "copy";
+    /// Standard command: paste.
+    public static final String DESKTOP_ROLE_PASTE = "paste";
+    /// Standard command: select all.
+    public static final String DESKTOP_ROLE_SELECT_ALL = "selectAll";
+    /// Standard command: find.
+    public static final String DESKTOP_ROLE_FIND = "find";
+    /// Standard command: toggles full screen.
+    public static final String DESKTOP_ROLE_FULL_SCREEN = "fullScreen";
+    /// Standard command: minimizes the window. Absent from a browser page.
+    public static final String DESKTOP_ROLE_MINIMIZE = "minimize";
+    /// Standard command: zooms (macOS) or maximizes the window. Absent from a browser page.
+    public static final String DESKTOP_ROLE_ZOOM = "zoom";
+    /// Standard command: opens the application's help.
+    public static final String DESKTOP_ROLE_HELP = "help";
+
+    /// Client property key carrying the platforms a command is published on, see
+    /// `#setDesktopPlatforms(String...)`.
+    public static final String DESKTOP_PLATFORMS = "DesktopPlatforms";
+
+    /// Client property key that makes a command's enabled state follow the document-modified
+    /// state of its form or window (as a {@code Boolean}), see
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    public static final String DESKTOP_ENABLED_WHEN_MODIFIED = "DesktopEnabledWhenModified";
+
+    /// Marks this command as one of the standard commands every desktop application has, so
+    /// the native menu bar puts it where the platform's own applications do: About, Settings
+    /// and Quit in the application menu on macOS; About under Help, Options under Tools and
+    /// Exit under File on Windows; Preferences under Edit on Linux. Each role also brings the
+    /// platform's standard shortcut and its position within the menu.
+    ///
+    /// What the command sets itself wins: an explicit `#setDesktopMenu(String)`,
+    /// `#setDesktopMenuGroup(int)` or `#setDesktopShortcut(char, int)` overrides the role's.
+    /// The label is the command's own name; `#createDesktopRole(String, ActionListener)` creates
+    /// a command named the way the running platform names the role (Quit or Exit, Settings or
+    /// Options or Preferences). A role the platform has no place for (Hide outside macOS, Quit
+    /// in a browser) leaves the command out of that platform's menu bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `role`: one of the `DESKTOP_ROLE_*` constants, or null to clear it
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopRole(String role) {
+        putClientProperty(DESKTOP_ROLE, role);
+        return this;
+    }
+
+    /// Returns the standard desktop role, or null when unset. See `#setDesktopRole(String)`.
+    ///
+    /// #### Returns
+    ///
+    /// one of the `DESKTOP_ROLE_*` constants or null
+    public String getDesktopRole() {
+        Object o = getClientProperty(DESKTOP_ROLE);
+        return o == null ? null : o.toString();
+    }
+
+    /// Creates a command for a standard desktop role, named the way the running platform names
+    /// it: "Quit" on macOS and Linux and "Exit" on Windows, "Settings", "Options" or
+    /// "Preferences", "About" followed by the application name. The name can be translated
+    /// through the `cn1.menu.<role>` resource key, for example `cn1.menu.quit`. See
+    /// `#setDesktopRole(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `role`: one of the `DESKTOP_ROLE_*` constants
+    ///
+    /// - `listener`: the action, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the new command
+    public static Command createDesktopRole(String role, final ActionListener listener) {
+        String label = NativeMenuConventions.labelOf(NativeMenuConventions.current(), role);
+        if (label == null) {
+            // A role this platform does not show still gets a name for the application's
+            // own menus: the Windows one, which every platform's users read correctly.
+            label = NativeMenuConventions.labelOf(NativeMenuConventions.WINDOWS, role);
+        }
+        Command c = new Command(label == null ? role : label) {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                if (listener != null) {
+                    listener.actionPerformed(evt);
+                }
+            }
+        };
+        c.setDesktopRole(role);
+        return c;
+    }
+
+    /// Publishes this command on the native menu bar of the listed platforms only, for a
+    /// command that only makes sense on some of them. The names are `mac`, `win`, `linux`
+    /// and `web` (the JavaScript port's in-page menu). The command stays in the application's
+    /// own menus everywhere; only the native menu bar is affected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `platforms`: the platform names; none, or null, publishes it everywhere
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopPlatforms(String... platforms) {
+        if (platforms == null || platforms.length == 0) {
+            putClientProperty(DESKTOP_PLATFORMS, null);
+        } else {
+            String[] copy = new String[platforms.length];
+            System.arraycopy(platforms, 0, copy, 0, platforms.length);
+            putClientProperty(DESKTOP_PLATFORMS, copy);
+        }
+        return this;
+    }
+
+    /// True when this command is published on the native menu bar of the named platform. See
+    /// `#setDesktopPlatforms(String...)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `platform`: `mac`, `win`, `linux` or `web`
+    ///
+    /// #### Returns
+    ///
+    /// true when no platform list is set or the list names this platform
+    public boolean isDesktopPlatform(String platform) {
+        Object o = getClientProperty(DESKTOP_PLATFORMS);
+        if (!(o instanceof String[])) {
+            return true;
+        }
+        for (String p : (String[]) o) {
+            if (p != null && p.equalsIgnoreCase(platform)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Makes this command's enabled state follow the document-modified state of the form or
+    /// window publishing it: enabled while the document has unsaved changes, disabled once it
+    /// is saved. On by default for `#DESKTOP_ROLE_SAVE`. Nothing changes until the application
+    /// calls `Form#setDocumentModified(boolean)` or `Window#setDocumentModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `follow`: true to follow the modified state
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopEnabledWhenModified(boolean follow) {
+        putClientProperty(DESKTOP_ENABLED_WHEN_MODIFIED, Boolean.valueOf(follow));
+        return this;
+    }
+
+    /// True when this command's enabled state follows the document-modified state. See
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when it follows the modified state
+    public boolean isDesktopEnabledWhenModified() {
+        Object o = getClientProperty(DESKTOP_ENABLED_WHEN_MODIFIED);
+        if (o instanceof Boolean) {
+            return ((Boolean) o).booleanValue();
+        }
+        return DESKTOP_ROLE_SAVE.equals(getDesktopRole());
     }
 
     /// #### Returns

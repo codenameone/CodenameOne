@@ -88,10 +88,9 @@ void cn1WinMenuSetIntegrated(BOOL integrated) {
  * strings are Command.DESKTOP_MENU_* verbatim; anything else becomes a top-level menu
  * titled with the hint itself, and an empty hint lands in "Commands".
  *
- * The application menu has no equivalent here: Windows has no app menu, so About,
- * Preferences and Quit go where a Windows user looks for them -- About under Help, the
- * other two under File. That is a placement decision, not a mapping gap, and it is the
- * reason this table is not simply the macOS one. */
+ * Where About, Options and Exit go is decided in core (NativeMenuConventions), which also
+ * spells the standard menus the same way whatever case the application used, so the rows
+ * arriving here already name the menu each item belongs in. */
 typedef struct {
     const char* hint;
     const char* title;
@@ -103,10 +102,6 @@ static const CN1MenuHint MENU_HINTS[] = {
     {"View",        "View"},
     {"Window",      "Window"},
     {"Help",        "Help"},
-    {"About",       "Help"},
-    {"Preferences", "File"},
-    {"Quit",        "File"},
-    {"App",         "File"},
     {"",            "Commands"},
 };
 #define MENU_HINT_COUNT ((int) (sizeof(MENU_HINTS) / sizeof(MENU_HINTS[0])))

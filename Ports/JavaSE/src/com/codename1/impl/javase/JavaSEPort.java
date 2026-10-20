@@ -2834,14 +2834,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (frame == null || f == null) {
             return;
         }
-        final String t = f.getTitle() == null ? "" : f.getTitle();
+        // On macOS the modified state is the dot in the close button, which Swing exposes as
+        // the Window.documentModified root pane property; elsewhere it is the title's "*".
+        final boolean modified = f.isDocumentModified();
+        final String t = IS_MAC ? (f.getTitle() == null ? "" : f.getTitle()) : getNativeWindowTitle(f);
         if (EventQueue.isDispatchThread()) {
             frame.setTitle(t);
+            frame.getRootPane().putClientProperty("Window.documentModified", Boolean.valueOf(modified));
         } else {
             EventQueue.invokeLater(new Runnable() {
                 @Override
                 public void run() {
                     frame.setTitle(t);
+                    frame.getRootPane().putClientProperty("Window.documentModified", Boolean.valueOf(modified));
                 }
             });
         }
@@ -2999,6 +3004,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String title = path[p];
                     if (p == 0 && title.length() == 0) {
                         title = "Commands";
+                    } else if (p == 0 && com.codename1.ui.Command.DESKTOP_MENU_APP.equals(title)) {
+                        // The macOS application menu, which a Swing menu bar cannot reach:
+                        // a leading menu named after the application stands in for it.
+                        title = Display.getInstance().getProperty("AppName", "Application");
                     }
                     m = new JMenu(title);
                     menus.put(k, m);
@@ -3037,7 +3046,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (icon != null) {
                 item.setIcon(new javax.swing.ImageIcon(icon));
             }
-            KeyStroke accelerator = acceleratorFor(cmd);
+            KeyStroke accelerator = acceleratorFor(row);
             if (accelerator != null) {
                 item.setAccelerator(accelerator);
             }
@@ -3081,15 +3090,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         return bar;
     }
 
-    /// Builds a Swing {@link KeyStroke} from a command's desktop-shortcut hint, mapping the
-    /// platform-primary modifier to the OS menu-shortcut mask (Command on macOS, Control
-    /// elsewhere). Returns null when the command has no accelerator.
-    private static KeyStroke acceleratorFor(com.codename1.ui.Command cmd) {
-        int keyChar = cmd.getDesktopShortcutKeyChar();
+    /// Builds a Swing {@link KeyStroke} from a row's shortcut -- the command's own, or the
+    /// platform's for its standard role -- mapping the platform-primary modifier to the OS
+    /// menu-shortcut mask (Command on macOS, Control elsewhere). Returns null when the row has
+    /// no accelerator.
+    private static KeyStroke acceleratorFor(com.codename1.impl.NativeMenuEncoder.Row row) {
+        int keyChar = row.getShortcutKeyChar();
         if (keyChar == 0) {
             return null;
         }
-        int mods = cmd.getDesktopShortcutModifiers();
+        int mods = row.getShortcutModifiers();
         int awtMods = 0;
         if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
             awtMods |= Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();

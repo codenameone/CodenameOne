@@ -383,6 +383,13 @@ public class MacWindowManager extends WindowManager {
         }
     }
 
+    /// Nothing: a Mac window marks unsaved changes with the dot in its close button,
+    /// which UIKit does not reach, and the default's "*" in the title is not how a
+    /// Mac application shows it.
+    @Override
+    public void setDocumentModified(Object p, boolean modified, String title) {
+    }
+
     @Override
     public void setBounds(Object p, int x, int y, int width, int height) {
         int s = slot(p);

@@ -501,6 +501,30 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     /**
+     * On macOS the modified state is the dot in the close button, which Swing exposes as the
+     * {@code Window.documentModified} root pane property; elsewhere it is the title's "*".
+     */
+    @Override
+    public void setDocumentModified(Object peerObj, final boolean modified, final String title) {
+        if (!JavaSEPort.IS_MAC) {
+            super.setDocumentModified(peerObj, modified, title);
+            return;
+        }
+        final Peer p = peer(peerObj);
+        if (p != null) {
+            runOnAwt(new Runnable() {
+                @Override
+                public void run() {
+                    if (p.frame instanceof javax.swing.RootPaneContainer) {
+                        ((javax.swing.RootPaneContainer) p.frame).getRootPane()
+                                .putClientProperty("Window.documentModified", Boolean.valueOf(modified));
+                    }
+                }
+            });
+        }
+    }
+
+    /**
      * Applied on the AWT thread <em>before returning</em>, not queued.
      *
      * <p>Geometry is read back synchronously: {@code setWindowSize()} followed by

@@ -3483,8 +3483,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
         com.codename1.ui.Form f = getCurrentForm();
         if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            String t = f.getTitle();
-            LinuxNative.mainWindowSetTitle(t == null ? "" : t);
+            // With the "*" of a document that has unsaved changes, see Form.setDocumentModified.
+            LinuxNative.mainWindowSetTitle(getNativeWindowTitle(f));
         }
     }
 

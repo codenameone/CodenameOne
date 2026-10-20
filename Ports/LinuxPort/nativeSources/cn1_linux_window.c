@@ -1220,31 +1220,11 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
 static int cn1MenuCommandIds[CN1_MENU_MAX_ITEMS];
 static int cn1MenuItemCount = 0;
 
-/* The standard top-level menus. The hint strings are Command.DESKTOP_MENU_* verbatim;
- * anything else becomes a top-level menu titled with the hint itself, and an empty hint
- * lands in "Commands".
- *
- * About, Preferences and Quit have no application menu to go to -- GNOME has no menu bar
- * app menu the way macOS does -- so they go where a GNOME user looks: About under Help,
- * the other two under File. A placement decision, which is why this table is not simply a
- * copy of the macOS one. */
+/* The title of a top-level menu. Placement is decided in core (NativeMenuConventions): the
+ * rows already name the menu each item belongs in -- Preferences under Edit, Quit and About
+ * where GNOME puts them -- with the standard menus spelled one way, so the only mapping left
+ * is the default menu, the one an empty hint names. */
 static const char* cn1MenuTitleForHint(const char* hint) {
-    if (strcmp(hint, "File") == 0 || strcmp(hint, "Preferences") == 0
-            || strcmp(hint, "Quit") == 0 || strcmp(hint, "App") == 0) {
-        return "File";
-    }
-    if (strcmp(hint, "Edit") == 0) {
-        return "Edit";
-    }
-    if (strcmp(hint, "View") == 0) {
-        return "View";
-    }
-    if (strcmp(hint, "Window") == 0) {
-        return "Window";
-    }
-    if (strcmp(hint, "Help") == 0 || strcmp(hint, "About") == 0) {
-        return "Help";
-    }
     return hint[0] == '\0' ? "Commands" : hint;
 }
 

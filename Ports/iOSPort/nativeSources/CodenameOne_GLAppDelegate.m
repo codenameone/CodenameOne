@@ -1256,8 +1256,9 @@ static NSArray<UIMenuElement *> *cn1MenuNodeChildren(NSDictionary *node) API_AVA
 static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) API_AVAILABLE(ios(13.0)) {
     *placeAtStart = NO;
     NSString *h = [hint lowercaseString];
-    if ([h isEqualToString:@"app"] || [h isEqualToString:@"about"]
-            || [h isEqualToString:@"preferences"] || [h isEqualToString:@"quit"]) {
+    // Core resolves the standard roles (NativeMenuConventions), so About, Settings and Quit
+    // arrive here already under "App".
+    if ([h isEqualToString:@"app"]) {
         *placeAtStart = YES;
         return UIMenuApplication;
     }
@@ -1287,6 +1288,9 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
     NSMutableDictionary<NSString *, NSMutableDictionary *> *nodes = [NSMutableDictionary dictionary];
     NSMutableDictionary<NSString *, NSString *> *rootHints = [NSMutableDictionary dictionary];
+    // The stock items the application's own About, Hide and Quit replace, by the role ordinal
+    // the flags carry (NativeMenuEncoder.FLAG_ROLE_SHIFT).
+    NSMutableArray<UIMenuIdentifier> *replacedStock = [NSMutableArray array];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
         NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
@@ -1327,6 +1331,12 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         if (rowFlags & 16) {
             [node[@"sections"] addObject:[NSMutableArray array]];
             continue;
+        }
+        switch ((rowFlags >> 8) & 0xff) {
+            case 1: [replacedStock addObject:UIMenuAbout]; break;
+            case 2: [replacedStock addObject:UIMenuHide]; break;
+            case 3: [replacedStock addObject:UIMenuQuit]; break;
+            default: break;
         }
         UIImage *image = nil;
         if (iconPng.length > 0) {
@@ -1387,7 +1397,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                             identifier:nil
                                                options:UIMenuOptionsDisplayInline
                                               children:bucket];
-            if (placeAtStart) {
+            if (placeAtStart && [builder menuForIdentifier:UIMenuAbout] != nil) {
+                // Below About, where a Mac application puts Settings and its own entries.
+                [builder insertSiblingMenu:inlineMenu afterMenuForIdentifier:UIMenuAbout];
+            } else if (placeAtStart) {
                 [builder insertChildMenu:inlineMenu atStartOfMenuForIdentifier:targetIdentifier];
             } else {
                 [builder insertChildMenu:inlineMenu atEndOfMenuForIdentifier:targetIdentifier];
@@ -1403,6 +1416,11 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                         children:bucket];
             [builder insertSiblingMenu:menu afterMenuForIdentifier:UIMenuView];
         }
+    }
+    // After the inserts: the application's group sits beside About, so it has to be placed
+    // before the stock About it replaces goes.
+    for (UIMenuIdentifier stock in replacedStock) {
+        [builder removeMenuForIdentifier:stock];
     }
 }
 

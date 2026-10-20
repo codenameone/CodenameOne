@@ -11129,6 +11129,39 @@ public abstract class CodenameOneImplementation {
     public void refreshNativeTitle() {
     }
 
+    /// The title a desktop port shows in the OS title bar of the main window for a form: the
+    /// form's title, with the leading `*` Windows and Linux applications use for a document
+    /// with unsaved changes. A port with its own indicator for that state reads
+    /// `Form#isDocumentModified()` itself and uses `Form#getTitle()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    ///
+    /// #### Returns
+    ///
+    /// the title to show, never null
+    public String getNativeWindowTitle(Form f) {
+        String t = f.getTitle();
+        if (t == null) {
+            t = "";
+        }
+        return f.isDocumentModified() ? "*" + t : t;
+    }
+
+    /// Called when a form's document-modified state changes, see
+    /// `Form#setDocumentModified(boolean)`. The default refreshes the native title, which
+    /// `#getNativeWindowTitle(Form)` marks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    public void documentModifiedChanged(Form f) {
+        if (f == getCurrentForm()) { //NOPMD CompareObjectsWithEquals
+            refreshNativeTitle();
+        }
+    }
+
     /// Indicates the way commands should be added to a form as one of the ocmmand constants defined
     /// in this class
     ///

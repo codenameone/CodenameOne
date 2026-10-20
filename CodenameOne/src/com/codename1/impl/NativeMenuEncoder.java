@@ -67,6 +67,12 @@ public final class NativeMenuEncoder {
     public static final int FLAG_RADIO = 8;
     /// The row is a separator line, not an item.
     public static final int FLAG_SEPARATOR = 16;
+    /// The flags above this many bits carry the item's standard role as a small ordinal, 0 for
+    /// none, so a port can put the item where its own stock item of that role is, in place of
+    /// it, rather than beside it: the application menu's Quit, the Edit menu's Copy. A port
+    /// with no stock items ignores it. Read it with `(flags >> FLAG_ROLE_SHIFT) & 0xff`; the
+    /// ordinals are listed by `NativeMenuConventions#ordinalOf(String)`.
+    public static final int FLAG_ROLE_SHIFT = 8;
 
     /// Joins the segments of a menu path on the wire (the ASCII unit separator).
     public static final char PATH_SEPARATOR = (char) 0x1f;
@@ -81,13 +87,45 @@ public final class NativeMenuEncoder {
         private final int flags;
         private final Command command;
         private final int id;
+        private final int keyChar;
+        private final int modifiers;
 
-        Row(String[] path, String label, int flags, Command command, int id) {
+        Row(String[] path, String label, int flags, Command command, int id, int keyChar, int modifiers) {
             this.path = path;
             this.label = label;
             this.flags = flags;
             this.command = command;
             this.id = id;
+            this.keyChar = keyChar;
+            this.modifiers = modifiers;
+        }
+
+        /// The upper-cased shortcut character, 0 for none: the command's own, or its role's
+        /// on this platform.
+        ///
+        /// #### Returns
+        ///
+        /// the shortcut character or 0
+        public int getShortcutKeyChar() {
+            return keyChar;
+        }
+
+        /// The shortcut modifier bits, see `Command#DESKTOP_SHORTCUT_MODIFIER_PRIMARY`.
+        ///
+        /// #### Returns
+        ///
+        /// the modifier bits
+        public int getShortcutModifiers() {
+            return modifiers;
+        }
+
+        /// The standard role ordinal, 0 for none. See `#FLAG_ROLE_SHIFT`.
+        ///
+        /// #### Returns
+        ///
+        /// the role ordinal
+        public int getRoleOrdinal() {
+            return (flags >> FLAG_ROLE_SHIFT) & 0xff;
         }
 
         /// The menu path, first segment is the placement hint ("" for the default menu).
@@ -165,6 +203,25 @@ public final class NativeMenuEncoder {
         }
     }
 
+    /// A command as this platform places it.
+    private static final class Item {
+        final Command command;
+        final int group;
+        final String label;
+        final int keyChar;
+        final int modifiers;
+        final int ordinal;
+
+        Item(Command command, int group, String label, int keyChar, int modifiers, int ordinal) {
+            this.command = command;
+            this.group = group;
+            this.label = label;
+            this.keyChar = keyChar;
+            this.modifiers = modifiers;
+            this.ordinal = ordinal;
+        }
+    }
+
     private static final class Node {
         final String segment;
         final int group;
@@ -225,10 +282,33 @@ public final class NativeMenuEncoder {
     ///
     /// the encoder holding the rows
     public static NativeMenuEncoder encode(Vector commands, int firstId, boolean keepIconOnly) {
+        return encode(commands, firstId, keepIconOnly, NativeMenuConventions.current());
+    }
+
+    /// Encodes the commands into rows under a given platform's menu conventions, see
+    /// `#encode(Vector, int, boolean)`. Standard roles are resolved here: a command with a
+    /// role gets the platform's menu, group, label and shortcut for anything it does not set
+    /// itself, and a command the platform does not publish is left out.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the published commands, entries that are not commands are ignored
+    ///
+    /// - `firstId`: the id of the first row
+    ///
+    /// - `keepIconOnly`: see `#encode(Vector, int, boolean)`
+    ///
+    /// - `convention`: one of the `NativeMenuConventions` platform constants
+    ///
+    /// #### Returns
+    ///
+    /// the encoder holding the rows
+    public static NativeMenuEncoder encode(Vector commands, int firstId, boolean keepIconOnly, String convention) {
         NativeMenuEncoder e = new NativeMenuEncoder(firstId);
         if (commands == null) {
             return e;
         }
+        boolean mac = NativeMenuConventions.MAC.equals(convention);
         List<Node> roots = new ArrayList<Node>();
         for (int i = 0; i < commands.size(); i++) {
             Object o = commands.elementAt(i);
@@ -236,13 +316,51 @@ public final class NativeMenuEncoder {
                 continue;
             }
             Command c = (Command) o;
+            if (!c.isDesktopPlatform(convention)) {
+                continue;
+            }
+            String hint = c.getDesktopMenu();
+            String role = c.getDesktopRole();
+            if (role == null) {
+                role = legacyRole(hint);
+                if (role != null) {
+                    // The old About/Preferences/Quit placements name a role, not a menu.
+                    hint = null;
+                }
+            }
+            NativeMenuConventions.Entry entry = null;
+            if (NativeMenuConventions.ordinalOf(role) != 0) {
+                entry = NativeMenuConventions.entry(convention, role);
+                if (entry == null) {
+                    // A standard command this platform does not have: Hide outside macOS,
+                    // Quit in a browser page.
+                    continue;
+                }
+            }
+            String label = c.getCommandName();
+            if ((label == null || label.length() == 0) && entry != null) {
+                label = NativeMenuConventions.labelOf(convention, role);
+            }
             boolean sep = c.isDesktopSeparator();
-            if (!sep && (c.getCommandName() == null || c.getCommandName().length() == 0)
+            if (!sep && (label == null || label.length() == 0)
                     && !(keepIconOnly && (c.getIcon() != null || c.getMaterialIcon() != 0))) {
                 continue;
             }
-            String[] path = parsePath(c.getDesktopMenu());
-            int group = c.getDesktopMenuGroup();
+            String[] path = parsePath(hint != null || entry == null ? hint : entry.menu);
+            path[0] = NativeMenuConventions.canonicalRoot(path[0]);
+            if (!mac && Command.DESKTOP_MENU_APP.equals(path[0])) {
+                // Only macOS has an application menu; elsewhere its items go to File.
+                path[0] = Command.DESKTOP_MENU_FILE;
+            }
+            int group = c.getClientProperty(Command.DESKTOP_MENU_GROUP) == null && entry != null
+                    ? entry.group : c.getDesktopMenuGroup();
+            int key = c.getDesktopShortcutKeyChar();
+            int mods = c.getDesktopShortcutModifiers();
+            if (c.getClientProperty(Command.DESKTOP_SHORTCUT_KEY) == null && entry != null) {
+                key = entry.key;
+                mods = entry.modifiers;
+            }
+            Item item = new Item(c, group, clean(label), key, mods, NativeMenuConventions.ordinalOf(role));
             Node node = null;
             for (Node root : roots) {
                 if (root.segment.equals(path[0])) {
@@ -257,29 +375,56 @@ public final class NativeMenuEncoder {
             for (int p = 1; p < path.length; p++) {
                 node = node.child(path[p], group);
             }
-            node.children.add(c);
+            node.children.add(item);
         }
-        // Top-level menus are batched by the hint as written. A port that maps two hints to one
-        // physical menu (File and Preferences both land in File on Windows and Linux, the
-        // application-menu aliases on macOS) lists the second hint's items after the first's,
-        // each batch in its own order. Putting the batches back in one insertion order would need
-        // each port's mapping in core, and interleaving two hints in one menu is unusual: use one
-        // hint, with groups, to control the order of a menu exactly.
+        // Top-level menus are batched by their resolved name: roles, the old About/Preferences/
+        // Quit placements and the standard menus in any case are all resolved above, so one
+        // physical menu is one batch and its groups order it exactly.
+        //
+        // The batches themselves go in the standard order -- App, File, Edit, View, the
+        // application's own menus, Tools, Window, Help -- so every port lays the bar out the
+        // way the platform's own applications do, whatever order the commands were added in.
+        List<Node> ordered = new ArrayList<Node>(roots.size());
         for (Node root : roots) {
+            int rank = NativeMenuConventions.rootRank(root.segment);
+            int at = ordered.size();
+            while (at > 0 && NativeMenuConventions.rootRank(ordered.get(at - 1).segment) > rank) {
+                at--;
+            }
+            ordered.add(at, root);
+        }
+        for (Node root : ordered) {
             e.emit(root, new String[]{root.segment});
         }
         return e;
+    }
+
+    // The placements that used to stand for a role before roles existed.
+    private static String legacyRole(String hint) {
+        if (hint == null) {
+            return null;
+        }
+        if (Command.DESKTOP_MENU_ABOUT.equalsIgnoreCase(hint)) {
+            return Command.DESKTOP_ROLE_ABOUT;
+        }
+        if (Command.DESKTOP_MENU_PREFERENCES.equalsIgnoreCase(hint)) {
+            return Command.DESKTOP_ROLE_SETTINGS;
+        }
+        if (Command.DESKTOP_MENU_QUIT.equalsIgnoreCase(hint)) {
+            return Command.DESKTOP_ROLE_QUIT;
+        }
+        return null;
     }
 
     private static int groupOf(Object o) {
         if (o instanceof Node) {
             return ((Node) o).group;
         }
-        return ((Command) o).getDesktopMenuGroup();
+        return ((Item) o).group;
     }
 
     private static boolean isSeparator(Object o) {
-        return o instanceof Command && ((Command) o).isDesktopSeparator();
+        return o instanceof Item && ((Item) o).command.isDesktopSeparator();
     }
 
     private void emit(Node node, String[] path) {
@@ -347,16 +492,17 @@ public final class NativeMenuEncoder {
                     continue;
                 }
                 if (pendingSeparator) {
-                    rows.add(before, new Row(path, "", FLAG_SEPARATOR, null, nextId++));
+                    rows.add(before, new Row(path, "", FLAG_SEPARATOR, null, nextId++, 0, 0));
                     pendingSeparator = false;
                 }
             } else {
                 if (pendingSeparator) {
-                    rows.add(new Row(path, "", FLAG_SEPARATOR, null, nextId++));
+                    rows.add(new Row(path, "", FLAG_SEPARATOR, null, nextId++, 0, 0));
                     pendingSeparator = false;
                 }
-                Command c = (Command) o;
-                int flags = 0;
+                Item item = (Item) o;
+                Command c = item.command;
+                int flags = item.ordinal << FLAG_ROLE_SHIFT;
                 if (c.isEnabled()) {
                     flags |= FLAG_ENABLED;
                 }
@@ -369,7 +515,7 @@ public final class NativeMenuEncoder {
                         flags |= FLAG_RADIO;
                     }
                 }
-                rows.add(new Row(path, clean(c.getCommandName()), flags, c, nextId++));
+                rows.add(new Row(path, item.label, flags, c, nextId++, item.keyChar, item.modifiers));
             }
             anyItem = true;
             lastGroup = g;
@@ -473,8 +619,8 @@ public final class NativeMenuEncoder {
             }
             Command c = r.command;
             sb.append('\t').append(r.label)
-                    .append('\t').append(c == null ? 0 : c.getDesktopShortcutKeyChar())
-                    .append('\t').append(c == null ? 0 : c.getDesktopShortcutModifiers())
+                    .append('\t').append(r.keyChar)
+                    .append('\t').append(r.modifiers)
                     .append('\t').append(r.id)
                     .append('\t').append(r.flags)
                     .append('\t');

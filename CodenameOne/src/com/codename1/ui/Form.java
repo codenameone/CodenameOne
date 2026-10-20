@@ -125,6 +125,7 @@ public class Form extends Container implements TopLevelContainer {
     }
     private Command sourceCommand;
     private boolean globalAnimationLock;
+    private boolean documentModified;
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
@@ -3299,6 +3300,35 @@ public class Form extends Container implements TopLevelContainer {
                 addLongPressListener(l);
                 break;
         }
+    }
+
+    /// Marks the document this form shows as having unsaved changes, the way the platform
+    /// shows it in the window's title bar: the dot in the close button on macOS, a leading `*`
+    /// in the title on Windows and Linux. `#getTitle()` keeps answering the title as set, and
+    /// platforms without a desktop window ignore the indicator. Commands that follow the
+    /// modified state (the `Command#DESKTOP_ROLE_SAVE` role by default) are enabled while it is
+    /// set and disabled once it is cleared, see `Command#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modified`: true while the document has unsaved changes
+    public void setDocumentModified(boolean modified) {
+        documentModified = modified;
+        java.util.Vector published = nativeMenuCommands();
+        if (published == null) {
+            published = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
+        }
+        Command.followDocumentModified(published, modified);
+        Display.impl.documentModifiedChanged(this);
+    }
+
+    /// True while the form's document has unsaved changes, see `#setDocumentModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// the modified state
+    public boolean isDocumentModified() {
+        return documentModified;
     }
 
     /// The commands this form puts on the platform's native menu, or null when it puts none
