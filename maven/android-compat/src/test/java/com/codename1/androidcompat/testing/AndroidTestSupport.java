@@ -427,6 +427,11 @@ public final class AndroidTestSupport {
             @Override
             public void run() {
                 android.app.ActivityThread.finishAllActivities();
+                // Back to light mode, and the cached configuration with it: a test
+                // that turned dark mode on and off again without a refresh left the
+                // resources dark, so the next test's switch to dark changed nothing.
+                HeadlessImplementation.darkMode = false;
+                com.codename1.androidcompat.runtime.ResourceManager.get().refresh();
                 com.codename1.ui.Form current = d.getCurrent();
                 if (current instanceof com.codename1.ui.Dialog) {
                     ((com.codename1.ui.Dialog) current).dispose();

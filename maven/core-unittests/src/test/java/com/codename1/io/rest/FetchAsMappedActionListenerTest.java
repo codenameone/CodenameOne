@@ -67,13 +67,26 @@ class FetchAsMappedActionListenerTest extends UITestBase {
     }
 
     @Test
-    void unregisteredTypeYieldsNullData() {
+    void unregisteredTypeNeverAnswersWithNull() {
+        // A missing @Mapped fails rather than answering null data.
         prepareJson(BASE_URL + "/unmapped", "{\"title\":\"Widget\"}");
 
         Response<Unmapped> response = fetch(BASE_URL + "/unmapped", Unmapped.class);
-        assertNotNull(response);
-        assertEquals(200, response.getResponseCode());
+        assertNotNull(response, "the callback must still run so the caller does not hang");
+        assertEquals(-1, response.getResponseCode());
         assertNull(response.getResponseData());
+        assertTrue(response.getResponseErrorMessage().contains("@Mapped"), response.getResponseErrorMessage());
+    }
+
+    @Test
+    void unregisteredTypeFailsEvenForANullBody() {
+        // The mapper is asked for before the body, so a JSON null cannot hide it.
+        prepareJson(BASE_URL + "/unmapped-null", "null");
+
+        Response<Unmapped> response = fetch(BASE_URL + "/unmapped-null", Unmapped.class);
+        assertNotNull(response, "the callback must still run so the caller does not hang");
+        assertEquals(-1, response.getResponseCode());
+        assertTrue(response.getResponseErrorMessage().contains("@Mapped"), response.getResponseErrorMessage());
     }
 
     private <T> Response<T> fetch(String url, Class<T> type) {

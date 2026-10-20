@@ -14,7 +14,7 @@ The first reason is the application's own tools. An `@McpTool` method becomes a
 tool an agent can call, with its JSON Schema written by the build from the
 parameter types:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SupportTools.java[tag=backend-mcp-tool,indent=0]
 ----

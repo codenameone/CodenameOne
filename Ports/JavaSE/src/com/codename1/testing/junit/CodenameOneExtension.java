@@ -129,7 +129,11 @@ public class CodenameOneExtension
 
     @Override
     public void afterEach(ExtensionContext context) throws Exception {
-        final Runnable restore = context.getStore(FONT_STATE).remove("restore", Runnable.class);
+        restoreOnEdt(context.getStore(FONT_STATE).remove("restoreDarkMode", Runnable.class), "restore dark mode");
+        restoreOnEdt(context.getStore(FONT_STATE).remove("restore", Runnable.class), "restore theme fonts");
+    }
+
+    private static void restoreOnEdt(final Runnable restore, String what) throws Exception {
         if (restore != null) {
             try {
                 dispatchOnEdt(new Invocation<Void>() {
@@ -138,7 +142,7 @@ public class CodenameOneExtension
                         restore.run();
                         return null;
                     }
-                }, 10000L, "restore theme fonts");
+                }, 10000L, what);
             } catch (Exception e) {
                 throw e;
             } catch (Throwable t) {
@@ -260,6 +264,16 @@ public class CodenameOneExtension
                         installTheme(cfg.theme, context);
                     }
                     if (cfg.darkMode != null) {
+                        // Put back in afterEach. Display is one per JVM, so a forced dark mode
+                        // left in place turned every later test in the run dark -- including
+                        // pixel tests that measure ink against a light background.
+                        final Boolean previous = Display.getInstance().isDarkMode();
+                        context.getStore(FONT_STATE).put("restoreDarkMode", new Runnable() {
+                            @Override
+                            public void run() {
+                                Display.getInstance().setDarkMode(previous);
+                            }
+                        });
                         Display.getInstance().setDarkMode(cfg.darkMode);
                     }
                     if (cfg.largerTextScale != null) {

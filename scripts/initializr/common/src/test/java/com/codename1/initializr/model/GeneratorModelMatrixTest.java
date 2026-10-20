@@ -370,8 +370,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// What a full-stack template adds to an app with a backend: the contract
     /// module both halves compile against, the template's own server in place of
     /// the generic one, and nothing left that still carries the template's name.
-    private void assertFullStackProject(Map<String, byte[]> entries, byte[] zipData, String packageName,
-                                        String mainClassName, String label) throws IOException {
+    private void assertFullStackProject(Template template, Map<String, byte[]> entries, byte[] zipData,
+                                        String packageName, String mainClassName, String label) throws IOException {
+        boolean rides = template == Template.WAYLINE;
+        String name = template.SOURCE_MAIN_CLASS;
+        String upper = template.name();
+        String lower = GeneratorModel.toLowerCaseInvariant(name);
         String packagePath = StringUtil.replaceAll(packageName, ".", "/");
         String artifact = GeneratorModel.toLowerCaseInvariant(mainClassName);
         String rootPom = removeWhitespace(getText(entries, "pom.xml"));
@@ -379,6 +383,14 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "the shared module is built ahead of the app");
         assertTrue(rootPom.indexOf("<module>shared</module>") == rootPom.lastIndexOf("<module>shared</module>"),
                 label + "the shared module is in the reactor once");
+        // The README describes the app this template really is: a food-delivery
+        // project once got the ride-hailing accounts and chapters.
+        String readme = getText(entries, "README.md");
+        assertContains(readme, rides ? "ride-hailing app" : "food-delivery app", label + "README names the app");
+        assertContains(readme, (rides ? "`rider@" : "`customer@") + artifact + ".example`",
+                label + "README lists the template's own demo accounts");
+        assertFalse(readme.indexOf(rides ? "courier@" : "rider@") >= 0,
+                label + "README carries no other template's accounts");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
@@ -388,15 +400,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + "/api/RiderApi.java"),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (rides ? "/api/RiderApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/V1__accounts.sql"),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + "/RideFlowTest.java"),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (rides ? "/RideFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + "/rider/RiderForm.java"),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (rides ? "/rider/RiderForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
         // The generic server every other project gets, which this one replaces.
@@ -416,13 +428,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String path = entry.getKey();
-            assertFalse(path.indexOf("wayline") >= 0 || path.indexOf("Wayline") >= 0,
+            assertFalse(path.indexOf(lower) >= 0 || path.indexOf(name) >= 0,
                     label + "the template's name is still in the path " + path);
             if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")) {
                 continue;
             }
             String text = StringUtil.newString(entry.getValue());
-            assertFalse(text.indexOf("wayline") >= 0 || text.indexOf("Wayline") >= 0 || text.indexOf("WAYLINE") >= 0,
+            assertFalse(text.indexOf(lower) >= 0 || text.indexOf(name) >= 0 || text.indexOf(upper) >= 0,
                     label + "the template's name is still in " + path);
             assertFalse(text.indexOf("myappname") >= 0 || text.indexOf("MyAppName") >= 0
                             || text.indexOf("MYAPPNAME") >= 0,
@@ -678,7 +690,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
         }
         if (template.isFullStack()) {
-            assertFullStackProject(entries, zipData, packageName, mainClassName, label);
+            assertFullStackProject(template, entries, zipData, packageName, mainClassName, label);
         } else {
             assertNull(entries.get("shared/pom.xml"), label + "only a full-stack template has a shared module");
             assertFalse(rootPom.indexOf("<module>shared</module>") >= 0,

@@ -15,7 +15,7 @@ image::img/backend-session-lifecycle.svg["The states of a session: no session, n
 
 A handler reaches the session through the request:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Login.java[tag=backend-session,indent=0]
 ----
@@ -41,7 +41,7 @@ change its id, and protect it against CSRF.
 
 Most requests want the session only if there is one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Account.java[tag=backend-session-read,indent=0]
 ----
@@ -50,7 +50,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 without a valid one, so a read-only request doesn't create a session as a side
 effect. `invalidate()` ends one, and the response clears the client's cookie:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Account.java[tag=backend-session-logout,indent=0]
 ----
@@ -170,7 +170,7 @@ cookie is treated as having no session at all.
 A bean marked `@Scope("session")` exists once per session, which suits state that
 belongs to a client and has behaviour of its own:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Cart.java[tag=backend-session-bean,indent=0]
 ----
@@ -178,7 +178,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 A singleton that injects it receives a generated stand-in, and each call on the
 stand-in reaches the calling client's own instance:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/CartApi.java[tag=backend-session-bean-api,indent=0]
 ----

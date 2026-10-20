@@ -200,6 +200,31 @@ public final class PlaygroundSyntaxMatrixHarness {
     // ------------------------------------------------------------------
     private static void addEntriesAndJavacRules(List<Case> cases) {
         String cat = "entries_and_rules";
+        // Members shown on their own, as the documentation does: a field with an
+        // access modifier or static is a field of the script, not a local.
+        cases.add(new Case(cat, "top_level_private_field", ui(""
+                + "private String greeting = \"hi\";\n"
+                + "private static final int COUNT = 2;\n"
+                + "String twice() { return greeting + COUNT; }\n"
+                + "root.add(new Label(twice()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "top_level_volatile_transient_field", ui(""
+                + "volatile boolean stopped;\n"
+                + "transient int count = 2;\n"
+                + "root.add(new Label(stopped + \" \" + count));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "top_level_annotated_field", ui(""
+                + "@Deprecated private String greeting = \"hi\";\n"
+                + "@SuppressWarnings(\"unused\") static int count = 2;\n"
+                + "root.add(new Label(greeting + count));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "top_level_final_is_still_a_local", ui(""
+                + "final int n = 3;\n"
+                + "Runnable r = () -> root.add(new Label(\"\" + n));\n"
+                + "r.run();"), ExpectedOutcome.SUCCESS, null));
+        // Classes a script names without importing them are imported when one API
+        // class has that name (documentation snippets leave their imports out).
+        cases.add(new Case(cat, "auto_import_unique_class", ui(""
+                + "ConnectionRequest req = new ConnectionRequest();\n"
+                + "req.setUrl(\"https://example.com\");\n"
+                + "root.add(new Label(req.getUrl()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "script_with_package_line", ""
                 + "package demo.app;\n"
                 + "Label l = new Label(\"in a package\");\n"

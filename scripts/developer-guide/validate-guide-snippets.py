@@ -15,7 +15,7 @@ TAG_RE = re.compile(r"(?:^|,)tag=([^,\]]+)")
 LISTING_DELIMITER_RE = re.compile(r"^-{4,}\s*$")
 TAG_BLOCK_RE = re.compile(r"// tag::([^\[]+)\[\]\n(.*?)\n// end::\1\[\]", re.S)
 JAVA_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.java$")
-INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/")
+INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/")
 
 
 def parse_args():
@@ -135,8 +135,8 @@ def validate_includes(includes):
     cache = {}
     java_snippets = []
     for item in includes:
-        # The Wayline chapters show the sample application itself, which is
-        # built and tested by wayline.yml, so they include its sources directly
+        # The Wayline and Savor chapters show the sample applications themselves,
+        # which are built and tested by wayline.yml and savor.yml, so they include its sources directly
         # rather than through copies under docs/demos that could drift from it.
         if not item["target"].startswith(INCLUDE_ROOTS):
             errors.append(
