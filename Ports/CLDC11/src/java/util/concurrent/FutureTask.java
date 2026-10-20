@@ -193,8 +193,12 @@ public class FutureTask<V> implements RunnableFuture<V> {
         } catch (Throwable t) {
             // Failed before released, as in run(): otherwise another run could
             // claim the still-NEW task and call it again.
-            setException(t);
-            release();
+            try {
+                setException(t);
+            } finally {
+                // A done() that throws must not keep this thread recorded.
+                release();
+            }
             return false;
         }
         release();

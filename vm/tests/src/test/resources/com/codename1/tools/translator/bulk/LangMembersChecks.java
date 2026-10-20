@@ -388,6 +388,25 @@ public final class LangMembersChecks {
             Thread.yield();
             Bulk.p("interrupted", String.valueOf(Thread.interrupted()));
         });
+        Bulk.check("Lang.resolveAgainstAnAuthorityOnlyBase", () -> {
+            Bulk.p("a", java.net.URI.create("http://h").resolve(java.net.URI.create("a")).toString());
+            Bulk.p("q", java.net.URI.create("http://h").resolve(java.net.URI.create("b?x=1")).toString());
+        });
+        Bulk.check("Lang.chmViewsRejectNullAndAdds", () -> {
+            java.util.concurrent.ConcurrentHashMap<String, String> m =
+                    new java.util.concurrent.ConcurrentHashMap<String, String>();
+            m.put("k", "v");
+            try {
+                Bulk.p("contains", String.valueOf(m.values().contains(null)));
+            } catch (NullPointerException e) {
+                Bulk.p("contains", "NPE");
+            }
+            try {
+                Bulk.p("addAll", String.valueOf(m.keySet().addAll(java.util.Collections.<String>emptyList())));
+            } catch (UnsupportedOperationException e) {
+                Bulk.p("addAll", "UOE");
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

@@ -539,7 +539,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
 
         @Override
         public boolean contains(Object o) {
-            return o != null && owner.containsValue(o);
+            // containsValue throws for null, as the map forbids null values.
+            return owner.containsValue(o);
         }
 
         @Override
@@ -662,6 +663,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
 
         @Override
         public boolean addAll(Collection<? extends K> c) {
+            if (value == null) {
+                // Unsupported even for an empty collection, as in the JDK.
+                throw new UnsupportedOperationException();
+            }
             boolean added = false;
             for (K e : c) {
                 if (add(e)) {

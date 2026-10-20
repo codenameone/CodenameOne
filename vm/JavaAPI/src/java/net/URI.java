@@ -914,7 +914,15 @@ public class URI {
             // this one, as RFC 2396 section 5.2 step 6 and the JDK merge it
             String thisPath = getPath() == null ? "" : getPath();
             int index = thisPath.lastIndexOf(PATH_SEPARATOR);
-            thisPath = index == -1 ? thatPath : thisPath.substring(0, index + 1) + thatPath;
+            if (index != -1) {
+                thisPath = thisPath.substring(0, index + 1) + thatPath;
+            } else if (getAuthority() != null) {
+                // An authority with an empty path: the merged path needs its
+                // root slash, or "a" against http://h would read as host "ha".
+                thisPath = "/" + thatPath;
+            } else {
+                thisPath = thatPath;
+            }
             return new URI(getScheme(), getAuthority(), thisPath, thatQuery, thatFragment).normalize();
         } catch (URISyntaxException use) {
             // since both uri's are already validated, should never get here
