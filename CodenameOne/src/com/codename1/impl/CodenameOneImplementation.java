@@ -7042,6 +7042,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.webrtc` API: the native WebRTC
+    /// stack, or the simulator's loopback. The default answers `null`, which is the capability
+    /// query -- `WebRtc.isSupported()` reads it.
+    ///
+    /// #### Returns
+    ///
+    /// the WebRTC bridge, or null when unsupported
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.vpn` API to install and control VPN
     /// configurations. Ports supporting VPN management override this; the default answers `null`.
     ///

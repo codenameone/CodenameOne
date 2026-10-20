@@ -17965,6 +17965,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         com.codename1.continuity.Continuity.refreshBridge();
     }
 
+    private com.codename1.impl.javase.webrtc.LoopbackWebRtc webRtc;
+
+    /// The simulator carries calls through every step but the media: see
+    /// [com.codename1.impl.javase.webrtc.LoopbackWebRtc].
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (webRtc == null) {
+            webRtc = new com.codename1.impl.javase.webrtc.LoopbackWebRtc();
+        }
+        return webRtc;
+    }
+
     /// The VPN bridge for the simulator and desktop builds: a simulated
     /// configuration store that tunnels nothing.
     ///

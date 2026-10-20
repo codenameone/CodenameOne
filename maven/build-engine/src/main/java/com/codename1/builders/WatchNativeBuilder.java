@@ -257,7 +257,11 @@ class WatchNativeBuilder {
             // slice compiles the add-device flow out (CN1SmartHome.h #undefs
             // CN1_INCLUDE_MATTER_SETUP for TARGET_OS_WATCH), because Apple's sheet is iOS and
             // iPadOS only. Present but unreferenced is exactly what this list is for.
-            + "MatterSupport.framework";
+            + "MatterSupport.framework;"
+            // Linked on the iOS slice when the app references com.codename1.webrtc. MetalKit and
+            // VideoToolbox are absent from the watchOS SDK; Network is present (verified against
+            // WatchOS26.2) but unused there, as CN1_INCLUDE_WEBRTC is undone for TARGET_OS_WATCH.
+            + "MetalKit.framework;VideoToolbox.framework;Network.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is

@@ -169,6 +169,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean inCall;
     private LocationManager locationManager;
     private com.codename1.bluetooth.Bluetooth bluetooth;
+    private com.codename1.webrtc.spi.WebRtcBridge webRtcBridge;
     private com.codename1.health.Health health;
     private L10NManager localizationManager;
     private ImageIO imageIO;
@@ -1620,6 +1621,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mediaRecorderBuilderHandler = null;
         locationManager = null;
         bluetooth = null;
+        webRtcBridge = null;
         health = null;
         localizationManager = null;
         imageIO = null;
@@ -1797,6 +1799,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setLocationManager(LocationManager locationManager) {
         this.locationManager = locationManager;
+    }
+
+    /**
+     * Returns the WebRTC bridge installed via {@link #setWebRtcBridge}; {@code null}
+     * by default, as on a port without WebRTC.
+     */
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return webRtcBridge;
+    }
+
+    /** Scripts the bridge {@link #getWebRtcBridge()} returns; cleared by {@link #reset()}. */
+    public void setWebRtcBridge(com.codename1.webrtc.spi.WebRtcBridge bridge) {
+        this.webRtcBridge = bridge;
     }
 
     /**

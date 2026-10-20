@@ -16008,6 +16008,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return nearbyBridge;
     }
 
+    private com.codename1.webrtc.spi.WebRtcBridge webRtcBridge;
+    private boolean webRtcLoaded;
+
+    /// The WebRTC bridge, loaded by name from the optional
+    /// `com.codename1.impl.android.webrtc` package -- the same way the ar,
+    /// cipher and nearby backends are reached. The builder deletes that package
+    /// for an app that never referenced `com.codename1.webrtc`, and then this
+    /// answers null, which the API reports as unsupported.
+    @Override
+    public synchronized com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (!webRtcLoaded) {
+            webRtcLoaded = true;
+            Object instance = null;
+            try {
+                Class<?> clazz = Class.forName(
+                        "com.codename1.impl.android.webrtc.AndroidWebRtc");
+                instance = clazz.getConstructor(android.content.Context.class)
+                        .newInstance(getContext());
+            } catch (Throwable t) {
+                // Expected: the package was not bundled.
+                instance = null;
+            }
+            // Tested rather than cast, so a mismatched class stays inert.
+            webRtcBridge = instance instanceof com.codename1.webrtc.spi.WebRtcBridge
+                    ? (com.codename1.webrtc.spi.WebRtcBridge) instance : null;
+        }
+        return webRtcBridge;
+    }
+
     private com.codename1.impl.android.call.AndroidCallBridge callBridge;
 
     private com.codename1.impl.android.vpn.AndroidVpnBridge vpnBridge;

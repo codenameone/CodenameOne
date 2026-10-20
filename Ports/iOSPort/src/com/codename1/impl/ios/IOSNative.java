@@ -2317,6 +2317,48 @@ public class IOSNative {
     /** True when this build linked CallKit and the OS provides it. */
     native boolean callSupported();
 
+    /** True when this build compiled the WebRTC natives in (CN1_INCLUDE_WEBRTC). */
+    native boolean isWebRtcSupported();
+
+    /** Creates an RTCPeerConnection; answers its handle or a negative number. */
+    native int webRtcCreatePeerConnection(String iceServers, boolean relayOnly);
+
+    /** Opens the camera and/or microphone, answering WebRtc.deliverTracks. */
+    native void webRtcOpenUserMedia(int requestId, boolean audio, boolean video, boolean frontCamera);
+
+    /** Sends a local track over a peer connection. */
+    native void webRtcAddTrack(int peer, int track);
+
+    /** Creates an offer or answer, answering WebRtc.deliverDescription. */
+    native void webRtcCreateDescription(int peer, int requestId, boolean answer);
+
+    /** Sets the local or remote description, answering WebRtc.deliverResult. */
+    native void webRtcSetDescription(int peer, int requestId, boolean remote, String type, String sdp);
+
+    /** Adds a candidate the other side gathered. */
+    native void webRtcAddIceCandidate(int peer, String sdpMid, int sdpMLineIndex, String candidate);
+
+    /** Closes a peer connection and frees its handle. */
+    native void webRtcClosePeerConnection(int peer);
+
+    /** Mutes or unmutes a track. */
+    native void webRtcSetTrackEnabled(int track, boolean enabled);
+
+    /** Switches a local video track between the front and back cameras. */
+    native void webRtcSwitchCamera(int track);
+
+    /** Routes call audio to the loudspeaker or back to the receiver. */
+    native void webRtcSetSpeakerphone(boolean on);
+
+    /** Stops a local track and frees its handle. */
+    native void webRtcReleaseTrack(int track);
+
+    /** An RTCMTLVideoView drawing a video track, as a UIView peer, or 0. */
+    native long webRtcCreateVideoView(int track, boolean mirror);
+
+    /** Detaches a view returned by webRtcCreateVideoView from its track. */
+    native void webRtcReleaseVideoView(long view);
+
     /** True when this build linked PushKit. */
     native boolean callVoipSupported();
 

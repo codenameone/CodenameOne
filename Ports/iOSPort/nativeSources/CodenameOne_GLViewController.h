@@ -416,6 +416,19 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #undef CN1_CALL_DIRECTORY
 #endif
 
+// CN1_INCLUDE_WEBRTC gates the com.codename1.webrtc native bridge
+// (CN1WebRTC.m: RTCPeerConnectionFactory, the camera capturer and the Metal
+// video view). IPhoneBuilder uncomments this only when the classpath scanner
+// saw com.codename1.webrtc.*, because the WebRTC framework is a large
+// third-party dependency an app without calls must not carry. Off, the
+// natives still exist and report the feature unsupported.
+//#define CN1_INCLUDE_WEBRTC
+
+// The WebRTC framework ships no tvOS or watchOS slice.
+#if TARGET_OS_TV || TARGET_OS_WATCH
+#undef CN1_INCLUDE_WEBRTC
+#endif
+
 // CN1_INCLUDE_VPN gates the com.codename1.vpn native bridge (CN1Vpn.{h,m}:
 // NEVPNManager and the IKEv2/IPsec protocol configuration). Note this is a
 // different thing from the VPN DETECTION in IOSNative.m, which is always

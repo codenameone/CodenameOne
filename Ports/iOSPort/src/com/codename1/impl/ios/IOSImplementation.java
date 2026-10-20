@@ -449,6 +449,28 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private IOSVpnBridge vpnBridge;
 
+    private IOSWebRtc webRtc;
+
+    /// The WebRTC bridge, on the WebRTC framework.
+    ///
+    /// Unlike [#getCallBridge()] this answers null when the build did not
+    /// compile the natives in (`CN1_INCLUDE_WEBRTC`, flipped by the builder
+    /// when the app references `com.codename1.webrtc`): null IS the
+    /// capability query `WebRtc.isSupported()` reads, and the stub natives
+    /// cannot answer a request, because in such a build the
+    /// `com.codename1.webrtc.WebRtc` callbacks were never translated.
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (webRtc == null) {
+            if (!nativeInstance.isWebRtcSupported()) {
+                return null;
+            }
+            webRtc = new IOSWebRtc(this, nativeInstance);
+        }
+        return webRtc;
+    }
+
+
     /// The call bridge, on CallKit and PushKit.
     ///
     /// Only meaningful in builds that linked the call natives
