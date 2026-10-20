@@ -964,7 +964,9 @@ public class UnityProjectBuilder {
             throw new BuildException("Cannot install the Unity project into " + classesOut + ": " + e.getMessage(), e);
         }
         for (String rel : previous) {
-            if (!installed.contains(rel)) {
+            // The record is a file in the build directory; as in
+            // removeOutput(), a line that climbs out of classesOut is ignored.
+            if (!installed.contains(rel) && !climbs(rel)) {
                 deleteQuietly(new File(classesOut, rel));
             }
         }
