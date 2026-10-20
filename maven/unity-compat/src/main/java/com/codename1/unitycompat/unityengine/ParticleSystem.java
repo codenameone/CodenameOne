@@ -842,7 +842,14 @@ public final class ParticleSystem extends Component {
                     if (rest < duration) {
                         break;
                     }
-                    rest -= duration;
+                    float less = rest - duration;
+                    if (less == rest) {
+                        // A duration too small to change rest: no cycle can
+                        // finish, so what is left is less than one of them.
+                        rest = 0f;
+                        break;
+                    }
+                    rest = less;
                 }
                 clock = duration > 0f ? rest : 0f;
             } else {

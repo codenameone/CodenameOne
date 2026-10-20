@@ -306,7 +306,7 @@ public class UnityProjectBuilder {
                 // A record is only ever written by install(), but it is a file
                 // in the build directory: a line that climbs out of the classes
                 // directory is not followed.
-                if (rel.length() > 0 && !rel.contains("..")) {
+                if (rel.length() > 0 && !climbs(rel)) {
                     deleteAndPrune(new File(classesOut, rel), classesOut);
                 }
             }
@@ -1245,6 +1245,16 @@ public class UnityProjectBuilder {
             // to write here, with the path.
             return;
         }
+    }
+
+    /// Whether a recorded path has a `..` component; `icon..png` is a name.
+    static boolean climbs(String rel) {
+        for (String part : rel.replace('\\', '/').split("/")) {
+            if ("..".equals(part)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The text of a file, or null when it cannot be read.

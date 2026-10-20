@@ -189,6 +189,14 @@ public class UnityProjectBuilderTest {
     }
 
     @Test
+    public void onlyAParentComponentClimbs() {
+        assertTrue(UnityProjectBuilder.climbs("../x.png"));
+        assertTrue(UnityProjectBuilder.climbs("a/../../x.png"));
+        assertFalse(UnityProjectBuilder.climbs("icon..png"));
+        assertFalse(UnityProjectBuilder.climbs("a/b..c/x.png"));
+    }
+
+    @Test
     public void definesTheEditorVersionSymbols() {
         String d = ";" + UnityProjectBuilder.versionDefines("2021.3.5f1") + ";";
         assertTrue(d, d.contains(";UNITY_2021;") && d.contains(";UNITY_2021_3;") && d.contains(";UNITY_2021_3_5;"));

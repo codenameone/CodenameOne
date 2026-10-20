@@ -125,8 +125,10 @@ public class MonoBehaviour extends Behaviour {
         return UnityRuntime.startCoroutine(this, routine);
     }
 
+    /// Only a coroutine this behaviour started: Unity stops nothing for a
+    /// handle another behaviour owns.
     public void StopCoroutine(Coroutine routine) {
-        if (routine != null) {
+        if (routine != null && routine.owner == this) { // NOPMD CompareObjectsWithEquals
             routine.done = true;
         }
     }

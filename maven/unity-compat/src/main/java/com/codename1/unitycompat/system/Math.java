@@ -225,7 +225,9 @@ public final class Math {
         if (v != v) {
             return v;
         }
-        if (v > 709.78) {
+        // The largest argument whose exponential is still finite; the
+        // doubling below overflows by itself for anything just under it.
+        if (v > 709.782712893384) {
             return 1.0 / 0.0;
         }
         if (v < -745.2) {
