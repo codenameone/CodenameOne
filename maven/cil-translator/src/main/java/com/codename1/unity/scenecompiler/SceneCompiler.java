@@ -2612,29 +2612,41 @@ public final class SceneCompiler {
                 passed = nodes.get(fileId(arguments.get("m_ObjectArgument")));
             }
             boolean one = wanted != null || "2".equals(mode);
+            // The Inspector records the argument type it chose
+            // ("UnityEngine.AudioClip, UnityEngine"); among overloads taking
+            // one object, that one is meant, wherever it is declared.
+            String recorded = "2".equals(mode) ? text(arguments.get("m_ObjectArgumentAssemblyTypeName")) : "";
+            int comma = recorded.indexOf(',');
+            recorded = (comma < 0 ? recorded : recorded.substring(0, comma)).trim();
             MethodDef found = null;
             boolean hidden = false;
-            TypeDef at = universe.find(to.cilType);
-            while (at != null && found == null) {
-                for (int mi = 0; mi < at.methods.size() && found == null; mi++) {
-                    MethodDef m = at.methods.get(mi);
-                    if (!m.name.equals(name) || m.isStatic() || m.sig.params.length != (one ? 1 : 0)) {
-                        continue;
-                    }
-                    if (one) {
-                        CilType param = types.storage(m.sig.params[0]);
-                        if (wanted != null ? param.kind != wanted : types.isStruct(param)
-                                || universe.definitionOf(param) == null) {
+            for (int pass = recorded.length() > 0 ? 0 : 1; pass < 2 && found == null; pass++) {
+                TypeDef at = universe.find(to.cilType);
+                while (at != null && found == null) {
+                    for (int mi = 0; mi < at.methods.size() && found == null; mi++) {
+                        MethodDef m = at.methods.get(mi);
+                        if (!m.name.equals(name) || m.isStatic() || m.sig.params.length != (one ? 1 : 0)) {
                             continue;
                         }
+                        if (one) {
+                            CilType param = types.storage(m.sig.params[0]);
+                            if (wanted != null ? param.kind != wanted : types.isStruct(param)
+                                    || universe.definitionOf(param) == null) {
+                                continue;
+                            }
+                            if (pass == 0 && !recorded.equals(universe.definitionOf(param).fullName().replace('/', '+'))
+                                    && !recorded.equals(universe.definitionOf(param).fullName())) {
+                                continue;
+                            }
+                        }
+                        if ((m.flags & 7) != 6) {
+                            hidden = true;
+                            continue;
+                        }
+                        found = m;
                     }
-                    if ((m.flags & 7) != 6) {
-                        hidden = true;
-                        continue;
-                    }
-                    found = m;
+                    at = at.baseType == null ? null : universe.definitionOf(at.baseType);
                 }
-                at = at.baseType == null ? null : universe.definitionOf(at.baseType);
             }
             if (found == null) {
                 warnings.add(origin + ": " + user + " calls " + name + " on a " + to.cilType + ", which has no "
@@ -2645,7 +2657,20 @@ public final class SceneCompiler {
             if ("2".equals(mode)) {
                 CilType param = types.storage(found.sig.params[0]);
                 TypeDef def = universe.definitionOf(param);
-                if (passed == null || passed.cilType == null || !universe.derivesFrom(passed.cilType, def.fullName())) {
+                Object reference = arguments.get("m_ObjectArgument");
+                if (passed == null && text(map(reference).get("guid")).length() > 0) {
+                    // An asset -- a clip, a sprite, a prefab -- is no node of
+                    // this scene; it is read as a serialized field of that
+                    // type would be, into a local the listener captures.
+                    String temporary = "v" + temporaries++;
+                    String javaType = types.javaClass(param);
+                    line(sb, javaType + " " + temporary + " = null;");
+                    assign(origin, temporary, found.sig.params[0], reference, nodes, sb);
+                    String captured = "v" + temporaries++;
+                    line(sb, "final " + javaType + " " + captured + " = " + temporary + ";");
+                    argument = captured;
+                } else if (passed == null || passed.cilType == null
+                        || !universe.derivesFrom(passed.cilType, def.fullName())) {
                     argument = "null";
                 } else {
                     argument = "(" + types.javaClass(param) + ") (java.lang.Object) " + passed.variable;

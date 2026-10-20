@@ -87,10 +87,13 @@ public class Transform extends Component implements IEnumerable {
     /// True when the world basis is not a rotation times a scale along its
     /// own axes: a rotated transform under a parent scaled unevenly, or a
     /// mirrored one. `Rp * Sp * Rc` is not `R(p + c) * (Sp * Sc)` then, and
-    /// the basis below is the exact one. `wrot`, `wsx` and `wsy` are still
-    /// kept, as the nearest rotation and scale, for what draws a sprite or
-    /// shapes a collider: like Unity's `lossyScale`, they cannot hold a skew.
+    /// the basis below is the exact one. `wsx`, `wsy` and `brot` are the
+    /// nearest scale and turn of that basis, for what draws a sprite: like
+    /// Unity's `lossyScale`, they cannot hold a skew. `wrot` stays the
+    /// rotation itself, the parent's plus this one's, which a scale never
+    /// changes in Unity (rotations compose as quaternions).
     boolean general;
+    float brot;
     float m00 = 1f;
     float m01;
     float m10;
@@ -150,6 +153,12 @@ public class Transform extends Component implements IEnumerable {
             wsz = p.wsz * scaleZ;
             wrot = p.wrot + rotationZ;
         }
+        brot = wrot;
+        turn();
+    }
+
+    /// `wcos` and `wsin` of `wrot`.
+    private void turn() {
         if (wrot == 0f) {
             wcos = 1f;
             wsin = 0f;
@@ -205,17 +214,17 @@ public class Transform extends Component implements IEnumerable {
             wsx = 0f;
             wsy = 0f;
             wrot = p.wrot + rotationZ;
-            wcos = 1f;
-            wsin = 0f;
+            brot = wrot;
+            turn();
             return;
         }
         a = m00 * m11;
         b = m01 * m10;
         wsx = len;
         wsy = (a - b) / len;
-        wcos = m00 / len;
-        wsin = m10 / len;
-        wrot = (float) (com.codename1.unitycompat.system.Math.Atan2(m10, m00) * RAD2DEG);
+        brot = (float) (com.codename1.unitycompat.system.Math.Atan2(m10, m00) * RAD2DEG);
+        wrot = p.wrot + rotationZ;
+        turn();
     }
 
     /// Marks this and everything below it stale. A stale transform's

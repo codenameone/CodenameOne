@@ -72,6 +72,31 @@ final class AnimationAssets {
         return SceneCompiler.f(o, fallback);
     }
 
+    /// Whether any key below `node` has weighted tangents: a `weightedMode`
+    /// other than None (0).
+    static boolean weighted(Object node) {
+        if (node instanceof Map) {
+            Map<?, ?> m = (Map<?, ?>) node;
+            Object mode = m.get("weightedMode");
+            String text = mode == null ? null : SceneCompiler.text(mode);
+            if (text != null && text.length() > 0 && !"0".equals(text)) {
+                return true;
+            }
+            for (Object child : m.values()) {
+                if (weighted(child)) {
+                    return true;
+                }
+            }
+        } else if (node instanceof List) {
+            for (Object item : (List<?>) node) {
+                if (weighted(item)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /// The keys of one curve as the four floats a key the runtime reads.
     static String keys(Object curve, String member) {
         StringBuilder sb = new StringBuilder();
@@ -188,6 +213,14 @@ final class AnimationAssets {
         if (p == null) {
             warnings.add(label + ": the file holds no animation clip; a state that plays it shows nothing");
             return null;
+        }
+        if (weighted(p)) {
+            // Unity documents that weighted tangents change the segments
+            // they touch, but not the curve those weights define, and its
+            // source is not read here: such keys play as plain Hermite
+            // segments, and the build says so rather than guessing a shape.
+            warnings.add(label + ": the clip has keys with weighted tangents; they are played unweighted, so the"
+                    + " curves between them may differ from Unity's");
         }
         Map<String, Object> settings = SceneCompiler.map(p.get("m_AnimationClipSettings"));
         double start = Double.parseDouble(SceneCompiler.number(settings.get("m_StartTime"), "0"));

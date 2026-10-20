@@ -2108,7 +2108,7 @@ public final class UnityRuntime {
             // com.codename1.gaming.Sprite is a scaled, turned quad, so the
             // shear itself needs a skew in that core API and its renderers,
             // which is a change to the framework, not to this runtime.
-            view.$sprite(sprite, t.wx, t.wy, t.wz, t.wsx, t.wsy, t.wrot, r.argb(), r.flipX, r.flipY, r.sortingOrder,
+            view.$sprite(sprite, t.wx, t.wy, t.wz, t.wsx, t.wsy, t.brot, r.argb(), r.flipX, r.flipY, r.sortingOrder,
                     r.sortingLayerID);
         }
         int drawn = drawers.size();

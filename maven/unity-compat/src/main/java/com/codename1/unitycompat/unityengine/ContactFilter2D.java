@@ -144,8 +144,12 @@ public final class ContactFilter2D implements Struct {
             return false;
         }
         float a = angle - 360f * (float) Math.floor(angle / 360f);
-        float min = minNormalAngle < maxNormalAngle ? minNormalAngle : maxNormalAngle;
-        float max = minNormalAngle < maxNormalAngle ? maxNormalAngle : minNormalAngle;
+        // Either infinity is documented as the lowest angle there is for
+        // the minimum and the highest for the maximum, whatever its sign.
+        float lo = Float.isInfinite(minNormalAngle) ? Float.NEGATIVE_INFINITY : minNormalAngle;
+        float hi = Float.isInfinite(maxNormalAngle) ? Float.POSITIVE_INFINITY : maxNormalAngle;
+        float min = lo < hi ? lo : hi;
+        float max = lo < hi ? hi : lo;
         boolean outside = a < min || a > max;
         return useOutsideNormalAngle ? !outside : outside;
     }
