@@ -865,8 +865,18 @@ public final class FlutterProjectImporter {
                     .append("    }\n\n");
         }
         b.append("    @Override\n")
-                .append("    public void runApp() {\n")
-                .append("        ").append(flutterPackage).append(".FlutterRegistry.invokeMain();\n")
+                .append("    public void runApp() {\n");
+        if (push) {
+            // the runtime reads the key through this, so only an app using push names Push
+            b.append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.tokenSource(\n")
+                    .append("                new dart.runtime.Funcs.Func0<String>() {\n")
+                    .append("                    @Override\n")
+                    .append("                    public String call() {\n")
+                    .append("                        return com.codename1.push.Push.getPushKey();\n")
+                    .append("                    }\n")
+                    .append("                });\n");
+        }
+        b.append("        ").append(flutterPackage).append(".FlutterRegistry.invokeMain();\n")
                 .append("    }\n");
         if (notifications) {
             b.append("\n    @Override\n")

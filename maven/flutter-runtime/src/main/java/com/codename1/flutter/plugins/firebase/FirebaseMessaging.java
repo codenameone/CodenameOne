@@ -23,7 +23,6 @@
  */
 package com.codename1.flutter.plugins.firebase;
 
-import com.codename1.push.Push;
 import com.codename1.ui.Display;
 
 import dart.async.Future;
@@ -89,8 +88,21 @@ public class FirebaseMessaging {
         // background isolates do not exist here; foreground delivery uses onMessage
     }
 
+    /// Where getToken reads the push key from, installed by the import-generated entry
+    /// point. This class must not name com.codename1.push itself: the Android builder
+    /// turns push on (and then demands google-services.json) for any app whose classes
+    /// reference that package, and this runtime ships in every imported app -- the
+    /// Flutter gallery, with no Firebase at all, stopped building. The entry point
+    /// references Push only when the app depends on firebase_messaging.
+    private static Funcs.Func0<String> tokenSource;
+
+    public static void tokenSource(Funcs.Func0<String> source) {
+        tokenSource = source;
+    }
+
     public Future<String> getToken(String vapidKey) {
-        return Future.value(Display.isInitialized() ? Push.getPushKey() : null);
+        Funcs.Func0<String> src = tokenSource;
+        return Future.value(Display.isInitialized() && src != null ? src.call() : null);
     }
 
     public Future<String> getAPNSToken() {

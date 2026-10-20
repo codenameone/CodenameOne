@@ -671,6 +671,8 @@ public class FlutterProjectImporterTest {
         assertFalse(plain.contains("implements"));
         assertFalse(plain.contains("AppLinks"));
         assertTrue(plain.contains("com.example.flutter.FlutterRegistry.invokeMain();"));
+        // naming com.codename1.push makes the Android build require google-services.json
+        assertFalse(plain.contains("com.codename1.push"));
 
         String all = FlutterProjectImporter.entryPointSource("com.example", "Main", "com.example.flutter",
                 java.util.Arrays.asList("app_links", "flutter_local_notifications", "firebase_messaging"));
@@ -679,6 +681,7 @@ public class FlutterProjectImporterTest {
         assertTrue(all.contains("AppLinks.appStarted();\n        super.start();"));
         assertTrue(all.contains("FlutterLocalNotificationsPlugin.notificationTapped(notificationId);"));
         assertTrue(all.contains("FirebaseMessaging.pushReceived(value);"));
+        assertTrue(all.contains("return com.codename1.push.Push.getPushKey();"));
     }
 
     @Test

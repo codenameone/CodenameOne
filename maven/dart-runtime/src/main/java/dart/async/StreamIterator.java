@@ -46,7 +46,7 @@ public final class StreamIterator<T> {
     private final ArrayDeque<Object> queue = new ArrayDeque<Object>();
     private StreamSubscription<T> sub;
     private Completer<Boolean> waiting;
-    private T current;
+    private volatile T current;
     private boolean finished;
     private Object error;
     private boolean hasError;
@@ -61,13 +61,25 @@ public final class StreamIterator<T> {
 
     /** Dart's {@code moveNext()}: completes with false once the stream is done. */
     public Future<Boolean> moveNext() {
-        if (sub == null && !finished) {
+        boolean start;
+        synchronized (this) {
+            start = sub == null && !finished;
+        }
+        if (start) {
             subscribe();
         }
         Completer<Boolean> c = new Completer<Boolean>();
-        if (!deliver(c)) {
-            waiting = c;
+        Object outcome;
+        // Checking the queue and publishing the waiter is one step: an async* body
+        // pushes from a timer thread, and an event landing between the two was lost,
+        // leaving next() parked forever (a rare hang in lang_async_star under load).
+        synchronized (this) {
+            outcome = take();
+            if (outcome == NOTHING) {
+                waiting = c;
+            }
         }
+        settle(c, outcome);
         return c.future();
     }
 
@@ -78,17 +90,21 @@ public final class StreamIterator<T> {
     }
 
     public Future<Object> cancel() {
-        finished = true;
-        queue.clear();
-        // A moveNext still pending ends now, so a body blocked in next() -- a derived
-        // stream whose listener cancelled -- unblocks instead of waiting for an event.
-        Completer<Boolean> w = waiting;
-        waiting = null;
+        Completer<Boolean> w;
+        StreamSubscription<T> s;
+        synchronized (this) {
+            finished = true;
+            queue.clear();
+            // A moveNext still pending ends now, so a body blocked in next() -- a derived
+            // stream whose listener cancelled -- unblocks instead of waiting for an event.
+            w = waiting;
+            waiting = null;
+            s = sub;
+            sub = null;
+        }
         if (w != null && !w.isCompleted()) {
             w.complete(Boolean.FALSE);
         }
-        StreamSubscription<T> s = sub;
-        sub = null;
         if (s != null) {
             return s.cancel();
         }
@@ -96,7 +112,7 @@ public final class StreamIterator<T> {
     }
 
     private void subscribe() {
-        sub = stream.listen(new Funcs.VoidFunc1<T>() {
+        StreamSubscription<T> created = stream.listen(new Funcs.VoidFunc1<T>() {
             @Override
             public void call(T v) {
                 push(v);
@@ -104,9 +120,11 @@ public final class StreamIterator<T> {
         }, new Funcs.VoidFunc1<Object>() {
             @Override
             public void call(Object e) {
-                if (!hasError) {
-                    hasError = true;
-                    error = e;
+                synchronized (StreamIterator.this) {
+                    if (!hasError) {
+                        hasError = true;
+                        error = e;
+                    }
                 }
                 push(DONE);
             }
@@ -116,24 +134,48 @@ public final class StreamIterator<T> {
                 push(DONE);
             }
         }, Boolean.TRUE);
-    }
-
-    private void push(Object event) {
-        queue.addLast(event == null ? NULL : event);
-        Completer<Boolean> c = waiting;
-        if (c != null && deliver(c)) {
-            waiting = null;
+        boolean stale;
+        synchronized (this) {
+            stale = finished;
+            if (!stale) {
+                sub = created;
+            }
+        }
+        if (stale) {
+            // cancelled, or already done, while listen ran: nothing should stay subscribed
+            created.cancel();
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private boolean deliver(Completer<Boolean> c) {
-        if (queue.isEmpty()) {
-            if (finished) {
-                c.complete(Boolean.FALSE);
-                return true;
+    private void push(Object event) {
+        Completer<Boolean> c;
+        Object outcome;
+        synchronized (this) {
+            queue.addLast(event == null ? NULL : event);
+            c = waiting;
+            if (c == null) {
+                return;
             }
-            return false;
+            outcome = take();
+            if (outcome == NOTHING) {
+                return;
+            }
+            waiting = null;
+        }
+        settle(c, outcome);
+    }
+
+    /** No event yet: the caller keeps waiting. */
+    private static final Object NOTHING = new Object();
+    /** The stream ended (or was cancelled): moveNext answers false. */
+    private static final Object END = new Object();
+
+    /// The next outcome for a moveNext, taken off the queue. Called holding the lock;
+    /// the completer is settled after it is released, since completing runs listeners.
+    @SuppressWarnings("unchecked")
+    private Object take() {
+        if (queue.isEmpty()) {
+            return finished ? END : NOTHING;
         }
         Object e = queue.removeFirst();
         if (e == DONE) {
@@ -142,14 +184,25 @@ public final class StreamIterator<T> {
             sub = null;
             if (hasError) {
                 hasError = false;
-                c.completeError(error);
-            } else {
-                c.complete(Boolean.FALSE);
+                Object err = error;
+                return new Object[] {err};
             }
-            return true;
+            return END;
         }
         current = e == NULL ? null : (T) e;
-        c.complete(Boolean.TRUE);
-        return true;
+        return Boolean.TRUE;
+    }
+
+    private static void settle(Completer<Boolean> c, Object outcome) {
+        if (outcome == NOTHING) {
+            return;
+        }
+        if (outcome == END) {
+            c.complete(Boolean.FALSE);
+        } else if (outcome instanceof Object[]) {
+            c.completeError(((Object[]) outcome)[0]);
+        } else {
+            c.complete(Boolean.TRUE);
+        }
     }
 }

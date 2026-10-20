@@ -1,0 +1,51 @@
+{
+ "pr": 6055,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13238731
+     },
+     "reason": "Flutter language completeness: dart:convert, dart:io, async*/sync* generators, dynamic dispatch members and the plugin stub packs join the runtime every imported app ships, so the gallery's JavaScript executable grows",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 14156093
+    },
+    "install_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 108271844
+     },
+     "reason": "Flutter language completeness: dart:convert, dart:io, async*/sync* generators, dynamic dispatch members and the plugin stub packs join the runtime every imported app ships, so the gallery's JavaScript executable grows",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 109653399
+    },
+    "wire_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 79744971
+     },
+     "reason": "Flutter language completeness: dart:convert, dart:io, async*/sync* generators, dynamic dispatch members and the plugin stub packs join the runtime every imported app ships, so the gallery's JavaScript executable grows",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 80162794
+    }
+   }
+  }
+ }
+}

@@ -189,8 +189,15 @@ public final class Dyn {
             case "isOdd":
                 return Boolean.valueOf(n.longValue() % 2 != 0);
             case "sign":
-                return dbl ? (Object) Double.valueOf(Math.signum(n.doubleValue()))
-                        : (Object) Long.valueOf(Long.signum(n.longValue()));
+                // Hand-written: ParparVM's class library (vm/JavaAPI) has neither
+                // Math.signum nor Long.signum, and the native builds failed to link.
+                // d itself is returned for 0.0, -0.0 and NaN, as Dart's sign does.
+                if (dbl) {
+                    double d = n.doubleValue();
+                    return Double.valueOf(d > 0 ? 1.0 : d < 0 ? -1.0 : d);
+                }
+                long l = n.longValue();
+                return Long.valueOf(l > 0 ? 1L : l < 0 ? -1L : 0L);
             default:
                 return NO_MEMBER;
         }
