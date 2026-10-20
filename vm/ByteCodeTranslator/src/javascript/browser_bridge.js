@@ -2456,6 +2456,17 @@
         && activeEditor && /^(INPUT|TEXTAREA)$/.test(activeEditor.tagName)
         && !activeEditor.readOnly && !activeEditor.disabled
         && nativeSelectionElement(activeEditor)) return null;
+    // Focus never scrolls. Codename One paints its own canvas and the focused
+    // DOM nodes (the hidden text-input textarea, the accessibility tree) sit
+    // wherever the port parks them; letting the browser bring one into view
+    // scrolls every scrollable ancestor -- including the PARENT page when the
+    // app runs in an iframe, where a double click in an embedded editor threw
+    // the host page hundreds of pixels down (Firefox).
+    if (kind !== 'getter' && kind !== 'setter' && member === 'focus' && !(payload.args && payload.args.length)
+        && receiver && typeof receiver.focus === 'function') {
+      receiver.focus({ preventScroll: true });
+      return null;
+    }
     var value;
     if (kind === 'getter') {
       value = receiver[member];
@@ -4165,7 +4176,7 @@
     textArea.value = text;
     var ok = false;
     try {
-      textArea.focus();
+      textArea.focus({ preventScroll: true });
       textArea.select();
       ok = !!doc.execCommand('copy');
     } catch (err) {

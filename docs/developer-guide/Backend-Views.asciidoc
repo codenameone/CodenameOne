@@ -19,7 +19,7 @@ Use `com.codename1.backend.annotations.Controller` for HTML controllers and
 their response semantics. An HTML controller uses the same mapping annotations,
 constructor injection, sessions and security chains as a REST controller.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-controller,indent=0]
 ----
@@ -93,7 +93,7 @@ This is a syntax-compatible subset, not the Thymeleaf library.
 
 A mapped method can receive a dedicated form DTO:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/HtmlProducts.java[tag=backend-views-save,indent=0]
 ----

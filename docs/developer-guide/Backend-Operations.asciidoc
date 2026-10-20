@@ -227,7 +227,7 @@ remain executable. It accepts standard `ZipEntry` objects and adds
 compression and writes the Unix creator platform and external attributes in
 the central directory.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ZipDownload.java[tag=backend-zip-download,indent=0]
 ----

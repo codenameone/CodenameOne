@@ -4,4 +4,4 @@ slug: "demos"
 layout: "demos"
 ---
 
-Browse real Codename One applications, UI kits, and sample projects.
+Complete full-stack applications you can generate, run and make your own.

@@ -11,7 +11,7 @@ format, so any OpenTelemetry collector or tracing backend can display them.
 
 Put `@OpenTelemetry` on the main class:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-relay,indent=0]
 ----
@@ -39,7 +39,7 @@ web build never has to reach a collector on another origin.
 
 `endpoint` sends the spans straight to an OTLP/HTTP collector:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-direct,indent=0]
 ----
@@ -56,7 +56,7 @@ to a relay are always JSON, and the backend re-encodes them for its collector.
 A request made on its own is a trace of its own. To group the requests that one
 user action causes, run the action inside a span:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-run,indent=0]
 ----
@@ -99,7 +99,7 @@ every host.
 The annotation is a shortcut for this call, which an app can also make itself,
 for example to choose the endpoint at run time:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-install,indent=0]
 ----

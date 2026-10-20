@@ -427,9 +427,9 @@ public final class AndroidTestSupport {
             @Override
             public void run() {
                 android.app.ActivityThread.finishAllActivities();
-                // A test that turned dark mode on and back off may not have
-                // refreshed the configuration, which then stays dark and makes
-                // the next test's switch to dark mode a no-op.
+                // Back to light mode, and the cached configuration with it: a test
+                // that turned dark mode on and off again without a refresh left the
+                // resources dark, so the next test's switch to dark changed nothing.
                 HeadlessImplementation.darkMode = false;
                 com.codename1.androidcompat.runtime.ResourceManager.get().refresh();
                 com.codename1.ui.Form current = d.getCurrent();
