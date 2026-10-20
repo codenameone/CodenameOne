@@ -2031,6 +2031,14 @@ public class EditableResources extends Resources implements TreeModel {
         return super.getDataResourceNames();
     }
     
+    // A theme loaded to be compiled again -- the CSS compiler's incremental
+    // build keeps the rules that did not change -- must keep its TrueType
+    // fonts whatever the headless platform says about drawing them.
+    @Override
+    boolean isTrueTypeFileSupported() {
+        return true;
+    }
+
     com.codename1.ui.Font createTrueTypeFont(com.codename1.ui.Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         // workaround for NPE in case of people doing stupid things like moving the res file.
         File loadedFile = getLoadedFile();

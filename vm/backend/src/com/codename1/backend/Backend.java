@@ -2479,7 +2479,50 @@ public final class Backend {
             if (create) {
                 manager.createTables();
             }
+            if (config.getBoolean(Config.ORM_VALIDATE_SCHEMA, true)) {
+                validateSchema(manager);
+            }
             return manager;
+        }
+
+        /// Refuses to start on a schema the mappings cannot use. Before the
+        /// first request rather than at it: a missing column or a native
+        /// TIMESTAMP behind a plain Date field otherwise fails one request at a
+        /// time, and only the requests that touch it. A column stricter than its
+        /// mapping (an unexpected NOT NULL) is logged and tolerated -- a
+        /// legitimate design; a missing NOT NULL is not.
+        private void validateSchema(EntityManager manager) throws IOException {
+            if (com.codename1.impl.orm.Models.snapshot().isEmpty()) {
+                // Hand-written definitions only: there is no mapping to compare.
+                return;
+            }
+            com.codename1.orm.session.SchemaReport report = manager.schemaReport();
+            if (report.isCompatible()) {
+                return;
+            }
+            if (report.getIssues(com.codename1.orm.session.SchemaReport.Kind.UNSUPPORTED).isEmpty()
+                    && report.getIssues(com.codename1.orm.session.SchemaReport.Kind.MIGRATION_REQUIRED).isEmpty()
+                    && !missingNotNull(report)) {
+                System.err.println("cn1: " + report);
+                return;
+            }
+            throw new IOException("The database schema does not match the entity mappings. "
+                    + "Set " + Config.ORM_VALIDATE_SCHEMA + "=false to start anyway.\n" + report);
+        }
+
+        /// A NOT NULL the mapping needs and the column lacks: a NULL already in
+        /// the table fails when its row loads, so it stops startup like a type
+        /// mismatch. An unmapped required column fails every insert, so it does
+        /// too. Only a column stricter than its mapping is tolerated.
+        private static boolean missingNotNull(com.codename1.orm.session.SchemaReport report) {
+            for (com.codename1.orm.session.SchemaReport.Issue issue
+                    : report.getIssues(com.codename1.orm.session.SchemaReport.Kind.CONSTRAINT_MISMATCH)) {
+                String message = issue.getMessage();
+                if (!message.startsWith("Unexpected NOT NULL") && !message.endsWith(": unexpected NOT NULL")) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// One line saying what came up and where its data is.

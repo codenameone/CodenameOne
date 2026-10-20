@@ -183,6 +183,11 @@ public final class TransactionSession implements Session {
     }
 
     @Override
+    public com.codename1.orm.session.SchemaReport schemaReport() {
+        return current().schemaReport();
+    }
+
+    @Override
     public long count(Object entity, String field) {
         return current().count(entity, field);
     }

@@ -15,11 +15,11 @@ ride-hailing template.
 
 Two chapters of the developer guide cover this project:
 
-* https://www.codenameone.com/developer-guide/#wayline-users-guide[The user's guide]
+* https://www.codenameone.com/developer-guide/wayline-users-guide/[The user's guide]
   (link:../../docs/developer-guide/Wayline-Users-Guide.asciidoc[source]) shows the
   application as a rider, a driver and an administrator see it, screen by screen,
   with the demo accounts and test cards.
-* https://www.codenameone.com/developer-guide/#wayline-implementors-guide[The implementor's guide]
+* https://www.codenameone.com/developer-guide/wayline-implementors-guide/[The implementor's guide]
   (link:../../docs/developer-guide/Wayline-Implementors-Guide.asciidoc[source])
   explains how the project is built and what to change to make it yours: a
   ride-sharing service or the dispatch service of a small taxi station, real
@@ -207,7 +207,7 @@ Android and iOS through `scripts/build-android-app.sh` and
 
 == The Initializr template
 
-`scripts/sync-initializr-wayline.py --write` copies this project into the
+`scripts/sync-initializr-template.py wayline --write` copies this project into the
 Initializr's resources; without `--write` it fails when they differ, which is what
 CI runs. Change the project here, never the copies.
 

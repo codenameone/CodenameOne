@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" role="img" aria-labelledby="title desc"><title id="title">Android: a major runtime advantage</title><desc id="desc">Same-source Flutter Gallery release builds. Android emulator: 3.60 times faster startup, 42 percent lower idle memory, 77 percent less executable code. Bars show each metric relative to Flutter at 100 percent.</desc><metadata>Source: https://github.com/codenameone/CodenameOne/blob/2c2beba40ce177e5e028f0e34961bfbf41c952b8/benchmarks/flutter.json; measured 2026-10-18; Flutter 3.35.4; CN1 d2d7ec3f25.</metadata><rect width="1000" height="600" rx="20" fill="#10182e"/><g font-family="system-ui, sans-serif">
+<text x="32" y="46" fill="#e9eefc" font-size="30" font-weight="700">Android: a major runtime advantage</text>
+<text x="32" y="79" fill="#e9eefc" font-size="18" font-weight="400">Same Flutter Gallery source · release builds · October 18, 2026</text>
+<text x="32" y="115" fill="#66e0c2" font-size="18" font-weight="400">Codename One</text>
+<text x="218" y="115" fill="#aab8ff" font-size="18" font-weight="400">Flutter</text>
+<text x="585" y="115" fill="#e9eefc" font-size="18" font-weight="400">Less is better → shorter bars</text>
+<text x="32" y="160" fill="#e9eefc" font-size="22" font-weight="600">Time to first frame</text>
+<text x="615" y="160" fill="#66e0c2" font-size="23" font-weight="700">3.60× faster startup</text>
+<rect x="32" y="175" width="144.44" height="24" rx="4" fill="#66e0c2"/>
+<text x="188.44444444444443" y="195" fill="#e9eefc" font-size="18" font-weight="400">27.8%</text>
+<rect x="32" y="208" width="520.00" height="24" rx="4" fill="#aab8ff"/>
+<text x="564" y="228" fill="#e9eefc" font-size="18" font-weight="400">100%</text>
+<text x="32" y="280" fill="#e9eefc" font-size="22" font-weight="600">Memory at rest</text>
+<text x="615" y="280" fill="#66e0c2" font-size="23" font-weight="700">42% lower RAM</text>
+<rect x="32" y="295" width="302.68" height="24" rx="4" fill="#66e0c2"/>
+<text x="346.6775320139697" y="315" fill="#e9eefc" font-size="18" font-weight="400">58.2%</text>
+<rect x="32" y="328" width="520.00" height="24" rx="4" fill="#aab8ff"/>
+<text x="564" y="348" fill="#e9eefc" font-size="18" font-weight="400">100%</text>
+<text x="32" y="400" fill="#e9eefc" font-size="22" font-weight="600">Executable code</text>
+<text x="615" y="400" fill="#66e0c2" font-size="23" font-weight="700">77% less code</text>
+<rect x="32" y="415" width="117.28" height="24" rx="4" fill="#66e0c2"/>
+<text x="161.27559765448802" y="435" fill="#e9eefc" font-size="18" font-weight="400">22.6%</text>
+<rect x="32" y="448" width="520.00" height="24" rx="4" fill="#aab8ff"/>
+<text x="564" y="468" fill="#e9eefc" font-size="18" font-weight="400">100%</text>
+<text x="32" y="540" fill="#e9eefc" font-size="18" font-weight="400">Flutter = 100% for each metric; every bar starts at zero.</text>
+<text x="32" y="567" fill="#e9eefc" font-size="17" font-weight="400">Startup and RAM: paired-round ratios on an emulator, not phone measurements.</text>
+</g></svg>

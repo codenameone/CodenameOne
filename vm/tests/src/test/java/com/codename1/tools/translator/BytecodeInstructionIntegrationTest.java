@@ -644,19 +644,8 @@ class BytecodeInstructionIntegrationTest {
             assertFalse(c3.contains("POP_INT(), POP_INT()"),
                     "3D MULTIANEWARRAY must not chain multiple POP_INT calls:\n" + c3);
 
-            // 4D, fully-specified ("new int[a][b][c][d]").
-            MultiArray ma4 = new MultiArray("[[[[I", 4);
-            List<String> deps4 = new ArrayList<>();
-            ma4.addDependencies(deps4);
-            StringBuilder out4 = new StringBuilder();
-            ma4.appendInstruction(out4, new ArrayList<>());
-            String c4 = out4.toString();
-            assertTrue(c4.contains("SP -= 4"),
-                    "4D MULTIANEWARRAY should decrement SP once for all dims:\n" + c4);
-            assertTrue(c4.contains("alloc4DArray(threadStateData, (*(SP+3)).data.i, (*(SP+2)).data.i, (*(SP+1)).data.i, (*SP).data.i"),
-                    "4D dims=4 must read dims with PEEK in innermost-to-outermost order:\n" + c4);
-            assertFalse(c4.contains("POP_INT(), POP_INT()"),
-                    "4D MULTIANEWARRAY must not chain multiple POP_INT calls:\n" + c4);
+            // Four dimensions and more are refused when the array type is
+            // registered (ArrayDimensionLimitTest), so 3D is the deepest emission.
 
             // 2D was already safe; verify the existing pattern is intact.
             MultiArray ma2 = new MultiArray("[[Ljava/lang/String;", 2);

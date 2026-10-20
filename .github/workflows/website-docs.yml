@@ -63,6 +63,7 @@ on:
       # tag, so a merged change there changes the published guide. Not on pull
       # requests: developer-guide-docs.yml already renders the guide for those.
       - 'scripts/wayline/**'
+      - 'scripts/savor/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'
@@ -355,6 +356,8 @@ jobs:
           set -euo pipefail
           node docs/website/scripts/test-build-first-funnel.mjs docs/website/public
           node docs/website/scripts/test-cn1-crisp-events.mjs
+          node docs/website/scripts/test-acquisition.mjs
+          python3 -m unittest discover -s scripts/website -p test_social_operations.py
           node docs/website/scripts/test-initializr-download-beacon.mjs
           node docs/website/scripts/test-initializr-chat-clearance.mjs
 

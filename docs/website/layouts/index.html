@@ -5,10 +5,11 @@
       <p class="cn1-eyebrow">100% native. Fast.</p>
       <h1>Full-stack Java.<br><span>Compiled to native.</span></h1>
       <p class="cn1-v2-hero__lead">
-        Java from UI to server to serverless. Full-stack programming with shared code as WORA always intended on iOS, Android, Windows, Linux, Mac and JavaScript (web). ±5mb binary GUI with no JVM install. Open source and free.
+        Share Java from UI to server. Build native apps for phones and desktops, plus JavaScript for the web. Open source and free.
       </p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-primary-project") }}
+        {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-primary-browser-ide" "variant" "secondary" "external" true) }}
         {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne?utm_source=codenameone&utm_medium=website&utm_campaign=homepage&utm_content=source" "event" "home-source" "variant" "secondary" "external" true) }}
       </div>
       <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
@@ -24,17 +25,17 @@ app.add(CENTER, buildContent());
 app.add(SOUTH, buildTabs());
 app.show();</code></pre>
       </div>
-      <a class="cn1-runtime-proof" href="/blog/pixel-perfect-is-a-test/" data-cn1-conversion="home-ui-proof" aria-label="See the iOS Liquid Glass fidelity tests">
-        <div class="cn1-runtime-proof__comparison">
-          <p><span>Native iOS 26</span><span>Codename One Metal</span></p>
-          <video class="cn1-runtime-proof__motion" data-cn1-motion-proof data-src="/proof/tab-morph-native-vs-cn1.mp4" poster="/proof/tab-morph-native-vs-cn1.png" muted loop playsinline aria-label="Native iOS 26 and Codename One Liquid Glass tab selection animations in light and dark appearance" width="900" height="324"></video>
-          <img class="cn1-runtime-proof__still" src="/proof/tab-morph-native-vs-cn1.png" alt="Native iOS 26 and Codename One Liquid Glass tab selection states in light and dark appearance" width="900" height="323">
+      <a class="cn1-runtime-proof" href="/blog/ios27-glass-from-measurements/" data-cn1-conversion="home-ui-proof" aria-label="See the iOS 27 tab animation comparison">
+        <div class="cn1-runtime-proof__comparison cn1-runtime-proof__comparison--ios27">
+          <p><span>iOS 27 · UIKit above Codename One · 60 fps</span></p>
+          <video class="cn1-runtime-proof__motion" data-cn1-motion-proof data-src="/blog/ios27-measured-glass/dark-tabs.mp4" poster="/blog/ios27-measured-glass/dark-poster.jpg" preload="metadata" muted loop playsinline aria-label="iOS 27 tab gestures: UIKit above Codename One, recorded at 60 frames per second" width="1178" height="1024"></video>
+          <img class="cn1-runtime-proof__still" src="/blog/ios27-measured-glass/dark-poster.jpg" alt="iOS 27 tab bars: UIKit above Codename One" width="1178" height="1024">
         </div>
         <div class="cn1-runtime-proof__device cn1-runtime-proof__device--android">
           <span class="cn1-runtime-proof__camera" aria-hidden="true"></span>
           <img src="/proof/android-material3-showcase.png" alt="Codename One Android Material 3 light and dark theme test capture" width="800" height="600">
         </div>
-        <span class="cn1-runtime-proof__caption"><strong>Real runtime captures</strong> Native reference beside Codename One Liquid Glass, plus Android Material 3.</span>
+        <span class="cn1-runtime-proof__caption"><strong>Real runtime captures</strong> iOS 27 tab gestures and Android Material 3.</span>
       </a>
     </div>
   </section>
@@ -49,26 +50,51 @@ app.show();</code></pre>
       <h2>A new service. An existing Android app. A shared stack.</h2>
       <p>Start with the part you need. The app framework works with any backend, and the native backend can run on its own.</p>
     </div>
-    <div class="cn1-v2-ownership__grid">
-      <article class="cn1-v2-feature">
-        <h3>Java services without a deployed JVM</h3>
-        <p>Use Spring-style controllers, dependency injection and transactions. The build generates the wiring and compiles a native executable. Add SQL persistence, OAuth2/OIDC, migrations and OpenTelemetry as your service grows.</p>
-        <p>The backend is evolving, with its own supported APIs and libraries. It is not a drop-in Spring Boot replacement.</p>
-        <a href="/developer-guide/backend/" data-cn1-conversion="home-backend">Build a native Java backend</a>
-        <p>Serve browser pages too: <a href="/developer-guide/backend-views/" data-cn1-conversion="home-backend-views">compiled HTML views</a> turn supported Thymeleaf attributes into Java renderers, with htmx for partial-page updates.</p>
+    <div class="cn1-home-stories">
+      <article class="cn1-home-story">
+        <div>
+          <h3>Java services without a deployed JVM</h3>
+          <p>Write controllers, inject dependencies and use transactions. Compile the wiring into a native executable.</p>
+          <p class="cn1-home-caveat">An evolving API with documented library support, not a drop-in Spring Boot replacement.</p>
+          <a href="/developer-guide/backend/" data-cn1-conversion="home-backend">Build a native Java backend →</a>
+          <p class="cn1-home-caveat">Serve browser pages with <a href="/developer-guide/backend-views/" data-cn1-conversion="home-backend-views">compiled HTML views and htmx</a>.</p>
+        </div>
+        <figure class="cn1-home-visual">
+          <div class="cn1-home-chart">
+            <h4>Native executable size <small>MiB · lower is better</small></h4>
+            <div class="cn1-home-bar"><span>CN1 native <b>5.17</b></span><i style="--bar:5.85%"></i></div>
+            <div class="cn1-home-bar cn1-home-bar--reference"><span>Spring / GraalVM 25 <b>88.31</b></span><i style="--bar:100%"></i></div>
+          </div>
+          <figcaption>Two-endpoint HTTP example. Uncompressed binaries; shared system libraries excluded. <a href="/blog/java-server-work-before-startup/">Measurements and source</a>.</figcaption>
+        </figure>
       </article>
-      <article class="cn1-v2-feature">
-        <h3>Your Android app on more platforms</h3>
-        <p>Import classic Android Java or Kotlin code, activities, XML layouts and resources. Supported Android and AndroidX APIs run over Codename One on iOS, desktop and the web, as well as Android.</p>
-        <p>Check your dependencies and data flows against the compatibility guide. Coverage is specific to the documented APIs.</p>
-        <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android app compatibility</a>
-        <p>Have Flutter screens? <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">Experimental Flutter compatibility</a> translates supported Dart and widgets to Java. Some callbacks and parameters are not implemented; check the guide before porting.</p>
+      <article class="cn1-home-story cn1-home-story--reverse">
+        <div>
+          <h3>Your Android app on more platforms</h3>
+          <p>Bring Java or Kotlin activities, XML layouts and resources to iOS, desktop and the web.</p>
+          <p class="cn1-home-caveat">Check your dependencies against the supported Android and AndroidX APIs.</p>
+          <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android compatibility →</a>
+          <p class="cn1-home-caveat">Also explore <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">experimental Flutter compatibility</a>. Some callbacks and parameters are not implemented.</p>
+        </div>
+        <figure class="cn1-home-visual cn1-home-gallery">
+          <div class="cn1-home-gallery__screens">
+            <div><span>Android / CN1</span><img src="/developer-guide/img/android-interop-material.png" alt="Material gallery: Android framework at left, Codename One compatibility layer at right, both on Android 16" width="736" height="800" loading="lazy"></div>
+            <div><span>Same gallery · web</span><img src="/blog/release-2026-10-09/android-browser-main.png" alt="Imported Android gallery running in Chromium" width="440" height="850" loading="lazy"></div>
+          </div>
+          <figcaption>Real captures. The paired comparison runs on Android 16. <a href="/android-compatibility-demo/">Try the browser build →</a></figcaption>
+        </figure>
       </article>
-      <article class="cn1-v2-feature">
-        <h3>Keep app and server contracts together</h3>
-        <p>Share Java models and generate typed REST clients instead of maintaining a second definition of every object crossing the network. Initializr creates app-only, app-with-backend and backend-only projects.</p>
-        <a href="/blog/java-backend-shared-models/" data-cn1-conversion="home-shared-models">See the shared-model example</a>
-        <p>Run a complete example with <a href="/developer-guide/wayline-implementors-guide/" data-cn1-conversion="home-wayline">Wayline, the ride-hailing sample</a>: rider, driver and admin screens with a Java backend. Generate it from Initializr’s ride-hailing template.</p>
+      <article class="cn1-home-story">
+        <div>
+          <h3>Keep app and server contracts together</h3>
+          <p>Share Java models and generate typed REST clients. Change the contract in one place.</p>
+          <a href="/blog/java-backend-shared-models/" data-cn1-conversion="home-shared-models">See the shared-model example →</a>
+          <p class="cn1-home-caveat">Try <a href="/developer-guide/wayline-implementors-guide/" data-cn1-conversion="home-wayline">Wayline</a>, the full-stack ride-hailing template in Initializr.</p>
+        </div>
+        <figure class="cn1-home-visual">
+          <div class="cn1-home-contract"><span>shared /</span><code>Java models</code><div class="cn1-home-contract__branches"><div><b>App</b><small>Generated REST client</small></div><div><b>Backend</b><small>Typed controller</small></div></div></div>
+          <figcaption>One contract across the network. App-only and backend-only projects work independently, too.</figcaption>
+        </figure>
       </article>
     </div>
   </section>
@@ -81,19 +107,19 @@ app.show();</code></pre>
     </div>
     <div class="cn1-v2-ownership__grid">
       <article class="cn1-v2-feature">
-        <h3>37.5% less time than JDK 25</h3>
+        <div class="cn1-home-chart"><h4>Compiler translation time <small>JDK 25 = 100 · lower is better</small></h4><div class="cn1-home-bar"><span>ParparVM <b>62.5</b></span><i style="--bar:62.5%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>JDK 25 <b>100</b></span><i style="--bar:100%"></i></div></div><h3>37.5% less time</h3>
         <p>ParparVM translating its own compiler also used 45.8% less peak memory in the Linux ARM64 Neoverse N2 baseline, across seven calibration runs. Generated files were identical. Allocation-heavy workloads can favor HotSpot.</p>
         <a href="/blog/parparvm-four-byte-header/" data-cn1-conversion="home-performance-hotspot">Inspect every workload and machine</a>
       </article>
       <article class="cn1-v2-feature">
-        <h3>3.9× Spring's plaintext throughput</h3>
-        <p>The CN1 HTTP handler reached 3.9× plaintext and 3.4× JSON throughput versus Spring Boot 4.1.1 on JDK 25: two pinned CPUs in a Linux ARM64 VM on M4 Max, 32 connections and matched 60-second warmup.</p>
-        <p>This compares HTTP stacks, without database, TLS or authentication. It does not measure CN1's generated controller API.</p>
+        <div class="cn1-home-chart"><h4>Plaintext requests / second <small>Higher is better</small></h4><div class="cn1-home-bar"><span>CN1 native <b>296,928</b></span><i style="--bar:100%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>Spring / JDK 25 <b>75,721</b></span><i style="--bar:25.5%"></i></div></div><h3>3.9× Spring’s throughput</h3>
+        <p>Spring Boot 4.1.1 / JDK 25. Two pinned CPUs, Linux ARM64 VM on M4 Max, 32 connections, matched 60-second warmup.</p>
+        <p>HTTP handlers only: no database, TLS, authentication or generated controllers.</p>
         <a href="/blog/java-server-work-before-startup/" data-cn1-conversion="home-performance-spring">Reproduce the Spring comparison</a>
       </article>
       <article class="cn1-v2-feature">
-        <h3>595,610 requests per second</h3>
-        <p>CN1 native musl versus 496,293 for Go fasthttp in a separate plaintext test: two pinned cores, 64 connections, medians of three interleaved runs. Go used less memory and a smaller binary.</p>
+        <div class="cn1-home-chart"><h4>Plaintext requests / second <small>Separate Go comparison · higher is better</small></h4><div class="cn1-home-bar"><span>CN1 native musl <b>595,610</b></span><i style="--bar:100%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>Go fasthttp <b>496,293</b></span><i style="--bar:83.32%"></i></div></div><h3>Compare with Go</h3>
+        <p>Two pinned cores, 64 connections, medians of three interleaved runs. Go used less memory and a smaller binary.</p>
         <a href="/developer-guide/backend-operations/" data-cn1-conversion="home-performance-go">Compare throughput, startup and memory</a>
       </article>
     </div>
@@ -105,6 +131,11 @@ app.show();</code></pre>
       <h2>The screen you test is the screen you ship.</h2>
       <p>Codename One draws its own components. The runtime and theme are packaged with the application, so an OS update does not silently swap in a different widget implementation.</p>
     </div>
+    <figure class="cn1-home-themes">
+      <img src="/proof/tab-morph-native-vs-cn1.png" alt="Native iOS 26 and Codename One tab states, in light and dark themes" width="900" height="323" loading="lazy">
+      <img src="/proof/android-material3-showcase.png" alt="Codename One Material 3 theme in light and dark appearance" width="800" height="600" loading="lazy">
+      <figcaption>Liquid Glass and Material 3, captured from the running UI. <a href="/blog/liquid-glass-material-3-modern-native-themes/">Explore the themes →</a></figcaption>
+    </figure>
     <div class="cn1-v2-ownership__grid">
       <article class="cn1-v2-feature cn1-v2-feature--accent">
         <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6"/></svg>
@@ -122,11 +153,7 @@ app.show();</code></pre>
         <p>Call platform SDKs through native interfaces. Embed a map, web view, camera surface, or other heavyweight view with <code>PeerComponent</code>.</p>
       </article>
     </div>
-    <aside class="cn1-ownership-proof">
-      <strong>Adopt platform changes on your schedule</strong>
-      <p>Ship Liquid Glass, Material 3, or your own design as a versioned part of the application. An OS upgrade does not silently replace the UI you tested.</p>
-      <a href="/blog/liquid-glass-material-3-modern-native-themes/" data-cn1-conversion="home-ui-control">See the current themes</a>
-    </aside>
+
   </section>
 
   <section class="cn1-v2-section cn1-v2-how">
@@ -135,6 +162,7 @@ app.show();</code></pre>
       <h2>Java in. Native applications out.</h2>
       <p>Use Maven or Gradle and your existing IDE. Codename One supplies the portable runtime, platform ports, and build tooling.</p>
     </div>
+    <div class="cn1-home-flow" aria-label="Build pipeline"><div><small>Source</small><strong>Java + CSS</strong></div><span aria-hidden="true">→</span><div><small>Develop locally</small><strong>Simulator + tests</strong></div><span aria-hidden="true">→</span><div><small>Build</small><strong>Native / JavaScript</strong></div></div>
     <ol class="cn1-v2-steps">
       <li>
         <span>1</span>
@@ -160,58 +188,47 @@ app.show();</code></pre>
   <section class="cn1-v2-section cn1-v2-agent" id="agentic-development">
     <div class="cn1-v2-agent__intro">
       <p class="cn1-eyebrow">Agentic development</p>
-      <h2>Give the agent a strict codebase and a short feedback loop.</h2>
-      <p>A generated Java 17 project includes Codename One instructions for coding agents. The simulator can expose the running UI to Codex, Claude Code, and other MCP hosts, so the agent can inspect meaning and invoke actions instead of guessing screen coordinates.</p>
+      <h2>Let the agent see what it built.</h2>
+      <p>Generated projects include agent instructions. Connect Codex, Claude Code or another MCP host to inspect and operate the running simulator.</p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Connect an agent" "href" "/getting-started/#agent" "event" "home-agent-tools" "variant" "secondary") }}
         {{ partial "cn1-cta.html" (dict "label" "Read the MCP implementation" "href" "/developer-guide/mcp-headless-api/#_mcp_headless_api" "event" "home-agent-mcp" "variant" "text") }}
       </div>
     </div>
-    <div class="cn1-v2-agent__grid">
-      <article>
-        <span>Java</span>
-        <h3>Java keeps edits in bounds</h3>
-        <p>Agents know Java deeply. Static types, bytecode compliance, and the compiler reject unsupported APIs and invalid calls before they reach a device.</p>
-      </article>
-      <article>
-        <span>Local</span>
-        <h3>Inspect the running application</h3>
-        <p>Compile, run tests, and inspect the simulator locally. Give the agent a concrete test result and the current UI state before the next edit.</p>
-      </article>
-      <article>
-        <span>Tools</span>
-        <h3>Skills and MCP ship with the tools</h3>
-        <p>Initializr places the Codename One authoring skill in the project. The JavaSE tooling can register its built-in semantic UI tools with supported MCP hosts.</p>
-      </article>
-    </div>
-    <p class="cn1-v2-agent__scope">MCP also supports loopback connections to native development builds on ports that provide server sockets, including Linux. Device connections need forwarding. Release builds block access by default; the guide covers setup and controlled-development opt-ins.</p>
+    <figure class="cn1-home-visual cn1-home-agent-loop">
+      <div class="cn1-home-flow"><div><small>01 · Edit</small><strong>Java source</strong></div><span aria-hidden="true">→</span><div><small>02 · Verify</small><strong>Compiler + tests</strong></div><span aria-hidden="true">→</span><div><small>03 · Inspect</small><strong>Live UI via MCP</strong></div></div>
+      <figcaption>↶ UI state and test results inform the next edit.</figcaption>
+    </figure>
+    <p class="cn1-v2-agent__scope">MCP also connects to native development builds on ports with server sockets, including Linux. Device connections need forwarding; release builds block access by default.</p>
   </section>
 
-  <section class="cn1-v2-section cn1-v2-reach">
+  <section class="cn1-v2-section cn1-v2-reach cn1-home-platforms" id="platforms">
     <div class="cn1-v2-reach__copy">
       <p class="cn1-eyebrow">Deployment targets</p>
-      <h2>One Java project across the ports we test.</h2>
-      <p>The same application model reaches phones, native desktops, browsers, watches, and TV. Add a native backend for the server. The Port Status page publishes the architecture, operating-system floor, and CI evidence for the app targets.</p>
+      <h2>One Java project. Every screen.</h2>
+      <p>Phones, desktops, browsers, watches and TV, with a native backend for the server. See Port Status for supported versions, architectures and test evidence.</p>
       <a class="cn1-reach-link" href="/port-status/" data-cn1-conversion="home-platforms">Inspect every port and test</a>
+
     </div>
     <ul class="cn1-platform-grid" aria-label="Supported deployment targets">
       {{- range site.Data.port_status_support.deployment_support }}
       <li>
         <strong>{{ .platform }}</strong>
-        <span>{{ .architectures }}</span>
-        <small>{{ .declared_range }}</small>
+        <span>{{ index (dict "android" "Phones &amp; tablets" "ios" "iPhone &amp; iPad" "macos" "Native desktop" "web" "Browser JavaScript" "linux" "Native desktop" "windows" "Native desktop" "watchos" "Apple Watch" "tvos" "Apple TV") .id | htmlUnescape }}</span>
       </li>
       {{- end }}
       <li>
         <strong>Vehicle integrations</strong>
         <span>CarPlay and Android Auto</span>
-        <small>Portable Java templates map to native CarPlay and Android Auto UI.</small>
+
       </li>
       <li>
         <strong>System surfaces</strong>
         <span>Widgets, Live Activities, Dynamic Island</span>
-        <small>Portable Java surface APIs publish to iOS, Android, and desktop renderers.</small>
+
       </li>
+      <li><strong>Native backend</strong><span>Java services &amp; serverless</span></li>
+      <li><strong>Android surfaces</strong><span>Wear OS &amp; Android TV</span></li>
     </ul>
   </section>
 
@@ -230,7 +247,7 @@ app.show();</code></pre>
       <article>
         <a class="cn1-engineering-grid__image" href="{{ .RelPermalink }}">
           {{- with $thumb -}}
-          <img src="{{ . }}" alt="">
+          <img src="{{ . }}" alt="" loading="lazy">
           {{- else -}}
           <span aria-hidden="true">{ }</span>
           {{- end -}}
@@ -246,10 +263,11 @@ app.show();</code></pre>
     <div>
       <p class="cn1-eyebrow">Start with the real thing</p>
       <h2>Create the project. Build it your way.</h2>
-      <p>Initializr generates a standard Maven project. Build it with your own toolchains: the framework is open source and free for commercial use, so nothing ties you to us. Or skip the setup and use cloud builds: iOS apps without a Mac, desktop and device builds from whatever machine you have, no SDKs to install. Your first cloud build asks you to create a free account, which includes 100 cloud build credits each month.</p>
+      <p>Generate a Maven project and build with your own tools, or use cloud builds for iOS without a Mac. A free account includes 100 cloud build credits each month.</p>
     </div>
     <div class="cn1-action-row">
       {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-final-project") }}
+      {{ partial "cn1-cta.html" (dict "label" "Try it in your browser" "href" "https://cloud.codenameone.com/ide/" "event" "home-final-browser-ide" "variant" "secondary" "external" true) }}
       {{ partial "cn1-cta.html" (dict "label" "Follow the build guide" "href" "/getting-started/" "variant" "secondary") }}
     </div>
   </section>

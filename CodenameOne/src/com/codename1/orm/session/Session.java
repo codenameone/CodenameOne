@@ -203,8 +203,17 @@ public interface Session {
 
     /// Checks mapped columns, type families, nullability, and primary keys.
     /// Does not migrate the schema or exhaustively validate indexes and foreign keys.
-    /// @throws PersistenceException if a mapped table or column is incompatible or inaccessible
+    /// @throws PersistenceException if [#schemaReport()] finds any difference, with
+    ///         that report as the message, or a mapped table is inaccessible
     void validateSchema();
+
+    /// Compares every registered mapping, its collection tables included, with
+    /// the tables that already exist, and reports each difference as either a
+    /// required migration or an unsupported mapping. Reads the catalog only;
+    /// nothing in the database changes.
+    /// @return the differences found; [SchemaReport#isCompatible()] when there are none
+    /// @throws PersistenceException if the catalog cannot be read
+    SchemaReport schemaReport();
 
     /// Counts stored related rows without loading the relationship's entities.
     /// Flushes pending changes when a transaction is active. Detached owners are

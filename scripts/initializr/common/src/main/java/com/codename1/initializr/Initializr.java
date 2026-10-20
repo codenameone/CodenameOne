@@ -51,6 +51,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
@@ -81,7 +82,7 @@ public class Initializr extends Lifecycle {
     // UIIDs that have a "...Dark" variant in theme.css. Used to re-skin the whole
     // tree when the host website / system switches between light and dark.
     private static final String[] THEMEABLE = {
-            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar",
+            "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar", "InitializrSecondaryButton",
             "InitializrWordmark", "InitializrHero", "InitializrHeroTitle", "InitializrHeroSubtitle",
             "InitializrPill", "InitializrPillDot", "InitializrPillText",
             "InitializrPanel", "InitializrPanelHeader", "InitializrPanelTitle",
@@ -184,7 +185,11 @@ public class Initializr extends Lifecycle {
                 }
                 lookSubtitle.setText(schemeLabel(brandColor[0])
                         + (roundedCorners[0] ? "" : " . Square corners"));
-                lookIcon.setIcon(AppIcon.create(appNameField.getText(), schemeColor(brandColor[0]),
+                if (ownScheme[0] != null) {
+                    ownScheme[0].setIcon(swatch(GeneratorModel.brandOf(selectedTemplate[0])));
+                }
+                lookIcon.setIcon(AppIcon.create(appNameField.getText(),
+                        schemeColor(brandColor[0], selectedTemplate[0]),
                         convertToPixels(12)));
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
@@ -253,6 +258,7 @@ public class Initializr extends Lifecycle {
         // button still carried the default Button style is what painted a white
         // box behind the download glyph.
         FontImage.setMaterialIcon(generateButton, FontImage.MATERIAL_DOWNLOAD);
+        generateButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_DOWNLOAD));
         this.generateButton = generateButton;
         generateButton.addActionListener(e -> {
             if (!validateInputs(appNameField, packageField)) {
@@ -268,7 +274,7 @@ public class Initializr extends Lifecycle {
                         .withPlatformModules(allPlatformModules[0]);
             if (selectedTemplate[0].isFullStack()) {
                 options = options.forFullStack().withScheme(brandColor[0], roundedCorners[0])
-                        .withIcon(AppIcon.png(appName, schemeColor(brandColor[0])));
+                        .withIcon(AppIcon.png(appName, schemeColor(brandColor[0], selectedTemplate[0])));
             }
             GeneratorModel model = GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName,
                     options);
@@ -277,10 +283,30 @@ public class Initializr extends Lifecycle {
             }
         });
 
+        // Zero install: open the same app in the browser IDE, where it runs at once
+        // and can be sent to the cloud. The IDE creates it from its own template
+        // with this name, package, kind and build tool (or reopens the project it
+        // already has with this package).
+        final Button browserButton = new Button("Open in browser");
+        browserButton.setUIID("InitializrSecondaryButton");
+        FontImage.setMaterialIcon(browserButton, FontImage.MATERIAL_OPEN_IN_BROWSER);
+        browserButton.putClientProperty(MATERIAL_ICON, Character.valueOf(FontImage.MATERIAL_OPEN_IN_BROWSER));
+        browserButton.addActionListener(e -> {
+            if (!validateInputs(appNameField, packageField)) {
+                updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
+                ToastBar.showErrorMessage("Please fix validation errors before opening the project.");
+                form.revalidate();
+                return;
+            }
+            String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
+            String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
+            Display.getInstance().execute(browserIdeUrl(appName, packageName, selectedTemplate[0], projectType[0], buildTool[0]));
+        });
+
         Container generateBar = new Container(new BorderLayout());
         generateBar.setUIID("InitializrGenerateBar");
         generateBar.add(BorderLayout.CENTER, bundleInfo);
-        generateBar.add(BorderLayout.EAST, generateButton);
+        generateBar.add(BorderLayout.EAST, FlowLayout.encloseRight(browserButton, generateButton));
 
         Container body = new Container(new BorderLayout());
         body.add(BorderLayout.CENTER, column);
@@ -407,18 +433,19 @@ public class Initializr extends Lifecycle {
     }
 
     /// What the project starts as: an empty app in Java or in Kotlin, or -- once the
-    /// plugin the Initializr generates against can build it -- the ride-hailing app
-    /// with its server.
+    /// plugin the Initializr generates against can build it -- the ride-hailing or
+    /// the food-delivery app with its server.
     private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
         boolean fullStack = GeneratorModel.isTemplateOffered(Template.WAYLINE);
-        Container selector = new Container(new GridLayout(fullStack ? 3 : 1, fullStack ? 1 : 2));
+        Container selector = new Container(new GridLayout(fullStack ? 4 : 1, fullStack ? 1 : 2));
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
-                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE}
+                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR}
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
-                ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java"}
+                ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
+                    "Food delivery app with its server, Java"}
                 : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];
@@ -442,8 +469,11 @@ public class Initializr extends Lifecycle {
 
     /// The colour schemes a full-stack template is offered in. The first is the
     /// template's own, which leaves its stylesheet as it is.
-    private static final String[] SCHEME_LABELS = {"Blue", "Teal", "Violet", "Orange", "Rose", "Graphite"};
+    private static final String[] SCHEME_LABELS = {"As designed", "Teal", "Violet", "Orange", "Rose", "Graphite"};
     private static final int[] SCHEME_COLORS = {-1, 0x0f766e, 0x6d3fd1, 0xd9540b, 0xc8235d, 0x2f3a4a};
+
+    /// The choice of the template's own scheme, whose swatch follows the template.
+    private final RadioButton[] ownScheme = new RadioButton[1];
 
     private static String schemeLabel(int brandColor) {
         for (int i = 0; i < SCHEME_COLORS.length; i++) {
@@ -455,8 +485,18 @@ public class Initializr extends Lifecycle {
     }
 
     /// The colour a scheme paints with, which for the template's own is not -1.
-    private static int schemeColor(int brandColor) {
-        return brandColor < 0 ? GeneratorModel.FULL_STACK_BRAND : brandColor;
+    private static int schemeColor(int brandColor, Template template) {
+        return brandColor < 0 ? GeneratorModel.brandOf(template) : brandColor;
+    }
+
+    /// A round swatch of `color`, the icon of a scheme's choice.
+    private static Image swatch(int color) {
+        int dot = convertToPixels(3);
+        Image swatch = Image.createImage(dot, dot, 0);
+        swatch.getGraphics().setAntiAliased(true);
+        swatch.getGraphics().setColor(color);
+        swatch.getGraphics().fillArc(0, 0, dot, dot, 0, 360);
+        return swatch;
     }
 
     /// The look of a full-stack template: its brand colour, the corners, and the
@@ -467,17 +507,16 @@ public class Initializr extends Lifecycle {
         Container colors = new Container(new GridLayout(2, 3));
         colors.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
-        int dot = convertToPixels(3);
         for (int i = 0; i < SCHEME_COLORS.length; i++) {
             final int color = SCHEME_COLORS[i];
             RadioButton button = new RadioButton(SCHEME_LABELS[i]);
             button.setToggle(true);
             button.setUIID("InitializrChoice");
-            Image swatch = Image.createImage(dot, dot, 0);
-            swatch.getGraphics().setAntiAliased(true);
-            swatch.getGraphics().setColor(schemeColor(color));
-            swatch.getGraphics().fillArc(0, 0, dot, dot, 0, 360);
-            button.setIcon(swatch);
+            // The template's own colour is painted when the template is known.
+            button.setIcon(swatch(color < 0 ? 0 : color));
+            if (color < 0) {
+                ownScheme[0] = button;
+            }
             group.add(button);
             colors.add(button);
             if (color == brandColor[0]) {
@@ -1068,6 +1107,12 @@ public class Initializr extends Lifecycle {
         String themed = themedUiid(uiid, dark);
         if (!uiid.equals(themed)) {
             component.setUIID(themed);
+            // A material icon is drawn from the style it was made with; remake
+            // it from the new UIID's colours.
+            Object icon = component.getClientProperty(MATERIAL_ICON);
+            if (icon instanceof Character && component instanceof Button) {
+                FontImage.setMaterialIcon((Button) component, ((Character) icon).charValue());
+            }
         }
         if (component instanceof Container) {
             Container cnt = (Container) component;
@@ -1094,6 +1139,26 @@ public class Initializr extends Lifecycle {
         return isThemeable(base) ? base : uiid;
     }
 
+    /// The browser IDE link for a project: `?new=<kind>&name=&package=&build=`.
+    static String browserIdeUrl(String appName, String packageName, Template template,
+                                ProjectOptions.ProjectType type, ProjectOptions.BuildTool build) {
+        String kind = template.isFullStack() || type == ProjectOptions.ProjectType.APP_WITH_BACKEND ? "fullstack"
+                : type == ProjectOptions.ProjectType.BACKEND_ONLY ? "backend" : "app";
+        return "https://cloud.codenameone.com/ide/?new=" + kind
+                + "&name=" + com.codename1.io.Util.encodeUrl(appName)
+                + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
+                // There is more than one full-stack template, and new=fullstack alone
+                // would give the browser IDE no way to tell which one was chosen.
+                + (template.isFullStack() ? "&template=" + template.name() : "")
+                // Full-stack templates (Wayline) are Maven-only (ProjectOptions.forFullStack),
+                // whatever the hidden build-tool choice still holds; an ordinary
+                // App + backend project keeps the Gradle the user picked.
+                + "&build=" + (build == ProjectOptions.BuildTool.GRADLE && !template.isFullStack() ? "gradle" : "maven");
+    }
+
+    /// Client property: the material icon a button carries, so a theme switch can redraw it.
+    private static final String MATERIAL_ICON = "initializr.materialIcon";
+
     private boolean isThemeable(String uiid) {
         for (String s : THEMEABLE) {
             if (s.equals(uiid)) {
@@ -1110,7 +1175,8 @@ public class Initializr extends Lifecycle {
         String safePackage = packageName == null ? "" : packageName.trim();
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
-                + (template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
+                + (template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
+                        : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"
                 + "Build    " + options.buildTool.label
