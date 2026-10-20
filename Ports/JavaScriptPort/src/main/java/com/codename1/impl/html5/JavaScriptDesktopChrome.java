@@ -165,6 +165,11 @@ final class JavaScriptDesktopChrome {
         menuBar.setInnerHTML("");
         Map<String, List<Command>> groups = group(commands);
         for (Map.Entry<String, List<Command>> e : groups.entrySet()) {
+            // A menu holding only separators encodes to no rows; it would be an empty title.
+            if (com.codename1.impl.NativeMenuEncoder.encode(
+                    new java.util.Vector(e.getValue()), 0, true).getRows().isEmpty()) {
+                continue;
+            }
             menuBar.appendChild(buildMenu(e.getKey(), e.getValue()));
         }
     }

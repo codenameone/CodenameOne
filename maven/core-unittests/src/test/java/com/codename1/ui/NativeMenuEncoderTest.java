@@ -250,4 +250,14 @@ class NativeMenuEncoderTest extends UITestBase {
         DisplayTest.flushEdt();
         assertNull(implementation.getLastNativeCommands(), "an unpublished command rebuilt the menu");
     }
+
+    @FormTest
+    void anEqualCommandOffTheShownFormIsNotAMemberOfItsGroup() {
+        Form shown = Display.getInstance().getCurrent();
+        Command visible = new Command("Same").setDesktopRadioGroup("g").setDesktopChecked(true);
+        shown.addCommand(visible);
+        Command twin = new Command("Same").setDesktopRadioGroup("g");
+        twin.setDesktopChecked(true);
+        assertTrue(visible.isDesktopChecked(), "an equal command elsewhere cleared the shown group");
+    }
 }

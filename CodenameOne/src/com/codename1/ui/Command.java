@@ -620,7 +620,16 @@ public class Command implements ActionListener<ActionEvent> {
             return;
         }
         for (java.util.List members : Display.getInstance().getPublishedNativeMenuSurfaces()) {
-            if (!members.contains(this)) {
+            // By identity: contains() would use equals(), which compares fields and client
+            // properties, so an equal command elsewhere would claim this surface.
+            boolean member = false;
+            for (Object o : members) {
+                if (o == this) { //NOPMD CompareObjectsWithEquals
+                    member = true;
+                    break;
+                }
+            }
+            if (!member) {
                 // Same group name on another surface is another group.
                 continue;
             }
