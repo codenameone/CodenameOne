@@ -256,6 +256,21 @@ final class AndroidFileDialogs {
                                 }
                             }
                         }
+                        if (result.getError() != null) {
+                            // ACTION_CREATE_DOCUMENT already created the document;
+                            // a failed write leaves it empty or partial, and the
+                            // content:// path cannot be deleted through
+                            // FileSystemStorage, so it is removed here.
+                            try {
+                                if (Build.VERSION.SDK_INT >= 19) {
+                                    android.provider.DocumentsContract.deleteDocument(resolver, uri);
+                                }
+                            } catch (java.io.FileNotFoundException ignored) {
+                                // already gone
+                            } catch (RuntimeException ignored) {
+                                // the provider does not support deletion
+                            }
+                        }
                         deliver(callback, result);
                     }
                 }, "FileDialogSave").start();

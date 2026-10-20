@@ -156,6 +156,20 @@ final class JavaSEFileDialogs {
         if (path == null) {
             return null;
         }
+        // FileSystemStorage's virtual app home, which the port maps to a folder
+        // under user.home; read as a plain path it would be a relative "home/".
+        if (path.startsWith("file://home") && JavaSEPort.instance != null) {
+            return new File(JavaSEPort.instance.unfile(path));
+        }
+        if (path.startsWith("file:") && path.indexOf('%') >= 0) {
+            // A URL with escapes (getAppHomePath() under "My Documents" answers
+            // %20): decode it, or the dialog is handed a folder that does not exist.
+            try {
+                return new File(new java.net.URI(path));
+            } catch (Exception notAUrl) {
+                // a literal '%' in a plain path; strip the scheme below
+            }
+        }
         if (path.startsWith("file:")) {
             // file:///x and the file:/x that getAppHomePath() answers
             path = path.substring(5);

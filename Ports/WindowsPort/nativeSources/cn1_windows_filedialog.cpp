@@ -426,7 +426,8 @@ void cn1FdxRun(Cn1FdxRequest* r) {
             if (r->selectedFilter >= 0 && r->selectedFilter < r->filterCount) {
                 Cn1FdxSplit* f = &r->filters[r->selectedFilter];
                 dlg->SetFileTypeIndex((UINT) r->selectedFilter + 1); /* 1-based */
-                if (r->save && f->count > 1) {
+                /* "*" is the all-files extension, never a suffix to append */
+                if (r->save && f->count > 1 && wcscmp(f->fields[1], L"*") != 0) {
                     dlg->SetDefaultExtension(f->fields[1]);
                 }
             }

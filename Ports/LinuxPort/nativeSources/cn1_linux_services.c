@@ -786,7 +786,8 @@ static int cn1FdxAddExtension(GSList* paths, const char* filter, int n) {
         if (!first) {
             first = field;
         }
-        if (len > el + 1 && path[len - el - 1] == '.'
+        /* >= so a dotfile such as ".gitignore" already counts as carrying it */
+        if (len >= el + 1 && path[len - el - 1] == '.'
                 && g_ascii_strcasecmp(path + len - el, field) == 0) {
             return 0;
         }

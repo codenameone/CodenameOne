@@ -6834,7 +6834,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // allowsMultipleSelection is iOS 11+; IOSNative.m sets it only there.
                 || (feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
                     && iosMajorVersion() >= 11)
-                || feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
+                // Picking a folder through UIDocumentPickerViewController is iOS 13+.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
+                    && iosMajorVersion() >= 13)
                 // UIDocumentPickerViewController.directoryURL is iOS 13+; the
                 // native side sets it only there, so older systems ignore it.
                 || (feature == com.codename1.io.filechooser.FileDialogFeatures.INITIAL_DIRECTORY
@@ -6926,8 +6928,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (name == null || name.length() == 0) {
             name = "Untitled";
         }
-        // A separator in the suggested name would escape the staging folder.
+        // A separator in the suggested name would escape the staging folder,
+        // and "." or ".." would name the folder itself or its parent.
         name = name.replace('/', '_');
+        if (".".equals(name) || "..".equals(name)) {
+            name = "Untitled";
+        }
+        // The picker exports the staged file under exactly this name, and no
+        // later step adds the selected filter's extension, so it is added here
+        // with the same rule the desktop ports apply.
+        com.codename1.io.filechooser.FileTypeFilter[] filters = request.getFilters();
+        int selected = request.getSelectedFilter();
+        if (selected >= 0 && selected < filters.length) {
+            com.codename1.io.filechooser.FileTypeFilter f = filters[selected];
+            String[] ext = f.getExtensions();
+            if (ext.length > 0 && !"*".equals(ext[0]) && !f.acceptsName(name)) {
+                name = name + "." + ext[0];
+            }
+        }
         String caches = nativeInstance.getCachesDir();
         if (!caches.endsWith("/")) {
             caches = caches + "/";
