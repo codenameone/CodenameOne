@@ -39,9 +39,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "Java API additions: linux size after round 14 fixes",
+     "reason": "java-api-additions: java.time and CompletableFuture review fixes grew linux code by 64 bytes",
      "runs": 1,
-     "value": 14571314
+     "value": 14571378
     },
     "install_bytes": {
      "from": {
@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "java-api-additions: java.time and CompletableFuture review fixes; linux download size moved by 395 bytes",
+     "reason": "java-api-additions: java.time and CompletableFuture review fixes grew linux code by 64 bytes",
      "runs": 1,
-     "value": 84679646
+     "value": 84689106
     }
    }
   }

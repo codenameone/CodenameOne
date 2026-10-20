@@ -46,4 +46,12 @@ class ZeroWidthOptionalGroupTest {
             assertEquals(c[2], m.group(1), c[0]);
         }
     }
+
+    @Test
+    void aWordBoundaryTakesACountedQuantifier() {
+        assertTrue(Pattern.compile("\\b{2}a").matcher("a").find());
+        Matcher m = Pattern.compile("a\\b{0,2}").matcher("ab a");
+        assertTrue(m.find());
+        assertEquals(0, m.start());
+    }
 }

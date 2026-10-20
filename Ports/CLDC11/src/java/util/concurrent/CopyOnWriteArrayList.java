@@ -328,13 +328,23 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         // lists adding each other would otherwise each wait for the other.
         Object[] incoming = c.toArray();
         synchronized (lock) {
+            // Collected first and published once, as in the JDK: an equals
+            // that throws part way leaves the list as it was.
+            Object[] current = getArray();
+            int len = current.length;
+            Object[] grown = new Object[len + incoming.length];
+            System.arraycopy(current, 0, grown, 0, len);
             int added = 0;
             for (Object o : incoming) {
-                @SuppressWarnings("unchecked")
-                E e = (E) o;
-                if (addIfAbsent(e)) {
+                if (indexOf(o, current, 0, len) < 0 && indexOf(o, grown, len, len + added) < 0) {
+                    grown[len + added] = o;
                     added++;
                 }
+            }
+            if (added > 0) {
+                Object[] result = new Object[len + added];
+                System.arraycopy(grown, 0, result, 0, len + added);
+                setArray(result);
             }
             return added;
         }

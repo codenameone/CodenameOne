@@ -1787,8 +1787,10 @@ public final class Pattern {
                 case 'G':
                     return Piece.of(new Anchor(Anchor.LAST_MATCH, unix), 0);
                 case 'b':
-                    if (at < p.length() && p.charAt(at) == '{') {
-                        throw unsupported("The boundary \\b{...}");
+                    // Only \b{g} is a grapheme boundary; \b{2} is a word
+                    // boundary under a counted quantifier, as in the JDK.
+                    if (at + 1 < p.length() && p.charAt(at) == '{' && p.charAt(at + 1) == 'g') {
+                        throw unsupported("The boundary \\b{g}");
                     }
                     return Piece.of(new Anchor(Anchor.WORD, unix), 0);
                 case 'B':

@@ -172,9 +172,9 @@ public final class Spliterators {
         /// caller that needs what remains has to count it itself.
         @Override
         public long estimateSize() {
-            if (it == null) {
-                return collection.size();
-            }
+            // The first estimate binds, as in the JDK: later changes to the
+            // collection neither move the estimate nor join the traversal.
+            open();
             return size;
         }
 

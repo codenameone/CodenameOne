@@ -1364,6 +1364,25 @@ public final class DateTimeFormatter {
                 date = LocalDate.ofYearDay((int) year.longValue(), (int) values[F_DAY_OF_YEAR]);
             }
             if (date != null) {
+                // Every date field parsed is held to the date resolved from
+                // the others, as the JDK does: "2020-01-01-002" with
+                // uuuu-MM-dd-DDD is a conflict, not January 1.
+                // A month or day beside a day-of-year is checked only when
+                // the date came from the day-of-year: a smart-mode clamp of
+                // the day of month is not a conflict.
+                boolean fromYearDay = !(present[F_MONTH] && present[F_DAY]);
+                if (present[F_DAY_OF_YEAR] && date.getDayOfYear() != values[F_DAY_OF_YEAR]) {
+                    throw new DateTimeException("Conflict found: Field DayOfYear " + date.getDayOfYear()
+                            + " differs from DayOfYear " + values[F_DAY_OF_YEAR] + " derived from " + date);
+                }
+                if (fromYearDay && present[F_MONTH] && date.getMonthValue() != values[F_MONTH]) {
+                    throw new DateTimeException("Conflict found: Field MonthOfYear " + date.getMonthValue()
+                            + " differs from MonthOfYear " + values[F_MONTH] + " derived from " + date);
+                }
+                if (fromYearDay && present[F_DAY] && date.getDayOfMonth() != values[F_DAY]) {
+                    throw new DateTimeException("Conflict found: Field DayOfMonth " + date.getDayOfMonth()
+                            + " differs from DayOfMonth " + values[F_DAY] + " derived from " + date);
+                }
                 if (present[F_DAY_OF_WEEK] && date.getDayOfWeek().getValue() != values[F_DAY_OF_WEEK]) {
                     throw new DateTimeException("Conflict found: Field DayOfWeek " + date.getDayOfWeek().getValue()
                             + " differs from DayOfWeek " + values[F_DAY_OF_WEEK] + " derived from " + date);

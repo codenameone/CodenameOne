@@ -511,6 +511,59 @@ public final class LangMembersChecks {
             Bulk.p("runs", runs[0]);
             Bulk.p("both", both.join());
         });
+        Bulk.check("Lang.aDayOfYearConflictsWithTheDate", () -> {
+            for (String[] c : new String[][]{{"uuuu-MM-dd-DDD", "2020-01-01-002"}, {"uuuu-MM-dd-DDD", "2020-01-02-002"},
+                    {"uuuu-MM-DDD", "2020-02-002"}, {"uuuu-MM-dd", "2021-02-31"}}) {
+                try {
+                    Bulk.p(c[1], java.time.LocalDate.parse(c[1], java.time.format.DateTimeFormatter.ofPattern(c[0])).toString());
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(c[1], "rejected");
+                }
+            }
+        });
+        Bulk.check("Lang.theFirstEstimateBindsASpliterator", () -> {
+            java.util.List<String> list = new java.util.ArrayList<>(java.util.Arrays.asList("a", "b"));
+            java.util.Spliterator<String> s = java.util.Spliterators.spliterator(list, 0);
+            Bulk.p("first", s.estimateSize());
+            list.add("c");
+            Bulk.p("second", s.estimateSize());
+            try {
+                final int[] n = new int[1];
+                s.forEachRemaining(x -> n[0]++);
+                Bulk.p("seen", n[0]);
+            } catch (java.util.ConcurrentModificationException e) {
+                Bulk.p("seen", "CME");
+            }
+        });
+        Bulk.check("Lang.addAllAbsentIsAtomic", () -> {
+            java.util.concurrent.CopyOnWriteArrayList<Object> l = new java.util.concurrent.CopyOnWriteArrayList<>();
+            l.add("x");
+            Object bad = new Object() {
+                @Override
+                public boolean equals(Object o) {
+                    throw new IllegalStateException();
+                }
+
+                @Override
+                public int hashCode() {
+                    return 1;
+                }
+            };
+            try {
+                l.addAllAbsent(java.util.Arrays.asList("a", bad));
+                Bulk.p("threw", false);
+            } catch (IllegalStateException e) {
+                Bulk.p("threw", true);
+            }
+            Bulk.p("size", l.size());
+            Bulk.p("added", l.addAllAbsent(java.util.Arrays.asList("a", "x", "a", "b")));
+            Bulk.p("list", l.toString());
+        });
+        Bulk.check("Lang.scriptLettersAreLetters", () -> {
+            for (int c : new int[]{0xe32, 0xe33, 0xe40, 0x6d5, 0x6e5, 0x93d, 0x950, 0x30fc, 0x309b, 0x5f0, 0x10fd}) {
+                Bulk.p(Integer.toHexString(c), Character.isLetter(c) + "/" + Character.isJavaIdentifierStart(c));
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

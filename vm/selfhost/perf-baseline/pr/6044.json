@@ -1,6 +1,20 @@
 {
  "pr": 6044,
  "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.507,
+      "time": 0.698
+     },
+     "memory": 0.43,
+     "reason": "java-api-additions: translator self-hosting RAM 0.43x vs 0.51x on linux arm64",
+     "runs": 1,
+     "time": 0.698
+    }
+   }
+  },
   "linux-x64@amd-epyc-7763-64-core-processor": {
    "hello": {
     "all": {
