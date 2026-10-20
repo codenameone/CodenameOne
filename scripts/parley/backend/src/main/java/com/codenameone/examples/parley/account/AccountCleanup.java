@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.account;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.parley.chat.Conversations;
 import com.codenameone.examples.parley.domain.Device;
+import com.codenameone.examples.parley.repository.CallLineRepository;
 import com.codenameone.examples.parley.repository.CallRecordRepository;
 import com.codenameone.examples.parley.repository.ContactBlockRepository;
 import com.codenameone.examples.parley.repository.DeviceRepository;
@@ -59,6 +60,7 @@ public class AccountCleanup {
     private final ProfilePhotoRepository photos;
     private final PushDeviceRepository pushDevices;
     private final CallRecordRepository calls;
+    private final CallLineRepository lines;
     private final MessageLogRepository log;
     private final PreferenceRepository preferences;
     private final PhoneCodeRepository codes;
@@ -68,7 +70,7 @@ public class AccountCleanup {
             EnvelopeRepository envelopes, Conversations conversations,
             ContactBlockRepository blocks, ReportRepository reports, MediaBlobRepository media,
             ProfilePhotoRepository photos, PushDeviceRepository pushDevices,
-            CallRecordRepository calls, MessageLogRepository log,
+            CallRecordRepository calls, CallLineRepository lines, MessageLogRepository log,
             PreferenceRepository preferences, PhoneCodeRepository codes,
             LiveTicketRepository tickets) {
         this.devices = devices;
@@ -81,6 +83,7 @@ public class AccountCleanup {
         this.photos = photos;
         this.pushDevices = pushDevices;
         this.calls = calls;
+        this.lines = lines;
         this.log = log;
         this.preferences = preferences;
         this.codes = codes;
@@ -113,6 +116,9 @@ public class AccountCleanup {
         }
         pushDevices.deleteByUsername(username);
         calls.deleteOf(username);
+        if (lines.existsById(username)) {
+            lines.deleteById(username);
+        }
         log.deleteBySender(username);
         preferences.deleteByUsername(username);
         codes.deleteByUsername(username);

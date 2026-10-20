@@ -65,6 +65,9 @@ public final class CallScreen {
             form = new Form(new BorderLayout());
             form.setName("Call");
             form.setUIID("PlCall");
+            form.getContentPane().setUIID("PlCall");
+            // Nothing under the notch or the home indicator.
+            form.getContentPane().setSafeArea(true);
             form.getToolbar().hideToolbar();
             form.setBackCommand(Lang.tr("Back"), null, e -> {
                 if (showing != null && Calls.current() == showing) {
@@ -113,6 +116,13 @@ public final class CallScreen {
         }
     }
 
+    /// The caller's initials, large, as the call screen shows them.
+    private static Label callAvatar(String name) {
+        Label avatar = Ui.avatar(name);
+        avatar.setUIID("PlCallAvatar");
+        return avatar;
+    }
+
     private static void build(Calls.Call call) {
         form.removeAll();
         Container stage = new Container(new LayeredLayout());
@@ -135,7 +145,7 @@ public final class CallScreen {
             localTrack = localVideo;
         }
 
-        Container who = BoxLayout.encloseY(centred(Ui.avatar(call.getPeerName())),
+        Container who = BoxLayout.encloseY(centred(callAvatar(call.getPeerName())),
                 named(new Label(call.getPeerName(), "PlCallName"), "callName"),
                 named(new Label(Lang.tr(stateText(call)), "PlCallState"), "callState"));
         if (remote != null) {

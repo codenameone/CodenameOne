@@ -35,7 +35,7 @@ import com.codenameone.examples.parley.Telemetry;
 /// stops this account seeing other people's, as in every messenger, so that
 /// it is not a way to watch without being watched.
 public final class PrivacyForm {
-    static final String[] TIMER_LABELS = {"Off", "5 minutes", "1 hour", "1 day", "1 week"};
+    static final String[] TIMER_LABELS = {"Off", "5 min", "1 hour", "1 day", "1 week"};
     static final String[] TIMER_VALUES = {"0", "300", "3600", "86400", "604800"};
 
     private PrivacyForm() {

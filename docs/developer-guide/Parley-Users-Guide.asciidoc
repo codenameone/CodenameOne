@@ -56,7 +56,7 @@ answers. <<parley-launch>> has the commands.
 
 | The Parley bot
 | Answers whoever writes to it, so that one person trying the app alone has
-  someone to talk to. It is the server, so its chats are marked as not end-to-end
+  someone to talk to. It's the server, so its chats are marked as not end-to-end
   encrypted.
 |===
 
@@ -70,16 +70,20 @@ is there for a phone on the same network as a development server: `localhost` on
 phone is the phone, so the app has to be told where the server is. The app in a
 browser has no such entry: it always talks to the server that hosts it.
 
+image::img/parley-welcome.png["The Parley welcome screen with buttons to sign in, to create an account and to set the server address",scaledwidth=40%]
+
+image::img/parley-register.png["The form for a new account with fields for name, e-mail, mobile number and password",scaledwidth=40%]
+
 A new account asks for a name, an e-mail address, a mobile number and a password.
 The mobile number is verified with a code sent as a text message, and a
 development server prints the code on its console and the app shows it. The number
 is used to find people you know, and only if you leave that on.
 
 The first sign-in on a device asks whether the app may share usage statistics. The
-answer can be changed in the settings at any time. What is shared never includes a
+answer can be changed in the settings at any time. What's shared never includes a
 name, a contact, a number or anything that was written.
 
-On first sign-in the app also makes this device's encryption keys. They are made
+On first sign-in the app also makes this device's encryption keys. They're made
 on the device and never leave it, which is why a message sent before the account
 existed on this device can't be read here.
 
@@ -90,11 +94,19 @@ count and the start of the last message. Pressing and holding a conversation
 pins it to the top, mutes it or archives it. A notification only says that
 something arrived: what it says is fetched and decrypted on the device.
 
+image::img/parley-chats.png["The chat list with each conversation's avatar, last message, time and unread count, and the button for a new chat",scaledwidth=40%]
+
+image::img/parley-direct-chat-received.png["A conversation with an incoming and an outgoing message bubble, the call buttons in the title bar and the composer at the bottom",scaledwidth=40%]
+
+image::img/parley-new-group.png["The new group form with the group name, the chosen member and the button that creates the group",scaledwidth=40%]
+
+image::img/parley-group-info.png["The group information screen with the disappearing messages timer, the members and the link to invite people",scaledwidth=40%]
+
 There are three kinds of conversation:
 
 [cols="1,3"]
 |===
-| Kind | What it is
+| Kind | Description
 
 | Chat
 | Two people.
@@ -112,8 +124,8 @@ The button on the chat list starts a conversation: find a person by name,
 username or phone number, make a group, or join one with an invite link.
 
 A conversation shows its messages as they arrive, a typing indicator, and the
-state of each message you sent: sent, delivered and read. A message can be
-replied to, copied, forwarded, edited and deleted. **Delete for everyone**
+state of each message you sent: sent, delivered, and read. A message can be
+replied to, copied, forwarded, edited, and deleted. **Delete for everyone**
 removes it from every phone in the conversation. Photos, video and voice notes
 are sent from the attachment button: a photo or a video from the gallery or the
 camera, and a voice note recorded with the microphone. Each is encrypted on
@@ -138,7 +150,7 @@ keys do -- a new phone, a reinstall -- so a number that changed for a person who
 hasn't changed phones is worth a question.
 
 A chat with the demo bot, and a conversation an administrator has linked to
-Telegram or WhatsApp, are not end-to-end encrypted, because a bot or another
+Telegram or WhatsApp, aren't end-to-end encrypted, because a bot or another
 network has to read what's written. The app marks those conversations, and
 anyone in a bridged conversation is told when it's linked. <<parley-bridges>>
 explains the trade-off.
@@ -184,6 +196,8 @@ what the phone shows:
   screen.
 |===
 
+image::img/parley-privacy.png["The privacy settings: who can see the last seen time and profile photo, read receipts, typing indicator and the default message timer",scaledwidth=40%]
+
 **Report** on a person or a conversation sends the administrators a reason and the
 last few messages as the reporter's phone shows them, and nothing else: they can't
 read anything the reporter didn't choose to send.
@@ -197,6 +211,8 @@ running. Answering opens the call screen, which has a mute switch, a speaker swi
 switch and a button to turn the camera off, and **End**. A call you don't answer shows in **Calls**
 as missed, and a call to someone who's already in one is told they're busy.
 
+image::img/parley-call-connected.png["A voice call in progress with the caller's initials and name, the encryption note and the mute, speaker and hang up buttons",scaledwidth=40%]
+
 The audio and video go straight between the two phones, or through a relay when a
 direct path doesn't exist, which on mobile networks is often. Either way they're
 encrypted between the two phones. Calls need the camera and the microphone, which
@@ -204,9 +220,9 @@ the app asks for the first time.
 
 === Linked devices
 
-The same account can be signed in on up to six phones, tablets and browsers.
+The same account can be signed in on up to six phones, tablets, and browsers.
 **Linked devices** in the settings lists them. Each is its own end of every
-conversation, with its own keys, and a message to you is encrypted separately for
+conversation, with its own keys, and a message to you is encrypted for
 each.
 Unlinking one is final: the server stops sending it anything, and what it held
 opens nothing sent afterward.
@@ -218,10 +234,12 @@ messages were sent and how many accounts are new, with charts of the last two
 weeks, of the busiest hours and of the kinds of chat. Message counts are all the
 server knows: what was said is encrypted on the devices and never reached it.
 
+image::img/parley-admin-dashboard.png["The operations dashboard with the reports to review, today's counts and the message trend",scaledwidth=40%]
+
 **Reports** lists what people reported, with the reason, the messages the reporter
 attached and a button to resolve it with a note of what was done. **People** finds
 any account. An account can be flagged, which marks it for the admins and changes
-nothing for its owner, or blocked with a reason that is kept in its history: a
+nothing for its owner, or blocked with a reason that's kept in its history: a
 blocked account is signed out everywhere and can't sign in. Another administrator
 can be named from the same screen.
 
@@ -235,9 +253,13 @@ opens what's picked beside its list.
 
 The settings hold the account -- its name, about line, photo, phone number and
 password -- the privacy choices, the linked devices, the language, the theme,
-notifications and the usage statistics. **Delete my account** removes the
+notifications and the usage statistics. Deleting the account removes the
 sign-in, the profile and the settings for good. The app is in English, Spanish,
 French, German and Hebrew, and in Hebrew it's laid out from right to left.
+
+image::img/parley-settings-dark.png["The settings screen in the dark theme with the profile card, account and privacy sections",scaledwidth=40%]
+
+image::img/parley-settings-hebrew.png["The settings screen in Hebrew, laid out right to left",scaledwidth=40%]
 
 NOTE: The translations are machine-generated samples, and no native speaker has
 reviewed them. Have them checked before you ship the app in those languages.

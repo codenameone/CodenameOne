@@ -5215,6 +5215,119 @@
     return 1;
   });
 
+  // WebRTC (com.codename1.webrtc). RTCPeerConnection, getUserMedia and the
+  // <video> views exist only on the main thread, and neither a MediaStream nor
+  // a peer connection can cross into the worker, so every peer and track lives
+  // in these host tables keyed by the integer handles the Java API speaks in.
+  // Asynchronous outcomes (descriptions, ICE, state, remote tracks) stream back
+  // through the worker-callback channel to HTML5WebRtc.dispatch; a view comes
+  // back as an opaque <video> host-ref the worker hands to PeerComponent.
+  var rtcCallbackId = null;
+  var rtc = { peers: {}, tracks: {}, next: 1 };
+  function rtcFire(k, a, b, s1, s2, s3) {
+    var target = global.__parparWorker;
+    if (rtcCallbackId == null || !target || typeof target.postMessage !== 'function') { return; }
+    try {
+      target.postMessage({ type: 'worker-callback', callbackId: rtcCallbackId, args: [{
+        kind: k, a: a | 0, b: b | 0,
+        s1: s1 == null ? null : '' + s1, s2: s2 == null ? null : '' + s2, s3: s3 == null ? null : '' + s3 }] });
+    } catch (e) { console.log('cn1WebRtc', e); }
+  }
+  function rtcErr(e) { return '' + ((e && (e.message || e.name)) || e); }
+  function rtcTrack(t) { var id = rtc.next++; rtc.tracks[id] = t; return id; }
+  function rtcAvailable() {
+    return typeof global.RTCPeerConnection !== 'undefined' && typeof navigator !== 'undefined'
+      && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+  var rtcOps = {
+    available: function() { return rtcAvailable() ? 1 : 0; },
+    init: function(r) {
+      var cb = r.callback || r;
+      if (cb && typeof cb.__cn1WorkerCallback === 'number') { rtcCallbackId = cb.__cn1WorkerCallback; }
+      else if (typeof cb === 'function' && typeof cb.__cn1WorkerCallbackId === 'number') { rtcCallbackId = cb.__cn1WorkerCallbackId; }
+      else { return 0; }
+      return 1;
+    },
+    create: function(r) {
+      var servers = [];
+      String(r.wire || '').split('\n').forEach(function(line) { if (!line) { return; }
+        var f = line.split('\t'); var s = { urls: f[0].split(',') };
+        if (f[1]) { s.username = f[1]; } if (f[2]) { s.credential = f[2]; } servers.push(s); });
+      var id = rtc.next++;
+      var pc = new global.RTCPeerConnection({ iceServers: servers, iceTransportPolicy: r.relay ? 'relay' : 'all' });
+      var p = { pc: pc, early: [], remoteSet: false };
+      rtc.peers[id] = p;
+      pc.onicecandidate = function(e) { if (e.candidate) { rtcFire('ice', id,
+        e.candidate.sdpMLineIndex || 0, e.candidate.sdpMid || '', e.candidate.candidate, null); } };
+      pc.onconnectionstatechange = function() { rtcFire('state', id, 0, pc.connectionState, null, null); };
+      pc.ontrack = function(e) { var t = rtcTrack(e.track); rtcFire('track', id, t, e.track.kind, null, null); };
+      return id;
+    },
+    media: function(r) {
+      var req = r.req, front = !!r.front;
+      navigator.mediaDevices.getUserMedia({ audio: !!r.audio,
+        video: r.video ? { facingMode: front ? 'user' : 'environment' } : false })
+      .then(function(stream) { var a = 0, v = 0;
+        stream.getAudioTracks().forEach(function(t) { if (!a) { a = rtcTrack(t); } });
+        stream.getVideoTracks().forEach(function(t) { if (!v) { v = rtcTrack(t); rtc.tracks[v].cn1Front = front; } });
+        rtcFire('tracks', req, a, '' + v, null, null); })
+      .catch(function(e) { rtcFire('tracks', req, 0, '0', rtcErr(e), null); });
+      return 1;
+    },
+    add: function(r) { var p = rtc.peers[r.peer], t = rtc.tracks[r.track];
+      if (p && t) { p.pc.addTrack(t, new global.MediaStream([t])); } return 1; },
+    describe: function(r) { var p = rtc.peers[r.peer], req = r.req;
+      if (!p) { rtcFire('desc', req, 0, null, null, 'closed'); return 1; }
+      (r.answer ? p.pc.createAnswer() : p.pc.createOffer())
+      .then(function(d) { rtcFire('desc', req, 0, d.type, d.sdp, null); })
+      .catch(function(e) { rtcFire('desc', req, 0, null, null, rtcErr(e)); });
+      return 1; },
+    set: function(r) { var p = rtc.peers[r.peer], req = r.req, remote = !!r.remote;
+      if (!p) { rtcFire('result', req, 0, 'closed', null, null); return 1; }
+      var d = { type: r.type, sdp: r.sdp };
+      (remote ? p.pc.setRemoteDescription(d) : p.pc.setLocalDescription(d))
+      .then(function() { if (remote) { p.remoteSet = true;
+          p.early.forEach(function(c) { p.pc.addIceCandidate(c).catch(function() {}); }); p.early = []; }
+        rtcFire('result', req, 0, null, null, null); })
+      .catch(function(e) { rtcFire('result', req, 0, rtcErr(e), null, null); });
+      return 1; },
+    ice: function(r) { var p = rtc.peers[r.peer]; if (!p) { return 0; }
+      var c = { sdpMid: r.mid, sdpMLineIndex: r.index, candidate: r.cand };
+      if (p.remoteSet) { p.pc.addIceCandidate(c).catch(function() {}); } else { p.early.push(c); }
+      return 1; },
+    close: function(r) { var p = rtc.peers[r.peer]; if (p) { delete rtc.peers[r.peer]; p.pc.close(); } return 1; },
+    enable: function(r) { var t = rtc.tracks[r.track]; if (t) { t.enabled = !!r.on; } return 1; },
+    release: function(r) { var t = rtc.tracks[r.track]; if (t) { delete rtc.tracks[r.track]; t.stop(); } return 1; },
+    switchCamera: function(r) { var track = r.track, t = rtc.tracks[track]; if (!t) { return 0; }
+      var front = !t.cn1Front;
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: front ? 'user' : 'environment' } })
+      .then(function(s) { var n = s.getVideoTracks()[0]; if (!n) { return; } n.cn1Front = front;
+        n.enabled = t.enabled;
+        Object.keys(rtc.peers).forEach(function(k) { rtc.peers[k].pc.getSenders().forEach(function(snd) {
+          if (snd.track === t) { snd.replaceTrack(n); } }); });
+        (t.cn1Views || []).forEach(function(v) { v.srcObject = new global.MediaStream([n]); });
+        n.cn1Views = t.cn1Views; t.stop(); rtc.tracks[track] = n; })
+      .catch(function(e) { console.log('cn1WebRtc switchCamera', e); });
+      return 1; },
+    view: function(r) { var t = rtc.tracks[r.track]; if (!t) { return null; }
+      var doc = global.document || (global.window && global.window.document);
+      if (!doc) { return null; }
+      var v = doc.createElement('video');
+      v.autoplay = true; v.playsInline = true; v.muted = true;
+      v.setAttribute('playsinline', ''); v.style.objectFit = 'cover';
+      if (r.mirror) { v.style.transform = 'scaleX(-1)'; }
+      v.srcObject = new global.MediaStream([t]);
+      (t.cn1Views = t.cn1Views || []).push(v);
+      var play = v.play(); if (play && play.catch) { play.catch(function() {}); }
+      return hostResult(v); }
+  };
+  hostBridge.register('__cn1_webrtc__', function(request) {
+    var op = request && rtcOps[request.op];
+    if (!op) { return null; }
+    if (request.op !== 'available' && request.op !== 'init' && !rtcAvailable()) { return null; }
+    return op(request);
+  });
+
   // VideoIO lives entirely on the browser host.  The translated application
   // runs in a Worker, where document, HTMLVideoElement and (on some browsers)
   // WebCodecs are absent.  A single host-owned session table prevents the

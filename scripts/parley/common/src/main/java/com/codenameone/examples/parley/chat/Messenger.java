@@ -107,6 +107,28 @@ public final class Messenger implements LiveChannel.Handler {
 
     private Messenger(String me) {
         this.me = me;
+        // Envelopes decrypted but not yet acknowledged when the app last
+        // stopped. The server sends them again, and their ratchet keys are
+        // spent, so they are acknowledged rather than decrypted a second time.
+        Map<String, Object> pending = Vault.get(PENDING_ACKS);
+        Object ids = pending == null ? null : pending.get("ids");
+        if (ids instanceof List) {
+            for (Object each : (List<?>) ids) {
+                if (each instanceof String) {
+                    toAck.add((String) each);
+                    processed.add((String) each);
+                }
+            }
+        }
+    }
+
+    /// The vault document holding [#toAck].
+    private static final String PENDING_ACKS = "pending-acks";
+
+    private void savePendingAcks() {
+        Map<String, Object> document = new HashMap<String, Object>();
+        document.put("ids", new ArrayList<String>(toAck));
+        Vault.put(PENDING_ACKS, document);
     }
 
     /// Opens this account's vault and keys, registers the device the first
@@ -123,9 +145,13 @@ public final class Messenger implements LiveChannel.Handler {
             ready.run();
             return;
         }
+        final String identity = Identity.owner();
         Api.devices().register(Identity.registration(deviceName(), platform()),
                 Net.to(device -> {
-                    Identity.registered(device.id());
+                    if (!identity.equals(Identity.owner())) {
+                        return;
+                    }
+                    Identity.registered(device.id(), identity);
                     if (instance != null) {
                         instance.started();
                     }
@@ -138,9 +164,10 @@ public final class Messenger implements LiveChannel.Handler {
     /// and the sync start again under the new id.
     private void registerAgain() {
         LiveChannel.stop();
+        final String owner = Identity.owner();
         Api.devices().register(Identity.registration(deviceName(), platform()),
                 Net.to(device -> {
-                    Identity.registered(device.id());
+                    Identity.registered(device.id(), owner);
                     if (instance == this) {
                         started();
                     }
@@ -169,6 +196,7 @@ public final class Messenger implements LiveChannel.Handler {
         stop();
         Vault.open(owner);
         Vault.destroy(owner);
+        Media.clearCache();
     }
 
     public static boolean running() {
@@ -695,13 +723,21 @@ public final class Messenger implements LiveChannel.Handler {
             }
             return;
         }
-        List<String> ids = new ArrayList<String>(toAck);
+        final List<String> ids = new ArrayList<String>(toAck);
         toAck.clear();
         Api.messages().ack(Identity.deviceId(), new AckDto(ids), Net.to(ok -> {
+            savePendingAcks();
             if (then != null) {
                 then.run();
             }
         }, (status, message) -> {
+            // Not acknowledged: they go with the next flush. The vault copy
+            // was never cleared, so a restart in between loses nothing.
+            for (String each : ids) {
+                if (!toAck.contains(each)) {
+                    toAck.add(each);
+                }
+            }
             if (then != null) {
                 then.run();
             }
@@ -713,7 +749,10 @@ public final class Messenger implements LiveChannel.Handler {
         if (id.length() == 0) {
             return;
         }
-        toAck.add(id);
+        if (!toAck.contains(id)) {
+            toAck.add(id);
+            savePendingAcks();
+        }
         if (!processed.add(id)) {
             return;
         }

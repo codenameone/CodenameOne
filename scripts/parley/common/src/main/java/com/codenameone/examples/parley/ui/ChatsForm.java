@@ -188,6 +188,10 @@ public final class ChatsForm implements Nav.Home, Store.Listener {
         }
         Label name = new Label(title, "PlChatTitle");
         String preview = Store.lastText(id);
+        if (preview == null || preview.trim().length() == 0) {
+            // An empty second line reads as a broken row.
+            preview = "No messages yet";
+        }
         List<String> typing = Messenger.typists(id);
         Label last = new Label(!typing.isEmpty() ? "typing..." : preview, "PlChatPreview");
         Label time = new Label(Ui.listTime(Store.lastAt(id)), "PlChatTime");

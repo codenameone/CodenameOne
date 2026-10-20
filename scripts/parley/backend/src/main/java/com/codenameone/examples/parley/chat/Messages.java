@@ -51,6 +51,8 @@ import com.codenameone.examples.parley.repository.ProfileRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 
@@ -161,10 +163,13 @@ public class Messages {
 
         List<String> members = conversations.usernames(id);
         List<Device> targets = deviceRows.findByUsernameIn(members);
-        Set<String> expected = new HashSet<String>();
+        // Each device to the account that owns it: a copy names both, and a
+        // copy whose pair does not match is stale, or a member could address
+        // Bob's device under its own name and step around Bob's block.
+        Map<String, String> expected = new HashMap<String, String>();
         for (int iter = 0; iter < targets.size(); iter++) {
             if (!targets.get(iter).getId().equals(message.senderDevice())) {
-                expected.add(targets.get(iter).getId());
+                expected.put(targets.get(iter).getId(), targets.get(iter).getUsername());
             }
         }
         List<EnvelopeCopyDto> copies = message.copies() == null
@@ -176,7 +181,7 @@ public class Messages {
             if (copy == null || copy.deviceId() == null) {
                 throw new ResponseStatusException(400, "A copy for no device");
             }
-            if (!expected.contains(copy.deviceId()) || !members.contains(copy.username())) {
+            if (copy.username() == null || !copy.username().equals(expected.get(copy.deviceId()))) {
                 stale.add(new DeviceAddressDto(copy.username(), copy.deviceId()));
             } else if (!covered.add(copy.deviceId())) {
                 throw new ResponseStatusException(400, "Two copies for one device");
@@ -189,7 +194,7 @@ public class Messages {
         if (MESSAGE.equals(kind)) {
             for (int iter = 0; iter < targets.size(); iter++) {
                 Device each = targets.get(iter);
-                if (expected.contains(each.getId()) && !covered.contains(each.getId())) {
+                if (expected.containsKey(each.getId()) && !covered.contains(each.getId())) {
                     missing.add(new DeviceAddressDto(each.getUsername(), each.getId()));
                 }
             }

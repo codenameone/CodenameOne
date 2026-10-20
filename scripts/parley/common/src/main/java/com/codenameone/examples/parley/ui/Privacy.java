@@ -93,6 +93,7 @@ public final class Privacy {
         form.setUIID("PlLock");
         form.getToolbar().hideToolbar();
         form.setName("Locked");
+        form.getContentPane().setSafeArea(true);
         Label icon = new Label("", "PlLockTitle");
         FontImage.setMaterialIcon(icon, FontImage.MATERIAL_LOCK, 14);
         Container middle = BoxLayout.encloseY(icon, new Label("Parley is locked", "PlLockTitle"),

@@ -39,10 +39,10 @@ public final class WelcomeForm {
         hero.setUIID("PlHero");
         hero.setSafeArea(true);
         Label icon = new Label("", "PlHeroIcon");
-        Ui.icon(icon, FontImage.MATERIAL_RESTAURANT_MENU, 10f);
+        Ui.icon(icon, FontImage.MATERIAL_FORUM, 10f);
         hero.add(icon);
         hero.add(Ui.label("Parley", "PlHeroTitle"));
-        hero.add(Ui.text("Good food from places nearby, brought to your door.", "PlHeroText"));
+        hero.add(Ui.text("Private messages, groups and calls, end-to-end encrypted.", "PlHeroText"));
 
         Container actions = Ui.page();
         actions.setScrollableY(false);

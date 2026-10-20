@@ -25,7 +25,7 @@ package com.codename1.security;
 /// HMAC-based key derivation (HKDF), per RFC 5869.
 ///
 /// HKDF turns input keying material that is not uniformly random -- the
-/// shared secret of a [KeyAgreement], say -- into one or more keys of any
+/// shared secret of a `KeyAgreement`, say -- into one or more keys of any
 /// length. It runs in two steps: *extract* concentrates the input into a
 /// pseudorandom key, and *expand* stretches that into as many bytes as are
 /// asked for, bound to an `info` label so that keys derived for different

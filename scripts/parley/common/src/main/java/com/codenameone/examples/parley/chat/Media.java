@@ -33,12 +33,15 @@ import com.codenameone.examples.parley.api.MediaUploadDto;
 import com.codenameone.examples.parley.crypto.Codec;
 import com.codenameone.examples.parley.net.Api;
 import com.codenameone.examples.parley.net.Net;
+import com.codenameone.examples.parley.ui.Lang;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /// Attachments: photos, videos, voice messages and files.
@@ -50,6 +53,11 @@ import java.util.Map;
 /// from a voice message by. A downloaded blob whose hash is not the one the
 /// message promised is refused before it is decrypted.
 public final class Media {
+    /// The most the attachment cache keeps.
+    static final long CACHE_BYTES = 64L * 1024 * 1024;
+    /// The cache's index; not an attachment, so not named like one.
+    private static final String CACHE_INDEX = "parley-media-cache";
+
     /// The largest attachment the server takes, before encryption adds its
     /// 16-byte tag.
     public static final int MAX_BYTES = 16 * 1024 * 1024 - 16;
@@ -140,6 +148,10 @@ public final class Media {
                 out.write(plain);
             } catch (IOException failedWrite) {
                 Util.cleanup(out);
+                FileSystemStorage.getInstance().delete(path);
+                if (failed != null) {
+                    failed.failed(0, Lang.tr("There is no room to open this"));
+                }
                 return;
             }
             Util.cleanup(out);
@@ -249,22 +261,82 @@ public final class Media {
         }
     }
 
+    /// Keeps a sealed attachment so it opens without a download next time.
+    /// The cache is bounded: past [#CACHE_BYTES] the attachments used least
+    /// recently go, and they are fetched again if they are wanted. Storage
+    /// the app cannot fill is also storage the vault can still write to.
     private static void cache(String id, byte[] sealed) {
+        Storage storage = Storage.getInstance();
         OutputStream out = null;
         try {
-            out = Storage.getInstance().createOutputStream("pm-" + id);
+            out = storage.createOutputStream("pm-" + id);
             out.write(sealed);
         } catch (IOException full) {
             // Not cached; it is fetched again next time.
+            Util.cleanup(out);
+            storage.deleteStorageFile("pm-" + id);
+            return;
         } finally {
             Util.cleanup(out);
         }
+        touch(id);
+        List<String> order = cacheOrder();
+        long total = 0;
+        for (int iter = order.size() - 1; iter >= 0; iter--) {
+            String each = order.get(iter);
+            total += storage.exists("pm-" + each) ? storage.entrySize("pm-" + each) : 0;
+            if (total > CACHE_BYTES && iter < order.size() - 1) {
+                storage.deleteStorageFile("pm-" + each);
+                order.remove(iter);
+            }
+        }
+        storage.writeObject(CACHE_INDEX, order);
+    }
+
+    /// The attachments in the cache, the most recently used last.
+    @SuppressWarnings("unchecked")
+    private static List<String> cacheOrder() {
+        Object stored = Storage.getInstance().readObject(CACHE_INDEX);
+        List<String> order = new ArrayList<String>();
+        if (stored instanceof List) {
+            for (Object each : (List<Object>) stored) {
+                if (each instanceof String) {
+                    order.add((String) each);
+                }
+            }
+        }
+        return order;
+    }
+
+    private static void touch(String id) {
+        List<String> order = cacheOrder();
+        order.remove(id);
+        order.add(id);
+        Storage.getInstance().writeObject(CACHE_INDEX, order);
+    }
+
+    /// Deletes every cached attachment, for a device that is signed out for
+    /// good.
+    public static void clearCache() {
+        Storage storage = Storage.getInstance();
+        for (String each : cacheOrder()) {
+            storage.deleteStorageFile("pm-" + each);
+        }
+        String[] all = storage.listEntries();
+        for (int iter = 0; all != null && iter < all.length; iter++) {
+            if (all[iter].startsWith("pm-")) {
+                storage.deleteStorageFile(all[iter]);
+            }
+        }
+        storage.deleteStorageFile(CACHE_INDEX);
+        cleanUp();
     }
 
     private static byte[] cached(String id) {
         if (!Storage.getInstance().exists("pm-" + id)) {
             return null;
         }
+        touch(id);
         InputStream in = null;
         try {
             in = Storage.getInstance().createInputStream("pm-" + id);

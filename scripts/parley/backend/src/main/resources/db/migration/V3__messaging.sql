@@ -54,7 +54,8 @@ CREATE TABLE one_time_pre_key (
 CREATE INDEX one_time_pre_key_device_id ON one_time_pre_key (device_id);
 
 -- Conversations. direct_key is the pair of usernames of a direct chat, in
--- order, so the same two people never get two; it is empty for a group.
+-- order, and unique, so the same two people never get two even when both
+-- start the chat at once; a group's is '#' and its id.
 CREATE TABLE conversation (
     id VARCHAR(32) NOT NULL PRIMARY KEY,
     kind VARCHAR(16) NOT NULL,
@@ -68,7 +69,7 @@ CREATE TABLE conversation (
     last_activity_at BIGINT NOT NULL,
     direct_key VARCHAR(400) NOT NULL
 );
-CREATE INDEX conversation_direct_key ON conversation (direct_key);
+CREATE UNIQUE INDEX conversation_direct_key ON conversation (direct_key);
 
 -- Who is in which conversation, in which role, and how they see it.
 CREATE TABLE membership (
@@ -149,6 +150,14 @@ CREATE TABLE call_record (
 );
 CREATE INDEX call_record_caller ON call_record (caller);
 CREATE INDEX call_record_callee ON call_record (callee);
+
+-- The call each person is on, keyed by username, so that the database refuses
+-- a second live call for anyone however two callers' transactions interleave.
+CREATE TABLE call_line (
+    id VARCHAR(190) NOT NULL PRIMARY KEY,
+    call_id VARCHAR(32) NOT NULL
+);
+CREATE INDEX call_line_call_id ON call_line (call_id);
 
 -- Bridges. A bridged conversation is not end-to-end encrypted.
 CREATE TABLE bridge_link (

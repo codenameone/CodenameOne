@@ -198,6 +198,7 @@ public class AndroidWebRtc implements WebRtcBridge {
             synchronized (this) {
                 peers.put(Integer.valueOf(handle), p);
             }
+            inCall(true);
             return handle;
         } catch (Throwable t) {
             return -1;
@@ -418,6 +419,36 @@ public class AndroidWebRtc implements WebRtcBridge {
         if (p != null) {
             p.connection.dispose();
         }
+        boolean last;
+        synchronized (this) {
+            last = peers.isEmpty();
+        }
+        if (last) {
+            inCall(false);
+        }
+    }
+
+    /// The audio mode before the first call, restored after the last; -1
+    /// outside a call.
+    private int modeBeforeCall = -1;
+
+    /// A call keeps the audio system in communication mode -- earpiece
+    /// routing, echo cancellation -- for its whole length, whichever way the
+    /// speaker is switched, and hands back the mode it found when it ends.
+    private void inCall(boolean on) {
+        Object service = context.getSystemService(Context.AUDIO_SERVICE);
+        if (!(service instanceof AudioManager)) {
+            return;
+        }
+        AudioManager am = (AudioManager) service;
+        if (on && modeBeforeCall < 0) {
+            modeBeforeCall = am.getMode();
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        } else if (!on && modeBeforeCall >= 0) {
+            am.setSpeakerphoneOn(false);
+            am.setMode(modeBeforeCall);
+            modeBeforeCall = -1;
+        }
     }
 
     @Override
@@ -445,7 +476,6 @@ public class AndroidWebRtc implements WebRtcBridge {
         Object service = context.getSystemService(Context.AUDIO_SERVICE);
         if (service instanceof AudioManager) {
             AudioManager am = (AudioManager) service;
-            am.setMode(on ? AudioManager.MODE_IN_COMMUNICATION : AudioManager.MODE_NORMAL);
             am.setSpeakerphoneOn(on);
         }
     }

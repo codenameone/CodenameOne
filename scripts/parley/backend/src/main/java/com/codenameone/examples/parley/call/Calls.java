@@ -33,11 +33,15 @@ import com.codenameone.examples.parley.api.IceConfigDto;
 import com.codenameone.examples.parley.api.IceServerDto;
 import com.codenameone.examples.parley.chat.Conversations;
 import com.codenameone.examples.parley.domain.CallRecord;
+import com.codenameone.examples.parley.domain.CallSetup;
+import com.codenameone.examples.parley.domain.CallLine;
 import com.codenameone.examples.parley.domain.Conversation;
 import com.codenameone.examples.parley.domain.Profile;
 import com.codenameone.examples.parley.live.LiveHub;
 import com.codenameone.examples.parley.push.MessagePushes;
 import com.codenameone.examples.parley.repository.CallRecordRepository;
+import com.codenameone.examples.parley.repository.CallSetupRepository;
+import com.codenameone.examples.parley.repository.CallLineRepository;
 import com.codenameone.examples.parley.repository.ContactBlockRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 import com.codenameone.examples.parley.chat.Messages;
@@ -80,6 +84,8 @@ public class Calls {
     static final String DECLINE = "DECLINE";
     static final String END = "END";
     static final int MAX_PAYLOAD = 16384;
+    /// How much of a ringing call's candidates is kept for a late callee.
+    static final int MAX_SETUP = 16384;
 
     /// How long a call rings before it counts as missed.
     static final long RING_MILLIS = 45000L;
@@ -88,6 +94,8 @@ public class Calls {
     static final long STALE_MILLIS = 6 * 3600000L;
 
     private final CallRecordRepository calls;
+    private final CallLineRepository lines;
+    private final CallSetupRepository setups;
     private final ProfileRepository profiles;
     private final ContactBlockRepository blocks;
     private final Conversations conversations;
@@ -98,7 +106,8 @@ public class Calls {
     private final String turnSecret;
     private final int turnTtl;
 
-    public Calls(CallRecordRepository calls, ProfileRepository profiles,
+    public Calls(CallRecordRepository calls, CallLineRepository lines,
+            CallSetupRepository setups, ProfileRepository profiles,
             ContactBlockRepository blocks, Conversations conversations, LiveHub live,
             MessagePushes pushes,
             @Value("${parley.ice.stun:stun:stun.l.google.com:19302}") String stun,
@@ -106,6 +115,8 @@ public class Calls {
             @Value("${parley.ice.secret:}") String turnSecret,
             @Value("${parley.ice.ttl:86400}") int turnTtl) {
         this.calls = calls;
+        this.lines = lines;
+        this.setups = setups;
         this.profiles = profiles;
         this.blocks = blocks;
         this.conversations = conversations;
@@ -152,13 +163,23 @@ public class Calls {
         // A callee who blocked the caller is never rung, and the caller is
         // not told why: to them it looks like a call nobody answered.
         boolean blocked = blocks.findById(Messages.blockId(callee, username)) != null;
-        if (!calls.liveOf(callee).isEmpty()) {
+        if (!calls.liveOf(callee).isEmpty() || lines.findById(callee) != null) {
             row.setState(BUSY);
             row.setEndedAt(now);
         } else {
             row.setState(RINGING);
         }
         calls.save(row);
+        if (RINGING.equals(row.getState())) {
+            // The check above reads; these inserts are what decide. Of two
+            // callers ringing one callee at once, the second insert fails on
+            // the callee's key and that call never rings.
+            lines.insert(new CallLine(username, row.getId()));
+            lines.insert(new CallLine(callee, row.getId()));
+            CallSetup setup = new CallSetup();
+            setup.setId(row.getId());
+            setups.insert(setup);
+        }
         if (RINGING.equals(row.getState()) && !blocked) {
             Map<String, Object> frame = frame(row, "ring");
             live.toUsers(Arrays.asList(callee), frame);
@@ -193,6 +214,9 @@ public class Calls {
         long now = System.currentTimeMillis();
         if (OFFER.equals(type) && caller) {
             row.setCallerDevice(device);
+            remember(row, signal.payload(), true);
+        } else if (ICE.equals(type) && caller && RINGING.equals(row.getState())) {
+            remember(row, signal.payload(), false);
         } else if (ACCEPT.equals(type) && !caller && RINGING.equals(row.getState())) {
             row.setState(ACCEPTED);
             row.setAnsweredAt(now);
@@ -200,6 +224,7 @@ public class Calls {
             // The callee's other devices are still ringing.
             pushes.cancelRing(row.getCallee(), uuid(row.getId()));
             live.toUsers(Arrays.asList(row.getCallee()), frame(row, "answered"));
+            replay(row);
         } else if (DECLINE.equals(type) && !caller && RINGING.equals(row.getState())) {
             end(row, DECLINED, now);
         } else if (END.equals(type)) {
@@ -272,10 +297,55 @@ public class Calls {
         }
     }
 
+    /// Keeps the caller's offer, or one of its candidates, for a callee that
+    /// is not connected yet.
+    private void remember(CallRecord row, String payload, boolean offer) {
+        CallSetup setup = setups.findById(row.getId());
+        if (setup == null || payload == null) {
+            return;
+        }
+        if (offer) {
+            setup.setOffer(payload);
+        } else if (setup.getCandidates().length() + payload.length() < MAX_SETUP) {
+            setup.setCandidates(setup.getCandidates() + payload + "\n");
+        }
+        setups.save(setup);
+    }
+
+    /// Sends the device that accepted what the caller sent while it rang. The
+    /// app takes an offer it already has once only, so a callee that was
+    /// connected all along and saw these live loses nothing.
+    private void replay(CallRecord row) {
+        CallSetup setup = setups.findById(row.getId());
+        if (setup == null || setup.getOffer().length() == 0) {
+            return;
+        }
+        live.toDevice(row.getCalleeDevice(), replayed(row, OFFER, setup.getOffer()));
+        String[] each = setup.getCandidates().split("\n");
+        for (int iter = 0; iter < each.length; iter++) {
+            if (each[iter].length() > 0) {
+                live.toDevice(row.getCalleeDevice(), replayed(row, ICE, each[iter]));
+            }
+        }
+        setups.deleteById(row.getId());
+    }
+
+    private Map<String, Object> replayed(CallRecord row, String type, String payload) {
+        Map<String, Object> frame = frame(row, "signal");
+        frame.put("signal", type);
+        frame.put("payload", payload);
+        frame.put("fromDevice", row.getCallerDevice());
+        return frame;
+    }
+
     private void end(CallRecord row, String state, long now) {
         boolean ringing = RINGING.equals(row.getState());
         row.setState(state);
         row.setEndedAt(now);
+        lines.deleteByCallId(row.getId());
+        if (setups.findById(row.getId()) != null) {
+            setups.deleteById(row.getId());
+        }
         if (ringing) {
             pushes.cancelRing(row.getCallee(), uuid(row.getId()));
         }

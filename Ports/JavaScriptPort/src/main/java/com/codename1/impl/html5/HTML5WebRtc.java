@@ -31,11 +31,16 @@ import com.codename1.webrtc.spi.WebRtcBridge;
 
 /// The browser's own WebRTC behind the bridge.
 ///
-/// The work is done by a small script object, `window.cn1WebRtc`, installed
-/// on first use: it keeps the browser's peer connections and tracks in
-/// tables keyed by the integer handles the API speaks in, and reports
-/// everything back through one functor. Strings are converted on the way in
-/// with `jvm.toNativeString`, as `@JSBody` does not marshal them.
+/// On the ParparVM JavaScript port the translated application runs in a
+/// worker, which has no `RTCPeerConnection`, no `navigator.mediaDevices` and no
+/// DOM. Every `nativeRtc*` method is therefore bound in `port.js` to the
+/// `__cn1_webrtc__` host native in `browser_bridge.js`, which keeps the peer
+/// connections and tracks on the main thread in tables keyed by the integer
+/// handles the API speaks in, streams asynchronous outcomes back through the
+/// worker-callback channel into [#dispatch], and hands a video view back as an
+/// opaque `<video>` host-ref, the way the live camera preview does. The
+/// `@JSBody` bodies below are only the TeaVM main-thread fallback, where
+/// `window.cn1WebRtc` reports through the [Sink] functor instead.
 final class HTML5WebRtc implements WebRtcBridge {
 
     /// Everything the script reports: what happened and up to five values.
@@ -48,7 +53,7 @@ final class HTML5WebRtc implements WebRtcBridge {
 
     @JSBody(params = {}, script = "return typeof RTCPeerConnection !== 'undefined'"
             + " && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);")
-    static native boolean available();
+    static native boolean nativeRtcAvailable();
 
     @JSBody(params = {"sink"}, script = ""
             + "if (window.cn1WebRtc) { window.cn1WebRtc.sink = sink; return; }\n"
@@ -130,50 +135,61 @@ final class HTML5WebRtc implements WebRtcBridge {
             + "window.cn1WebRtc = R;")
     private static native void install(Sink sink);
 
+    /// Connects the host's event stream to [#dispatch]. True on the worker
+    /// port; the TeaVM fallback answers false and [#install] runs instead.
+    @JSBody(params = {}, script = "return false;")
+    private static native boolean nativeRtcInit();
+
     @JSBody(params = {"wire", "relay"}, script =
             "return window.cn1WebRtc.create(jvm.toNativeString(wire), relay);")
-    private static native int create(String wire, boolean relay);
+    private static native int nativeRtcCreate(String wire, boolean relay);
 
     @JSBody(params = {"req", "audio", "video", "front"}, script =
             "window.cn1WebRtc.media(req, audio, video, front);")
-    private static native void media(int req, boolean audio, boolean video, boolean front);
+    private static native void nativeRtcMedia(int req, boolean audio, boolean video, boolean front);
 
     @JSBody(params = {"peer", "track"}, script = "window.cn1WebRtc.add(peer, track);")
-    private static native void add(int peer, int track);
+    private static native void nativeRtcAdd(int peer, int track);
 
     @JSBody(params = {"peer", "req", "answer"}, script =
             "window.cn1WebRtc.describe(peer, req, answer);")
-    private static native void describe(int peer, int req, boolean answer);
+    private static native void nativeRtcDescribe(int peer, int req, boolean answer);
 
     @JSBody(params = {"peer", "req", "remote", "type", "sdp"}, script =
             "window.cn1WebRtc.set(peer, req, remote, jvm.toNativeString(type),"
             + " jvm.toNativeString(sdp));")
-    private static native void set(int peer, int req, boolean remote, String type, String sdp);
+    private static native void nativeRtcSet(int peer, int req, boolean remote, String type, String sdp);
 
     @JSBody(params = {"peer", "mid", "index", "cand"}, script =
             "window.cn1WebRtc.ice(peer, mid == null ? null : jvm.toNativeString(mid), index,"
             + " jvm.toNativeString(cand));")
-    private static native void ice(int peer, String mid, int index, String cand);
+    private static native void nativeRtcIce(int peer, String mid, int index, String cand);
 
     @JSBody(params = {"peer"}, script = "window.cn1WebRtc.close(peer);")
-    private static native void close(int peer);
+    private static native void nativeRtcClose(int peer);
 
     @JSBody(params = {"track", "on"}, script = "window.cn1WebRtc.enable(track, on);")
-    private static native void enable(int track, boolean on);
+    private static native void nativeRtcEnable(int track, boolean on);
 
     @JSBody(params = {"track"}, script = "window.cn1WebRtc.switchCamera(track);")
-    private static native void switchTrack(int track);
+    private static native void nativeRtcSwitch(int track);
 
     @JSBody(params = {"track"}, script = "window.cn1WebRtc.release(track);")
-    private static native void release(int track);
+    private static native void nativeRtcRelease(int track);
 
     @JSBody(params = {"track", "mirror"}, script = "return window.cn1WebRtc.view(track, mirror);")
-    private static native HTMLElement view(int track, boolean mirror);
+    private static native HTMLElement nativeRtcView(int track, boolean mirror);
 
     HTML5WebRtc() {
         synchronized (HTML5WebRtc.class) {
             if (!installed) {
                 installed = true;
+                // Keeps dispatch reachable for the translator's dead-code
+                // pass: on the worker port only port.js calls it.
+                dispatch("__keepalive__", 0, 0, null, null, null);
+                if (nativeRtcInit()) {
+                    return;
+                }
                 install(new Sink() {
                     public void event(String kind, int a, int b, String s1, String s2,
                             String s3) {
@@ -207,41 +223,41 @@ final class HTML5WebRtc implements WebRtcBridge {
     }
 
     public int createPeerConnection(String iceServers, boolean relayOnly) {
-        return create(iceServers == null ? "" : iceServers, relayOnly);
+        return nativeRtcCreate(iceServers == null ? "" : iceServers, relayOnly);
     }
 
     public void openUserMedia(int requestId, boolean audio, boolean video, boolean frontCamera) {
-        media(requestId, audio, video, frontCamera);
+        nativeRtcMedia(requestId, audio, video, frontCamera);
     }
 
     public void addTrack(int peer, int track) {
-        add(peer, track);
+        nativeRtcAdd(peer, track);
     }
 
     public void createDescription(int peer, int requestId, boolean answer) {
-        describe(peer, requestId, answer);
+        nativeRtcDescribe(peer, requestId, answer);
     }
 
     public void setDescription(int peer, int requestId, boolean remote, String type, String sdp) {
-        set(peer, requestId, remote, type, sdp == null ? "" : sdp);
+        nativeRtcSet(peer, requestId, remote, type, sdp == null ? "" : sdp);
     }
 
     public void addIceCandidate(int peer, String sdpMid, int sdpMLineIndex, String candidate) {
         if (candidate != null) {
-            ice(peer, sdpMid, sdpMLineIndex, candidate);
+            nativeRtcIce(peer, sdpMid, sdpMLineIndex, candidate);
         }
     }
 
     public void closePeerConnection(int peer) {
-        close(peer);
+        nativeRtcClose(peer);
     }
 
     public void setTrackEnabled(int track, boolean enabled) {
-        enable(track, enabled);
+        nativeRtcEnable(track, enabled);
     }
 
     public void switchCamera(int track) {
-        switchTrack(track);
+        nativeRtcSwitch(track);
     }
 
     /// A browser routes audio where the system says; a page cannot choose
@@ -250,11 +266,11 @@ final class HTML5WebRtc implements WebRtcBridge {
     }
 
     public void releaseTrack(int track) {
-        release(track);
+        nativeRtcRelease(track);
     }
 
     public Object createVideoView(int track, boolean mirror) {
-        HTMLElement element = view(track, mirror);
+        HTMLElement element = nativeRtcView(track, mirror);
         return element == null ? null : new HTML5Peer(element);
     }
 

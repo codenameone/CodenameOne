@@ -110,6 +110,10 @@ public final class Calls {
         SessionDescription offer;
         final List<IceCandidate> early = new ArrayList<IceCandidate>();
         boolean remoteSet;
+        /// The offer was taken. The server replays it to a callee that accepts,
+        /// for a phone that was not connected when it was sent, so one that was
+        /// sees it twice.
+        boolean offerTaken;
         CallSession system;
         boolean muted;
         boolean speaker;
@@ -301,7 +305,7 @@ public final class Calls {
             connect(call, () -> call.connection.createOffer().ready(offer ->
                     call.connection.setLocalDescription(offer).ready(done -> {
                         send(call, OFFER, offer.getSdp());
-                    }).except(Calls::failed)).except(Calls::failed));
+                    }).except(why -> failed(call, why))).except(why -> failed(call, why)));
         }, Ui::fail));
     }
 
@@ -348,13 +352,14 @@ public final class Calls {
     private static void answerOffer(final Call call) {
         final SessionDescription offer = call.offer;
         call.offer = null;
+        call.offerTaken = true;
         call.connection.setRemoteDescription(offer).ready(set -> {
             remoteSet(call);
             call.connection.createAnswer().ready(answer ->
                     call.connection.setLocalDescription(answer).ready(done ->
-                            send(call, ANSWER, answer.getSdp())).except(Calls::failed))
-                    .except(Calls::failed);
-        }).except(Calls::failed);
+                            send(call, ANSWER, answer.getSdp())).except(why -> failed(call, why)))
+                    .except(why -> failed(call, why));
+        }).except(why -> failed(call, why));
     }
 
     /// Turns the ringing call down.
@@ -509,9 +514,12 @@ public final class Calls {
         call.early.clear();
     }
 
-    private static void failed(Throwable why) {
+    /// A step of `call` failed. A peer connection answers late, so this can be
+    /// a call that is already over while another one rings or runs: that
+    /// one is left alone.
+    private static void failed(Call call, Throwable why) {
         Log.p("Call failed: " + why);
-        if (current != null) {
+        if (current != null && current == call) {
             Ui.say(Lang.tr("The call could not be connected"));
             hangUp();
         }
@@ -551,6 +559,9 @@ public final class Calls {
         String payload = text(frame, "payload");
         String state = text(frame, "state");
         if (OFFER.equals(signal) && !call.outgoing) {
+            if (call.offerTaken) {
+                return;
+            }
             call.offer = new SessionDescription(SessionDescription.OFFER, payload);
             if (call.connection != null) {
                 answerOffer(call);
@@ -559,7 +570,7 @@ public final class Calls {
             state(call, CONNECTING);
             call.connection.setRemoteDescription(new SessionDescription(
                     SessionDescription.ANSWER, payload)).ready(done -> remoteSet(call))
-                    .except(Calls::failed);
+                    .except(why -> failed(call, why));
         } else if (ACCEPT.equals(signal) && call.outgoing) {
             state(call, CONNECTING);
         } else if (ICE.equals(signal)) {

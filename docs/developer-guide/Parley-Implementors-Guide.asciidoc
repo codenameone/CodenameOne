@@ -1,7 +1,7 @@
 [[parley-implementors-guide]]
 == Parley: Building on the sample
 
-Parley is a messenger, and most of what makes one is not in the server. The
+Parley is a messenger, and most of what makes one isn't in the server. The
 server stores and relays envelopes it can't open; the keys, the sessions, the
 encryption and the history are in the app. Parley kept what it shares with
 <<wayline-implementors-guide,Wayline>> and <<savor-implementors-guide,Savor>>: the
@@ -117,19 +117,19 @@ with two; the earlier one opens whatever the other side sent on it. The same
 happens when a contact reinstalls: the new device's first message starts a new
 session, and messages still in flight on the old one still open.
 
-A message is a JSON payload -- kind, text and a media reference -- that is encrypted for each recipient device separately. The
-server sees an envelope: who sent it, which device it is for, a header, a
+A message is a JSON payload -- kind, text and a media reference -- that's encrypted for each recipient device. The
+server sees an envelope: who sent it, which device it's for, a header, a
 ciphertext and a time. It never sees a payload. The ciphertext is limited to 64 KB,
-which is why attachments travel separately.
+which is why attachments travel apart from it.
 
 [[parley-fanout]]
 ==== Groups, devices and delivery
 
 There is no group key. A message to a group is encrypted once for every device of
 every member, and once for each of the sender's other devices, so that they show
-what was sent. The client sends all of the copies in one request, and the server
+what was sent. The client sends all the copies in one request, and the server
 checks that they cover exactly the devices it knows, so that a message can't
-silently skip a device. A group of 256 people on up to six devices each is a lot of
+skip a device. A group of 256 people on up to six devices each is a lot of
 copies, which is the price of having no state to keep in step: adding a member
 needs no rekey, and a removed member simply stops being addressed.
 
@@ -137,7 +137,7 @@ needs no rekey, and a removed member simply stops being addressed.
 it's for. An account with no device connected gets a push that carries nothing:
 it only wakes the app, which fetches what's waiting over its own connection. An
 envelope is deleted when its device acknowledges it, and one nobody fetches is
-kept for 30 days. Delivery is at least once: an envelope is stored before it is
+kept for 30 days. Delivery is at least once: an envelope is stored before it's
 sent live, so a device can see it twice, and the app remembers the ids it has
 seen. Typing indicators and call signals go live only and are never stored.
 
@@ -179,7 +179,7 @@ The timer is a setting of the conversation, in seconds, that the server keeps an
 every member's phone reads. A message in a conversation with a timer is stamped
 with the time it vanishes, counted from when it was sent: the server stamps the
 envelopes it stores, and each phone stamps its own copy and deletes it then. An
-envelope that is still waiting when its time comes is deleted on the server
+envelope that's still waiting when its time comes is deleted on the server
 too (`EnvelopeRepository.expire`), so a phone that was offline for longer than
 the timer never receives it. A timer can't take back what a recipient already copied, and
 the user's guide says so.
@@ -258,7 +258,7 @@ service of your own.
 === Bridges to Telegram and WhatsApp
 
 A group or a channel can be linked to a Telegram group or a WhatsApp number. What a
-Parley member writes goes out to the linked chat, and what is written there comes in
+Parley member writes goes out to the linked chat, and what's written there comes in
 and is posted into the conversation. Each bridge is off until the server has its
 credentials:
 
@@ -274,6 +274,8 @@ include::../demos/common/src/main/snippets/developer-guide/parley.sh[tag=parley-
 * **WhatsApp:** a Cloud API access token and phone number. Meta calls
   `/bridge/whatsapp`, answers the verify token when subscribing, and signs every
   delivery with the app secret, which the server checks.
+
+image::img/parley-bot-chat.png["A chat with the demo bot under a banner that says its messages are not end-to-end encrypted",scaledwidth=40%]
 
 ==== The privacy trade-off
 

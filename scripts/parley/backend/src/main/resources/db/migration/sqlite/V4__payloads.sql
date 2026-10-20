@@ -43,3 +43,11 @@ CREATE TABLE conversation_photo (
     updated_at BIGINT NOT NULL,
     data BLOB NOT NULL
 );
+
+-- What a caller sent while the call rang -- the offer and its first ICE
+-- candidates -- for a callee whose phone connects only after the ring.
+CREATE TABLE call_setup (
+    id VARCHAR(32) NOT NULL PRIMARY KEY,
+    offer TEXT NOT NULL,
+    candidates TEXT NOT NULL
+);

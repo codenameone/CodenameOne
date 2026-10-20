@@ -8648,7 +8648,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
         synchronized (HTML5Implementation.class) {
-            if (webRtc == null && HTML5WebRtc.available()) {
+            if (webRtc == null && HTML5WebRtc.nativeRtcAvailable()) {
                 webRtc = new HTML5WebRtc();
             }
             return webRtc;

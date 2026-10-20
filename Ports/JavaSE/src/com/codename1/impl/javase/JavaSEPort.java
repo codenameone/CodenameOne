@@ -17968,9 +17968,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     private com.codename1.impl.javase.webrtc.LoopbackWebRtc webRtc;
 
     /// The simulator carries calls through every step but the media: see
-    /// [com.codename1.impl.javase.webrtc.LoopbackWebRtc].
+    /// [com.codename1.impl.javase.webrtc.LoopbackWebRtc]. A desktop build has
+    /// no WebRTC, so it answers null and the app sees calls as unsupported
+    /// rather than connecting calls that carry nothing.
     @Override
     public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (!isSimulator()) {
+            return null;
+        }
         if (webRtc == null) {
             webRtc = new com.codename1.impl.javase.webrtc.LoopbackWebRtc();
         }

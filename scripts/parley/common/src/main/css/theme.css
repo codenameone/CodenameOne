@@ -34,6 +34,10 @@
     device-desktop-font-scale: "1.25";
     /* A line too long for its place ends in an ellipsis, not mid-word. */
     endsWith3PointsBool: true;
+    /* Lists scroll by touch; a painted scrollbar is a desktop artefact. */
+    scrollVisibleBool: false;
+    /* The title sits beside the back arrow, as in every messenger. */
+    centeredTitleBool: false;
     /* Screens change quickly: nothing waits for an animation. */
     transitionSpeedInt: "200";
     /* The switch, sized from the Switch style's font. */
@@ -366,6 +370,7 @@ PlField.selected {
 
 PlField.disabled {
     color: var(--text-muted);
+    background-color: transparent;
 }
 
 PlFieldHint {
@@ -502,12 +507,16 @@ Title {
     color: var(--text);
     font-family: "native:MainBold";
     font-size: 3.05mm;
+    text-align: left;
+    padding: 0 0 0 3mm;
     background-color: transparent;
 }
 
 TitleCommand {
     color: var(--text);
     background-color: transparent;
+    padding: 1.6mm 1.8mm 1.6mm 1.8mm;
+    margin: 0;
 }
 
 BackCommand {
@@ -650,6 +659,7 @@ PlFactTotal {
     cn1-derive: PlFactValue;
     font-family: "native:MainBold";
     font-size: 3.3mm;
+    background-color: transparent;
 }
 /* The one thing a screen is about, said large at its top. */
 /* A note to read in the flow of a page: see Ui.callout. */
@@ -1005,6 +1015,7 @@ PlSegment.pressed {
 
 PlSegment.disabled {
     color: var(--line-strong);
+    background-color: transparent;
 }
 
 /* The outline of rows that are on their way: the colour is the bars'. */
@@ -1178,7 +1189,9 @@ PlDeskMaster { background-color: var(--view-bg-color); border-right: 1px solid #
 PlDeskHomeBar { background-color: var(--headerbar-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 4mm 1mm 0; margin: 0; }
 PlDeskPaneBar { background-color: var(--window-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 5mm 1mm 5mm; margin: 0; }
 PlDeskPaneTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
-PlDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0; }
+PlDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0;
+    background-color: transparent;
+}
 
 PlDeskSide { background-color: var(--headerbar-bg-color); border-right: 1px solid #c6c6c8; padding: 2.5mm 2mm 2.5mm 2mm; margin: 0; }
 PlDeskSideName { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; padding: 1mm 2.6mm 0 2.6mm; margin: 0; }
@@ -1188,17 +1201,33 @@ PlDeskSideItem { color: var(--text-color); background-color: transparent; border
 PlDeskSideItem.pressed { background-color: var(--separator-color); }
 PlDeskSidePicked { cn1-derive: PlDeskSideItem; color: var(--accent-fg-color); background-color: var(--accent-color); }
 
-PlDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0; }
-PlDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0; }
-PlDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0; }
-PlDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0; }
-PlDeskField { cn1-derive: TextField; margin: 0; }
-PlDeskFieldHint { cn1-derive: TextHint; }
-PlDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0; }
+PlDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0;
+    background-color: transparent;
+}
+PlDeskField { cn1-derive: TextField; margin: 0;
+    background-color: transparent;
+}
+PlDeskFieldHint { cn1-derive: TextHint;
+    background-color: transparent;
+}
+PlDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0;
+    background-color: transparent;
+}
 /* Four of these share the master pane of the console, which is narrow: the
    platform's own tab padding leaves "Cancelled" no room and it was drawn cut
    off at both ends. */
-PlDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0; }
+PlDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0;
+    background-color: transparent;
+}
 /* Something waiting is the one thing on the console that is not the
    platform's grey: it wears the warning tint the phone's does. */
 PlDeskAlert { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
@@ -1219,8 +1248,12 @@ PlDeskText { color: var(--text-color); background-color: transparent; font-famil
 PlDeskMuted { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 0 0.5mm 0; margin: 0; }
 PlDeskLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 2.4mm 0 0.8mm 0; margin: 0; }
 PlDeskError { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; }
-PlDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0; }
-PlDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0; }
+PlDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0;
+    background-color: transparent;
+}
 PlDeskFact { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
 PlDeskFactLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; padding: 0; margin: 0; }
 PlDeskFactValue { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; text-align: right; padding: 0; margin: 0; }
@@ -1232,8 +1265,12 @@ PlDeskBannerText { color: var(--text-secondary-color); background-color: transpa
 
 /* The numbers and the charts have no control on any desktop: they keep their
    shape, in a group box, in the platform's colours. */
-PlDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm; }
-PlDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm; }
+PlDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm;
+    background-color: transparent;
+}
+PlDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm;
+    background-color: transparent;
+}
 PlDeskStatValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0; margin: 0; }
 PlDeskStatLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
 PlDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
@@ -1255,17 +1292,19 @@ PlChatRow.pressed {
 PlChatTitle {
     color: var(--text);
     font-family: "native:MainBold";
-    font-size: 3.1mm;
+    font-size: 2.85mm;
     padding: 0 0 0.4mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlChatPreview {
     color: var(--text-muted);
     font-family: "native:MainRegular";
-    font-size: 2.7mm;
+    font-size: 2.5mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlChatTime {
@@ -1275,6 +1314,7 @@ PlChatTime {
     text-align: right;
     padding: 0 0 0.6mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlUnread {
@@ -1292,6 +1332,14 @@ PlUnread {
 PlWall {
     background-color: var(--wall);
     padding: 1.6mm 2.4mm 1.6mm 2.4mm;
+    margin: 0;
+}
+
+/* The chat's content pane: the wallpaper edge to edge, so the composer spans
+   the full width under it. */
+PlWallPane {
+    background-color: var(--wall);
+    padding: 0;
     margin: 0;
 }
 
@@ -1315,6 +1363,7 @@ PlBubbleText {
     font-size: 3mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlBubbleDeleted {
@@ -1323,6 +1372,7 @@ PlBubbleDeleted {
     font-size: 2.8mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlBubbleAuthor {
@@ -1331,6 +1381,7 @@ PlBubbleAuthor {
     font-size: 2.5mm;
     padding: 0 0 0.4mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlBubbleMeta {
@@ -1340,6 +1391,7 @@ PlBubbleMeta {
     text-align: right;
     padding: 0.4mm 0 0 0;
     margin: 0;
+    background-color: transparent;
 }
 
 PlTickRead {
@@ -1347,6 +1399,7 @@ PlTickRead {
     font-size: 2.6mm;
     padding: 0.4mm 0 0 0.6mm;
     margin: 0;
+    background-color: transparent;
 }
 
 PlTick {
@@ -1354,6 +1407,7 @@ PlTick {
     font-size: 2.6mm;
     padding: 0.4mm 0 0 0.6mm;
     margin: 0;
+    background-color: transparent;
 }
 
 PlTickFailed {
@@ -1361,6 +1415,7 @@ PlTickFailed {
     font-size: 2.6mm;
     padding: 0.4mm 0 0 0.6mm;
     margin: 0;
+    background-color: transparent;
 }
 
 /* The message a reply quotes, inside the bubble and over the composer. */
@@ -1387,6 +1442,7 @@ PlReactions {
 PlMediaThumb {
     padding: 0;
     margin: 0 0 1mm 0;
+    background-color: transparent;
 }
 
 PlDay {
@@ -1407,6 +1463,7 @@ PlSystem {
     text-align: center;
     padding: 0.6mm 4mm 0.6mm 4mm;
     margin: 0.8mm 0 0.8mm 0;
+    background-color: transparent;
 }
 
 PlTyping {
@@ -1415,6 +1472,7 @@ PlTyping {
     font-size: 2.5mm;
     padding: 0.6mm 1mm 0.6mm 1mm;
     margin: 0;
+    background-color: transparent;
 }
 
 /* Under the chat: the field and the round send button. */
@@ -1422,6 +1480,12 @@ PlComposer {
     background-color: var(--surface);
     border-top: 1px solid var(--line);
     padding: 1.4mm 2mm 1.4mm 2mm;
+    margin: 0;
+}
+
+PlComposerDock {
+    background-color: var(--surface);
+    padding: 0;
     margin: 0;
 }
 
@@ -1475,6 +1539,7 @@ PlSafety {
     text-align: center;
     padding: 2mm 0 2mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 /* Over the whole screen while the app is locked or in the app switcher. */
@@ -1491,6 +1556,7 @@ PlLockTitle {
     text-align: center;
     padding: 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 /* The call screen. */
@@ -1503,10 +1569,11 @@ PlCall {
 PlCallName {
     color: #ffffff;
     font-family: "native:MainBold";
-    font-size: 6mm;
+    font-size: 5.2mm;
     text-align: center;
     padding: 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 PlCallState {
@@ -1516,6 +1583,7 @@ PlCallState {
     text-align: center;
     padding: 1mm;
     margin: 0;
+    background-color: transparent;
 }
 
 PlCallButton {
@@ -1559,8 +1627,49 @@ PlLocalVideo {
     border-radius: 2mm;
     padding: 0;
     margin: 3mm;
+    background-color: transparent;
 }
 
+
+/* The new-chat button: the brand colour, like every other primary action. */
+FloatingActionButton {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-size: 3.8mm;
+    padding: 3.6mm;
+    margin: 0;
+}
+
+FloatingActionButton.pressed {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand-pressed);
+}
+
+/* The caller, large in the middle of the dark call screen. */
+PlCallAvatar {
+    color: #ffffff;
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 9mm;
+    text-align: center;
+    padding: 7mm;
+    margin: 0 0 3mm 0;
+}
+
+/* The person in a conversation's title bar, beside their name. */
+PlTitleAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.7mm;
+    margin: 0 2mm 0 0;
+}
 @media (prefers-color-scheme: dark) {
     PlChatRow { background-color: var(--surface-dark); }
     PlChatRow.pressed { background-color: var(--surface-alt-dark); }
@@ -1569,6 +1678,7 @@ PlLocalVideo {
     PlChatTime { color: var(--text-muted-dark); }
     PlUnread { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     PlWall { background-color: var(--wall-dark); }
+    PlWallPane { background-color: var(--wall-dark); }
     PlBubbleIn { background-color: var(--bubble-in-dark); }
     PlBubbleOut { background-color: var(--bubble-out-dark); }
     PlBubbleText { color: var(--text-dark); }

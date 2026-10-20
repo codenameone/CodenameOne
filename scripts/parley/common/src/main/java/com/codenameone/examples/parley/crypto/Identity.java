@@ -79,7 +79,25 @@ public final class Identity {
         return state == null ? "" : Codec.str(state.get("device"));
     }
 
+    /// The identity a registration is about to be sent for, so that its
+    /// answer can be matched to it in [#registered(String, String)].
+    public static String owner() {
+        return state == null ? "" : Codec.str(state.get("idPub"));
+    }
+
     public static void registered(String deviceId) {
+        registered(deviceId, owner());
+    }
+
+    /// Records the device id the server gave the identity `owner`. An answer
+    /// for any other identity is dropped: the user signed out while it was in
+    /// flight, and on a shared simulator or browser the next user's identity
+    /// may already be loaded -- stamping the old device id on it would route
+    /// that user's messages to a device that cannot read them.
+    public static void registered(String deviceId, String owner) {
+        if (state == null || !owner.equals(owner())) {
+            return;
+        }
         state.put("device", deviceId);
         save();
     }

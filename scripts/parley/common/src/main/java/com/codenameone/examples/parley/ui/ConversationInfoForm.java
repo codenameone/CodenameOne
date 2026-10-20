@@ -64,7 +64,13 @@ public final class ConversationInfoForm {
         final boolean admin = "OWNER".equals(row.myRole()) || "ADMIN".equals(row.myRole());
         final String peer = Store.peer(id, Messenger.me());
 
-        page.add(FlowLayout.encloseCenter(Ui.avatar(row.title())));
+        Label face = Ui.avatar(row.title());
+        face.setUIID("PlCallAvatar");
+        if (!direct) {
+            FontImage.setMaterialIcon(face, FontImage.MATERIAL_GROUP, 9f);
+            face.setText("");
+        }
+        page.add(FlowLayout.encloseCenter(face));
         page.add(FlowLayout.encloseCenter(Ui.label(row.title(), "PlHeading")));
         if (row.about() != null && row.about().length() > 0) {
             page.add(Ui.text(row.about(), "PlMuted"));

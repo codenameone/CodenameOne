@@ -83,9 +83,10 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
         this.conversationId = conversationId;
         this.previous = previous;
         setUIID("PlForm");
-        getContentPane().setUIID("PlWall");
+        getContentPane().setUIID("PlWallPane");
         setName("Chat");
         Ui.watch(this);
+        Ui.fit(this);
         Ui.back(this, previous);
     }
 
@@ -111,7 +112,21 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
                 () -> ConversationInfoForm.show(conversationId, this));
         Label title = new Label(Store.title(conversationId), "Title");
         title.setName("chatTitle");
-        getToolbar().setTitleComponent(BoxLayout.encloseY(title, subtitle));
+        Label face = Ui.avatar(Store.title(conversationId));
+        face.setUIID("PlTitleAvatar");
+        if (!direct) {
+            FontImage.setMaterialIcon(face, FontImage.MATERIAL_GROUP, 2.6f);
+            face.setText("");
+        }
+        // The name gets whatever the call buttons leave and ends in an
+        // ellipsis there, instead of being painted under them.
+        Container heading = new Container(new BorderLayout());
+        heading.add(BorderLayout.WEST, BoxLayout.encloseYCenter(face));
+        // Centred on the avatar and the call buttons; with no subtitle the
+        // name alone sits on their centre line rather than above it.
+        heading.add(BorderLayout.CENTER, BoxLayout.encloseYCenter(title, subtitle));
+        getToolbar().setTitleCentered(false);
+        getToolbar().setTitleComponent(heading);
 
         Container top = new Container(BoxLayout.y());
         if (Store.bridged(conversationId)) {
@@ -137,7 +152,15 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
             composer.add(BorderLayout.CENTER, new Label("Only admins can send messages here",
                     "PlSystem"));
         }
-        add(BorderLayout.SOUTH, BoxLayout.encloseY(replyBar, composer));
+        // The composer, not the content pane, carries the safe area: padding
+        // the pane left the home-indicator inset painted in the wallpaper
+        // colour under the composer. The dock paints the composer's surface
+        // into that inset instead.
+        getContentPane().setSafeArea(false);
+        Container dock = BoxLayout.encloseY(replyBar, composer);
+        dock.setUIID("PlComposerDock");
+        dock.setSafeArea(true);
+        add(BorderLayout.SOUTH, dock);
 
         addShowListener(e -> {
             Store.listen(this);
@@ -293,6 +316,7 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
                 subtitle.setText(row.members() == null ? "" : row.members().size() + " members");
             }
         }
+        subtitle.setHidden(subtitle.getText().length() == 0);
         getToolbar().revalidate();
     }
 
@@ -334,6 +358,10 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
                     : "Messages and calls are end-to-end encrypted. Nobody outside this "
                     + "chat, not even the server, can read them.", "PlSystem"));
         }
+        revalidate();
+        // A wrapped bubble only knows how tall it is once it knows how wide
+        // it was laid out; the second pass measures it at that width, so
+        // lines past the first are not cut off.
         revalidate();
     }
 

@@ -19,6 +19,7 @@
 package com.codenameone.examples.parley;
 
 import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.DataSource;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.parley.account.Accounts;
@@ -31,6 +32,8 @@ import java.util.Map;
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The call state machine and the signalling relay.
@@ -40,6 +43,8 @@ class CallTest {
     private MockMvc mvc;
     @Autowired
     private Accounts accounts;
+    @Autowired
+    private DataSource db;
 
     private Map start(String caller, String chat, boolean video) throws Exception {
         return Chat.json(mvc, People.asUser(Chat.body(post("/api/calls"),
@@ -95,6 +100,44 @@ class CallTest {
                 false);
         assertEquals("BUSY", second.get("state"));
         assertTrue(Chat.number(second, "endedAt") > 0);
+    }
+
+    @Test
+    void theDatabaseHoldsEachPersonToOneLiveCall() throws Exception {
+        String alice = People.user(accounts, "line-a");
+        String bob = People.user(accounts, "line-b");
+        String chat = Chat.conversation(mvc, alice, Conversations.DIRECT, "", bob);
+        // A line nobody's call record shows -- what a second caller racing
+        // the first would find -- is enough to make Bob busy.
+        db.execute("INSERT INTO call_line (id, call_id) VALUES (?, ?)", new Object[] {bob, "racer"});
+        assertEquals("BUSY", start(alice, chat, false).get("state"));
+        db.execute("DELETE FROM call_line WHERE id = ?", new Object[] {bob});
+        // And a call that ends gives both lines back.
+        String id = (String) start(alice, chat, false).get("id");
+        assertNotNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {bob}));
+        signal(alice, id, "END", "");
+        assertNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {bob}));
+        assertNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {alice}));
+        assertEquals("RINGING", start(alice, chat, false).get("state"));
+    }
+
+    @Test
+    void theOfferWaitsForACalleeThatWasNotConnected() throws Exception {
+        String alice = People.user(accounts, "setup-a");
+        String bob = People.user(accounts, "setup-b");
+        String alices = Chat.device(mvc, alice);
+        String bobs = Chat.device(mvc, bob);
+        String chat = Chat.conversation(mvc, alice, Conversations.DIRECT, "", bob);
+        String id = (String) start(alice, chat, true).get("id");
+        signal(alice, id, "OFFER", alices);
+        signal(alice, id, "ICE", alices);
+        Map setup = db.queryOne("SELECT offer, candidates FROM call_setup WHERE id = ?",
+                new Object[] {id});
+        assertEquals("v=0", setup.get("offer"));
+        assertEquals("v=0\n", setup.get("candidates"));
+        // Accepting replays it to the device that accepted, and it is gone.
+        signal(bob, id, "ACCEPT", bobs);
+        assertNull(db.queryOne("SELECT id FROM call_setup WHERE id = ?", new Object[] {id}));
     }
 
     @Test

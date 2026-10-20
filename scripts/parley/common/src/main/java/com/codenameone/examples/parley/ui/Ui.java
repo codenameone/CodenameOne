@@ -70,8 +70,7 @@ public final class Ui {
         form.getContentPane().setUIID("PlForm");
         form.setName(name);
         watch(form);
-        clearOfTheStatusBar(form);
-        form.addSizeChangedListener(e -> clearOfTheStatusBar(form));
+        fit(form);
         return form;
     }
 
@@ -81,6 +80,15 @@ public final class Ui {
     /// strip a form reserves for the status bar is as tall as the theme makes
     /// it, which says nothing of a notch; the title bar is padded by whatever
     /// that strip leaves uncovered.
+    /// Keeps `form` clear of what the device draws over the screen: the title
+    /// bar under the clock and notch, and the content pane above the home
+    /// indicator. Every form with a title bar comes through here.
+    public static void fit(final Form form) {
+        clearOfTheStatusBar(form);
+        form.getContentPane().setSafeArea(true);
+        form.addSizeChangedListener(e -> clearOfTheStatusBar(form));
+    }
+
     private static void clearOfTheStatusBar(Form form) {
         Container bar = form.getToolbar();
         if (bar == null) {
@@ -329,12 +337,23 @@ public final class Ui {
                 columns));
         row.setUIID("PlSegments");
         ButtonGroup group = new ButtonGroup();
+        // A value none of the options has -- a preference never set on this
+        // device -- shows the first, which is each choice's default, rather
+        // than a row with nothing chosen.
+        boolean known = false;
+        for (int iter = 0; iter < values.length; iter++) {
+            known |= values[iter].equals(current);
+        }
         for (int iter = 0; iter < values.length; iter++) {
             final String value = values[iter];
             RadioButton option = RadioButton.createToggle(labels[iter], group);
             option.setUIID("PlSegment");
+            // A segment that took the form's initial focus wore the focused
+            // style instead of the pressed one, so the chosen option of the
+            // first row on a screen looked unchosen.
+            option.setFocusable(false);
             option.setName(name + "-" + value);
-            option.setSelected(value.equals(current));
+            option.setSelected(known ? value.equals(current) : iter == 0);
             option.addActionListener(e -> chosen.chosen(value));
             row.add(option);
         }

@@ -281,9 +281,17 @@ public final class Store {
             return;
         }
         List<Object> out = new ArrayList<Object>();
+        long soonest = 0;
         for (Message each : list) {
             out.add(each.toMap());
+            if (each.expiresAt > 0 && (soonest == 0 || each.expiresAt < soonest)) {
+                soonest = each.expiresAt;
+            }
         }
+        // The index says when the next message here disappears, so that it
+        // goes on time in a conversation nobody has opened since the app
+        // started, whose history is not in memory.
+        summary(id).put("expires", Long.valueOf(soonest));
         Map<String, Object> document = new HashMap<String, Object>();
         document.put("messages", out);
         Vault.put(name(id), document);
@@ -304,8 +312,13 @@ public final class Store {
 
     /// Drops every message whose disappearing timer ran out, everywhere.
     public static void expireAll() {
-        for (String id : new ArrayList<String>(history.keySet())) {
-            expire(id, history.get(id));
+        long now = System.currentTimeMillis();
+        for (String id : new ArrayList<String>(summaries.keySet())) {
+            long expires = Codec.num(summaries.get(id).get("expires"));
+            if (history.containsKey(id) || (expires > 0 && expires <= now)) {
+                // messages() reads the history in and expires it.
+                messages(id);
+            }
         }
     }
 
@@ -319,9 +332,12 @@ public final class Store {
                 gone = true;
             }
         }
+        Map<String, Object> summary = summary(id);
         if (gone) {
-            Map<String, Object> summary = summary(id);
             summary.put("last", list.isEmpty() ? "" : preview(list.get(list.size() - 1)));
+            save(id);
+        } else if (Codec.num(summary.get("expires")) > 0 && Codec.num(summary.get("expires")) <= now) {
+            // A stale mark, from a history written before it was kept.
             save(id);
         }
     }

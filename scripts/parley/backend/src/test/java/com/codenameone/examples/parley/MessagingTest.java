@@ -152,6 +152,13 @@ class MessagingTest {
         Map sent = Chat.send(mvc, alice, alices, chat, "b-1", Chat.copies(Chat.copy(bob, bobs)));
         assertTrue(((String) sent.get("messageId")).length() > 0);
         assertTrue(Chat.envelopes(mvc, bob, bobs).isEmpty());
+        // Nor can Alice reach Bob's device by naming it as one of her own:
+        // a copy whose device and account do not belong together is stale.
+        Map disguised = Chat.send(mvc, alice, alices, chat, "b-2",
+                Chat.copies(Chat.copy(alice, bobs)));
+        assertEquals("", disguised.get("messageId"));
+        assertEquals(bobs, ((Map) ((List) disguised.get("stale")).get(0)).get("deviceId"));
+        assertTrue(Chat.envelopes(mvc, bob, bobs).isEmpty());
     }
 
     @Test

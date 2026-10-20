@@ -268,6 +268,15 @@ try {
   await page.screenshot({ path: path.join(out, '3-chats.png') });
   say('signed in: the chats are up');
 
+  // Calls run on the page's own WebRTC, through the port's main-thread host
+  // natives (the worker the app runs in has none). No call is placed here.
+  const rtc = await page.evaluate(() => typeof RTCPeerConnection !== 'undefined'
+      && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+  if (!rtc) {
+    throw new Error('the page has no RTCPeerConnection/getUserMedia, so calls cannot work');
+  }
+  say('the page offers WebRTC');
+
   const expected = ['200 POST /login', '200 GET /signin/code', '200 POST /oauth2/token',
     '200 GET /api/me'];
   for (const line of expected) {

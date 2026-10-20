@@ -133,6 +133,15 @@ static void cn1wRemoteTrack(int peer, int track, BOOL video) {
 @interface CN1WebRtcPeer : NSObject <RTCPeerConnectionDelegate>
 @property (nonatomic, assign) int handle;
 @property (nonatomic, retain) RTCPeerConnection *connection;
+// Candidates that arrived before the remote description was set. The SDK
+// rejects a candidate it has no description for, and trickle ICE routinely
+// delivers the first ones while setRemoteDescription is still running, so
+// they wait here and are added when it completes -- as the API promises.
+@property (nonatomic, retain) NSMutableArray *pendingCandidates;
+@property (nonatomic, assign) BOOL remoteDescriptionSet;
+// The handles of the remote tracks this connection produced, so closing it
+// releases them: MediaTrack.release() leaves remote tracks to their peer.
+@property (nonatomic, retain) NSMutableArray *remoteTracks;
 @end
 
 static RTCPeerConnectionFactory *cn1wFactory = nil;
@@ -221,11 +230,21 @@ static RTCMediaConstraints *cn1wConstraints(void) {
             return;
         }
         int handle = cn1wRegisterTrack(track);
+        CN1WebRtcPeer *owner = [cn1wPeers objectForKey:@(peer)];
+        [owner.remoteTracks addObject:@(handle)];
         cn1wRemoteTrack(peer, handle, [track.kind isEqualToString:kRTCMediaStreamTrackKindVideo]);
     });
 }
 
 @end
+
+static void cn1wAddCandidate(RTCPeerConnection *pc, RTCIceCandidate *c) {
+    [pc addIceCandidate:c completionHandler:^(NSError *error) {
+        if (error != nil) {
+            NSLog(@"CN1WebRTC: candidate rejected: %@", error);
+        }
+    }];
+}
 
 static RTCPeerConnection *cn1wPeer(int handle) {
     CN1WebRtcPeer *p = [cn1wPeers objectForKey:@(handle)];
@@ -362,6 +381,8 @@ JAVA_INT com_codename1_impl_ios_IOSNative_webRtcCreatePeerConnection___java_lang
         }
         peer.handle = cn1wNextHandle++;
         peer.connection = pc;
+        peer.pendingCandidates = CN1W_AUTORELEASE([[NSMutableArray alloc] init]);
+        peer.remoteTracks = CN1W_AUTORELEASE([[NSMutableArray alloc] init]);
         [cn1wPeers setObject:peer forKey:@(peer.handle)];
         result = peer.handle;
     });
@@ -465,7 +486,20 @@ void com_codename1_impl_ios_IOSNative_webRtcSetDescription___int_int_boolean_jav
             });
         };
         if (isRemote) {
-            [pc setRemoteDescription:desc completionHandler:done];
+            [pc setRemoteDescription:desc completionHandler:^(NSError *error) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    CN1WebRtcPeer *entry = [cn1wPeers objectForKey:@(p)];
+                    if (error == nil && entry != nil) {
+                        entry.remoteDescriptionSet = YES;
+                        NSArray *waiting = [NSArray arrayWithArray:entry.pendingCandidates];
+                        [entry.pendingCandidates removeAllObjects];
+                        for (RTCIceCandidate *each in waiting) {
+                            cn1wAddCandidate(entry.connection, each);
+                        }
+                    }
+                });
+                done(error);
+            }];
         } else {
             [pc setLocalDescription:desc completionHandler:done];
         }
@@ -485,11 +519,12 @@ void com_codename1_impl_ios_IOSNative_webRtcAddIceCandidate___int_java_lang_Stri
         }
         RTCIceCandidate *c = CN1W_AUTORELEASE([[RTCIceCandidate alloc] initWithSdp:text
                 sdpMLineIndex:index sdpMid:([mid length] > 0 ? mid : nil)]);
-        [pc addIceCandidate:c completionHandler:^(NSError *error) {
-            if (error != nil) {
-                NSLog(@"CN1WebRTC: candidate rejected: %@", error);
-            }
-        }];
+        CN1WebRtcPeer *entry = [cn1wPeers objectForKey:@(p)];
+        if (!entry.remoteDescriptionSet) {
+            [entry.pendingCandidates addObject:c];
+            return;
+        }
+        cn1wAddCandidate(pc, c);
     });
 }
 
@@ -503,6 +538,25 @@ void com_codename1_impl_ios_IOSNative_webRtcClosePeerConnection___int(
         }
         [entry.connection close];
         entry.connection.delegate = nil;
+        // Its remote tracks go with it, detached from any view still showing
+        // them; the views themselves are released by their components.
+        for (NSNumber *t in entry.remoteTracks) {
+            RTCMediaStreamTrack *mt = [cn1wTracks objectForKey:t];
+            if ([mt isKindOfClass:[RTCVideoTrack class]]) {
+                for (NSValue *key in [cn1wViews allKeys]) {
+                    if ([[cn1wViews objectForKey:key] isEqual:t]) {
+                        RTCMTLVideoView *v = [cn1wViewObjects objectForKey:key];
+                        if (v != nil) {
+                            [(RTCVideoTrack *)mt removeRenderer:v];
+                        }
+                        [cn1wViews removeObjectForKey:key];
+                    }
+                }
+            }
+            [cn1wTracks removeObjectForKey:t];
+        }
+        [entry.remoteTracks removeAllObjects];
+        [entry.pendingCandidates removeAllObjects];
         [cn1wPeers removeObjectForKey:@(p)];
     });
 }

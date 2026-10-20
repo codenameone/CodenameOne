@@ -684,7 +684,7 @@ The result is a shared secret, not yet a key. `Hkdf` (RFC 5869) turns it into ke
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=ecdh-derive,indent=0]
 ----
 
-Protocols that keep the intermediate key, a ratchet for example, call the two steps separately:
+Protocols that keep the intermediate key, a ratchet for example, call the two steps one at a time:
 
 [source,java]
 ----

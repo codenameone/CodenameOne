@@ -548,6 +548,11 @@ public class Conversations {
         row.setCreatedBy(by);
         row.setCreatedAt(now);
         row.setLastActivityAt(now);
+        // direct_key is unique, so it is what keeps two people to one direct
+        // chat even when both start it at once: the second insert fails rather
+        // than splitting their history. Every other conversation has a key of
+        // its own that no pair of usernames can spell.
+        row.setDirectKey("#" + row.getId());
         return row;
     }
 
