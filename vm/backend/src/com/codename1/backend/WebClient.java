@@ -82,36 +82,36 @@ public final class WebClient {
 
     /// Requires HTTP/2: a peer that does not negotiate it fails the request.
     /// Default false.
-    public WebClient setRequireHttp2(boolean requireHttp2) {
+    public synchronized WebClient setRequireHttp2(boolean requireHttp2) {
         checkUnused();
         this.requireHttp2 = requireHttp2;
         return this;
     }
 
-    public boolean isRequireHttp2() {
+    public synchronized boolean isRequireHttp2() {
         return requireHttp2;
     }
 
     /// The certificate presented when a server asks for one, or null for none.
-    public WebClient setClientCertificate(ClientCertificate clientCertificate) {
+    public synchronized WebClient setClientCertificate(ClientCertificate clientCertificate) {
         checkUnused();
         this.clientCertificate = clientCertificate;
         return this;
     }
 
-    public ClientCertificate getClientCertificate() {
+    public synchronized ClientCertificate getClientCertificate() {
         return clientCertificate;
     }
 
     /// How long establishing the connection -- TCP and TLS -- may take. Default
     /// 30000; 0 means no limit.
-    public WebClient setConnectTimeoutMillis(int millis) {
+    public synchronized WebClient setConnectTimeoutMillis(int millis) {
         checkUnused();
         this.connectTimeoutMillis = nonNegative(millis);
         return this;
     }
 
-    public int getConnectTimeoutMillis() {
+    public synchronized int getConnectTimeoutMillis() {
         return connectTimeoutMillis;
     }
 
@@ -121,39 +121,39 @@ public final class WebClient {
     ///
     /// The packaged binary measures this in whole seconds (libcurl's
     /// low-speed limit), so a value is rounded UP to the next second there.
-    public WebClient setReadTimeoutMillis(int millis) {
+    public synchronized WebClient setReadTimeoutMillis(int millis) {
         checkUnused();
         this.readTimeoutMillis = nonNegative(millis);
         return this;
     }
 
-    public int getReadTimeoutMillis() {
+    public synchronized int getReadTimeoutMillis() {
         return readTimeoutMillis;
     }
 
     /// The ceiling on a whole request, connection to last byte. Default 0, no
     /// ceiling. A request still running when it is reached fails with an
     /// IOException.
-    public WebClient setRequestTimeoutMillis(int millis) {
+    public synchronized WebClient setRequestTimeoutMillis(int millis) {
         checkUnused();
         this.requestTimeoutMillis = nonNegative(millis);
         return this;
     }
 
-    public int getRequestTimeoutMillis() {
+    public synchronized int getRequestTimeoutMillis() {
         return requestTimeoutMillis;
     }
 
     /// Whether a finished request's connection is kept for the next request to
     /// the same server. Default true. With false every request opens, and closes,
     /// a connection of its own.
-    public WebClient setReuseConnections(boolean reuseConnections) {
+    public synchronized WebClient setReuseConnections(boolean reuseConnections) {
         checkUnused();
         this.reuseConnections = reuseConnections;
         return this;
     }
 
-    public boolean isReuseConnections() {
+    public synchronized boolean isReuseConnections() {
         return reuseConnections;
     }
 
@@ -237,6 +237,11 @@ public final class WebClient {
         return transport;
     }
 
+    // Every setter and getter is synchronized, as checkUnused() and the `used`
+    // transition in request() are: a setter checked outside the monitor could
+    // pass, let the first request build its transport from the old value, and
+    // then assign -- leaving a client that reports one certificate and
+    // presents another. Callers hold the monitor only for a field access.
     private synchronized void checkUnused() {
         if (used) {
             throw new IllegalStateException("A WebClient's configuration is fixed by its "

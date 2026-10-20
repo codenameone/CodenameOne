@@ -244,10 +244,103 @@ public final class Web {
     /// handed to another client -- the translated twin's per-client pool, in the
     /// JDK's spelling.
     private static final class Transport {
-        private final SSLSocketFactory sockets;
+        private final TrackingSockets sockets;
 
         Transport(SSLSocketFactory sockets) {
-            this.sockets = sockets;
+            this.sockets = new TrackingSockets(sockets);
+        }
+    }
+
+    /// The client's factory, remembering every socket it makes so close() can
+    /// shut the ones idling in the JDK's keep-alive cache. That cache has no
+    /// API to evict by factory, and without this a closed client's sockets --
+    /// with its certificate's session on them -- stayed open until the server
+    /// or the JDK timed them out. Closed sockets are pruned as new ones are
+    /// made, so the list holds at most what is open.
+    private static final class TrackingSockets extends SSLSocketFactory {
+        private final SSLSocketFactory delegate;
+        private final List open = new ArrayList();
+        private boolean closed;
+
+        TrackingSockets(SSLSocketFactory delegate) {
+            this.delegate = delegate;
+        }
+
+        private java.net.Socket track(java.net.Socket socket) throws IOException {
+            synchronized (open) {
+                if (closed) {
+                    socket.close();
+                    throw new IOException("This WebClient has been closed");
+                }
+                for (int i = open.size() - 1; i >= 0; i--) {
+                    if (((java.net.Socket) open.get(i)).isClosed()) {
+                        open.remove(i);
+                    }
+                }
+                open.add(socket);
+            }
+            return socket;
+        }
+
+        void closeAll() {
+            List all;
+            synchronized (open) {
+                closed = true;
+                all = new ArrayList(open);
+                open.clear();
+            }
+            for (Object socket : all) {
+                try {
+                    ((java.net.Socket) socket).close();
+                } catch (IOException ignored) {
+                    // Already gone; nothing else to release.
+                }
+            }
+        }
+
+        @Override
+        public String[] getDefaultCipherSuites() {
+            return delegate.getDefaultCipherSuites();
+        }
+
+        @Override
+        public String[] getSupportedCipherSuites() {
+            return delegate.getSupportedCipherSuites();
+        }
+
+        @Override
+        public java.net.Socket createSocket() throws IOException {
+            return track(delegate.createSocket());
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.Socket s, String host, int port,
+                                            boolean autoClose) throws IOException {
+            return track(delegate.createSocket(s, host, port, autoClose));
+        }
+
+        @Override
+        public java.net.Socket createSocket(String host, int port) throws IOException {
+            return track(delegate.createSocket(host, port));
+        }
+
+        @Override
+        public java.net.Socket createSocket(String host, int port, java.net.InetAddress local,
+                                            int localPort) throws IOException {
+            return track(delegate.createSocket(host, port, local, localPort));
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.InetAddress host, int port)
+                throws IOException {
+            return track(delegate.createSocket(host, port));
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.InetAddress host, int port,
+                                            java.net.InetAddress local, int localPort)
+                throws IOException {
+            return track(delegate.createSocket(host, port, local, localPort));
         }
     }
 
@@ -270,8 +363,11 @@ public final class Web {
     private static final java.util.Timer DEADLINES = new java.util.Timer("cn1-web-deadlines", true);
 
     static void closeTransport(Object transport) {
-        // Nothing to release: the JDK owns its keep-alive cache, and idle
-        // connections in it expire on their own.
+        // Runs once no request of the client is in flight (WebClient.close),
+        // so every socket left is idle in the keep-alive cache. A plain
+        // http:// connection has no factory to track it by and expires there
+        // on its own; it carries no credential.
+        ((Transport) transport).sockets.closeAll();
     }
 
     static Result request(WebClient client, String method, String url, List headers,
