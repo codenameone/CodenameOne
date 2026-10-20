@@ -39,8 +39,9 @@ import java.util.Map;
 /// A fully static build has whatever the image provides, which for a `scratch`
 /// container is nothing - and TLS then fails with "unable to get local issuer
 /// certificate". Ship a `ca-certificates.crt` and point curl at it with the
-/// `CURL_CA_BUNDLE` or `SSL_CERT_FILE` environment variable; both are read by
-/// libcurl itself, so no code here has to know about it.
+/// `CURL_CA_BUNDLE` or `SSL_CERT_FILE` environment variable (the first one set
+/// wins). The native client reads them and hands the file to libcurl, which
+/// would not read either on its own.
 public final class Web {
 
     /// ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
@@ -72,10 +73,16 @@ public final class Web {
         private final String error;
         private final Map headers;
         private final Map values;
+        private final String protocol;
 
         /// @param values name (lower case) to the List of every value the response
         /// carried for it, in arrival order
         Result(int status, byte[] body, String error, Map values) {
+            this(status, body, error, values, null);
+        }
+
+        Result(int status, byte[] body, String error, Map values, String protocol) {
+            this.protocol = protocol;
             this.status = status;
             this.body = body;
             this.error = error;
@@ -115,6 +122,12 @@ public final class Web {
             } catch (IOException err) {
                 return new String(body);
             }
+        }
+
+        /// The protocol the response came over -- "HTTP/2", "HTTP/1.1" or
+        /// "HTTP/1.0" -- or null when the runtime could not tell.
+        public String getProtocol() {
+            return protocol;
         }
 
         /// Non-null only when the transfer failed before producing a status.
@@ -189,7 +202,84 @@ public final class Web {
     }
 
     /// - `headers`: a list of "Name: value" strings, or null
+    ///
+    /// Every default and no connection pool; a [WebClient] is the way to set a
+    /// client certificate, require HTTP/2, change a timeout or reuse connections.
     public static Result request(String method, String url, List headers, byte[] body) throws IOException {
+        return request(null, method, url, headers, body);
+    }
+
+    /// Creates the per-client transport the first time a WebClient is used.
+    interface TransportFactory {
+        Object create(WebClient client) throws IOException;
+    }
+
+    /// A WebClient's native connection pool. The pool itself is freed only when
+    /// the client is closed AND no request is still inside it, so close() from
+    /// one handler cannot pull the pool out from under a request on another.
+    private static final class Pool {
+        private long handle;
+        private int active;
+        private boolean closed;
+
+        synchronized long enter() throws IOException {
+            if (closed || handle == 0) {
+                throw new IOException("This WebClient has been closed");
+            }
+            active++;
+            return handle;
+        }
+
+        void exit() {
+            long release = 0;
+            synchronized (this) {
+                active--;
+                if (closed && active == 0) {
+                    release = handle;
+                    handle = 0;
+                }
+            }
+            if (release != 0) {
+                poolFreeImpl(release);
+            }
+        }
+
+        void close() {
+            long release = 0;
+            synchronized (this) {
+                closed = true;
+                if (active == 0) {
+                    release = handle;
+                    handle = 0;
+                }
+            }
+            if (release != 0) {
+                poolFreeImpl(release);
+            }
+        }
+    }
+
+    private static final TransportFactory POOLS = new TransportFactory() {
+        @Override
+        public Object create(WebClient client) throws IOException {
+            initialiseCurlOnce();
+            Pool pool = new Pool();
+            pool.handle = poolCreateImpl();
+            if (pool.handle == 0) {
+                throw new IOException("Could not allocate the WebClient's connection pool");
+            }
+            return pool;
+        }
+    };
+
+    static void closeTransport(Object transport) {
+        if (transport instanceof Pool) {
+            ((Pool) transport).close();
+        }
+    }
+
+    static Result request(WebClient client, String method, String url, List headers,
+                          byte[] body) throws IOException {
         Urls.requireHttp(url);
         // The request line's other field; see HeaderLines.requireMethod.
         HeaderLines.requireMethod(method);
@@ -199,7 +289,7 @@ public final class Web {
         int status = -1;
         Throwable failure = null;
         try {
-            Result result = perform(method, url, headers, body,
+            Result result = perform(client, method, url, headers, body,
                     Tracing.propagationHeaders(span, headers));
             status = result.getStatus();
             return result;
@@ -221,8 +311,8 @@ public final class Web {
     /// and a trace id is not that. Counting it would have silently
     /// stopped every plain GET following redirects the moment tracing
     /// was turned on.
-    private static Result perform(String method, String url, List headers, byte[] body,
-                                  List trace) throws IOException {
+    private static Result perform(WebClient client, String method, String url, List headers,
+                                  byte[] body, List trace) throws IOException {
         StringBuilder joined = new StringBuilder();
         boolean callerHeaders = false;
         if (headers != null) {
@@ -248,8 +338,21 @@ public final class Web {
             }
         }
         initialiseCurlOnce();
-        long handle = performImpl(method, url, HeaderLines.narrowed(joined.toString()), body,
-                callerHeaders);
+        Pool pool = null;
+        long poolHandle = 0;
+        if (client != null && client.isReuseConnections()) {
+            pool = (Pool) client.transport(POOLS);
+            poolHandle = pool.enter();
+        }
+        long handle;
+        try {
+            handle = performClient(client, poolHandle, method, url,
+                    HeaderLines.narrowed(joined.toString()), body, callerHeaders);
+        } finally {
+            if (pool != null) {
+                pool.exit();
+            }
+        }
         if (handle == 0) {
             // REDACTED, because this message goes wherever the caller logs it and
             // the URL may be a presigned one whose signature is the credential.
@@ -264,9 +367,62 @@ public final class Web {
                         + (error == null ? "unknown error" : error));
             }
             return new Result(status, bodyImpl(handle), error,
-                    parseHeaders(headersImpl(handle)));
+                    parseHeaders(headersImpl(handle)), protocolName(protocolImpl(handle)));
         } finally {
             freeImpl(handle);
+        }
+    }
+
+    /// Bit 0 of performImpl's flags: HTTP/2 or nothing.
+    private static final int FLAG_REQUIRE_HTTP2 = 1;
+    /// Bit 1: a WebClient, which offers HTTP/2 over TLS even where this libcurl's
+    /// own default would not, and takes the timeouts it was given.
+    private static final int FLAG_CLIENT = 2;
+    /// Bit 2: never keep or reuse a connection.
+    private static final int FLAG_NO_REUSE = 4;
+
+    private static long performClient(WebClient client, long pool, String method, String url,
+                                      byte[] headerLines, byte[] body, boolean callerHeaders) {
+        if (client == null) {
+            return performImpl(0, method, url, headerLines, body, callerHeaders, 0,
+                    30000, 30000, 0, null, null, -1, null);
+        }
+        int flags = FLAG_CLIENT;
+        if (client.isRequireHttp2()) {
+            flags |= FLAG_REQUIRE_HTTP2;
+        }
+        if (!client.isReuseConnections()) {
+            flags |= FLAG_NO_REUSE;
+        }
+        ClientCertificate credential = client.getClientCertificate();
+        byte[] certificate = null;
+        byte[] key = null;
+        int type = -1;
+        String password = null;
+        if (credential != null) {
+            certificate = credential.getCertificate();
+            key = credential.getKey();
+            type = credential.getType();
+            password = credential.getPassword();
+        }
+        return performImpl(pool, method, url, headerLines, body, callerHeaders, flags,
+                client.getConnectTimeoutMillis(), client.getReadTimeoutMillis(),
+                client.getRequestTimeoutMillis(), certificate, key, type, password);
+    }
+
+    /// CURLINFO_HTTP_VERSION's answer as a protocol name.
+    private static String protocolName(int version) {
+        switch (version) {
+            case 1:
+                return "HTTP/1.0";
+            case 2:
+                return "HTTP/1.1";
+            case 3:
+                return "HTTP/2";
+            case 30:
+                return "HTTP/3";
+            default:
+                return null;
         }
     }
 
@@ -358,8 +514,19 @@ public final class Web {
     /// curl_global_init's CURLcode -- 0 is CURLE_OK.
     private static native int globalInitImpl();
 
-    private static native long performImpl(String method, String url, byte[] headerLines,
-                                           byte[] body, boolean callerHeaders);
+    /// @param pool a poolCreateImpl handle, or 0 for a connection of the request's own
+    /// @param certificate the client certificate (PEM chain or PKCS#12), or null
+    /// @param key the PEM private key, or null
+    /// @param certificateType ClientCertificate.PEM or PKCS12, -1 for none
+    private static native long performImpl(long pool, String method, String url,
+                                           byte[] headerLines, byte[] body,
+                                           boolean callerHeaders, int flags,
+                                           int connectTimeoutMillis, int readTimeoutMillis,
+                                           int requestTimeoutMillis, byte[] certificate,
+                                           byte[] key, int certificateType, String password);
+    private static native long poolCreateImpl();
+    private static native void poolFreeImpl(long pool);
+    private static native int protocolImpl(long handle);
     private static native String headersImpl(long handle);
     private static native int statusImpl(long handle);
     private static native String errorImpl(long handle);

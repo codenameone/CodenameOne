@@ -21,7 +21,7 @@ another checks a password or a token, another applies the authorization rules.
 You don't write the filters. You declare a `SecurityFilterChain` bean, and the
 `HttpSecurity` its method is handed builds the chain from what you ask for:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecurityConfig.java[tag=backend-security-config,indent=0]
 ----
@@ -63,7 +63,7 @@ starter on the classpath locks every route. See
 
 A handler receives the caller by declaring a parameter:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AccountApi.java[tag=backend-security-handler,indent=0]
 ----
@@ -77,7 +77,7 @@ where they would always be `null`.
 
 Anywhere else, ask the holder:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-current,indent=0]
 ----
@@ -92,7 +92,7 @@ A chain that takes a password needs to know its users. It finds them in the
 application's `UserDetailsService` bean. For a demonstration or a test, keep
 them in memory:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DemoUsers.java[tag=backend-security-users-memory,indent=0]
 ----
@@ -101,7 +101,7 @@ For a real application, keep them in the database. `JdbcUserDetailsManager`
 uses the `cn1_users` and `cn1_authorities` tables described in
 <<backend-security-schema>>:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecurityConfig.java[tag=backend-security-users-jdbc,indent=0]
 ----
@@ -110,7 +110,7 @@ Both stores compare names without regard to the case of `A` to `Z`, and keep
 the spelling a user was created with. A store keeps a password as it's given,
 so encode it first:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DemoUsers.java[tag=backend-security-users-create,indent=0]
 ----
@@ -172,7 +172,7 @@ answer takes doesn't say whether the account exists.
 
 `authorizeHttpRequests` says which requests need what:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-rules,indent=0]
 ----
@@ -251,7 +251,7 @@ token or an API key gets a 401 with the reason in `WWW-Authenticate`. A chain
 with no way of signing in answers 403. A signed-in caller that's denied gets a
 403. Change either one with `exceptionHandling`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-handling,indent=0]
 ----
@@ -267,7 +267,7 @@ and a refused one to `/login?error`.
 
 Name a `loginPage` to serve your own:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-form,indent=0]
 ----
@@ -285,7 +285,7 @@ after the user signs in.
 `httpBasic` checks the `Authorization: Basic` header on every request that
 carries one. It keeps nothing and starts no session:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-basic,indent=0]
 ----
@@ -318,7 +318,7 @@ user signs in.
 A single-page application usually wants the token in a cookie that its script
 reads and sends back in the `X-XSRF-TOKEN` header:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-csrf,indent=0]
 ----
@@ -343,7 +343,7 @@ HTTP Basic credentials from browsers should ask for it.
 `sessionManagement` says whether a chain may use the HTTP session that
 <<backend-sessions>> describes:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-session,indent=0]
 ----
@@ -385,7 +385,7 @@ The cache headers are left out when the handler set any of the three itself.
 A header the handler set is never replaced. `headers` changes the defaults and
 adds a `Content-Security-Policy`, which isn't sent unless you configure it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-headers,indent=0]
 ----
@@ -396,7 +396,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 Rules about paths guard the door. Method security guards the service behind
 it, whoever calls it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/Reports.java[tag=backend-security-method,indent=0]
 ----
@@ -447,7 +447,7 @@ does above.
 
 Anything the subset can't say goes in a bean method:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/DocumentPermissions.java[tag=backend-security-method-bean,indent=0]
 ----
@@ -520,7 +520,7 @@ For an issuer that publishes no metadata, set `jwk-set-uri` instead, or
 `public-key-location` for a PEM file holding the one public key. For anything
 the properties can't say, declare a `JwtDecoder` bean:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-decoder,indent=0]
 ----
@@ -553,7 +553,7 @@ the `SCOPE_` prefix. A token with `"scope": "orders:read orders:write"` is
 granted `SCOPE_orders:read` and `SCOPE_orders:write`. Its name is the `sub`
 claim. A converter changes either one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-converter,indent=0]
 ----
@@ -562,7 +562,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 
 A server that trusts more than one issuer routes each token by its `iss`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-jwt-issuers,indent=0]
 ----
@@ -575,7 +575,7 @@ being made anywhere.
 An API key is a long-lived secret that a program presents instead of signing
 in. `apiKey` turns it on:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-apikey,indent=0]
 ----
@@ -591,7 +591,7 @@ The chain looks keys up in the application's `ApiKeyRepository` bean. That's a
 `JdbcApiKeyRepository` over the `cn1_api_key` table, an
 `InMemoryApiKeyRepository`, or your own. Make a key with `ApiKeyGenerator`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-apikey-generate,indent=0]
 ----
@@ -614,7 +614,7 @@ and the chain's prefix has to be the one the keys were generated with.
 `rateLimit` bounds how often the requests a matcher matches may be made under
 one key. A request over the limit is answered 429 with `Retry-After`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-ratelimit,indent=0]
 ----
@@ -669,7 +669,7 @@ With no `RateLimiter` bean, both are counted in the process. Declare one
 `RateLimiter` bean and they're counted wherever that bean counts. A
 `JdbcRateLimiter` bean makes each a single count for every instance:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-limiter-bean,indent=0]
 ----
@@ -784,7 +784,7 @@ always the other end of the connection.
 `oauth2Login` signs users in through Google, GitHub, Microsoft, Apple or any
 OAuth2 or OpenID Connect provider:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-oauth2-login,indent=0]
 ----
@@ -829,7 +829,7 @@ Apple's client secret isn't a text Apple issues. It's a token the server signs
 with the `.p8` key from the developer account, so Sign in with Apple is
 declared in code, beside the registrations the configuration holds:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-apple,indent=0]
 ----
@@ -859,7 +859,7 @@ nothing more. `LinkingOAuth2UserService` ties them to one of the application's
 own users, so the same person has the same account and the same roles however
 they sign in:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-linking,indent=0]
 ----
@@ -894,7 +894,7 @@ OpenID Connect provider: the one that signs users in for clients and issues
 them tokens. A Codename One app signs in against it with a system browser and
 PKCE, and then calls your API with the access token.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver,indent=0]
 ----
@@ -947,7 +947,7 @@ On a development profile it's taken from the request. `settings` sets the
 issuer in code and moves the endpoints, and `tokenCustomizer` changes the
 claims of a token before it's signed:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-customize,indent=0]
 ----
@@ -957,7 +957,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 The clients are the application's `RegisteredClientRepository` bean, and the
 server doesn't start without one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-clients,indent=0]
 ----
@@ -1040,7 +1040,7 @@ must not each claim the same interval.
 
 The grants are kept by the application's `OAuth2AuthorizationService` bean:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-store,indent=0]
 ----
@@ -1074,7 +1074,7 @@ the server from starting.
 An application that signs tokens of its own declares the keys and an encoder
 as beans, and the authorization server uses the same ones:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/AuthorizationServerConfig.java[tag=backend-security-authserver-keys,indent=0]
 ----
@@ -1153,7 +1153,7 @@ A request that names no resource gets the default audience. That's the issuer,
 unless `defaultAudience` on the settings or
 `cn1.security.authorizationserver.audience` names another:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-authserver-audience,indent=0]
 ----
@@ -1196,7 +1196,7 @@ already issued stays good until it expires. Keep access tokens short.
 `mfa` asks a user who has enrolled an authenticator app for a one-time code
 after their password:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-mfa,indent=0]
 ----
@@ -1259,7 +1259,7 @@ can opt out with `httpBasic(basic -> basic.secondFactorExempt())`.
 Enrollment takes two steps, so that nobody is locked out by an app that was
 never set up. First make a secret and show it to the user:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-totp-begin,indent=0]
 ----
@@ -1267,7 +1267,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 Then take a code from their app. Only then does the user have a second
 factor:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-totp-confirm,indent=0]
 ----
@@ -1309,7 +1309,7 @@ the key loses every enrollment, and so does changing it.
 `webAuthn` lets a signed-in user register a passkey and, from then on, sign in
 with it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-webauthn,indent=0]
 ----
@@ -1390,7 +1390,7 @@ CSRF token like any other `POST`. A page sends it as it does for its other
 requests. An app has no page to read it from, so leave the ceremony out of the
 check:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-webauthn-csrf,indent=0]
 ----
@@ -1404,7 +1404,7 @@ protection, which is why the example leaves it under the check.
 Passkeys are kept in the application's `UserCredentialRepository` and
 `PublicKeyCredentialUserEntityRepository` beans:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecondFactorConfig.java[tag=backend-security-webauthn-store,indent=0]
 ----
@@ -1420,7 +1420,7 @@ authorities.
 `rememberMe` gives a user who ticks the box on the login form a cookie that
 signs them in on a later visit:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-remember,indent=0]
 ----
@@ -1484,7 +1484,7 @@ The goals run for a module that has scripts of its own.
 A test, or a server you assemble by hand, registers the set before the server
 starts:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-schema-register,indent=0]
 ----
@@ -1576,7 +1576,7 @@ again. The first two are yours to call from a scheduled job.
 The test library that <<backend-testing>> describes has Spring Security's
 test support under the same names:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuredApiTest.java[tag=backend-security-test,indent=0]
 ----

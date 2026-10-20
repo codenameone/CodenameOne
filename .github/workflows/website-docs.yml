@@ -63,6 +63,7 @@ on:
       # tag, so a merged change there changes the published guide. Not on pull
       # requests: developer-guide-docs.yml already renders the guide for those.
       - 'scripts/wayline/**'
+      - 'scripts/savor/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'

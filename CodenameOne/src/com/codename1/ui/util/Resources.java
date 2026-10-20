@@ -1443,6 +1443,15 @@ public class Resources {
         return f;
     }
 
+    /// Whether a theme font that names a TrueType font is loaded as one. A
+    /// resource editor overrides it: it keeps such a font as written even where
+    /// the platform it runs on cannot draw TrueType, or a theme it loads and
+    /// saves again would come out with every such font turned into its system
+    /// fallback.
+    boolean isTrueTypeFileSupported() {
+        return Font.isTrueTypeFileSupported();
+    }
+
     Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         switch (sizeSetting) {
             case 0: // small
@@ -1773,7 +1782,7 @@ public class Resources {
                             String fontName = input.readUTF();
                             int sizeSetting = input.readInt();
                             float fontSize = input.readFloat();
-                            if (Font.isTrueTypeFileSupported()) {
+                            if (isTrueTypeFileSupported()) {
                                 fontKeys.add(key);
                                 f = createTrueTypeFont(f, fontName, fileName, fontSize, sizeSetting);
                             }

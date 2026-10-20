@@ -19,7 +19,15 @@
 <script type="text/javascript" src="/javadoc/script-files/jquery-3.7.1.min.js"></script>
 <script type="text/javascript" src="/javadoc/script-files/jquery-ui.min.js"></script>
 <script type="text/javascript" src="/javadoc/script-files/highlight.min.js"></script>
+<script type="text/javascript" src="/js/cn1-snippet-runner.js"></script>
 <script type="text/javascript" src="/javadoc/script-files/javadoc-highlight-init.js"></script>
+{{- end -}}
+{{- /* "Try it" on every Java snippet: the guide (single page and chapters), the
+       API reference (the api-javadoc layout loads it above, before
+       javadoc-highlight-init.js) and blog posts. Nothing of the Playground loads
+       until a reader clicks. */ -}}
+{{- if or (eq .Layout "developer-guide") (eq .Layout "guide-chapter") (eq .Type "javadoc") (and (eq .Section "blog") .IsPage) -}}
+<script type="text/javascript" src="/js/cn1-snippet-runner.js" defer></script>
 {{- end -}}
 {{- with site.GetPage "section" "blog" -}}
   {{- with .OutputFormats.Get "RSS" -}}

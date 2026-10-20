@@ -17,12 +17,12 @@ repositories hold the SQL, and each one receives what it depends on instead of
 building it. The annotations are Spring's too, under
 `com.codename1.backend.annotations`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Signups.java[tag=backend-bean-service,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SignupApi.java[tag=backend-bean-controller,indent=0]
 ----
@@ -111,7 +111,7 @@ you to take those dependencies in the subclass instead.
 where a required point is a build error. A `List<T>` or `Collection<T>` receives
 every bean of type `T`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Checkout.java[tag=backend-bean-candidates,indent=0]
 ----
@@ -119,7 +119,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 When several beans have the injected type and the point names none, the build
 takes the one marked `@Primary`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/CardPayments.java[tag=backend-bean-primary,indent=0]
 ----
@@ -169,7 +169,7 @@ and they're injected the same way:
 `@Value` reads a setting, with a fallback after the colon, and converts it to the
 field's type:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SmtpMailer.java[tag=backend-bean-value,indent=0]
 ----
@@ -190,7 +190,7 @@ environment at run time.
 `@Value` per field, and a bean that holds them is an ordinary bean that others
 inject:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/MailSettings.java[tag=backend-bean-properties,indent=0]
 ----
@@ -205,7 +205,7 @@ means the class and the prefix disagree.
 
 `@Profile` and `@ConditionalOnProperty` make a bean depend on the deployment:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ConsoleMailer.java[tag=backend-bean-profile,indent=0]
 ----
@@ -218,7 +218,7 @@ another of its type.
 A class from a library can't carry annotations. A `@Bean` method in a
 `@Configuration` class makes one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Limits.java[tag=backend-bean-factory,indent=0]
 ----
@@ -236,7 +236,7 @@ every profile but `prod`.
 
 `@ConditionalOnProperty` makes a bean depend on a key:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SearchIndexer.java[tag=backend-bean-on-property,indent=0]
 ----
@@ -258,7 +258,7 @@ the same condition.
 It marks a default that steps aside when the application declares another bean it
 would compete with, which is how a module offers a fallback:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Defaults.java[tag=backend-bean-on-missing,indent=0]
 ----
@@ -282,7 +282,7 @@ configuration class that steps aside takes its `@Bean` methods with it.
 A library class often has methods to start and stop it, and no annotations to say
 so. `@Bean` names them:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SearchConfig.java[tag=backend-bean-init-destroy,indent=0]
 ----
@@ -329,7 +329,7 @@ exist at all, so the expensive part of setting a bean up belongs in its
 
 A request-scoped bean looks like any other to the code that uses it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/RequestClock.java[tag=backend-bean-request-scope,indent=0]
 ----
@@ -348,7 +348,7 @@ is checked by the build.
 
 `@Lazy` suits a bean that's expensive to prepare and not always needed:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ExpensiveIndex.java[tag=backend-bean-lazy,indent=0]
 ----
@@ -369,7 +369,7 @@ there when its own method runs. Within one bean the same rule holds for its clas
 hierarchy: a superclass's `@PostConstruct` runs before the subclass's, and a
 subclass's `@PreDestroy` runs before the superclass's:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Outbox.java[tag=backend-bean-lifecycle,indent=0]
 ----
