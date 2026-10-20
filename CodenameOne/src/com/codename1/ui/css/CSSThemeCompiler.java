@@ -465,7 +465,12 @@ public class CSSThemeCompiler {
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);
                 literalTokens.put(key, raw);
-            } else if (isColorLiteral(value)) {
+            } else if (isColorLiteral(value) || !legacy && isColorLiteral(leadingToken(value))) {
+                if (!legacy) {
+                    // `rgb(255, 0, 0) extra` is a chain whose leading unit is the color, and the
+                    // build-time constants emitter writes only that unit.
+                    value = leadingToken(value);
+                }
                 // Stored as plain hex, as the build-time compiler stores it: color constants
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
                 // Only `#hex` and `rgb()`/`rgba()` are color tokens here; a keyword such as `red`
@@ -835,8 +840,10 @@ public class CSSThemeCompiler {
                 // UIID from every state but pressed.
                 ownerDerives.put(uiid, value.trim());
             }
-            if (universal && ("font-family".equals(property) || "font-size".equals(property))) {
-                // The build-time compiler ignores universal rules, so `*` sets no font there.
+            if (universal) {
+                // The build-time compiler ignores universal rules entirely (CSSTheme.apply()
+                // returns before any element), so `*` sets no style property there; its custom
+                // properties, handled above, still count.
                 if ("font-size".equals(property)) {
                     parseFontSize(value);
                 }

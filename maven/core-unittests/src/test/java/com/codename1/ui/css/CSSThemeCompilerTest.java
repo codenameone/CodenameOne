@@ -1355,6 +1355,25 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testUniversalRuleSetsNoStyleProperty() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("* { color: red; padding: 1px; --tone: #00f; } Label { color: var(--tone); }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        for (Object key : theme.keySet()) {
+            assertFalse(String.valueOf(key).startsWith("Component."), String.valueOf(key));
+        }
+        assertEquals("0000ff", theme.get("Label.fgColor"));
+    }
+
+    @Test
+    void testFunctionalColorConstantTakesItsLeadingToken() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { accent: rgb(255, 0, 0) extra; }", res, "Theme");
+        assertEquals(0xff0000, Integer.parseInt((String) res.getTheme("Theme").get("@accent"), 16));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));
