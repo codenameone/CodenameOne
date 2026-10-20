@@ -52,6 +52,7 @@ final class PlaygroundApi {
     private static String[] classNames;
     private static final Map<String, String[]> methodCache = new HashMap<String, String[]>();
     private static final Map<String, String[]> fieldCache = new HashMap<String, String[]>();
+    private static final Map<String, Map<String, String>> memberTypeCache = new HashMap<String, Map<String, String>>();
 
     private PlaygroundApi() {
     }
@@ -167,7 +168,7 @@ final class PlaygroundApi {
         String[] cached = methodCache.get(dottedName);
         if (cached == null) {
             Set<String> out = new LinkedHashSet<String>();
-            collectMembers(internalName(dottedName), out, null, new LinkedHashSet<String>());
+            collectMembers(internalName(dottedName), out, null, null, new LinkedHashSet<String>());
             cached = out.toArray(new String[out.size()]);
             methodCache.put(dottedName, cached);
         }
@@ -179,11 +180,52 @@ final class PlaygroundApi {
         String[] cached = fieldCache.get(dottedName);
         if (cached == null) {
             Set<String> out = new LinkedHashSet<String>();
-            collectMembers(internalName(dottedName), null, out, new LinkedHashSet<String>());
+            collectMembers(internalName(dottedName), null, out, null, new LinkedHashSet<String>());
             cached = out.toArray(new String[out.size()]);
             fieldCache.put(dottedName, cached);
         }
         return cached;
+    }
+
+    /**
+     * The type of a member of a class or its supertypes, for completing after a
+     * chained expression ({@code b.getAllStyles().}): {@code name/argc} keys a
+     * method (its return type), {@code name} a field. Answers the dotted class name,
+     * or "" when the member is unknown or its type is a primitive or an array --
+     * neither has members to offer. A subclass is read before its supertypes, so a
+     * covariant override's narrower return type wins.
+     */
+    static synchronized String memberType(String dottedName, String key) {
+        Map<String, String> types = memberTypeCache.get(dottedName);
+        if (types == null) {
+            types = new HashMap<String, String>();
+            collectMembers(internalName(dottedName), null, null, types, new LinkedHashSet<String>());
+            memberTypeCache.put(dottedName, types);
+        }
+        String t = types.get(key);
+        return t == null ? "" : t;
+    }
+
+    /** {@code Lcom/codename1/ui/plaf/Style;} to {@code com.codename1.ui.plaf.Style}; "" for anything else. */
+    private static String referenceType(String desc) {
+        if (desc.length() < 3 || desc.charAt(0) != 'L') {
+            return "";
+        }
+        return desc.substring(1, desc.length() - 1).replace('/', '.').replace('$', '.');
+    }
+
+    private static int paramCount(String desc) {
+        String params = simpleParams(desc);
+        if (params.length() == 0) {
+            return 0;
+        }
+        int n = 1;
+        for (int i = 0; i < params.length(); i++) {
+            if (params.charAt(i) == ',') {
+                n++;
+            }
+        }
+        return n;
     }
 
     /** {@code java.util.Map.Entry} to the internal name the library has ({@code java/util/Map$Entry}). */
@@ -204,7 +246,7 @@ final class PlaygroundApi {
     }
 
     private static void collectMembers(String internalName, final Set<String> methods, final Set<String> fields,
-            Set<String> seen) {
+            final Map<String, String> types, Set<String> seen) {
         StubLibrary lib = libraryOrNull();
         if (lib == null || internalName == null || !seen.add(internalName)) {
             return;
@@ -232,6 +274,9 @@ final class PlaygroundApi {
                 if (fields != null && (access & 0x0001) != 0) {
                     fields.add(name);
                 }
+                if (types != null && (access & 0x0001) != 0 && !types.containsKey(name)) {
+                    types.put(name, referenceType(desc));
+                }
                 return null;
             }
 
@@ -240,11 +285,17 @@ final class PlaygroundApi {
                 if (methods != null && (access & 0x0001) != 0 && !name.startsWith("<")) {
                     methods.add(name + "(" + simpleParams(desc) + ")");
                 }
+                if (types != null && (access & 0x0001) != 0 && !name.startsWith("<")) {
+                    String key = name + "/" + paramCount(desc);
+                    if (!types.containsKey(key)) {
+                        types.put(key, referenceType(desc.substring(desc.indexOf(')') + 1)));
+                    }
+                }
                 return null;
             }
         }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         for (String s : supers) {
-            collectMembers(s, methods, fields, seen);
+            collectMembers(s, methods, fields, types, seen);
         }
     }
 
