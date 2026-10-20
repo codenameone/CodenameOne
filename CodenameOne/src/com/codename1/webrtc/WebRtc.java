@@ -111,9 +111,7 @@ public final class WebRtc {
             throw new IllegalStateException("The platform could not create a peer connection");
         }
         PeerConnection connection = new PeerConnection(handle, listener);
-        synchronized (PEERS) {
-            PEERS.put(Integer.valueOf(handle), connection);
-        }
+        PEERS.put(Integer.valueOf(handle), connection);
         return connection;
     }
 
@@ -123,30 +121,24 @@ public final class WebRtc {
         bridge().setSpeakerphone(on);
     }
 
+    // The registries are touched only on the EDT: the API is called there, and
+    // every answer from a port is marshalled there by callSerially below.
     static int request(AsyncResource<?> pending) {
-        synchronized (REQUESTS) {
-            int id = nextRequest++;
-            REQUESTS.put(Integer.valueOf(id), pending);
-            return id;
-        }
+        int id = nextRequest++;
+        REQUESTS.put(Integer.valueOf(id), pending);
+        return id;
     }
 
     static void forget(PeerConnection connection) {
-        synchronized (PEERS) {
-            PEERS.remove(Integer.valueOf(connection.handle()));
-        }
+        PEERS.remove(Integer.valueOf(connection.handle()));
     }
 
     private static AsyncResource<?> take(int requestId) {
-        synchronized (REQUESTS) {
-            return REQUESTS.remove(Integer.valueOf(requestId));
-        }
+        return REQUESTS.remove(Integer.valueOf(requestId));
     }
 
     private static PeerConnection peer(int handle) {
-        synchronized (PEERS) {
-            return PEERS.get(Integer.valueOf(handle));
-        }
+        return PEERS.get(Integer.valueOf(handle));
     }
 
     // ------------------------------------------------- answers from a port
@@ -158,7 +150,7 @@ public final class WebRtc {
         CN.callSerially(new Runnable() {
             public void run() {
                 AsyncResource<?> pending = take(requestId);
-                if (!(pending instanceof AsyncResource)) {
+                if (pending == null) {
                     return;
                 }
                 @SuppressWarnings("unchecked")

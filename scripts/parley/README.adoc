@@ -1,17 +1,17 @@
 = Parley
 
-A food-delivery application and its server, in one Maven project and one language.
-A customer browses the restaurants that deliver to them, fills a cart and pays; the
-restaurant accepts the order and cooks it; the nearest courier is offered the
-delivery, collects it and brings it to the door while the customer follows it on a
-map; and an administrator runs the service. Which of these a person sees is decided
-by the roles the server gives their account: a customer opens on the restaurants, a
-merchant on the restaurant's order queue, a courier on the delivery screen, an
-administrator on the operations console.
+A private messenger and its server, in one Maven project and one language. People
+chat one to one, in groups and in channels, send photos, video and voice notes,
+and call each other with voice or video. Messages, attachments and calls are
+end-to-end encrypted: the server stores and relays what it cannot read. An
+administrator runs the service, with its statistics, its reports and its accounts,
+without ever seeing a message. Which of these a person sees is decided by the roles
+the server gives their account: a user opens on their chats, an administrator on
+the admin console.
 
 It is a sample of how a Codename One application and a Codename One Backend fit
 together, and the project the Initializr generates when you start from the
-food-delivery template.
+messaging template.
 
 == Start here
 
@@ -19,15 +19,14 @@ Two chapters of the developer guide cover this project:
 
 * https://www.codenameone.com/developer-guide/#parley-users-guide[The user's guide]
   (link:../../docs/developer-guide/Parley-Users-Guide.asciidoc[source]) shows the
-  application as a customer, a merchant, a courier and an administrator see it,
-  screen by screen,
-  with the demo accounts and test cards.
+  application as a user and as an administrator see it, with the demo accounts.
 * https://www.codenameone.com/developer-guide/#parley-implementors-guide[The implementor's guide]
   (link:../../docs/developer-guide/Parley-Implementors-Guide.asciidoc[source])
-  explains how the project is built and what to change to make it yours: one
-  restaurant's own ordering app or a whole marketplace, real billing, your own map data or native maps, sign-in through another identity
-  provider, real text messages, analytics, and the database: the engines it
-  runs on, changing the schema, and hosting it.
+  explains how the project is built and what to change to make it yours: the
+  protocol, delivery to several devices, encrypted media, calls and the TURN
+  server, the Telegram and WhatsApp bridges and their privacy trade-off, real
+  text messages and push, analytics, and the database: the engines it runs on,
+  changing the schema, and hosting it.
 
 To see it running first, the two commands under <<Running it>> are all it takes.
 
@@ -42,11 +41,11 @@ To see it running first, the two commands under <<Running it>> are all it takes.
   other side did not follow is a compile error.
 
 | `common`
-| The application: sign-in, the customer, merchant, courier and administrator
-  screens, the map,
-  the wallet, the settings and the live channel. Styled in
-  `src/main/css/theme.css`, whose first block of variables holds the colors and
-  the corner radius everything else is drawn with. The text is in
+| The application: sign-in, the chats and their screens, the keys, sessions and
+  encrypted vault in `crypto`, calls over `com.codename1.webrtc` and
+  `com.codename1.call`, the privacy settings, the admin console and the live
+  channel. Styled in `src/main/css/theme.css`, whose first block of variables holds
+  the colors and the corner radius everything else is drawn with. The text is in
   `src/main/l10n`, in English, Spanish, French, German and Hebrew. The
   translations are machine-generated samples that no native speaker has
   reviewed; have them checked before you ship.
@@ -54,11 +53,11 @@ To see it running first, the two commands under <<Running it>> are all it takes.
   has agreed, is all in `Telemetry`.
 
 | `backend`
-| The server: accounts and roles, phone verification, the restaurants and their
-  menus, courier applications and their documents, moderation, quotes and
-  pricing, the order and delivery state machines, dispatch, payments held at
-  checkout and taken on delivery, payouts, statistics, and a WebSocket that
-  pushes changes as they happen.
+| The server: accounts and roles, phone verification, the public keys of each
+  device, conversations and their members, the envelopes that carry messages and
+  their delivery over a WebSocket and push, encrypted attachments, call
+  signalling and TURN credentials, reports and moderation, statistics, and the
+  optional bridges to Telegram and WhatsApp.
   The data is entity classes in `domain`, read and written by the repository
   beside each service. The schema is the migration scripts in
   `src/main/resources/db/migration`, and the same server runs on SQLite,
@@ -87,27 +86,21 @@ mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
 ----
 
 The development profile creates these accounts, all with the password
-`parley-demo`, twelve restaurants with their menus, and a fortnight of orders for
-the charts to draw:
+`parley-demo`, a few conversations between them and a bot that answers:
 
 [cols="2,3"]
 |===
-| `customer@parley.example`, `customer2@parley.example` | order food
-| `customer3@parley.example` | a customer an administrator has flagged
-| `courier@parley.example`, `courier2@parley.example` | approved couriers
-| `courier3@parley.example`, `courier4@parley.example` | approved couriers who
-  carry the past orders
-| `merchant@parley.example` | runs Ember & Crust's kitchen
-| `applicant@parley.example` | has applied to deliver and is waiting for a decision
+| `alice@parley.example`, `bob@parley.example`, `carol@parley.example`, `dan@parley.example`
+| users who share a group, a family group and a channel
+| `mallory@parley.example` | a user an administrator has flagged, with a report open
 | `admin@parley.example` | runs the service
 |===
 
-On the development profile a customer alone can watch an order all the way: a
-simulated kitchen accepts and cooks for every restaurant whose merchant is not
-signed in, and a simulated courier takes the delivery while no real one is
-online. Sign in as the merchant and a courier in other simulators to play those
-parts yourself. On a phone, set the server's address on the welcome screen:
-`localhost` on a phone is the phone.
+Sign in as one account in the simulator and as another in a second simulator or in
+a browser to see a conversation from both ends. The bot answers whoever writes to
+it, so one person trying the app alone has someone to talk to; its chat is plain
+text, and the app says so. On a phone, set the server's address on the welcome
+screen: `localhost` on a phone is the phone.
 
 === In a browser, with nothing installed
 
@@ -130,43 +123,49 @@ flow with the code sent back to `/signin/code` on that server, and opens its liv
 channel to the same origin. To deploy it, put `backend/target/webapp` beside the
 server binary as `webapp`.
 
-A browser gives a page less than a phone gives an app, and the application says
-so where it matters: calling and texting a courier are offered only where the
-device can dial, and the restaurants listed are the ones near the default
-address when the browser will not say where it is.
+A browser is linked as one more device of the account, with keys of its own. It
+gives a page less than a phone gives an app, and the application says so where it
+matters: the system call screen and the call push are for phones.
 
 == What each role does
 
-A customer chooses where to deliver to, browses the restaurants by cuisine or
-searches their dishes, and builds an order with each dish's options. The checkout
-shows the fees, takes a promo code (`WELCOME10`, `PARLEY5` on the development
-profile) and a tip, and the card is held, not charged. The order is then followed
-step by step and on a map, and can be cancelled until the kitchen accepts it. Past
-orders can be ordered again, restaurants kept as favorites, and a tip added after
-the food arrives.
+A user finds people by name, username or phone number and starts a chat, makes a
+group of up to 256 people, or joins one with an invite link. A channel is a group
+in which only the administrators can send. A conversation shows typing, delivery
+and read state, and a message can be replied to, forwarded, edited and deleted for
+everyone. Photos, video and voice notes are encrypted on the device before they are
+uploaded. The conversation's info screen shows the safety numbers to compare with
+the other person, a timer for disappearing messages, and the choice to block or
+report. The settings hold the privacy choices -- who sees last seen and the photo,
+read receipts, typing indicators, app lock and screen security -- and the linked
+devices: up to six phones, tablets and browsers, each with keys of its own.
 
-A merchant sees their restaurant's orders arrive, accepts one with a preparation
-time or rejects it with a reason, and marks it ready for the courier. They pause
-the restaurant when the kitchen is full, edit the menu, its photos and what is sold
-out, and see the sales.
+A call is one to one, voice or video, and rings on the lock screen through the
+system call UI, with a VoIP push when the app is not running.
 
-Anyone can apply to deliver. The application asks for the courier's details, the
-vehicle, and five photographs: an identity document, the licence, a selfie, the
-vehicle registration and the insurance. Nobody delivers until an administrator
-approves the application; a rejection carries a reason, and the applicant can
-correct it and send it again. An approved courier goes online, is offered
-deliveries from restaurants near them, collects the food once it is ready, and
-sees what they earned and cashes it out.
+An administrator sees the service in charts of what the server can count,
+resolves the reports people make, flags or blocks an account with a reason that is
+kept in its history, names other administrators, and sees the conversations linked
+to Telegram or WhatsApp.
 
-An administrator sees the service in charts, approves restaurants and couriers,
-flags or blocks an account with a reason that is kept in its history, cancels and
-refunds orders, and sets the prices and the promos.
+== How the encryption works
+
+Parley follows Signal's published X3DH and Double Ratchet specifications over the
+primitives Codename One has on every port: P-256 for the Diffie-Hellman steps,
+HKDF-SHA-256 for the key chains and AES-256-GCM for the messages. Every device is
+its own identity, with an identity key, a signed prekey and one-time prekeys whose
+private halves live only in an encrypted vault on the device. A message is
+encrypted separately for each device of each recipient, and of the sender, so there
+is no group key. The server stores envelopes it cannot open, and an attachment is
+encrypted with a fresh key that travels inside the message. Users compare safety
+numbers to know nobody is in the middle. The implementor's guide has the details.
+
+The conversations that are not end-to-end encrypted are the demo bot's, and any
+conversation an administrator links to Telegram or WhatsApp: a bridge has to read a
+message to carry it, so such a conversation sends its messages to the server in
+plain text, and the app marks it and tells its members when it is linked.
 
 == What is real and what is simulated
-
-Maps, search and routes are real and need no key: the map tiles come from
-OpenFreeMap, routes from the public OSRM server, and place search from Photon,
-which the server calls so the app never talks to a third party directly.
 
 Text messages go through the provider `parley.sms.provider` names: `twilio`,
 `vonage` or `messagebird`, each with its own credentials. On a development
@@ -175,24 +174,30 @@ so a sign-up can finish. Any other profile needs a provider; one whose
 credentials are missing is logged as a configuration error, naming the missing
 settings, and the app is told the code could not be sent.
 
-Payments are simulated on a development profile. Simulated, the card
-`4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
-money moves. With `parley.payments.provider=stripe` and
-`PARLEY_PAYMENTS_STRIPE_SECRET` set in the server's environment, a card is
-added on Stripe's own page, so its number never reaches the app or this server,
-and an order's total is held on the card at checkout and taken when the food is
-delivered; a rejected or cancelled order releases the hold. The Stripe provider is an untested
-stub: it is covered by tests that answer for Stripe, has never been run against
-a live account, and has to be tried with a Stripe test key before it is trusted
-with money. Paying a
-courier out is a ledger entry in both cases; moving that money to a bank is left
-to the deployment.
+Push goes through `parley.push.provider`: `cloud`, which sends through Codename
+One's push servers with `parley.push.app` and `PARLEY_PUSH_KEY`, or `console` on a
+development profile. A push never carries a message; it only wakes the app, which
+fetches what is waiting and decrypts it on the device.
+
+Calls connect the two phones directly when they can and through a TURN server when
+they cannot. The server hands out the addresses with `parley.ice.stun` and
+`parley.ice.turn`, and issues a credential per call that expires after
+`parley.ice.ttl` seconds from the secret it shares with the TURN server
+(`parley.ice.secret`, coturn's `static-auth-secret`). Without a TURN server only
+STUN is offered, and calls between networks that block a direct path fail. In the
+simulator the WebRTC package connects calls without carrying media, and the video
+views show a test pattern.
+
+The bridges are off until they are configured: `parley.telegram.token`,
+`parley.telegram.secret` and `parley.telegram.bot` for a Telegram bot, whose
+webhook is `/bridge/telegram/<secret>`, and `parley.whatsapp.token`,
+`parley.whatsapp.phone`, `parley.whatsapp.secret` and `parley.whatsapp.verify` for
+the WhatsApp Cloud API, whose webhook is `/bridge/whatsapp`.
 
 `backend/application.properties` lists every setting a deployment supplies. The
 database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
-address, or the path of a SQLite file. The SMS and payment settings are listed
-there too, each also read from the environment in upper case with `_` for every
-dot (`PARLEY_SMS_TWILIO_TOKEN`).
+address, or the path of a SQLite file. The settings are also read from the
+environment in upper case with `_` for every dot (`PARLEY_SMS_TWILIO_TOKEN`).
 
 == Tests
 
@@ -208,9 +213,7 @@ mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledT
 <2> The same tests again, translated to a native binary, which is how the server
     ships.
 <3> Starts the server on the `test` profile and runs the application's tests
-    against it in the simulator: they register, apply to deliver and are approved,
-    order food, accept and cook it as the restaurant, deliver it, pay for it and
-    administer it, and compare the screens in `screenshots/`. Pass `--native` to run them against the compiled
+    against it in the simulator, and compares the screens in `screenshots/`. Pass `--native` to run them against the compiled
     server. On Linux they then run a second time with the simulator as a desktop
     window, where the admin console is laid out side by side under the
     platform's own theme.
@@ -218,8 +221,8 @@ mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledT
     package, and builds it.
 <5> Builds the browser version of the application, starts the server hosting
     it, and drives it in a headless browser: the application loads from the
-    server, signs in as the demo customer, reaches the home screen and opens its
-    live channel, then signs out and signs in as the demo admin. Needs Node with Playwright and its Chromium (`npm ci` and
+    server, signs in as a demo user, links itself as a device, reaches the chat list and
+    opens its live channel, then signs out and signs in as the demo admin. Needs Node with Playwright and its Chromium (`npm ci` and
     `npx playwright install chromium` in `scripts/`). Screenshots and logs go
     to `target/web-e2e`.
 

@@ -65,7 +65,7 @@ log "running the generated server's tests"
 (cd "$minimal" && "$MVN" -B -q -Dcodename1.platform=backend -pl shared,backend -am test)
 ls "$minimal"/backend/target/surefire-reports/TEST-*.xml >/dev/null 2>&1 \
     || { log "the generated server's tests did not run"; exit 1; }
-[ -f "$minimal/backend/target/generated-sources/cn1-annotations/$PACKAGE/api/OrderApiServer.java" ] \
+[ -f "$minimal/backend/target/generated-sources/cn1-annotations/$PACKAGE/api/ConversationApiServer.java" ] \
     || { log "the server's half of the contract was not generated"; exit 1; }
 
 for layout in APP_WITH_BACKEND FULL; do
@@ -73,7 +73,7 @@ for layout in APP_WITH_BACKEND FULL; do
   [ -d "$project" ] || project="$(extract "$layout")"
   log "building the generated app ($layout)"
   (cd "$project" && "$MVN" -B -q -Dcodename1.platform=javase -Djava.awt.headless=true -DskipTests package)
-  for built in "classes/theme.res" "classes/$PACKAGE/api/OrderApiImpl.class" "classes/cn1app/RestClientBootstrap.class"; do
+  for built in "classes/theme.res" "classes/$PACKAGE/api/ConversationApiImpl.class" "classes/cn1app/RestClientBootstrap.class"; do
     [ -f "$project/common/target/$built" ] \
         || { log "$layout: common/target/$built was not built"; exit 1; }
   done

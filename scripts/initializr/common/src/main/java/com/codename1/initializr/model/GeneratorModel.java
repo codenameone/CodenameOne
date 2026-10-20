@@ -86,9 +86,15 @@ public class GeneratorModel {
     /// The food-delivery template's `--brand`, held to its theme.css the same way.
     public static final int SAVOR_BRAND = 0x7ac943;
 
+    /// The messaging template's `--brand`, held to its theme.css the same way.
+    public static final int PARLEY_BRAND = 0x0a7d6b;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
+        if (template == Template.PARLEY) {
+            return PARLEY_BRAND;
+        }
         return template == Template.SAVOR ? SAVOR_BRAND : FULL_STACK_BRAND;
     }
 
@@ -1456,6 +1462,13 @@ public class GeneratorModel {
         if ("common/pom.xml".equals(targetPath)) {
             content = applyJavaVersionToPom(content);
         }
+        if ("pom.xml".equals(targetPath) && !isBareTemplate()
+                && options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
+            // The server and the shared module inherit the root's level, and a
+            // full-stack template's server may be written in Java 17 (records).
+            content = StringUtil.replaceAll(content, "<maven.compiler.source>1.8<", "<maven.compiler.source>17<");
+            content = StringUtil.replaceAll(content, "<maven.compiler.target>1.8<", "<maven.compiler.target>17<");
+        }
         if (".idea/misc.xml".equals(targetPath)) {
             content = normalizeIntellijMiscXml(content);
         }
@@ -1894,16 +1907,23 @@ public class GeneratorModel {
         }
         if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
+            boolean chat = template == Template.PARLEY;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(food
+                    .append(chat
+                            ? "This project is a working messaging app: chats, groups, media, calls and an admin "
+                            + "console in one "
+                            : food
                             ? "This project is a working food-delivery app: a customer, a restaurant, a courier "
                             + "and an admin mode in one "
                             : "This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(food
+                    .append(chat
+                            ? "- `backend/` is the server: accounts and devices, contacts, conversations and "
+                            + "messages, media, calls, the live channel and the database migrations.\n"
+                            : food
                             ? "- `backend/` is the server: accounts and roles, phone verification, restaurants and "
                             + "their menus, orders, courier applications, deliveries, payments, the live channel "
                             + "and the database migrations.\n"

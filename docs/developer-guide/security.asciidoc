@@ -668,6 +668,31 @@ A key that arrives as a file is usually PEM rather than raw DER -- base64 betwee
 
 The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`, `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, and `SHA512_WITH_ECDSA`.
 
+==== Key agreement and key derivation (ECDH, HKDF)
+
+Two parties that have never met can agree on a secret over a channel anyone can read. `KeyGenerator.ec(256)` makes a P-256 key pair, each side sends the other its public key, and `KeyAgreement.ecdh` combines one side's private key with the other's public key. Both arrive at the same 32 bytes, and nobody who watched the exchange can compute them:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=ecdh-agree,indent=0]
+----
+
+The result is a shared secret, not yet a key. `Hkdf` (RFC 5869) turns it into keys of any length, bound to an `info` label so that keys derived for different purposes never coincide. `Hkdf.derive` runs both steps at once:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=ecdh-derive,indent=0]
+----
+
+Protocols that keep the intermediate key, a ratchet for example, call the two steps separately:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=hkdf-steps,indent=0]
+----
+
+`Hkdf` is portable Java over `Hmac`, so it behaves identically on every port and on a Codename One backend. The key agreement itself runs in the platform's native crypto provider. Use a fresh key pair for each exchange you want to be forward secret, and never use the raw ECDH output as a key.
+
 ==== JSON Web Tokens
 
 `com.codename1.security.Jwt` provides JWT (RFC 7519) signing and verification. The `HS` family (HMAC-SHA-2) is pure Java so it works on every platform; the `RS` family (RSA-PKCS#1 v1.5 with SHA-2) and the `ES` family (ECDSA with SHA-2) route through the platform's native crypto:
@@ -807,5 +832,6 @@ NOTE: `RSA_OAEP_SHA256` uses SHA-256 for the label hash and for MGF1 alike. The 
 
 * *AES*: 256 bits (`KeyGenerator.aes(256)`) for new code. 128 bits is also acceptable and faster; pick 192 only if you have a specific reason.
 * *RSA*: 2048 bits minimum (`KeyGenerator.rsa(2048)`). Use 3072 or 4096 if you need a longer security margin -- key generation gets slow above 2048 so run it on a background thread.
+* *Elliptic curve*: `KeyGenerator.ec(256)`, which is P-256, for both signatures and key agreement.
 * *HMAC*: a key at least as long as the hash output (32 bytes for HMAC-SHA-256). `KeyGenerator.hmac(256)` returns a key of the requested bit length.
 * *TOTP / HOTP*: 160 bits (20 bytes) is the de-facto standard for authenticator-app compatibility.

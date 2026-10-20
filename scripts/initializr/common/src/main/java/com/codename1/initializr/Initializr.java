@@ -441,7 +441,7 @@ public class Initializr extends Lifecycle {
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
-                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR}
+                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR, Template.PARLEY}
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
                 ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
@@ -1175,7 +1175,8 @@ public class Initializr extends Lifecycle {
         String safePackage = packageName == null ? "" : packageName.trim();
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
-                + (template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
+                + (template == Template.PARLEY ? "Template MESSAGING APP + SERVER\n"
+                : template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
                         : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"

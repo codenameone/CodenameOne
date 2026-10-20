@@ -1,0 +1,109 @@
+[[webrtc-section]]
+== Real-Time Audio and Video
+
+`com.codename1.webrtc` carries live audio and video between two devices: a voice
+call, a video call, or a camera stream. It is WebRTC, so the media goes directly
+between the devices when a path exists and is encrypted on the way, with a relay
+in between when it doesn't.
+
+The package does one thing. It opens the camera and the microphone, sets up the
+connection and draws the pictures. It doesn't ring, place the call in the system
+call log or wake a sleeping phone -- that is <<call-management,Call Management>>, which a calling
+app uses beside this package -- and it doesn't signal.
+
+=== Signalling is yours
+
+Before two devices can talk they have to exchange a few messages: a description
+of what each can send and receive, and the network addresses each found for
+itself. WebRTC defines what those messages say, not how they travel. Codename One
+creates them and hands them to you, and you carry them to the other side over
+whatever you already have: your own server, a WebSocket, a push. Nothing in the
+package sends one for you. That keeps the package free of any particular backend,
+and means the same call code works whether your server is a Codename One Backend
+or anything else.
+
+The exchange is the standard one:
+
+. The caller adds its tracks, creates an offer, sets it as its local description and sends it.
+. The callee sets the offer as its remote description, adds its own tracks, creates an answer, sets it as its local description and sends it back.
+. The caller sets the answer as its remote description.
+. Meanwhile each side sends the other every `IceCandidate` its listener is given, and adds each one it receives.
+
+=== A call
+
+`WebRtc.openUserMedia(audio, video, frontCamera)` opens the camera and the
+microphone, asking for permission where the platform asks, and answers a
+`LocalMedia` with a `MediaTrack` for each. `WebRtc.createPeerConnection` makes the
+connection, and a `PeerConnectionConfig` names the STUN and TURN servers it uses to
+find a path. The listener hears about the candidates to send, the connection's
+state and the other side's tracks, all on the EDT:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-call,indent=0]
+----
+
+The callee answers with the offer that arrived over your signalling:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-answer,indent=0]
+----
+
+and each candidate that arrives afterward goes into the connection:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-candidate,indent=0]
+----
+
+A candidate can arrive before the description it belongs to, because your channel
+doesn't promise an order; hold it until the description is set. When the call is
+over, close the connection and release the media so the camera light goes off:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-hangup,indent=0]
+----
+
+=== Tracks and views
+
+A `MediaTrack` is one stream of audio or video, local or remote. `setEnabled(false)`
+mutes it: it keeps flowing as silence or black frames, so unmuting is instant and
+the other side's connection never notices. `switchCamera()` flips a local video
+track between the front and back cameras. `WebRtc.setSpeakerphone(true)` routes
+the call's audio to the loudspeaker and `false` returns it to the earpiece or
+headset.
+
+A `VideoView` draws a video track and is laid out like any other component. Pass
+`true` as its second argument for your own front camera, which people expect
+mirrored. Call `release()` when you discard it.
+
+=== STUN and TURN
+
+Most connections find a direct path with only a STUN server, which tells a device
+how the internet sees it. Between two phones on mobile networks that often fails,
+and the media has to go through a TURN server that relays it. Add both to the
+configuration with `IceServer.stun(url)` and `new IceServer(urls, username,
+credential)`. TURN credentials should be short-lived and handed out by your own
+server per call, rather than built into the app. `setRelayOnly(true)` uses only
+relayed paths, so the other side never learns the device's own addresses, at the
+cost of every call going through the relay.
+
+=== Platforms
+
+On Android the package is Google's WebRTC library and on iOS the Apple-platform
+build of the same library. In a browser it is the browser's own WebRTC. Referencing
+the package is what adds the native library to an Android or iOS build, along with
+the camera and microphone permissions, so an app that doesn't use it pays for none
+of that. `WebRtc.isSupported()` says whether the platform can carry media.
+
+The simulator connects calls without carrying any media. Tracks open, descriptions
+are exchanged and the connection reaches `PeerConnection.CONNECTED`, and each video
+view shows a test pattern. The whole call flow -- signalling, states, screens --
+can be developed and run on the desktop, but what you hear and see needs two
+devices.
+
+The Parley sample uses this package, with `com.codename1.call` for the system
+call screen and a VoIP push, for its voice and video calls: see
+<<parley-calls>>.

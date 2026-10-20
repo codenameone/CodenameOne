@@ -806,5 +806,6 @@ inlining
 inlined
 # -----------------------------------------------------------------------------
 # The sample application the Wayline chapters walk through.
+Parley
 Savor
 Wayline

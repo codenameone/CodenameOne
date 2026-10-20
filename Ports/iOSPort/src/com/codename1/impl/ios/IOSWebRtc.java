@@ -115,10 +115,6 @@ class IOSWebRtc implements WebRtcBridge {
             return null;
         }
         PeerComponent view = impl.createNativePeer(new long[] {peer});
-        if (view == null) {
-            nativeInstance.webRtcReleaseVideoView(peer);
-            return null;
-        }
         views.put(view, Long.valueOf(peer));
         return view;
     }
