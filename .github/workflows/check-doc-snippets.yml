@@ -14,6 +14,7 @@ on:
       # changes the published snippet without touching the .asciidoc.
       - 'docs/demos/**'
       - 'scripts/wayline/**'
+      - 'scripts/savor/**'
       - 'docs/website/content/blog/**'
       - 'CodenameOne/src/**/*.java'
       - 'Ports/CLDC11/src/**/*.java'
