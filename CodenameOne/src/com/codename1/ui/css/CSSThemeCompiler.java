@@ -788,10 +788,11 @@ public class CSSThemeCompiler {
                 out.append(c);
                 continue;
             }
-            // CSS: one to six hex digits name a code point, and one whitespace after them ends it.
+            // CSS: one to six hex digits name a code point, and one CSS whitespace after them
+            // (space, tab, LF, FF, CR or CR LF) ends it; an em space (U+2003) after `\\41` is kept.
             i += digits - 1;
-            if (i + 1 < end && Character.isWhitespace(v.charAt(i + 1))) {
-                i++;
+            if (i + 1 < end) {
+                i = Math.min(end, skipEscapeTerminator(v, i + 1)) - 1;
             }
             if (code == 0 || code > 0x10FFFF || code >= 0xD800 && code <= 0xDFFF) {
                 code = 0xFFFD;

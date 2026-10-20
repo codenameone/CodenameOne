@@ -1315,6 +1315,14 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testStringEscapeKeepsANonCssWhitespaceAfterIt() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { message: \"\\41\u2003B\"; plain: \"\\41 B\"; }", res, "Theme");
+        assertEquals("A\u2003B", res.getTheme("Theme").get("@message"));
+        assertEquals("AB", res.getTheme("Theme").get("@plain"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
