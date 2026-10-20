@@ -169,6 +169,10 @@ public class FileTypeFilter {
             return false;
         }
         for (String e : extensions) {
+            // "*" is the all-files extension the native ports recognize too.
+            if ("*".equals(e)) {
+                return true;
+            }
             int start = name.length() - e.length() - 1;
             if (start >= 0 && name.charAt(start) == '.'
                     && name.regionMatches(true, start + 1, e, 0, e.length())) {

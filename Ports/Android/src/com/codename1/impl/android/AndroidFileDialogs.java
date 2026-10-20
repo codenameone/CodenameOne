@@ -129,20 +129,15 @@ final class AndroidFileDialogs {
                     return;
                 }
                 final ContentResolver resolver = AndroidNativeUtil.getContext().getContentResolver();
-                if (persist) {
-                    int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            | (data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                    for (Uri u : uris) {
-                        try {
-                            resolver.takePersistableUriPermission(u, flags);
-                        } catch (SecurityException ignored) {
-                        }
-                    }
-                }
+                final int grantFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | (data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 // Copying can be slow for cloud documents, keep it off the UI thread
                 new Thread(new Runnable() {
                     public void run() {
                         FileDialogResult result;
+                        // Every cache directory this import creates; a failed
+                        // import returns none of them, so they are removed.
+                        List<File> staged = new ArrayList<File>();
                         try {
                             // Checked before anything is copied: a selection with
                             // any file the filters reject fails whole, rather than
@@ -161,8 +156,8 @@ final class AndroidFileDialogs {
                                 for (Uri u : uris) {
                                     // A tree URI is not a path FileSystemStorage can
                                     // list; a folder is copied, as iOS does.
-                                    paths.add(request.isDirectories() ? copyTreeToCache(resolver, u)
-                                            : copyToCache(resolver, u));
+                                    paths.add(request.isDirectories() ? copyTreeToCache(resolver, u, staged)
+                                            : copyToCache(resolver, u, staged));
                                 }
                             }
                             if (rejected) {
@@ -170,6 +165,17 @@ final class AndroidFileDialogs {
                                 result.setError(new IOException("A selected file does not match the dialog's filters"));
                             } else {
                                 result = new FileDialogResult(request, paths.toArray(new String[paths.size()]), -1, null);
+                                // Persisted only once the import succeeded: a grant
+                                // for a selection the app never receives would
+                                // still count against the persisted-grant quota.
+                                if (persist) {
+                                    for (Uri u : uris) {
+                                        try {
+                                            resolver.takePersistableUriPermission(u, grantFlags);
+                                        } catch (SecurityException ignored) {
+                                        }
+                                    }
+                                }
                             }
                         } catch (IOException e) {
                             result = new FileDialogResult(request, null, -1, null);
@@ -177,6 +183,11 @@ final class AndroidFileDialogs {
                         } catch (SecurityException e) {
                             result = new FileDialogResult(request, null, -1, null);
                             result.setError(e);
+                        }
+                        if (result.getError() != null) {
+                            for (File f : staged) {
+                                deleteRecursive(f);
+                            }
                         }
                         deliver(callback, result);
                     }
@@ -190,7 +201,7 @@ final class AndroidFileDialogs {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         String name = request.getSuggestedName();
         String[] mimes = mimeTypes(request.getFilters(), request.getSelectedFilter());
-        String type = mimes.length == 1 ? mimes[0] : null;
+        String type = mimes.length == 1 ? mimes[0] : commonMime(mimes);
         if (type == null || type.indexOf('*') >= 0) {
             String fromName = name == null ? null : mimeForExtension(extensionOf(name));
             if (fromName != null) {
@@ -252,8 +263,19 @@ final class AndroidFileDialogs {
         });
     }
 
-    private static void start(FileDialogRequest<?> request, SuccessCallback<FileDialogResult> callback,
-                              Intent intent, IntentResultListener listener) {
+    private static void start(final FileDialogRequest<?> request, final SuccessCallback<FileDialogResult> callback,
+                              final Intent intent, final IntentResultListener listener) {
+        if (!Display.getInstance().isEdt()) {
+            // The busy check below and the listener registration inside
+            // startActivityForResult must not interleave with another launch;
+            // running every launch on the EDT serializes them.
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    start(request, callback, intent, listener);
+                }
+            });
+            return;
+        }
         if (AndroidNativeUtil.getActivity() == null) {
             FileDialogResult r = FileDialogResult.cancelled(request);
             r.setError(new IOException("No activity to show the file dialog"));
@@ -327,6 +349,30 @@ final class AndroidFileDialogs {
             return new String[]{"*/*"};
         }
         return out.toArray(new String[out.size()]);
+    }
+
+    /*
+     * One MIME type standing for several, for ACTION_CREATE_DOCUMENT which takes
+     * a single type: "image/png" and "image/jpeg" become "image/*", so the picker
+     * still offers image providers. Types of different families have no common
+     * form and answer null, which the caller resolves from the name or falls
+     * back to application/octet-stream.
+     */
+    private static String commonMime(String[] mimes) {
+        String family = null;
+        for (String m : mimes) {
+            int slash = m.indexOf('/');
+            if (slash <= 0) {
+                return null;
+            }
+            String f = m.substring(0, slash);
+            if (family == null) {
+                family = f;
+            } else if (!family.equals(f)) {
+                return null;
+            }
+        }
+        return family == null || "*".equals(family) ? null : family + "/*";
     }
 
     private static String mimeForExtension(String ext) {
@@ -432,6 +478,10 @@ final class AndroidFileDialogs {
         if (name == null || name.length() == 0) {
             return fallback;
         }
+        // "." and ".." would resolve to the staging folder or its parent.
+        if (".".equals(name) || "..".equals(name)) {
+            return fallback;
+        }
         return name.replace('/', '_').replace('\\', '_');
     }
 
@@ -445,10 +495,12 @@ final class AndroidFileDialogs {
         return dir;
     }
 
-    private static String copyTreeToCache(ContentResolver resolver, Uri tree) throws IOException {
+    private static String copyTreeToCache(ContentResolver resolver, Uri tree, List<File> staged) throws IOException {
         String rootId = android.provider.DocumentsContract.getTreeDocumentId(tree);
         Uri rootDoc = android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, rootId);
-        File dest = new File(pickDirectory(tree), safeName(displayName(resolver, rootDoc), "folder"));
+        File dir = pickDirectory(tree);
+        staged.add(dir);
+        File dest = new File(dir, safeName(displayName(resolver, rootDoc), "folder"));
         copyTreeChildren(resolver, tree, rootId, dest);
         return "file://" + dest.getAbsolutePath();
     }
@@ -505,10 +557,24 @@ final class AndroidFileDialogs {
         }
     }
 
-    private static String copyToCache(ContentResolver resolver, Uri uri) throws IOException {
-        File dest = new File(pickDirectory(uri), safeName(displayName(resolver, uri), "document"));
+    private static String copyToCache(ContentResolver resolver, Uri uri, List<File> staged) throws IOException {
+        File dir = pickDirectory(uri);
+        staged.add(dir);
+        File dest = new File(dir, safeName(displayName(resolver, uri), "document"));
         copyStream(resolver, uri, dest);
         return "file://" + dest.getAbsolutePath();
+    }
+
+    private static void deleteRecursive(File f) {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File c : children) {
+                deleteRecursive(c);
+            }
+        }
+        if (!f.delete()) {
+            f.deleteOnExit();
+        }
     }
 
     private static void copyStream(ContentResolver resolver, Uri uri, File dest) throws IOException {

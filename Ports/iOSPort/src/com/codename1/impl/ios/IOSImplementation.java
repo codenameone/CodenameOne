@@ -6833,7 +6833,36 @@ public class IOSImplementation extends CodenameOneImplementation {
         return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
                 || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
                 || feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
-                || feature == com.codename1.io.filechooser.FileDialogFeatures.INITIAL_DIRECTORY;
+                // UIDocumentPickerViewController.directoryURL is iOS 13+; the
+                // native side sets it only there, so older systems ignore it.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.INITIAL_DIRECTORY
+                    && iosMajorVersion() >= 13);
+    }
+
+    private int iosMajorVersion() {
+        String ver = nativeInstance.getOSVersion();
+        if (ver == null) {
+            return 0;
+        }
+        int dot = ver.indexOf('.');
+        try {
+            return Integer.parseInt(dot < 0 ? ver : ver.substring(0, dot));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /// Deletes an export's staged file and the per-request folder holding it.
+    private static void deleteExportStaging(String temp) {
+        com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+        fs.delete(temp);
+        int slash = temp.lastIndexOf('/');
+        if (slash > 0) {
+            String folder = temp.substring(0, slash + 1);
+            if (fs.exists(folder)) {
+                fs.delete(folder);
+            }
+        }
     }
 
     @Override
@@ -6929,7 +6958,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         out.close();
                     }
                 } catch (final IOException err) {
-                    fs.delete(temp);
+                    deleteExportStaging(temp);
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
@@ -7062,7 +7091,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (pending.tempFile != null) {
                     // Exported as a copy or moved away; either way the staging
                     // file is no longer needed.
-                    com.codename1.io.FileSystemStorage.getInstance().delete(pending.tempFile);
+                    deleteExportStaging(pending.tempFile);
                 }
                 pending.callback.onSucess(r);
             }
