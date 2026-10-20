@@ -746,7 +746,7 @@ same request with settings of its own:
   and TLS handshakes. `setReuseConnections(false)` opens a new connection for
   each request.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/PartnerApi.java[tag=backend-web-client,indent=0]
 ----

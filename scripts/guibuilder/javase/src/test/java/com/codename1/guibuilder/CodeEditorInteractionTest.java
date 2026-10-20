@@ -29,6 +29,7 @@ import com.codename1.ui.TextInputState;
 import com.codename1.ui.editor.CodePureEditor;
 import com.codename1.ui.editor.CodeView;
 import com.codename1.ui.editor.EditorHost;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodeEditorInteractionTest {
+    // Every editor builds Components, which need the runtime. The class only passed when
+    // another test class happened to initialize Display before it ran.
+    @BeforeAll
+    static void initializeCodenameOneRuntime() {
+        if (!com.codename1.ui.Display.isInitialized()) com.codename1.ui.Display.init(new javax.swing.JPanel());
+    }
+
     @Test
     void pureEditorAcceptsUserEditsUndoRedoAndProtectsOnlyGeneratedBlocks() {
         CodePureEditor editor = new CodePureEditor(new TestEditorHost(), "code");
