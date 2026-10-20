@@ -2614,6 +2614,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
                                com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (rejectOversized(request, callback)) {
+            return;
+        }
         String[] answer = LinuxNative.fileDialogEx(false, request.getTitle(), request.getAcceptLabel(),
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), null,
                 com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
@@ -2626,6 +2629,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
                                com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (rejectOversized(request, callback)) {
+            return;
+        }
         String[] answer = LinuxNative.fileDialogEx(true, request.getTitle(), request.getAcceptLabel(),
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()),
                 request.getSuggestedName(),
@@ -2640,6 +2646,26 @@ public class LinuxImplementation extends CodenameOneImplementation {
         } else {
             completeSaveDialog(request, result, callback);
         }
+    }
+
+    /* cn1_linux_services.c holds filters and options in fixed arrays of
+     * CN1_FDX_MAX_ITEMS (64). Truncating there would leave the Java decoder
+     * expecting a value slot per original option, so an accepted dialog would
+     * decode as a cancel; such a request fails up front with an error instead. */
+    private static final int MAX_FILE_DIALOG_ITEMS = 64;
+
+    private static boolean rejectOversized(com.codename1.io.filechooser.FileDialogRequest<?> request,
+                                           com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (request.getFilters().length <= MAX_FILE_DIALOG_ITEMS
+                && request.getOptions().length <= MAX_FILE_DIALOG_ITEMS) {
+            return false;
+        }
+        com.codename1.io.filechooser.FileDialogResult result =
+                com.codename1.io.filechooser.FileDialogResult.cancelled(request);
+        result.setError(new java.io.IOException("A file dialog supports at most "
+                + MAX_FILE_DIALOG_ITEMS + " filters and " + MAX_FILE_DIALOG_ITEMS + " options"));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
+        return true;
     }
 
     @Override

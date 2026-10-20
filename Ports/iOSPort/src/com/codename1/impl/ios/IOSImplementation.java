@@ -6901,16 +6901,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!caches.endsWith("/")) {
             caches = caches + "/";
         }
-        final String dir = caches + "cn1-export-" + System.currentTimeMillis() + "/";
-        final String temp = dir + name;
+        final String base = caches + "cn1-export-";
+        final String fileName = name;
         // The document picker exports a file that already exists, so the
         // content is staged first, off the EDT.
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
                 com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+                // Each request gets a folder no other request has. Background
+                // tasks run one at a time, so choosing an unused name here and
+                // creating it cannot race another save; a timestamp chosen on
+                // the caller's thread could repeat within one millisecond.
+                long stamp = System.currentTimeMillis();
+                String folder = base + stamp + "/";
+                for (int n = 1; fs.exists(folder); n++) {
+                    folder = base + stamp + "-" + n + "/";
+                }
+                final String temp = folder + fileName;
                 try {
-                    fs.mkdir(dir);
+                    fs.mkdir(folder);
                     java.io.OutputStream out = fs.openOutputStream(temp);
                     try {
                         request.writeContent(new com.codename1.io.filechooser.FileDialogResult(

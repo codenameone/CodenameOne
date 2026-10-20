@@ -25,6 +25,7 @@ package com.codename1.impl;
 
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.io.filechooser.FileDialogOption;
 import com.codename1.io.filechooser.FileDialogResult;
 import com.codename1.io.filechooser.FileTypeFilter;
@@ -46,6 +47,7 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -216,11 +218,15 @@ final class FileDialogSupport {
                         deliver(result, callback);
                         return;
                     }
-                    OutputStream out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
-                    try {
-                        request.writeContent(result, out);
-                    } finally {
-                        out.close();
+                    if (request.getContent() == null) {
+                        copyStaged(request.getSourceFile(), result.getPath());
+                    } else {
+                        OutputStream out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
+                        try {
+                            request.writeContent(result, out);
+                        } finally {
+                            out.close();
+                        }
                     }
                 } catch (IOException err) {
                     Log.e(err);
@@ -229,6 +235,47 @@ final class FileDialogSupport {
                 deliver(result, callback);
             }
         });
+    }
+
+    /// Copies a save's source file to its destination through a staged copy.
+    /// The two can be the same file under different spellings (a drive path
+    /// against a `file:` URL, case on a case-insensitive volume, `..`, links),
+    /// which no textual comparison catches; opening the destination first would
+    /// then truncate the source before it was read. Reading the whole source into
+    /// a staging file before the destination is opened is safe for every alias.
+    private static void copyStaged(String source, String destination) throws IOException {
+        if (source == null) {
+            throw new IOException("SaveFileRequest has neither content nor a source file");
+        }
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String home = fs.getAppHomePath();
+        String staging = (home.endsWith("/") ? home : home + "/")
+                + ".cn1-save-" + System.currentTimeMillis() + "-" + (stagingCounter++);
+        try {
+            copy(fs, source, staging);
+            copy(fs, staging, destination);
+        } finally {
+            if (fs.exists(staging)) {
+                fs.delete(staging);
+            }
+        }
+    }
+
+    // Only the single background-task thread touches this, through completeSave.
+    private static int stagingCounter;
+
+    private static void copy(FileSystemStorage fs, String from, String to) throws IOException {
+        InputStream in = fs.openInputStream(from);
+        try {
+            OutputStream out = fs.openOutputStream(to);
+            try {
+                Util.copyNoClose(in, out, 8192);
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
     }
 
     private static void deliver(final FileDialogResult result, final SuccessCallback<FileDialogResult> callback) {

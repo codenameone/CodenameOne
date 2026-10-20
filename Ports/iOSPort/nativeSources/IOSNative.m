@@ -9240,6 +9240,9 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
                 result = destinationPath;
             } else {
                 NSLog(@"Codename One file dialog failed to copy selected item: %@", error);
+                // Nothing is returned for this item, so its staging folder,
+                // with whatever a partial folder copy left in it, goes now.
+                [fileManager removeItemAtPath:folder error:nil];
             }
         }
     } @finally {
@@ -9307,6 +9310,14 @@ static NSString *cn1FileDialogJoin(NSArray *paths) {
             if (p == nil) {
                 copyFailed = YES;
                 failed = [url lastPathComponent];
+                // The import fails as a whole, so the items already staged are
+                // never handed to the app; each lives in its own UUID folder,
+                // which is removed with it.
+                NSFileManager *fm = [NSFileManager defaultManager];
+                for (NSString *staged in paths) {
+                    [fm removeItemAtPath:[staged stringByDeletingLastPathComponent] error:nil];
+                }
+                [paths removeAllObjects];
                 break;
             }
             [paths addObject:p];

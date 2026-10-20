@@ -213,6 +213,9 @@ public class FileChooser {
     
     public void showDialog() {
         Log.p("Showing file dialog");
+        // Each showDialog() is a new dialog with a fresh input; the guard only
+        // stops change and cancel from both answering the same one.
+        answered = false;
         createFileInput();
 
         final Window win = Window.current();
