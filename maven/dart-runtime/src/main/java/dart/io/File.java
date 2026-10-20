@@ -42,8 +42,7 @@ public class File extends FileSystemEntity {
 
     /** Dart's {@code File.fromUri}. */
     public static File fromUri(dart.core.DartUri uri) {
-        String s = uri.toString();
-        return new File(s.startsWith("file://") ? s.substring(7) : s);
+        return new File(uriToFilePath(uri));
     }
 
     public File absolute() {
@@ -250,6 +249,10 @@ public class File extends FileSystemEntity {
 
     public File renameSync(String newPath) {
         Fs fs = Fs.get();
+        if (absolutePath(newPath).equals(absolutePath(path))) {
+            // Renaming onto itself is a no-op; the copy-and-delete below would delete it.
+            return new File(newPath);
+        }
         fs.write(newPath, fs.read(path), false);
         fs.delete(path);
         return new File(newPath);

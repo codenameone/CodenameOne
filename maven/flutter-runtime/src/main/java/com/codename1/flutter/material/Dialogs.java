@@ -190,6 +190,14 @@ public final class Dialogs {
     }
 
     /**
+     * The root element of the topmost open dialog, or null: what a back request
+     * inspects for PopScope guards, since a dialog is its own route.
+     */
+    public static Element topDialogRoot() {
+        return dialogStack.isEmpty() ? null : dialogStack.get(dialogStack.size() - 1).root;
+    }
+
+    /**
      * Test / hot-restart hook: forgets all open dialogs without disposing.
      */
     public static void reset() {

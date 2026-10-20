@@ -59,6 +59,23 @@ public abstract class FileSystemEntity {
 
     /// The path {@code absolute} answers: a relative one joined to Directory.current,
     /// the same base every read and write resolves it against.
+    /// Dart's {@code uri.toFilePath()} as {@code File.fromUri} uses it: only a file
+    /// (or scheme-less) URI names a file, and its path is percent-decoded, so
+    /// file:///tmp/a%20b is "/tmp/a b" rather than a file literally named a%20b.
+    static String uriToFilePath(dart.core.DartUri uri) {
+        String scheme = uri.scheme();
+        if (scheme.length() != 0 && !"file".equals(scheme)) {
+            throw new dart.core.UnsupportedError("Cannot extract a file path from a " + scheme + " URI");
+        }
+        if (uri.query().length() != 0) {
+            throw new dart.core.UnsupportedError("Cannot extract a file path from a URI with a query component");
+        }
+        if (uri.fragment().length() != 0) {
+            throw new dart.core.UnsupportedError("Cannot extract a file path from a URI with a fragment component");
+        }
+        return dart.core.DartUri.decodeComponent(uri.path());
+    }
+
     static String absolutePath(String path) {
         if (path.startsWith("/") || path.startsWith("file:")) {
             return path;

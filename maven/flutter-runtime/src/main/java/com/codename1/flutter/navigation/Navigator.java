@@ -213,6 +213,11 @@ public class Navigator extends StatelessWidget {
      * so with a dialog over the base route maybePop answered false without closing it
      * and a system-back handler could not dismiss the dialog.
      */
+    /** Whether a pop would remove anything: a pushed page or an open dialog. */
+    public static boolean canPopAnything() {
+        return poppable();
+    }
+
     static boolean poppable() {
         return com.codename1.flutter.material.Dialogs.openDialogCount() > 0 || !stack.isEmpty();
     }
@@ -940,14 +945,17 @@ public class Navigator extends StatelessWidget {
         if (!poppable()) {
             return dart.async.Future.value(Boolean.FALSE);
         }
-        if (Dialogs.openDialogCount() > 0 || stack.isEmpty()) {
+        final boolean dialog = Dialogs.openDialogCount() > 0;
+        if (!dialog && stack.isEmpty()) {
             pop(context, result);
             return dart.async.Future.value(Boolean.TRUE);
         }
         // The route's PopScope/WillPopScope widgets decide first -- a back press and
-        // maybePop are requests, unlike pop.
-        final RouteEntry top = stack.get(stack.size() - 1);
-        final List<Widget> scopes = PopGuards.collect(top.rootElement);
+        // maybePop are requests, unlike pop. A dialog is itself the top route, so its
+        // own guards are the ones asked (PopScope(canPop: false) in a dialog blocks it).
+        final RouteEntry top = dialog ? null : stack.get(stack.size() - 1);
+        final Element dialogRoot = dialog ? Dialogs.topDialogRoot() : null;
+        final List<Widget> scopes = PopGuards.collect(dialog ? dialogRoot : top.rootElement);
         if (scopes.isEmpty()) {
             pop(context, result);
             return dart.async.Future.value(Boolean.TRUE);
@@ -957,7 +965,9 @@ public class Navigator extends StatelessWidget {
             @Override
             public void call(Boolean ok) {
                 // still the top route: a guard that awaited a dialog must not pop the page beneath
-                boolean pop = Boolean.TRUE.equals(ok) && !stack.isEmpty() && stack.get(stack.size() - 1) == top;
+                boolean pop = Boolean.TRUE.equals(ok) && (dialog
+                        ? Dialogs.openDialogCount() > 0 && Dialogs.topDialogRoot() == dialogRoot
+                        : !stack.isEmpty() && stack.get(stack.size() - 1) == top);
                 if (pop) {
                     pop(context, result);
                 }

@@ -96,6 +96,9 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
                     public void call(Object err) {
                         emitter.complete();
                         onError(err, null);
+                        // Bloc notifies onError and then rethrows, so zones, tests and
+                        // crash reporting still see the failure.
+                        throw dart.runtime.DartRuntime.asError(err);
                     }
                 });
             } else {

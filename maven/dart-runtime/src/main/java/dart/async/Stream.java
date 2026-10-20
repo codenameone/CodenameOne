@@ -834,7 +834,16 @@ public class Stream<T> {
             @Override
             public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
                 while (it.next()) {
-                    s.yield$((R) Await.awaitAny(convert.call(it.current())));
+                    // A failed conversion is one error event and the stream goes on, as
+                    // Dart's asyncMap does; letting it escape would close the stream.
+                    Object r;
+                    try {
+                        r = Await.awaitAny(convert.call(it.current()));
+                    } catch (Throwable t) {
+                        s.addError(t);
+                        continue;
+                    }
+                    s.yield$((R) r);
                 }
             }
         });
@@ -974,16 +983,16 @@ public class Stream<T> {
                 }, new Funcs.VoidFunc1<Object>() {
                     @Override
                     public void call(Object e) {
-                        if (test == null || dart.runtime.Dyn.invoke(test, e) == Boolean.TRUE) {
-                            // handleError transforms: what the handler throws (a rethrow
-                            // or a replacement) is emitted downstream, as Dart does.
-                            try {
+                        // handleError transforms: what the test or the handler throws (a
+                        // rethrow or a replacement) is emitted downstream, as Dart does.
+                        try {
+                            if (test == null || dart.runtime.Dyn.invoke(test, e) == Boolean.TRUE) {
                                 callError(onError, e);
-                            } catch (Throwable t) {
-                                out.addError(t);
+                            } else {
+                                out.addError(e);
                             }
-                        } else {
-                            out.addError(e);
+                        } catch (Throwable t) {
+                            out.addError(t);
                         }
                     }
                 }, new Funcs.VoidFunc0() {

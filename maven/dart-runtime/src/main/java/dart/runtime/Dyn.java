@@ -285,6 +285,11 @@ public final class Dyn {
             }
         } else if (name.equals("call") && isFunction(o)) {
             return invoke(o, args);
+        } else if (args.length > builtinMaxArgs(name)
+                && (o instanceof Map || o instanceof Iterable || o instanceof String || o instanceof Number)) {
+            // Dart rejects a mismatched invocation before running anything: m.clear(42)
+            // on a dynamic map is a NoSuchMethodError, not a cleared map.
+            throw noSuch(o, name + "()");
         } else if (o instanceof Map) {
             Object v = mapCall((Map<Object, Object>) o, name, args);
             if (v != NO_MEMBER) {
@@ -315,6 +320,28 @@ public final class Dyn {
             return Boolean.valueOf(o == null ? args[0] == null : o.equals(args[0]));
         }
         throw noSuch(o, name + "()");
+    }
+
+    /// The most positional arguments the built-in member {@code name} accepts on a Map,
+    /// Iterable, String or num; the dispatchers below only check that required ones
+    /// are present. Unknown names answer Integer.MAX_VALUE and reach NO_MEMBER as before.
+    private static int builtinMaxArgs(String name) {
+        switch (name) {
+            case "clear": case "removeLast": case "toList": case "toSet": case "cast": case "toLowerCase":
+            case "toUpperCase": case "trim": case "toString": case "toInt": case "toDouble": case "round":
+            case "floor": case "ceil": case "abs":
+                return 0;
+            case "containsKey": case "containsValue": case "remove": case "addAll": case "forEach": case "add":
+            case "removeAt": case "sort": case "map": case "where": case "any": case "every":
+            case "join": case "elementAt": case "skip": case "take": case "endsWith":
+            case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed":
+                return 1;
+            case "putIfAbsent": case "insert": case "indexOf": case "sublist": case "firstWhere": case "fold":
+            case "substring": case "replaceAll": case "padLeft": case "clamp": case "contains": case "startsWith":
+                return 2;
+            default:
+                return Integer.MAX_VALUE;
+        }
     }
 
     private static Object mapCall(Map<Object, Object> m, String name, Object[] a) {

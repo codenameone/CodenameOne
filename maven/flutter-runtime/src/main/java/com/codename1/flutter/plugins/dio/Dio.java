@@ -59,6 +59,8 @@ public class Dio {
         this(null);
     }
 
+    private boolean closed;
+
     public Dio(BaseOptions options) {
         this.options = options == null ? new BaseOptions() : options;
     }
@@ -76,9 +78,13 @@ public class Dio {
     }
 
     public void close() {
+        close(null);
     }
 
+    /// Dio marks a closed client and fails every later request; a delayed callback
+    /// reusing it after teardown must not still reach the network.
     public void close(Boolean force) {
+        closed = true;
     }
 
     public <T> Future<Response<T>> get(String path, Object data, Map<String, Object> queryParameters,
@@ -121,6 +127,11 @@ public class Dio {
     /// an error interceptor retries after refreshing a token.
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> Future<Response<T>> fetch(RequestOptions ro) {
+        if (closed) {
+            return Future.error(DioException.of(ro, DioExceptionType.connectionError,
+                    "The connection errored: Dio can't establish a new connection after it was closed.",
+                    new dart.core.StateError("Dio can't establish a new connection after it was closed."), null));
+        }
         Call call = new Call(ro);
         call.request(0, ro);
         return (Future) call.done.future();

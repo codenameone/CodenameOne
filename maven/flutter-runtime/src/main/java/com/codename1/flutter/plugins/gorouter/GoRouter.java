@@ -326,7 +326,9 @@ public class GoRouter implements RouterConfigSource {
     }
 
     public boolean canPop() {
-        return Navigator.stackSize() > 0;
+        // Upstream delegates to its navigator, so an open dialog counts: pop() below
+        // dismisses it, and `if (router.canPop()) router.pop()` must reach it.
+        return Navigator.canPopAnything();
     }
 
     public void goNamed(String name, Object pathParameters, Object queryParameters, Object extra) {

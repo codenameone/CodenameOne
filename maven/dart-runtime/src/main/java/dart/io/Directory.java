@@ -131,6 +131,16 @@ public class Directory extends FileSystemEntity {
 
     public Directory renameSync(String newPath) {
         Fs fs = Fs.get();
+        String from = Fs.trimSlash(absolutePath(path));
+        String to = Fs.trimSlash(absolutePath(newPath));
+        if (to.equals(from)) {
+            return new Directory(newPath);
+        }
+        if (to.startsWith(from + "/")) {
+            // The emulated copy would create the target inside the tree it is
+            // enumerating and recurse into it forever; the OS rejects this move too.
+            throw new FileSystemException("Rename failed", path);
+        }
         fs.mkdirs(newPath);
         for (FileSystemEntity e : listSync()) {
             String target = Fs.trimSlash(newPath) + "/" + Fs.nameOf(e.path);
