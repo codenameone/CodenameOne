@@ -57,6 +57,12 @@ public class GoRouter implements RouterConfigSource {
     private Funcs.Func2<BuildContext, GoRouterState, Object> redirect;
     private Funcs.Func2<BuildContext, GoRouterState, Widget> errorBuilder;
     private int redirectLimit = DEFAULT_REDIRECT_LIMIT;
+    /**
+     * The error of an asynchronous redirect that failed, consumed by the next routeFor.
+     * A failed auth guard must not read as "no redirect" and open the guarded page, so
+     * the navigation shows the error page (errorBuilder) instead, as go_router does.
+     */
+    private Object redirectFailure;
     private GoRouterState state;
     private BuildContext appContext;
 
@@ -248,6 +254,7 @@ public class GoRouter implements RouterConfigSource {
             ((Future<Object>) to).then(answered, new Funcs.VoidFunc1<Object>() {
                 @Override
                 public void call(Object e) {
+                    redirectFailure = e == null ? new dart.core.DartException("redirect failed") : e;
                     then.call(loc);
                 }
             });
@@ -349,9 +356,14 @@ public class GoRouter implements RouterConfigSource {
             }
             loc = to;
         }
+        Object failure = redirectFailure;
+        redirectFailure = null;
+        if (failure != null) {
+            m = null;
+        }
         final Match match = m;
-        final GoRouterState s = stateOf(loc, match, extra,
-                match == null ? new dart.core.DartException("no routes for location: " + loc) : null);
+        final GoRouterState s = stateOf(loc, match, extra, failure != null ? failure
+                : match == null ? new dart.core.DartException("no routes for location: " + loc) : null);
         state = s;
         MaterialPageRoute<Object> route = new MaterialPageRoute<Object>();
         RouteSettings settings = new RouteSettings();

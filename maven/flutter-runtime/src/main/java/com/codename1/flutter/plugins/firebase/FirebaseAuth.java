@@ -241,6 +241,35 @@ public class FirebaseAuth {
         return done.future();
     }
 
+    Future<Object> reloadUser(final User user) {
+        final Completer<Object> done = new Completer<Object>();
+        withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String token) {
+                FirebaseAuth.call(TOOLKIT + "lookup?key=", DartMap.<String, Object>of("idToken", token),
+                        new Funcs.VoidFunc1<Map<String, Object>>() {
+                            @Override
+                            public void call(Map<String, Object> r) {
+                                Object users = r.get("users");
+                                Object first = users instanceof java.util.List && !((java.util.List<?>) users).isEmpty()
+                                        ? ((java.util.List<?>) users).get(0) : null;
+                                if (first instanceof Map) {
+                                    Map<?, ?> u = (Map<?, ?>) first;
+                                    user.email = str(u.get("email"));
+                                    user.displayName = str(u.get("displayName"));
+                                    user.photoURL = str(u.get("photoUrl"));
+                                    user.emailVerified = Boolean.TRUE.equals(u.get("emailVerified"));
+                                    persist();
+                                    publish();
+                                }
+                                done.complete(null);
+                            }
+                        }, done);
+            }
+        });
+        return done.future();
+    }
+
     Future<Object> deleteUser(User user) {
         final Completer<Object> done = new Completer<Object>();
         withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
@@ -456,6 +485,7 @@ public class FirebaseAuth {
         Preferences.set(PREF + "name", current.displayName == null ? "" : current.displayName);
         Preferences.set(PREF + "refresh", current.refreshToken == null ? "" : current.refreshToken);
         Preferences.set(PREF + "anonymous", current.anonymous ? "true" : "false");
+        Preferences.set(PREF + "verified", current.emailVerified ? "true" : "false");
     }
 
     private void restore() {
@@ -470,6 +500,7 @@ public class FirebaseAuth {
         User u = new User(uid, blankToNull(Preferences.get(PREF + "email", "")),
                 "true".equals(Preferences.get(PREF + "anonymous", "false")));
         u.displayName = blankToNull(Preferences.get(PREF + "name", ""));
+        u.emailVerified = "true".equals(Preferences.get(PREF + "verified", "false"));
         u.refreshToken = blankToNull(Preferences.get(PREF + "refresh", ""));
         current = u;
     }

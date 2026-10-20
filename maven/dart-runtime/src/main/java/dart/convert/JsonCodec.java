@@ -225,6 +225,12 @@ public final class JsonCodec {
     }
 
     /** A strict RFC 8259 parser; a malformed document is a FormatException, as in Dart. */
+    /// JSON numbers are ASCII digits only; Character.isDigit also took other scripts'
+    /// decimal digits, which Long.parseLong then accepted, so "1" + ARABIC-INDIC TWO read as 12.
+    static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
     private static final class Parser {
         private final String s;
         private int i;
@@ -440,23 +446,23 @@ public final class JsonCodec {
             if (s.charAt(i) == '-') {
                 i++;
             }
-            if (i >= s.length() || !Character.isDigit(s.charAt(i))) {
+            if (i >= s.length() || !isAsciiDigit(s.charAt(i))) {
                 fail("Invalid number");
             }
             if (s.charAt(i) == '0') {
                 i++;
             } else {
-                while (i < s.length() && Character.isDigit(s.charAt(i))) {
+                while (i < s.length() && isAsciiDigit(s.charAt(i))) {
                     i++;
                 }
             }
             if (i < s.length() && s.charAt(i) == '.') {
                 fraction = true;
                 i++;
-                if (i >= s.length() || !Character.isDigit(s.charAt(i))) {
+                if (i >= s.length() || !isAsciiDigit(s.charAt(i))) {
                     fail("Invalid number");
                 }
-                while (i < s.length() && Character.isDigit(s.charAt(i))) {
+                while (i < s.length() && isAsciiDigit(s.charAt(i))) {
                     i++;
                 }
             }
@@ -466,10 +472,10 @@ public final class JsonCodec {
                 if (i < s.length() && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
                     i++;
                 }
-                if (i >= s.length() || !Character.isDigit(s.charAt(i))) {
+                if (i >= s.length() || !isAsciiDigit(s.charAt(i))) {
                     fail("Invalid number");
                 }
-                while (i < s.length() && Character.isDigit(s.charAt(i))) {
+                while (i < s.length() && isAsciiDigit(s.charAt(i))) {
                     i++;
                 }
             }

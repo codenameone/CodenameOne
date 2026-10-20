@@ -62,6 +62,10 @@ public class StreamBuilderElement extends ComposedElement {
         Object next = ((StreamBuilder<?>) newWidget).getStream();
         if (next != subscribedTo) {
             cancel();
+            // The error is kept on purpose: Flutter's StreamBuilderBase moves the snapshot
+            // with AsyncSnapshot.inState(none) and then inState(waiting), and inState
+            // carries data, error and stackTrace alike. Clearing it here would make a
+            // builder that tests hasError render differently than it does on Flutter.
             snapshot = new AsyncSnapshot(ConnectionState.none, snapshot.data(), snapshot.error(),
                     snapshot.stackTrace());
             subscribe(next);

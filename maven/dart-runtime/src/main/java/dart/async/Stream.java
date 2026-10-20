@@ -786,8 +786,15 @@ public class Stream<T> {
         final Stream<T> self = this;
         return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<R>>() {
             @Override
-            public void call(AsyncStar.Sink<R> s) {
-                final StreamIterator<T> it = new StreamIterator<T>(self);
+            public void call(final AsyncStar.Sink<R> s) {
+                // Source errors are re-emitted and the operator keeps reading, as Dart's
+                // transformations do; a plain StreamIterator would stop at the first one.
+                final StreamIterator<T> it = new StreamIterator<T>(self, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        s.addError(e);
+                    }
+                });
                 s.onCancel(new Funcs.VoidFunc0() {
                     @Override
                     public void call() {

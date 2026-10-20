@@ -51,8 +51,27 @@ public final class StreamIterator<T> {
     private Object error;
     private boolean hasError;
 
+    /// Set for a derived stream (Stream.derive): source errors go here, in order, and the
+    /// iterator stays subscribed. Dart's StreamIterator ends at an error, which is right
+    /// for await for, but take/skip/expand/asyncMap forward an error and carry on.
+    private final Funcs.VoidFunc1<Object> forward;
+
+    /** A forwarded error waiting in the queue, in order with the data around it. */
+    private static final class Err {
+        final Object error;
+
+        Err(Object error) {
+            this.error = error;
+        }
+    }
+
     public StreamIterator(Stream<T> stream) {
+        this(stream, null);
+    }
+
+    StreamIterator(Stream<T> stream, Funcs.VoidFunc1<Object> forward) {
         this.stream = stream;
+        this.forward = forward;
     }
 
     public T current() {
@@ -70,15 +89,17 @@ public final class StreamIterator<T> {
         }
         Completer<Boolean> c = new Completer<Boolean>();
         Object outcome;
+        java.util.List<Object> errs = forward == null ? null : new java.util.ArrayList<Object>();
         // Checking the queue and publishing the waiter is one step: an async* body
         // pushes from a timer thread, and an event landing between the two was lost,
         // leaving next() parked forever (a rare hang in lang_async_star under load).
         synchronized (this) {
-            outcome = take();
+            outcome = take(errs);
             if (outcome == NOTHING) {
                 waiting = c;
             }
         }
+        forwardAll(errs);
         settle(c, outcome);
         return c.future();
     }
@@ -120,6 +141,10 @@ public final class StreamIterator<T> {
         }, new Funcs.VoidFunc1<Object>() {
             @Override
             public void call(Object e) {
+                if (forward != null) {
+                    push(new Err(e));
+                    return;
+                }
                 synchronized (StreamIterator.this) {
                     if (!hasError) {
                         hasError = true;
@@ -133,7 +158,8 @@ public final class StreamIterator<T> {
             public void call() {
                 push(DONE);
             }
-        }, Boolean.TRUE);
+            // cancelOnError only for await for; a forwarding iterator outlives an error
+        }, Boolean.valueOf(forward == null));
         boolean stale;
         synchronized (this) {
             stale = finished;
@@ -150,18 +176,19 @@ public final class StreamIterator<T> {
     private void push(Object event) {
         Completer<Boolean> c;
         Object outcome;
+        java.util.List<Object> errs = forward == null ? null : new java.util.ArrayList<Object>();
         synchronized (this) {
             queue.addLast(event == null ? NULL : event);
             c = waiting;
             if (c == null) {
                 return;
             }
-            outcome = take();
-            if (outcome == NOTHING) {
-                return;
+            outcome = take(errs);
+            if (outcome != NOTHING) {
+                waiting = null;
             }
-            waiting = null;
         }
+        forwardAll(errs);
         settle(c, outcome);
     }
 
@@ -173,7 +200,10 @@ public final class StreamIterator<T> {
     /// The next outcome for a moveNext, taken off the queue. Called holding the lock;
     /// the completer is settled after it is released, since completing runs listeners.
     @SuppressWarnings("unchecked")
-    private Object take() {
+    private Object take(java.util.List<Object> errs) {
+        while (errs != null && !queue.isEmpty() && queue.peekFirst() instanceof Err) {
+            errs.add(((Err) queue.removeFirst()).error);
+        }
         if (queue.isEmpty()) {
             return finished ? END : NOTHING;
         }
@@ -191,6 +221,16 @@ public final class StreamIterator<T> {
         }
         current = e == NULL ? null : (T) e;
         return Boolean.TRUE;
+    }
+
+    /// Hands drained errors to the derived stream, outside the lock and before the
+    /// event that followed them settles the waiter, so the order is the source's.
+    private void forwardAll(java.util.List<Object> errs) {
+        if (errs != null) {
+            for (Object e : errs) {
+                forward.call(e);
+            }
+        }
     }
 
     private static void settle(Completer<Boolean> c, Object outcome) {

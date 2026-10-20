@@ -498,16 +498,18 @@ public final class Dyn {
         boolean dbl = n instanceof Double || n instanceof Float;
         double d = n.doubleValue();
         switch (name) {
+            // The DartRuntime helpers refuse NaN and the infinities with UnsupportedError,
+            // as Dart does; a bare (long) cast fabricated 0 or a saturated long.
             case "toInt":
-                return Long.valueOf(dbl ? (long) d : n.longValue());
+                return Long.valueOf(dbl ? DartRuntime.toInt(d) : n.longValue());
             case "toDouble":
                 return Double.valueOf(d);
             case "round":
                 return Long.valueOf(dbl ? DartRuntime.round(d) : n.longValue());
             case "floor":
-                return Long.valueOf(dbl ? (long) Math.floor(d) : n.longValue());
+                return Long.valueOf(dbl ? DartRuntime.floor(d) : n.longValue());
             case "ceil":
-                return Long.valueOf(dbl ? (long) Math.ceil(d) : n.longValue());
+                return Long.valueOf(dbl ? DartRuntime.ceil(d) : n.longValue());
             case "abs":
                 return dbl ? (Object) Double.valueOf(Math.abs(d)) : (Object) Long.valueOf(Math.abs(n.longValue()));
             case "toStringAsFixed":

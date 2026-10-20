@@ -88,8 +88,9 @@ public class User {
         return FirebaseAuth.instance.updateProfile(this, displayName, url);
     }
 
+    /** Re-reads the account (accounts:lookup), so a verified email shows as verified. */
     public Future<Object> reload() {
-        return Future.value(null);
+        return FirebaseAuth.instance.reloadUser(this);
     }
 
     public Future<Object> delete() {

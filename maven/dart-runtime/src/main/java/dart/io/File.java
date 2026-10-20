@@ -228,7 +228,11 @@ public class File extends FileSystemEntity {
     }
 
     public Future<dart.core.DateTime> lastModified() {
-        return Future.value(lastModifiedSync());
+        try {
+            return Future.value(lastModifiedSync());
+        } catch (RuntimeException e) {
+            return Future.error(e);
+        }
     }
 
     public File copySync(String newPath) {

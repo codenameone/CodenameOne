@@ -60,15 +60,21 @@ abstract class BlocWidgetState<W extends StatefulWidget> extends State<W> {
     /// A state after `before`. Called while mounted, outside build.
     protected abstract void onState(Object before, Object next);
 
+    /// Called from build only. A provided bloc is looked up on every build, with a
+    /// dependency on the provider: when an ancestor BlocProvider swaps its bloc while
+    /// this widget stays in place, the provider rebuilds us and the subscription moves
+    /// to the new bloc, as flutter_bloc's context.select on the bloc does. Before, the
+    /// lookup was made once without a dependency and kept the old, possibly closed, bloc.
     @SuppressWarnings("unchecked")
     protected final BlocBase<Object> bloc() {
-        if (bloc == null) {
-            BlocBase<?> b = explicitBloc();
-            if (b == null) {
-                Class<?> type = blocType();
-                Object found = context().providerValueOfType(type == null ? BlocBase.class : type, false);
-                b = found instanceof BlocBase ? (BlocBase<?>) found : null;
-            }
+        BlocBase<?> b = explicitBloc();
+        if (b == null) {
+            Class<?> type = blocType();
+            Object found = context().providerValueOfType(type == null ? BlocBase.class : type, true);
+            b = found instanceof BlocBase ? (BlocBase<?>) found : null;
+        }
+        if (b != bloc) {
+            release();
             if (b != null) {
                 fromExplicit = b == explicitBloc();
                 bloc = (BlocBase<Object>) b;

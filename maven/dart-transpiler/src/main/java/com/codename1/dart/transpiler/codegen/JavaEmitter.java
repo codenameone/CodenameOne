@@ -96,7 +96,49 @@ public final class JavaEmitter {
                 + (ex.getMessage() != null ? ": " + ex.getMessage() : "") + at);
     }
 
+    /// Marks a case of the $dget/$dset/$dcall switches. The switches are emitted while the
+    /// program's dynamic accesses are still being found, so each case is marked and
+    /// pruneDynamicCases drops, after the whole program is emitted, every case whose
+    /// name no `dynamic` access in the program uses. A case keeps its member alive
+    /// against ParparVM's dead-code removal, and unpruned they were most of a 20%
+    /// native size regression (one case per localized string, for instance).
+    private static final String DYN_CASE = "/*dyn*/";
+
+    /// Every member name a `dynamic` receiver is read, written or called with.
+    private final java.util.Set<String> dynNames = new java.util.HashSet<String>();
+
+    private List<GeneratedFile> pruneDynamicCases(List<GeneratedFile> files) {
+        List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(files.size());
+        for (GeneratedFile g : files) {
+            if (g == null || g.content.indexOf(DYN_CASE) < 0) {
+                pruned.add(g);
+                continue;
+            }
+            StringBuilder sb = new StringBuilder(g.content.length());
+            for (String line : g.content.split("\n", -1)) {
+                int at = line.indexOf(DYN_CASE + "case \"");
+                if (at >= 0) {
+                    int start = at + DYN_CASE.length() + 6;
+                    String name = line.substring(start, line.indexOf('"', start));
+                    // a case spanning lines (a closure default) is kept rather than cut in half
+                    if (!dynNames.contains(name) && line.trim().endsWith(";")) {
+                        continue;
+                    }
+                    line = line.substring(0, at) + line.substring(at + DYN_CASE.length());
+                }
+                sb.append(line).append('\n');
+            }
+            sb.setLength(sb.length() - 1);
+            pruned.add(new GeneratedFile(g.relativePath, sb.toString()));
+        }
+        return pruned;
+    }
+
     public List<GeneratedFile> emit() {
+        return pruneDynamicCases(emitAll());
+    }
+
+    private List<GeneratedFile> emitAll() {
         List<GeneratedFile> out = new ArrayList<GeneratedFile>();
         // Every library with a top-level main(), collected in source order (which is itself
         // sorted by path -- see DartTranspiler.transpile -- not necessarily the order a
@@ -1135,11 +1177,11 @@ public final class JavaEmitter {
             if (f.isStatic || !seen.add(f.name)) {
                 continue;
             }
-            get.append("            case \"").append(f.name).append("\": return this.get$").append(f.name)
+            get.append("            ").append(DYN_CASE).append("case \"").append(f.name).append("\": return this.get$").append(f.name)
                     .append("();\n");
             if (!f.isFinal && !f.isConst) {
                 TypeRef ft = fieldType(f, ctx);
-                set.append("            case \"").append(f.name).append("\": this.set$").append(f.name).append('(')
+                set.append("            ").append(DYN_CASE).append("case \"").append(f.name).append("\": this.set$").append(f.name).append('(')
                         .append(dynCast("v", ft, ctx)).append("); return true;\n");
             }
         }
@@ -1149,7 +1191,7 @@ public final class JavaEmitter {
             }
             if (m.isGetter) {
                 if (seen.add(m.name)) {
-                    get.append("            case \"").append(m.name).append("\": return this.")
+                    get.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": return this.")
                             .append(javaMethodName(m.name)).append("();\n");
                 }
                 continue;
@@ -1188,7 +1230,7 @@ public final class JavaEmitter {
             }
             TypeRef rt = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
             String invoke = "this." + javaMethodName(m.name) + "(" + args + ")";
-            call.append("            case \"").append(m.name).append("\": ");
+            call.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": ");
             if (rt.is("void") || overridesVoid(c, m.name)) {
                 call.append(invoke).append("; return null;\n");
             } else {
@@ -5642,6 +5684,7 @@ public final class JavaEmitter {
         // `platformDispatcher.platformBrightness`. Emit the access with a dynamic result.
         if (tt != null && tt.is("dynamic")) {
             ctx.importClass("dart.runtime.Dyn");
+            dynNames.add(name);
             return new Out("Dyn.get(" + target.code + ", \"" + name + "\")", TypeRef.DYNAMIC);
         }
         // record component accessor: `r.$1`, `r.$2`, or `r.namedField`
@@ -5682,7 +5725,10 @@ public final class JavaEmitter {
             if (stubs.isStubClass(cls)) {
                 Ast.MethodDecl g = stubs.findMethod(cls, name, true);
                 if (g != null && g.isStatic) {
-                    return new Out(stubSimpleName(cls, ctx) + "." + name, g.returnType);
+                    // Icons are methods in the runtime (see Icons.java: a field per icon
+                    // kept all 2,176 alive), so an icon read is a call.
+                    return new Out(stubSimpleName(cls, ctx) + "." + name
+                            + (cls.equals("Icons") ? "()" : ""), g.returnType);
                 }
                 // Material's style variants (`Icons.home_outlined`, `_rounded`, `_sharp`) are
                 // separate glyphs in Flutter's font; the icon font here has one glyph per
@@ -5699,7 +5745,7 @@ public final class JavaEmitter {
                         for (String cand : cands) {
                             Ast.MethodDecl bg = stubs.findMethod(cls, cand, true);
                             if (bg != null && bg.isStatic) {
-                                return new Out(stubSimpleName(cls, ctx) + "." + cand, bg.returnType);
+                                return new Out(stubSimpleName(cls, ctx) + "." + cand + "()", bg.returnType);
                             }
                         }
                     }
@@ -6042,6 +6088,7 @@ public final class JavaEmitter {
         }
         if (tt.is("dynamic") && !target.fromError) {
             ctx.importClass("dart.runtime.Dyn");
+            dynNames.add("[]");
             return new Out("Dyn.index(" + target.code + ", " + boxIfPrimitive(idx, ctx) + ")", TypeRef.DYNAMIC);
         }
         if (tt.is("String")) {
@@ -6315,6 +6362,12 @@ public final class JavaEmitter {
                 : boxIfPrimitive(emitExpr(((IndexGet) a.lhs).index, null, ctx), ctx);
         String value = boxIfPrimitive(emitExpr(a.rhs, null, ctx), ctx);
         boolean prop = a.lhs instanceof PropertyGet;
+        if (prop) {
+            dynNames.add(((PropertyGet) a.lhs).name);
+        } else {
+            dynNames.add("[]=");
+            dynNames.add("[]");
+        }
         if (!a.op.equals("=")) {
             ctx.importClass("dart.runtime.DartRuntime");
             String cur = prop ? "Dyn.get(" + t.code + ", " + key + ")" : "Dyn.index(" + t.code + ", " + key + ")";
@@ -8373,6 +8426,7 @@ public final class JavaEmitter {
         // Genuine `dynamic` receiver: dispatch at runtime through dart.runtime.Dyn.
         if (tt != null && tt.is("dynamic")) {
             ctx.importClass("dart.runtime.Dyn");
+            dynNames.add(n);
             return new Out("Dyn.call(" + target.code + ", \"" + n + "\", " + dynArgs(c.args, ctx) + ")",
                     TypeRef.DYNAMIC);
         }

@@ -64,18 +64,37 @@ public class FirebaseMessaging {
     /// callback does not say whether a tap opened the app; a push arriving while the
     /// app is minimized (the tap resumes it) or before it has started (the tap
     /// launched it) is one the user opened, so it goes to onMessageOpenedApp.
+    ///
+    /// A push that arrives before the first form is shown launched the app. No Dart
+    /// listener can be on the broadcast stream yet, so it is held for
+    /// getInitialMessage, which is how firebase_messaging hands over a cold-start tap
+    /// (and it is not also sent to onMessageOpenedApp, as on Flutter).
     public static void pushReceived(String payload) {
-        boolean opened = !com.codename1.ui.Display.isInitialized()
-                || com.codename1.ui.Display.getInstance().isMinimized()
+        boolean cold = !com.codename1.ui.Display.isInitialized()
                 || com.codename1.ui.Display.getInstance().getCurrent() == null;
-        deliver(payload, opened);
+        if (cold) {
+            synchronized (FirebaseMessaging.class) {
+                if (!initialTaken && initialMessage == null) {
+                    initialMessage = message(payload);
+                    return;
+                }
+            }
+        }
+        deliver(payload, cold || com.codename1.ui.Display.getInstance().isMinimized());
     }
 
-    public static void deliver(String payload, boolean opened) {
+    private static RemoteMessage initialMessage;
+    private static boolean initialTaken;
+
+    private static RemoteMessage message(String payload) {
         received++;
         DartMap<String, Object> data = new DartMap<String, Object>();
         data.put("payload", payload);
-        RemoteMessage m = new RemoteMessage("cn1-" + received, data, new RemoteNotification(null, payload));
+        return new RemoteMessage("cn1-" + received, data, new RemoteNotification(null, payload));
+    }
+
+    public static void deliver(String payload, boolean opened) {
+        RemoteMessage m = message(payload);
         (opened ? OPENED : MESSAGES).add(m);
     }
 
@@ -129,8 +148,15 @@ public class FirebaseMessaging {
         return Future.value(new NotificationSettings(AuthorizationStatus.authorized));
     }
 
+    /** The message whose tap launched the app, once; null afterwards, as on Flutter. */
     public Future<RemoteMessage> getInitialMessage() {
-        return Future.value(null);
+        RemoteMessage m;
+        synchronized (FirebaseMessaging.class) {
+            m = initialMessage;
+            initialMessage = null;
+            initialTaken = true;
+        }
+        return Future.value(m);
     }
 
     public Future<Object> subscribeToTopic(String topic) {

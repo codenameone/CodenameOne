@@ -206,6 +206,9 @@ abstract class Fs {
 
         @Override
         long lastModified(String path) {
+            if (!exists(path)) {
+                throw new FileSystemException("Cannot retrieve modification time", path);
+            }
             return fss().getLastModified(url(path));
         }
     }
@@ -304,8 +307,12 @@ abstract class Fs {
 
         @Override
         synchronized long lastModified(String path) {
+            // A missing file is an error, as in Dart, never the epoch.
             Long t = times.get(key(path));
-            return t == null ? 0 : t.longValue();
+            if (t == null || !files.containsKey(key(path))) {
+                throw new FileSystemException("Cannot retrieve modification time", path);
+            }
+            return t.longValue();
         }
     }
 }

@@ -36,7 +36,7 @@ import dart.runtime.Funcs;
 public class CloseButton extends IconButton {
 
     public CloseButton() {
-        icon(new Icon(Icons.close));
+        icon(new Icon(Icons.close()));
     }
 
     public CloseButton(com.codename1.flutter.Key key, Color color, Funcs.VoidFunc0 onPressed) {

@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       a previous finite limit must lift the native cap back up, not keep it.</li>
  *   <li>The decoration's prefix/suffix icon glyph: {@code decorated()} only builds the
  *       row ONCE, on mount, so a password field toggling between
- *       {@code Icons.visibility}/{@code visibility_off} kept drawing the glyph it was
+ *       {@code Icons.visibility()}/{@code visibility_off} kept drawing the glyph it was
  *       built with forever.</li>
  * </ul>
  */
@@ -116,7 +116,7 @@ class TextFieldDecorationUpdateTest {
         tf.obscureText(true);
         InputDecoration d = new InputDecoration();
         IconButton toggle = new IconButton();
-        toggle.icon(new Icon(obscured ? Icons.visibility_off : Icons.visibility));
+        toggle.icon(new Icon(obscured ? Icons.visibility_off() : Icons.visibility()));
         d.suffixIcon(toggle);
         tf.decoration(d);
         return tf;

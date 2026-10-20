@@ -1,3 +1,4 @@
 data 1, error replaced boom, data 2
 1, err cmp, 3
 source cancelled: true
+1, err boom, 2, 3

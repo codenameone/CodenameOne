@@ -76,7 +76,7 @@ class FabExtendedPaddingTest {
 
     @Test
     void withAnIconTheStartInsetIsSixteenAndTheEndIsTwenty() {
-        FabRenderElement el = mountFab(new Icon(Icons.arrow_back));
+        FabRenderElement el = mountFab(new Icon(Icons.arrow_back()));
         Component c = el.component();
         assertNotNull(c, "RasterDisplay gives createComponent a real Button");
         Style s = c.getUnselectedStyle();
@@ -100,7 +100,7 @@ class FabExtendedPaddingTest {
 
     @Test
     void theIconAndLabelAreEightLogicalPixelsApart() {
-        FabRenderElement el = mountFab(new Icon(Icons.arrow_back));
+        FabRenderElement el = mountFab(new Icon(Icons.arrow_back()));
         Component c = el.component();
         assertTrue(c instanceof Button);
         assertEquals((int) Math.round(Dp.px(8)), ((Button) c).getGap(),
