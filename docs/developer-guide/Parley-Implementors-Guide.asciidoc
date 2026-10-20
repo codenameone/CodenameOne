@@ -71,7 +71,7 @@ follow the domain:
 The server's rules are in one table, with the admin console behind the `admin`
 role and everything else behind a signed-in account:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/parley/backend/src/main/java/com/codenameone/examples/parley/SecurityConfig.java[tag=parley-api-rules,indent=0]
 ----

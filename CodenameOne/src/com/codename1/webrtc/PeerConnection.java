@@ -36,10 +36,27 @@ import com.codename1.util.AsyncResource;
 /// server, a WebSocket, anything -- and nothing here sends them.
 ///
 /// ```java
-/// PeerConnection pc = WebRtc.createPeerConnection(config, listener);
-/// pc.addTrack(media.getAudio());
-/// pc.createOffer().ready(offer -> pc.setLocalDescription(offer)
-///         .ready(done -> signalling.send(offer)));
+/// import com.codename1.io.Log;
+/// import com.codename1.webrtc.*;
+///
+/// WebRtc.openUserMedia(true, false, false).ready(media -> {
+///     PeerConnection pc = WebRtc.createPeerConnection(new PeerConnectionConfig(),
+///             new PeerConnection.Listener() {
+///                 public void iceCandidate(PeerConnection connection, IceCandidate candidate) {
+///                     Log.p("send to the other side: " + candidate.getCandidate());
+///                 }
+///
+///                 public void stateChanged(PeerConnection connection, String state) {
+///                     Log.p("state " + state);
+///                 }
+///
+///                 public void remoteTrack(PeerConnection connection, MediaTrack track) {
+///                 }
+///             });
+///     pc.addTrack(media.getAudio());
+///     pc.createOffer().ready(offer -> pc.setLocalDescription(offer)
+///             .ready(done -> Log.p("send to the other side: " + offer.getSdp())));
+/// });
 /// ```
 public final class PeerConnection {
     /// [#getState()] before the two sides found each other.

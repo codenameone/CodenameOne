@@ -33,17 +33,38 @@ import java.util.Map;
 /// package.
 ///
 /// ```java
-/// if (!WebRtc.isSupported()) {
-///     return;
+/// import com.codename1.webrtc.*;
+///
+/// Form form = new Form("Call", new BorderLayout());
+/// if (WebRtc.isSupported()) {
+///     WebRtc.openUserMedia(true, true, true).ready(media -> {
+///         PeerConnection pc = WebRtc.createPeerConnection(
+///                 new PeerConnectionConfig().addIceServer(IceServer.stun("stun:stun.example.com")),
+///                 new PeerConnection.Listener() {
+///                     public void iceCandidate(PeerConnection connection, IceCandidate candidate) {
+///                         // send it to the other side over your own channel
+///                     }
+///
+///                     public void stateChanged(PeerConnection connection, String state) {
+///                         form.setTitle(state);
+///                     }
+///
+///                     public void remoteTrack(PeerConnection connection, MediaTrack track) {
+///                         if (track.isVideo()) {
+///                             form.add(BorderLayout.CENTER, new VideoView(track, false));
+///                             form.revalidate();
+///                         }
+///                     }
+///                 });
+///         pc.addTrack(media.getAudio());
+///         pc.addTrack(media.getVideo());
+///         form.add(BorderLayout.SOUTH, new VideoView(media.getVideo(), true));
+///         form.revalidate();
+///     });
+/// } else {
+///     form.add(BorderLayout.CENTER, new Label("No camera calls on this device"));
 /// }
-/// WebRtc.openUserMedia(true, true, true).ready(media -> {
-///     PeerConnection pc = WebRtc.createPeerConnection(
-///             new PeerConnectionConfig().addIceServer(IceServer.stun("stun:stun.example.com")),
-///             listener);
-///     pc.addTrack(media.getAudio());
-///     pc.addTrack(media.getVideo());
-///     form.add(new VideoView(media.getVideo(), true));
-/// });
+/// form.show();
 /// ```
 ///
 /// The package carries media. It does not ring, place the call in the
