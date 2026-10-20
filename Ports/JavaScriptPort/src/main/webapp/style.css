@@ -426,6 +426,45 @@ div#cn1-video-capture > video {
 #cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
     opacity: 0.45;
 }
+#cn1-desktop-chrome .cn1-chrome-separator {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(0, 0, 0, 0.14);
+}
+#cn1-desktop-chrome .cn1-chrome-check {
+    display: inline-block;
+    width: 1em;
+    flex-shrink: 0;
+}
+/* A submenu flies out to the right of its title while the pointer or focus is inside it. */
+#cn1-desktop-chrome .cn1-chrome-submenu {
+    position: relative;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title {
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title::after {
+    content: "\25B8";
+    float: right;
+    margin-left: 24px;
+    opacity: 0.6;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu:hover > .cn1-chrome-submenu-title,
+#cn1-desktop-chrome .cn1-chrome-submenu:focus-within > .cn1-chrome-submenu-title {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-items {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: -5px;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu:hover > .cn1-chrome-submenu-items,
+#cn1-desktop-chrome .cn1-chrome-submenu:focus-within > .cn1-chrome-submenu-items {
+    display: flex;
+}
 #cn1-desktop-chrome .cn1-chrome-icon {
     display: inline-flex;
     align-items: center;

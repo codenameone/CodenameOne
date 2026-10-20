@@ -3301,6 +3301,31 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// The commands this form puts on the platform's native menu, or null when it puts none
+    /// there. Only a form that owns the surface publishes: an embedded one -- a Dialog hosted in
+    /// a window's layered pane, a form inside an EmbeddedContainer -- would otherwise overwrite
+    /// the real surface's native menu bar with its own.
+    ///
+    /// With native desktop chrome the (hidden) toolbar's commands are bridged to the native
+    /// menu bar. That is checked BEFORE the native command behaviour: the desktop native themes
+    /// declare commandBehavior Native, and with a Toolbar the commands live on the Toolbar
+    /// rather than on this form's MenuBar -- publishing the MenuBar's list there handed the
+    /// native menu bar nothing, so it came up empty while the Toolbar that held the commands
+    /// was hidden. getAllNativeMenuCommands() includes the Toolbar's MenuBar, so nothing the
+    /// other branch would publish is lost.
+    java.util.Vector nativeMenuCommands() {
+        if (getParent() != null) {
+            return null;
+        }
+        if (isDesktopNativeChrome() && toolbar != null) {
+            return toolbar.getAllNativeMenuCommands();
+        }
+        if (Display.getInstance().isNativeCommands()) {
+            return menuBar.getCommands();
+        }
+        return null;
+    }
+
     /// {@inheritDoc}
     @Override
     void initComponentImpl() {
@@ -3311,17 +3336,9 @@ public class Form extends Container implements TopLevelContainer {
         // an EmbeddedContainer -- would otherwise overwrite the real surface's native
         // menu bar with its own.
         if (getParent() == null) {
-            if (isDesktopNativeChrome() && toolbar != null) {
-                // bridge the (hidden) toolbar's commands to the native desktop menu bar.
-                // Checked BEFORE the native command behaviour: the desktop native themes declare
-                // commandBehavior Native, and with a Toolbar the commands live on the Toolbar
-                // rather than on this form's MenuBar -- publishing the MenuBar's list there
-                // handed the native menu bar nothing, so it came up empty while the Toolbar
-                // that held the commands was hidden. getAllNativeMenuCommands() includes the
-                // Toolbar's MenuBar, so nothing the other branch would publish is lost.
-                Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
-            } else if (Display.getInstance().isNativeCommands()) {
-                Display.impl.setNativeCommands(menuBar.getCommands());
+            java.util.Vector published = nativeMenuCommands();
+            if (published != null) {
+                Display.impl.setNativeCommands(published);
             }
         }
         if (getParent() != null) {

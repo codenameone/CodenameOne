@@ -60,6 +60,11 @@ static NSArray *cn1MenuRows = nil;
     return shared;
 }
 
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+    id enabled = item.representedObject;
+    return ![enabled isKindOfClass:[NSNumber class]] || [enabled boolValue];
+}
+
 - (void)cn1MenuAction:(id)sender {
     if (![sender isKindOfClass:[NSMenuItem class]]) {
         return;
@@ -249,6 +254,19 @@ void CN1MacReleaseStartupMenu(void) {
     }
 }
 
+/// Appends an item, or for the application menu inserts it after the ones this pass
+/// already put at its start, above the About item.
+static void cn1AddMenuItem(NSMenu *target, NSMenuItem *item, BOOL placeAtStart, NSMutableDictionary *appended) {
+    if (placeAtStart) {
+        NSNumber *seen = appended[[NSValue valueWithNonretainedObject:target]];
+        NSInteger at = seen != nil ? seen.integerValue : 0;
+        [target insertItem:item atIndex:at];
+        appended[[NSValue valueWithNonretainedObject:target]] = @(at + 1);
+    } else {
+        [target addItem:item];
+    }
+}
+
 static void cn1ApplyMenuCommands(NSArray *rows) {
 #ifndef CN1_USE_ARC
     [cn1MenuRows release];
@@ -270,9 +288,16 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
     NSMenu *appMenu = mainMenu.numberOfItems > 0 ? [mainMenu itemAtIndex:0].submenu : nil;
     NSMutableDictionary *appended = [NSMutableDictionary dictionary];
 
+    // Submenus created on this pass, by the full path that named them.
+    NSMutableDictionary *submenus = [NSMutableDictionary dictionary];
+    NSString *pathSeparator = [NSString stringWithFormat:@"%C", (unichar)0x1f];
+
     for (NSUInteger i = 0; i < rows.count; i++) {
+        // The NativeMenuEncoder row: path, label, key, modifiers, id, flags, icon.
         NSArray *cols = [rows[i] componentsSeparatedByString:@"\t"];
-        NSString *hint = cols.count > 0 ? cols[0] : @"";
+        NSString *pathField = cols.count > 0 ? cols[0] : @"";
+        NSArray *path = [pathField componentsSeparatedByString:pathSeparator];
+        NSString *hint = path.count > 0 ? path[0] : @"";
         NSString *label = cols.count > 1 ? cols[1] : rows[i];
         int keyChar = cols.count > 2 ? [cols[2] intValue] : 0;
         int modifiers = cols.count > 3 ? [cols[3] intValue] : 0;
@@ -282,7 +307,8 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         // would then name whichever command had since taken that position. An id names
         // one command for as long as anything can still click it.
         NSInteger commandId = cols.count > 4 ? (NSInteger)[cols[4] intValue] : (NSInteger)i;
-        NSMenuItem *item = cn1MakeCommandItem(label, keyChar, modifiers, commandId);
+        int rowFlags = cols.count > 5 ? [cols[5] intValue] : 1;
+        NSString *iconPng = cols.count > 6 ? cols[6] : @"";
 
         BOOL placeAtStart = NO;
         NSString *standard = cn1StandardMenuForHint(hint, &placeAtStart);
@@ -306,14 +332,58 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         if (target == nil) {
             continue;
         }
-        if (placeAtStart) {
-            NSNumber *seen = appended[[NSValue valueWithNonretainedObject:target]];
-            NSInteger at = seen != nil ? seen.integerValue : 0;
-            [target insertItem:item atIndex:at];
-            appended[[NSValue valueWithNonretainedObject:target]] = @(at + 1);
-        } else {
-            [target addItem:item];
+        // Rows arrive depth first, so a submenu is created by its first row and lands at
+        // its place among the parent's items. Its container item carries the shared
+        // target too, which is how cn1RemovePreviousCommands takes the whole subtree.
+        NSString *key = hint;
+        for (NSUInteger p = 1; p < path.count; p++) {
+            key = [key stringByAppendingFormat:@"%@%@", pathSeparator, path[p]];
+            NSMenu *sub = submenus[key];
+            if (sub == nil) {
+                NSMenuItem *holder = [[NSMenuItem alloc] initWithTitle:path[p] action:NULL keyEquivalent:@""];
+                sub = [[NSMenu alloc] initWithTitle:path[p]];
+                holder.submenu = sub;
+                holder.target = [CN1MacMenuTarget sharedTarget];
+                cn1AddMenuItem(target, holder, p == 1 && placeAtStart, appended);
+                submenus[key] = sub;
+#ifndef CN1_USE_ARC
+                [holder release];
+                [sub release];
+#endif
+            }
+            target = sub;
+            placeAtStart = NO;
         }
+        NSMenuItem *item;
+        if (rowFlags & 16) {
+            item = [NSMenuItem separatorItem];
+            item.target = [CN1MacMenuTarget sharedTarget];
+        } else {
+            item = cn1MakeCommandItem(label, keyChar, modifiers, commandId);
+            // FLAG_ENABLED=1, FLAG_CHECKABLE=2, FLAG_CHECKED=4. A radio item shows the
+            // same checkmark: that is how AppKit draws one, and Java keeps the group
+            // exclusive.
+            // The standard menus auto-enable (Cut/Copy follow the responder chain), so the
+            // enabled flag is answered from validateMenuItem: rather than item.enabled,
+            // which AppKit would overwrite.
+            item.representedObject = @((rowFlags & 1) != 0);
+            if (rowFlags & 2) {
+                item.state = (rowFlags & 4) ? NSControlStateValueOn : NSControlStateValueOff;
+            }
+            if (iconPng.length > 0) {
+                NSData *png = [[NSData alloc] initWithBase64EncodedString:iconPng options:0];
+                NSImage *image = png == nil ? nil : [[NSImage alloc] initWithData:png];
+                if (image != nil) {
+                    image.size = NSMakeSize(16, 16);
+                    item.image = image;
+                }
+#ifndef CN1_USE_ARC
+                [image release];
+                [png release];
+#endif
+            }
+        }
+        cn1AddMenuItem(target, item, placeAtStart, appended);
     }
 }
 

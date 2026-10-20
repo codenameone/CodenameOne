@@ -27,10 +27,13 @@
  * Codename One commands reach here as one encoded row each, exactly the format
  * IOSImplementation.setNativeCommands writes for the macOS menu:
  *
- *   "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"
+ *   "<path>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>\t<flags>\t<icon>"
  *
- * rows separated by '\n'. The three ParparVM desktop ports share that shape on purpose --
- * a second encoding is a second thing to keep in step with Command's placement constants.
+ * rows separated by '\n', written by NativeMenuEncoder in core so the three ParparVM desktop
+ * ports share it. The path's segments are joined by 0x1f: the first is the placement hint,
+ * the rest nest submenus. Flags: 1 enabled, 2 checkable, 4 checked, 8 radio, 16 separator.
+ * The icon column (base64 PNG) is not read here -- the Java side does not send it to this
+ * port, since a Win32 menu bitmap needs a premultiplied DIB this file has no decoder for.
  *
  * WHY A MENU BAR AND NOT A RIBBON: this is what SetMenu gives, it is what Win32 draws for
  * free in the window's non-client area, and it is what desktopTitleBarMode=native means on
@@ -67,6 +70,7 @@ typedef struct {
     int commandId;    /* the Codename One id, echoed back in the event */
     int keyChar;      /* the shortcut key, 0 when the command has none */
     int modifiers;    /* Command.DESKTOP_SHORTCUT_MODIFIER_*: 1 primary, 2 shift, 4 alt */
+    int enabled;      /* a greyed item must not fire from its shortcut either */
 } CN1MenuItem;
 
 static CN1MenuItem menuItems[CN1_MENU_MAX_ITEMS];
@@ -161,16 +165,22 @@ static void appendAccelerator(char* label, size_t cap, int keyChar, int modifier
     label[len] = '\0';
 }
 
-/* Finds or creates the popup for a top-level title, so two commands with the same hint
- * land in one menu rather than two menus with the same name. */
-static HMENU popupNamed(HMENU bar, const char* title, HMENU* popups, char titles[][64],
-                        int* popupCount) {
+#define CN1_MENU_MAX_POPUPS 64
+#define CN1_MENU_PATH_CAP 256
+
+/* Finds or creates the popup for a menu path, so two commands with the same path land in
+ * one menu rather than two menus with the same name. The key is the whole path, the title
+ * its last segment, and a new popup is appended to parent -- the bar for a top-level menu.
+ * Rows arrive depth first, so a submenu appended on its first row sits at its place among
+ * the parent's items. */
+static HMENU popupNamed(HMENU parent, const char* key, const char* title, HMENU* popups,
+                        char keys[][CN1_MENU_PATH_CAP], int* popupCount) {
     for (int i = 0; i < *popupCount; i++) {
-        if (strcmp(titles[i], title) == 0) {
+        if (strcmp(keys[i], key) == 0) {
             return popups[i];
         }
     }
-    if (*popupCount >= 32) {
+    if (*popupCount >= CN1_MENU_MAX_POPUPS) {
         return NULL;
     }
     HMENU popup = CreatePopupMenu();
@@ -184,13 +194,50 @@ static HMENU popupNamed(HMENU bar, const char* title, HMENU* popups, char titles
         DestroyMenu(popup);
         return NULL;
     }
-    AppendMenuW(bar, MF_POPUP, (UINT_PTR) popup, wide);
+    AppendMenuW(parent, MF_POPUP, (UINT_PTR) popup, wide);
     free(wide);
     popups[*popupCount] = popup;
-    strncpy(titles[*popupCount], title, 63);
-    titles[*popupCount][63] = '\0';
+    strncpy(keys[*popupCount], key, CN1_MENU_PATH_CAP - 1);
+    keys[*popupCount][CN1_MENU_PATH_CAP - 1] = '\0';
     (*popupCount)++;
     return popup;
+}
+
+/* Resolves a row's path to the popup its item goes in, creating the menus on the way. */
+static HMENU popupForPath(HMENU bar, const char* path, HMENU* popups,
+                          char keys[][CN1_MENU_PATH_CAP], int* popupCount) {
+    char key[CN1_MENU_PATH_CAP];
+    char segment[CN1_MENU_PATH_CAP];
+    size_t keyLen = 0;
+    HMENU parent = bar;
+    const char* p = path;
+    int first = 1;
+    for (;;) {
+        size_t n = 0;
+        while (*p != '\0' && *p != 0x1f) {
+            if (n + 1 < sizeof(segment)) {
+                segment[n++] = *p;
+            }
+            p++;
+        }
+        segment[n] = '\0';
+        const char* title = first ? titleForHint(segment) : segment;
+        if (keyLen + strlen(title) + 2 >= sizeof(key)) {
+            return parent == bar ? NULL : parent;
+        }
+        if (!first) {
+            key[keyLen++] = 0x1f;
+        }
+        memcpy(key + keyLen, title, strlen(title));
+        keyLen += strlen(title);
+        key[keyLen] = '\0';
+        parent = popupNamed(parent, key, title, popups, keys, popupCount);
+        if (parent == NULL || *p == '\0') {
+            return parent;
+        }
+        p++;
+        first = 0;
+    }
 }
 
 /* Reads one tab-delimited field into out, advancing *cursor past the delimiter. Returns 0
@@ -223,32 +270,43 @@ static void rebuildMenu(const char* spec) {
     if (spec != NULL && spec[0] != '\0') {
         HMENU bar = CreateMenu();
         if (bar != NULL) {
-            HMENU popups[32];
-            char titles[32][64];
+            static HMENU popups[CN1_MENU_MAX_POPUPS];
+            static char keys[CN1_MENU_MAX_POPUPS][CN1_MENU_PATH_CAP];
             int popupCount = 0;
             const char* cursor = spec;
             while (*cursor != '\0' && menuItemCount < CN1_MENU_MAX_ITEMS) {
-                char hint[64];
+                char path[CN1_MENU_PATH_CAP];
                 char label[256];
                 char keyField[16];
                 char modField[16];
                 char idField[24];
-                nextField(&cursor, hint, sizeof(hint));
+                char flagField[16];
+                char iconField[4];
+                nextField(&cursor, path, sizeof(path));
                 nextField(&cursor, label, sizeof(label));
                 nextField(&cursor, keyField, sizeof(keyField));
                 nextField(&cursor, modField, sizeof(modField));
                 nextField(&cursor, idField, sizeof(idField));
+                nextField(&cursor, flagField, sizeof(flagField));
+                /* Skipped, not read: see the file header. nextField consumes a field of any
+                 * length and keeps only what fits. */
+                nextField(&cursor, iconField, sizeof(iconField));
                 if (*cursor == '\n') {
                     cursor++;
+                }
+                int flags = flagField[0] == '\0' ? 1 : atoi(flagField);
+                HMENU popup = popupForPath(bar, path, popups, keys, &popupCount);
+                if (popup == NULL) {
+                    continue;
+                }
+                if (flags & 16) {
+                    AppendMenuW(popup, MF_SEPARATOR, 0, NULL);
+                    continue;
                 }
                 if (label[0] == '\0') {
                     continue;
                 }
                 appendAccelerator(label, sizeof(label), atoi(keyField), atoi(modField));
-                HMENU popup = popupNamed(bar, titleForHint(hint), popups, titles, &popupCount);
-                if (popup == NULL) {
-                    continue;
-                }
                 WCHAR* wide = widen(label);
                 if (wide == NULL) {
                     continue;
@@ -257,8 +315,29 @@ static void rebuildMenu(const char* spec) {
                 menuItems[slot].commandId = atoi(idField);
                 menuItems[slot].keyChar = atoi(keyField);
                 menuItems[slot].modifiers = atoi(modField);
-                AppendMenuW(popup, MF_STRING, (UINT_PTR) (CN1_MENU_ID_BASE + slot), wide);
+                menuItems[slot].enabled = (flags & 1) != 0;
+                UINT itemFlags = MF_STRING;
+                if ((flags & 1) == 0) {
+                    itemFlags |= MF_GRAYED;
+                }
+                if ((flags & 2) != 0 && (flags & 4) != 0) {
+                    itemFlags |= MF_CHECKED;
+                }
+                UINT itemId = (UINT) (CN1_MENU_ID_BASE + slot);
+                AppendMenuW(popup, itemFlags, (UINT_PTR) itemId, wide);
                 free(wide);
+                if (flags & 8) {
+                    /* A radio item draws a bullet instead of a tick. Java keeps the group
+                     * exclusive, so the item only needs the look. */
+                    MENUITEMINFOW info;
+                    memset(&info, 0, sizeof(info));
+                    info.cbSize = sizeof(info);
+                    info.fMask = MIIM_FTYPE;
+                    if (GetMenuItemInfoW(popup, itemId, FALSE, &info)) {
+                        info.fType |= MFT_RADIOCHECK;
+                        SetMenuItemInfoW(popup, itemId, FALSE, &info);
+                    }
+                }
             }
             if (popupCount == 0) {
                 /* Every row was unusable. An empty bar is a one-pixel strip the user cannot
@@ -320,7 +399,7 @@ int cn1WinMenuHandleAccelerator(int vkey) {
     }
     for (int i = 0; i < menuItemCount; i++) {
         int keyChar = menuItems[i].keyChar;
-        if (keyChar == 0 || menuItems[i].modifiers != mods) {
+        if (keyChar == 0 || !menuItems[i].enabled || menuItems[i].modifiers != mods) {
             continue;
         }
         /* The shortcut is carried as a character; WM_KEYDOWN reports a virtual key, and for

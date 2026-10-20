@@ -341,7 +341,10 @@ public class Command implements ActionListener<ActionEvent> {
     ///
     /// - `enabled`: the enabled to set
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        if (this.enabled != enabled) {
+            this.enabled = enabled;
+            Display.refreshNativeMenuIfPublished();
+        }
     }
 
     /// The client properties are a useful way to associate meta-data with a command
@@ -388,6 +391,10 @@ public class Command implements ActionListener<ActionEvent> {
     /// `#DESKTOP_MENU_EDIT`, `#DESKTOP_MENU_VIEW`, `#DESKTOP_MENU_WINDOW`, `#DESKTOP_MENU_HELP`.
     /// Any other value becomes a top-level menu with that literal title. Commands without the
     /// hint are grouped under a default application-commands menu.
+    ///
+    /// The value is a path: {@code "File/Open Recent"} puts the command in an "Open Recent"
+    /// submenu of the File menu, created on demand, and deeper paths nest further. The first
+    /// segment keeps the meaning above. Write {@code //} for a slash that is part of a title.
     public static final String DESKTOP_MENU = "DesktopMenu";
 
     /// Standard desktop menu placement: the application menu (macOS app menu / a leading menu).
@@ -431,6 +438,180 @@ public class Command implements ActionListener<ActionEvent> {
     public String getDesktopMenu() {
         Object o = getClientProperty(DESKTOP_MENU);
         return o == null ? null : o.toString();
+    }
+
+    /// Client property key carrying the separator group of this command within its desktop menu
+    /// (as an {@code Integer}), see `#setDesktopMenuGroup(int)`.
+    public static final String DESKTOP_MENU_GROUP = "DesktopMenuGroup";
+
+    /// Client property key marking a command as a separator line in the desktop menu, see
+    /// `#createDesktopSeparator(String)`.
+    public static final String DESKTOP_SEPARATOR = "DesktopSeparator";
+
+    /// Client property key carrying the checked state of a check or radio desktop menu item
+    /// (as a {@code Boolean}). Its presence makes the item checkable, see
+    /// `#setDesktopChecked(boolean)`.
+    public static final String DESKTOP_CHECKED = "DesktopChecked";
+
+    /// Client property key carrying the name of the radio group of a desktop menu item, see
+    /// `#setDesktopRadioGroup(String)`.
+    public static final String DESKTOP_RADIO_GROUP = "DesktopRadioGroup";
+
+    /// Places this command in a separator group within its desktop menu. Items of one menu are
+    /// ordered by group, keeping the order they were added in within a group, and the native
+    /// menu draws a separator line wherever the group changes. Commands default to group 0.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the group number, lower groups come first
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopMenuGroup(int group) {
+        putClientProperty(DESKTOP_MENU_GROUP, Integer.valueOf(group));
+        return this;
+    }
+
+    /// Returns the separator group set with `#setDesktopMenuGroup(int)`, 0 when unset.
+    ///
+    /// #### Returns
+    ///
+    /// the group number
+    public int getDesktopMenuGroup() {
+        Object o = getClientProperty(DESKTOP_MENU_GROUP);
+        return o instanceof Integer ? ((Integer) o).intValue() : 0;
+    }
+
+    private static int separatorCounter;
+
+    /// Creates a command that shows as a separator line in a desktop native menu, at the
+    /// position it is added in. It has no label and never runs. Where groups already
+    /// separate the items (`#setDesktopMenuGroup(int)`) it is not needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: the menu path the separator goes in, see `#setDesktopMenu(String)`
+    ///
+    /// #### Returns
+    ///
+    /// the separator command
+    public static Command createDesktopSeparator(String menu) {
+        Command c = new Command("-");
+        // A distinct value per separator: Command.equals compares client properties, and the
+        // de-duplication that gathers the published commands would otherwise fold every
+        // separator of a menu into the first one.
+        c.putClientProperty(DESKTOP_SEPARATOR, Integer.valueOf(separatorCounter++));
+        c.setDesktopMenu(menu);
+        return c;
+    }
+
+    /// True when this command was created by `#createDesktopSeparator(String)`.
+    ///
+    /// #### Returns
+    ///
+    /// true for a separator
+    public boolean isDesktopSeparator() {
+        return getClientProperty(DESKTOP_SEPARATOR) != null;
+    }
+
+    /// Makes this command a check item in the desktop native menu and sets its state. When
+    /// the user picks the item the state flips before the command runs, so the action reads
+    /// the new value from `#isDesktopChecked()`. Changing the state while the command is in
+    /// the native menu updates the menu.
+    ///
+    /// #### Parameters
+    ///
+    /// - `checked`: the checked state
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopChecked(boolean checked) {
+        Object old = getClientProperty(DESKTOP_CHECKED);
+        Boolean b = checked ? Boolean.TRUE : Boolean.FALSE;
+        if (b.equals(old)) {
+            return this;
+        }
+        putClientProperty(DESKTOP_CHECKED, b);
+        if (checked) {
+            clearRadioSiblings();
+        }
+        Display.refreshNativeMenuIfPublished();
+        return this;
+    }
+
+    /// True when this command is a check or radio item, see `#setDesktopChecked(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when the item shows a check state
+    public boolean isDesktopCheckable() {
+        return getClientProperty(DESKTOP_CHECKED) != null || getDesktopRadioGroup() != null;
+    }
+
+    /// The checked state of a check or radio item, false when the command is not checkable.
+    ///
+    /// #### Returns
+    ///
+    /// the checked state
+    public boolean isDesktopChecked() {
+        return Boolean.TRUE.equals(getClientProperty(DESKTOP_CHECKED));
+    }
+
+    /// Makes this command a radio item of the named group in the desktop native menu. At most
+    /// one command of a group is checked: checking one, from the menu or with
+    /// `#setDesktopChecked(boolean)`, unchecks the others. Picking the checked item again
+    /// leaves it checked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the radio group name, null to make this an ordinary item again
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopRadioGroup(String group) {
+        putClientProperty(DESKTOP_RADIO_GROUP, group);
+        if (group != null) {
+            if (getClientProperty(DESKTOP_CHECKED) == null) {
+                putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
+            } else if (isDesktopChecked()) {
+                clearRadioSiblings();
+            }
+        }
+        return this;
+    }
+
+    /// Returns the radio group set with `#setDesktopRadioGroup(String)`, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the radio group name or null
+    public String getDesktopRadioGroup() {
+        Object o = getClientProperty(DESKTOP_RADIO_GROUP);
+        return o instanceof String ? (String) o : null;
+    }
+
+    private void clearRadioSiblings() {
+        String group = getDesktopRadioGroup();
+        if (group == null) {
+            return;
+        }
+        // The group is found among the commands the current form publishes rather than in a
+        // registry of its own: a static registry would hold every command, and through their
+        // listeners every form, for the life of the application.
+        java.util.Vector members = Display.getInstance().getCurrentNativeMenuCommands();
+        for (int i = 0; i < members.size(); i++) {
+            Object o = members.elementAt(i);
+            if (!(o instanceof Command)) {
+                continue;
+            }
+            Command c = (Command) o;
+            if (c != this && group.equals(c.getDesktopRadioGroup()) && c.isDesktopChecked()) { //NOPMD CompareObjectsWithEquals
+                c.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);
+            }
+        }
     }
 
     /// Client property key carrying the upper-cased character of the desktop keyboard

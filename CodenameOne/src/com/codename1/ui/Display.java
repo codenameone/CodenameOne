@@ -85,6 +85,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Vector;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedList;
@@ -5118,6 +5119,50 @@ public final class Display extends CN1Constants {
     /// use setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE)
     public void setNativeCommands(boolean nativeCommands) {
         setCommandBehavior(COMMAND_BEHAVIOR_NATIVE);
+    }
+
+    private static boolean nativeMenuRefreshPending;
+
+    /// Republishes the current form's commands to the platform's native menu bar, so the menu
+    /// shows their current label, enabled and checked state. Commands already do this when
+    /// `Command#setEnabled(boolean)` or `Command#setDesktopChecked(boolean)` change them; call
+    /// it after changing anything else about a command that is in the menu, such as its name
+    /// or icon. Does nothing on a platform without a native menu bar.
+    public void refreshNativeMenu() {
+        if (impl == null || !impl.isNativeCommandsSupported()) {
+            return;
+        }
+        Form f = getCurrent();
+        if (f == null || !f.isInitialized()) {
+            return;
+        }
+        Vector v = f.nativeMenuCommands();
+        if (v != null) {
+            impl.setNativeCommands(v);
+        }
+    }
+
+    /// Schedules one `#refreshNativeMenu()` for the next EDT cycle, so a batch of state changes
+    /// rebuilds the native menu once rather than once per change.
+    static void refreshNativeMenuIfPublished() {
+        if (impl == null || nativeMenuRefreshPending || !impl.isNativeCommandsSupported()) {
+            return;
+        }
+        nativeMenuRefreshPending = true;
+        getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                nativeMenuRefreshPending = false;
+                getInstance().refreshNativeMenu();
+            }
+        });
+    }
+
+    /// The commands the current form publishes to the native menu, never null.
+    Vector getCurrentNativeMenuCommands() {
+        Form f = impl == null ? null : getCurrent();
+        Vector v = f == null ? null : f.nativeMenuCommands();
+        return v == null ? new Vector() : v;
     }
 
     /// Exits the application...

@@ -185,10 +185,12 @@ final class JavaScriptDesktopChrome {
                 // kept: with the Toolbar hidden this menu is its only way to be reached. The
                 // native desktop ports skip it because their menus take text only; this one can
                 // show the icon itself.
-                if (!hasLabel(c) && !hasIcon(c)) {
+                if (!hasLabel(c) && !hasIcon(c) && !c.isDesktopSeparator()) {
                     continue;
                 }
-                String menu = titleForHint(c.getDesktopMenu());
+                // Grouped by the first path segment; the rest of the path is a submenu that
+                // buildMenu lays out inside this menu.
+                String menu = titleForHint(com.codename1.impl.NativeMenuEncoder.parsePath(c.getDesktopMenu())[0]);
                 List<Command> list = byTitle.get(menu);
                 if (list == null) {
                     list = new ArrayList<Command>();
@@ -260,11 +262,40 @@ final class JavaScriptDesktopChrome {
         HTMLElement list = document.createElement("div");
         list.setAttribute("class", "cn1-chrome-menu-items");
         list.setAttribute("role", "menu");
-        for (final Command c : commands) {
+        java.util.Vector all = new java.util.Vector(commands);
+        com.codename1.impl.NativeMenuEncoder encoded =
+                com.codename1.impl.NativeMenuEncoder.encode(all, 0, true);
+        // Item containers by their submenu path below this menu; "" is the menu's own list.
+        Map<String, HTMLElement> containers = new HashMap<String, HTMLElement>();
+        containers.put("", list);
+        for (com.codename1.impl.NativeMenuEncoder.Row row : encoded.getRows()) {
+            HTMLElement parent = containerFor(containers, row.getPath());
+            if (row.isSeparator()) {
+                HTMLElement sep = document.createElement("div");
+                sep.setAttribute("role", "separator");
+                sep.setAttribute("class", "cn1-chrome-separator");
+                parent.appendChild(sep);
+                continue;
+            }
+            final Command c = row.getCommand();
+            int flags = row.getFlags();
             HTMLElement item = document.createElement("button");
             item.setAttribute("type", "button");
-            item.setAttribute("role", "menuitem");
             item.setAttribute("class", "cn1-chrome-menu-item");
+            if ((flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKABLE) != 0) {
+                boolean radio = (flags & com.codename1.impl.NativeMenuEncoder.FLAG_RADIO) != 0;
+                boolean checked = (flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKED) != 0;
+                item.setAttribute("role", radio ? "menuitemradio" : "menuitemcheckbox");
+                item.setAttribute("aria-checked", checked ? "true" : "false");
+                HTMLElement mark = document.createElement("span");
+                mark.setAttribute("class", "cn1-chrome-check");
+                // Checking an item republishes the menu (Command.setDesktopChecked), so the mark
+                // is current every time the menu is rebuilt.
+                mark.setTextContent(checked ? (radio ? "\u2022" : "\u2713") : "");
+                item.appendChild(mark);
+            } else {
+                item.setAttribute("role", "menuitem");
+            }
             // Not the disabled attribute: Command.setEnabled() does not republish the menu, so an
             // item disabled when the menu was built would stay unclickable after the command was
             // enabled again. The look is refreshed each time the menu opens, and a click on a
@@ -274,6 +305,15 @@ final class JavaScriptDesktopChrome {
             String id = String.valueOf(nextCommandId++);
             commandsById.put(id, c);
             item.setAttribute("data-cn1-cmd", id);
+            if (hasLabel(c) && hasIcon(c)) {
+                HTMLElement icon = document.createElement("span");
+                icon.setAttribute("class", "cn1-chrome-icon");
+                item.appendChild(icon);
+                Object image = sink.renderIcon(icon, c);
+                if (image != null) {
+                    iconImages.add(image);
+                }
+            }
             if (hasLabel(c)) {
                 HTMLElement label = document.createElement("span");
                 label.setAttribute("class", "cn1-chrome-label");
@@ -305,10 +345,41 @@ final class JavaScriptDesktopChrome {
                 accel.setTextContent(shortcut);
                 item.appendChild(accel);
             }
-            list.appendChild(item);
+            parent.appendChild(item);
         }
         details.appendChild(list);
         return details;
+    }
+
+    /// The element a row's items go in: the menu's own list for a one-segment path, otherwise a
+    /// nested submenu created on its first row, which keeps it at its place among the items.
+    private HTMLElement containerFor(Map<String, HTMLElement> containers, String[] path) {
+        HTMLElement parent = containers.get("");
+        StringBuilder key = new StringBuilder();
+        for (int p = 1; p < path.length; p++) {
+            key.append('/').append(path[p]);
+            String k = key.toString();
+            HTMLElement sub = containers.get(k);
+            if (sub == null) {
+                HTMLElement wrap = document.createElement("div");
+                wrap.setAttribute("class", "cn1-chrome-submenu");
+                wrap.setAttribute("role", "none");
+                HTMLElement head = document.createElement("div");
+                head.setAttribute("class", "cn1-chrome-submenu-title");
+                head.setAttribute("role", "menuitem");
+                head.setAttribute("aria-haspopup", "menu");
+                head.setTextContent(path[p]);
+                wrap.appendChild(head);
+                sub = document.createElement("div");
+                sub.setAttribute("class", "cn1-chrome-menu-items cn1-chrome-submenu-items");
+                sub.setAttribute("role", "menu");
+                wrap.appendChild(sub);
+                parent.appendChild(wrap);
+                containers.put(k, sub);
+            }
+            parent = sub;
+        }
+        return parent;
     }
 
     /// The accelerator as text, the way the Windows menu writes it into the label. The page

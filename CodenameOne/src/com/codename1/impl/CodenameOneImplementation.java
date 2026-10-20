@@ -5243,12 +5243,17 @@ public abstract class CodenameOneImplementation {
         if (cmd == null) {
             return;
         }
-        if (!cmd.isEnabled()) {
-            // A disabled Command must not run because its menu item was clicked. The row format
-            // carries no enabled flag, so the native item is created enabled and stays
-            // clickable; greying it out as well needs another field and a matching change in
-            // every native parser. This is the half that prevents the damage.
+        if (!cmd.isEnabled() || cmd.isDesktopSeparator()) {
+            // The native item is greyed out too (NativeMenuEncoder.FLAG_ENABLED), but a menu
+            // published before the command was disabled can still deliver a click.
             return;
+        }
+        // A check item flips and a radio item becomes the checked one of its group BEFORE the
+        // command runs, as a native toggle does, so the action reads the new state.
+        if (cmd.getDesktopRadioGroup() != null) {
+            cmd.setDesktopChecked(true);
+        } else if (cmd.isDesktopCheckable()) {
+            cmd.setDesktopChecked(!cmd.isDesktopChecked());
         }
         Form current = Display.getInstance().getCurrent();
         ActionEvent ev = new ActionEvent(cmd);
