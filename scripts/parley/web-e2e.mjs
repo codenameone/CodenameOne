@@ -341,12 +341,12 @@ try {
     const text = await screenText();
     return seeded.some(name => text.includes(name));
   });
-  // The admin's menu ends with the console, after Settings.
+  // The console heads the admin's menu.
   // The menu's rows are clicked where they are drawn, and on a slow runner the
   // popup can still be sliding in when the click lands: a click that missed
   // leaves the chats list up, so the menu is opened and picked again.
   for (let attempt = 1; ; attempt++) {
-    await overflowCommand(4);
+    await overflowCommand(0);
     try {
       await waitFor('the admin console', attempt < 3 ? 15 : stepSeconds, async () =>
           /Messages\s+today/.test(await screenText()));
@@ -358,6 +358,17 @@ try {
       say('the admin console did not open; picking it from the menu again');
       await page.keyboard.press('Escape');
       await settled();
+      // A click that landed on another row opened that form instead: back
+      // out of it to the chats, whose menu holds the console.
+      const text = await screenText();
+      if (!seeded.some(name => text.includes(name))) {
+        const back = (await components()).filter(c => c.role === 'button' && c.y < 140)
+            .sort((a, b) => a.x - b.x)[0];
+        if (back) {
+          await click(back);
+          await settled();
+        }
+      }
     }
   }
   await waitFor('the console to ask the server for its figures', stepSeconds, async () =>

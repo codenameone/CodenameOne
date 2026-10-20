@@ -1938,23 +1938,36 @@ public class GeneratorModel {
                     .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(food
+                    .append(chat
+                            ? "`alice@" + lower + ".example`, `bob@" + lower + ".example`, `carol@" + lower
+                            + ".example` and `dan@" + lower + ".example`, who already share chats and a group, "
+                            + "`admin@" + lower + ".example`, who sees the console, and `mallory@" + lower
+                            + ".example`, whom the others have reported "
+                            : food
                             ? "`customer@" + lower + ".example`, `merchant@" + lower + ".example`, who runs the "
                             + "first restaurant's kitchen, `courier@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append("and waits for the admin's decision. ")
+                    .append(chat ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
-                    .append("configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the ")
-                    .append("server is given a Stripe key; `backend/application.properties` says how.\n\n")
+                    .append(chat
+                            ? "configured. Calls use a public STUN server until the server is given a TURN "
+                            + "server; `backend/application.properties` says how.\n\n"
+                            : "configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the "
+                            + "server is given a Stripe key; `backend/application.properties` says how.\n\n")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n")
                     .append("The server can also host the app, so it runs in a browser with nothing to install: ")
                     .append("`backend/server.sh web` builds the browser version, and a server started after that ")
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append(food
+                    .append(chat
+                            ? "cover the sample this project started as: \"A private messenger from three sides\" "
+                            + "shows it as two people chatting and an admin see it, and \"Building on the sample\" "
+                            + "explains how it is built and what to change: the encryption, calls and TURN, the "
+                            + "bridges to other networks and the database.\n\n"
+                            : food
                             ? "cover the sample this project started as: \"A food-delivery app from four sides\" "
                             + "shows it as a customer, a restaurant, a courier and an admin see it, and "
                             + "\"Building on the sample\" explains how it is built and what to change, including "

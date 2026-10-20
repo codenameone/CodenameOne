@@ -32,8 +32,10 @@ package com.codename1.security;
 /// purposes never coincide.
 ///
 /// ```java
-/// byte[] shared = KeyAgreement.ecdh(mine.getPrivateKey(), theirs);
-/// byte[] keys = Hkdf.derive("SHA-256", salt, shared, info, 64);
+/// KeyPair mine = KeyGenerator.ec(256);
+/// KeyPair theirs = KeyGenerator.ec(256);
+/// byte[] shared = KeyAgreement.ecdh(mine.getPrivateKey(), theirs.getPublicKey());
+/// byte[] keys = Hkdf.derive("SHA-256", null, shared, "chat keys".getBytes(), 64);
 /// ```
 ///
 /// It is pure Java over [Hmac], so it behaves identically on every port and on

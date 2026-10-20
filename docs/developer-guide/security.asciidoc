@@ -679,14 +679,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/K
 
 The result is a shared secret, not yet a key. `Hkdf` (RFC 5869) turns it into keys of any length, bound to an `info` label so that keys derived for different purposes never coincide. `Hkdf.derive` runs both steps at once:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=ecdh-derive,indent=0]
 ----
 
 Protocols that keep the intermediate key, a ratchet for example, call the two steps one at a time:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyAgreementSnippets.java[tag=hkdf-steps,indent=0]
 ----

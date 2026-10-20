@@ -767,6 +767,13 @@ public final class Messenger implements LiveChannel.Handler {
             return;
         }
         if (header.length() == 0) {
+            if (!Store.bridged(conversationId) && !"SYSTEM".equals(kind)) {
+                // In an encrypted chat a user's message always carries a
+                // ratchet header. One without it is unauthenticated, and only
+                // the server could have sent it: it is not shown as anyone's.
+                Log.p("Dropped a plaintext envelope in an encrypted chat from " + sender);
+                return;
+            }
             plain(id, conversationId, sender, kind, Codec.text(body), sentAt, expiresAt);
             return;
         }

@@ -128,8 +128,13 @@ public class Calls {
         this.turnTtl = turnTtl;
     }
 
+    /// Records a call and claims both lines for it. Nobody is rung yet: that
+    /// is [#ring(CallDto)], once this transaction has committed. The line
+    /// inserts are what decide a race between two callers, and they are only
+    /// written at the commit -- so the loser finds out after this returns, and
+    /// the endpoint records its call again with `busy` set.
     @Transactional(rollbackFor = IOException.class)
-    public CallDto start(String username, CallStartDto request) throws IOException {
+    public CallDto start(String username, CallStartDto request, boolean busy) throws IOException {
         if (request == null) {
             throw new ResponseStatusException(400, "Nothing to call");
         }
@@ -160,10 +165,7 @@ public class Calls {
         row.setCalleeDevice("");
         row.setVideo(request.video());
         row.setStartedAt(now);
-        // A callee who blocked the caller is never rung, and the caller is
-        // not told why: to them it looks like a call nobody answered.
-        boolean blocked = blocks.findById(Messages.blockId(callee, username)) != null;
-        if (!calls.liveOf(callee).isEmpty() || lines.findById(callee) != null) {
+        if (busy || !calls.liveOf(callee).isEmpty() || lines.findById(callee) != null) {
             row.setState(BUSY);
             row.setEndedAt(now);
         } else {
@@ -180,13 +182,22 @@ public class Calls {
             setup.setId(row.getId());
             setups.insert(setup);
         }
-        if (RINGING.equals(row.getState()) && !blocked) {
-            Map<String, Object> frame = frame(row, "ring");
-            live.toUsers(Arrays.asList(callee), frame);
-            pushes.ring(callee, row.getId(), uuid(row.getId()), name(username), username,
-                    row.isVideo());
-        }
         return toDto(row);
+    }
+
+    /// Rings the callee of a call [#start] committed. A callee who blocked the
+    /// caller is never rung, and the caller is not told why: to them it looks
+    /// like a call nobody answered.
+    @Transactional(readOnly = true)
+    public void ring(CallDto call) throws IOException {
+        CallRecord row = calls.findById(call.id());
+        if (row == null || !RINGING.equals(row.getState())
+                || blocks.findById(Messages.blockId(row.getCallee(), row.getCaller())) != null) {
+            return;
+        }
+        live.toUsers(Arrays.asList(row.getCallee()), frame(row, "ring"));
+        pushes.ring(row.getCallee(), row.getId(), uuid(row.getId()), name(row.getCaller()),
+                row.getCaller(), row.isVideo());
     }
 
     /// Passes a signal to the other side of the call, and moves the call on

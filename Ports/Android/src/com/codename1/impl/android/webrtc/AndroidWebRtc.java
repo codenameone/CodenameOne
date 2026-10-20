@@ -87,6 +87,8 @@ public class AndroidWebRtc implements WebRtcBridge {
         PeerConnection connection;
         boolean remoteSet;
         final List<IceCandidate> pending = new ArrayList<IceCandidate>();
+        /// Handles of the tracks the far side sent, dropped with the peer.
+        final List<Integer> remote = new ArrayList<Integer>();
     }
 
     /// A local camera track and what feeds it.
@@ -415,6 +417,13 @@ public class AndroidWebRtc implements WebRtcBridge {
         Peer p;
         synchronized (this) {
             p = peers.remove(Integer.valueOf(peer));
+            if (p != null) {
+                // The SDK disposes remote tracks with their connection, and
+                // releaseTrack leaves them alone, so their handles go here.
+                for (int iter = 0; iter < p.remote.size(); iter++) {
+                    tracks.remove(p.remote.get(iter));
+                }
+            }
         }
         if (p != null) {
             p.connection.dispose();
@@ -618,6 +627,12 @@ public class AndroidWebRtc implements WebRtcBridge {
             MediaStreamTrack t = transceiver.getReceiver().track();
             if (t != null) {
                 int trackHandle = register(t);
+                synchronized (AndroidWebRtc.this) {
+                    Peer p = peers.get(Integer.valueOf(handle));
+                    if (p != null) {
+                        p.remote.add(Integer.valueOf(trackHandle));
+                    }
+                }
                 WebRtc.remoteTrack(handle, trackHandle, t instanceof VideoTrack);
             }
         }

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.parley.call;
 
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.parley.Caller;
 import com.codenameone.examples.parley.api.CallApiServer;
@@ -38,7 +39,20 @@ public class CallEndpoint implements CallApiServer {
 
     @Override
     public CallDto start(CallStartDto call) throws Exception {
-        return calls.start(Caller.name(), call);
+        String username = Caller.name();
+        CallDto started;
+        try {
+            started = calls.start(username, call, false);
+        } catch (ResponseStatusException refused) {
+            throw refused;
+        } catch (RuntimeException lostTheLine) {
+            // Another caller claimed the callee's line in the same moment;
+            // the unique key on call_line rejected this commit. To the caller
+            // that is a busy line, not a server error.
+            return calls.start(username, call, true);
+        }
+        calls.ring(started);
+        return started;
     }
 
     @Override

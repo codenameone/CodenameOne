@@ -67,6 +67,12 @@ public final class ChatsForm implements Nav.Home, Store.Listener {
             }
             form.revalidate();
         });
+        // The console heads an admin's menu: it is what they open the app for.
+        UserDto user = Session.user();
+        if (user != null && user.admin()) {
+            form.getToolbar().addMaterialCommandToOverflowMenu("Admin console",
+                    FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, e -> Nav.switchTo(Nav.ADMIN));
+        }
         form.getToolbar().addMaterialCommandToOverflowMenu("New group", FontImage.MATERIAL_GROUP_ADD,
                 e -> NewChatForm.group(form));
         form.getToolbar().addMaterialCommandToOverflowMenu("Join with a link",
@@ -75,11 +81,6 @@ public final class ChatsForm implements Nav.Home, Store.Listener {
                 e -> CallsForm.show(form));
         form.getToolbar().addMaterialCommandToOverflowMenu("Settings", FontImage.MATERIAL_SETTINGS,
                 e -> SettingsForm.show(form));
-        UserDto user = Session.user();
-        if (user != null && user.admin()) {
-            form.getToolbar().addMaterialCommandToOverflowMenu("Admin console",
-                    FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, e -> Nav.switchTo(Nav.ADMIN));
-        }
 
         search = new TextField("", "Search", 20, TextField.ANY);
         search.setUIID("PlSearchField");

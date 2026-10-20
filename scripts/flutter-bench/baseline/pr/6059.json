@@ -1,0 +1,37 @@
+{
+ "pr": 6059,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13238731
+     },
+     "reason": "The JavaScript port ships the browser WebRTC bridge (HTML5WebRtc, browser_bridge.js and port.js handlers), wired like the Home and Nearby bridges",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 13320141
+    },
+    "install_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 108271844
+     },
+     "reason": "The JavaScript port ships the browser WebRTC bridge (HTML5WebRtc, browser_bridge.js and port.js handlers), wired like the Home and Nearby bridges",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 108817447
+    }
+   }
+  }
+ }
+}

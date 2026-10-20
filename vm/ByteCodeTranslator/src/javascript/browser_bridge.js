@@ -5246,6 +5246,17 @@
   }
   function rtcErr(e) { return '' + ((e && (e.message || e.name)) || e); }
   function rtcTrack(t) { var id = rtc.next++; rtc.tracks[id] = t; return id; }
+  // The far side's audio is heard through an element of its own: the video
+  // views are muted, and an audio-only call has no view at all.
+  function rtcPlay(p, track) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) { return; }
+    var a = doc.createElement('audio');
+    a.autoplay = true; a.style.display = 'none';
+    a.srcObject = new global.MediaStream([track]);
+    doc.body.appendChild(a); (p.audio = p.audio || []).push(a);
+    var play = a.play(); if (play && play.catch) { play.catch(function() {}); }
+  }
   function rtcAvailable() {
     return typeof global.RTCPeerConnection !== 'undefined' && typeof navigator !== 'undefined'
       && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -5271,7 +5282,9 @@
       pc.onicecandidate = function(e) { if (e.candidate) { rtcFire('ice', id,
         e.candidate.sdpMLineIndex || 0, e.candidate.sdpMid || '', e.candidate.candidate, null); } };
       pc.onconnectionstatechange = function() { rtcFire('state', id, 0, pc.connectionState, null, null); };
-      pc.ontrack = function(e) { var t = rtcTrack(e.track); rtcFire('track', id, t, e.track.kind, null, null); };
+      pc.ontrack = function(e) { var t = rtcTrack(e.track); (p.remote = p.remote || []).push(t);
+        if (e.track.kind === 'audio') { rtcPlay(p, e.track); }
+        rtcFire('track', id, t, e.track.kind, null, null); };
       return id;
     },
     media: function(r) {
@@ -5306,7 +5319,13 @@
       var c = { sdpMid: r.mid, sdpMLineIndex: r.index, candidate: r.cand };
       if (p.remoteSet) { p.pc.addIceCandidate(c).catch(function() {}); } else { p.early.push(c); }
       return 1; },
-    close: function(r) { var p = rtc.peers[r.peer]; if (p) { delete rtc.peers[r.peer]; p.pc.close(); } return 1; },
+    close: function(r) { var p = rtc.peers[r.peer]; if (p) { delete rtc.peers[r.peer]; p.pc.close();
+        // Remote tracks belong to their peer (release() leaves them alone),
+        // so they and the elements showing them go with it.
+        (p.remote || []).forEach(function(t) { var track = rtc.tracks[t]; delete rtc.tracks[t];
+          if (track) { (track.cn1Views || []).forEach(function(v) { v.srcObject = null; }); track.cn1Views = null; } });
+        (p.audio || []).forEach(function(a) { a.srcObject = null; if (a.parentNode) { a.parentNode.removeChild(a); } }); }
+      return 1; },
     enable: function(r) { var t = rtc.tracks[r.track]; if (t) { t.enabled = !!r.on; } return 1; },
     release: function(r) { var t = rtc.tracks[r.track]; if (t) { delete rtc.tracks[r.track]; t.stop(); } return 1; },
     switchCamera: function(r) { var track = r.track, t = rtc.tracks[track]; if (!t) { return 0; }

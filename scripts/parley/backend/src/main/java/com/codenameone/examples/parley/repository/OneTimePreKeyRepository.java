@@ -19,6 +19,9 @@
 package com.codenameone.examples.parley.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.OneTimePreKey;
 
@@ -31,4 +34,10 @@ public interface OneTimePreKeyRepository extends CrudRepository<OneTimePreKey, S
     long countByDeviceId(String deviceId);
 
     int deleteByDeviceId(String deviceId);
+
+    /// Deletes one key, answering how many rows went: 0 means another
+    /// request claimed it first.
+    @Modifying
+    @Query("delete from OneTimePreKey k where k.id = :id")
+    int claim(@Param("id") String id);
 }

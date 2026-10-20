@@ -433,11 +433,11 @@ public class Initializr extends Lifecycle {
     }
 
     /// What the project starts as: an empty app in Java or in Kotlin, or -- once the
-    /// plugin the Initializr generates against can build it -- the ride-hailing or
-    /// the food-delivery app with its server.
+    /// plugin the Initializr generates against can build it -- the ride-hailing,
+    /// the food-delivery or the messaging app with its server.
     private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
         boolean fullStack = GeneratorModel.isTemplateOffered(Template.WAYLINE);
-        Container selector = new Container(new GridLayout(fullStack ? 4 : 1, fullStack ? 1 : 2));
+        Container selector = new Container(new GridLayout(fullStack ? 5 : 1, fullStack ? 1 : 2));
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
@@ -445,7 +445,7 @@ public class Initializr extends Lifecycle {
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
                 ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
-                    "Food delivery app with its server, Java"}
+                    "Food delivery app with its server, Java", "Messaging app with its server, Java"}
                 : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];

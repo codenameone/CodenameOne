@@ -208,11 +208,18 @@ public class Devices {
     }
 
     private PreKeyBundleDto bundle(Device row) throws IOException {
-        OneTimePreKey one = preKeys.findFirstByDeviceIdOrderByKeyIdAsc(row.getId());
+        // Two senders asking at once can both read the same oldest key; the
+        // delete is what claims it, and only the one whose delete removed the
+        // row may hand it out. The other tries the next key.
         PreKeyDto oneTime = null;
-        if (one != null) {
-            oneTime = new PreKeyDto(one.getKeyId(), one.getPublicKey());
-            preKeys.deleteById(one.getId());
+        for (int attempt = 0; attempt < 8 && oneTime == null; attempt++) {
+            OneTimePreKey one = preKeys.findFirstByDeviceIdOrderByKeyIdAsc(row.getId());
+            if (one == null) {
+                break;
+            }
+            if (preKeys.claim(one.getId()) == 1) {
+                oneTime = new PreKeyDto(one.getKeyId(), one.getPublicKey());
+            }
         }
         return new PreKeyBundleDto(row.getUsername(), row.getId(), row.getIdentityKey(),
                 new SignedPreKeyDto(row.getSignedPreKeyId(), row.getSignedPreKey(),
