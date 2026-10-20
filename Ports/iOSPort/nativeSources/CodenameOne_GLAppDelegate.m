@@ -1286,6 +1286,7 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     NSString *pathSeparator = [NSString stringWithFormat:@"%C", (unichar)0x1f];
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
     NSMutableDictionary<NSString *, NSMutableDictionary *> *nodes = [NSMutableDictionary dictionary];
+    NSMutableDictionary<NSString *, NSString *> *rootHints = [NSMutableDictionary dictionary];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
         NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
@@ -1298,13 +1299,21 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         int rowFlags = (cols.count > 5) ? [cols[5] intValue] : 1;
         NSString *iconPng = (cols.count > 6) ? cols[6] : @"";
 
-        NSMutableDictionary *node = nodes[hint];
+        // A root is keyed by the menu it lands in, not the hint as written: hints the mapping
+        // treats as one menu ("File", "file") share it and its submenus. The separator prefix
+        // keeps a standard menu's key apart from any custom title.
+        BOOL rootAtStart = NO;
+        NSString *rootId = cn1MenuIdentifierForHint(hint, &rootAtStart);
+        NSString *rootKey = rootId == nil ? hint
+                : [NSString stringWithFormat:@"%@%@%d", pathSeparator, rootId, rootAtStart ? 1 : 0];
+        NSMutableDictionary *node = nodes[rootKey];
         if (node == nil) {
             node = cn1NewMenuNode(hint);
-            nodes[hint] = node;
-            [groupOrder addObject:hint];
+            nodes[rootKey] = node;
+            rootHints[rootKey] = hint;
+            [groupOrder addObject:rootKey];
         }
-        NSString *key = hint;
+        NSString *key = rootKey;
         for (NSUInteger p = 1; p < path.count; p++) {
             key = [key stringByAppendingFormat:@"%@%@", pathSeparator, path[p]];
             NSMutableDictionary *sub = nodes[key];
@@ -1363,8 +1372,9 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         [[node[@"sections"] lastObject] addObject:cmd];
     }
     NSUInteger customMenuCounter = 0;
-    for (NSString *hint in groupOrder) {
-        NSArray<UIMenuElement *> *bucket = cn1MenuNodeChildren(nodes[hint]);
+    for (NSString *rootKey in groupOrder) {
+        NSString *hint = rootHints[rootKey];
+        NSArray<UIMenuElement *> *bucket = cn1MenuNodeChildren(nodes[rootKey]);
         if (bucket.count == 0) {
             continue;
         }

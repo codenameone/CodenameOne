@@ -166,7 +166,10 @@ static void appendAccelerator(char* label, size_t cap, int keyChar, int modifier
 }
 
 #define CN1_MENU_MAX_POPUPS 64
-#define CN1_MENU_PATH_CAP 256
+/* A row whose path does not fit is dropped rather than truncated: a truncated path names a
+ * different menu, and the command would sit under a wrong title. 1 KB of UTF-8 is far past any
+ * menu a person can read. */
+#define CN1_MENU_PATH_CAP 1024
 
 /* Finds or creates the popup for a menu path, so two commands with the same path land in
  * one menu rather than two menus with the same name. The key is the whole path, the title
@@ -215,15 +218,16 @@ static HMENU popupForPath(HMENU bar, const char* path, HMENU* popups,
     for (;;) {
         size_t n = 0;
         while (*p != '\0' && *p != 0x1f) {
-            if (n + 1 < sizeof(segment)) {
-                segment[n++] = *p;
+            if (n + 1 >= sizeof(segment)) {
+                return NULL;
             }
+            segment[n++] = *p;
             p++;
         }
         segment[n] = '\0';
         const char* title = first ? titleForHint(segment) : segment;
         if (keyLen + strlen(title) + 2 >= sizeof(key)) {
-            return parent == bar ? NULL : parent;
+            return NULL;
         }
         if (!first) {
             key[keyLen++] = 0x1f;
@@ -238,6 +242,15 @@ static HMENU popupForPath(HMENU bar, const char* path, HMENU* popups,
         p++;
         first = 0;
     }
+}
+
+/* The length of the field at cursor, up to its delimiter. */
+static size_t fieldLength(const char* cursor) {
+    size_t n = 0;
+    while (cursor[n] != '\0' && cursor[n] != '\t' && cursor[n] != '\n') {
+        n++;
+    }
+    return n;
 }
 
 /* Reads one tab-delimited field into out, advancing *cursor past the delimiter. Returns 0
@@ -282,6 +295,7 @@ static void rebuildMenu(const char* spec) {
                 char idField[24];
                 char flagField[16];
                 char iconField[4];
+                int pathFits = fieldLength(cursor) < sizeof(path);
                 nextField(&cursor, path, sizeof(path));
                 nextField(&cursor, label, sizeof(label));
                 nextField(&cursor, keyField, sizeof(keyField));
@@ -295,7 +309,7 @@ static void rebuildMenu(const char* spec) {
                     cursor++;
                 }
                 int flags = flagField[0] == '\0' ? 1 : atoi(flagField);
-                HMENU popup = popupForPath(bar, path, popups, keys, &popupCount);
+                HMENU popup = pathFits ? popupForPath(bar, path, popups, keys, &popupCount) : NULL;
                 if (popup == NULL) {
                     continue;
                 }

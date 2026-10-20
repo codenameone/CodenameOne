@@ -1212,7 +1212,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
 
 #define CN1_MENU_MAX_ITEMS 512
 #define CN1_MENU_MAX_POPUPS 64
-#define CN1_MENU_PATH_CAP 256
+/* A row whose path does not fit is dropped rather than truncated: a truncated path names a
+ * different menu, and the command would sit under a wrong title. 1 KB of UTF-8 is far past any
+ * menu a person can read. */
+#define CN1_MENU_PATH_CAP 1024
 
 static int cn1MenuCommandIds[CN1_MENU_MAX_ITEMS];
 static int cn1MenuItemCount = 0;
@@ -1340,6 +1343,11 @@ static void cn1MenuRebuild(void* arg) {
         char idField[24];
         char flagField[16];
         char iconField[4];
+        size_t pathLen = 0;
+        while (cursor[pathLen] != '\0' && cursor[pathLen] != '\t' && cursor[pathLen] != '\n') {
+            pathLen++;
+        }
+        int pathFits = pathLen < sizeof(path);
         cn1MenuNextField(&cursor, path, sizeof(path));
         cn1MenuNextField(&cursor, label, sizeof(label));
         cn1MenuNextField(&cursor, keyField, sizeof(keyField));
@@ -1357,6 +1365,9 @@ static void cn1MenuRebuild(void* arg) {
          * submenu appended on its first row sits at its place among the parent's items. */
         GtkWidget* parent = bar;
         GtkWidget* popup = 0;
+        if (!pathFits) {
+            continue;
+        }
         char key[CN1_MENU_PATH_CAP];
         size_t keyLen = 0;
         const char* p = path;
@@ -1364,16 +1375,16 @@ static void cn1MenuRebuild(void* arg) {
         for (;;) {
             char segment[CN1_MENU_PATH_CAP];
             size_t n = 0;
-            while (*p != '\0' && *p != 0x1f) {
-                if (n + 1 < sizeof(segment)) {
-                    segment[n++] = *p;
-                }
+            while (*p != '\0' && *p != 0x1f && n + 1 < sizeof(segment)) {
+                segment[n++] = *p;
                 p++;
             }
             segment[n] = '\0';
             const char* title = first ? cn1MenuTitleForHint(segment) : segment;
             size_t tl = strlen(title);
-            if (keyLen + tl + 2 >= sizeof(key)) {
+            if ((*p != '\0' && *p != 0x1f) || keyLen + tl + 2 >= sizeof(key)) {
+                /* Does not fit: no menu, rather than the parent standing in for it. */
+                popup = 0;
                 break;
             }
             if (!first) {
@@ -1391,6 +1402,7 @@ static void cn1MenuRebuild(void* arg) {
             }
             if (popup == 0) {
                 if (popupCount >= CN1_MENU_MAX_POPUPS) {
+                    popup = 0;
                     break;
                 }
                 popup = gtk_menu_new();

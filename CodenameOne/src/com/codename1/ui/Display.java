@@ -5133,8 +5133,8 @@ public final class Display extends CN1Constants {
             return;
         }
         Window[] windows = Desktop.getInstance().getWindows();
-        for (int i = 0; i < windows.length; i++) {
-            windows[i].republishNativeMenu();
+        for (Window w : windows) {
+            w.republishNativeMenu();
         }
         Form f = getCurrent();
         if (f == null || !f.isInitialized()) {
@@ -5148,8 +5148,16 @@ public final class Display extends CN1Constants {
 
     /// Schedules one `#refreshNativeMenu()` for the next EDT cycle, so a batch of state changes
     /// rebuilds the native menu once rather than once per change.
-    static void refreshNativeMenuIfPublished() {
+    ///
+    /// #### Parameters
+    ///
+    /// - `changed`: the command that changed; nothing is scheduled unless a native menu shows it,
+    /// so a command that only backs a button never rebuilds a menu
+    static void refreshNativeMenuIfPublished(Command changed) {
         if (impl == null || nativeMenuRefreshPending || !impl.isNativeCommandsSupported()) {
+            return;
+        }
+        if (!isOnPublishedNativeMenu(changed)) {
             return;
         }
         nativeMenuRefreshPending = true;
@@ -5162,10 +5170,21 @@ public final class Display extends CN1Constants {
         });
     }
 
+    private static boolean isOnPublishedNativeMenu(Command c) {
+        for (java.util.List surface : getInstance().getPublishedNativeMenuSurfaces()) {
+            for (Object o : surface) {
+                if (o == c) { //NOPMD CompareObjectsWithEquals
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /// The command lists of every published native menu surface: the current form's and each
     /// open window's.
     java.util.List<java.util.List> getPublishedNativeMenuSurfaces() {
-        java.util.ArrayList<java.util.List> out = new java.util.ArrayList<java.util.List>();
+        ArrayList<java.util.List> out = new ArrayList<java.util.List>();
         if (impl == null) {
             return out;
         }
@@ -5175,8 +5194,8 @@ public final class Display extends CN1Constants {
             out.add(v);
         }
         Window[] windows = Desktop.getInstance().getWindows();
-        for (int i = 0; i < windows.length; i++) {
-            out.add(windows[i].publishedNativeMenuCommands());
+        for (Window w : windows) {
+            out.add(w.publishedNativeMenuCommands());
         }
         return out;
     }

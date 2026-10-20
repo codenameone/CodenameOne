@@ -343,7 +343,7 @@ public class Command implements ActionListener<ActionEvent> {
     public void setEnabled(boolean enabled) {
         if (this.enabled != enabled) {
             this.enabled = enabled;
-            Display.refreshNativeMenuIfPublished();
+            Display.refreshNativeMenuIfPublished(this);
         }
     }
 
@@ -538,7 +538,7 @@ public class Command implements ActionListener<ActionEvent> {
             stampDesktopCheck();
             clearRadioSiblings();
         }
-        Display.refreshNativeMenuIfPublished();
+        Display.refreshNativeMenuIfPublished(this);
         return this;
     }
 
@@ -584,7 +584,7 @@ public class Command implements ActionListener<ActionEvent> {
             stampDesktopCheck();
             clearRadioSiblings();
         }
-        Display.refreshNativeMenuIfPublished();
+        Display.refreshNativeMenuIfPublished(this);
         return this;
     }
 
@@ -619,15 +619,12 @@ public class Command implements ActionListener<ActionEvent> {
         if (group == null) {
             return;
         }
-        java.util.List<java.util.List> surfaces = Display.getInstance().getPublishedNativeMenuSurfaces();
-        for (int s = 0; s < surfaces.size(); s++) {
-            java.util.List members = surfaces.get(s);
+        for (java.util.List members : Display.getInstance().getPublishedNativeMenuSurfaces()) {
             if (!members.contains(this)) {
                 // Same group name on another surface is another group.
                 continue;
             }
-            for (int i = 0; i < members.size(); i++) {
-                Object o = members.get(i);
+            for (Object o : members) {
                 if (!(o instanceof Command)) {
                     continue;
                 }
@@ -648,9 +645,8 @@ public class Command implements ActionListener<ActionEvent> {
     /// - `commands`: the commands one surface publishes; entries that are not commands are
     /// ignored
     static void settleRadioGroups(java.util.List commands) {
-        java.util.HashMap<String, Command> winners = null;
-        for (int i = 0; i < commands.size(); i++) {
-            Object o = commands.get(i);
+        HashMap<String, Command> winners = null;
+        for (Object o : commands) {
             if (!(o instanceof Command)) {
                 continue;
             }
@@ -660,7 +656,7 @@ public class Command implements ActionListener<ActionEvent> {
                 continue;
             }
             if (winners == null) {
-                winners = new java.util.HashMap<String, Command>();
+                winners = new HashMap<String, Command>();
             }
             Command w = winners.get(group);
             if (w == null) {

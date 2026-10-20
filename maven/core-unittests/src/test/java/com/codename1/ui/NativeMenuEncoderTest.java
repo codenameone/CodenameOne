@@ -68,6 +68,7 @@ class NativeMenuEncoderTest extends UITestBase {
         assertArrayEquals(new String[]{"File", "Open Recent"}, NativeMenuEncoder.parsePath("File/Open Recent"));
         assertArrayEquals(new String[]{"Tools", "A/B"}, NativeMenuEncoder.parsePath("Tools/A//B"));
         assertArrayEquals(new String[]{"File", "Sub"}, NativeMenuEncoder.parsePath("/File/Sub/"));
+        assertArrayEquals(new String[]{" File"}, NativeMenuEncoder.parsePath(" File"), "a hint is taken literally");
     }
 
     @FormTest
@@ -232,5 +233,21 @@ class NativeMenuEncoderTest extends UITestBase {
         Command elsewhere = new Command("Elsewhere").setDesktopRadioGroup("g");
         elsewhere.setDesktopChecked(true);
         assertTrue(visible.isDesktopChecked(), "a command not on the shown form is another group");
+    }
+
+    @FormTest
+    void aCommandOutsideEveryMenuNeverRebuildsOne() {
+        implementation.setDesktop(true);
+        implementation.setDesktopTitleBarMode("native");
+        Toolbar.setGlobalToolbar(true);
+        Form f = new Form("Doc");
+        f.addCommand(new Command("Sidebar").setDesktopMenu("View"));
+        f.show();
+        DisplayTest.flushEdt();
+        implementation.setNativeCommandsForTest(null);
+        Command buttonOnly = new Command("Button only");
+        buttonOnly.setEnabled(false);
+        DisplayTest.flushEdt();
+        assertNull(implementation.getLastNativeCommands(), "an unpublished command rebuilt the menu");
     }
 }

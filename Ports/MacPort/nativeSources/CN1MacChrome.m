@@ -335,7 +335,9 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         // Rows arrive depth first, so a submenu is created by its first row and lands at
         // its place among the parent's items. Its container item carries the shared
         // target too, which is how cn1RemovePreviousCommands takes the whole subtree.
-        NSString *key = hint;
+        // Keyed by the physical menu, not the hint as written: hints the mapping treats as
+        // one menu ("File", "file", the application-menu aliases) share their submenus.
+        NSString *key = [NSString stringWithFormat:@"%p%d", (void *)target, placeAtStart ? 1 : 0];
         for (NSUInteger p = 1; p < path.count; p++) {
             key = [key stringByAppendingFormat:@"%@%@", pathSeparator, path[p]];
             NSMenu *sub = submenus[key];

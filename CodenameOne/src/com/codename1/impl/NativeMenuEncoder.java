@@ -23,8 +23,11 @@
 package com.codename1.impl;
 
 import com.codename1.ui.Command;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.Base64;
@@ -173,8 +176,7 @@ public final class NativeMenuEncoder {
         }
 
         Node child(String seg, int group) {
-            for (int i = 0; i < children.size(); i++) {
-                Object o = children.get(i);
+            for (Object o : children) {
                 if (o instanceof Node && ((Node) o).segment.equals(seg)) {
                     return (Node) o;
                 }
@@ -242,9 +244,9 @@ public final class NativeMenuEncoder {
             String[] path = parsePath(c.getDesktopMenu());
             int group = c.getDesktopMenuGroup();
             Node node = null;
-            for (int r = 0; r < roots.size(); r++) {
-                if (roots.get(r).segment.equals(path[0])) {
-                    node = roots.get(r);
+            for (Node root : roots) {
+                if (root.segment.equals(path[0])) {
+                    node = root;
                     break;
                 }
             }
@@ -263,8 +265,7 @@ public final class NativeMenuEncoder {
         // each batch in its own order. Putting the batches back in one insertion order would need
         // each port's mapping in core, and interleaving two hints in one menu is unusual: use one
         // hint, with groups, to control the order of a menu exactly.
-        for (int r = 0; r < roots.size(); r++) {
-            Node root = roots.get(r);
+        for (Node root : roots) {
             e.emit(root, new String[]{root.segment});
         }
         return e;
@@ -323,8 +324,7 @@ public final class NativeMenuEncoder {
         boolean anyItem = false;
         boolean pendingSeparator = false;
         int lastGroup = 0;
-        for (int i = 0; i < sorted.size(); i++) {
-            Object o = sorted.get(i);
+        for (Object o : sorted) {
             if (isSeparator(o)) {
                 pendingSeparator = anyItem;
                 continue;
@@ -393,7 +393,7 @@ public final class NativeMenuEncoder {
                         i++;
                         continue;
                     }
-                    String seg = clean(cur.toString().trim());
+                    String seg = clean(cur.toString());
                     if (seg.length() > 0) {
                         out.add(seg);
                     }
@@ -402,7 +402,7 @@ public final class NativeMenuEncoder {
                     cur.append(ch);
                 }
             }
-            String seg = clean(cur.toString().trim());
+            String seg = clean(cur.toString());
             if (seg.length() > 0) {
                 out.add(seg);
             }
@@ -497,8 +497,17 @@ public final class NativeMenuEncoder {
         }
         Image img = c.getIcon();
         if (img == null && c.getMaterialIcon() != 0) {
-            img = FontImage.createMaterial(c.getMaterialIcon(),
-                    UIManager.getInstance().getComponentStyle("Command"), 4);
+            Style s = UIManager.getInstance().getComponentStyle("Command");
+            Font font = c.getIconFont();
+            if (font == null) {
+                img = FontImage.createMaterial(c.getMaterialIcon(), s, 4);
+            } else {
+                // A glyph of the command's own icon font, the way Button draws it.
+                if (font.isTTFNativeFont()) {
+                    font = font.derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN);
+                }
+                img = FontImage.create("" + c.getMaterialIcon(), s, font);
+            }
         }
         return img;
     }
