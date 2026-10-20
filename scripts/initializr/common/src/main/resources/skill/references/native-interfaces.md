@@ -66,9 +66,10 @@ The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generat
 Before you write any platform code, run the target you care about so you can see the stubs in the generated build:
 
 ```bash
-# iOS — produces an Xcode project under ios/target/codenameone/ios/dist/. Open it and
-# confirm the stub files appear and that the project builds (no missing-symbol errors).
-mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+# iOS — produces an Xcode project under ios/target/codenameone/ios/dist/ without
+# launching Xcode. Confirm the stub files appear and that the project builds
+# (xcodebuild; no missing-symbol errors).
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 
 # Android — cloud builds emit logs that show the stubs being compiled into the APK.
 mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
@@ -80,7 +81,7 @@ mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javasc
 mvn -pl common cn1:run
 
 # Gradle equivalents
-./gradlew buildIosXcodeProject
+./gradlew buildIosXcodeProject -Pcodename1.open=false
 ./gradlew buildAndroid -Pautomated=true
 ./gradlew buildJavascriptLocal
 ./gradlew run

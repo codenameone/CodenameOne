@@ -57,7 +57,7 @@ final class ProjectSupport {
         // already pass to keep Xcode or Android Studio shut works here too.
         ext.getOpenGeneratedProjects().convention(project.getProviders().gradleProperty("codename1.open")
                 .orElse(project.getProviders().gradleProperty("open"))
-                .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
+                .map(Boolean::parseBoolean));
 
         // A com.codenameone module declared without a version gets the framework's,
         // the job ${cn1.version} does in the archetype's pom. Settings' add-on
