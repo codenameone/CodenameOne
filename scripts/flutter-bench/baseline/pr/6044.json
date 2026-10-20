@@ -47,17 +47,17 @@
      "from": {
       "value": 116342496
      },
-     "reason": "The Java API additions change the translated runtime's code size",
+     "reason": "java-api-additions: java.time and CompletableFuture review fixes; linux download size moved by 395 bytes",
      "runs": 1,
-     "value": 116497568
+     "value": 116501664
     },
     "wire_bytes": {
      "from": {
       "value": 84685068
      },
-     "reason": "2-byte zip size noise; this PR touches no Flutter-side code",
+     "reason": "java-api-additions: java.time and CompletableFuture review fixes; linux download size moved by 395 bytes",
      "runs": 1,
-     "value": 84680041
+     "value": 84679646
     }
    }
   }

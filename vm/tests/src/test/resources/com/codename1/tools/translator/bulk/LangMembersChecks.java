@@ -163,7 +163,7 @@ public final class LangMembersChecks {
                 Bulk.p("writer", "npe");
             }
         });
-        Bulk.check("Lang.anEmptyChoiceIsSkipped", () -> {
+        Bulk.check("Lang.anEmptyChoiceRepeatsTheLastLimit", () -> {
             java.text.ChoiceFormat f = new java.text.ChoiceFormat("0#a||1#b");
             Bulk.p("zero", f.format(0));
             Bulk.p("one", f.format(1));
@@ -476,6 +476,40 @@ public final class LangMembersChecks {
             src.complete(1);
             Bulk.p("ran", String.valueOf(ran[0]));
             Bulk.p("dep", String.valueOf(dep.join()));
+        });
+        Bulk.check("Lang.extremeInstantsRoundTrip", () -> {
+            Bulk.p("min", java.time.Instant.parse(java.time.Instant.MIN.toString()).equals(java.time.Instant.MIN));
+            Bulk.p("max", java.time.Instant.parse(java.time.Instant.MAX.toString()).equals(java.time.Instant.MAX));
+            Bulk.p("far", java.time.Instant.parse("+12345-06-07T08:09:10Z").getEpochSecond());
+            Bulk.p("farBack", java.time.Instant.parse("-12345-06-07T08:09:10Z").getEpochSecond());
+        });
+        Bulk.check("Lang.aggregateTimeFieldsConflictWithComponents", () -> {
+            for (String[] c : new String[][]{{"H N", "1 0"}, {"H N", "1 3600000000000"},
+                    {"H:m A", "1:30 5400000"}, {"m A", "31 5400000"}, {"N", "5400000000123"}}) {
+                try {
+                    Bulk.p(c[0] + "|" + c[1], java.time.LocalTime.parse(c[1],
+                            java.time.format.DateTimeFormatter.ofPattern(c[0])).toString());
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(c[0] + "|" + c[1], "rejected");
+                }
+            }
+        });
+        Bulk.check("Lang.aMonthFormatsAlone", () -> {
+            Bulk.p("MMM", java.time.format.DateTimeFormatter.ofPattern("MMM").format(java.time.Month.MARCH));
+            Bulk.p("MM", java.time.format.DateTimeFormatter.ofPattern("MM").format(java.time.Month.MARCH));
+        });
+        Bulk.check("Lang.aCompletedCombineSkipsItsAction", () -> {
+            java.util.concurrent.CompletableFuture<String> a = new java.util.concurrent.CompletableFuture<>();
+            java.util.concurrent.CompletableFuture<String> b = new java.util.concurrent.CompletableFuture<>();
+            final int[] runs = new int[1];
+            java.util.concurrent.CompletableFuture<String> both = a.thenCombine(b, (x, y) -> { runs[0]++; return x + y; });
+            java.util.concurrent.CompletableFuture<String> either = a.applyToEither(b, x -> { runs[0] += 10; return x; });
+            both.complete("hand");
+            either.cancel(false);
+            a.complete("a");
+            b.complete("b");
+            Bulk.p("runs", runs[0]);
+            Bulk.p("both", both.join());
         });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];

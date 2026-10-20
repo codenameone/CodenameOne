@@ -952,6 +952,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 if (remaining.decrementAndGet() != 0) {
                     return;
                 }
+                if (stage.isDone()) {
+                    // Completed or cancelled by hand first, as in then():
+                    // the action is skipped once its stage holds a result.
+                    return;
+                }
                 final Object a = result.get();
                 final Object b = second.result.get();
                 if (a instanceof Failure) {
@@ -965,6 +970,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 Runnable body = new Runnable() {
                     @Override
                     public void run() {
+                        if (stage.isDone()) {
+                            return;
+                        }
                         try {
                             stage.complete(fn.apply(CompletableFuture.<T>value(a), CompletableFuture.<U>value(b)));
                         } catch (Throwable t) {
@@ -1081,6 +1089,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 if (!taken.compareAndSet(false, true)) {
                     return;
                 }
+                if (stage.isDone()) {
+                    // Completed or cancelled by hand first, as in then():
+                    // the action is skipped once its stage holds a result.
+                    return;
+                }
                 Object mine = self.result.get();
                 final Object outcome = mine != null ? mine : second.result.get();
                 if (outcome instanceof Failure) {
@@ -1090,6 +1103,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 Runnable body = new Runnable() {
                     @Override
                     public void run() {
+                        if (stage.isDone()) {
+                            return;
+                        }
                         try {
                             stage.complete(fn.apply(CompletableFuture.<T>value(outcome)));
                         } catch (Throwable t) {

@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -332,7 +333,7 @@ public final class DateTimeFormatter {
             }
             case 'M':
             case 'L': {
-                int month = f.date("MonthOfYear").getMonthValue();
+                int month = f.monthValue();
                 if (count >= 3) {
                     text(out, count, MONTHS[month - 1], null);
                 } else {
@@ -789,10 +790,20 @@ public final class DateTimeFormatter {
                 // 23:59:60 is one; any other :60 fails in LocalTime.of.
                 second = 59;
             }
-            LocalDate date = LocalDate.of((int) p.values[F_YEAR], (int) p.values[F_MONTH], (int) p.values[F_DAY])
+            // Instant.MIN and MAX print years one past LocalDate's range, so
+            // whole 10000-year cycles are taken off the year and added back
+            // as seconds, the way the JDK's instant parser does it.
+            long year = p.values[F_YEAR];
+            long cycles = year / 10000;
+            LocalDate date = LocalDate.of((int) (year % 10000), (int) p.values[F_MONTH], (int) p.values[F_DAY])
                     .plusDays(dayAdjust);
             LocalTime time = LocalTime.of(hour, (int) p.values[F_MINUTE], second, (int) nano);
-            return LocalDateTime.of(date, time).toInstant(p.offset);
+            Instant instant = LocalDateTime.of(date, time).toInstant(p.offset);
+            if (cycles == 0) {
+                return instant;
+            }
+            return Instant.ofEpochSecond(instant.getEpochSecond() + cycles * SECONDS_PER_10000_YEARS,
+                    instant.getNano());
         } catch (DateTimeException ex) {
             throw new DateTimeParseException("Text '" + p.text + "' could not be parsed: " + ex.getMessage(), p.text,
                     0, ex);
@@ -1382,13 +1393,11 @@ public final class DateTimeFormatter {
                     hour = conflict(hour, values[F_AMPM] * 12 + values[F_HOUR_AMPM]);
                 }
             }
+            LocalTime aggregate = aggregateTime(hour);
+            if (aggregate != null) {
+                return aggregate;
+            }
             if (hour == null) {
-                if (present[F_NANO_OF_DAY]) {
-                    return LocalTime.ofNanoOfDay(values[F_NANO_OF_DAY]);
-                }
-                if (present[F_MILLI_OF_DAY]) {
-                    return LocalTime.ofNanoOfDay(values[F_MILLI_OF_DAY] * 1000000L);
-                }
                 return null;
             }
             if (present[F_AMPM] && hour.longValue() / 12 != values[F_AMPM]) {
@@ -1411,6 +1420,47 @@ public final class DateTimeFormatter {
             }
             return LocalTime.of((int) hour.longValue(), minute ? (int) values[F_MINUTE] : 0,
                     second ? (int) values[F_SECOND] : 0, nano ? (int) values[F_NANO] : 0);
+        }
+
+        /// The time a nano-of-day (`N`) or milli-of-day (`A`) field names, held
+        /// against every component field parsed beside it: the JDK resolves an
+        /// aggregate into hour, minute, second and fraction and rejects any
+        /// that disagree, so `H N` reading "1 0" is an error, not 01:00.
+        private LocalTime aggregateTime(Long hour) {
+            if (!present[F_NANO_OF_DAY] && !present[F_MILLI_OF_DAY]) {
+                return null;
+            }
+            LocalTime t;
+            if (present[F_NANO_OF_DAY]) {
+                t = LocalTime.ofNanoOfDay(values[F_NANO_OF_DAY]);
+                if (present[F_MILLI_OF_DAY] && values[F_NANO_OF_DAY] / 1000000L != values[F_MILLI_OF_DAY]) {
+                    throw new DateTimeException("Conflict found: MilliOfDay " + values[F_MILLI_OF_DAY]
+                            + " differs from NanoOfDay " + values[F_NANO_OF_DAY]);
+                }
+            } else {
+                t = LocalTime.ofNanoOfDay(values[F_MILLI_OF_DAY] * 1000000L);
+            }
+            if (hour != null && hour.longValue() != t.getHour()) {
+                throw new DateTimeException("Conflict found: HourOfDay " + hour + " differs from HourOfDay "
+                        + t.getHour());
+            }
+            if (present[F_MINUTE] && values[F_MINUTE] != t.getMinute()) {
+                throw new DateTimeException("Conflict found: MinuteOfHour " + values[F_MINUTE]
+                        + " differs from MinuteOfHour " + t.getMinute());
+            }
+            if (present[F_SECOND] && values[F_SECOND] != t.getSecond()) {
+                throw new DateTimeException("Conflict found: SecondOfMinute " + values[F_SECOND]
+                        + " differs from SecondOfMinute " + t.getSecond());
+            }
+            if (present[F_NANO]) {
+                if (present[F_NANO_OF_DAY] ? values[F_NANO] != t.getNano()
+                        : values[F_NANO] / 1000000L != t.getNano() / 1000000) {
+                    throw new DateTimeException("Conflict found: NanoOfSecond " + values[F_NANO]
+                            + " differs from NanoOfSecond " + t.getNano());
+                }
+                t = t.withNano((int) values[F_NANO]);
+            }
+            return t;
         }
 
         private static Long conflict(Long hour, long value) {
@@ -1454,6 +1504,7 @@ public final class DateTimeFormatter {
         Long epochSecond;
         int nano;
         DayOfWeek dayOfWeek;
+        Month month;
 
         static Fields of(TemporalAccessor temporal, ZoneId override) {
             Fields f = new Fields();
@@ -1501,6 +1552,8 @@ public final class DateTimeFormatter {
                 f.nano = i.getNano();
             } else if (temporal instanceof DayOfWeek) {
                 f.dayOfWeek = (DayOfWeek) temporal;
+            } else if (temporal instanceof Month) {
+                f.month = (Month) temporal;
             } else if (temporal instanceof ZoneOffset) {
                 f.offsetValue = (ZoneOffset) temporal;
             }
@@ -1529,6 +1582,13 @@ public final class DateTimeFormatter {
                 throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
             }
             return offsetValue;
+        }
+
+        int monthValue() {
+            if (month != null) {
+                return month.getValue();
+            }
+            return date("MonthOfYear").getMonthValue();
         }
 
         DayOfWeek dayOfWeek() {
