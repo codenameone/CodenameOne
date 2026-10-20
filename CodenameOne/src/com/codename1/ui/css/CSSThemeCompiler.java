@@ -163,7 +163,7 @@ public class CSSThemeCompiler {
                     }
                     declaredThisCompile.add("@" + (n.startsWith("--") ? n.substring(2) : n));
                 } else if (declaration.name.startsWith("--")) {
-                    declaredThisCompile.add("@" + declaration.name.substring(2));
+                    declaredThisCompile.add("@" + customPropertyName(declaration.name));
                 }
             }
         }
@@ -477,7 +477,10 @@ public class CSSThemeCompiler {
                 if (!legacy && declaration.snapshot == null && !declaration.dropped) {
                     String target = aliasTarget(value);
                     String targetKind = target == null ? null : deferred.get(target);
+                    // Text when the target is, through aliases or a redefinition of an exported
+                    // constant, or when an undefined target's fallback is a quoted string.
                     declaration.snapshotKind = DEFERRED_LITERAL.equals(targetKind) || DEFERRED_TEXT.equals(targetKind)
+                            || aliasesQuotedText(value) || quotedFallbackApplies(value)
                             ? DEFERRED_LITERAL : DEFERRED_VAR;
                     declaration.snapshot = resolveAtDeclaration(theme, key, value, deferred);
                     declaration.dropped = declaration.snapshot == null;
@@ -619,6 +622,29 @@ public class CSSThemeCompiler {
         return i < token.length() && (token.charAt(i) >= '0' && token.charAt(i) <= '9'
                 || token.charAt(i) == '.' && i + 1 < token.length()
                 && token.charAt(i + 1) >= '0' && token.charAt(i + 1) <= '9');
+    }
+
+    /// `--a\62 c` as the name `abc`, decoded as the build-time parser reads it.
+    private static String customPropertyName(String property) {
+        String decoded = decodeIdentifier(property);
+        return (decoded != null ? decoded : property).substring(2);
+    }
+
+    /// Whether `value` is `var(--x, "text")` with `x` not declared so far: the fallback is then
+    /// the value, and it keeps its string type.
+    private boolean quotedFallbackApplies(String value) {
+        String v = value.trim();
+        String target = aliasTarget(v);
+        if (target == null || cssVars.get(target) != null) {
+            return false;
+        }
+        String inner = v.substring("var(".length(), v.length() - 1);
+        int comma = topLevelComma(inner);
+        if (comma < 0) {
+            return false;
+        }
+        String fallback = inner.substring(comma + 1).trim();
+        return !unquote(fallback).equals(fallback);
     }
 
     /// Whether `value` is an alias that ends, through every intermediate alias, at a quoted
@@ -841,12 +867,18 @@ public class CSSThemeCompiler {
         if (!property.startsWith("--")) {
             return false;
         }
-        String key = "@" + property.substring(2);
+        String key = "@" + customPropertyName(property);
         String raw = value.trim();
         String unquoted = unquote(raw);
         cssVars.put(key, raw);
         if (exportedConstants.contains(key)) {
-            // Only the variable changes; the constant #Constants exported keeps its value.
+            // Only the variable changes; the constant #Constants exported keeps its value. Its
+            // token type changes with it, so a later alias of a now quoted `--x` is text.
+            if (!raw.equals(unquoted)) {
+                literalTokens.put(key, raw);
+            } else {
+                literalTokens.remove(key);
+            }
             return true;
         }
         plainConstants.remove(key);
