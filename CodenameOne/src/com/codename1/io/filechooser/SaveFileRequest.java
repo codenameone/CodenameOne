@@ -43,8 +43,8 @@ import java.io.OutputStream;
 ///         .addFilter(new FileTypeFilter("PDF").extensions("pdf").mimeTypes("application/pdf"))
 ///         .addFilter(new FileTypeFilter("Plain text").extensions("txt").mimeTypes("text/plain"))
 ///         .addOption(FileDialogOption.checkbox("charts", "Include charts", true))
-///         .content((result, out) -> report.export(result.getSelectedFilter(),
-///                 "true".equals(result.getOptionValue("charts")), out)),
+///         .content((result, out) -> out.write(("Charts: " + result.getOptionValue("charts"))
+///                 .getBytes("UTF-8"))),
 ///     result -> {
 ///         if (result.getError() != null) {
 ///             ToastBar.showErrorMessage("Export failed");

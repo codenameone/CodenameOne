@@ -6594,8 +6594,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void showOpenDialog(final com.codename1.io.filechooser.OpenFileRequest request,
                                final com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
         StringBuilder accept = new StringBuilder();
+        boolean allFiles = false;
         for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
             for (String e : f.getExtensions()) {
+                // "*" is the all-files extension, but ".*" in accept names one
+                // literal extension; a filter that takes everything means the
+                // picker must not be narrowed at all.
+                if ("*".equals(e)) {
+                    allFiles = true;
+                    continue;
+                }
                 accept.append(accept.length() == 0 ? "." : ",.").append(e);
             }
             for (String m : f.getMimeTypes()) {
@@ -6614,7 +6622,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                         callback.onSucess(new com.codename1.io.filechooser.FileDialogResult(request, paths, -1, null));
                     }
-                }, accept.length() == 0 ? null : accept.toString(), null);
+                }, allFiles || accept.length() == 0 ? null : accept.toString(), null);
         chooser.setMultiple(request.isMultiSelect());
         chooser.showDialog();
     }

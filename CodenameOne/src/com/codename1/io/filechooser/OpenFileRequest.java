@@ -31,11 +31,11 @@ package com.codename1.io.filechooser;
 ///         .title("Import photos")
 ///         .multiSelect(true)
 ///         .addFilter(new FileTypeFilter("Images").extensions("png", "jpg").mimeTypes("image/*"))
-///         .preview(path -> new ScaleImageLabel(loadThumbnail(path))),
+///         .preview(path -> new Label(path)),
 ///     result -> {
 ///         if (!result.isCancelled()) {
 ///             for (String p : result.getPaths()) {
-///                 importFile(p);
+///                 Log.p("Picked " + p);
 ///             }
 ///         }
 ///     });

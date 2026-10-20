@@ -6831,7 +6831,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     && feature != com.codename1.io.filechooser.FileDialogFeatures.PREVIEW;
         }
         return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
-                || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
+                // allowsMultipleSelection is iOS 11+; IOSNative.m sets it only there.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
+                    && iosMajorVersion() >= 11)
                 || feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
                 // UIDocumentPickerViewController.directoryURL is iOS 13+; the
                 // native side sets it only there, so older systems ignore it.

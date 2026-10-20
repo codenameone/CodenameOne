@@ -284,7 +284,12 @@ public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
             return ((Boolean) o).booleanValue();
         }
         if (o instanceof String) {
-            return "true".equalsIgnoreCase((String) o);
+            if ("true".equalsIgnoreCase((String) o)) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase((String) o)) {
+                return false;
+            }
         }
         return def;
     }
