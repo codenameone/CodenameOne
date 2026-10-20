@@ -120,7 +120,7 @@ public final class UnityProjectImporter {
             for (String path : previous) {
                 if (!imported.contains(path)) {
                     File stale = new File(target, path);
-                    if (stale.isFile() && stale.delete()) {
+                    if (!linked(target, stale) && stale.isFile() && stale.delete()) {
                         r.removedFiles++;
                     }
                 }
@@ -134,6 +134,18 @@ public final class UnityProjectImporter {
             throw new BuildException("Cannot import " + source + ": " + e.getMessage(), e);
         }
         return r;
+    }
+
+    /// Whether the file or any directory between it and the import root is
+    /// a link: a recorded path whose parent became one would otherwise
+    /// delete a file outside the project.
+    private static boolean linked(File root, File f) {
+        for (File p = f; p != null && !p.equals(root); p = p.getParentFile()) {
+            if (Files.isSymbolicLink(p.toPath())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void copy(File src, File dest, String path, Set<String> imported, Result r) throws IOException {

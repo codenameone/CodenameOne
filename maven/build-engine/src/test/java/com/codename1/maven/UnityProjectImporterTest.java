@@ -171,6 +171,24 @@ public class UnityProjectImporterTest {
         assertEquals("now a file", read(new File(unity, "Assets/Levels")));
     }
 
+    /// A folder that left the project and was replaced by a link in the
+    /// import: its recorded files are not deleted through the link.
+    @Test
+    public void staleFilesUnderALinkedFolderAreNotDeleted() throws Exception {
+        write(new File(game, "Assets/Old/file.txt"), "old");
+        importIt();
+        assertTrue(new File(game, "Assets/Old/file.txt").delete());
+        assertTrue(new File(game, "Assets/Old").delete());
+        File outside = tmp.newFolder("outside");
+        write(new File(outside, "file.txt"), "keep");
+        File old = new File(unity, "Assets/Old");
+        assertTrue(new File(old, "file.txt").delete());
+        assertTrue(old.delete());
+        Files.createSymbolicLink(old.toPath(), outside.toPath());
+        importIt();
+        assertEquals("keep", read(new File(outside, "file.txt")));
+    }
+
     /// A link inside the project is reported and not followed, so one that
     /// points at a folder above it cannot recurse.
     @Test

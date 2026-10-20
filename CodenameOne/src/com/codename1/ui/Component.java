@@ -738,9 +738,11 @@ public class Component implements Animation, StyleListener, Editable {
 
     private boolean hasApplicationPointerListeners(EventDispatcher dispatcher) {
         if (dispatcher != null && dispatcher.hasListeners()) {
-            // Indexed rather than an iterator: an iterator throws
-            // ConcurrentModificationException when the list changes during
-            // the walk, which a JavaSE test thread racing the EDT hit.
+            // Indexed rather than an iterator, so that a listener added during
+            // the walk is not a ConcurrentModificationException, which a JavaSE
+            // test thread racing the EDT hit. Not a snapshot or the
+            // dispatcher's lock: Codename One UI code runs on the EDT, and
+            // cross-thread listener changes are not supported here.
             Object listeners = dispatcher.getListenerCollection();
             if (!(listeners instanceof java.util.List)) {
                 return true;
