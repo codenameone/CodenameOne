@@ -1287,6 +1287,34 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testColorKeywordConstantStaysAnIdentifier() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
+                + " --pal: red; alias: var(--pal); }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("red", theme.get("@accent"));
+        assertEquals("transparent", theme.get("@clear"));
+        assertEquals("red", theme.get("@accentColor"));
+        assertEquals("red", theme.get("@alias"));
+    }
+
+    @Test
+    void testEscapedAliasKeepsTheQuotedType() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --a\\62 c: \"#f00\"; alias: var(--a\\62 c); }", res, "Theme");
+        assertEquals("#f00", res.getTheme("Theme").get("@alias"));
+    }
+
+    @Test
+    void testExplicitDarkDeriveFollowsTheLightTarget() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:native:MainRegular;font-size:2mm;}"
+                + " @media (prefers-color-scheme: dark){ Base{font-family:native:MainBold;}"
+                + " Child{cn1-derive:Base;font-size:20px;} }", res, "Theme");
+        assertEquals("native:MainRegular", fontName((Font) res.getTheme("Theme").get("$DarkChild.font")));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));

@@ -465,6 +465,9 @@ public class CSSThemeCompiler {
             } else if (isColorLiteral(value)) {
                 // Stored as plain hex, as the build-time compiler stores it: color constants
                 // are read with Integer.parseInt(value, 16), which a leading '#' would break.
+                // Only `#hex` and `rgb()`/`rgba()` are color tokens here; a keyword such as `red`
+                // or `transparent` is an identifier and is stored as written, as in the build.
+                // testColorKeywordConstantStaysAnIdentifier holds that.
                 value = constantColor(value);
             } else if (value.indexOf("var(--") > -1) {
                 String kind = DEFERRED_VAR;
@@ -673,7 +676,10 @@ public class CSSThemeCompiler {
         }
         String inner = v.substring("var(--".length(), v.length() - 1);
         int comma = topLevelComma(inner);
-        return "@" + (comma < 0 ? inner : inner.substring(0, comma)).trim();
+        String name = (comma < 0 ? inner : inner.substring(0, comma)).trim();
+        // Decoded, as resolveVars looks it up: `var(--a\62 c)` is `@abc`.
+        String decoded = decodeIdentifier("--" + name);
+        return "@" + (decoded != null ? decoded.substring(2) : name);
     }
 
     /// UIManager.getThemeImageConstant casts an image constant to Image, and on iOS that cast is
@@ -942,14 +948,14 @@ public class CSSThemeCompiler {
                 }
                 // The state's own derive applies in both passes: its parent's unselected style
                 // is what a state derived from it falls back to.
-                int[] normalFrom = {Integer.MAX_VALUE};
+                int[] normalFrom = {Integer.MAX_VALUE, Integer.MAX_VALUE};
                 ArrayList<String> chain = fontChain(theme, own, state, dark, normalFrom);
                 for (int i = 0; i < chain.size() && (family == null || size == null); i++) {
                     String id = chain.get(i);
                     String lookupHere = i >= normalFrom[0] ? "" : lookup;
                     // A dark rule is its own `$Dark` element in the build-time compiler, with no
                     // link to the light UIID, so a dark font never takes the light one's half.
-                    String[] fallbacks = dark
+                    String[] fallbacks = dark && i < normalFrom[1]
                             ? new String[]{"$Dark" + id + "." + lookupHere}
                             : new String[]{id + "." + lookupHere};
                     for (String fallback : fallbacks) {
@@ -1006,11 +1012,17 @@ public class CSSThemeCompiler {
     /// the UIID's. `*` is not part of it: the build-time compiler ignores universal rules.
     /// `normalFrom[0]` is set to the first index past a pressed-only derive: the build-time
     /// compiler attaches `Child:pressed{cn1-derive:Base}` to `Base` itself, not `Base:pressed`,
-    /// so from there on the chain is read in the unselected state.
+    /// so from there on the chain is read in the unselected state. `normalFrom[1]` is the first
+    /// index past a dark element's derive: `$DarkChild{cn1-derive:Base}` is attached to the
+    /// light `Base` by name, so from there on the chain is light.
     private ArrayList<String> fontChain(Hashtable theme, String id, String state, boolean dark, int[] normalFrom) {
         ArrayList<String> chain = new ArrayList<String>();
         while (id != null && !chain.contains(id)) {
             chain.add(id);
+            if (dark && chain.size() > 1) {
+                dark = false;
+                normalFrom[1] = chain.size() - 1;
+            }
             // A derive this compile declared, in any state: the last one in source order is the
             // owning UIID's only parent in the build-time compiler, for every state.
             // The build-time compiler makes `$DarkChild` an element of its own with no link to
