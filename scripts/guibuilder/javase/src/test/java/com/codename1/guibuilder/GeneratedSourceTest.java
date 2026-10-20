@@ -1797,8 +1797,13 @@ class GeneratedSourceTest {
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> listed = (java.util.List<Object>) unsupported.invoke(builder,
-                "#Constants, Other {\n  accentColor: #ff0000;\n}\n");
-        assertTrue(listed.isEmpty(), "#Constants in a selector list exports its constants: " + listed);
+                "#Constants, #Constants {\n  accentColor: #ff0000;\n}\n");
+        assertTrue(listed.isEmpty(), "a list of only #Constants exports its constants: " + listed);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> mixed = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants, Label {\n  font-style: italic;\n}\n");
+        assertEquals(1, mixed.size(), "Label still gets the probe in a mixed list: " + mixed);
     }
 
     @Test

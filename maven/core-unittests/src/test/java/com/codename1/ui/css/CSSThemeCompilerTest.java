@@ -1278,6 +1278,15 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testPressedOnlyDeriveInheritsTheNormalFont() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:native:MainRegular;font-size:2mm;}"
+                + " Base:pressed{font-family:native:MainBold;}"
+                + " Child:pressed{cn1-derive:Base;font-size:20px;}", res, "Theme");
+        assertEquals("native:MainRegular", fontName((Font) res.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));

@@ -5378,15 +5378,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (open.isEmpty()) return false;
         String selector = open.get(open.size() - 1);
         if ("@constants".equalsIgnoreCase(selector)) return true;
-        // `#Constants, Other { ... }` exports its constants too, as the compiler reads it.
+        // `#Constants, Other { ... }` exports its constants too, but also styles `Other`, whose
+        // declarations still need the probe: only a list of nothing but #Constants is skipped.
         int start = 0;
         for (int i = 0; i <= selector.length(); i++) {
             if (i == selector.length() || selector.charAt(i) == ',') {
-                if ("#Constants".equalsIgnoreCase(selector.substring(start, i).trim())) return true;
+                if (!"#Constants".equalsIgnoreCase(selector.substring(start, i).trim())) return false;
                 start = i + 1;
             }
         }
-        return false;
+        return true;
     }
 
     /** True for the characters a CSS property name is made of. */

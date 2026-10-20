@@ -942,14 +942,16 @@ public class CSSThemeCompiler {
                 }
                 // The state's own derive applies in both passes: its parent's unselected style
                 // is what a state derived from it falls back to.
-                ArrayList<String> chain = fontChain(theme, own, state, dark);
+                int[] normalFrom = {Integer.MAX_VALUE};
+                ArrayList<String> chain = fontChain(theme, own, state, dark, normalFrom);
                 for (int i = 0; i < chain.size() && (family == null || size == null); i++) {
                     String id = chain.get(i);
+                    String lookupHere = i >= normalFrom[0] ? "" : lookup;
                     // A dark rule is its own `$Dark` element in the build-time compiler, with no
                     // link to the light UIID, so a dark font never takes the light one's half.
                     String[] fallbacks = dark
-                            ? new String[]{"$Dark" + id + "." + lookup}
-                            : new String[]{id + "." + lookup};
+                            ? new String[]{"$Dark" + id + "." + lookupHere}
+                            : new String[]{id + "." + lookupHere};
                     for (String fallback : fallbacks) {
                         String[] other = fonts.get(fallback);
                         if (other != null) {
@@ -1002,7 +1004,10 @@ public class CSSThemeCompiler {
     /// The UIIDs a font in `state` inherits from, nearest first. At every hop a state that
     /// declares its own `cn1-derive` (`Child:selected{cn1-derive:Base}`) follows that instead of
     /// the UIID's. `*` is not part of it: the build-time compiler ignores universal rules.
-    private ArrayList<String> fontChain(Hashtable theme, String id, String state, boolean dark) {
+    /// `normalFrom[0]` is set to the first index past a pressed-only derive: the build-time
+    /// compiler attaches `Child:pressed{cn1-derive:Base}` to `Base` itself, not `Base:pressed`,
+    /// so from there on the chain is read in the unselected state.
+    private ArrayList<String> fontChain(Hashtable theme, String id, String state, boolean dark, int[] normalFrom) {
         ArrayList<String> chain = new ArrayList<String>();
         while (id != null && !chain.contains(id)) {
             chain.add(id);
@@ -1021,6 +1026,9 @@ public class CSSThemeCompiler {
             Object stateDerive = state.length() > 0 ? theme.get(prefix + state + "derive") : null;
             if (stateDerive instanceof String) {
                 id = (String) stateDerive;
+                if ("press#".equals(state) && normalFrom[0] == Integer.MAX_VALUE) {
+                    normalFrom[0] = chain.size();
+                }
             } else {
                 Object base = theme.get(prefix + "derive");
                 id = base instanceof String ? (String) base : null;
