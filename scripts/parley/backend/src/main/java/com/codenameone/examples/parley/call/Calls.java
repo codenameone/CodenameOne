@@ -321,11 +321,19 @@ public class Calls {
             return;
         }
         live.toDevice(row.getCalleeDevice(), replayed(row, OFFER, setup.getOffer()));
-        String[] each = setup.getCandidates().split("\n");
-        for (int iter = 0; iter < each.length; iter++) {
-            if (each[iter].length() > 0) {
-                live.toDevice(row.getCalleeDevice(), replayed(row, ICE, each[iter]));
+        // One candidate a line. Walked by hand: the compiled backend has no
+        // String.split, which is a regular expression.
+        String all = setup.getCandidates();
+        int start = 0;
+        while (start < all.length()) {
+            int end = all.indexOf('\n', start);
+            if (end < 0) {
+                end = all.length();
             }
+            if (end > start) {
+                live.toDevice(row.getCalleeDevice(), replayed(row, ICE, all.substring(start, end)));
+            }
+            start = end + 1;
         }
         setups.deleteById(row.getId());
     }

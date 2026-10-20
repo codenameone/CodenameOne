@@ -342,9 +342,24 @@ try {
     return seeded.some(name => text.includes(name));
   });
   // The admin's menu ends with the console, after Settings.
-  await overflowCommand(4);
-  await waitFor('the admin console', stepSeconds, async () =>
-      /Messages\s+today/.test(await screenText()));
+  // The menu's rows are clicked where they are drawn, and on a slow runner the
+  // popup can still be sliding in when the click lands: a click that missed
+  // leaves the chats list up, so the menu is opened and picked again.
+  for (let attempt = 1; ; attempt++) {
+    await overflowCommand(4);
+    try {
+      await waitFor('the admin console', attempt < 3 ? 15 : stepSeconds, async () =>
+          /Messages\s+today/.test(await screenText()));
+      break;
+    } catch (e) {
+      if (attempt >= 3 || problems.length > 0) {
+        throw e;
+      }
+      say('the admin console did not open; picking it from the menu again');
+      await page.keyboard.press('Escape');
+      await settled();
+    }
+  }
   await waitFor('the console to ask the server for its figures', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/admin\//.test(r)));
   await page.waitForTimeout(3000);

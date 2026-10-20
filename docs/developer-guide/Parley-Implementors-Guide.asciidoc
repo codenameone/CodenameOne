@@ -2,7 +2,7 @@
 == Parley: Building on the sample
 
 Parley is a messenger, and most of what makes one isn't in the server. The
-server stores and relays envelopes it can't open; the keys, the sessions, the
+server stores and relays ciphertext it can't open; the keys, the sessions, the
 encryption and the history are in the app. Parley kept what it shares with
 <<wayline-implementors-guide,Wayline>> and <<savor-implementors-guide,Savor>>: the
 module layout, the accounts and sign-in, text messages, push notifications, the
@@ -188,8 +188,8 @@ the user's guide says so.
 === Calls
 
 A call is two apps and a relay. The server never touches the media: it rings the
-callee, relays the signalling, and hands out the addresses of the servers the apps
-use to reach each other. The media itself is WebRTC's, encrypted with DTLS-SRTP
+callee, relays the signalling, and hands out the addresses of the servers through which
+the apps reach each other. The media itself is WebRTC's, encrypted with DTLS-SRTP
 between the two devices.
 
 The app owns the signalling, which is how `com.codename1.webrtc` is meant to be used
@@ -247,8 +247,8 @@ include::../demos/common/src/main/snippets/developer-guide/parley.sh[tag=parley-
 
 `parley.ice.secret` is the secret shared with the TURN server -- coturn's
 `static-auth-secret`, with `use-auth-secret` on. `Calls.ice` builds the credential
-the way coturn checks it: the user name is the expiry time and the account, and the
-password is the HMAC-SHA1 of the user name under the secret. Nothing is stored, and
+the way coturn checks it: the username is the expiry time and the account, and the
+password is the HMAC-SHA1 of the username under the secret. Nothing is stored, and
 a leaked credential stops working on its own after `parley.ice.ttl` seconds. With
 no TURN server set, only STUN is handed out, and calls between networks that block
 a direct path fail. The default STUN server is a public one; run your own for a
@@ -275,7 +275,7 @@ include::../demos/common/src/main/snippets/developer-guide/parley.sh[tag=parley-
   `/bridge/whatsapp`, answers the verify token when subscribing, and signs every
   delivery with the app secret, which the server checks.
 
-image::img/parley-bot-chat.png["A chat with the demo bot under a banner that says its messages are not end-to-end encrypted",scaledwidth=40%]
+image::img/parley-bot-chat.png["A chat with the demo bot under a banner that says its messages aren't end-to-end encrypted",scaledwidth=40%]
 
 ==== The privacy trade-off
 

@@ -121,7 +121,7 @@ There are three kinds of conversation:
 |===
 
 The button on the chat list starts a conversation: find a person by name,
-username or phone number, make a group, or join one with an invite link.
+username or phone number, make a group, or join one with an invitation link.
 
 A conversation shows its messages as they arrive, a typing indicator, and the
 state of each message you sent: sent, delivered, and read. A message can be
