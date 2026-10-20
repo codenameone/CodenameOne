@@ -144,19 +144,30 @@ final class AndroidFileDialogs {
                     public void run() {
                         FileDialogResult result;
                         try {
-                            List<String> paths = new ArrayList<String>();
-                            for (Uri u : uris) {
-                                if (request.isDirectories()) {
-                                    // A tree URI is not a path FileSystemStorage can
-                                    // list; copy the folder, as iOS does.
-                                    paths.add(copyTreeToCache(resolver, u));
-                                } else if (acceptedByFilters(request.getFilters(), resolver, u)) {
-                                    paths.add(copyToCache(resolver, u));
+                            // Checked before anything is copied: a selection with
+                            // any file the filters reject fails whole, rather than
+                            // handing back a quietly incomplete subset.
+                            boolean rejected = false;
+                            if (!request.isDirectories()) {
+                                for (Uri u : uris) {
+                                    if (!acceptedByFilters(request.getFilters(), resolver, u)) {
+                                        rejected = true;
+                                        break;
+                                    }
                                 }
                             }
-                            if (paths.isEmpty()) {
+                            List<String> paths = new ArrayList<String>();
+                            if (!rejected) {
+                                for (Uri u : uris) {
+                                    // A tree URI is not a path FileSystemStorage can
+                                    // list; a folder is copied, as iOS does.
+                                    paths.add(request.isDirectories() ? copyTreeToCache(resolver, u)
+                                            : copyToCache(resolver, u));
+                                }
+                            }
+                            if (rejected) {
                                 result = FileDialogResult.cancelled(request);
-                                result.setError(new IOException("The selected file does not match the dialog's filters"));
+                                result.setError(new IOException("A selected file does not match the dialog's filters"));
                             } else {
                                 result = new FileDialogResult(request, paths.toArray(new String[paths.size()]), -1, null);
                             }

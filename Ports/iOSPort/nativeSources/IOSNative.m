@@ -9421,7 +9421,9 @@ void com_codename1_impl_ios_IOSNative_showOpenFileDialog___java_lang_String_java
         if (picker == nil) {
             NSMutableArray *legacy = [NSMutableArray array];
             if (directories) {
-                [legacy addObject:(NSString *)kUTTypeFolder];
+                // The stable UTI strings rather than kUTTypeFolder/kUTTypeItem,
+                // which iOS 15 deprecates (see cn1AddFileChooserDocumentType).
+                [legacy addObject:@"public.folder"];
             } else {
                 [legacy addObjectsFromArray:utList];
                 // Before iOS 14 there is no UTType class, so an extension-only
@@ -9431,7 +9433,7 @@ void com_codename1_impl_ios_IOSNative_showOpenFileDialog___java_lang_String_java
                     cn1AddFileChooserDocumentType(legacy, kUTTagClassFilenameExtension, ext);
                 }
                 if ([legacy count] == 0) {
-                    [legacy addObject:(NSString *)kUTTypeItem];
+                    [legacy addObject:@"public.item"];
                 }
             }
             picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:legacy
