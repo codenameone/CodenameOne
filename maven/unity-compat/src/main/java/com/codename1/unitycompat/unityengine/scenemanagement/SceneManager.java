@@ -50,12 +50,15 @@ public final class SceneManager {
         UnityRuntime.$loadScene(sceneBuildIndex);
     }
 
-    /// By name, or by the path the build settings list it under.
+    /// By name, or by the path the build settings list it under, with or
+    /// without the `.unity` extension; Unity compares either ignoring case.
     public static void LoadScene(String sceneName) {
         int n = UnityRuntime.$sceneCount();
         for (int i = 0; i < n; i++) {
             String path = UnityRuntime.$scenePath(i);
-            if (path.equals(sceneName) || name(path).equals(sceneName)) {
+            String bare = path.endsWith(".unity") ? path.substring(0, path.length() - 6) : path;
+            if (path.equalsIgnoreCase(sceneName) || bare.equalsIgnoreCase(sceneName)
+                    || name(path).equalsIgnoreCase(sceneName)) {
                 UnityRuntime.$loadScene(i);
                 return;
             }

@@ -2733,17 +2733,22 @@ public final class SceneCompiler {
         }
     }
 
-    /// The serialized fields of a script: every key that is not one of
-    /// Unity's own `m_` properties names a field of the class.
+    /// The serialized fields of a script: every key names a field of the
+    /// class, but for Unity's own `m_` properties. A script's field may itself
+    /// be called `m_health`, so an `m_` key is looked up first and skipped
+    /// only when the script has no such serialized field.
     private void script(String origin, Node n, Map<Long, Node> nodes, StringBuilder sb) {
         Map<String, Object> p = n.doc.properties;
         enabled(sb, n.variable, p);
         for (Map.Entry<String, Object> e : p.entrySet()) {
             String key = e.getKey();
-            if (key.startsWith("m_") || "serializedVersion".equals(key)) {
+            if ("serializedVersion".equals(key)) {
                 continue;
             }
             FieldDef field = findField(n.script, key);
+            if (key.startsWith("m_") && (field == null || !serialized(n.script, field))) {
+                continue;
+            }
             if (field == null) {
                 field = formerlyNamed(n.script, key);
             }
@@ -3551,7 +3556,7 @@ public final class SceneCompiler {
             Map<String, Object> offset = map(p.get("m_FollowOffset"));
             line(sb, v + ".$setup(" + f(offset.get("x"), "0") + ", " + f(offset.get("y"), "0") + ", "
                     + f(offset.get("z"), "-10") + ", " + f(p.get("m_XDamping"), "1") + ", "
-                    + f(p.get("m_YDamping"), "1") + ");");
+                    + f(p.get("m_YDamping"), "1") + ", " + number(p.get("m_BindingMode"), "1") + ");");
         }
     }
 
