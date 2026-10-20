@@ -3235,8 +3235,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public Object createFont(int face, int style, int size) {
         TestFont font = new TestFont(defaultFont.charWidth, defaultFont.height);
         font.face = face;
+        font.style = style;
         font.size = size;
         return font;
+    }
+
+    @Override
+    public int getStyle(Object nativeFont) {
+        return nativeFont instanceof TestFont ? ((TestFont) nativeFont).style : 0;
     }
 
     @Override
@@ -5642,6 +5648,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         final int height;
         /// What a system font was created with; a real port reports these from its native font.
         int face;
+        int style;
         int size = com.codename1.ui.Font.SIZE_MEDIUM;
 
         TestFont(int charWidth, int height) {

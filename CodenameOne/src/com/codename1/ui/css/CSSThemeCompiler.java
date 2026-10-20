@@ -993,8 +993,11 @@ public class CSSThemeCompiler {
                     }
                 }
             }
-            // A system font keeps only what it can say: monospace, and its system size.
+            // A system font keeps only what it can say: monospace, its system size and its style,
+            // so a size-only rule over a bold system font stays bold.
+            int style = Font.STYLE_PLAIN;
             if (inherited != null && !inherited.isTTFNativeFont()) {
+                style = inherited.getStyle();
                 if (family == null && inherited.getFace() == Font.FACE_MONOSPACE) {
                     family = "monospace";
                 }
@@ -1019,7 +1022,7 @@ public class CSSThemeCompiler {
                     parsed.unit = Style.UNIT_TYPE_PIXELS;
                     parsed.value = inherited.getPixelSize();
                 }
-                font = createFont(family, parsed);
+                font = createFont(family, parsed, style);
             }
             theme.put(keyPrefix + Style.FONT, font);
         }
@@ -1045,6 +1048,17 @@ public class CSSThemeCompiler {
             // owning UIID's only parent in the build-time compiler, for every state.
             // The build-time compiler makes `$DarkChild` an element of its own with no link to
             // the light `Child`'s derive, so only a dark derive extends the dark chain.
+            // Except a pressed state's own derive: `Child:pressed{cn1-derive:Base1}` is attached
+            // to `Base1` directly, whatever the owner's normal derive says.
+            String prefix = dark ? "$Dark" + id + "." : id + ".";
+            if ("press#".equals(state) && normalFrom[0] == Integer.MAX_VALUE) {
+                Object pressDerive = theme.get(prefix + "press#derive");
+                if (pressDerive instanceof String) {
+                    id = (String) pressDerive;
+                    normalFrom[0] = chain.size();
+                    continue;
+                }
+            }
             String owner = ownerDerives.get(dark ? "$Dark" + id : id);
             if (owner != null) {
                 id = owner;
@@ -1052,7 +1066,6 @@ public class CSSThemeCompiler {
             }
             // Otherwise a derive a previous compile into the same theme stored. For a dark
             // element only its own `$Dark` keys: a retained light derive is no link either.
-            String prefix = dark ? "$Dark" + id + "." : id + ".";
             Object stateDerive = state.length() > 0 ? theme.get(prefix + state + "derive") : null;
             if (stateDerive instanceof String) {
                 id = (String) stateDerive;
@@ -1092,7 +1105,7 @@ public class CSSThemeCompiler {
         return null;
     }
 
-    private Font createFont(String familyList, FontSize size) {
+    private Font createFont(String familyList, FontSize size, int style) {
         String ttfName = "native:MainRegular";
         boolean monospace = false;
         if (familyList != null) {
@@ -1126,9 +1139,9 @@ public class CSSThemeCompiler {
         }
         int systemSize = size == null ? Font.SIZE_MEDIUM : size.systemSize;
         if (monospace) {
-            return Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, systemSize);
+            return Font.createSystemFont(Font.FACE_MONOSPACE, style, systemSize);
         }
-        Font fallback = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, systemSize);
+        Font fallback = Font.createSystemFont(Font.FACE_SYSTEM, style, systemSize);
         float pixels = size == null || size.unit < 0 ? fallback.getHeight() : fontSizeInPixels(size);
         Font ttf;
         try {
@@ -1137,7 +1150,7 @@ public class CSSThemeCompiler {
             ttf = null;
         }
         // The same fallback a resource file takes for a truetype font the platform cannot load.
-        return ttf == null ? fallback : ttf.derive(pixels, Font.STYLE_PLAIN);
+        return ttf == null ? fallback : ttf.derive(pixels, style);
     }
 
     private static boolean isGenericFamily(String family) {
@@ -2279,6 +2292,14 @@ public class CSSThemeCompiler {
                 i++;
             } else if (c == '"' || c == '\'') {
                 quote = c;
+            } else if ((c == 'u' || c == 'U') && input.regionMatches(true, i, "url(", 0, 4)
+                    && (i == 0 || !isNameChar(input.charAt(i - 1)))) {
+                // An unquoted url() is one token, so `url(data:image/png;base64,AAAA)` keeps
+                // its semicolon, as the build-time parser reads it.
+                int close = input.indexOf(')', i + 4);
+                if (close > 0) {
+                    i = close;
+                }
             } else if (c == ';') {
                 out.add(input.substring(start, i));
                 start = i + 1;

@@ -1287,6 +1287,34 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testPressedDeriveWinsOverTheOwnerDerive() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base1{font-family:native:MainBold;font-size:2mm;}"
+                + " Base2{font-family:native:MainLight;font-size:2mm;}"
+                + " Child{cn1-derive:Base2;} Child:pressed{cn1-derive:Base1;font-size:20px;}", res, "Theme");
+        assertEquals("native:MainBold", fontName((Font) res.getTheme("Theme").get("Child.press#font")));
+    }
+
+    @Test
+    void testSizeOnlyRuleKeepsTheInheritedSystemFontStyle() {
+        MutableResource res = new MutableResource();
+        res.setTheme("Theme", new Hashtable());
+        res.getTheme("Theme").put("Label.font",
+                Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_MEDIUM));
+        new CSSThemeCompiler().compile("Label{font-size:large;}", res, "Theme");
+        Font font = (Font) res.getTheme("Theme").get("Label.font");
+        assertEquals(Font.STYLE_BOLD, font.getStyle() & Font.STYLE_BOLD);
+    }
+
+    @Test
+    void testUnquotedUrlKeepsItsSemicolon() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { navImage: url(data:image/png;base64,AAAA); after: \"x\"; }",
+                res, "Theme");
+        assertEquals("x", res.getTheme("Theme").get("@after"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
