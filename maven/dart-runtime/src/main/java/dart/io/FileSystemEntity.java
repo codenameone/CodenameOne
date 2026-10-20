@@ -57,6 +57,16 @@ public abstract class FileSystemEntity {
         return new Directory(Fs.parentOf(path));
     }
 
+    /// The path {@code absolute} answers: a relative one joined to Directory.current,
+    /// the same base every read and write resolves it against.
+    static String absolutePath(String path) {
+        if (path.startsWith("/") || path.startsWith("file:")) {
+            return path;
+        }
+        String base = Directory.current.path();
+        return (base.endsWith("/") ? base : base + "/") + path;
+    }
+
     public boolean isAbsolute() {
         return path.startsWith("/") || path.startsWith("file:");
     }

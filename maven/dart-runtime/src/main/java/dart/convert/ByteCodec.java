@@ -356,6 +356,10 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                 throw new FormatException("Missing padding character (at character " + (len + 1) + ")");
             }
         } else if (len % 4 != 0) {
+            // Deliberately strict, and checked against the Dart VM: base64.decode and
+            // base64Url.decode both reject unpadded "QQ" and "QUI" with exactly this
+            // message. Dart code decoding unpadded input (a JWT segment) calls
+            // base64.normalize first, which pads it.
             throw new FormatException("Invalid length, must be multiple of four (at character " + (len + 1) + ")");
         }
         if (data % 4 != 0) {

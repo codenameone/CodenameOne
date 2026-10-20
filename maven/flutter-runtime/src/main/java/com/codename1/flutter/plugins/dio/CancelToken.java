@@ -66,6 +66,19 @@ public class CancelToken {
         }
     }
 
+    /// A settled request leaves the token, so a long-lived token reused for many
+    /// requests does not keep every finished one (and its callback) alive.
+    void detach(ConnectionRequest req) {
+        // by identity: ConnectionRequest.equals matches duplicate requests (same URL)
+        for (int i = 0; i < requests.size(); i++) {
+            if (requests.get(i) == req) {
+                requests.remove(i);
+                callbacks.remove(i);
+                return;
+            }
+        }
+    }
+
     void attach(ConnectionRequest req, Runnable cancelled) {
         if (this.cancelled) {
             // dio fails a request made with an already-cancelled token straight away.

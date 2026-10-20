@@ -47,7 +47,7 @@ public class File extends FileSystemEntity {
     }
 
     public File absolute() {
-        return this;
+        return isAbsolute() ? this : new File(absolutePath(path));
     }
 
     private static ByteCodec codec(Object encoding) {
@@ -183,6 +183,10 @@ public class File extends FileSystemEntity {
     public void createSync(Boolean recursive, Boolean exclusive) {
         Fs fs = Fs.get();
         if (fs.exists(path)) {
+            if (fs.isDirectory(path)) {
+                // a directory is not a file that already exists: Dart fails here
+                throw new FileSystemException("Cannot create file, path is a directory", path);
+            }
             if (exclusive != null && exclusive.booleanValue()) {
                 throw new FileSystemException("Cannot create file, it already exists", path);
             }

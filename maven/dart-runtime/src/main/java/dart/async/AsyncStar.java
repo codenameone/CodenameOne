@@ -58,6 +58,26 @@ public final class AsyncStar {
     public static final class Sink<T> {
         final StreamController<T> controller = new StreamController<T>();
         volatile boolean cancelled;
+        private final java.util.List<Funcs.VoidFunc0> cancelHooks = new java.util.ArrayList<Funcs.VoidFunc0>();
+
+        /// Runs {@code hook} when the listener cancels: a body blocked on an upstream
+        /// source releases it then, not at the source's next event.
+        public void onCancel(Funcs.VoidFunc0 hook) {
+            if (cancelled) {
+                hook.call();
+            } else {
+                cancelHooks.add(hook);
+            }
+        }
+
+        /// An error event that does not end the stream, as a caught error in an
+        /// async* body re-raised to the listener would not.
+        public void addError(Object error) {
+            if (cancelled) {
+                throw new Cancelled();
+            }
+            controller.addError(error instanceof Throwable ? DartRuntime.caught((Throwable) error) : error);
+        }
 
         public void yield$(T value) {
             if (cancelled) {
@@ -100,6 +120,11 @@ public final class AsyncStar {
             @Override
             public void call() {
                 sink.cancelled = true;
+                Funcs.VoidFunc0[] hooks = sink.cancelHooks.toArray(new Funcs.VoidFunc0[sink.cancelHooks.size()]);
+                sink.cancelHooks.clear();
+                for (Funcs.VoidFunc0 h : hooks) {
+                    h.call();
+                }
             }
         });
         return sink.controller.stream();

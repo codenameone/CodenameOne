@@ -44,6 +44,7 @@ public class FlutterLocalNotificationsPlugin {
     private static final String PREFIX = "cn1flutter-";
     private static final Map<String, String> PAYLOADS = new HashMap<String, String>();
     private static Funcs.VoidFunc1<NotificationResponse> onTap;
+    private static NotificationResponse launchResponse;
     private static int shown;
 
     public FlutterLocalNotificationsPlugin() {
@@ -61,15 +62,21 @@ public class FlutterLocalNotificationsPlugin {
         if (notificationId == null || !notificationId.startsWith(PREFIX)) {
             return;
         }
+        Long id = null;
+        try {
+            id = Long.valueOf(Long.parseLong(notificationId.substring(PREFIX.length())));
+        } catch (NumberFormatException ignore) {
+            // not one of ours after all
+        }
+        NotificationResponse response = new NotificationResponse(id, payload(notificationId));
         Funcs.VoidFunc1<NotificationResponse> cb = onTap;
         if (cb != null) {
-            Long id = null;
-            try {
-                id = Long.valueOf(Long.parseLong(notificationId.substring(PREFIX.length())));
-            } catch (NumberFormatException ignore) {
-                // not one of ours after all
-            }
-            cb.call(new NotificationResponse(id, payload(notificationId)));
+            cb.call(response);
+        } else {
+            // A cold launch from a tap arrives before the app has run initialize(). As in
+            // Flutter, that tap is reported by getNotificationAppLaunchDetails, not the
+            // callback, so it is held for the app to ask.
+            launchResponse = response;
         }
     }
 
@@ -225,8 +232,9 @@ public class FlutterLocalNotificationsPlugin {
         return shown;
     }
 
-    public Future<Object> getNotificationAppLaunchDetails() {
-        return Future.value(null);
+    public Future<NotificationAppLaunchDetails> getNotificationAppLaunchDetails() {
+        NotificationResponse r = launchResponse;
+        return Future.value(new NotificationAppLaunchDetails(r != null, r));
     }
 
     public Future<DartList<Object>> pendingNotificationRequests() {

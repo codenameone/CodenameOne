@@ -24,6 +24,13 @@ enum UILocalNotificationDateInterpretation { absoluteTime, wallClockTime }
 @JavaName('com.codename1.flutter.plugins.notifications.NotificationResponseType')
 enum NotificationResponseType { selectedNotification, selectedNotificationAction }
 
+@JavaName('com.codename1.flutter.plugins.notifications.NotificationAppLaunchDetails')
+class NotificationAppLaunchDetails {
+  external NotificationAppLaunchDetails(bool didNotificationLaunchApp, NotificationResponse? notificationResponse);
+  external bool get didNotificationLaunchApp;
+  external NotificationResponse? get notificationResponse;
+}
+
 @JavaName('com.codename1.flutter.plugins.notifications.NotificationResponse')
 class NotificationResponse {
   external int? get id;
@@ -94,7 +101,7 @@ class FlutterLocalNotificationsPlugin {
       UILocalNotificationDateInterpretation? uiLocalNotificationDateInterpretation});
   external Future<void> cancel(int id, {String? tag});
   external Future<void> cancelAll();
-  external Future<Object?> getNotificationAppLaunchDetails();
+  external Future<NotificationAppLaunchDetails?> getNotificationAppLaunchDetails();
   external Future<List<Object>> pendingNotificationRequests();
   external T? resolvePlatformSpecificImplementation<T>([Type? witness]);
 }

@@ -301,7 +301,15 @@ public class Dio {
         if (contentType[0] == null) {
             contentType[0] = ro.contentType;
         }
-        final byte[] payload = encodeBody(ro, contentType);
+        final byte[] payload;
+        try {
+            payload = encodeBody(ro, contentType);
+        } catch (RuntimeException e) {
+            // dio reports an unencodable body through the request's future (and the
+            // error interceptors), never as a throw out of dio.post itself.
+            call.error(0, DioException.of(ro, DioExceptionType.unknown, e.getMessage(), e, null));
+            return;
+        }
         final Headers responseHeaders = new Headers();
         final ByteArrayOutputStream received = new ByteArrayOutputStream();
         ConnectionRequest req = new ConnectionRequest() {
@@ -353,6 +361,9 @@ public class Dio {
 
             @Override
             protected void postResponse() {
+                if (token != null) {
+                    token.detach(this);
+                }
                 if (failure != null) {
                     String m = String.valueOf(failure.getMessage());
                     boolean timeout = failure.getClass().getName().indexOf("Timeout") >= 0

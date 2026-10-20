@@ -82,10 +82,20 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
                 throw err;
             }
             if (result instanceof Future) {
-                ((Future<?>) result).whenComplete(new dart.runtime.Funcs.VoidFunc0() {
+                // A handler that fails later reaches onError (and the observer) as a
+                // synchronous throw does; nothing else would ever see that future's error.
+                @SuppressWarnings("unchecked")
+                Future<Object> pending = (Future<Object>) result;
+                pending.then(new dart.runtime.Funcs.VoidFunc1<Object>() {
                     @Override
-                    public void call() {
+                    public void call(Object v) {
                         emitter.complete();
+                    }
+                }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object err) {
+                        emitter.complete();
+                        onError(err, null);
                     }
                 });
             } else {

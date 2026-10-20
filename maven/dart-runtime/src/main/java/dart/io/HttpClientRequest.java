@@ -187,6 +187,22 @@ public class HttpClientRequest {
         final ByteArrayOutputStream received = new ByteArrayOutputStream();
         ConnectionRequest req = new ConnectionRequest() {
             private Exception failure;
+            private int redirects;
+            private boolean tooManyRedirects;
+
+            /// maxRedirects, counted per hop. Past the limit Dart fails the request
+            /// with "Redirect limit exceeded" rather than following on, and so does
+            /// this; returning true tells ConnectionRequest not to follow. (iOS
+            /// follows redirects natively and never calls this.)
+            @Override
+            public boolean onRedirect(String url) {
+                redirects++;
+                if (redirects > maxRedirects) {
+                    tooManyRedirects = true;
+                    return true;
+                }
+                return false;
+            }
 
             @Override
             protected void readHeaders(Object connection) throws java.io.IOException {
@@ -237,6 +253,10 @@ public class HttpClientRequest {
 
             private void finish() {
                 if (result.isCompleted()) {
+                    return;
+                }
+                if (tooManyRedirects) {
+                    result.completeError(new HttpException("Redirect limit exceeded"));
                     return;
                 }
                 if (failure != null) {

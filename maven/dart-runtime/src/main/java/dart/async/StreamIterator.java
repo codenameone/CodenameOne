@@ -80,6 +80,13 @@ public final class StreamIterator<T> {
     public Future<Object> cancel() {
         finished = true;
         queue.clear();
+        // A moveNext still pending ends now, so a body blocked in next() -- a derived
+        // stream whose listener cancelled -- unblocks instead of waiting for an event.
+        Completer<Boolean> w = waiting;
+        waiting = null;
+        if (w != null && !w.isCompleted()) {
+            w.complete(Boolean.FALSE);
+        }
         StreamSubscription<T> s = sub;
         sub = null;
         if (s != null) {

@@ -58,7 +58,7 @@ public class Directory extends FileSystemEntity {
     }
 
     public Directory absolute() {
-        return this;
+        return isAbsolute() ? this : new Directory(absolutePath(path));
     }
 
     public void createSync() {

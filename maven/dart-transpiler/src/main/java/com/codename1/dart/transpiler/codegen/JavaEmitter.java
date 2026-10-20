@@ -1172,10 +1172,19 @@ public final class JavaEmitter {
                 TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
                 String raw = p.named ? "(n == null ? null : n.idx(\"" + p.name + "\"))"
                         : "(a.length > " + pi + " ? a[" + pi + "] : null)";
+                String cast = dynCast(raw, pt, ctx);
+                if (p.defaultValue != null) {
+                    // An omitted argument takes the declared default, as a static call
+                    // would: null would be the wrong value, and fails unboxing an int.
+                    String present = p.named ? "(n != null && n.containsKey(\"" + p.name + "\"))"
+                            : "(a.length > " + pi + ")";
+                    cast = "(" + present + " ? " + cast + " : "
+                            + coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx) + ")";
+                }
                 if (!p.named) {
                     pi++;
                 }
-                args.append(dynCast(raw, pt, ctx));
+                args.append(cast);
             }
             TypeRef rt = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
             String invoke = "this." + javaMethodName(m.name) + "(" + args + ")";

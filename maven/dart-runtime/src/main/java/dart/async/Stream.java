@@ -546,9 +546,20 @@ public class Stream<T> {
      */
     @SuppressWarnings("unchecked")
     static void deliverError(Object onError, Object error) {
+        try {
+            callError(onError, error);
+        } catch (Throwable t) {
+            reportUncaught(t);
+        }
+    }
+
+    /// {@link #deliverError} without the guard: what the handler throws propagates,
+    /// for a transformer (handleError) whose thrown error belongs on its output.
+    @SuppressWarnings("unchecked")
+    static void callError(Object onError, Object error) {
         Object err = error instanceof Throwable
                 ? dart.runtime.DartRuntime.caught((Throwable) error) : error;
-        try {
+        {
             if (onError instanceof Funcs.VoidFunc1) {
                 ((Funcs.VoidFunc1<Object>) onError).call(err);
             } else if (onError instanceof Funcs.Func1) {
@@ -563,8 +574,6 @@ public class Stream<T> {
                 // has nowhere else to go but the log.
                 reportUncaught(err instanceof Throwable ? (Throwable) err : new RuntimeException(String.valueOf(err)));
             }
-        } catch (Throwable t) {
-            reportUncaught(t);
         }
     }
 
@@ -778,7 +787,13 @@ public class Stream<T> {
         return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<R>>() {
             @Override
             public void call(AsyncStar.Sink<R> s) {
-                StreamIterator<T> it = new StreamIterator<T>(self);
+                final StreamIterator<T> it = new StreamIterator<T>(self);
+                s.onCancel(new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        it.cancel();
+                    }
+                });
                 try {
                     body.call(it, s);
                 } finally {
@@ -909,9 +924,23 @@ public class Stream<T> {
                 T last = null;
                 while (it.next()) {
                     T v = it.current();
-                    if (first || !equals.call(last, v).booleanValue()) {
-                        s.yield$(v);
+                    if (!first) {
+                        boolean same;
+                        try {
+                            same = equals.call(last, v).booleanValue();
+                        } catch (AsyncStar.Cancelled c) {
+                            throw c;
+                        } catch (RuntimeException e) {
+                            // Dart turns this one event into an error and goes on,
+                            // keeping the previous value for the next comparison.
+                            s.addError(e);
+                            continue;
+                        }
+                        if (same) {
+                            continue;
+                        }
                     }
+                    s.yield$(v);
                     first = false;
                     last = v;
                 }
@@ -939,7 +968,13 @@ public class Stream<T> {
                     @Override
                     public void call(Object e) {
                         if (test == null || dart.runtime.Dyn.invoke(test, e) == Boolean.TRUE) {
-                            deliverError(onError, e);
+                            // handleError transforms: what the handler throws (a rethrow
+                            // or a replacement) is emitted downstream, as Dart does.
+                            try {
+                                callError(onError, e);
+                            } catch (Throwable t) {
+                                out.addError(t);
+                            }
                         } else {
                             out.addError(e);
                         }
