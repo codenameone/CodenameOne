@@ -60,7 +60,7 @@ public class WebhookController {
         Map update = Json.parseObject(new String(request.getBodyBytes(), StandardCharsets.UTF_8));
         String[] message = TelegramBridge.message(update);
         if (message != null) {
-            bridges.incoming(Bridges.TELEGRAM, message[0], message[1], message[2]);
+            bridges.incoming(Bridges.TELEGRAM, message[0], message[1], message[2], message[3]);
         }
         return HttpServer.Response.text(200, "ok");
     }
@@ -85,7 +85,7 @@ public class WebhookController {
         List<String[]> messages = WhatsAppCloudBridge.messages(
                 Json.parseObject(new String(body, StandardCharsets.UTF_8)));
         for (String[] message : messages) {
-            bridges.incoming(Bridges.WHATSAPP, message[0], message[1], message[2]);
+            bridges.incoming(Bridges.WHATSAPP, message[0], message[1], message[2], message[3]);
         }
         return HttpServer.Response.text(200, "ok");
     }

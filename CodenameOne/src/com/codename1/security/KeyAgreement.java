@@ -64,10 +64,42 @@ public final class KeyAgreement {
             throw new CryptoException("ECDH needs EC keys, got " + mine.getAlgorithm()
                     + " and " + theirs.getAlgorithm());
         }
+        byte[] privateDer = mine.getEncoded();
+        byte[] publicDer = theirs.getEncoded();
+        // The EC label says nothing about the curve. Some providers would
+        // agree over an imported P-384 key and others refuse it, so a key that
+        // does not name P-256 is refused here, the same on every port.
+        if (!namesP256(privateDer) || !namesP256(publicDer)) {
+            throw new CryptoException("ECDH supports P-256 keys only");
+        }
         try {
-            return Util.ecdhAgree(mine.getEncoded(), theirs.getEncoded());
+            return Util.ecdhAgree(privateDer, publicDer);
         } catch (RuntimeException re) {
             throw new CryptoException(re.getMessage(), re);
         }
+    }
+
+    /// The DER encoding of the P-256 curve's object identifier,
+    /// 1.2.840.10045.3.1.7, which a PKCS#8 or X.509 EC key carries in its
+    /// algorithm parameters.
+    private static final byte[] P256_OID = {
+        0x06, 0x08, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x03, 0x01, 0x07
+    };
+
+    private static boolean namesP256(byte[] der) {
+        if (der == null) {
+            return false;
+        }
+        int last = der.length - P256_OID.length;
+        for (int i = 0; i <= last; i++) {
+            int j = 0;
+            while (j < P256_OID.length && der[i + j] == P256_OID[j]) {
+                j++;
+            }
+            if (j == P256_OID.length) {
+                return true;
+            }
+        }
+        return false;
     }
 }

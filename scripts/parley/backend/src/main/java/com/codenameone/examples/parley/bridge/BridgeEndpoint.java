@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.parley.bridge;
 
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.parley.Caller;
 import com.codenameone.examples.parley.api.BridgeApiServer;
@@ -48,7 +49,15 @@ public class BridgeEndpoint implements BridgeApiServer {
 
     @Override
     public BridgeLinkDto link(BridgeRequestDto request) throws Exception {
-        return bridges.link(Caller.name(), request);
+        try {
+            return bridges.link(Caller.name(), request);
+        } catch (ResponseStatusException refused) {
+            throw refused;
+        } catch (RuntimeException raced) {
+            // Another admin linked the same conversation or chat in the same
+            // moment, and the unique index turned this commit away.
+            throw new ResponseStatusException(409, "That chat or conversation was just linked");
+        }
     }
 
     @Override

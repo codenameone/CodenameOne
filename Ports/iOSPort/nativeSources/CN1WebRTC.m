@@ -151,6 +151,26 @@ static NSMutableDictionary *cn1wCameras = nil;  // NSNumber -> CN1WebRtcCamera
 static NSMutableDictionary *cn1wViews = nil;    // NSValue(view) -> NSNumber(track)
 static NSMutableDictionary *cn1wViewObjects = nil; // NSValue(view) -> view
 static int cn1wNextHandle = 1;
+// The audio session as the app had it before a call changed it, put back when
+// the last peer closes. Nil while no call holds the session.
+static NSString *cn1wSavedCategory = nil;
+static NSString *cn1wSavedMode = nil;
+static AVAudioSessionCategoryOptions cn1wSavedOptions = 0;
+
+static void cn1wRestoreAudioSession(void) {
+    if (cn1wSavedCategory == nil) {
+        return;
+    }
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    NSError *error = nil;
+    [session overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
+    [session setCategory:cn1wSavedCategory mode:cn1wSavedMode options:cn1wSavedOptions error:&error];
+    if (error != nil) {
+        NSLog(@"CN1WebRTC: restoring the audio session failed: %@", error);
+    }
+    cn1wSavedCategory = nil;
+    cn1wSavedMode = nil;
+}
 
 static void cn1wInit(void) {
     if (cn1wFactory != nil) {
@@ -558,6 +578,9 @@ void com_codename1_impl_ios_IOSNative_webRtcClosePeerConnection___int(
         [entry.remoteTracks removeAllObjects];
         [entry.pendingCandidates removeAllObjects];
         [cn1wPeers removeObjectForKey:@(p)];
+        if ([cn1wPeers count] == 0) {
+            cn1wRestoreAudioSession();
+        }
     });
 }
 
@@ -596,6 +619,13 @@ void com_codename1_impl_ios_IOSNative_webRtcSetSpeakerphone___boolean(
     cn1wOnMain(^{
         AVAudioSession *session = [AVAudioSession sharedInstance];
         NSError *error = nil;
+        if (cn1wSavedCategory == nil) {
+            // The category and mode are AVFoundation's own constants, which
+            // live as long as the process, so neither needs retaining here.
+            cn1wSavedCategory = session.category;
+            cn1wSavedMode = session.mode;
+            cn1wSavedOptions = session.categoryOptions;
+        }
         [session setCategory:AVAudioSessionCategoryPlayAndRecord
                         mode:AVAudioSessionModeVoiceChat
                      options:0

@@ -81,6 +81,19 @@ class BridgeTest {
         Map arrived = Chat.await(mvc, member, members, Conversations.BOT);
         assertNotNull(arrived);
         assertEquals("Tomas (Telegram): See you at eight", Chat.text(arrived));
+
+        // Telegram retries an update whose answer it did not see: the same
+        // update_id again is answered 200 and posts nothing new.
+        assertEquals(200, Chat.statusOf(mvc, Chat.body(post("/bridge/telegram/" + TELEGRAM_SECRET),
+                update).header("X-Telegram-Bot-Api-Secret-Token", TELEGRAM_SECRET)));
+        int fromBridge = 0;
+        for (Object each : Chat.envelopes(mvc, member, members)) {
+            if (each instanceof Map && Conversations.BOT.equals(((Map) each).get("sender"))
+                    && "MESSAGE".equals(((Map) each).get("kind"))) {
+                fromBridge++;
+            }
+        }
+        assertEquals(1, fromBridge);
     }
 
     @Test

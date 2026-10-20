@@ -85,6 +85,16 @@ class KeyAgreementTest extends UITestBase {
     }
 
     @Test
+    void ecdhRejectsOtherCurves() throws Exception {
+        java.security.KeyPairGenerator gen = java.security.KeyPairGenerator.getInstance("EC");
+        gen.initialize(384);
+        java.security.KeyPair p384 = gen.generateKeyPair();
+        KeyPair ec = KeyGenerator.ec(256);
+        PublicKey theirs = PublicKey.fromX509(PublicKey.EC, p384.getPublic().getEncoded());
+        assertThrows(CryptoException.class, () -> KeyAgreement.ecdh(ec.getPrivateKey(), theirs));
+    }
+
+    @Test
     void onlyP256IsOffered() {
         assertThrows(CryptoException.class, () -> KeyGenerator.ec(384));
     }

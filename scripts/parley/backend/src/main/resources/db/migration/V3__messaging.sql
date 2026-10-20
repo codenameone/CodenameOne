@@ -169,5 +169,15 @@ CREATE TABLE bridge_link (
     created_by VARCHAR(190) NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE INDEX bridge_link_conversation_id ON bridge_link (conversation_id);
-CREATE INDEX bridge_link_external_chat ON bridge_link (external_chat);
+-- One link per conversation and one per external chat. The checks in
+-- Bridges read first; these decide when two admins link at once.
+CREATE UNIQUE INDEX bridge_link_conversation_id ON bridge_link (conversation_id);
+CREATE UNIQUE INDEX bridge_link_external_chat ON bridge_link (network, external_chat);
+
+-- Webhook events already posted, by the network's own event or message id:
+-- a provider retries a delivery whose answer it did not see.
+CREATE TABLE bridge_event (
+    id VARCHAR(240) NOT NULL PRIMARY KEY,
+    received_at BIGINT NOT NULL
+);
+CREATE INDEX bridge_event_received_at ON bridge_event (received_at);

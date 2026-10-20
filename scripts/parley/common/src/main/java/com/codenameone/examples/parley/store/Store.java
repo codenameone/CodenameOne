@@ -53,6 +53,10 @@ public final class Store {
     private static final Map<String, Map<String, Object>> summaries = new HashMap<String, Map<String, Object>>();
     private static final Map<String, List<Message>> history = new HashMap<String, List<Message>>();
     private static final List<Listener> listeners = new ArrayList<Listener>();
+    /// Whether the server's list has arrived since the vault opened. Before
+    /// it does, the cached summaries are all there is to show; after it, the
+    /// server's list is the truth even when it is empty.
+    private static boolean loaded;
 
     private Store() {
     }
@@ -73,6 +77,7 @@ public final class Store {
     }
 
     public static void clear() {
+        loaded = false;
         conversations.clear();
         summaries.clear();
         history.clear();
@@ -99,6 +104,7 @@ public final class Store {
     /// a fetch. Conversations no longer in it are ones this account left or
     /// was removed from; their history stays until the user deletes it.
     public static void conversations(List<ConversationDto> fresh) {
+        loaded = true;
         conversations.clear();
         for (ConversationDto each : fresh) {
             conversation(each, false);
@@ -134,8 +140,7 @@ public final class Store {
     public static List<String> ids(final boolean archived) {
         List<String> out = new ArrayList<String>();
         for (String id : summaries.keySet()) {
-            if (flag(id, "archived") == archived && (conversations.isEmpty()
-                    || conversations.containsKey(id))) {
+            if (flag(id, "archived") == archived && (!loaded || conversations.containsKey(id))) {
                 out.add(id);
             }
         }
@@ -234,6 +239,25 @@ public final class Store {
             history.put(id, out);
         }
         expire(id, out);
+        return out;
+    }
+
+    /// This account's messages still marked as sending, by conversation: after
+    /// a restart nothing is sending them any more.
+    public static Map<String, List<Message>> unsent(String me) {
+        Map<String, List<Message>> out = new HashMap<String, List<Message>>();
+        for (String id : summaries.keySet()) {
+            for (Message each : messages(id)) {
+                if (each.status == Message.SENDING && me.equals(each.from)) {
+                    List<Message> list = out.get(id);
+                    if (list == null) {
+                        list = new ArrayList<Message>();
+                        out.put(id, list);
+                    }
+                    list.add(each);
+                }
+            }
+        }
         return out;
     }
 

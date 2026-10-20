@@ -97,7 +97,8 @@ public class TelegramBridge implements Bridge {
         }
     }
 
-    /// The text message an update carries, as `{chat, sender, text}`; null
+    /// The text message an update carries, as `{chat, sender, text, update}`,
+    /// the last being the update's id, which a retry repeats; null
     /// for anything else: edits, joins, stickers, the bot's own messages.
     static String[] message(Map update) {
         Object message = update.get("message");
@@ -126,7 +127,8 @@ public class TelegramBridge implements Bridge {
         if (id == null) {
             return null;
         }
-        return new String[] {id(id), sender, (String) text};
+        Object updateId = update.get("update_id");
+        return new String[] {id(id), sender, (String) text, updateId == null ? "" : id(updateId)};
     }
 
     /// A chat id as text. JSON numbers come back as a Long or a Double; a

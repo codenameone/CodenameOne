@@ -61,7 +61,14 @@ public final class Sessions {
             throw new CryptoException("No session with " + username + "/" + device);
         }
         String[] out = session.encrypt(plaintext);
-        Vault.put(name("s", username, device), session.toMap());
+        try {
+            Vault.put(name("s", username, device), session.toMap());
+        } catch (Vault.WriteFailed unsaved) {
+            // The cached session moved on and the stored one did not: drop
+            // the cache, so the next use starts from what is on disk.
+            cache.remove(name("s", username, device));
+            throw unsaved;
+        }
         return out;
     }
 
@@ -109,6 +116,11 @@ public final class Sessions {
             Ratchet started = Ratchet.respond(header);
             byte[] plain = started.decrypt(header, headerText, ciphertext);
             keep(username, device, started, current);
+            // Only now, with the message authenticated and the session it
+            // opened saved, is the one-time prekey it named spent. Before
+            // that, a tampered first message or a crash would have burned it
+            // and every honest retry would name a key that is gone.
+            Identity.consumePreKey(Ratchet.oneTimePreKey(header));
             return plain;
         }
         throw last != null ? last : new CryptoException("No session with " + username + "/" + device);
@@ -140,8 +152,8 @@ public final class Sessions {
 
     private static void keep(String username, String device, Ratchet now, Ratchet before) {
         String name = name("s", username, device);
-        cache.put(name, now);
         Vault.put(name, now.toMap());
+        cache.put(name, now);
         if (before != null) {
             Vault.put(name("p", username, device), before.toMap());
         }

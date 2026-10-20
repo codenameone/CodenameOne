@@ -137,8 +137,11 @@ public class WhatsAppCloudBridge implements Bridge {
                             || !(((Map) text).get("body") instanceof String)) {
                         continue;
                     }
+                    // The message's own id, which a retried delivery repeats.
+                    Object wamid = message.get("id");
                     out.add(new String[] {(String) from, name.length() > 0 ? name : (String) from,
-                            (String) ((Map) text).get("body")});
+                            (String) ((Map) text).get("body"),
+                            wamid instanceof String ? (String) wamid : ""});
                 }
             }
         }

@@ -18,8 +18,11 @@
  */
 package com.codenameone.examples.parley.chat;
 
+import com.codename1.backend.Transactions;
 import com.codename1.backend.Base64;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Isolation;
+import com.codename1.backend.annotations.Propagation;
 import com.codenameone.examples.parley.Ids;
 import com.codenameone.examples.parley.api.EnvelopeDto;
 import com.codenameone.examples.parley.domain.Device;
@@ -69,6 +72,34 @@ public class Fanout {
         for (int iter = 0; iter < batch.size(); iter++) {
             envelopes.insert(batch.get(iter));
         }
+        // Nobody hears of an envelope before its row is committed: a fast
+        // device would acknowledge one it cannot yet see, and the row would
+        // then stay queued and come back after its message key was spent.
+        if (Transactions.isActive()) {
+            Transactions.registerSynchronization(new Transactions.Synchronization() {
+                @Override
+                public void afterCommit() {
+                    // Waking reads the accounts' devices and settings, which
+                    // takes a transaction of its own once this one is over.
+                    try {
+                        Transactions.execute(Propagation.REQUIRES_NEW, false, 0, Isolation.DEFAULT,
+                                () -> {
+                                    announce(batch, wake, group);
+                                    return null;
+                                });
+                    } catch (RuntimeException failed) {
+                        throw failed;
+                    } catch (Exception failed) {
+                        throw new IllegalStateException(failed);
+                    }
+                }
+            });
+        } else {
+            announce(batch, wake, group);
+        }
+    }
+
+    private void announce(List<Envelope> batch, List<String> wake, boolean group) {
         send(batch);
         for (int iter = 0; wake != null && iter < wake.size(); iter++) {
             if (!live.online(wake.get(iter))) {

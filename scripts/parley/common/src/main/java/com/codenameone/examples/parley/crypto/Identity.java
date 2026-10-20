@@ -126,17 +126,22 @@ public final class Identity {
         return Codec.unb64(state.get("spkPub"));
     }
 
-    /// Takes a one-time prekey out of use and answers its private half, or
-    /// null when it was already used: each one opens one session, ever.
+    /// The private half of a one-time prekey, or null when it was already
+    /// used: each one opens one session, ever. [#consumePreKey] spends it.
     @SuppressWarnings("unchecked")
-    static PrivateKey consumePreKey(long id) {
+    static PrivateKey preKey(long id) {
         Map<String, Object> keys = (Map<String, Object>) state.get("preKeys");
-        Object priv = keys.remove(String.valueOf(id));
-        if (priv == null) {
-            return null;
+        Object priv = keys.get(String.valueOf(id));
+        return priv == null ? null : PrivateKey.fromPkcs8(PublicKey.EC, Codec.unb64(priv));
+    }
+
+    /// Deletes a one-time prekey a session was opened with; -1 is none.
+    @SuppressWarnings("unchecked")
+    static void consumePreKey(long id) {
+        Map<String, Object> keys = (Map<String, Object>) state.get("preKeys");
+        if (id >= 0 && keys.remove(String.valueOf(id)) != null) {
+            save();
         }
-        save();
-        return PrivateKey.fromPkcs8(PublicKey.EC, Codec.unb64(priv));
     }
 
     /// What the server needs to list this device: the public identity key,
@@ -170,10 +175,30 @@ public final class Identity {
         state.put("spkSig", Codec.b64(Signature.sign(Signature.SHA256_WITH_ECDSA, privateKey(),
                 pub)));
         state.put("spkAt", Long.valueOf(System.currentTimeMillis()));
+        state.put("spkPending", Boolean.TRUE);
         save();
     }
 
     /// When the signed prekey was made, so the app can replace it weekly.
+    /// The current signed prekey alone, with no new one-time keys: what a
+    /// rotation uploads. One-time keys are topped up by count, separately.
+    public static PreKeyUploadDto signedOnly() {
+        return new PreKeyUploadDto(signed(), new ArrayList<PreKeyDto>());
+    }
+
+    /// Whether a rotated signed prekey has yet to reach the server.
+    public static boolean signedPreKeyPending() {
+        return state != null && Boolean.TRUE.equals(state.get("spkPending"));
+    }
+
+    /// The server has the signed prekey [#signedOnly] carried.
+    public static void signedPreKeyUploaded(int id) {
+        if (state != null && Codec.num(state.get("spkId")) == id) {
+            state.remove("spkPending");
+            save();
+        }
+    }
+
     public static long signedPreKeyAge() {
         return System.currentTimeMillis() - Codec.num(state.get("spkAt"));
     }

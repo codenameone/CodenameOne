@@ -148,6 +148,11 @@ public final class Ratchet {
         return header != null && header.get("ek") != null;
     }
 
+    /// The one-time prekey a session-starting header names, or -1.
+    public static long oneTimePreKey(Map<String, Object> header) {
+        return header == null || header.get("opk") == null ? -1 : Codec.num(header.get("opk"));
+    }
+
     /// The ephemeral key that started the session a header belongs to; a
     /// header that names a different one than the session holds means the
     /// other device started over (reinstalled, restored).
@@ -170,7 +175,8 @@ public final class Ratchet {
         }
         PrivateKey oneTime = null;
         if (header.get("opk") != null) {
-            oneTime = Identity.consumePreKey(Codec.num(header.get("opk")));
+            // Read, not removed: Sessions spends it once the message opened.
+            oneTime = Identity.preKey(Codec.num(header.get("opk")));
             if (oneTime == null) {
                 throw new CryptoException("That message uses a one-time prekey that was already used");
             }

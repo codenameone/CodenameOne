@@ -28,10 +28,12 @@ import com.codenameone.examples.parley.api.DeviceAddressDto;
 import com.codenameone.examples.parley.api.EnvelopeCopyDto;
 import com.codenameone.examples.parley.api.EnvelopeDto;
 import com.codenameone.examples.parley.api.OutgoingDto;
+import com.codenameone.examples.parley.api.PreKeyUploadDto;
 import com.codenameone.examples.parley.api.SendResultDto;
 import com.codenameone.examples.parley.crypto.Codec;
 import com.codenameone.examples.parley.crypto.Identity;
 import com.codenameone.examples.parley.crypto.Sessions;
+import com.codenameone.examples.parley.crypto.Vault;
 import com.codenameone.examples.parley.crypto.Vault;
 import com.codenameone.examples.parley.live.LiveChannel;
 import com.codenameone.examples.parley.Prefs;
@@ -208,6 +210,7 @@ public final class Messenger implements LiveChannel.Handler {
     }
 
     private void started() {
+        resend();
         LiveChannel.start(Identity.deviceId(), this);
         Calls.signedIn();
         refreshConversations();
@@ -219,10 +222,20 @@ public final class Messenger implements LiveChannel.Handler {
         housekeeping = CN.setInterval(30000, () -> CN.callSerially(() -> {
             if (instance == this) {
                 Store.expireAll();
-                if (Identity.signedPreKeyAge() > 7L * 24 * 60 * 60 * 1000) {
+                // A rotation uploads the signed prekey alone: one-time keys are
+                // topped up by count, and adding a batch on every rotation
+                // would fill the server's quota on a quiet device. Until the
+                // server has the new key it is offered again each tick, and
+                // no further rotation retires the one the server still serves.
+                if (!Identity.signedPreKeyPending()
+                        && Identity.signedPreKeyAge() > 7L * 24 * 60 * 60 * 1000) {
                     Identity.rotateSignedPreKey();
-                    Api.devices().uploadPreKeys(Identity.deviceId(), Identity.topUp(),
-                            Net.to(count -> { }, (status, message) -> { }));
+                }
+                if (Identity.signedPreKeyPending()) {
+                    final PreKeyUploadDto upload = Identity.signedOnly();
+                    Api.devices().uploadPreKeys(Identity.deviceId(), upload, Net.to(
+                            count -> Identity.signedPreKeyUploaded(upload.signedPreKey().id()),
+                            (status, message) -> { }));
                 }
             }
         }));
@@ -401,6 +414,17 @@ public final class Messenger implements LiveChannel.Handler {
     }
 
     /// Sends the message whose send failed again.
+    /// Queues again what was still sending when the app last stopped: the
+    /// message was saved, but its job lived only in memory.
+    private void resend() {
+        Map<String, List<Message>> unsent = Store.unsent(me);
+        for (Map.Entry<String, List<Message>> each : unsent.entrySet()) {
+            for (Message message : each.getValue()) {
+                enqueue(new Job(each.getKey(), KIND_MESSAGE, payloadOf(message), null, message));
+            }
+        }
+    }
+
     public static void retry(String conversationId, Message failed) {
         if (instance == null || failed.status != Message.FAILED) {
             return;
@@ -749,10 +773,25 @@ public final class Messenger implements LiveChannel.Handler {
         if (id.length() == 0) {
             return;
         }
+        try {
+            open(id, conversationId, sender, senderDevice, kind, header, ciphertext, sentAt,
+                    expiresAt);
+        } catch (Vault.WriteFailed unsaved) {
+            // The session state this message moved on could not be saved.
+            // It is not acknowledged, so the server keeps it and the next
+            // sync opens it again from the state that is on disk.
+            Log.p(unsaved.getMessage());
+            processed.remove(id);
+            return;
+        }
         if (!toAck.contains(id)) {
             toAck.add(id);
             savePendingAcks();
         }
+    }
+
+    private void open(String id, String conversationId, String sender, String senderDevice,
+            String kind, String header, String ciphertext, long sentAt, long expiresAt) {
         if (!processed.add(id)) {
             return;
         }

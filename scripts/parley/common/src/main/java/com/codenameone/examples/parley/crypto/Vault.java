@@ -102,6 +102,20 @@ public final class Vault {
         prefix = null;
     }
 
+    /// A document that could not be written: storage is full, or the write
+    /// was cut off. Callers must not act as though the state was saved -- a
+    /// ratchet that moved on in memory only would send what it cannot read
+    /// back after a restart -- so this is thrown, not logged.
+    public static final class WriteFailed extends RuntimeException {
+        WriteFailed(String name, IOException cause) {
+            super("Could not save " + name + ": " + cause.getMessage());
+        }
+    }
+
+    /// Saves `document` under `name`. It is written whole to a side file
+    /// first, then over the old copy, and the side file is dropped only after
+    /// that: an interrupted write leaves one complete copy either way, and
+    /// [#get] prefers the side file while it exists.
     public static void put(String name, Map<String, ?> document) {
         if (key == null) {
             return;
@@ -109,13 +123,23 @@ public final class Vault {
         byte[] nonce = SecureRandom.bytes(12);
         byte[] sealed = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, Codec.utf8(name),
                 Codec.utf8(Codec.json(document)));
+        write(prefix + name + SIDE, nonce, sealed, name);
+        write(prefix + name, nonce, sealed, name);
+        Storage.getInstance().deleteStorageFile(prefix + name + SIDE);
+    }
+
+    private static final String SIDE = ".new";
+
+    private static void write(String file, byte[] nonce, byte[] sealed, String name) {
         OutputStream out = null;
         try {
-            out = Storage.getInstance().createOutputStream(prefix + name);
+            out = Storage.getInstance().createOutputStream(file);
             out.write(nonce);
             out.write(sealed);
+            out.close();
+            out = null;
         } catch (IOException failed) {
-            com.codename1.io.Log.e(failed);
+            throw new WriteFailed(name, failed);
         } finally {
             Util.cleanup(out);
         }
@@ -124,12 +148,20 @@ public final class Vault {
     /// The document called `name`, or null when there is none or it does not
     /// open: a file from a vault whose key is gone reads as absent.
     public static Map<String, Object> get(String name) {
-        if (key == null || !Storage.getInstance().exists(prefix + name)) {
+        if (key == null) {
+            return null;
+        }
+        Map<String, Object> side = read(prefix + name + SIDE, name);
+        return side != null ? side : read(prefix + name, name);
+    }
+
+    private static Map<String, Object> read(String file, String name) {
+        if (!Storage.getInstance().exists(file)) {
             return null;
         }
         InputStream in = null;
         try {
-            in = Storage.getInstance().createInputStream(prefix + name);
+            in = Storage.getInstance().createInputStream(file);
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             Util.copy(in, bytes);
             byte[] all = bytes.toByteArray();
@@ -149,6 +181,7 @@ public final class Vault {
     public static void remove(String name) {
         if (prefix != null) {
             Storage.getInstance().deleteStorageFile(prefix + name);
+            Storage.getInstance().deleteStorageFile(prefix + name + SIDE);
         }
     }
 }

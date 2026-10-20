@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.parley.chat;
 
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.parley.Caller;
 import com.codenameone.examples.parley.api.ConversationApiServer;
@@ -48,7 +49,23 @@ public class ConversationEndpoint implements ConversationApiServer {
 
     @Override
     public ConversationDto create(NewConversationDto conversation) throws Exception {
-        return conversations.create(Caller.name(), conversation);
+        String username = Caller.name();
+        try {
+            return conversations.create(username, conversation);
+        } catch (ResponseStatusException refused) {
+            throw refused;
+        } catch (RuntimeException raced) {
+            // Both people opened the same direct chat at once, and the unique
+            // direct key rejected the second commit. Asking again finds the
+            // chat that won; a group create cannot race this way, so a second
+            // failure is a real one.
+            String kind = conversation == null ? null : conversation.kind();
+            if (conversation == null || !(kind == null || kind.length() == 0
+                    || Conversations.DIRECT.equalsIgnoreCase(kind))) {
+                throw raced;
+            }
+            return conversations.create(username, conversation);
+        }
     }
 
     @Override

@@ -30,9 +30,11 @@ import com.codenameone.examples.parley.api.BridgeStatusDto;
 import com.codenameone.examples.parley.chat.Conversations;
 import com.codenameone.examples.parley.chat.Messages;
 import com.codenameone.examples.parley.chat.Relays;
+import com.codenameone.examples.parley.domain.BridgeEvent;
 import com.codenameone.examples.parley.domain.BridgeLink;
 import com.codenameone.examples.parley.domain.Conversation;
 import com.codenameone.examples.parley.domain.Membership;
+import com.codenameone.examples.parley.repository.BridgeEventRepository;
 import com.codenameone.examples.parley.repository.BridgeLinkRepository;
 import com.codenameone.examples.parley.repository.MembershipRepository;
 
@@ -53,16 +55,19 @@ public class Bridges {
     static final int MAX_TEXT = 4096;
 
     private final BridgeLinkRepository links;
+    private final BridgeEventRepository events;
     private final MembershipRepository members;
     private final Conversations conversations;
     private final Messages messages;
     private final TelegramBridge telegram;
     private final WhatsAppCloudBridge whatsapp;
 
-    public Bridges(BridgeLinkRepository links, MembershipRepository members,
+    public Bridges(BridgeLinkRepository links, BridgeEventRepository events,
+            MembershipRepository members,
             Conversations conversations, Messages messages, Relays relays,
             TelegramBridge telegram, WhatsAppCloudBridge whatsapp) {
         this.links = links;
+        this.events = events;
         this.members = members;
         this.conversations = conversations;
         this.messages = messages;
@@ -70,6 +75,10 @@ public class Bridges {
         this.whatsapp = whatsapp;
         relays.register(this::outgoing);
     }
+
+    /// How long an event id is remembered: both networks give up retrying
+    /// well within a day.
+    static final long EVENT_MEMORY_MILLIS = 7L * 24 * 60 * 60 * 1000;
 
     /// Which networks this server can bridge to.
     public BridgeStatusDto status() {
@@ -150,10 +159,23 @@ public class Bridges {
     /// bot added to a chat nobody linked hears what is said there and passes
     /// none of it on.
     @Transactional(rollbackFor = IOException.class)
-    public void incoming(String network, String externalChat, String senderName, String text)
-            throws IOException {
+    public void incoming(String network, String externalChat, String senderName, String text,
+            String eventId) throws IOException {
         if (text == null || text.length() == 0) {
             return;
+        }
+        // A retried delivery names the event it already sent. The insert is
+        // what claims it: of two copies arriving at once, the second commit
+        // fails on the key, the network sees an error and retries, and the
+        // retry finds the event here.
+        if (eventId != null && eventId.length() > 0) {
+            String key = network + ":" + eventId;
+            if (events.findById(key) != null) {
+                return;
+            }
+            long now = System.currentTimeMillis();
+            events.deleteByReceivedAtLessThan(now - EVENT_MEMORY_MILLIS);
+            events.insert(new BridgeEvent(key, now));
         }
         BridgeLink link = links.findByNetworkAndExternalChat(network, externalChat);
         if (link == null) {

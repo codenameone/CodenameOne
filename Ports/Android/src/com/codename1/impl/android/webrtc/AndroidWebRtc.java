@@ -80,6 +80,9 @@ public class AndroidWebRtc implements WebRtcBridge {
     private final Map<Integer, LocalVideo> videos = new HashMap<Integer, LocalVideo>();
     private final Map<Object, Sink> views = new HashMap<Object, Sink>();
     private final java.util.Set<Integer> locals = new java.util.HashSet<Integer>();
+    /// Each local audio track's source, a native object of its own that
+    /// disposing the track leaves behind.
+    private final Map<Integer, AudioSource> audioSources = new HashMap<Integer, AudioSource>();
 
     /// One peer connection and the candidates that arrived before its remote
     /// description, which the SDK would otherwise reject.
@@ -233,6 +236,9 @@ public class AndroidWebRtc implements WebRtcBridge {
                         AudioSource source = f.createAudioSource(new MediaConstraints());
                         AudioTrack t = f.createAudioTrack("a" + allocate(), source);
                         audioHandle = registerLocal(t);
+                        synchronized (AndroidWebRtc.this) {
+                            audioSources.put(Integer.valueOf(audioHandle), source);
+                        }
                     }
                     if (video) {
                         videoHandle = openCamera(f, frontCamera);
@@ -493,10 +499,12 @@ public class AndroidWebRtc implements WebRtcBridge {
     public void releaseTrack(int track) {
         MediaStreamTrack t;
         LocalVideo lv;
+        AudioSource audioSource;
         boolean local;
         synchronized (this) {
             Integer key = Integer.valueOf(track);
             t = tracks.remove(key);
+            audioSource = audioSources.remove(key);
             lv = videos.remove(key);
             local = locals.remove(key);
         }
@@ -504,6 +512,9 @@ public class AndroidWebRtc implements WebRtcBridge {
             // Remote tracks belong to their receiver and are disposed with the
             // peer connection; only the local ones are ours to free.
             t.dispose();
+        }
+        if (audioSource != null) {
+            audioSource.dispose();
         }
         if (lv != null) {
             try {
