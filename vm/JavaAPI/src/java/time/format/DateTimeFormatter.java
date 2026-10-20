@@ -532,6 +532,34 @@ public final class DateTimeFormatter {
     }
 
     /// `GMT+8` (short) or `GMT+08:00` (full); `GMT` alone for zero.
+    /// The localized offset `O` and `ZZZZ` print: GMT, or GMT and a
+    /// signed hours[:minutes[:seconds]] offset.
+    private static void parseLocalizedOffset(Parsed p) {
+        int start = p.pos;
+        p.literal('G');
+        p.literal('M');
+        p.literal('T');
+        if (p.pos < p.text.length() && (p.text.charAt(p.pos) == '+' || p.text.charAt(p.pos) == '-')) {
+            boolean negative = p.text.charAt(p.pos) == '-';
+            p.pos++;
+            int hours = (int) p.digits(1, 2);
+            int minutes = 0;
+            int seconds = 0;
+            if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
+                p.pos++;
+                minutes = (int) p.digits(2, 2);
+                if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
+                    p.pos++;
+                    seconds = (int) p.digits(2, 2);
+                }
+            }
+            int total = hours * 3600 + minutes * 60 + seconds;
+            p.setOffset(negative ? -total : total, start);
+        } else {
+            p.setOffset(0, start);
+        }
+    }
+
     private static void localizedOffset(StringBuilder out, int total, boolean full) {
         out.append("GMT");
         if (total == 0) {
@@ -956,32 +984,9 @@ public final class DateTimeFormatter {
             case 'z':
                 parseZoneId(p);
                 return;
-            case 'O': {
-                int start = p.pos;
-                p.literal('G');
-                p.literal('M');
-                p.literal('T');
-                if (p.pos < p.text.length() && (p.text.charAt(p.pos) == '+' || p.text.charAt(p.pos) == '-')) {
-                    boolean negative = p.text.charAt(p.pos) == '-';
-                    p.pos++;
-                    int hours = (int) p.digits(1, 2);
-                    int minutes = 0;
-                    int seconds = 0;
-                    if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
-                        p.pos++;
-                        minutes = (int) p.digits(2, 2);
-                        if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
-                            p.pos++;
-                            seconds = (int) p.digits(2, 2);
-                        }
-                    }
-                    int total = hours * 3600 + minutes * 60 + seconds;
-                    p.setOffset(negative ? -total : total, start);
-                } else {
-                    p.setOffset(0, start);
-                }
+            case 'O':
+                parseLocalizedOffset(p);
                 return;
-            }
             case 'X':
             case 'Z':
                 if ((t.letter == 'X' || count == 5) && p.pos < p.text.length() && p.text.charAt(p.pos) == 'Z') {
@@ -989,7 +994,12 @@ public final class DateTimeFormatter {
                     p.offset = ZoneOffset.UTC;
                     return;
                 }
-                p.setOffset(t.letter == 'Z' && count == 4 ? p.offsetSeconds() : offsetOfWidth(p, count, t.letter == 'Z'), p.pos);
+                if (t.letter == 'Z' && count == 4) {
+                    // ZZZZ prints the localized form, as OOOO does.
+                    parseLocalizedOffset(p);
+                    return;
+                }
+                p.setOffset(offsetOfWidth(p, count, t.letter == 'Z'), p.pos);
                 return;
             case 'x':
                 p.setOffset(offsetOfWidth(p, count, false), p.pos);

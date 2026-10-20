@@ -102,7 +102,8 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> {
         for (int i = 0; i < bucket.size(); i++) {
             Cell<V> c = bucket.get(i);
             Object k = c.key.get();
-            if (k == key || (k != null && k.equals(key))) {
+            // The queried key decides, as the Map contract and the JDK say.
+            if (k == key || (k != null && key.equals(k))) {
                 return c;
             }
         }
@@ -192,7 +193,7 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> {
         for (int i = 0; i < bucket.size(); i++) {
             Cell<V> c = bucket.get(i);
             Object held = c.key.get();
-            if (held == k || (held != null && held.equals(k))) {
+            if (held == k || (held != null && k.equals(held))) {
                 bucket.remove(i);
                 if (bucket.isEmpty()) {
                     buckets.remove(hash);

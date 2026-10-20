@@ -560,6 +560,16 @@ public class URI {
         // path, not host "a" with path "/b". An empty remainder ("#f", "?q",
         // "http://h") is an empty path, which getPath() answers as "".
         if (!s.startsWith(AUTHORITY_MARKER)) {
+            if (scheme == null && !encode) {
+                // A relative path may not have a colon in its first segment:
+                // "@:" or "1a:b" is a scheme that is not a legal one, and the
+                // JDK rejects it rather than reading it as a path.
+                int slash = s.indexOf(PATH_SEPARATOR);
+                int colon = s.indexOf(SCHEME_SEPARATOR);
+                if (colon != -1 && (slash == -1 || colon < slash)) {
+                    throw new URISyntaxException(s, "Expected scheme name", 0);
+                }
+            }
             setPath(s, encode);
             return;
         }
@@ -657,9 +667,14 @@ public class URI {
      * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
      */
     boolean isValidScheme(String scheme) {
-        for (int i = 0; i < scheme.length(); i++) {
+        // RFC 2396: alpha *( alpha | digit | "+" | "-" | "." ), as the JDK
+        // checks it -- so "1a" is no scheme, and "svn+ssh" is one.
+        if (scheme.length() == 0 || !URIHelper.isAlpha(scheme.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < scheme.length(); i++) {
             char ch = scheme.charAt(i);
-            if (URIHelper.isAlpha(ch) || URIHelper.isNumeric(ch) || ch == '-') {
+            if (URIHelper.isAlpha(ch) || URIHelper.isNumeric(ch) || ch == '-' || ch == '+' || ch == '.') {
                 continue;
             }
             return false;

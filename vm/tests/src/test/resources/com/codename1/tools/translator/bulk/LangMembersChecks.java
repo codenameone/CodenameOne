@@ -407,6 +407,36 @@ public final class LangMembersChecks {
                 Bulk.p("addAll", "UOE");
             }
         });
+        Bulk.check("Lang.aColonInTheFirstRelativeSegment", () -> {
+            String[] inputs = {"@:", "1a:b", "./x:y", "a/b:c", "svn+ssh://h/p", "a.b:c"};
+            for (String s : inputs) {
+                try {
+                    Bulk.p(s, new java.net.URI(s).getPath());
+                } catch (java.net.URISyntaxException e) {
+                    Bulk.p(s, "USE");
+                }
+            }
+        });
+        Bulk.check("Lang.aLoneTrailingBackslashProperty", () -> {
+            java.util.Properties props = new java.util.Properties();
+            try {
+                props.load(new java.io.StringReader("a=1\n\\"));
+            } catch (java.io.IOException e) {
+                Bulk.p("io", e.toString());
+            }
+            Bulk.p("size", String.valueOf(props.size()));
+            Bulk.p("empty", String.valueOf(props.getProperty("")));
+        });
+        Bulk.check("Lang.fourZsRoundTrip", () -> {
+            java.time.format.DateTimeFormatter f =
+                    java.time.format.DateTimeFormatter.ofPattern("ZZZZ yyyy-MM-dd HH:mm");
+            int[] offsets = {0, 5400, -3600};
+            for (int off : offsets) {
+                String text = f.format(java.time.OffsetDateTime.of(2020, 1, 2, 3, 4, 0, 0,
+                        java.time.ZoneOffset.ofTotalSeconds(off)));
+                Bulk.p(text, java.time.OffsetDateTime.parse(text, f).toString());
+            }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

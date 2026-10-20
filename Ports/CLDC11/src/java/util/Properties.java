@@ -255,7 +255,9 @@ public class Properties extends Hashtable<Object, Object> {
         if (mode == UNICODE && count <= 4) {
             throw new IllegalArgumentException("Malformed \\uxxxx encoding.");
         }
-        if (keyLength == -1 && offset > 0) {
+        // A last line that is only a backslash still holds an empty key with
+        // an empty value, as on the JDK.
+        if (keyLength == -1 && (offset > 0 || mode == SLASH)) {
             keyLength = offset;
         }
         if (keyLength >= 0) {
