@@ -1315,6 +1315,23 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testLegacyAliasFollowsALaterRootRedefinition() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("@constants { base: red; alias: var(--base); } :root { --base: blue; }",
+                res, "Theme");
+        assertEquals("blue", res.getTheme("Theme").get("@base"));
+        assertEquals("blue", res.getTheme("Theme").get("@alias"));
+    }
+
+    @Test
+    void testImageConstantOfAUrlOrDimensionIsLeftOut() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { navImage: url(icon.png); sizeImage: 2mm; }", res, "Theme");
+        assertFalse(res.getTheme("Theme").containsKey("@navImage"));
+        assertFalse(res.getTheme("Theme").containsKey("@sizeImage"));
+    }
+
+    @Test
     void testExponentFontSizeIsRejected() {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 new CSSThemeCompiler().compile("Label{font-size:1e2px;}", new MutableResource(), "Theme"));

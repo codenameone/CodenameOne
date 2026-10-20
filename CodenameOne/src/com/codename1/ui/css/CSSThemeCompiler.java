@@ -423,10 +423,6 @@ public class CSSThemeCompiler {
                     declaration.snapshot = resolveAtDeclaration(theme, key, value, deferred);
                     declaration.dropped = declaration.snapshot == null;
                     declaration.snapshotKind = DEFERRED_IMAGE;
-                } else if (alias && legacy && declaration.snapshot == null
-                        && referencesDeclaredOnly(theme, key, value, deferred)) {
-                    declaration.snapshot = resolveVars(theme, value);
-                    declaration.snapshotKind = DEFERRED_IMAGE;
                 }
                 if (declaration.dropped) {
                     theme.remove(key);
@@ -451,6 +447,13 @@ public class CSSThemeCompiler {
                         // Of a chain such as `icon extra` the build-time compiler looks up the
                         // leading unit alone.
                         value = leadingToken(value);
+                        if (isUriOrDimension(value)) {
+                            // The build-time constants emitter looks an image up only for a
+                            // string or identifier; `url(icon.png)` or `2mm` is silently left out.
+                            theme.remove(key);
+                            deferred.remove(key);
+                            continue;
+                        }
                     }
                     // An identifier image name is looked up decoded: `my\ icon` is `my icon`.
                     String decoded = decodeIdentifier(value);
@@ -488,16 +491,9 @@ public class CSSThemeCompiler {
                     deferred.remove(key);
                     continue;
                 }
-                if (legacy && declaration.snapshot == null && referencesDeclaredOnly(theme, key, value, deferred)) {
-                    // Every name it uses is already declared: the build-time compiler resolves it
-                    // right here, so a later redefinition of a target does not reach it. Kept on
-                    // the declaration, because the second pass sees the final values.
-                    String target = aliasTarget(value);
-                    String targetKind = target == null ? null : deferred.get(target);
-                    declaration.snapshotKind = DEFERRED_LITERAL.equals(targetKind) || DEFERRED_TEXT.equals(targetKind)
-                            ? DEFERRED_LITERAL : DEFERRED_VAR;
-                    declaration.snapshot = resolveVars(theme, value);
-                }
+                // A legacy `@constants` alias is not frozen here: the build-time compiler has no
+                // `@constants` block to match, so it keeps resolving after every rule, as it
+                // always has, and `:root { --base: blue; }` later still reaches `alias`.
                 if (declaration.snapshot != null) {
                     value = declaration.snapshot;
                     kind = declaration.snapshotKind;
@@ -614,32 +610,15 @@ public class CSSThemeCompiler {
         }
     }
 
-    /// True when every `var(--x)` in `value` names a constant this compile already declared and
-    /// that is itself settled: not an alias still waiting for a name declared later.
-    private boolean referencesDeclaredOnly(Hashtable theme, String key, String value,
-                                                  Hashtable<String, String> deferred) {
-        int at = value.indexOf("var(--");
-        while (at > -1) {
-            int end = closingParen(value, at + "var(".length());
-            if (end < 0) {
-                return false;
-            }
-            String inner = value.substring(at + "var(--".length(), end);
-            int comma = topLevelComma(inner);
-            String target = "@" + (comma < 0 ? inner : inner.substring(0, comma)).trim();
-            if (plainConstants.contains(target)) {
-                return false;
-            }
-            String kind = deferred.get(target);
-            Object current = theme.get(target);
-            // Its own name is never settled: that is a cycle, reported when it is resolved.
-            if (kind == null || target.equals(key) || (DEFERRED_VAR.equals(kind) && current instanceof String
-                    && ((String) current).indexOf("var(--") > -1)) {
-                return false;
-            }
-            at = value.indexOf("var(--", end);
+    /// A `url()` token or a number with a unit: neither is a string or identifier token.
+    private static boolean isUriOrDimension(String token) {
+        if (token.regionMatches(true, 0, "url(", 0, 4)) {
+            return true;
         }
-        return true;
+        int i = token.startsWith("+") || token.startsWith("-") ? 1 : 0;
+        return i < token.length() && (token.charAt(i) >= '0' && token.charAt(i) <= '9'
+                || token.charAt(i) == '.' && i + 1 < token.length()
+                && token.charAt(i + 1) >= '0' && token.charAt(i + 1) <= '9');
     }
 
     /// Whether `value` is an alias that ends, through every intermediate alias, at a quoted
