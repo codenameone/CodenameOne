@@ -94,7 +94,7 @@ A server is a class with routes on it. The annotations are Spring's, under
 Codename One's package names, so this reads the same way to anyone who has
 written a Spring controller:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Notes.java[tag=backend-first-server,indent=0]
 ----

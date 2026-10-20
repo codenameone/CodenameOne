@@ -55,6 +55,15 @@ Not supported: annotation processing, modules and reflection (`java.lang.reflect
 
 Code compiles against exactly the API the running VM contains -- the Codename One framework and ParparVM's Java class library -- so a call that compiles here also exists on device. It is the API the browser build ships, which is narrower than a desktop JDK (there is no `List.of` or `IntStream`, for example); `Collection.stream()`, `Optional`, `Comparator`'s combinators and the common `Stream` operations are available.
 
+A class the script names without importing it is imported automatically when exactly
+one public class in the API has that name (`ConnectionRequest`, `Log`, `Storage`): code
+copied from the documentation leaves its imports out. A name two packages share, such as
+`List`, still needs its import, and the error is javac's.
+
+A top-level declaration with an access modifier or `static` (`private Image icon;`,
+`static final int SIZE = 4;`) is a field of the script, the way a top-level method is a
+method of it, so a class's members can be pasted in as the documentation shows them.
+
 These are imported by default; other imports can be declared anywhere in a script:
 - `java.util.*`, `java.io.*`
 - `com.codename1.ui.*`, `com.codename1.ui.layouts.*`, `com.codename1.ui.events.*`, `com.codename1.ui.geom.*`
@@ -98,6 +107,35 @@ The encoding uses URL-safe Base64 (replacing `+` with `-` and `/` with `_`, with
 ```
 https://example.com/playground?sample=<sample-slug>
 ```
+
+### Inline Mode ("Try it" in the documentation)
+
+Every Java snippet in the developer guide, the API reference and the blog has a
+**Try it** button (`docs/website/static/js/cn1-snippet-runner.js`). It replaces the
+static block with this Playground in inline mode: the editor holding the snippet and
+the live preview, without the side panels, so the reader edits the code where they
+read it. Nothing of the Playground loads until the first click.
+
+```
+/playground-app/?mode=inline&code=<base64-encoded-script>
+```
+
+- Inline mode reads and writes none of the saved Playground state, so trying a
+  snippet never replaces the script a reader was working on.
+- The top bar's **Reset** puts the snippet back as the page shows it. The page's own
+  **Open in Playground** link opens the full Playground with the reader's edits.
+- The page reuses one frame for every snippet: opening another one posts
+  `{type: "cn1-playground-inline-code", code}` to it, so moving between snippets is
+  a recompile, not a second VM boot. After each run the frame posts
+  `{type: "cn1-playground-inline-result", ok, summary, sourceUrl}` back.
+- Server code cannot run here. A guide block marked `role=cn1-no-try` (the backend
+  chapters, anything included from a `backend/src` tree) and the backend API
+  reference get no button.
+
+`scripts/check-doc-snippets.py` compiles every snippet the way this frame does and
+holds the ones that do not compile as they stand against
+`scripts/doc-snippet-baseline.txt`, a ratchet: a new snippet has to be
+self-contained.
 
 ### Inspector Tab
 

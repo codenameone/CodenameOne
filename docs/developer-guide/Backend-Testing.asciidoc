@@ -61,14 +61,14 @@ include::../demos/common/src/main/snippets/developer-guide/backend-testing.sh[ta
 
 This controller answers a greeting as JSON, using a `Greetings` bean:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/GreetingApi.java[tag=backend-test-api,indent=0]
 ----
 
 A test of it reads the way a Spring MVC test does:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/GreetingApiTest.java[tag=backend-test-mockmvc,indent=0]
 ----
@@ -138,7 +138,7 @@ than stopping at the first. `andDo(print())` writes the request and response to
 standard output. `andReturn()` gives the result, for assertions no matcher
 covers:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/TunedGreetingTest.java[tag=backend-test-and-return,indent=0]
 ----
@@ -155,7 +155,7 @@ skips the checks the parser makes on a request target, so a malformed one such a
 `/users/%FF` reaches the routes instead of getting a 400. To test through them,
 serve the application on a free port:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/ServedGreetingTest.java[tag=backend-test-random-port,indent=0]
 ----
@@ -191,7 +191,7 @@ runs never collide with each other or with a server running on the machine.
 A test runs with the module's `application.properties`, then the profile's file,
 then the settings the annotation names:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/TunedGreetingTest.java[tag=backend-test-properties,indent=0]
 ----
@@ -219,7 +219,7 @@ A static nested class marked `@TestConfiguration` adds its `@Bean` methods to th
 test's application. Marked `@Primary`, a test bean wins every injection of its
 type, which replaces the application's bean without a mocking library:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/FakeGreetingsTest.java[tag=backend-test-configuration,indent=0]
 ----
@@ -235,7 +235,7 @@ other annotations the build weaves; the build says so when one does.
 With `org.mockito:mockito-core` on the test classpath, `@MockitoBean` replaces
 every bean of the field's type with a Mockito mock and injects it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/MockedGreetingsTest.java[tag=backend-test-mockito-bean,indent=0]
 ----
