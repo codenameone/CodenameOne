@@ -29,7 +29,7 @@ import com.codename1.ui.plaf.Style;
 ///
 /// It says "this is loading" without a word and without moving, and it keeps
 /// the screen from jumping when the rows arrive, because they land where the
-/// outline was. The colour is the `SvSkeleton` style's.
+/// outline was. The colour is the `PlSkeleton` style's.
 public final class Skeleton extends Component {
     /// How tall one row is drawn, in millimetres: a row of two lines.
     private static final float ROW_MM = 9.6f;
@@ -38,7 +38,7 @@ public final class Skeleton extends Component {
 
     public Skeleton(int rows) {
         this.rows = rows;
-        setUIID("SvSkeleton");
+        setUIID("PlSkeleton");
         setFocusable(false);
     }
 

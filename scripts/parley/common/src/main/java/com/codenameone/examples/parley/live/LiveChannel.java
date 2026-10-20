@@ -32,57 +32,45 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 
-/// The WebSocket the server pushes changes down: a delivery changed state, the
-/// courier moved, a car went on or offline.
+/// The WebSocket the server pushes down: messages for this device, word that
+/// a conversation changed, call signalling.
 ///
-/// It only ever says *that* something changed. What the delivery now is, the app
-/// asks for over the REST API, which stays the one source of truth -- so a
-/// frame that is lost, or a socket that is down, costs a few seconds and
-/// nothing else. Every screen that listens here also polls, slowly while the
-/// socket is up and faster while it is not ([#connected] says which).
+/// Messages arrive here first when the app is open and by sync otherwise;
+/// either way they are the same envelopes, and acknowledging them is what
+/// removes them from the server, so a frame lost with a dropped socket is
+/// fetched again by the next sync. The server holds nothing it can read: the
+/// envelopes are ciphertext addressed to this one device.
 ///
 /// A WebSocket handshake cannot carry the bearer token on every platform, so
 /// the connection is let in by a ticket: the app asks for one over the
 /// authenticated API, and the server accepts it once, within half a minute.
 public final class LiveChannel {
-    /// What a screen wants to hear about. All of it arrives on the EDT.
-    public interface Listener {
-        /// An order the user is a party to changed: theirs as a customer, their
-        /// restaurant's, or the one they carry.
-        void orderChanged(String id, String state);
+    /// Where frames go. All of it arrives on the EDT.
+    public interface Handler {
+        /// An envelope for this device, in the same shape a sync returns.
+        void envelope(Map<String, Object> frame);
 
-        void deliveryChanged(String id, String state);
+        /// A conversation's title, members or settings changed.
+        void conversationChanged(String id);
 
-        void courierMoved(String deliveryId, double lat, double lng, double heading);
+        /// Call signalling: an offer, an answer, a candidate, a hang-up.
+        void call(Map<String, Object> frame);
 
-        void fleetChanged(String username, boolean online, double lat, double lng,
-                double heading);
+        /// The connection is up: anything sent while it was down is waiting
+        /// in the queue now.
+        void connected();
     }
 
-    /// A listener that ignores everything, to override the part a screen wants.
-    public static class Adapter implements Listener {
-        @Override
-        public void orderChanged(String id, String state) {
-        }
-
-        @Override
-        public void deliveryChanged(String id, String state) {
-        }
-
-        @Override
-        public void courierMoved(String deliveryId, double lat, double lng, double heading) {
-        }
-
-        @Override
-        public void fleetChanged(String username, boolean online, double lat, double lng,
-                double heading) {
-        }
+    /// Admin screens listen for this: a report came in or a flag changed.
+    public interface AdminListener {
+        void changed();
     }
 
+    private static Handler handler;
+    private static AdminListener admin;
+    private static String device;
     private static final int PING_MILLIS = 25000;
-
     private static WebSocket socket;
-    private static Listener listener;
     private static boolean wanted;
     private static boolean connected;
     private static int attempts;
@@ -95,8 +83,10 @@ public final class LiveChannel {
     private LiveChannel() {
     }
 
-    /// Connects, and keeps reconnecting until [#stop].
-    public static void start() {
+    /// Connects as `deviceId`, and keeps reconnecting until [#stop].
+    public static void start(String deviceId, Handler to) {
+        handler = to;
+        device = deviceId;
         if (wanted) {
             return;
         }
@@ -108,7 +98,8 @@ public final class LiveChannel {
     public static void stop() {
         wanted = false;
         connected = false;
-        listener = null;
+        handler = null;
+        admin = null;
         generation++;
         if (pinger != null) {
             pinger.cancel();
@@ -120,9 +111,9 @@ public final class LiveChannel {
         }
     }
 
-    /// The one screen that is listening: the one on display.
-    public static void listen(Listener current) {
-        listener = current;
+    /// The admin screen on display, or null.
+    public static void listenAdmin(AdminListener current) {
+        admin = current;
     }
 
     public static boolean connected() {
@@ -144,7 +135,7 @@ public final class LiveChannel {
     private static void open(String ticket, final int mine) {
         String base = Session.serverUrl();
         // http -> ws and https -> wss: the scheme keeps its "s".
-        String url = "ws" + base.substring(4) + "/ws/live?ticket=" + ticket;
+        String url = "ws" + base.substring(4) + "/ws/live?ticket=" + ticket + "&device=" + device;
         // The handlers run on the socket's thread, so each hands its news to
         // the EDT, where the rest of the app lives.
         socket = WebSocket.build(url)
@@ -213,7 +204,7 @@ public final class LiveChannel {
     }
 
     private static void frame(String text, int mine) {
-        if (mine != generation || listener == null) {
+        if (mine != generation || handler == null) {
             return;
         }
         Map<String, Object> json;
@@ -223,18 +214,16 @@ public final class LiveChannel {
             return;
         }
         Object type = json.get("type");
-        if ("order".equals(type)) {
-            listener.orderChanged(text(json, "id"), text(json, "state"));
-        } else if ("delivery".equals(type)) {
-            listener.deliveryChanged(text(json, "id"), text(json, "state"));
-        } else if ("courier".equals(type)) {
-            listener.courierMoved(text(json, "deliveryId"), number(json, "lat"), number(json, "lng"),
-                    number(json, "heading"));
-        } else if ("fleet".equals(type)) {
-            Object online = json.get("online");
-            listener.fleetChanged(text(json, "username"),
-                    Boolean.TRUE.equals(online) || "true".equals(online),
-                    number(json, "lat"), number(json, "lng"), number(json, "heading"));
+        if ("envelope".equals(type)) {
+            handler.envelope(json);
+        } else if ("conversation".equals(type)) {
+            handler.conversationChanged(text(json, "id"));
+        } else if ("call".equals(type)) {
+            handler.call(json);
+        } else if ("ready".equals(type)) {
+            handler.connected();
+        } else if ("admin".equals(type) && admin != null) {
+            admin.changed();
         }
     }
 
@@ -242,10 +231,5 @@ public final class LiveChannel {
     private static String text(Map<String, Object> json, String key) {
         Object value = json.get(key);
         return value instanceof String ? (String) value : "";
-    }
-
-    private static double number(Map<String, Object> json, String key) {
-        Object value = json.get(key);
-        return value instanceof Number ? ((Number) value).doubleValue() : 0;
     }
 }

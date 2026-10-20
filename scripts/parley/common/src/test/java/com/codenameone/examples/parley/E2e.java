@@ -22,11 +22,6 @@ import com.codename1.components.SpanLabel;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
-import com.codename1.maps.LatLng;
-import com.codename1.maps.MapView;
-import com.codename1.maps.vector.BundledTileSource;
-import com.codename1.maps.vector.TileCallback;
-import com.codename1.maps.vector.TileSource;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -38,23 +33,17 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codenameone.examples.parley.live.LiveChannel;
-import com.codenameone.examples.parley.map.Locator;
-import com.codenameone.examples.parley.map.Maps;
-import com.codenameone.examples.parley.map.Routes;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.ui.Lang;
 import com.codenameone.examples.parley.ui.Look;
 import com.codenameone.examples.parley.ui.Nav;
-import com.codenameone.examples.parley.ui.Photos;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 
@@ -68,12 +57,12 @@ import java.util.Map;
 /// and the device stands at a fixed point. None of it touches the server.
 public abstract class E2e extends AbstractTest {
     public static final String PASSWORD = "parley-demo";
-    public static final String CUSTOMER = "customer@parley.example";
-    public static final String COURIER = "courier@parley.example";
+    public static final String ALICE = "alice@parley.example";
+    public static final String BOB = "bob@parley.example";
+    public static final String CAROL = "carol@parley.example";
     public static final String ADMIN = "admin@parley.example";
-    public static final String MERCHANT = "merchant@parley.example";
+    public static final String FLAGGED = "mallory@parley.example";
     /// Where the device stands: the middle of the bundled tiles.
-    public static final LatLng HERE = new LatLng(37.8080, -122.4120);
 
     protected interface Check {
         boolean ok();
@@ -126,9 +115,6 @@ public abstract class E2e extends AbstractTest {
             return;
         }
         Session.useStore(new MemoryStore());
-        Maps.useTiles(new Tiles());
-        Routes.useStraightLines(true);
-        Locator.pin(HERE);
         onEdt(() -> {
             LiveChannel.stop();
             // The tests read the screens in English, whatever the machine
@@ -142,25 +128,10 @@ public abstract class E2e extends AbstractTest {
             Look.apply();
             Lang.apply();
             Session.start(AppConfig.serverUrl());
-            AppConfig.setMode(Nav.CUSTOMER);
+            AppConfig.setMode(Nav.CHATS);
             Nav.launch();
         });
         waitForForm("Welcome");
-        quiet();
-    }
-
-    /// Puts the server back where a test expects to find it: nobody onboarding,
-    /// and the customer with no delivery under way. The tests share one server, and
-    /// without this a test that failed half way would fail the ones after it
-    /// for a reason that has nothing to do with them.
-    private void quiet() {
-        Actor.signIn(COURIER).online(false, 0, 0);
-        Actor customer = Actor.signIn(CUSTOMER);
-        String id = Actor.text(customer.get("/api/deliveries/active"), "id");
-        if (id.length() > 0) {
-            customer.post("/api/deliveries/" + id + "/cancel", null);
-        }
-        Photos.useSource(null);
     }
 
     @Override
@@ -307,103 +278,47 @@ public abstract class E2e extends AbstractTest {
         waitForForm("Welcome");
     }
 
-    /// Sets the date field called `name`. A test cannot turn the wheels of
-    /// the platform's date picker, which is not part of the app.
-    protected void date(final String name, final int year, final int month, final int day) {
-        until(() -> findByName(name) instanceof Picker, 20000, "a date called " + name);
-        onEdt(() -> {
-            Calendar calendar = Calendar.getInstance();
-            calendar.set(Calendar.YEAR, year);
-            calendar.set(Calendar.MONTH, month - 1);
-            calendar.set(Calendar.DAY_OF_MONTH, day);
-            ((Picker) findByName(name)).setDate(calendar.getTime());
-        });
+    // -------------------------------------------------------------- chats
+
+    /// Opens the chat called `title` from the chats list.
+    protected void openChat(String title) {
+        waitForForm("Chats");
+        until(() -> has("chat-" + title), 30000, "the chat " + title + " in the list");
+        click("chat-" + title);
+        waitForForm("Chat");
     }
 
-    /// The restaurant the demo merchant runs, and where its kitchen is.
-    protected static final String KITCHEN = "r-ember";
-    protected static final LatLng KITCHEN_AT = new LatLng(37.7952, -122.3934);
+    /// Writes `text` in the composer and sends it.
+    protected void say(String text) {
+        type("composer", text);
+        click("send");
+    }
 
-    /// The first dish of the demo kitchen's menu that is on sale and has
-    /// nothing to choose, read from the server: dish ids are made at seeding.
-    protected static String dish(Actor customer) {
-        Map<String, Object> restaurant = customer.get("/api/restaurants/" + KITCHEN + "?lat="
-                + HERE.getLatitude() + "&lng=" + HERE.getLongitude());
-        Object menu = restaurant.get("menu");
-        for (Object section : menu instanceof List ? (List<?>) menu : new ArrayList<Object>()) {
-            Object dishes = section instanceof Map ? ((Map<?, ?>) section).get("dishes") : null;
-            for (Object dish : dishes instanceof List ? (List<?>) dishes : new ArrayList<Object>()) {
-                if (!(dish instanceof Map)) {
-                    continue;
-                }
-                Map<?, ?> found = (Map<?, ?>) dish;
-                Object options = found.get("options");
-                // The parser reads a JSON boolean as the string "true".
-                if ("true".equals(String.valueOf(found.get("available")))
-                        && (!(options instanceof List) || ((List<?>) options).isEmpty())) {
-                    return String.valueOf(found.get("id"));
-                }
+    /// Whether a bubble on the open chat reads `text`.
+    protected boolean shows(final String text) {
+        final boolean[] found = new boolean[1];
+        onEdt(() -> found[0] = find(Display.getInstance().getCurrent(), text));
+        return found[0];
+    }
+
+    protected void untilShown(final String text, String what) {
+        until(() -> shows(text), 30000, what + " (\"" + text + "\")");
+    }
+
+    private static boolean find(Container in, String text) {
+        for (int iter = 0; in != null && iter < in.getComponentCount(); iter++) {
+            Component each = in.getComponentAt(iter);
+            if (each instanceof SpanLabel && text.equals(((SpanLabel) each).getText())) {
+                return true;
+            }
+            if (each instanceof Label && text.equals(((Label) each).getText())) {
+                return true;
+            }
+            if (each instanceof Container && find((Container) each, text)) {
+                return true;
             }
         }
-        throw new IllegalStateException("the demo kitchen has no plain dish on sale");
-    }
-
-    /// Puts a dish from the demo kitchen in the cart and opens the checkout,
-    /// as far as the server's price for it, which is where a test chooses
-    /// what to do next.
-    protected void cart() {
-        String dish = dish(Actor.signIn(CUSTOMER));
-        reveal("restaurant-" + KITCHEN);
-        click("restaurant-" + KITCHEN);
-        waitForForm("restaurant");
-        reveal("dish-" + dish);
-        click("dish-" + dish);
-        waitForForm("dish");
-        click("add-to-order");
-        waitForForm("restaurant");
-        click("restaurant-cart");
-        waitForForm("checkout");
-        // Enabled, not just showing a total: the button keeps the last total
-        // while a new quote is on its way, and cannot be used until it is in.
-        until(() -> text("place").indexOf("$") >= 0 && findByName("place").isEnabled(), 20000,
-                "the order to be priced");
-    }
-
-    /// The id of the order the customer has on its way.
-    protected static String placed(Actor customer) {
-        List<Object> active = customer.list("/api/orders/active");
-        return active.isEmpty() || !(active.get(0) instanceof Map) ? null
-                : Actor.text((Map<String, Object>) active.get(0), "id");
-    }
-
-    /// Waits for a delivery to be offered to `courier` and returns its id.
-    protected String offered(final Actor courier) {
-        final String[] id = new String[1];
-        until(() -> {
-            Map<String, Object> delivery = courier.get("/api/courier/active");
-            if ("OFFERED".equals(Actor.text(delivery, "state"))) {
-                id[0] = Actor.text(delivery, "id");
-            }
-            return id[0] != null;
-        }, 30000, "the offer to reach the courier");
-        return id[0];
-    }
-
-    /// A picture for the app to take as a photograph: the tests have neither
-    /// a camera nor a gallery. It is drawn rather than read from a file so
-    /// that it is the same picture wherever the tests run.
-    protected static Image photograph() {
-        Image picture = Image.createImage(640, 400, 0xffe9edf2);
-        Graphics g = picture.getGraphics();
-        g.setColor(0x2f6fed);
-        g.fillRect(0, 0, 640, 70);
-        g.setColor(0xb8c2cf);
-        g.fillRect(40, 110, 150, 190);
-        g.setColor(0x8795a7);
-        for (int line = 0; line < 5; line++) {
-            g.fillRect(230, 120 + line * 38, line % 2 == 0 ? 340 : 250, 16);
-        }
-        return picture;
+        return false;
     }
 
     // -------------------------------------------------------- screenshots
@@ -494,72 +409,11 @@ public abstract class E2e extends AbstractTest {
                 || Math.abs((a & 0xff) - (b & 0xff)) > 60;
     }
 
-    /// Waits for the screen to stop moving: transitions over, the map drawn.
+    /// Waits for the screen to stop moving.
     private void settle() {
         waitFor(1500);
-        until(() -> {
-            Component map = findByName("map");
-            return !(map instanceof MapView) || ((MapView) map).isMapReady();
-        }, 20000, "the map");
-        waitFor(500);
     }
 
-    /// The map of the neighbourhood the tests happen in, read from the test
-    /// resources, so that a run draws the same streets with no network.
-    ///
-    /// A tile outside the bundled area is answered with an empty one. A tile
-    /// that fails is asked for again and is never drawn, and the map then
-    /// never reports itself ready -- which a test waiting to take a capture
-    /// would read as a map that is still loading.
-    static final class Tiles implements TileSource {
-        private static final byte[] EMPTY = new byte[0];
-        // At the root of the resources: a Codename One resource has no
-        // directory, and the simulator refuses a path that names one.
-        private final TileSource bundled =
-                new BundledTileSource("/mt_{z}_{x}_{y}.mvt", true, 13, 13);
-
-        @Override
-        public boolean isVector() {
-            return true;
-        }
-
-        @Override
-        public int getTileSize() {
-            return 256;
-        }
-
-        @Override
-        public int getMinZoom() {
-            return 13;
-        }
-
-        @Override
-        public int getMaxZoom() {
-            return 13;
-        }
-
-        @Override
-        public String getAttribution() {
-            return "(c) OpenStreetMap contributors";
-        }
-
-        @Override
-        public void fetchTile(int z, int x, int y, final TileCallback callback) {
-            bundled.fetchTile(z, x, y, new TileCallback() {
-                @Override
-                public void tileLoaded(int tz, int tx, int ty, byte[] data) {
-                    callback.tileLoaded(tz, tx, ty, data);
-                }
-
-                @Override
-                public void tileFailed(int tz, int tx, int ty) {
-                    callback.tileLoaded(tz, tx, ty, EMPTY);
-                }
-            });
-        }
-    }
-
-    /// Tokens kept for the length of the run and nowhere else.
     static final class MemoryStore implements TokenStore {
         private OidcTokens kept;
 

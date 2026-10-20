@@ -18,82 +18,68 @@
  */
 package com.codenameone.examples.parley;
 
-import com.codename1.components.Switch;
-import com.codename1.ui.Component;
+import com.codename1.ui.Button;
+import com.codenameone.examples.parley.net.Session;
+import com.codenameone.examples.parley.ui.Nav;
 
+import com.codename1.ui.Component;
+import com.codename1.components.Switch;
+import com.codenameone.examples.parley.ui.Nav;
 import java.util.Map;
 
-/// The admin's screens, and a role granted from them taking effect on a token
-/// that was issued before the grant.
+/// The admin screens: the numbers, the seeded report resolved, and an
+/// account made an admin and blocked -- each checked against what the
+/// server then does with that account's token.
 public class AdminTest extends E2e {
     @Override
     protected boolean run() throws Exception {
-        // Someone to promote, and a car for the map.
-        Actor customer = Actor.signIn(CUSTOMER);
-        customer.get("/api/admin/stats");
-        assertEqual(403, customer.status);
-        Actor courier = Actor.signIn(COURIER);
-        courier.online(true, HERE.getLatitude() + 0.003, HERE.getLongitude() - 0.004);
-
-        onEdt(() -> AppConfig.setMode("admin"));
-        signIn(ADMIN, "Admin");
-        until(() -> text("couriersOnline").startsWith("1 /"), 20000, "one courier online");
+        final Actor dan = Actor.signIn("dan@parley.example");
+        signIn(ADMIN, "Chats");
+        onEdt(() -> Nav.switchTo(Nav.ADMIN));
+        waitForForm("Admin");
+        until(() -> text("statUsers").length() > 0 && !"0".equals(text("statUsers")), 20000,
+                "the dashboard's numbers");
         shot("admin-dashboard");
-        // The charts are under the fold.
-        reveal("chartRevenue");
-        shot("admin-trends");
 
-        click("fleet");
-        waitForForm("Fleet");
-        untilText("fleetCount", "1 courier online");
-        courier.online(false, 0, 0);
-        untilText("fleetCount", "No couriers online");
+        // The report the demo seeds, resolved with a reason.
+        until(() -> has("alert-reports"), 20000, "the dashboard to say a report is waiting");
+        click("alert-reports");
+        waitForForm("Reports");
+        until(this::hasReport, 20000, "the seeded report");
+        clickReport();
+        waitForForm("Report");
+        until(() -> findByName("evidence") != null, 20000, "the evidence the reporter attached");
+        shot("admin-report");
+        click("resolve");
+        waitForForm("Reason");
+        type("reason", "Warned the account");
+        click("confirm");
+        waitForForm("Reports");
         back();
         waitForForm("Admin");
 
-        // The one application that is waiting, with its documents.
-        until(() -> has("alert-applications"), 20000, "the dashboard to say one is waiting");
-        click("applications");
-        waitForForm("Applications");
-        click("application-applicant@parley.example");
-        waitForForm("ApplicationReview");
-        untilText("applicationStatus", "Waiting");
-        click("document-licence");
-        waitForForm("Document");
-        until(() -> findByName("picture") != null, 20000, "the licence to be shown");
-        back();
-        waitForForm("ApplicationReview");
-        back();
-        waitForForm("Applications");
-        back();
-        waitForForm("Admin");
-
-        // Make the customer an admin.
+        // Make Dan an admin, and take it away.
         click("users");
         waitForForm("Users");
-        click("user-" + CUSTOMER);
+        click("user-dan@parley.example");
         waitForForm("User");
         onEdt(() -> {
             Component toggle = findByName("admin");
             ((Switch) toggle).setValue(true);
         });
-        // The token the customer was holding all along now opens the admin API:
-        // the server reads the account's roles on every request.
         until(() -> {
-            customer.get("/api/admin/stats");
-            return customer.status == 200;
-        }, 20000, "the grant to reach the customer's existing token");
-        Map<String, Object> me = customer.get("/api/me");
-        assertEqual(Boolean.TRUE, bool(me.get("admin")), "/api/me reports the new role");
-
-        // And taking it away closes it again.
+            dan.get("/api/admin/stats");
+            return dan.status == 200;
+        }, 20000, "the grant to reach dan's existing token");
+        Map<String, Object> me = dan.get("/api/me");
+        assertEqual("true", String.valueOf(me.get("admin")), "/api/me reports the new role");
         onEdt(() -> ((Switch) findByName("admin")).setValue(false));
         until(() -> {
-            customer.get("/api/admin/stats");
-            return customer.status == 403;
+            dan.get("/api/admin/stats");
+            return dan.status == 403;
         }, 20000, "the role to be taken away again");
 
-        // Blocking signs the account out wherever it is, and says why.
+        // Blocking refuses the account's token, and lifting it lets it back.
         click("block");
         waitForForm("Reason");
         click("confirm");
@@ -101,50 +87,59 @@ public class AdminTest extends E2e {
         type("reason", "Asked to be locked while travelling");
         click("confirm");
         untilText("standing", "Blocked");
-        customer.get("/api/me");
-        assertEqual(401, customer.status, "a blocked account's token");
+        dan.get("/api/me");
+        assertEqual(401, dan.status, "a blocked account's token");
         click("unblock");
         untilText("standing", "In good standing");
         until(() -> {
-            customer.get("/api/me");
-            return customer.status == 200;
+            dan.get("/api/me");
+            return dan.status == 200;
         }, 20000, "the block to be lifted");
-        assertTrue(findByName("event-1") != null, "both are in the account's history");
         back();
         waitForForm("Users");
         back();
         waitForForm("Admin");
 
-        // The rest of the console opens, and the prices can be saved.
-        click("deliveries");
-        waitForForm("Deliveries");
-        until(() -> has("delivery-0"), 20000, "the deliveries");
-        click("delivery-0");
-        waitForForm("DeliveryDetail");
-        back();
-        waitForForm("Deliveries");
+        click("bridges");
+        waitForForm("Bridges");
         back();
         waitForForm("Admin");
-        click("payments");
-        waitForForm("Payments");
-        back();
-        waitForForm("Admin");
-        click("pricing");
-        waitForForm("Pricing");
-        until(() -> text("baseCents").length() > 0, 20000, "the prices");
-        final String base = text("baseCents");
-        type("commissionPercent", "95");
-        click("submit");
-        until(() -> text("error").length() > 0, 20000, "a commission of 95% to be refused");
-        back();
-        waitForForm("Admin");
-        click("pricing");
-        waitForForm("Pricing");
-        untilText("baseCents", base);
+        onEdt(() -> Nav.switchTo(Nav.CHATS));
+        waitForForm("Chats");
+        onEdt(Nav::signOut);
+        waitForForm("Welcome");
         return true;
     }
 
-    private static Boolean bool(Object value) {
-        return Boolean.valueOf(Boolean.TRUE.equals(value) || "true".equals(value));
+    private boolean hasReport() {
+        return firstReport() != null;
+    }
+
+    private void clickReport() {
+        final String name = firstReport();
+        click(name);
+    }
+
+    private String firstReport() {
+        final String[] found = new String[1];
+        onEdt(() -> found[0] = named(com.codename1.ui.Display.getInstance().getCurrent()));
+        return found[0];
+    }
+
+    private static String named(com.codename1.ui.Container in) {
+        for (int iter = 0; in != null && iter < in.getComponentCount(); iter++) {
+            Component each = in.getComponentAt(iter);
+            String name = each.getName();
+            if (name != null && name.startsWith("report-")) {
+                return name;
+            }
+            if (each instanceof com.codename1.ui.Container) {
+                String inner = named((com.codename1.ui.Container) each);
+                if (inner != null) {
+                    return inner;
+                }
+            }
+        }
+        return null;
     }
 }

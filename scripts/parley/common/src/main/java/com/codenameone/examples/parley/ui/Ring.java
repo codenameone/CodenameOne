@@ -29,8 +29,8 @@ import com.codename1.ui.plaf.UIManager;
 
 /// A countdown drawn as a ring that empties, with the seconds left inside it.
 ///
-/// The colours are two styles' text colours: `SvRing` for the part of the
-/// ring still left and `SvRingTrack` for the part used up. Neither has a
+/// The colours are two styles' text colours: `PlRing` for the part of the
+/// ring still left and `PlRingTrack` for the part used up. Neither has a
 /// background, so whatever the ring sits on shows through its middle.
 public final class Ring extends Component {
     private long endsAt;
@@ -38,7 +38,7 @@ public final class Ring extends Component {
     private int shown = -1;
 
     public Ring() {
-        setUIID("SvRing");
+        setUIID("PlRing");
     }
 
     /// Starts counting down from `seconds`, of a count that began at `of`.
@@ -92,7 +92,7 @@ public final class Ring extends Component {
     @Override
     public void paint(Graphics g) {
         Style style = getStyle();
-        int track = UIManager.getInstance().getComponentStyle("SvRingTrack").getFgColor();
+        int track = UIManager.getInstance().getComponentStyle("PlRingTrack").getFgColor();
         int side = Math.min(getWidth() - style.getHorizontalPadding(),
                 getHeight() - style.getVerticalPadding());
         if (side <= 0) {

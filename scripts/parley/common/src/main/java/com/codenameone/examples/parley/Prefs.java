@@ -19,19 +19,16 @@
 package com.codenameone.examples.parley;
 
 import com.codename1.io.Preferences;
-import com.codenameone.examples.parley.api.PlaceDto;
-import java.util.ArrayList;
-import java.util.List;
 
-/// What the user has chosen in Settings, and the places they go back to.
+/// What the user has chosen in Settings.
 ///
 /// Every screen reads and writes a preference through this class and through
-/// nothing else, so where the values live is decided in one place. Today that
-/// is the device: `Preferences`, which survives a restart and is gone with the
-/// app. A server that keeps the same values for the account plugs in at
-/// [#onChange]: it is told the name of each value as it changes, and puts the
-/// account's values in with the setters when it has fetched them. No screen
-/// has to change for that.
+/// nothing else. The values live on the device in `Preferences`, and most are
+/// also the account's: [com.codenameone.examples.parley.net.Account] listens
+/// at [#onChange] and keeps the server's copy in step, so a second device
+/// signs in with the same privacy settings. The server needs them anyway --
+/// it is the server that hides last-seen and the profile photo from whoever
+/// the user chose, and that decides whom a push wakes.
 public final class Prefs {
     /// Told when a value changes, with the value's name.
     public interface Listener {
@@ -40,33 +37,31 @@ public final class Prefs {
 
     public static final String LANGUAGE = "language";
     public static final String THEME = "theme";
-    public static final String UNITS = "units";
-    public static final String NOTIFY_DELIVERY_UPDATES = "notifyDeliveryUpdates";
-    public static final String NOTIFY_RECEIPTS = "notifyReceipts";
-    public static final String NOTIFY_PROMOTIONS = "notifyPromotions";
-    public static final String PAYMENT_METHOD = "defaultPaymentMethodId";
-    public static final String TIP_PERCENT = "defaultTipPercent";
-    /// Where orders go unless the cart says otherwise. Kept on the device:
-    /// the addresses the account saved are the server's.
-    public static final String DELIVER_TO = "deliverTo";
-    public static final String RECENTS = "recents";
-    /// Whose the recent destinations are: see [#ownedBy].
-    private static final String RECENTS_OWNER = "recentsOwner";
+    public static final String NOTIFY_MESSAGES = "notifyMessages";
+    public static final String NOTIFY_GROUPS = "notifyGroups";
+    public static final String NOTIFY_CALLS = "notifyCalls";
+    public static final String READ_RECEIPTS = "readReceipts";
+    public static final String TYPING = "typingIndicators";
+    public static final String LAST_SEEN = "lastSeen";
+    public static final String PROFILE_PHOTO = "profilePhoto";
+    public static final String DISAPPEARING = "disappearingSeconds";
+    public static final String SCREEN_SECURITY = "screenSecurity";
+    public static final String APP_LOCK = "appLock";
 
     public static final String THEME_SYSTEM = "system";
     public static final String THEME_LIGHT = "light";
     public static final String THEME_DARK = "dark";
-    public static final String UNITS_KM = "km";
-    public static final String UNITS_MILES = "mi";
-    /// The one way to pay that needs nothing set up.
-    public static final String PAYMENT_CASH = "cash";
+
+    /// Who sees last-seen and the profile photo.
+    public static final String EVERYONE = "everyone";
+    public static final String CONTACTS = "contacts";
+    public static final String NOBODY = "nobody";
 
     private static final String PREFIX = "parley.pref.";
-    /// The plain values that are a copy of the account's; see [#ownedBy].
-    private static final String[] ACCOUNT_OWNED = {NOTIFY_DELIVERY_UPDATES, NOTIFY_RECEIPTS,
-        NOTIFY_PROMOTIONS, PAYMENT_METHOD, TIP_PERCENT};
-    /// How many delivery addresses are remembered.
-    private static final int RECENT_LIMIT = 4;
+    /// The values that are a copy of the account's; see [#ownedBy].
+    private static final String[] ACCOUNT_OWNED = {NOTIFY_MESSAGES, NOTIFY_GROUPS, NOTIFY_CALLS,
+        READ_RECEIPTS, TYPING, LAST_SEEN, PROFILE_PHOTO, DISAPPEARING, SCREEN_SECURITY, APP_LOCK};
+    private static final String OWNER = "owner";
 
     private static Listener listener;
 
@@ -79,8 +74,6 @@ public final class Prefs {
     public static void onChange(Listener told) {
         listener = told;
     }
-
-    // -------------------------------------------------------------- appearance
 
     /// The language chosen, as its two-letter code; empty while the user has
     /// chosen none and the device's language decides.
@@ -101,142 +94,114 @@ public final class Prefs {
         put(THEME, theme);
     }
 
-    /// [#UNITS_KM] or [#UNITS_MILES].
-    public static String units() {
-        return text(UNITS, UNITS_KM);
+    public static boolean notifyMessages() {
+        return flag(NOTIFY_MESSAGES, true);
     }
 
-    public static void setUnits(String units) {
-        put(UNITS, units);
+    public static void setNotifyMessages(boolean on) {
+        put(NOTIFY_MESSAGES, on);
     }
 
-    // ----------------------------------------------------------- notifications
-
-    public static boolean notifyDeliveryUpdates() {
-        return flag(NOTIFY_DELIVERY_UPDATES, true);
+    public static boolean notifyGroups() {
+        return flag(NOTIFY_GROUPS, true);
     }
 
-    public static void setNotifyDeliveryUpdates(boolean on) {
-        put(NOTIFY_DELIVERY_UPDATES, on);
+    public static void setNotifyGroups(boolean on) {
+        put(NOTIFY_GROUPS, on);
     }
 
-    public static boolean notifyReceipts() {
-        return flag(NOTIFY_RECEIPTS, true);
+    public static boolean notifyCalls() {
+        return flag(NOTIFY_CALLS, true);
     }
 
-    public static void setNotifyReceipts(boolean on) {
-        put(NOTIFY_RECEIPTS, on);
+    public static void setNotifyCalls(boolean on) {
+        put(NOTIFY_CALLS, on);
     }
 
-    public static boolean notifyPromotions() {
-        return flag(NOTIFY_PROMOTIONS, false);
+    /// Whether others see that this account read their message. Off means
+    /// this account does not see theirs either, as in every messenger.
+    public static boolean readReceipts() {
+        return flag(READ_RECEIPTS, true);
     }
 
-    public static void setNotifyPromotions(boolean on) {
-        put(NOTIFY_PROMOTIONS, on);
+    public static void setReadReceipts(boolean on) {
+        put(READ_RECEIPTS, on);
     }
 
-    // --------------------------------------------------------------- payment
-
-    /// The id of the way the user pays unless they say otherwise for an order.
-    public static String paymentMethod() {
-        return text(PAYMENT_METHOD, PAYMENT_CASH);
+    public static boolean typingIndicators() {
+        return flag(TYPING, true);
     }
 
-    public static void setPaymentMethod(String id) {
-        put(PAYMENT_METHOD, id);
+    public static void setTypingIndicators(boolean on) {
+        put(TYPING, on);
     }
 
-    /// The tip offered first at checkout, as a percentage of the food.
-    public static int tipPercent() {
-        return Preferences.get(PREFIX + TIP_PERCENT, 0);
+    /// [#EVERYONE], [#CONTACTS] or [#NOBODY].
+    public static String lastSeen() {
+        return text(LAST_SEEN, EVERYONE);
     }
 
-    public static void setTipPercent(int percent) {
-        if (percent != tipPercent()) {
-            Preferences.set(PREFIX + TIP_PERCENT, percent);
-            changed(TIP_PERCENT);
+    public static void setLastSeen(String who) {
+        put(LAST_SEEN, who);
+    }
+
+    public static String profilePhoto() {
+        return text(PROFILE_PHOTO, EVERYONE);
+    }
+
+    public static void setProfilePhoto(String who) {
+        put(PROFILE_PHOTO, who);
+    }
+
+    /// The disappearing timer new chats start with, in seconds; 0 for off.
+    public static int disappearingSeconds() {
+        return Preferences.get(PREFIX + DISAPPEARING, 0);
+    }
+
+    public static void setDisappearingSeconds(int seconds) {
+        if (seconds != disappearingSeconds()) {
+            Preferences.set(PREFIX + DISAPPEARING, seconds);
+            changed(DISAPPEARING);
         }
     }
 
-    // ---------------------------------------------------------------- places
-
-    /// Where orders are delivered, or null until the customer has said.
-    public static PlaceDto deliverTo() {
-        return place(DELIVER_TO);
+    /// Keeps the app out of screenshots, screen recordings and the app
+    /// switcher's picture.
+    public static boolean screenSecurity() {
+        return flag(SCREEN_SECURITY, false);
     }
 
-    public static void setDeliverTo(PlaceDto place) {
-        store(DELIVER_TO, place);
-        changed(DELIVER_TO);
+    public static void setScreenSecurity(boolean on) {
+        put(SCREEN_SECURITY, on);
     }
 
-    /// The last few places delivered to, the newest first.
-    public static List<PlaceDto> recents() {
-        List<PlaceDto> all = new ArrayList<PlaceDto>();
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            PlaceDto place = place(RECENTS + "." + iter);
-            if (place != null) {
-                all.add(place);
-            }
-        }
-        return all;
+    /// Asks for the fingerprint, face or device passcode to open the app.
+    public static boolean appLock() {
+        return flag(APP_LOCK, false);
     }
 
-    /// Remembers `place` as the destination chosen last.
-    public static void addRecent(PlaceDto place) {
-        if (place == null || place.name() == null || place.name().length() == 0) {
-            return;
-        }
-        List<PlaceDto> all = recents();
-        for (int iter = all.size() - 1; iter >= 0; iter--) {
-            if (place.name().equals(all.get(iter).name())) {
-                all.remove(iter);
-            }
-        }
-        all.add(0, place);
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            store(RECENTS + "." + iter, iter < all.size() ? all.get(iter) : null);
-        }
-        changed(RECENTS);
+    public static void setAppLock(boolean on) {
+        put(APP_LOCK, on);
     }
 
     /// Says whose device this is now, by the name they signed in with; empty
-    /// for nobody. When the account changes, what the device holds of the
-    /// last one is dropped and not shown to the next: the recent
-    /// destinations, which are kept here only and say where a person goes,
-    /// and the copy of everything the account keeps on the server -- home,
-    /// work, the card paid with, the delivery options.
-    /// That copy is replaced when the new account's values arrive, but they
-    /// may not arrive, and then the last person's would be on screen and go
-    /// out with the next save as the new person's own. How the app looks
-    /// (language, theme, units) is the device's and stays. The same account
-    /// signing in again finds its own still there.
-    ///
-    /// The listener is told of the recent destinations alone. It sends what
-    /// it is told of to the server, and values dropped here were not changed
-    /// by anyone: reported, they would be saved over the new account's.
+    /// for nobody. When the account changes, the copy of the last account's
+    /// settings is dropped rather than shown to the next and sent as theirs.
+    /// How the app looks (language, theme) is the device's and stays.
     ///
     /// @param account the account, with its server, as
     ///     [com.codenameone.examples.parley.net.Session#owner(String)] names
     ///     it, or empty for none
     public static void ownedBy(String account) {
         String owner = account == null ? "" : account;
-        if (owner.equals(text(RECENTS_OWNER, ""))) {
+        if (owner.equals(text(OWNER, ""))) {
             return;
         }
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            store(RECENTS + "." + iter, null);
-        }
-        store(DELIVER_TO, null);
         for (String name : ACCOUNT_OWNED) {
             Preferences.delete(PREFIX + name);
         }
-        Preferences.set(PREFIX + RECENTS_OWNER, owner);
-        changed(RECENTS);
+        Preferences.set(PREFIX + OWNER, owner);
     }
-
-    // ------------------------------------------------------------- the store
 
     private static String text(String name, String fallback) {
         return Preferences.get(PREFIX + name, fallback);
@@ -261,25 +226,6 @@ public final class Prefs {
             Preferences.set(PREFIX + name, value);
             changed(name);
         }
-    }
-
-    private static PlaceDto place(String name) {
-        String title = text(name + ".name", "");
-        if (title.length() == 0) {
-            return null;
-        }
-        PlaceDto place = new PlaceDto(title, text(name + ".address", ""),
-                Preferences.get(PREFIX + name + ".lat", 0d),
-                Preferences.get(PREFIX + name + ".lng", 0d));
-        return place;
-    }
-
-    private static void store(String name, PlaceDto place) {
-        Preferences.set(PREFIX + name + ".name", place == null ? "" : place.name());
-        Preferences.set(PREFIX + name + ".address",
-                place == null || place.address() == null ? "" : place.address());
-        Preferences.set(PREFIX + name + ".lat", place == null ? 0d : place.lat());
-        Preferences.set(PREFIX + name + ".lng", place == null ? 0d : place.lng());
     }
 
     private static void changed(String name) {

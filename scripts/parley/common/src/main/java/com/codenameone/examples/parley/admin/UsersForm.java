@@ -48,7 +48,7 @@ import java.util.List;
 /// is flagged for attention, and whether it may be used at all.
 ///
 /// All of it takes effect at once. The server reads an account's roles and its
-/// block on every request, not from the token the app is holding, so a courier
+/// block on every request, not from the token the app is holding, so a member
 /// made an admin has the admin screens the next time their app asks who they
 /// are, and a blocked account's next call is refused.
 ///
@@ -57,10 +57,8 @@ import java.util.List;
 public final class UsersForm {
     static final String ALL = "all";
     static final String FLAGGED = "flagged";
-    private static final String[] FILTERS = {ALL, "customers", "couriers", "admins", FLAGGED,
-        "blocked"};
-    private static final String[] FILTER_NAMES = {"Everyone", "Customers", "Couriers", "Admins",
-        "Flagged", "Blocked"};
+    private static final String[] FILTERS = {ALL, "admins", FLAGGED, "blocked"};
+    private static final String[] FILTER_NAMES = {"Everyone", "Admins", "Flagged", "Blocked"};
 
     private final Panes panes;
     private final Container list = Ui.list("users");
@@ -72,10 +70,10 @@ public final class UsersForm {
         this.panes = panes;
         this.filter = filter == null || filter.length() == 0 ? ALL : filter;
         Container top = new Container(BoxLayout.y());
-        top.setUIID("SvPage");
+        top.setUIID("PlPage");
         search = new TextField("", Lang.tr("Search by name or e-mail"), 24, TextField.ANY);
-        search.setUIID("SvField");
-        search.getHintLabel().setUIID("SvFieldHint");
+        search.setUIID("PlField");
+        search.getHintLabel().setUIID("PlFieldHint");
         search.setName("search");
         search.addDataChangedListener((type, index) -> fill());
         top.add(search);
@@ -115,9 +113,9 @@ public final class UsersForm {
             shown++;
             Container marks = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
             if (user.flagged()) {
-                marks.add(Ui.badge("Flagged", "SvBadgeWarn"));
+                marks.add(Ui.badge("Flagged", "PlBadgeWarn"));
             }
-            marks.add(Ui.badge(roles(user), user.suspended() ? "SvBadgeBad" : "SvBadge"));
+            marks.add(Ui.badge(roles(user), user.suspended() ? "PlBadgeBad" : "PlBadge"));
             Container row = Ui.row((char) 0, user.displayName(), user.username(), marks);
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
                     Ui.avatar(user.displayName())));
@@ -142,12 +140,6 @@ public final class UsersForm {
         }
         if ("admins".equals(filter)) {
             return user.admin();
-        }
-        if ("couriers".equals(filter)) {
-            return user.courier();
-        }
-        if ("customers".equals(filter)) {
-            return !user.courier() && !user.admin();
         }
         return true;
     }
@@ -176,7 +168,7 @@ public final class UsersForm {
         if (user.suspended()) {
             return "Blocked";
         }
-        return user.admin() ? "Admin" : user.courier() ? "Courier" : "Customer";
+        return user.admin() ? "Admin" : "Member";
     }
 
     /// One account in full, fetched each time it is shown.
@@ -189,77 +181,63 @@ public final class UsersForm {
         Container page = Ui.page();
 
         Label standing = Ui.badge(user.suspended() ? "Blocked" : user.flagged() ? "Flagged"
-                : "In good standing", user.suspended() ? "SvBadgeBad" : user.flagged()
-                ? "SvBadgeWarn" : "SvBadgeGood");
+                : "In good standing", user.suspended() ? "PlBadgeBad" : user.flagged()
+                ? "PlBadgeWarn" : "PlBadgeGood");
         standing.setName("standing");
         page.add(Ui.person(user.displayName(), user.username(), standing));
         if (user.flagged() && user.flagReason() != null && user.flagReason().length() > 0) {
-            SpanLabel why = Ui.text(user.flagReason(), "SvNotice");
+            SpanLabel why = Ui.text(user.flagReason(), "PlNotice");
             why.setName("flagReason");
             page.add(why);
         }
 
-        StatRow numbers = Ui.stats(3);
-        numbers.stat(String.valueOf(detail.deliveries()), "Deliveries", "userDeliveries");
-        numbers.stat(String.valueOf(detail.cancellations()), "Cancelled",
-                "userCancellations");
-        numbers.stat(detail.rating() > 0 ? Ui.tenths(detail.rating()) : "-", "Rating",
-                "userRating");
+        StatRow numbers = Ui.stats(2);
+        numbers.stat(String.valueOf(detail.devices()), "Devices", "userDevices");
+        numbers.stat(String.valueOf(detail.conversations()), "Chats", "userConversations");
         page.add(numbers);
-        StatRow money = Ui.stats(2);
-        money.stat(Ui.money(detail.spent(), null), "Spent on orders", "userSpent");
-        money.stat(Ui.money(detail.earned(), null), "Earned delivering", "userEarned");
-        page.add(money);
+        StatRow activity = Ui.stats(2);
+        activity.stat(String.valueOf(detail.messagesSent()), "Messages sent", "userMessages");
+        activity.stat(String.valueOf(detail.reportsAgainst()), "Reported", "userReports");
+        page.add(activity);
+        page.add(Ui.text("Message counts are all the server knows: what they said is "
+                + "encrypted on the devices and was never readable here.", "PlMuted"));
 
         Ui.section(page, "Contact");
         page.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
                 user.phoneVerified() ? "Verified" : "Not verified", null));
-        if (user.courier()) {
-            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle(), user.plate(), null));
-        }
 
         Ui.section(page, "Access");
-        final Switch courier = toggle("courier", user.courier());
         final Switch admin = toggle("admin", user.admin());
-        page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "Courier",
-                "May go online and take deliveries", courier));
         page.add(Ui.row(FontImage.MATERIAL_INSIGHTS, "Admin",
-                "May see and change everything here", admin));
+                "May see the dashboard, reports and accounts", admin));
         // A change the server refuses -- an admin removing their own role, say
-        // -- is put back, so the switches always show what is true. Putting
-        // one back is itself a change, which `settling` keeps from being sent.
+        // -- is put back, so the switch always shows what is true. Putting it
+        // back is itself a change, which `settling` keeps from being sent.
         final boolean[] settling = new boolean[1];
-        // The roles as the server last confirmed them: courier, admin.
-        final boolean[] held = {user.courier(), user.admin()};
-        final Runnable roles = () -> {
+        final boolean[] held = {user.admin()};
+        admin.addChangeListener(e -> {
             if (settling[0]) {
                 return;
             }
-            RoleChangeDto change = new RoleChangeDto(courier.isValue(), admin.isValue());
-            Api.admin().setRoles(user.username(), change, Net.to(saved -> {
-                held[0] = saved.courier();
-                held[1] = saved.admin();
-            }, (status, message) -> {
-                Ui.fail(status, message);
-                settling[0] = true;
-                courier.setValue(held[0]);
-                admin.setValue(held[1]);
-                settling[0] = false;
-            }));
-        };
-        courier.addChangeListener(e -> roles.run());
-        admin.addChangeListener(e -> roles.run());
+            Api.admin().setRoles(user.username(), new RoleChangeDto(admin.isValue()),
+                    Net.to(saved -> held[0] = saved.admin(), (status, message) -> {
+                        Ui.fail(status, message);
+                        settling[0] = true;
+                        admin.setValue(held[0]);
+                        settling[0] = false;
+                    }));
+        });
 
         Ui.section(page, "Moderation");
         page.add(Ui.text("A flag marks the account for the admins and changes nothing for "
-                + "its owner. A block signs it out and refuses it until lifted.", "SvMuted"));
+                + "its owner. A block signs it out and refuses it until lifted.", "PlMuted"));
         Container actions = new Container(new GridLayout(1, 2));
-        actions.add(pair("SvPairLeft", user.flagged()
+        actions.add(pair("PlPairLeft", user.flagged()
                 ? Ui.secondary("Remove flag", "unflag", e -> flag(user, false, ""))
                 : Ui.secondary("Flag", "flag", e -> panes.reason("Flag account",
                         Lang.tr("Why does {0} need the admins' attention?", user.displayName()),
                         "Flag", why -> flag(user, true, why)))));
-        actions.add(pair("SvPairRight", user.suspended()
+        actions.add(pair("PlPairRight", user.suspended()
                 ? Ui.secondary("Unblock", "unblock", e -> block(user, false, ""))
                 : Ui.danger("Block", "block", e -> panes.reason("Block account",
                         Lang.tr("{0} is signed out everywhere and cannot sign in again "
@@ -270,7 +248,7 @@ public final class UsersForm {
         Ui.section(page, "History");
         List<ModerationEventDto> events = detail.events();
         if (events == null || events.isEmpty()) {
-            page.add(Ui.label("Nothing has been done to this account.", "SvMuted"));
+            page.add(Ui.label("Nothing has been done to this account.", "PlMuted"));
         }
         for (int iter = 0; events != null && iter < events.size(); iter++) {
             ModerationEventDto event = events.get(iter);
@@ -279,8 +257,8 @@ public final class UsersForm {
                     null);
             row.setName("event-" + iter);
             Container when = new Container(BoxLayout.y());
-            when.add(Ui.plain(Ui.when(event.at()), "SvRowDetail"));
-            when.add(Ui.plain(event.by(), "SvRowDetail"));
+            when.add(Ui.plain(Ui.when(event.at()), "PlRowDetail"));
+            when.add(Ui.plain(event.by(), "PlRowDetail"));
             row.add(BorderLayout.EAST, when);
             page.add(row);
         }
@@ -315,19 +293,14 @@ public final class UsersForm {
                 : "unblock".equals(action) ? FontImage.MATERIAL_LOCK_OPEN
                 : "flag".equals(action) ? FontImage.MATERIAL_FLAG
                 : "unflag".equals(action) ? FontImage.MATERIAL_OUTLINED_FLAG
-                : "approve".equals(action) ? FontImage.MATERIAL_CHECK_CIRCLE
-                : "reject".equals(action) ? FontImage.MATERIAL_CANCEL
-                : "listed".equals(action) ? FontImage.MATERIAL_STOREFRONT
-                : "cancel_order".equals(action) ? FontImage.MATERIAL_REMOVE_SHOPPING_CART
+                : "report_resolved".equals(action) ? FontImage.MATERIAL_GAVEL
                 : FontImage.MATERIAL_MANAGE_ACCOUNTS;
     }
 
     private static String action(String action) {
         return "block".equals(action) ? "Blocked" : "unblock".equals(action) ? "Unblocked"
                 : "flag".equals(action) ? "Flagged" : "unflag".equals(action) ? "Flag removed"
-                : "approve".equals(action) ? "Approved to deliver" : "reject".equals(action)
-                ? "Application sent back" : "listed".equals(action) ? "Restaurant listed"
-                : "cancel_order".equals(action) ? "Order cancelled" : "Roles changed";
+                : "report_resolved".equals(action) ? "Report resolved" : "Roles changed";
     }
 
     private static Switch toggle(String name, boolean value) {

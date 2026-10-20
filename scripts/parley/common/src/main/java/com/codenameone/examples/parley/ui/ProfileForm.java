@@ -26,18 +26,14 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.parley.api.ProfileDto;
-import com.codenameone.examples.parley.api.SavedAddressDto;
 import com.codenameone.examples.parley.api.UserDto;
-import com.codenameone.examples.parley.customer.PlaceSearchForm;
-import com.codenameone.examples.parley.map.Locator;
 import com.codenameone.examples.parley.net.Account;
 import com.codenameone.examples.parley.net.Api;
 import com.codenameone.examples.parley.net.Net;
 import com.codenameone.examples.parley.net.Session;
 import java.util.List;
 
-/// Who the user is to the service: the name couriers and kitchens see, and the
-/// addresses orders go to.
+/// Who the user is to the people they talk to: a name and a line about them.
 public final class ProfileForm {
     private ProfileForm() {
     }
@@ -52,57 +48,30 @@ public final class ProfileForm {
         Container page = Ui.page();
 
         Ui.section(page, "About you");
-        final TextField name = Ui.field(page, "Name", "name",
-                "What the kitchen and the courier will call you");
+        final TextField name = Ui.field(page, "Name", "name", "What your contacts will see");
         name.setText(profile == null ? user.displayName() : profile.name());
+        final TextField about = Ui.field(page, "About", "about", "Available");
+        about.setText(profile == null ? (user.about() == null ? "" : user.about())
+                : (profile.about() == null ? "" : profile.about()));
 
-        final SpanLabel error = Ui.text("", "SvError");
+        final SpanLabel error = Ui.text("", "PlError");
         error.setName("error");
         final Button save = Ui.primary("Save", "submit", null);
         save.addActionListener(e -> {
             save.setEnabled(false);
             error.setText("");
-            Account.saveProfile(name.getText().trim(), saved, (status, message) -> {
-                save.setEnabled(true);
-                error.setText(message);
-                Ui.refresh(form);
-            });
+            Account.saveProfile(name.getText().trim(), about.getText().trim(), saved,
+                    (status, message) -> {
+                        save.setEnabled(true);
+                        error.setText(message);
+                        Ui.refresh(form);
+                    });
         });
         page.add(error).add(save);
-
-        // Saved with the account, so they follow it to the browser and to the
-        // next phone; each is saved or removed as it is changed.
-        Ui.section(page, "Saved addresses");
-        final Container addresses = SettingsForm.group();
-        addresses.setName("addresses");
-        page.add(addresses);
-        page.add(Ui.secondary("Add an address", "addAddress",
-                e -> PlaceSearchForm.show(form, Locator.here(), picked ->
-                        Api.orders().saveAddress(new SavedAddressDto(null, picked.name(),
-                                picked.address(), picked.lat(), picked.lng(), ""),
-                                Net.to(added -> load(form, addresses), Ui::fail)))));
+        page.add(Ui.text("Your name and photo are seen by the people you talk to. Who sees "
+                + "your photo and when you were last online is up to you, in Privacy.",
+                "PlMuted"));
         form.add(BorderLayout.CENTER, page);
         form.show();
-        load(form, addresses);
-    }
-
-    private static void load(final Form form, final Container addresses) {
-        Api.orders().addresses(Net.to(found -> {
-            addresses.removeAll();
-            List<SavedAddressDto> all = found;
-            if (all == null || all.isEmpty()) {
-                addresses.add(Ui.text("None yet. Addresses you deliver to can be saved here.",
-                        "SvMuted"));
-            }
-            for (int iter = 0; all != null && iter < all.size(); iter++) {
-                final SavedAddressDto address = all.get(iter);
-                addresses.add(Ui.row(FontImage.MATERIAL_PLACE, address.label(),
-                        address.address(), Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE,
-                                "removeAddress-" + iter,
-                                e -> Api.orders().removeAddress(address.id(),
-                                        Net.to(gone -> load(form, addresses), Ui::fail)))));
-            }
-            Ui.refresh(form);
-        }, Ui::fail));
     }
 }

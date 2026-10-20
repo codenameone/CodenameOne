@@ -48,7 +48,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codenameone.examples.parley.net.Net;
 import com.codenameone.examples.parley.Prefs;
 import com.codenameone.examples.parley.Telemetry;
-import com.codenameone.examples.parley.api.DeliveryState;
 
 import java.util.Date;
 
@@ -67,8 +66,8 @@ public final class Ui {
     /// @param name what a test waits for; the title is for people and changes
     public static Form form(String title, String name) {
         Form form = new Form(title, new BorderLayout());
-        form.setUIID("SvForm");
-        form.getContentPane().setUIID("SvForm");
+        form.setUIID("PlForm");
+        form.getContentPane().setUIID("PlForm");
         form.setName(name);
         watch(form);
         clearOfTheStatusBar(form);
@@ -119,7 +118,10 @@ public final class Ui {
     /// Every screen of the app is made by this class or handed to this method,
     /// so this is the one place a screen view is reported from.
     public static void watch(final Form form) {
-        form.addShowListener(e -> viewed(form.getName()));
+        form.addShowListener(e -> {
+            viewed(form.getName());
+            Privacy.shown();
+        });
     }
 
     /// Counts something that takes the place of a screen without being a
@@ -133,10 +135,10 @@ public final class Ui {
     /// in over both.
     public static Form home(String name) {
         Form form = new Form("", new LayeredLayout());
-        form.setUIID("SvForm");
+        form.setUIID("PlForm");
         // The strips the device keeps clear at the top and bottom are the
         // content pane's; the native theme would paint them its own grey.
-        form.getContentPane().setUIID("SvForm");
+        form.getContentPane().setUIID("PlForm");
         form.setName(name);
         watch(form);
         form.getToolbar().hideToolbar();
@@ -176,8 +178,8 @@ public final class Ui {
             }
             added[0] = true;
             Container bar = new Container(new BorderLayout());
-            bar.setUIID("SvPaneBar");
-            Button arrow = button("Back", "back-bar", "SvLink", e2 -> leave.run());
+            bar.setUIID("PlPaneBar");
+            Button arrow = button("Back", "back-bar", "PlLink", e2 -> leave.run());
             icon(arrow, FontImage.MATERIAL_ARROW_BACK, 3.4f);
             bar.add(BorderLayout.WEST, arrow);
             Component top = ((BorderLayout) form.getContentPane().getLayout()).getNorth();
@@ -197,7 +199,7 @@ public final class Ui {
     /// A column of content with the page's margins, that scrolls when it has to.
     public static Container page() {
         Container page = new Column();
-        page.setUIID("SvPage");
+        page.setUIID("PlPage");
         page.setScrollableY(true);
         page.setScrollVisible(false);
         page.setSafeArea(true);
@@ -206,7 +208,7 @@ public final class Ui {
 
     public static Container card() {
         Container card = new Container(BoxLayout.y());
-        card.setUIID("SvCard");
+        card.setUIID("PlCard");
         return card;
     }
 
@@ -223,24 +225,24 @@ public final class Ui {
     }
 
     public static Button primary(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "SvPrimary", onClick);
+        return button(text, name, "PlPrimary", onClick);
     }
 
     public static Button secondary(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "SvSecondary", onClick);
+        return button(text, name, "PlSecondary", onClick);
     }
 
     public static Button danger(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "SvDanger", onClick);
+        return button(text, name, "PlDanger", onClick);
     }
 
     public static Button link(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, name, "SvLink", onClick);
+        return button(text, name, "PlLink", onClick);
     }
 
     /// A round button that floats over the map.
     public static Button round(char icon, String name, ActionListener<ActionEvent> onClick) {
-        Button button = button("", name, "SvMapButton", onClick);
+        Button button = button("", name, "PlMapButton", onClick);
         icon(button, icon, 4f);
         return button;
     }
@@ -248,7 +250,7 @@ public final class Ui {
     /// The same button for a bar that is a surface of its own: flat, since a
     /// shadow says "this floats", and on a bar nothing does.
     public static Button flat(char icon, String name, ActionListener<ActionEvent> onClick) {
-        Button button = button("", name, "SvBarButton", onClick);
+        Button button = button("", name, "PlBarButton", onClick);
         icon(button, icon, 4f);
         return button;
     }
@@ -256,7 +258,7 @@ public final class Ui {
     /// One of a row of things to do: an icon with a word under it.
     public static Button action(char icon, String text, String name,
             ActionListener<ActionEvent> onClick) {
-        Button button = button(text, name, "SvAction", onClick);
+        Button button = button(text, name, "PlAction", onClick);
         icon(button, icon, 4f);
         button.setTextPosition(Component.BOTTOM);
         button.setGap(CN.convertToPixels(0.6f));
@@ -265,7 +267,7 @@ public final class Ui {
 
     /// A short fact in a pill: how far, how long. The icon may be 0.
     public static Label chip(String text, char icon) {
-        Label chip = new Label(text == null ? "" : text, "SvChip");
+        Label chip = new Label(text == null ? "" : text, "PlChip");
         if (icon != 0) {
             icon(chip, icon, 2.7f);
         }
@@ -274,7 +276,7 @@ public final class Ui {
 
     /// A person, as the initials of their name in a circle.
     public static Label avatar(String name) {
-        Label avatar = new Label("", "SvAvatar");
+        Label avatar = new Label("", "PlAvatar");
         // Initials are not words: looking them up would translate "OK".
         avatar.setShouldLocalize(false);
         avatar.setText(initials(name));
@@ -325,12 +327,12 @@ public final class Ui {
             String current, final Chosen chosen, int columns) {
         Container row = new Container(new GridLayout((values.length + columns - 1) / columns,
                 columns));
-        row.setUIID("SvSegments");
+        row.setUIID("PlSegments");
         ButtonGroup group = new ButtonGroup();
         for (int iter = 0; iter < values.length; iter++) {
             final String value = values[iter];
             RadioButton option = RadioButton.createToggle(labels[iter], group);
-            option.setUIID("SvSegment");
+            option.setUIID("PlSegment");
             option.setName(name + "-" + value);
             option.setSelected(value.equals(current));
             option.addActionListener(e -> chosen.chosen(value));
@@ -348,21 +350,21 @@ public final class Ui {
     /// two people with the same name apart.
     public static Container person(String name, String username, Component value) {
         Container who = new Container(new BorderLayout());
-        who.setUIID("SvPanel");
+        who.setUIID("PlPanel");
         Container names = new Container(BoxLayout.y());
-        Label called = plain(name, "SvHeading");
+        Label called = plain(name, "PlHeading");
         shrink(called, 3f);
         String signsIn = username == null ? "" : username;
         Component address;
         if (signsIn.length() > LONG_ADDRESS) {
             // An address has no spaces to break at: a long one is broken
             // where the line ends, which keeps all of it readable.
-            SpanLabel wrapped = text("", "SvMuted");
+            SpanLabel wrapped = text("", "PlMuted");
             wrapped.setShouldLocalize(false);
             wrapped.setText(signsIn);
             address = wrapped;
         } else {
-            Label line = plain(signsIn, "SvMuted");
+            Label line = plain(signsIn, "PlMuted");
             shrink(line, 2f);
             address = line;
         }
@@ -410,7 +412,7 @@ public final class Ui {
 
     /// The heading over a group of settings or facts.
     public static void section(Container page, String title) {
-        page.add(label(title, "SvSection"));
+        page.add(label(title, "PlSection"));
     }
 
     /// A label for text that is a name or a number, not a word to translate.
@@ -424,12 +426,12 @@ public final class Ui {
     /// One line of a receipt or a record: what it is on one side, and its
     /// value, which is never translated, on the other.
     public static Container fact(String caption, String value) {
-        return fact(caption, value, "SvFactValue");
+        return fact(caption, value, "PlFactValue");
     }
 
     public static Container fact(String caption, String value, String valueUiid) {
-        Container fact = new FactRow(label(caption, "SvFactLabel"), plain(value, valueUiid));
-        fact.setUIID("SvFact");
+        Container fact = new FactRow(label(caption, "PlFactLabel"), plain(value, valueUiid));
+        fact.setUIID("PlFact");
         return fact;
     }
 
@@ -438,15 +440,15 @@ public final class Ui {
     /// words under it.
     public static Container banner(char icon, String title, String text, String iconUiid) {
         Container banner = new Container(BoxLayout.y());
-        banner.setUIID("SvBanner");
+        banner.setUIID("PlBanner");
         Label image = new Label("", iconUiid);
         icon(image, icon, 6f);
         banner.add(FlowLayout.encloseCenter(image));
-        SpanLabel heading = text(title, "SvBannerTitle");
+        SpanLabel heading = text(title, "PlBannerTitle");
         heading.getTextComponent().setAlignment(Component.CENTER);
         banner.add(heading);
         if (text != null && text.length() > 0) {
-            SpanLabel words = text(text, "SvBannerText");
+            SpanLabel words = text(text, "PlBannerText");
             words.getTextComponent().setAlignment(Component.CENTER);
             banner.add(words);
         }
@@ -459,27 +461,27 @@ public final class Ui {
     /// on it, and is far too loud between two sections.
     public static Container callout(char icon, String title, String text) {
         Container box = new Container(new BorderLayout());
-        box.setUIID("SvCallout");
-        Label image = new Label("", "SvCalloutIcon");
+        box.setUIID("PlCallout");
+        Label image = new Label("", "PlCalloutIcon");
         icon(image, icon, 3.6f);
         box.add(BorderLayout.WEST, FlowLayout.encloseIn(image));
         Container words = new Container(BoxLayout.y());
-        words.add(label(title, "SvCalloutTitle"));
+        words.add(label(title, "PlCalloutTitle"));
         if (text != null && text.length() > 0) {
-            words.add(text(text, "SvCalloutText"));
+            words.add(text(text, "PlCalloutText"));
         }
         box.add(BorderLayout.CENTER, words);
         return box;
     }
 
     public static Container empty(char icon, String title, String text) {
-        return banner(icon, title, text, "SvBannerIcon");
+        return banner(icon, title, text, "PlBannerIcon");
     }
 
     /// A list that fills a screen: rows from edge to edge, scrolling.
     public static Container list(String name) {
         Container list = new Column();
-        list.setUIID("SvList");
+        list.setUIID("PlList");
         list.setScrollableY(true);
         list.setScrollVisible(false);
         list.setName(name);
@@ -540,9 +542,9 @@ public final class Ui {
     /// it: the admin console shows it beside the list on a wide screen.
     public static Container reasonPage(String text, String action, final Reason reason) {
         final Container page = page();
-        page.add(text(text, "SvText"));
+        page.add(text(text, "PlText"));
         final TextField why = field(page, "Reason", "reason", "A sentence the record will keep");
-        final SpanLabel error = text("", "SvError");
+        final SpanLabel error = text("", "PlError");
         error.setName("error");
         page.add(error);
         page.add(danger(action, "confirm", e -> {
@@ -572,10 +574,10 @@ public final class Ui {
     public static TextField field(Container to, String caption, String name, String hint,
             int constraint) {
         TextField field = new TextField("", hint, 24, constraint);
-        field.setUIID("SvField");
-        field.getHintLabel().setUIID("SvFieldHint");
+        field.setUIID("PlField");
+        field.getHintLabel().setUIID("PlFieldHint");
         field.setName(name);
-        to.add(label(caption, "SvLabel")).add(field);
+        to.add(label(caption, "PlLabel")).add(field);
         return field;
     }
 
@@ -587,16 +589,16 @@ public final class Ui {
     /// The icon may be 0, and the last two null.
     public static Container row(char icon, String title, String detail, Component value) {
         Container row = new Container(new BorderLayout());
-        row.setUIID("SvRow");
+        row.setUIID("PlRow");
         if (icon != 0) {
-            Label image = new Label("", "SvRowIcon");
+            Label image = new Label("", "PlRowIcon");
             icon(image, icon, 4f);
             row.add(BorderLayout.WEST, image);
         }
         Container lines = new Container(BoxLayout.y());
-        lines.add(label(title, "SvRowTitle"));
+        lines.add(label(title, "PlRowTitle"));
         if (detail != null && detail.length() > 0) {
-            lines.add(text(detail, "SvRowDetail"));
+            lines.add(text(detail, "PlRowDetail"));
         }
         row.add(BorderLayout.CENTER, lines);
         if (value != null) {
@@ -682,46 +684,6 @@ public final class Ui {
         ToastBar.showInfoMessage(Lang.tr(message));
     }
 
-    /// The server's currency, from the payment config; null until it is known.
-    private static String currency;
-
-    /// Records the currency the server prices everything in.
-    public static void setCurrency(String code) {
-        currency = code;
-    }
-
-    /// An amount of money. Whole cents in and text out: `$12.40` for dollars,
-    /// and the amount followed by the currency's code for anything else.
-    public static String money(long cents, String currency) {
-        if (currency == null || currency.length() == 0) {
-            // Menus, options and carts carry no currency of their own: they are
-            // in the one the server is configured for (parley.currency).
-            currency = Ui.currency;
-        }
-        long whole = cents / 100;
-        long part = Math.abs(cents % 100);
-        String amount = whole + "." + (part < 10 ? "0" : "") + part;
-        if (currency == null || currency.length() == 0 || "USD".equals(currency)) {
-            return "$" + amount;
-        }
-        return amount + " " + currency;
-    }
-
-    /// A distance, in the units chosen in Settings.
-    public static String distance(double meters) {
-        if (Prefs.UNITS_MILES.equals(Prefs.units())) {
-            double feet = meters * 3.28084;
-            if (feet < 900) {
-                return Lang.tr("{0} ft", String.valueOf(Math.round(feet / 50d) * 50));
-            }
-            return Lang.tr("{0} mi", tenths(meters / 1609.344));
-        }
-        if (meters < 950) {
-            return Lang.tr("{0} m", String.valueOf(Math.round(meters / 50d) * 50));
-        }
-        return Lang.tr("{0} km", tenths(meters / 1000d));
-    }
-
     /// `value` with one digit after the point.
     public static String tenths(double value) {
         long tenths = Math.round(value * 10d);
@@ -732,46 +694,47 @@ public final class Ui {
         return Lang.tr("{0} min", String.valueOf(Math.max(1L, Math.round(seconds / 60d))));
     }
 
-    /// A delivery's state in words.
-    public static String state(DeliveryState state) {
-        if (DeliveryState.REQUESTED == state || DeliveryState.OFFERED == state) {
-            return "Finding a courier";
-        }
-        if (DeliveryState.ACCEPTED == state) {
-            return "Courier on the way";
-        }
-        if (DeliveryState.ARRIVED == state) {
-            return "Courier at pickup";
-        }
-        if (DeliveryState.IN_PROGRESS == state) {
-            return "On its way";
-        }
-        if (DeliveryState.COMPLETED == state) {
-            return "Completed";
-        }
-        if (DeliveryState.CANCELLED_BY_CUSTOMER == state) {
-            return "Cancelled by customer";
-        }
-        if (DeliveryState.CANCELLED_BY_COURIER == state) {
-            return "Cancelled by courier";
-        }
-        if (DeliveryState.CANCELLED_BY_ADMIN == state) {
-            return "Cancelled by Parley";
-        }
-        if (DeliveryState.NO_COURIERS == state) {
-            return "No courier found";
-        }
-        return "";
+    /// The time of day of `millis`, as 24-hour hh:mm.
+    public static String clock(long millis) {
+        java.util.Calendar at = java.util.Calendar.getInstance();
+        at.setTime(new java.util.Date(millis));
+        int h = at.get(java.util.Calendar.HOUR_OF_DAY);
+        int m = at.get(java.util.Calendar.MINUTE);
+        return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
     }
 
-    /// The style of the badge a state is shown in.
-    public static String stateBadge(DeliveryState state) {
-        if (DeliveryState.COMPLETED == state) {
-            return "SvBadgeGood";
+    /// Which day `millis` falls on, counted from the epoch in local time, so
+    /// two moments compare as the same day or not.
+    public static long dayNumber(long millis) {
+        java.util.Calendar at = java.util.Calendar.getInstance();
+        at.setTime(new java.util.Date(millis));
+        return at.get(java.util.Calendar.YEAR) * 400L + at.get(java.util.Calendar.DAY_OF_YEAR);
+    }
+
+    /// "Today", "Yesterday" or the date, for the label between days.
+    public static String dayLabel(long millis) {
+        long today = dayNumber(System.currentTimeMillis());
+        long that = dayNumber(millis);
+        if (that == today) {
+            return "Today";
         }
-        if (state != null && state.isActive()) {
-            return "SvBadgeWarn";
+        if (that == dayNumber(System.currentTimeMillis() - 86400000L)) {
+            return "Yesterday";
         }
-        return "SvBadgeBad";
+        return new com.codename1.l10n.SimpleDateFormat("d MMM yyyy").format(new java.util.Date(millis));
+    }
+
+    /// The time for the chat list: the clock today, the day otherwise.
+    public static String listTime(long millis) {
+        if (millis <= 0) {
+            return "";
+        }
+        if (dayNumber(millis) == dayNumber(System.currentTimeMillis())) {
+            return clock(millis);
+        }
+        if (System.currentTimeMillis() - millis < 6L * 86400000L) {
+            return new com.codename1.l10n.SimpleDateFormat("EEE").format(new java.util.Date(millis));
+        }
+        return new com.codename1.l10n.SimpleDateFormat("d/M/yy").format(new java.util.Date(millis));
     }
 }

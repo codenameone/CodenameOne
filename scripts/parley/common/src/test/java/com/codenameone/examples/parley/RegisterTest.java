@@ -56,7 +56,7 @@ public class RegisterTest extends E2e {
 
         type("code", code);
         click("submit");
-        waitForForm("Customer");
+        waitForForm("Chats");
         assertTrue(Session.user().phoneVerified(), "the right code verifies the number");
         return true;
     }

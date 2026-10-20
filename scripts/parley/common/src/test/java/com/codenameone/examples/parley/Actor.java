@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/// The other person in a test. The app on screen is one user; a delivery needs
+/// The other person in a test. The app on screen is one user; a conversation needs
 /// two, so the second one acts through the API directly, with their own token.
 ///
 /// Their requests opt out of the app's authorizer, which would otherwise put
@@ -136,12 +136,6 @@ final class Actor {
         Object root = get(path).get("root");
         return root instanceof java.util.List ? (java.util.List<Object>) root
                 : new java.util.ArrayList<Object>();
-    }
-
-    /// A courier's position report.
-    Map<String, Object> online(boolean online, double lat, double lng) {
-        return post("/api/courier/status", "{\"online\":" + online + ",\"lat\":" + lat
-                + ",\"lng\":" + lng + ",\"heading\":0}");
     }
 
     static String text(Map<String, Object> json, String key) {

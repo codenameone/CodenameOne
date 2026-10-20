@@ -41,7 +41,7 @@ import java.util.List;
 /// - [#over] shows something on top of that: a document, the question "why?".
 /// - [#back] leaves the last of those; [#home] leaves all of them.
 ///
-/// [#phone(Form)] is the phone's. The wide one is [Console]'s.
+/// [#phone(Form)] lays them out as one screen after another.
 abstract class Panes {
     /// Shows a part's list.
     ///

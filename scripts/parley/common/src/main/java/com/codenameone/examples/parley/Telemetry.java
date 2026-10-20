@@ -25,7 +25,6 @@ import com.codename1.analytics.AnalyticsProvider;
 import com.codename1.analytics.CodenameOneAnalyticsProvider;
 import com.codename1.analytics.LoggingAnalyticsProvider;
 import com.codename1.ui.CN;
-import com.codenameone.examples.parley.api.DeliveryState;
 import com.codenameone.examples.parley.ui.Lang;
 
 /// What the app reports about how it is used, and whether it may.
@@ -33,11 +32,11 @@ import com.codenameone.examples.parley.ui.Lang;
 /// This is the only class that talks to `com.codename1.analytics`. A screen
 /// says what happened by calling one of the methods here, so the whole
 /// vocabulary -- every event name and every parameter -- is in this file, and
-/// it is here that the one rule is kept: nothing that says who someone is or
-/// where they are ever goes into an event. No name, e-mail address, phone
-/// number, address, position, card number or delivery id; an amount of money goes
-/// as the bracket it falls in. What is known about the user is two things: the
-/// mode they are in and the language they read.
+/// it is here that the one rule is kept: nothing that says who someone is,
+/// whom they talk to or what they say ever goes into an event. No name,
+/// e-mail address, phone number, conversation id or message text; a count
+/// goes as the bracket it falls in. What is known about the user is two
+/// things: the mode they are in and the language they read.
 ///
 /// Nothing is reported until the user has said yes. The library starts with
 /// consent withheld and drops every call made without it, so a method here is
@@ -53,9 +52,8 @@ import com.codenameone.examples.parley.ui.Lang;
 /// writes what it would have sent to the log.
 public final class Telemetry {
     private static final String ACCOUNT = "account";
-    private static final String DELIVERY = "delivery";
-    private static final String PAYMENT = "payment";
-    private static final String COURIER = "courier";
+    private static final String MESSAGING = "messaging";
+    private static final String CALLS = "calls";
     private static final String ADMIN = "admin";
     private static final String SETTINGS = "settings";
 
@@ -208,89 +206,74 @@ public final class Telemetry {
         role = null;
     }
 
-    /// @param onboarding whether they came to drive
-    public static void registered(boolean onboarding) {
-        send(ACCOUNT, "sign_up", "method", "password", "intent", onboarding ? "courier" : "customer");
+    public static void registered() {
+        send(ACCOUNT, "sign_up", "method", "password");
     }
 
     public static void phoneVerified() {
         send(ACCOUNT, "phone_verified");
     }
 
-    // ------------------------------------------------------------------ deliveries
+    // ------------------------------------------------------------- messaging
 
-    /// @param lines how many dishes the cart holds
-    public static void orderQuoted(int lines) {
-        send(DELIVERY, "order_quoted", "lines", Integer.valueOf(lines));
+    /// @param kind what was sent: text, image, video, voice or file
+    /// @param group whether it went to a group rather than one person
+    public static void messageSent(String kind, boolean group) {
+        send(MESSAGING, "message_sent", "kind", kind, "to", group ? "group" : "direct");
     }
 
-    public static void orderPlaced(boolean cash, boolean promo) {
-        send(DELIVERY, "order_placed", "payment", cash ? "cash" : "card", "promo",
-                promo ? "yes" : "no");
+    /// @param members how many people the group started with
+    public static void groupCreated(int members) {
+        send(MESSAGING, "group_created", "size", bracket(members));
     }
 
-    /// @param by `customer`, `courier` or `admin`
-    /// @param state the state the delivery was in
-    public static void deliveryCancelled(String by, DeliveryState state) {
-        send(DELIVERY, "delivery_cancelled", "by", by, "state", state == null ? "" : state.name());
+    public static void inviteShared() {
+        send(MESSAGING, "invite_shared");
     }
 
-    /// @param side whose device saw it end: `customer` or `courier`. A delivery that
-    ///     both of them use the app for is reported by both, so a count of
-    ///     deliveries takes one side.
-    public static void deliveryCompleted(String side, long fareCents, boolean cash) {
-        send(DELIVERY, "delivery_completed", "side", side, "fare", fare(fareCents), "payment",
-                cash ? "cash" : "card");
+    /// @param seconds the disappearing timer chosen, 0 for off
+    public static void timerChanged(int seconds) {
+        send(MESSAGING, "disappearing_changed", "timer", seconds == 0 ? "off"
+                : seconds < 3600 ? "minutes" : seconds < 86400 ? "hours"
+                : seconds < 604800 ? "days" : "weeks");
     }
 
-    public static void rated(int stars) {
-        send(DELIVERY, "rating_given", "stars", Integer.valueOf(stars));
+    public static void safetyNumberViewed() {
+        send(MESSAGING, "safety_number_viewed");
     }
 
-    // --------------------------------------------------------------- payment
-
-    /// @param where `delivery` at the end of the delivery, `receipt` from the receipt
-    /// @param percent the share of the fare, or 0 for an amount typed in
-    public static void tipped(String where, int percent) {
-        send(PAYMENT, "tip_added", "where", where, "share",
-                percent > 0 ? percent + "_percent" : "custom");
+    public static void reported() {
+        send(MESSAGING, "report_filed");
     }
 
-    public static void cardAdded() {
-        send(PAYMENT, "card_added");
+    public static void blocked(boolean on) {
+        send(MESSAGING, on ? "contact_blocked" : "contact_unblocked");
     }
 
-    public static void cardRemoved() {
-        send(PAYMENT, "card_removed");
+    /// @param network the bridge: telegram or whatsapp
+    public static void bridgeLinked(String network) {
+        send(MESSAGING, "bridge_linked", "network", network);
     }
 
-    // --------------------------------------------------------------- onboarding
+    // ----------------------------------------------------------------- calls
 
-    /// @param again whether this is an application sent back, being put right
-    public static void applicationStarted(boolean again) {
-        send(COURIER, "courier_application_started", "resubmission", Boolean.valueOf(again));
+    public static void callStarted(boolean video) {
+        send(CALLS, "call_started", "media", video ? "video" : "audio");
     }
 
-    public static void applicationSubmitted() {
-        send(COURIER, "courier_application_submitted");
-    }
-
-    public static void courierOnline(boolean online) {
-        send(COURIER, online ? "courier_online" : "courier_offline");
-    }
-
-    public static void offerAnswered(boolean accepted) {
-        send(COURIER, accepted ? "offer_accepted" : "offer_declined");
-    }
-
-    public static void payoutRequested(long cents) {
-        send(COURIER, "payout_requested", "amount", fare(cents));
+    /// @param answered whether it was picked up
+    /// @param seconds how long it lasted once it was
+    public static void callEnded(boolean answered, long seconds) {
+        send(CALLS, "call_ended", "answered", answered ? "yes" : "no", "length",
+                !answered ? "none" : seconds < 60 ? "under_1_min" : seconds < 600
+                ? "1_to_10_min" : "over_10_min");
     }
 
     // ----------------------------------------------------------------- admin
 
-    public static void applicationReviewed(boolean approved) {
-        send(ADMIN, approved ? "admin_application_approved" : "admin_application_rejected");
+    /// @param outcome how the report was closed: dismissed, warned or suspended
+    public static void reportResolved(String outcome) {
+        send(ADMIN, "admin_report_resolved", "outcome", outcome);
     }
 
     public static void userFlagged(boolean flagged) {
@@ -299,15 +282,6 @@ public final class Telemetry {
 
     public static void userBlocked(boolean blocked) {
         send(ADMIN, blocked ? "admin_user_blocked" : "admin_user_unblocked");
-    }
-
-    /// @param from the screen it was done from
-    public static void deliveryRefunded(String from) {
-        send(ADMIN, "admin_delivery_refunded", "from", from);
-    }
-
-    public static void pricingChanged() {
-        send(ADMIN, "admin_pricing_changed");
     }
 
     // -------------------------------------------------------------- settings
@@ -334,12 +308,11 @@ public final class Telemetry {
 
     // ------------------------------------------------------------- the store
 
-    /// The bracket an amount of money falls in, in whole units of the
-    /// currency. The amount itself, beside a time, can be matched to a delivery.
-    static String fare(long cents) {
-        long units = cents / 100;
-        return units < 5 ? "under_5" : units < 10 ? "5_to_10" : units < 20 ? "10_to_20"
-                : units < 35 ? "20_to_35" : units < 50 ? "35_to_50" : "50_or_more";
+    /// The bracket a count falls in. The count itself, beside a time, can
+    /// pick out a group.
+    static String bracket(int count) {
+        return count < 3 ? "2" : count < 6 ? "3_to_5" : count < 11 ? "6_to_10"
+                : count < 51 ? "11_to_50" : "over_50";
     }
 
     /// Reports `name` with `pairs`: a parameter's name, then its value.

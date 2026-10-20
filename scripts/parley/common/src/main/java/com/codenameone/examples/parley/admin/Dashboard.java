@@ -19,18 +19,13 @@
 package com.codenameone.examples.parley.admin;
 
 import com.codename1.ui.Button;
-import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.parley.api.AdminStatsDto;
 import com.codenameone.examples.parley.api.DayStatsDto;
-import com.codenameone.examples.parley.api.CourierDto;
 import com.codenameone.examples.parley.api.NameCountDto;
 import com.codenameone.examples.parley.api.StatsSeriesDto;
 import com.codenameone.examples.parley.live.LiveChannel;
@@ -38,56 +33,34 @@ import com.codenameone.examples.parley.net.Api;
 import com.codenameone.examples.parley.net.Net;
 import com.codenameone.examples.parley.ui.Chart;
 import com.codenameone.examples.parley.ui.Lang;
-import com.codenameone.examples.parley.ui.Layouts;
 import com.codenameone.examples.parley.ui.StatRow;
 import com.codenameone.examples.parley.ui.Ui;
 import java.util.List;
 
-/// The numbers of the admin console: what needs an answer, how the service is
-/// doing right now, and how it has done over the last weeks.
+/// The numbers of the admin screen: what needs an answer, how busy the service
+/// is right now, and how it has done over the last weeks.
 ///
-/// It is the same on a phone and on a wide screen, laid out for the room there
-/// is. On a phone everything is one column, with the four numbers two by two.
-/// On a wide screen the numbers are one row and the charts are side by side,
-/// in as many columns as fit -- see [#fit()], which is what a resized window
-/// calls.
-final class Dashboard extends LiveChannel.Adapter {
-    /// A chart is not drawn narrower than this, in millimetres.
-    private static final float TILE_MM = 88f;
-
+/// Every number is a count. The server relays messages it cannot read, so
+/// there is nothing else to show: no content, and no one's contacts.
+final class Dashboard implements LiveChannel.AdminListener {
     /// Where the things that want attention lead.
     interface Places {
-        void applications();
+        void reports();
 
         void flagged();
     }
 
-    private final boolean wide;
     private final Places places;
     private final Container page;
     private final Container alerts = new Container(BoxLayout.y());
-    private final StatRow numbers;
+    private final StatRow numbers = Ui.stats(2);
     private final Container series = new Container(BoxLayout.y());
     private int days = 14;
-    private int columns;
-    private StatsSeriesDto last;
 
-    /// @param wide whether to lay out for a wide screen
-    Dashboard(boolean wide, Places places) {
-        this.wide = wide;
+    Dashboard(Places places) {
         this.places = places;
-        numbers = Ui.stats(wide ? 4 : 2);
-        if (wide) {
-            // Not Ui.page(): that keeps to a column, and this is the one page
-            // that is meant to use the width.
-            page = new Container(BoxLayout.y());
-            page.setUIID("SvPage");
-            page.setScrollableY(true);
-            page.setScrollVisible(false);
-        } else {
-            page = Ui.page();
-            page.setSafeArea(false);
-        }
+        page = Ui.page();
+        page.setSafeArea(false);
         page.setName("dashboard");
         alerts.setName("alerts");
         page.add(alerts);
@@ -95,37 +68,33 @@ final class Dashboard extends LiveChannel.Adapter {
         Ui.section(page, "Right now");
         page.add(numbers);
         Ui.section(page, "Trends");
-        Container range = Ui.choice("range", new String[] {"7 days", "14 days", "30 days"},
+        page.add(Ui.choice("range", new String[] {"7 days", "14 days", "30 days"},
                 new String[] {"7", "14", "30"}, String.valueOf(days), value -> {
                     days = Integer.parseInt(value);
                     loadSeries();
-                });
-        // On a wide screen the choice is as wide as it needs to be, not the
-        // whole width of the window.
-        page.add(wide ? FlowLayout.encloseIn(range) : range);
+                }));
         series.setName("series");
         page.add(series);
     }
 
-    /// The page, for the screen to place.
     Container page() {
         return page;
     }
 
     /// Shows the numbers as nothing, before the first answer.
     void start() {
-        fill(new AdminStatsDto(0, 0, 0, 0, 0, 0, 0L, null));
+        fill(new AdminStatsDto(0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     /// The page came into view: everything is fetched again.
     void shown() {
-        LiveChannel.listen(this);
+        LiveChannel.listenAdmin(this);
         load();
         loadSeries();
     }
 
     @Override
-    public void deliveryChanged(String id, String state) {
+    public void changed() {
         load();
     }
 
@@ -142,24 +111,7 @@ final class Dashboard extends LiveChannel.Adapter {
         }, (status, message) -> { }));
     }
 
-    /// The room changed: the charts are laid out again if a different number
-    /// of them now fits side by side.
-    void fit() {
-        if (wide && last != null && columns != columns()) {
-            fill(last);
-        }
-    }
-
-    private int columns() {
-        if (!wide) {
-            return 1;
-        }
-        int width = page.getWidth() > 0 ? page.getWidth() : CN.getDisplayWidth() * 3 / 4;
-        return Layouts.columns(width, TILE_MM, 3);
-    }
-
     private void refresh() {
-        Layouts.dress(page);
         Form form = page.getComponentForm();
         if (form != null) {
             Ui.refresh(form);
@@ -168,24 +120,22 @@ final class Dashboard extends LiveChannel.Adapter {
 
     private void fill(AdminStatsDto stats) {
         numbers.clear();
-        numbers.stat(String.valueOf(stats.ordersToday()), "Orders today", "ordersToday");
-        numbers.stat(String.valueOf(stats.ordersActive()), "Under way", "ordersActive");
-        numbers.stat(stats.couriersOnline() + " / " + stats.couriers(), "Couriers online",
-                "couriersOnline");
-        numbers.stat(Ui.money(stats.revenueCents(), stats.currency()), "Orders paid",
-                "revenue");
+        numbers.stat(String.valueOf(stats.messagesToday()), "Messages today", "statMessages");
+        numbers.stat(String.valueOf(stats.callsToday()), "Calls today", "statCalls");
+        numbers.stat(String.valueOf(stats.users()), "Accounts", "statUsers");
+        numbers.stat(String.valueOf(stats.devices()), "Devices", "statDevices");
+        numbers.stat(String.valueOf(stats.groups()), "Groups", "statGroups");
+        numbers.stat(String.valueOf(stats.bridges()), "Bridges", "statBridges");
         refresh();
     }
 
     private void fill(StatsSeriesDto found) {
-        last = found;
         alerts.removeAll();
-        if (found.pendingApplications() > 0) {
-            alerts.add(alert(FontImage.MATERIAL_ASSIGNMENT_IND, found.pendingApplications() == 1
-                    ? Lang.tr("1 application to review")
-                    : Lang.tr("{0} applications to review",
-                            String.valueOf(found.pendingApplications())), "alert-applications",
-                    places::applications));
+        if (found.openReports() > 0) {
+            alerts.add(alert(FontImage.MATERIAL_REPORT, found.openReports() == 1
+                    ? Lang.tr("1 report to review")
+                    : Lang.tr("{0} reports to review", String.valueOf(found.openReports())),
+                    "alert-reports", places::reports));
         }
         if (found.flaggedUsers() > 0) {
             alerts.add(alert(FontImage.MATERIAL_FLAG, found.flaggedUsers() == 1
@@ -195,92 +145,44 @@ final class Dashboard extends LiveChannel.Adapter {
         }
         series.removeAll();
         int count = found.days() == null ? 0 : found.days().size();
-        double[] orders = new double[count];
-        double[] revenue = new double[count];
-        int placed = 0;
-        int delivered = 0;
-        int cancelled = 0;
-        long taken = 0;
+        double[] messages = new double[count];
+        double[] active = new double[count];
+        int sent = 0;
+        int calls = 0;
         int joined = 0;
+        int peak = 0;
         for (int iter = 0; iter < count; iter++) {
             DayStatsDto day = found.days().get(iter);
-            orders[iter] = day.orders();
-            revenue[iter] = day.revenue();
-            placed += day.orders();
-            delivered += day.delivered();
-            cancelled += day.cancelled();
-            taken += day.revenue();
+            messages[iter] = day.messages();
+            active[iter] = day.activeUsers();
+            sent += day.messages();
+            calls += day.calls();
             joined += day.newUsers();
+            peak = Math.max(peak, day.activeUsers());
         }
-
-        StatRow rates = Ui.stats(3);
-        rates.stat(Math.round(found.completionRate() * 100d) + "%", "Delivered",
-                "completionRate");
-        rates.stat(Ui.money(found.averageOrder(), found.currency()), "Average order",
-                "averageOrder");
-        rates.stat(Ui.minutes(found.averageDeliveryMinutes() * 60d), "Average delivery",
-                "averageDelivery");
-
-        // One column on a phone, in the order they are added. On a wide screen
-        // as many columns as fit, dealt out in turn: each tile keeps its own
-        // height, which a grid of tiles would not let it.
-        columns = columns();
-        Container[] column = new Container[columns];
-        if (columns == 1) {
-            column[0] = series;
-        } else {
-            series.add(rates);
-            Container grid = new Container(new GridLayout(1, columns));
-            for (int iter = 0; iter < columns; iter++) {
-                column[iter] = new Container(BoxLayout.y());
-                grid.add(column[iter]);
-            }
-            series.add(grid);
-        }
-        int next = 0;
         String from = Lang.tr("{0} days ago", String.valueOf(Math.max(1, count - 1)));
         String to = Lang.tr("Today");
-        column[next++ % columns].add(tile("Orders", String.valueOf(placed), "seriesOrders",
-                Lang.tr("{0} delivered, {1} cancelled", String.valueOf(delivered),
-                        String.valueOf(cancelled)),
-                Chart.of("chartOrders", orders, from, to)));
-        column[next++ % columns].add(tile("Sales", Ui.money(taken, found.currency()),
-                "seriesRevenue", Lang.tr("{0} new accounts", String.valueOf(joined)),
-                Chart.of("chartRevenue", revenue, from, to)));
-        if (columns == 1) {
-            series.add(rates);
-        }
-
+        series.add(tile("Messages", String.valueOf(sent), "seriesMessages",
+                Lang.tr("{0} calls", String.valueOf(calls)),
+                Chart.of("chartMessages", messages, from, to)));
+        series.add(tile("Active people", String.valueOf(peak), "seriesActive",
+                Lang.tr("{0} new accounts", String.valueOf(joined)),
+                Chart.of("chartActive", active, from, to)));
         int hours = found.byHour() == null ? 0 : found.byHour().size();
         double[] hourly = new double[hours];
         for (int iter = 0; iter < hours; iter++) {
             Integer value = found.byHour().get(iter);
             hourly[iter] = value == null ? 0 : value.intValue();
         }
-        column[next++ % columns].add(tile("Orders by hour", null, null,
-                "The busy hours, in UTC", Chart.of("chartHours", hourly, "00:00", "23:00")));
-        column[next++ % columns].add(shares("By outcome", found.byState(), true));
-        column[next++ % columns].add(shares("Busiest restaurants", found.byRestaurant(), false));
-
-        if (found.topCouriers() != null && !found.topCouriers().isEmpty()) {
-            Container top = box("Top couriers");
-            for (int iter = 0; iter < found.topCouriers().size(); iter++) {
-                CourierDto courier = found.topCouriers().get(iter);
-                Container row = Ui.row((char) 0, courier.displayName(), courier.vehicle(),
-                        Ui.plain(Lang.tr("{0} deliveries", String.valueOf(courier.deliveries())),
-                                "SvRowValue"));
-                row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
-                        Ui.avatar(courier.displayName())));
-                top.add(row);
-            }
-            column[next++ % columns].add(top);
-        }
+        series.add(tile("Messages by hour", null, null, "The busy hours, in UTC",
+                Chart.of("chartHours", hourly, "00:00", "23:00")));
+        series.add(shares("By kind of chat", found.byKind()));
+        series.add(shares("By platform", found.byPlatform()));
         refresh();
     }
 
-    /// Something that wants the admin's attention, as a button that goes to it.
     private static Button alert(char icon, String text, String name, final Runnable go) {
-        Button alert = new Button("", "SvAlert");
+        Button alert = new Button("", "PlAlert");
         alert.setShouldLocalize(false);
         alert.setText(text);
         alert.setName(name);
@@ -291,61 +193,26 @@ final class Dashboard extends LiveChannel.Adapter {
 
     private static Container box(String title) {
         Container box = new Container(BoxLayout.y());
-        box.setUIID("SvTile");
-        box.add(Ui.label(title, "SvStatLabel"));
+        box.setUIID("PlTile");
+        box.add(Ui.label(title, "PlStatLabel"));
         return box;
     }
 
-    /// A chart with what it adds up to written over it.
     private static Container tile(String title, String value, String name, String detail,
             Container chart) {
         Container tile = box(title);
         if (value != null) {
-            Label total = Ui.plain(value, "SvChartValue");
+            Label total = Ui.plain(value, "PlChartValue");
             total.setName(name);
             tile.add(total);
         }
-        tile.add(Ui.plain(Lang.tr(detail), "SvMuted"));
+        tile.add(Ui.plain(Lang.tr(detail), "PlMuted"));
         tile.add(chart);
         return tile;
     }
 
-    /// An order's state as the admin reads it. The counts are of orders
-    /// (Statistics), not deliveries, and the customer's wording ("You
-    /// cancelled it") is not the admin's. Empty for a name it does not know.
-    static String outcome(String name) {
-        if ("PLACED".equals(name)) {
-            return Lang.tr("Waiting for the restaurant");
-        }
-        if ("ACCEPTED".equals(name)) {
-            return Lang.tr("Being prepared");
-        }
-        if ("READY".equals(name)) {
-            return Lang.tr("Ready, waiting for the courier");
-        }
-        if ("PICKED_UP".equals(name)) {
-            return Lang.tr("On its way");
-        }
-        if ("DELIVERED".equals(name)) {
-            return Lang.tr("Delivered");
-        }
-        if ("REJECTED".equals(name)) {
-            return Lang.tr("Rejected");
-        }
-        if ("CANCELLED_BY_CUSTOMER".equals(name)) {
-            return Lang.tr("Cancelled by customer");
-        }
-        if ("CANCELLED_BY_ADMIN".equals(name)) {
-            return Lang.tr("Cancelled by Parley");
-        }
-        if ("NO_COURIERS".equals(name)) {
-            return Lang.tr("No courier was free");
-        }
-        return "";
-    }
-
     /// How a total divides: each part with its count and its share as a bar.
-    private static Container shares(String title, List<NameCountDto> parts, boolean states) {
+    private static Container shares(String title, List<NameCountDto> parts) {
         Container tile = box(title);
         long total = 0;
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
@@ -353,10 +220,7 @@ final class Dashboard extends LiveChannel.Adapter {
         }
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
             NameCountDto part = parts.get(iter);
-            String name = states ? outcome(part.name()) : part.name();
-            tile.add(Ui.fact(name.length() == 0 ? part.name() : name,
-                    String.valueOf(part.count())));
-            // A total of nothing has no shares; the bars are then empty.
+            tile.add(Ui.fact(part.name(), String.valueOf(part.count())));
             tile.add(new Chart.Meter(total == 0 ? 0 : part.count() / (double) total));
         }
         return tile;

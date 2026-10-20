@@ -28,6 +28,7 @@ import com.codenameone.examples.parley.AppConfig;
 import com.codenameone.examples.parley.api.PushDeviceDto;
 import com.codenameone.examples.parley.net.Api;
 import com.codenameone.examples.parley.net.Net;
+import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.ui.Nav;
 
@@ -139,15 +140,13 @@ public final class Notifications {
 
         @Override
         public void onMessage(PushMessage message) {
-            // OrderPushes names the order; its delivery has the same id.
-            Object order = message.getData().get("orderId");
-            Object role = message.getData().get("role");
-            // A message with no title is a silent one: the Live Activity
-            // moving on, which the push client has already applied.
-            String title = message.getTitle();
-            if (order != null && title != null && title.length() > 0
-                    && Session.user() != null) {
-                Nav.showDelivery(role == null ? Nav.CUSTOMER : String.valueOf(role));
+            // MessagePushes says nothing but "sync": which conversation, and
+            // from whom, is in the envelopes, which only this device can read.
+            // So a push fetches them, and opening it lands on the chats.
+            Object type = message.getData().get("type");
+            if ("sync".equals(type) && Session.user() != null) {
+                Messenger.sync();
+                Nav.home();
             }
         }
 

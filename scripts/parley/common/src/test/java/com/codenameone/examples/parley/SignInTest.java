@@ -22,61 +22,43 @@ import com.codename1.ui.Button;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.ui.Nav;
 
-/// Signing in, and what a role does and does not open.
+import com.codename1.ui.Display;
+import com.codenameone.examples.parley.net.Session;
+import com.codenameone.examples.parley.ui.Nav;
+
+/// Signing in, a wrong password, and the admin's API refused to a member.
 public class SignInTest extends E2e {
     @Override
     protected boolean run() throws Exception {
         shot("welcome");
-
-        // A wrong password says so and stays put.
         click("signIn");
         waitForForm("SignIn");
-        type("email", CUSTOMER);
+        type("email", ALICE);
         type("password", "not-the-password");
         click("submit");
         until(() -> text("error").length() > 0, 20000, "the sign-in error");
-        assertEqual("SignIn", com.codename1.ui.Display.getInstance().getCurrent().getName());
+        assertEqual("SignIn", Display.getInstance().getCurrent().getName());
         assertNull(Session.user(), "nobody is signed in after a wrong password");
 
-        // The right one lands a customer on the customer's screen.
         type("password", PASSWORD);
         click("submit");
-        waitForForm("Customer");
-        assertEqual(CUSTOMER, Session.user().username());
-        assertTrue(Session.user().customer() && !Session.user().courier() && !Session.user().admin(),
-                "the demo customer has the customer role and no other");
-        shot("customer-home");
+        waitForForm("Chats");
+        assertEqual(ALICE, Session.user().username());
+        assertFalse(Session.user().admin(), "alice is not an admin");
+        until(() -> has("chat-Weekend hike"), 30000, "the seeded group in the list");
+        shot("chats");
 
-        // Asking for the admin's screens without the role gets the customer's.
+        // Asking for the admin's screens without the role gets the chats,
+        // and the server refuses the admin's API to the same token.
         onEdt(() -> Nav.switchTo(Nav.ADMIN));
-        waitForForm("Customer");
-        // Asking to drive gets the way there, the application, and nothing a
-        // courier has: there is no going online from it.
-        onEdt(() -> Nav.switchTo(Nav.COURIER));
-        waitForForm("Apply");
-        untilText("applicationStatus", "Not started");
-        assertFalse(has("goOnline"), "someone who is not a courier can go online");
-        onEdt(() -> Nav.switchTo(Nav.CUSTOMER));
-        waitForForm("Customer");
-        // And the server agrees, which is the part that matters: the same
-        // person's token is refused on the courier's and the admin's API.
-        Actor customer = Actor.signIn(CUSTOMER);
-        customer.get("/api/admin/stats");
-        assertEqual(403, customer.status, "a customer asking for the admin's numbers");
-        customer.online(true, HERE.getLatitude(), HERE.getLongitude());
-        assertEqual(403, customer.status, "a customer going online as a courier");
-        customer.get("/api/me");
-        assertEqual(200, customer.status);
+        waitForForm("Chats");
+        Actor alice = Actor.signIn(ALICE);
+        alice.get("/api/admin/stats");
+        assertEqual(403, alice.status, "a member asking for the admin's numbers");
+        alice.get("/api/me");
+        assertEqual(200, alice.status);
 
-        // The menu offers no mode to switch to -- only the way to apply for
-        // one -- and leads to the settings.
-        assertTrue(has("menu-deliver"), "a customer is shown how to become a courier");
-        assertFalse(findByName("switch-courier") instanceof Button, "a customer is offered courier mode");
-        assertFalse(findByName("switch-admin") instanceof Button, "a customer is offered admin");
-        click("menu-open");
-        click("menu-settings");
-        waitForForm("Settings");
-        click("signOut");
+        onEdt(() -> Nav.signOut());
         waitForForm("Welcome");
         assertNull(Session.user());
         return true;

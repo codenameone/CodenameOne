@@ -63,14 +63,14 @@ public final class Menu {
                 return size;
             }
         };
-        panel.setUIID("SvMenu");
+        panel.setUIID("PlMenu");
         panel.setSafeArea(true);
         panel.setGrabsPointerEvents(true);
         panel.setName("menu");
         build();
         // What is left of the screen beside the menu: dimmed, and a tap on it
         // puts the menu away.
-        Button dim = new Button("", "SvScrim");
+        Button dim = new Button("", "PlScrim");
         dim.setName("menu-dim");
         dim.addActionListener(e -> close());
         layer.add(BorderLayout.WEST, panel);
@@ -128,44 +128,33 @@ public final class Menu {
     private void build() {
         UserDto user = Session.user();
         Container top = new Container(BoxLayout.y());
-        top.setUIID("SvMenuTop");
+        top.setUIID("PlMenuTop");
         Container who = new Container(new BorderLayout());
         Container names = new Container(BoxLayout.y());
-        names.add(Ui.label(user.displayName(), "SvMenuName"));
-        names.add(Ui.label(user.username(), "SvMenuDetail"));
+        names.add(Ui.label(user.displayName(), "PlMenuName"));
+        names.add(Ui.label(user.username(), "PlMenuDetail"));
         who.add(BorderLayout.WEST, Ui.avatar(user.displayName()));
         who.add(BorderLayout.CENTER, names);
         top.add(who);
         // Which of the three apps this is, said in words at the top of each.
-        top.add(FlowLayout.encloseIn(Ui.badge(Nav.ADMIN.equals(mode) ? "Admin mode"
-                : Nav.MERCHANT.equals(mode) ? "Restaurant mode"
-                : Nav.COURIER.equals(mode) ? "Courier mode" : "Customer mode", "SvModeBadge")));
+        if (Nav.ADMIN.equals(mode)) {
+            top.add(FlowLayout.encloseIn(Ui.badge("Admin mode", "PlModeBadge")));
+        }
 
         Container list = new Container(BoxLayout.y());
         list.setScrollableY(true);
         list.setScrollVisible(false);
         list.add(places);
-        // The other modes, for an account whose roles open more than one.
-        // Everyone may order; delivering, running a restaurant and
-        // administering are granted.
-        if (user.courier() || user.admin() || user.merchant() || !Nav.CUSTOMER.equals(mode)) {
-            list.add(Ui.label("Switch to", "SvMenuLabel"));
-            if (!Nav.CUSTOMER.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_RESTAURANT_MENU, "Ordering", Nav.CUSTOMER));
-            }
-            if (user.courier() && !Nav.COURIER.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_DELIVERY_DINING, "Delivering", Nav.COURIER));
-            }
-            if (user.merchant() && !Nav.MERCHANT.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_STOREFRONT, "Your restaurant", Nav.MERCHANT));
-            }
-            if (user.admin() && !Nav.ADMIN.equals(mode)) {
-                list.add(other(FontImage.MATERIAL_INSIGHTS, "Administration", Nav.ADMIN));
-            }
+        // An admin chats like everyone else, and switches to administering.
+        if (user.admin()) {
+            list.add(Ui.label("Switch to", "PlMenuLabel"));
+            list.add(Nav.ADMIN.equals(mode)
+                    ? other(FontImage.MATERIAL_CHAT, "Chats", Nav.CHATS)
+                    : other(FontImage.MATERIAL_INSIGHTS, "Administration", Nav.ADMIN));
         }
 
         Container bottom = new Container(BoxLayout.y());
-        bottom.setUIID("SvMenuBottom");
+        bottom.setUIID("PlMenuBottom");
         bottom.add(entry(FontImage.MATERIAL_SETTINGS, "Settings", "menu-settings",
                 () -> SettingsForm.show(form)));
         bottom.add(entry(FontImage.MATERIAL_LOGOUT, "Sign out", "menu-signOut", Nav::signOut));
@@ -180,7 +169,7 @@ public final class Menu {
     }
 
     private Button entry(char icon, String text, String name, final Runnable go) {
-        Button entry = new Button(text, "SvMenuItem");
+        Button entry = new Button(text, "PlMenuItem");
         entry.setName(name);
         Ui.icon(entry, icon, 3.8f);
         entry.addActionListener(e -> {

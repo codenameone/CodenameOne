@@ -35,7 +35,6 @@ import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.parley.AppConfig;
 import com.codenameone.examples.parley.Prefs;
 import com.codenameone.examples.parley.api.UserDto;
-import com.codenameone.examples.parley.customer.Cart;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -172,11 +171,6 @@ public final class Session {
         String before = owner();
         user = described;
         String after = owner();
-        if (before == null ? after != null : !before.equals(after)) {
-            // Signed out, expired, another account or another server: the
-            // cart was picked by whoever was here before.
-            Cart.clear();
-        }
         if (described != null && described.username() != null) {
             // What the device keeps about one person is not the next one's.
             Prefs.ownedBy(owner(described.username()));

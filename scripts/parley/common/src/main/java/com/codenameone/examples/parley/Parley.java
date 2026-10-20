@@ -19,32 +19,35 @@
 package com.codenameone.examples.parley;
 
 import com.codename1.system.Lifecycle;
-import com.codenameone.examples.parley.courier.Shift;
-import com.codenameone.examples.parley.map.Locator;
+import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.net.Account;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.notify.Notifications;
-import com.codenameone.examples.parley.pay.CardForm;
 import com.codenameone.examples.parley.ui.Lang;
 import com.codenameone.examples.parley.ui.Look;
 import com.codenameone.examples.parley.ui.Nav;
+import com.codenameone.examples.parley.ui.Privacy;
 
-/// The app. It opens on whatever the stored session allows: the mode the user
-/// was last in when they are still signed in, the welcome screen when not.
+/// The app. It opens on whatever the stored session allows: the chats when
+/// the user is still signed in, the welcome screen when not.
 ///
 /// Where things are:
 ///
-/// - `net` -- the session, and the typed clients generated from the contracts in
-///   the `shared` module. Nothing else in the app builds a URL.
-/// - `live` -- the WebSocket the server pushes changes down.
-/// - `notify` -- push notifications, for a phone that is not looking.
-/// - `ui`, `customer`, `courier`, `admin` -- the screens.
-/// - `map` -- the map, its markers and the device's position.
+/// - `crypto` -- the end-to-end protocol: device keys, X3DH, the Double
+///   Ratchet, safety numbers, and the encrypted vault everything local lives in.
+/// - `chat` -- sending and receiving: the per-device fan-out, sync, receipts,
+///   typing, attachments and calls.
+/// - `store` -- the conversations and their history on this device.
+/// - `net` -- the session, and the typed clients generated from the contracts
+///   in the `shared` module. Nothing else in the app builds a URL.
+/// - `live` -- the WebSocket the server pushes envelopes and signalling down.
+/// - `notify` -- push notifications: content-free wake-ups.
+/// - `ui`, `admin` -- the screens.
 /// - `src/main/css/theme.css` -- every colour, font and margin.
 /// - `src/main/l10n` -- every word, in each language the app speaks.
-/// - `Prefs` -- what the user chose in Settings.
+/// - `Prefs` -- what the user chose in Settings that stays on this device.
 /// - `Telemetry` -- what is reported about how the app is used, once the user
-///   has agreed to it.
+///   has agreed to it. Never what anybody wrote.
 public class Parley extends Lifecycle {
     @Override
     public void runApp() {
@@ -58,32 +61,24 @@ public class Parley extends Lifecycle {
         Nav.launch();
     }
 
-    /// Coming back to the app is how a card added on the payment provider's
-    /// page is noticed: the browser it opened in tells the app nothing.
-    ///
-    /// It is also when the app asks for its push token, which the platform
-    /// answers at once when nothing has changed, and when the position is
-    /// looked for again if going to the background put the search down.
+    /// Coming back to the app: the push token is asked for again (the
+    /// platform answers at once when nothing changed), anything that arrived
+    /// while away is fetched, and the app lock asks again.
     @Override
     public void start() {
         super.start();
-        CardForm.resumed();
-        Shift.resumed();
-        Locator.resumed();
         Notifications.start();
+        Privacy.resumed();
+        Messenger.sync();
     }
 
     /// The app is put away, which is the last sure moment to send the usage
-    /// reports gathered since the last batch.
-    ///
-    /// A courier on line goes on reporting where the car is from the
-    /// background; anyone else's search for the position is put down until
-    /// the app is back.
+    /// reports gathered since the last batch, and when the screen is covered
+    /// if the user asked for that.
     @Override
     public void stop() {
         super.stop();
         Telemetry.flush();
-        Shift.paused();
-        Locator.paused();
+        Privacy.paused();
     }
 }

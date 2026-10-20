@@ -27,32 +27,22 @@ import com.codenameone.examples.parley.Prefs;
 import com.codenameone.examples.parley.Telemetry;
 import com.codenameone.examples.parley.admin.AdminForm;
 import com.codenameone.examples.parley.api.UserDto;
-import com.codenameone.examples.parley.courier.ApplyForm;
-import com.codenameone.examples.parley.courier.CourierForm;
-import com.codenameone.examples.parley.courier.Shift;
-import com.codenameone.examples.parley.live.LiveChannel;
-import com.codenameone.examples.parley.merchant.MerchantForm;
+import com.codenameone.examples.parley.chat.Media;
+import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.net.Account;
-import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.notify.Notifications;
-import com.codenameone.examples.parley.customer.CustomerForm;
 
 /// Decides which screen the app is on.
 ///
-/// The app is four apps in one -- for ordering, for delivering, for running a
-/// restaurant and for administering -- and which of them a user may enter is the server's
-/// decision: it is the roles on their account, as `/api/me` reports them. Each
-/// has a home screen of its own, with its own menu, and the user is in one of
-/// them at a time. Hiding a mode here is a courtesy and not the protection; the
-/// server refuses a courier's, a merchant's or an admin's call from anyone without the role,
-/// whatever the app shows.
+/// The app has two homes: the chats, which everyone has, and the console,
+/// for an account with the admin role. Which of them a user may enter is the
+/// server's decision -- the roles on their account, as `/api/me` reports them
+/// -- and hiding the console here is a courtesy, not the protection; the
+/// server refuses an admin call from anyone without the role.
 public final class Nav {
-    public static final String CUSTOMER = "customer";
-    public static final String COURIER = "courier";
+    public static final String CHATS = "chats";
     public static final String ADMIN = "admin";
-    public static final String MERCHANT = "merchant";
 
     /// The home screen of a mode.
     public interface Home {
@@ -80,8 +70,7 @@ public final class Nav {
     /// The first screen: wherever the stored session leads.
     public static void launch() {
         Session.onSignedOut(() -> {
-            Shift.end();
-            LiveChannel.stop();
+            Messenger.stop();
             Telemetry.signedOut("expired");
             WelcomeForm.show();
         });
@@ -92,25 +81,28 @@ public final class Nav {
     }
 
     /// Someone has just signed in, or been found still signed in: their
-    /// account's settings are fetched, applied, and then their home is shown in
-    /// the language and the colours they chose.
+    /// account's settings are fetched and applied, this device's keys are
+    /// opened (or made, the first time), and then their home is shown.
     public static void enter() {
         // Where this phone is to be sent notifications, now that there is
         // someone to send them to.
         Notifications.signedIn();
-        // Menu prices are shown in the server's currency, which only the
-        // payment config says.
-        Api.payments().config(Net.to(config -> Ui.setCurrency(config.currency()), (status, message) -> { }));
         Account.load(() -> {
             Look.apply();
             Lang.apply();
-            if (Telemetry.asked()) {
-                home();
-            } else {
-                // Once on a device, before the first screen that would be
-                // counted: whether it may be.
-                ConsentForm.show(Nav::home);
-            }
+            Media.cleanUp();
+            Messenger.start(() -> {
+                if (Telemetry.asked()) {
+                    home();
+                } else {
+                    // Once on a device, before the first screen that would be
+                    // counted: whether it may be.
+                    ConsentForm.show(Nav::home);
+                }
+            }, (status, message) -> {
+                Ui.say(message);
+                unreachable();
+            });
         });
     }
 
@@ -123,8 +115,7 @@ public final class Nav {
     }
 
     /// The account was asked about again: back to the home screen only if
-    /// the mode it opens in is no longer the one on screen, so somebody whose
-    /// roles did not change is not pulled out of what they were doing.
+    /// the mode it opens in is no longer the one on screen.
     public static void refreshed() {
         UserDto user = Session.user();
         if (user == null || !mode(user).equals(homeMode)) {
@@ -136,106 +127,65 @@ public final class Nav {
     /// for a caller that is about to show something on top of it. Null, and
     /// the welcome screen showing, when nobody is signed in.
     public static Form build() {
-        CustomerForm.stopLocating();
         UserDto user = Session.user();
         if (user == null) {
             WelcomeForm.show();
             return null;
         }
-        LiveChannel.start();
         String mode = mode(user);
         Telemetry.role(mode);
-        // Delivering is for the approved. Anyone else who chooses it gets the
-        // way there: the application, and what has become of it.
-        if (!COURIER.equals(mode)) {
-            // Out of the courier's side of the app is off line as far as the
-            // phone is concerned: nothing goes on reporting where it is.
-            Shift.leave();
-        }
-        Home home = ADMIN.equals(mode) ? new AdminForm()
-                : MERCHANT.equals(mode) ? new MerchantForm()
-                : !COURIER.equals(mode) ? new CustomerForm()
-                : user.courier() ? new CourierForm() : new ApplyForm();
+        Home home = ADMIN.equals(mode) ? new AdminForm() : new ChatsForm();
         home.start();
         homeForm = home.form();
         homeMode = mode;
         return homeForm;
     }
 
-    /// The mode to open for `user`.
-    ///
-    /// The one they chose last, while their account still allows it. With no
-    /// choice made, the one their account is for: an admin administers, a
-    /// merchant runs their restaurant, a courier delivers, and everyone else
-    /// orders. A choice is remembered for the
-    /// account that made it, so the next person to sign in on the same device
-    /// starts where their own account does.
+    /// The mode to open for `user`: the one they chose last while their
+    /// account still allows it, else the chats.
     public static String mode(UserDto user) {
         String saved = AppConfig.mode(Session.owner(user.username()));
         if (ADMIN.equals(saved) && user.admin()) {
             return ADMIN;
         }
-        if (MERCHANT.equals(saved) && user.merchant()) {
-            return MERCHANT;
-        }
-        // Not only for a courier: someone who is applying to be one is in the
-        // courier's side of the app too, on the screen that says how it stands.
-        if (COURIER.equals(saved)) {
-            return COURIER;
-        }
-        if (CUSTOMER.equals(saved)) {
-            return CUSTOMER;
-        }
-        return user.admin() ? ADMIN : user.merchant() ? MERCHANT
-                : user.courier() ? COURIER : CUSTOMER;
+        return CHATS;
     }
 
     /// The user chose `mode` from the menu.
     public static void switchTo(String mode) {
-        if (Shift.taken()) {
-            Ui.say("Finish the delivery you took first");
-            return;
-        }
         UserDto user = Session.user();
         AppConfig.setMode(mode, user == null ? "" : Session.owner(user.username()));
         home();
     }
 
-    /// A notification about a delivery was opened: the home that shows that delivery,
-    /// as the customer, the courier or the kitchen the notification was for. Nothing
-    /// changes when that home is already on screen; it hears of the change
-    /// over the live channel too.
-    public static void showDelivery(String role) {
+    /// A notification was opened: the chat it is about, over the home.
+    public static void showConversation(String conversationId) {
         UserDto user = Session.user();
-        if (user == null) {
+        if (user == null || conversationId == null || conversationId.length() == 0) {
             return;
         }
-        String wanted = COURIER.equals(role) && user.courier() ? COURIER
-                : MERCHANT.equals(role) && user.merchant() ? MERCHANT : CUSTOMER;
-        if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
+        Form current = CN.getCurrentForm();
+        if (current instanceof ChatForm && ((ChatForm) current).conversationId().equals(conversationId)) {
             return;
         }
-        if (Shift.taken() && !COURIER.equals(wanted)) {
-            // A notification is no reason to leave a delivery half done.
-            return;
+        if (!CHATS.equals(homeMode) || homeForm == null) {
+            AppConfig.setMode(CHATS, Session.owner(user.username()));
+            build();
         }
-        AppConfig.setMode(wanted, Session.owner(user.username()));
-        home();
+        ChatForm.show(conversationId, homeForm);
     }
 
     public static void signOut() {
-        if (Shift.taken()) {
-            Ui.say("Finish the delivery you took first");
-            return;
-        }
         leave("user", true);
     }
 
     /// The account was closed: signed out, and what the device kept for the
     /// usage reports forgotten with it.
     public static void deleted() {
+        String owner = Session.owner();
         // Closing the account already made the server forget its devices.
         leave("deleted", false);
+        Messenger.wipe(owner);
         Telemetry.forget();
         // Nobody is coming back for where that account went.
         Prefs.ownedBy("");
@@ -243,21 +193,17 @@ public final class Nav {
 
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
-        Shift.leave();
-        CustomerForm.stopLocating();
-        LiveChannel.stop();
+        Messenger.stop();
         homeForm = null;
         homeMode = "";
         // The server forgets this phone for the account first, while there is
-        // still a session to ask with.
+        // still a session to ask with. The device's keys and history stay in
+        // its vault, so signing back in on this phone finds them again; the
+        // delete-account path wipes them.
         Runnable out = () -> {
             Telemetry.signedOut(reason);
             Session.signOut(WelcomeForm::show);
         };
-        // The delivery's Live Activity is left to the system. Signing out does not
-        // end the delivery, which goes on for the customer who signed out, and the
-        // system removes an activity on its own within hours. Ending it here
-        // would hide a delivery that is still happening.
         if (forgetDevice) {
             Notifications.signingOut(out);
         } else {
@@ -273,19 +219,14 @@ public final class Nav {
             launch();
         };
         if (AppConfig.sameServer(url, Session.serverUrl()) || Session.user() == null) {
-            LiveChannel.stop();
+            Messenger.stop();
             switchOver.run();
             return;
         }
         // Signed in: sign out the way the Sign out button does, against the
-        // server still in use, before pointing anywhere else. Session.start
-        // only forgets the tokens on this phone, so the old server would keep
-        // a live refresh token and this phone's push registration, and go on
-        // notifying it about that account's deliveries.
+        // server still in use, before pointing anywhere else.
         Account.flush();
-        Shift.leave();
-        CustomerForm.stopLocating();
-        LiveChannel.stop();
+        Messenger.stop();
         homeForm = null;
         homeMode = "";
         Notifications.signingOut(() -> {
@@ -298,9 +239,9 @@ public final class Nav {
     private static void unreachable() {
         Form form = Ui.form("Parley", "Unreachable");
         Container page = Ui.page();
-        page.add(Ui.label("No connection", "SvTitle"));
+        page.add(Ui.label("No connection", "PlTitle"));
         page.add(Ui.text(Lang.tr("The server at {0} did not answer.", Session.serverUrl()),
-                "SvText"));
+                "PlText"));
         page.add(Ui.primary("Try again", "retry", e -> launch()));
         if (AppConfig.serverSwitchable()) {
             page.add(Ui.secondary("Server address", "server", e -> ServerForm.show(form)));

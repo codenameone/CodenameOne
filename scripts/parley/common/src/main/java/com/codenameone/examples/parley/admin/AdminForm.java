@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.parley.admin;
 
-import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -40,32 +39,21 @@ import com.codenameone.examples.parley.ui.Ui;
 /// screen is reached only when `/api/me` says the user is an admin, but that is
 /// so the others are not shown something useless -- not what keeps them out.
 ///
-/// It is laid out for the room there is. This is the phone's: the [Dashboard]
-/// with the places under it and in a drawer, each a screen of its own. On a
-/// wide screen -- a tablet on its side, a desktop, a browser -- it is the
-/// [Console] instead, with the places down the side and a list beside what was
-/// picked from it. Which one is decided when the screen is built, and a window
-/// resized across the line, or a device turned, builds it again.
+/// The [Dashboard] comes first, with the places under it and in a drawer,
+/// each a screen of its own.
 public class AdminForm implements Nav.Home {
     private static final int POLL_MILLIS = 5000;
 
-    private final Console console;
     private final Form form;
-    private Dashboard dashboard;
+    private final Dashboard dashboard;
 
     public AdminForm() {
-        if (Layouts.wide()) {
-            console = new Console();
-            form = console.form();
-            return;
-        }
-        console = null;
         form = Ui.home("Admin");
         final Menu menu = new Menu(form, Nav.ADMIN);
-        dashboard = new Dashboard(false, new Dashboard.Places() {
+        dashboard = new Dashboard(new Dashboard.Places() {
             @Override
-            public void applications() {
-                ApplicationsForm.show(form);
+            public void reports() {
+                ReportsForm.show(form);
             }
 
             @Override
@@ -74,81 +62,44 @@ public class AdminForm implements Nav.Home {
             }
         });
         menu.item(FontImage.MATERIAL_INSIGHTS, "Dashboard", "home", () -> { });
-        menu.item(FontImage.MATERIAL_STOREFRONT, "Restaurants", "restaurants",
-                () -> RestaurantsForm.show(form));
-        menu.item(FontImage.MATERIAL_ASSIGNMENT_IND, "Couriers", "applications",
-                () -> ApplicationsForm.show(form));
+        menu.item(FontImage.MATERIAL_REPORT, "Reports", "reports", () -> ReportsForm.show(form));
         menu.item(FontImage.MATERIAL_GROUP, "People", "users", () -> UsersForm.show(form, ""));
-        menu.item(FontImage.MATERIAL_RECEIPT_LONG, "Orders", "deliveries",
-                () -> AdminDeliveriesForm.show(form));
-        menu.item(FontImage.MATERIAL_PAYMENTS, "Payments", "payments",
-                () -> PaymentsForm.show(form));
-        menu.item(FontImage.MATERIAL_MAP, "Live map", "fleet", this::fleet);
-        menu.item(FontImage.MATERIAL_LOCAL_OFFER, "Promos", "promos", () -> PromosForm.show(form));
-        menu.item(FontImage.MATERIAL_SELL, "Pricing", "pricing", () -> PricingForm.show(form));
+        menu.item(FontImage.MATERIAL_LINK, "Bridges", "bridges", () -> BridgesForm.show(form));
 
-        // The bar a title bar would be, with the menu where the map screens
-        // have it, and the mode said beside the title: an admin who also delivers
-        // should never have to wonder which app this is.
+        // The mode is said beside the title: an admin who also chats should
+        // never have to wonder which app this is.
         Container bar = new Container(new BorderLayout());
-        bar.setUIID("SvHomeBar");
+        bar.setUIID("PlHomeBar");
         bar.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(menu.flatButton()));
         bar.add(BorderLayout.CENTER, FlowLayout.encloseLeftMiddle(
-                Ui.label("Operations", "SvHeading")));
-        // In the menu the badge stands under a name and keeps a gap above it;
-        // here it is alone on the bar's centre line.
-        Label admin = Ui.badge("Admin", "SvModeBadge");
+                Ui.label("Operations", "PlHeading")));
+        Label admin = Ui.badge("Admin", "PlModeBadge");
         admin.getAllStyles().setMargin(0, 0, 0, 0);
         bar.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(admin));
 
         Container page = dashboard.page();
         Ui.section(page, "Manage");
         Container manage = new Container(BoxLayout.y());
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_STOREFRONT, "Restaurants",
-                "Restaurants asking to join, and the ones selling", null), "restaurants",
-                e -> RestaurantsForm.show(form)));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_ASSIGNMENT_IND, "Couriers",
-                "People who asked to deliver, and their papers", null), "applications",
-                e -> ApplicationsForm.show(form)));
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_REPORT, "Reports",
+                "What people reported, and what was done", null), "reports",
+                e -> ReportsForm.show(form)));
         manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_GROUP, "People",
                 "Roles, flags, and blocking an account", null), "users",
                 e -> UsersForm.show(form, "")));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, "Orders",
-                "The most recent, in every state", null), "deliveries",
-                e -> AdminDeliveriesForm.show(form)));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_PAYMENTS, "Payments",
-                "What was charged, and refunds", null), "payments",
-                e -> PaymentsForm.show(form)));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_MAP, "Live map",
-                "Where every courier on line is", null), "fleet", e -> fleet()));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOCAL_OFFER, "Promos",
-                "Codes customers type at checkout", null), "promos",
-                e -> PromosForm.show(form)));
-        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_SELL, "Pricing",
-                "What a delivery costs, and the service's share", null), "pricing",
-                e -> PricingForm.show(form)));
+        manage.add(Ui.tap(Ui.row(FontImage.MATERIAL_LINK, "Bridges",
+                "Chats linked to Telegram or WhatsApp", null), "bridges",
+                e -> BridgesForm.show(form)));
         page.add(manage);
 
         Container screen = new Container(new BorderLayout());
-        // The strip the status bar is drawn in is the bar's colour, not
-        // whatever is behind the screen.
-        screen.setUIID("SvForm");
+        screen.setUIID("PlForm");
         screen.setSafeArea(true);
         screen.add(BorderLayout.NORTH, bar);
         screen.add(BorderLayout.CENTER, page);
         form.add(screen);
         menu.install();
-        // A narrow window on a desktop is still a desktop's.
         Layouts.dress(form);
-        form.addShowListener(e -> {
-            if (Layouts.wide()) {
-                // Come back to from a screen that was made wide meanwhile.
-                CN.callSerially(Nav::home);
-                return;
-            }
-            dashboard.shown();
-        });
-        Layouts.onChange(form, Nav::home);
+        form.addShowListener(e -> dashboard.shown());
         UITimer.timer(POLL_MILLIS, true, form, dashboard::load);
     }
 
@@ -159,43 +110,11 @@ public class AdminForm implements Nav.Home {
 
     @Override
     public void start() {
-        if (console != null) {
-            console.start();
-            return;
-        }
         dashboard.start();
-        // The window was a console a moment ago, on one of its places: that
-        // place is where the admin still is.
-        final String place = Console.resumed();
-        if (place != null) {
-            CN.callSerially(() -> open(place));
-        }
     }
 
     public void show() {
         start();
         form.show();
-    }
-
-    private void open(String place) {
-        if ("restaurants".equals(place)) {
-            RestaurantsForm.show(form);
-        } else if ("promos".equals(place)) {
-            PromosForm.show(form);
-        } else if ("applications".equals(place)) {
-            ApplicationsForm.show(form);
-        } else if ("users".equals(place)) {
-            UsersForm.show(form, "");
-        } else if ("deliveries".equals(place)) {
-            AdminDeliveriesForm.show(form);
-        } else if ("payments".equals(place)) {
-            PaymentsForm.show(form);
-        } else if ("pricing".equals(place)) {
-            PricingForm.show(form);
-        }
-    }
-
-    private void fleet() {
-        new FleetForm(form).show();
     }
 }

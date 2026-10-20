@@ -47,7 +47,7 @@ public final class BottomSheet extends Container {
 
     public BottomSheet() {
         super(BoxLayout.y());
-        setUIID("SvSheet");
+        setUIID("PlSheet");
         setName("panel");
         setSafeArea(true);
         // A touch on the sheet is the sheet's, and does not reach through to
@@ -163,7 +163,7 @@ public final class BottomSheet extends Container {
         }
 
         Grip() {
-            setUIID("SvGrip");
+            setUIID("PlGrip");
             setGrabsPointerEvents(true);
         }
 

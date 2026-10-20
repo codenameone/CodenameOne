@@ -164,13 +164,13 @@ public final class StatRow extends Container {
 
         Tile(String number, String caption, String name) {
             super(BoxLayout.y());
-            setUIID("SvStat");
+            setUIID("PlStat");
             this.number = number == null ? "" : number;
             this.caption = caption == null ? "" : caption;
-            value = new Sized(Ui.plain(this.number, "SvStatValue"));
+            value = new Sized(Ui.plain(this.number, "PlStatValue"));
             value.label.setName(name);
-            upper = new Sized(Ui.plain(this.caption, "SvStatLabel"));
-            lower = new Sized(Ui.plain("", "SvStatLabel"));
+            upper = new Sized(Ui.plain(this.caption, "PlStatLabel"));
+            lower = new Sized(Ui.plain("", "PlStatLabel"));
             top = this.caption;
             bottom = "";
             add(value.label).add(upper.label).add(lower.label);

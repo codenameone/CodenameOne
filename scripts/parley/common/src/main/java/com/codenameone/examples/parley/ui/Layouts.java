@@ -62,17 +62,17 @@ public final class Layouts {
     private static final Map<String, String> DESKTOP = new HashMap<String, String>();
 
     static {
-        String[] dressed = {"SvForm", "SvPage", "SvList", "SvPrimary", "SvSecondary", "SvDanger",
-            "SvLink", "SvField", "SvFieldHint", "SvRow", "SvRowPicked", "SvRowIcon", "SvRowTitle",
-            "SvRowDetail", "SvRowValue", "SvSection", "SvHeading", "SvText", "SvMuted", "SvLabel",
-            "SvTitle", "SvError", "SvNotice", "SvPanel", "SvFact", "SvFactLabel", "SvFactValue",
-            "SvFactTotal", "SvSegments", "SvSegment", "SvTile", "SvStat", "SvStatValue",
-            "SvStatLabel", "SvChartValue", "SvChartAxis", "SvAmount", "SvBannerIcon",
-            "SvBannerTitle", "SvBannerText", "SvAlert", "SvSide", "SvSideItem", "SvSidePicked",
-            "SvSideLabel", "SvSideName", "SvSideDetail", "SvPaneBar", "SvPaneTitle", "SvMaster",
-            "SvBarButton", "SvHomeBar"};
+        String[] dressed = {"PlForm", "PlPage", "PlList", "PlPrimary", "PlSecondary", "PlDanger",
+            "PlLink", "PlField", "PlFieldHint", "PlRow", "PlRowPicked", "PlRowIcon", "PlRowTitle",
+            "PlRowDetail", "PlRowValue", "PlSection", "PlHeading", "PlText", "PlMuted", "PlLabel",
+            "PlTitle", "PlError", "PlNotice", "PlPanel", "PlFact", "PlFactLabel", "PlFactValue",
+            "PlFactTotal", "PlSegments", "PlSegment", "PlTile", "PlStat", "PlStatValue",
+            "PlStatLabel", "PlChartValue", "PlChartAxis", "PlAmount", "PlBannerIcon",
+            "PlBannerTitle", "PlBannerText", "PlAlert", "PlSide", "PlSideItem", "PlSidePicked",
+            "PlSideLabel", "PlSideName", "PlSideDetail", "PlPaneBar", "PlPaneTitle", "PlMaster",
+            "PlBarButton", "PlHomeBar"};
         for (int iter = 0; iter < dressed.length; iter++) {
-            DESKTOP.put(dressed[iter], "SvDesk" + dressed[iter].substring(2));
+            DESKTOP.put(dressed[iter], "PlDesk" + dressed[iter].substring(2));
         }
     }
 

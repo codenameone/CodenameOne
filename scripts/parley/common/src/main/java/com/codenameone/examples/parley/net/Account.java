@@ -160,21 +160,21 @@ public final class Account {
     }
 
     /// Saves the name, which only the profile screen changes.
-    public static void saveProfile(final String name, final Runnable done,
+    public static void saveProfile(final String name, final String about, final Runnable done,
             final Net.Failed failed) {
         if (!profileLoaded) {
             // The rest of the profile goes out with the name, and it has not
             // been seen yet; see send().
             fetch(() -> {
                 if (profileLoaded) {
-                    saveProfile(name, done, failed);
+                    saveProfile(name, about, done, failed);
                 } else {
                     failed.failed(0, "Could not reach the server. Check your connection.");
                 }
             });
             return;
         }
-        ProfileDto wanted = new ProfileDto(name);
+        ProfileDto wanted = new ProfileDto(name, about);
         final String owner = Session.owner();
         Api.account().saveProfile(wanted, Net.to(user -> {
             // The answer is about the account that asked; see send().
@@ -198,12 +198,7 @@ public final class Account {
     }
 
     private static void changed(String name) {
-        if (applying || Session.user() == null || Prefs.RECENTS.equals(name)) {
-            return;
-        }
-        // Where to deliver is the device's: the server keeps saved addresses
-        // of its own, through their own calls.
-        if (Prefs.DELIVER_TO.equals(name)) {
+        if (applying || Session.user() == null) {
             return;
         }
         preferencesChanged = true;
@@ -330,18 +325,23 @@ public final class Account {
                 language.length() == 0 ? com.codenameone.examples.parley.ui.Lang.current()
                         : language,
                 Prefs.theme(),
-                Prefs.units(),
-                Prefs.notifyDeliveryUpdates(),
-                Prefs.notifyReceipts(),
-                Prefs.notifyPromotions(),
-                Prefs.paymentMethod(),
-                Prefs.tipPercent());
+                Prefs.notifyMessages(),
+                Prefs.notifyGroups(),
+                Prefs.notifyCalls(),
+                Prefs.readReceipts(),
+                Prefs.typingIndicators(),
+                Prefs.lastSeen(),
+                Prefs.profilePhoto(),
+                Prefs.disappearingSeconds(),
+                Prefs.screenSecurity(),
+                Prefs.appLock());
     }
 
     /// The profile to send: the one the server gave, or the name signed in
     /// with.
     private static ProfileDto described() {
-        return new ProfileDto(profile == null ? Session.user().displayName() : profile.name());
+        return profile != null ? profile
+                : new ProfileDto(Session.user().displayName(), Session.user().about());
     }
 
     private static void apply(PreferencesDto from) {
@@ -355,15 +355,21 @@ public final class Account {
                 Prefs.setLanguage(from.language());
             }
             Prefs.setTheme(from.theme());
-            Prefs.setUnits(from.units());
-            Prefs.setNotifyDeliveryUpdates(from.notifyDeliveryUpdates());
-            Prefs.setNotifyReceipts(from.notifyReceipts());
-            Prefs.setNotifyPromotions(from.notifyPromotions());
-            String method = from.defaultPaymentMethodId();
-            if (method != null && method.length() > 0) {
-                Prefs.setPaymentMethod(method);
+            Prefs.setNotifyMessages(from.notifyMessages());
+            Prefs.setNotifyGroups(from.notifyGroups());
+            Prefs.setNotifyCalls(from.notifyCalls());
+            Prefs.setReadReceipts(from.readReceipts());
+            Prefs.setTypingIndicators(from.typingIndicators());
+            if (from.lastSeen() != null && from.lastSeen().length() > 0) {
+                Prefs.setLastSeen(from.lastSeen());
             }
-            Prefs.setTipPercent(from.defaultTipPercent());
+            if (from.profilePhoto() != null && from.profilePhoto().length() > 0) {
+                Prefs.setProfilePhoto(from.profilePhoto());
+            }
+            Prefs.setDisappearingSeconds(from.disappearingSeconds());
+            Prefs.setScreenSecurity(from.screenSecurity());
+            Prefs.setAppLock(from.appLock());
+            sent = from;
         } finally {
             applying = false;
         }

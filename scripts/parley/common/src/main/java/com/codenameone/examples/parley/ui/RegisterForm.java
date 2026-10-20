@@ -34,10 +34,9 @@ import com.codenameone.examples.parley.net.Session;
 
 /// Creates an account, signs in with it and goes on to verify the phone.
 ///
-/// Everyone who registers can delivery. Someone who wants to drive says so here
-/// and is taken on to the application; the courier role comes when an admin
-/// approves it. Nobody registers as an admin either: that role is granted by
-/// another admin, from the admin screens.
+/// Nobody registers as an admin: that role is granted by another admin, from
+/// the admin screens. The device's keys are made on the first sign-in, after
+/// this, so the password never has anything to do with them.
 public final class RegisterForm {
     private RegisterForm() {
     }
@@ -46,7 +45,7 @@ public final class RegisterForm {
         final Form form = Ui.form("Create an account", "Register");
         Ui.back(form, previous);
         Container page = Ui.page();
-        final TextField name = Ui.field(page, "Name", "name", "What couriers will call you");
+        final TextField name = Ui.field(page, "Name", "name", "What your contacts will see");
         final TextField email = Ui.field(page, "E-mail", "email", "you@example.com",
                 TextArea.EMAILADDR);
         final TextField phone = Ui.field(page, "Mobile number", "phone", "+1 555 010 0000",
@@ -54,23 +53,13 @@ public final class RegisterForm {
         final TextField password = Ui.field(page, "Password", "password",
                 "At least 8 characters", TextArea.PASSWORD);
 
-        // Ordering is open to everyone the moment they have an account. Onboarding
-        // is asked for here and granted later, by an admin who has read the
-        // application this choice leads to.
-        final String[] wants = {Nav.CUSTOMER};
-        page.add(Ui.label("I want to", "SvLabel"));
-        page.add(Ui.choice("want", new String[] {"Order food", "Deliver"},
-                new String[] {Nav.CUSTOMER, Nav.COURIER}, wants[0], value -> wants[0] = value));
-        page.add(Ui.text("Couriers apply after signing up: a few details about you and your "
-                + "bike or scooter, and a few photos. You can order in the meantime.", "SvMuted"));
 
-        final SpanLabel error = Ui.text("", "SvError");
+        final SpanLabel error = Ui.text("", "PlError");
         error.setName("error");
         final Button create = Ui.primary("Create account", "submit", null);
         create.addActionListener(e -> {
-            final boolean onboarding = Nav.COURIER.equals(wants[0]);
             final RegisterDto request = new RegisterDto(email.getText().trim(), password.getText(),
-                    name.getText().trim(), phone.getText().trim(), null, null, onboarding);
+                    name.getText().trim(), phone.getText().trim());
             final Net.Failed failed = (status, message) -> {
                 create.setEnabled(true);
                 error.setText(message);
@@ -82,10 +71,8 @@ public final class RegisterForm {
             // first that fails, so nothing is validated twice.
             Api.account().register(request, Net.to(user -> Session.signIn(request.email(),
                     request.password(), () -> {
-                        // Someone who came to deliver starts on the courier's side,
-                        // which for them is the application.
-                        AppConfig.setMode(onboarding ? Nav.COURIER : Nav.CUSTOMER, Session.owner(request.email()));
-                        Telemetry.registered(onboarding);
+                        AppConfig.setMode(Nav.CHATS, Session.owner(request.email()));
+                        Telemetry.registered();
                         VerifyPhoneForm.show(Nav::enter);
                     }, failed), failed));
         });
