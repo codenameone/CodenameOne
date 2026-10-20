@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
 
 /// Java SE twin of Web, on HttpURLConnection.
 ///
@@ -69,9 +71,15 @@ public final class Web {
         private final String error;
         private final Map headers;
         private final Map values;
+        private final String protocol;
 
         /// @param values name (lower case) to every value, as the twin takes.
         Result(int status, byte[] body, String error, Map values) {
+            this(status, body, error, values, null);
+        }
+
+        Result(int status, byte[] body, String error, Map values, String protocol) {
+            this.protocol = protocol;
             this.status = status;
             this.body = body;
             this.error = error;
@@ -131,6 +139,12 @@ public final class Web {
 
         public String getError() {
             return error;
+        }
+
+        /// The protocol the response came over; see the translated twin. Always
+        /// an HTTP/1 version here.
+        public String getProtocol() {
+            return protocol;
         }
     }
 
@@ -215,6 +229,178 @@ public final class Web {
 
     public static Result request(String method, String url, List headers, byte[] body)
             throws IOException {
+        return request(null, method, url, headers, body);
+    }
+
+    /// Creates the per-client transport the first time a WebClient is used.
+    interface TransportFactory {
+        Object create(WebClient client) throws IOException;
+    }
+
+    /// A WebClient's transport on this arm: the socket factory carrying its
+    /// client certificate, or none. HttpURLConnection's keep-alive cache keys an
+    /// HTTPS connection by its socket factory as well as its host, so a client's
+    /// own factory is also what keeps its authenticated connections from being
+    /// handed to another client -- the translated twin's per-client pool, in the
+    /// JDK's spelling.
+    private static final class Transport {
+        private final TrackingSockets sockets;
+
+        Transport(SSLSocketFactory sockets) {
+            this.sockets = new TrackingSockets(sockets);
+        }
+    }
+
+    /// The client's factory, remembering every socket it makes so close() can
+    /// shut the ones idling in the JDK's keep-alive cache. That cache has no
+    /// API to evict by factory, and without this a closed client's sockets --
+    /// with its certificate's session on them -- stayed open until the server
+    /// or the JDK timed them out. Closed sockets are pruned as new ones are
+    /// made, so the list holds at most what is open.
+    private static final class TrackingSockets extends SSLSocketFactory {
+        private final SSLSocketFactory delegate;
+        private final List open = new ArrayList();
+        private boolean closed;
+
+        TrackingSockets(SSLSocketFactory delegate) {
+            this.delegate = delegate;
+        }
+
+        private java.net.Socket track(java.net.Socket socket) throws IOException {
+            synchronized (open) {
+                if (closed) {
+                    socket.close();
+                    throw new IOException("This WebClient has been closed");
+                }
+                for (int i = open.size() - 1; i >= 0; i--) {
+                    if (((java.net.Socket) open.get(i)).isClosed()) {
+                        open.remove(i);
+                    }
+                }
+                open.add(socket);
+            }
+            return socket;
+        }
+
+        void closeAll() {
+            List all;
+            synchronized (open) {
+                closed = true;
+                all = new ArrayList(open);
+                open.clear();
+            }
+            for (Object socket : all) {
+                try {
+                    ((java.net.Socket) socket).close();
+                } catch (IOException ignored) {
+                    // Already gone; nothing else to release.
+                }
+            }
+        }
+
+        @Override
+        public String[] getDefaultCipherSuites() {
+            return delegate.getDefaultCipherSuites();
+        }
+
+        @Override
+        public String[] getSupportedCipherSuites() {
+            return delegate.getSupportedCipherSuites();
+        }
+
+        @Override
+        public java.net.Socket createSocket() throws IOException {
+            return track(delegate.createSocket());
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.Socket s, String host, int port,
+                                            boolean autoClose) throws IOException {
+            return track(delegate.createSocket(s, host, port, autoClose));
+        }
+
+        @Override
+        public java.net.Socket createSocket(String host, int port) throws IOException {
+            return track(delegate.createSocket(host, port));
+        }
+
+        @Override
+        public java.net.Socket createSocket(String host, int port, java.net.InetAddress local,
+                                            int localPort) throws IOException {
+            return track(delegate.createSocket(host, port, local, localPort));
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.InetAddress host, int port)
+                throws IOException {
+            return track(delegate.createSocket(host, port));
+        }
+
+        @Override
+        public java.net.Socket createSocket(java.net.InetAddress host, int port,
+                                            java.net.InetAddress local, int localPort)
+                throws IOException {
+            return track(delegate.createSocket(host, port, local, localPort));
+        }
+    }
+
+    private static final TransportFactory TRANSPORTS = new TransportFactory() {
+        @Override
+        public Object create(WebClient client) throws IOException {
+            ClientCertificate credential = client.getClientCertificate();
+            // A factory per client even without a certificate: the keep-alive
+            // cache keys HTTPS connections by it, so a shared default factory
+            // would let certificate-less clients hand each other connections.
+            // Plain http:// carries no factory and the JDK's cache cannot be
+            // split for it; there is no credential on such a connection to
+            // confuse, and the packaged arm's pools are separate either way.
+            return new Transport(credential == null ? ClientCredentials.defaultSocketFactory()
+                    : ClientCredentials.socketFactory(credential));
+        }
+    };
+
+    /// Enforces WebClient request timeouts; see perform(). A scheduler that
+    /// removes a task when it is cancelled: java.util.Timer only marks it, so a
+    /// burst of fast requests with a long timeout kept every task, and the
+    /// connection it captured, queued until its deadline.
+    private static final java.util.concurrent.ScheduledThreadPoolExecutor DEADLINES =
+            deadlineScheduler();
+
+    private static java.util.concurrent.ScheduledThreadPoolExecutor deadlineScheduler() {
+        java.util.concurrent.ScheduledThreadPoolExecutor scheduler =
+                new java.util.concurrent.ScheduledThreadPoolExecutor(1,
+                        new java.util.concurrent.ThreadFactory() {
+                            @Override
+                            public Thread newThread(Runnable task) {
+                                Thread thread = new Thread(task, "cn1-web-deadlines");
+                                thread.setDaemon(true);
+                                return thread;
+                            }
+                        });
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
+    }
+
+    static void closeTransport(Object transport) {
+        // Runs once no request of the client is in flight (WebClient.close),
+        // so every socket left is idle in the keep-alive cache. A plain
+        // http:// connection has no factory to track it by and expires there
+        // on its own; it carries no credential.
+        ((Transport) transport).sockets.closeAll();
+    }
+
+    static Result request(WebClient client, String method, String url, List headers,
+                          byte[] body) throws IOException {
+        if (client != null && client.isRequireHttp2()) {
+            // Said out loud, the way PATCH is: the request would otherwise go
+            // out over HTTP/1.1, the protocol the caller ruled out.
+            throw new IOException("The local Java SE runtime cannot make an HTTP/2 "
+                    + "request -- its client is HttpURLConnection, which speaks HTTP/1.1 "
+                    + "only. The packaged backend negotiates HTTP/2, so this is a "
+                    + "limitation of cn1:backend rather than of your code. Exercise "
+                    + "this path against the packaged binary, or leave HTTP/2 "
+                    + "preferred rather than required while developing.");
+        }
         Urls.requireHttp(url);
         // The request line's other field; see HeaderLines.requireMethod.
         HeaderLines.requireMethod(method);
@@ -224,7 +410,7 @@ public final class Web {
         int status = -1;
         Throwable failure = null;
         try {
-            Result result = perform(method, url, headers, body,
+            Result result = perform(client, method, url, headers, body,
                     Tracing.propagationHeaders(span, headers));
             status = result.getStatus();
             return result;
@@ -239,16 +425,72 @@ public final class Web {
         }
     }
 
+    /// A step's timeout cut to what is left of the request's ceiling. 0 for no
+    /// limit, as HttpURLConnection reads it.
+    private static int bounded(int stepMillis, long deadline, String url) throws IOException {
+        if (deadline == 0) {
+            return stepMillis;
+        }
+        long left = deadline - System.currentTimeMillis();
+        if (left <= 0) {
+            throw new IOException("Request to " + Urls.forMessage(url)
+                    + " failed: its request timeout elapsed");
+        }
+        return stepMillis == 0 || left < stepMillis ? (int) left : stepMillis;
+    }
+
+    /// "HTTP/1.1" out of the status line.
+    private static String protocolOf(String statusLine) {
+        if (statusLine == null || !statusLine.startsWith("HTTP/")) {
+            return null;
+        }
+        int space = statusLine.indexOf(' ');
+        return space < 0 ? statusLine : statusLine.substring(0, space);
+    }
+
     /// @param trace the trace-context lines, or null. Sent, but not counted as the
     /// caller's headers when deciding whether to follow a redirect --
     /// the translated twin's rule, for the translated twin's reason.
-    private static Result perform(String method, String url, List headers, byte[] body,
-                                  List trace) throws IOException {
+    private static Result perform(WebClient client, String method, String url, List headers,
+                                  byte[] body, List trace) throws IOException {
+        int connectTimeout = 30000;
+        int readTimeout = 30000;
+        int requestTimeout = 0;
+        SSLSocketFactory sockets = null;
+        if (client != null) {
+            connectTimeout = client.getConnectTimeoutMillis();
+            readTimeout = client.getReadTimeoutMillis();
+            requestTimeout = client.getRequestTimeoutMillis();
+            sockets = ((Transport) client.transport(TRANSPORTS)).sockets;
+        }
+        // The whole-request ceiling, as libcurl's CURLOPT_TIMEOUT_MS is on the
+        // packaged arm. HttpURLConnection has no such thing, so it is applied by
+        // shortening each blocking step to what is left of it.
+        long deadline = requestTimeout > 0 ? System.currentTimeMillis() + requestTimeout : 0;
         HttpURLConnection connection;
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
         } catch (IOException err) {
             throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage(), err);
+        }
+        boolean keepAlive = false;
+        // Shortening each step bounds connects and reads, but not a write: a
+        // server that stops reading an upload blocks OutputStream.write() and
+        // setReadTimeout() never applies to it. The watchdog closes the
+        // connection at the deadline, which fails whatever step is blocked.
+        java.util.concurrent.ScheduledFuture watchdog = null;
+        if (deadline != 0) {
+            final HttpURLConnection watched = connection;
+            watchdog = DEADLINES.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    watched.disconnect();
+                }
+            }, Math.max(1, deadline - System.currentTimeMillis()),
+                    java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+        if (sockets != null && connection instanceof HttpsURLConnection) {
+            ((HttpsURLConnection) connection).setSSLSocketFactory(sockets);
         }
         try {
             String verb = method == null ? "GET" : method;
@@ -271,8 +513,14 @@ public final class Web {
                         + "code. Exercise this path against the packaged binary, or use "
                         + "POST with the override header your service expects.", unsupported);
             }
-            connection.setConnectTimeout(30000);
-            connection.setReadTimeout(30000);
+            connection.setConnectTimeout(bounded(connectTimeout, deadline, url));
+            connection.setReadTimeout(bounded(readTimeout, deadline, url));
+            if (client != null && !client.isReuseConnections()) {
+                // The JDK reuses through its keep-alive cache whenever the
+                // response allows it; asking for close is how one request says
+                // "not this connection". The packaged arm forbids reuse outright.
+                connection.setRequestProperty("Connection", "close");
+            }
             // Following a redirect RESENDS the caller's headers to wherever it
             // points, and HttpURLConnection carries every request property over
             // -- it knows nothing about which of them is an X-Api-Key. A single
@@ -303,8 +551,13 @@ public final class Web {
             // wrong in. A null method means GET on both arms.
             boolean safeMethod = method == null || "GET".equals(method)
                     || "HEAD".equals(method);
+            // AND A CLIENT CERTIFICATE. HttpURLConnection keeps this
+            // connection's socket factory when it follows an HTTPS redirect, so
+            // the certificate would be presented to the new host; the packaged
+            // arm keeps its blob on the handle and restricts it the same way.
+            boolean credential = client != null && client.getClientCertificate() != null;
             connection.setInstanceFollowRedirects((headers == null || headers.isEmpty())
-                    && (body == null || body.length == 0) && safeMethod);
+                    && (body == null || body.length == 0) && safeMethod && !credential);
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             List lines = headers;
             if (trace != null) {
@@ -376,6 +629,9 @@ public final class Web {
                 int n;
                 long total = 0;
                 while ((n = in.read(chunk)) > 0) {
+                    if (deadline != 0) {
+                        connection.setReadTimeout(bounded(readTimeout, deadline, url));
+                    }
                     total += n;
                     if (total > allowed) {
                         throw new IOException("Request to " + Urls.forMessage(url) + " failed: the response "
@@ -411,9 +667,40 @@ public final class Web {
                 }
                 all.add(value);
             }
-            return new Result(status, buffer.toByteArray(), null, responseHeaders);
+            if (in != null && client != null && client.isReuseConnections()) {
+                // Read to the end and CLOSED, which is what hands the socket back
+                // to the JDK's keep-alive cache. disconnect() closes the socket
+                // instead, so a pooled client never reused anything on this arm
+                // while the packaged one did -- measured by MtlsCheck's
+                // source-port comparison. The static methods keep disconnecting,
+                // as they always have, matching the packaged arm's no-pool path.
+                in.close();
+                keepAlive = true;
+            }
+            return new Result(status, buffer.toByteArray(), null, responseHeaders,
+                    protocolOf(connection.getHeaderField(0)));
+        } catch (java.net.SocketTimeoutException err) {
+            if (deadline != 0 && System.currentTimeMillis() >= deadline) {
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: it "
+                        + "did not complete within its " + requestTimeout + "ms request timeout", err);
+            }
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + err.getMessage(), err);
+        } catch (IOException err) {
+            // The watchdog's disconnect surfaces as whatever the blocked step
+            // makes of a closed socket; name the real cause.
+            if (deadline != 0 && System.currentTimeMillis() >= deadline) {
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: it "
+                        + "did not complete within its " + requestTimeout + "ms request timeout", err);
+            }
+            throw err;
         } finally {
-            connection.disconnect();
+            if (watchdog != null) {
+                watchdog.cancel(false);
+            }
+            if (!keepAlive) {
+                connection.disconnect();
+            }
         }
     }
 }
