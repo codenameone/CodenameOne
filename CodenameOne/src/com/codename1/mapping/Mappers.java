@@ -96,6 +96,21 @@ public final class Mappers {
         return (Mapper<T>) BY_NAME.get(type.getName());
     }
 
+    /// The mapper for `type`, failing loudly when there is none. A response
+    /// mapped with no mapper would otherwise read as empty: a list with nothing
+    /// in it, an object that is null, and no hint that `@Mapped` is missing.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when no mapper is registered for `type`
+    public static <T> Mapper<T> require(Class<T> type) {
+        Mapper<T> m = get(type);
+        if (m == null) {
+            throw missing(type);
+        }
+        return m;
+    }
+
     /// Serializes `instance` to JSON. Throws `IllegalStateException` when
     /// no mapper is registered for its concrete class; that always points
     /// at a missing `@Mapped` annotation or a build that ran without the

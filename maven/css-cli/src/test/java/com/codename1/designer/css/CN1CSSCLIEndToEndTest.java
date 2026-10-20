@@ -418,6 +418,48 @@ class CN1CSSCLIEndToEndTest {
         assertEquals(0xff0000ff, after[after.length / 2], "the rule was painted again from the new image");
     }
 
+    /// Whether the theme font stored under `key` still names its TrueType
+    /// font. Read from the bytes, not through [Resources]: this headless JVM
+    /// cannot draw TrueType, so the runtime loader hands back the system
+    /// fallback either way. After the key come the new-font flag, face, style
+    /// and size bytes, then the flag this asks about.
+    private static boolean storesTrueTypeFont(File res, String key) throws Exception {
+        byte[] data = java.nio.file.Files.readAllBytes(res.toPath());
+        byte[] name = key.getBytes("US-ASCII");
+        for (int i = 0; i + name.length + 5 <= data.length; i++) {
+            boolean match = true;
+            for (int j = 0; j < name.length && match; j++) {
+                match = data[i + j] == name[j];
+            }
+            if (match) {
+                return data[i + name.length + 4] == 1;
+            }
+        }
+        throw new AssertionError(key + " is not in " + res);
+    }
+
+    @Test
+    void aRuleThatDidNotChangeKeepsItsNativeFontThroughAnIncrementalCompile(@TempDir Path tmp) throws Exception {
+        File common = mavenProject(tmp.toFile());
+        String kept = "Kept { font-family: \"native:MainBold\"; font-size: 3mm; }\n";
+        File css = write(new File(common, "src/main/css/theme.css"), kept + "Edited { color: #000001; }\n");
+        File res = new File(common, "target/classes/theme.res");
+        String[] args = {"-input", css.getPath(), "-output", res.getPath()};
+
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertTrue(storesTrueTypeFont(res, "Kept.font"), "a clean compile writes the native font");
+
+        long built = res.lastModified();
+        write(css, kept + "Edited { color: #000002; }\n");
+        assertTrue(css.setLastModified(built + 5000));
+        assertEquals(0, CN1CSSCLI.run(args), stderr());
+        assertEquals("2", theme(res).get("Edited.fgColor"), "the second compile was a real one");
+        // The rule that did not change is carried over from the theme the
+        // first compile wrote. Loading that theme used to turn the font into
+        // its system fallback, and every unedited rule lost its font.
+        assertTrue(storesTrueTypeFont(res, "Kept.font"), "the unchanged rule keeps its native font");
+    }
+
     @Test
     void aBuildDirectoryOutsideTheProjectIsStillAProjectBuild(@TempDir Path tmp) throws Exception {
         File common = mavenProject(new File(tmp.toFile(), "project"));

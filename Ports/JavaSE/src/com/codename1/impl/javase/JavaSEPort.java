@@ -14662,10 +14662,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private java.awt.Font desktopNativeFont(String alias) {
-        String family = fontFaceSystem;
         // FACE_SYSTEM and native aliases share the installed family resolved at
         // theme selection. Windows Java may expose "Segoe UI Variable" without
         // the preferred "Text" suffix; retaining that missing name gives Dialog.
+        return weightedNativeFont(fontFaceSystem, alias);
+    }
+
+    /// The installed `family` at the weight and posture `alias` names
+    /// (`native:MainBold`, `native:ItalicLight`...). The font is remembered as
+    /// an alias font, so deriving it at another size keeps those attributes.
+    private java.awt.Font weightedNativeFont(String family, String alias) {
         String variant = alias.substring("native:".length());
         boolean italic = variant.startsWith("Italic");
         if (!italic && !variant.startsWith("Main")) {
@@ -14702,8 +14708,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(isIOS) {
                     String nn = nativeFontName(fontName);
                     if (nn != null) {
-                        java.awt.Font nf = new java.awt.Font(nn, java.awt.Font.PLAIN, medianFontSize);
-                        return nf;
+                        // The weight is part of the alias. Created PLAIN, every
+                        // native:MainBold under an iOS skin drew at the regular
+                        // weight wherever SF or Helvetica Neue is installed.
+                        return weightedNativeFont(nn, fontName);
                     }
                 }
                 String res; 

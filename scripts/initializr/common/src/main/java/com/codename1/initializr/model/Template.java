@@ -36,8 +36,8 @@ public enum Template {
     // A whole application rather than a starting point: a ride-hailing app with a
     // rider, a driver and an admin mode, and the server it talks to. It is the
     // project in scripts/wayline, which CI builds and tests; the resources named
-    // here are derived from it by scripts/sync-initializr-wayline.py and never
-    // edited by hand.
+    // here are derived from it by `scripts/sync-initializr-template.py wayline`
+    // and never edited by hand.
     //
     // Its preview is a resource of its own, read when the template is chosen,
     // and not an image of the theme: the theme is loaded at start-up, so a
@@ -51,7 +51,16 @@ public enum Template {
             "com.codenameone.examples.wayline", "Wayline", "/wayline-preview.jpg",
             "The ride-hailing template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/wayline-modules.zip", "/wayline-settings.properties");
+            new String[0], "/wayline-modules.zip", "/wayline-settings.properties"),
+    // The same kind of template as WAYLINE: a food-delivery app with a customer,
+    // a courier, a restaurant and an admin mode, and its server. It is the project
+    // in scripts/savor, and its resources come from
+    // `scripts/sync-initializr-template.py savor`.
+    SAVOR(false, "/savor-src.zip", "/savor-css.zip", "/savor-pom.xml",
+            "com.codenameone.examples.savor", "Savor", "/savor-preview.jpg",
+            "The food-delivery template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/savor-modules.zip", "/savor-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.
