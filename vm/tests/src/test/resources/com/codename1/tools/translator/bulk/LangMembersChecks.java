@@ -583,6 +583,30 @@ public final class LangMembersChecks {
                 Bulk.p("null", "NPE");
             }
         });
+        Bulk.check("Lang.aParsePositionPastTheEndFails", () -> {
+            java.text.ParsePosition pos = new java.text.ParsePosition(5);
+            Bulk.p("result", new java.text.SimpleDateFormat("yyyy").parse("2020", pos) == null);
+            Bulk.p("index", pos.getIndex());
+            Bulk.p("error", pos.getErrorIndex());
+        });
+        Bulk.check("Lang.aCustomUnitProbesByAdding", () -> {
+            java.time.temporal.TemporalUnit unit = new java.time.temporal.TemporalUnit() {
+                public java.time.Duration getDuration() { return java.time.Duration.ofDays(2); }
+                public boolean isDurationEstimated() { return false; }
+                public boolean isDateBased() { return true; }
+                public boolean isTimeBased() { return false; }
+                @SuppressWarnings("unchecked")
+                public <R extends java.time.temporal.Temporal> R addTo(R t, long n) {
+                    return (R) t.plus(n * 2, java.time.temporal.ChronoUnit.DAYS);
+                }
+                public long between(java.time.temporal.Temporal a, java.time.temporal.Temporal b) {
+                    return a.until(b, java.time.temporal.ChronoUnit.DAYS) / 2;
+                }
+            };
+            Bulk.p("date", java.time.LocalDate.of(2020, 1, 1).isSupported(unit));
+            Bulk.p("time", java.time.LocalTime.NOON.isSupported(unit));
+            Bulk.p("dateTime", java.time.LocalDateTime.of(2020, 1, 1, 0, 0).isSupported(unit));
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

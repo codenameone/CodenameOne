@@ -40,8 +40,35 @@ public interface TemporalUnit {
     boolean isTimeBased();
 
     /// Whether `temporal` can add or subtract this unit.
+    ///
+    /// Answered by the unit's kind for the built-in temporals and otherwise by
+    /// trying to add one, as the JDK's default does. It never asks
+    /// `temporal.isSupported(this)`: that is what calls here, so a custom unit
+    /// relying on this default would recurse.
     default boolean isSupportedBy(Temporal temporal) {
-        return temporal.isSupported(this);
+        if (temporal instanceof java.time.LocalTime) {
+            return isTimeBased();
+        }
+        if (temporal instanceof java.time.chrono.ChronoLocalDate) {
+            return isDateBased();
+        }
+        if (temporal instanceof java.time.chrono.ChronoLocalDateTime
+                || temporal instanceof java.time.chrono.ChronoZonedDateTime) {
+            return true;
+        }
+        try {
+            temporal.plus(1, this);
+            return true;
+        } catch (UnsupportedTemporalTypeException ex) {
+            return false;
+        } catch (RuntimeException ex) {
+            try {
+                temporal.plus(-1, this);
+                return true;
+            } catch (RuntimeException ex2) {
+                return false;
+            }
+        }
     }
 
     /// `temporal` moved by `amount` of this unit.

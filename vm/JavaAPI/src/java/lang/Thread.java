@@ -71,6 +71,10 @@ public class Thread implements java.lang.Runnable{
     private long nativeThreadId;
     private boolean daemon;
     private long id;
+    // Plain, like the default handler below: a handler is installed on a
+    // thread before it starts, or by the thread itself. Installing one on
+    // a running thread from another is not a supported pattern; the target
+    // sees it after its next synchronization.
     private UncaughtExceptionHandler uncaughtExceptionHandler;
     private static int activeThreads = 0;
     private static long lastId;

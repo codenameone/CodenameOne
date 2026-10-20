@@ -53,8 +53,6 @@ CodenameOne/src/com/codename1/call/session/Calls.java#ec1d4978c69a
 CodenameOne/src/com/codename1/call/voip/VoipPush.java#d5cd4cf7c3b1
 CodenameOne/src/com/codename1/camera/Camera.java#914d198cd45e
 CodenameOne/src/com/codename1/camera/CameraView.java#b4437bfda716
-CodenameOne/src/com/codename1/capture/Capture.java#6f09a797f57a
-CodenameOne/src/com/codename1/capture/package-info.java#6f09a797f57a
 CodenameOne/src/com/codename1/car/Car.java#607a745d6664
 CodenameOne/src/com/codename1/car/CarAction.java#c3f2393e6815
 CodenameOne/src/com/codename1/car/CarApplication.java#2eec141820cc
@@ -190,12 +188,9 @@ CodenameOne/src/com/codename1/maps/routing/RouteRequest.java#dee0f78e4809
 CodenameOne/src/com/codename1/maps/routing/Routing.java#ec823a8e0384
 CodenameOne/src/com/codename1/maps/routing/package-info.java#bda5b66fa7cf
 CodenameOne/src/com/codename1/media/AudioMixer.java#f6cc44ee497c
-CodenameOne/src/com/codename1/media/Media.java#6f09a797f57a
 CodenameOne/src/com/codename1/media/Media.java#6fdad3c6b836
-CodenameOne/src/com/codename1/media/MediaManager.java#6f09a797f57a
 CodenameOne/src/com/codename1/media/MediaManager.java#6fdad3c6b836
 CodenameOne/src/com/codename1/media/VideoWriter.java#dde085400571
-CodenameOne/src/com/codename1/media/package-info.java#6f09a797f57a
 CodenameOne/src/com/codename1/messaging/Message.java#0b9abd0a591a
 CodenameOne/src/com/codename1/messaging/package-info.java#0b9abd0a591a
 CodenameOne/src/com/codename1/migration/Migrator.java#0f95ce9090fb
@@ -578,7 +573,6 @@ docs/developer-guide/Miscellaneous-Features.asciidoc#4d04dff4b1c7
 docs/developer-guide/Miscellaneous-Features.asciidoc#51f703f10b7c
 docs/developer-guide/Miscellaneous-Features.asciidoc#68709055a8b8
 docs/developer-guide/Miscellaneous-Features.asciidoc#6e0e366e3155
-docs/developer-guide/Miscellaneous-Features.asciidoc#6f09a797f57a
 docs/developer-guide/Miscellaneous-Features.asciidoc#9131556a34bd
 docs/developer-guide/Miscellaneous-Features.asciidoc#ade704dbd855
 docs/developer-guide/Miscellaneous-Features.asciidoc#b7b3af84c6e9
@@ -1162,7 +1156,6 @@ docs/website/content/blog/sqlite-portable-encrypted.md#37991b84f8ba
 docs/website/content/blog/sqlite-portable-encrypted.md#4e0e55968e11
 docs/website/content/blog/sqlite-portable-encrypted.md#7876f754dd81
 docs/website/content/blog/sqlite-portable-encrypted.md#d207c69ad4a4
-docs/website/content/blog/stream-apis-spm-tutorial-trail-and-uwp.md#61a6169ba960
 docs/website/content/blog/the-codename-one-game-builder.md#6314fc3a7632
 docs/website/content/blog/third-generation-gui-builder.md#ead90de5fd7a
 docs/website/content/blog/tips-for-the-javascript-port-of-codename-one-apps.md#42120e09e043

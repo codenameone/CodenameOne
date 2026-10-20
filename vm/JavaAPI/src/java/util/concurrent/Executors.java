@@ -419,9 +419,13 @@ public class Executors {
                     } catch (Throwable t) {
                         // Reported, and the worker carries on. The JDK lets the
                         // thread die and starts another; a device pays for a new
-                        // native thread per failed task for no gain, since
-                        // nothing here keeps per-thread state a failure could
-                        // leave behind, and this is the report the dead thread's
+                        // native thread per failed task, and Codename One is not
+                        // the JDK, so this is a deliberate difference. What it
+                        // leaves behind is per-thread state: a ThreadLocal the
+                        // failed task set is still set for the next task on
+                        // this worker. Pooled tasks must not count on a fresh
+                        // thread after a failure; clear a ThreadLocal in a
+                        // finally. The log is the report the dead thread's
                         // uncaught-exception handler would have made.
                         JdkHost.get().log(JdkHost.LOG_ERROR,
                                 "Exception in thread \"" + self.getName() + "\" " + t, t);

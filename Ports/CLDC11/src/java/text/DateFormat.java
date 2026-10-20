@@ -173,6 +173,12 @@ public class DateFormat extends Format {
 	/// position is moved past the date; on failure it is left alone, its
 	/// error index is set and null is returned.
 	public Date parse(String source, ParsePosition pos) {
+		// A start past the end is a failed parse at that index, as in the
+		// JDK, not a StringIndexOutOfBoundsException from the field readers.
+		if (pos.getIndex() > source.length()) {
+			pos.setErrorIndex(pos.getIndex());
+			return null;
+		}
 		int[] end = new int[1];
 		try {
 			Date result = parseAt(source, pos.getIndex(), end);
