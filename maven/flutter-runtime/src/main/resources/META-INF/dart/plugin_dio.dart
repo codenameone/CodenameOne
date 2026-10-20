@@ -87,6 +87,13 @@ class Headers {
   external void forEach(void Function(String name, List<String> values) f);
 }
 
+@JavaName('com.codename1.flutter.plugins.dio.ResponseBody')
+class ResponseBody {
+  external Stream<Uint8List> get stream;
+  external int? get statusCode;
+  external int get contentLength;
+}
+
 @JavaName('com.codename1.flutter.plugins.dio.Response')
 class Response<T> {
   external Response({required RequestOptions requestOptions, T? data, int? statusCode,

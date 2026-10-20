@@ -145,17 +145,22 @@ public class GoRouter implements RouterConfigSource {
     }
 
     /** Shows {@code location} in place of every pushed page. */
-    public void go(String location, Object extra) {
+    public void go(String location, final Object extra) {
         while (Navigator.stackSize() > 0) {
             Navigator.pop(null);
         }
         if (samePath(location, initialLocation)) {
             return;
         }
-        Route r = routeFor(location, extra);
-        if (r != null) {
-            Navigator.push(appContext, r);
-        }
+        whenRedirected(location, extra, new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String loc) {
+                Route r = routeFor(loc, extra);
+                if (r != null) {
+                    Navigator.push(appContext, r);
+                }
+            }
+        });
     }
 
     public Future<Object> push(String location) {
@@ -163,9 +168,92 @@ public class GoRouter implements RouterConfigSource {
     }
 
     /** Pushes {@code location} above the current page. */
-    public Future<Object> push(String location, Object extra) {
-        Route r = routeFor(location, extra);
-        return r == null ? Future.value(null) : Navigator.push(appContext, r);
+    public Future<Object> push(String location, final Object extra) {
+        final dart.async.Completer<Object> result = new dart.async.Completer<Object>();
+        whenRedirected(location, extra, new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String loc) {
+                Route r = routeFor(loc, extra);
+                if (r == null) {
+                    result.complete(null);
+                    return;
+                }
+                Navigator.push(appContext, r).then(new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object v) {
+                        result.complete(v);
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        result.completeError(e);
+                    }
+                });
+            }
+        });
+        return result.future();
+    }
+
+    /**
+     * Runs the redirect chain from {@code location}, waiting for any redirect that
+     * answers a Future (an auth check reading its session), then hands the final
+     * location to {@code then}. routeFor applies the same redirects again, now all
+     * already answered; without the wait an incomplete future read as "no redirect"
+     * and a guarded page opened.
+     */
+    private void whenRedirected(final String location, final Object extra, final Funcs.VoidFunc1<String> then) {
+        resolveRedirects(location == null ? "/" : location, extra, 0, then);
+    }
+
+    private void resolveRedirects(final String loc, final Object extra, final int depth,
+            final Funcs.VoidFunc1<String> then) {
+        if (depth > redirectLimit) {
+            then.call(loc);
+            return;
+        }
+        Match m = match(loc);
+        GoRouterState s = stateOf(loc, m, extra, null);
+        List<Funcs.Func2<BuildContext, GoRouterState, Object>> fs =
+                new java.util.ArrayList<Funcs.Func2<BuildContext, GoRouterState, Object>>();
+        fs.add(redirect);
+        if (m != null) {
+            for (GoRoute r : m.chain) {
+                fs.add(r.redirectFunc());
+            }
+        }
+        nextRedirect(fs, 0, s, loc, extra, depth, then);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void nextRedirect(final List<Funcs.Func2<BuildContext, GoRouterState, Object>> fs, final int i,
+            final GoRouterState s, final String loc, final Object extra, final int depth,
+            final Funcs.VoidFunc1<String> then) {
+        if (i >= fs.size()) {
+            then.call(loc);
+            return;
+        }
+        Funcs.Func2<BuildContext, GoRouterState, Object> f = fs.get(i);
+        Object to = f == null ? null : f.call(appContext, s);
+        Funcs.VoidFunc1<Object> answered = new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object v) {
+                if (v instanceof String && !samePath((String) v, loc)) {
+                    resolveRedirects((String) v, extra, depth + 1, then);
+                } else {
+                    nextRedirect(fs, i + 1, s, loc, extra, depth, then);
+                }
+            }
+        };
+        if (to instanceof Future) {
+            ((Future<Object>) to).then(answered, new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    then.call(loc);
+                }
+            });
+        } else {
+            answered.call(to);
+        }
     }
 
     public void pushReplacement(String location, Object extra) {
@@ -376,7 +464,7 @@ public class GoRouter implements RouterConfigSource {
             String t = target.get(i);
             if (p.startsWith(":")) {
                 captured.put(p.substring(1), DartUri.decodeComponent(t));
-            } else if (!p.equalsIgnoreCase(t)) {
+            } else if (!p.equals(t)) {  // go_router literals are case-sensitive by default
                 return false;
             }
         }

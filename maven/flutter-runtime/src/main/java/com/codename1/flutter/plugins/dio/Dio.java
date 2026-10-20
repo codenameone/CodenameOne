@@ -367,7 +367,7 @@ public class Dio {
                 r.statusMessage = getResponseErrorMessage();
                 r.headers = responseHeaders;
                 try {
-                    r.data = decode(ro, responseHeaders, received.toByteArray());
+                    r.data = decode(ro, responseHeaders, received.toByteArray(), r.statusCode);
                 } catch (RuntimeException e) {
                     call.error(0, DioException.of(ro, DioExceptionType.unknown, e.getMessage(), e, r));
                     return;
@@ -491,9 +491,12 @@ public class Dio {
         return true;
     }
 
-    private static Object decode(RequestOptions ro, Headers headers, byte[] body) {
+    private static Object decode(RequestOptions ro, Headers headers, byte[] body, Long status) {
         ResponseType type = ro.responseType == null ? ResponseType.json : ro.responseType;
-        if (type == ResponseType.bytes || type == ResponseType.stream) {
+        if (type == ResponseType.stream) {
+            return new ResponseBody(body, status);
+        }
+        if (type == ResponseType.bytes) {
             return Uint8List.fromBytes(body);
         }
         String text;

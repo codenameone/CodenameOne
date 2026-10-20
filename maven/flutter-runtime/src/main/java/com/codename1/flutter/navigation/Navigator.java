@@ -960,8 +960,10 @@ public class Navigator extends StatelessWidget {
                 boolean pop = Boolean.TRUE.equals(ok) && !stack.isEmpty() && stack.get(stack.size() - 1) == top;
                 if (pop) {
                     pop(context, result);
-                    PopGuards.notifyPopScopes(scopes, true, result);
                 }
+                // one onPopInvoked per request: didPop false for any refusal, a
+                // WillPopScope's included, as Flutter reports it
+                PopGuards.notifyPopScopes(scopes, pop, result);
                 done.complete(Boolean.valueOf(pop));
             }
         }, null);

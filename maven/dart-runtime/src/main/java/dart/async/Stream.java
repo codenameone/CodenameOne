@@ -820,6 +820,7 @@ public class Stream<T> {
 
     /** Dart's {@code take}. */
     public final Stream<T> take(final long count) {
+        // A negative count is an empty stream, not an error (measured on the Dart VM).
         return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
             @Override
             public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
@@ -832,6 +833,9 @@ public class Stream<T> {
 
     /** Dart's {@code skip}. */
     public final Stream<T> skip(final long count) {
+        // Dart rejects a negative argument up front; elementAt(-1) otherwise drained
+        // the whole source (forever, for an endless one) before failing.
+        dart.core.RangeError.checkNotNegative(count, "count");
         return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
             @Override
             public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
@@ -883,7 +887,7 @@ public class Stream<T> {
                 T last = null;
                 while (it.next()) {
                     T v = it.current();
-                    if (first || !(v == null ? last == null : v.equals(last))) {
+                    if (first || !dart.runtime.DartRuntime.eq(v, last)) {
                         s.yield$(v);
                     }
                     first = false;
@@ -1021,6 +1025,11 @@ public class Stream<T> {
                     }
                 } catch (Throwable t) {
                     stopped[0] = true;
+                    // The result is decided; stop listening, as the error path does, so an
+                    // endless source is not left subscribed for nothing.
+                    if (holder[0] != null) {
+                        holder[0].cancel();
+                    }
                     c.completeError(dart.runtime.DartRuntime.caught(t));
                 }
             }
@@ -1268,7 +1277,7 @@ public class Stream<T> {
         return any(new Funcs.Func1<T, Boolean>() {
             @Override
             public Boolean call(T v) {
-                return Boolean.valueOf(needle == null ? v == null : needle.equals(v));
+                return Boolean.valueOf(dart.runtime.DartRuntime.eq(v, needle));
             }
         });
     }
@@ -1338,6 +1347,9 @@ public class Stream<T> {
 
     /** Dart's {@code elementAt}. */
     public final Future<T> elementAt(final long index) {
+        // Dart rejects a negative argument up front; elementAt(-1) otherwise drained
+        // the whole source (forever, for an endless one) before failing.
+        dart.core.RangeError.checkNotNegative(index, "index");
         final long[] i = new long[1];
         final java.util.List<T> seen = new java.util.ArrayList<T>(1);
         return collect(new Funcs.Func1<T, Boolean>() {

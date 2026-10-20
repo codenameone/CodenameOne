@@ -61,6 +61,17 @@ public class FirebaseMessaging {
     }
 
     /** Called with a push payload; plain text becomes the notification body. */
+    /// Codename One's push callback, as the imported entry point forwards it. The
+    /// callback does not say whether a tap opened the app; a push arriving while the
+    /// app is minimized (the tap resumes it) or before it has started (the tap
+    /// launched it) is one the user opened, so it goes to onMessageOpenedApp.
+    public static void pushReceived(String payload) {
+        boolean opened = !com.codename1.ui.Display.isInitialized()
+                || com.codename1.ui.Display.getInstance().isMinimized()
+                || com.codename1.ui.Display.getInstance().getCurrent() == null;
+        deliver(payload, opened);
+    }
+
     public static void deliver(String payload, boolean opened) {
         received++;
         DartMap<String, Object> data = new DartMap<String, Object>();

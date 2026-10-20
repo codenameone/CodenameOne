@@ -158,10 +158,14 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                         carry = new byte[all.length - cut];
                         System.arraycopy(all, cut, carry, 0, carry.length);
                         if (cut > 0) {
+                            // Strict as decode() is: Java's decoder would substitute U+FFFD.
+                            checkUtf8(head, head.length);
                             sink.yield$(text(head));
                         }
                     }
                     if (carry.length > 0) {
+                        // An incomplete sequence left at the end of the stream is malformed.
+                        checkUtf8(carry, carry.length);
                         sink.yield$(text(carry));
                     }
                 } finally {
@@ -293,6 +297,7 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
 
     /** Accepts both alphabets, and missing padding, as Dart's decoder does. */
     static byte[] unbase64(String s) {
+        checkBase64(s);
         byte[] out = new byte[s.length() * 3 / 4 + 3];
         int n = 0;
         int acc = 0;
@@ -325,6 +330,44 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
         byte[] r = new byte[n];
         System.arraycopy(out, 0, r, 0, n);
         return r;
+    }
+
+    /**
+     * Dart's decoder rejects what this one used to truncate silently: a length that is
+     * not a multiple of four, padding that does not complete the last quartet,
+     * anything after the padding, and set bits left over before it. Messages and
+     * positions follow the Dart VM's.
+     */
+    private static void checkBase64(String s) {
+        int len = s.length();
+        int pad = s.indexOf('=');
+        int data = pad < 0 ? len : pad;
+        if (pad >= 0) {
+            int need = data % 4 == 2 ? 2 : data % 4 == 3 ? 1 : 0;
+            int have = 0;
+            while (pad + have < len && s.charAt(pad + have) == '=') {
+                have++;
+            }
+            if (need == 0 || pad + have < len || have > need) {
+                throw new FormatException("Invalid padding character (at character " + (pad + Math.min(have, need) + 1)
+                        + ")");
+            }
+            if (have < need) {
+                throw new FormatException("Missing padding character (at character " + (len + 1) + ")");
+            }
+        } else if (len % 4 != 0) {
+            throw new FormatException("Invalid length, must be multiple of four (at character " + (len + 1) + ")");
+        }
+        if (data % 4 != 0) {
+            // The bits of the last character that do not reach a whole byte must be zero.
+            char last = s.charAt(data - 1);
+            int v = last >= 'A' && last <= 'Z' ? last - 'A' : last >= 'a' && last <= 'z' ? last - 'a' + 26
+                    : last >= '0' && last <= '9' ? last - '0' + 52 : last == '+' || last == '-' ? 62 : 63;
+            int unused = data % 4 == 2 ? 0x0f : 0x03;
+            if ((v & unused) != 0) {
+                throw new FormatException("Invalid encoding before padding (at character " + (data + 1) + ")");
+            }
+        }
     }
 
     /** {@code LineSplitter.split(s)} and {@code const LineSplitter().convert(s)}. */

@@ -52,6 +52,8 @@ abstract class BlocWidgetState<W extends StatefulWidget> extends State<W> {
     /// The widget's explicit `bloc:`, or null to look it up.
     protected abstract BlocBase<?> explicitBloc();
 
+    private boolean fromExplicit;
+
     /// The widget's `B`, threaded in by the transpiler; null when it was not known.
     protected abstract Class<?> blocType();
 
@@ -68,6 +70,7 @@ abstract class BlocWidgetState<W extends StatefulWidget> extends State<W> {
                 b = found instanceof BlocBase ? (BlocBase<?>) found : null;
             }
             if (b != null) {
+                fromExplicit = b == explicitBloc();
                 bloc = (BlocBase<Object>) b;
                 previous = bloc.state();
                 bloc.addListener(listener);
@@ -94,7 +97,9 @@ abstract class BlocWidgetState<W extends StatefulWidget> extends State<W> {
     public void didUpdateWidget(W oldWidget) {
         super.didUpdateWidget(oldWidget);
         BlocBase<?> explicit = explicitBloc();
-        if (explicit != null && explicit != bloc) {
+        // A bloc the widget passed and then dropped (bloc: x -> bloc: null) is released
+        // too, so the next build looks the provider up instead of keeping the old one.
+        if (explicit != null ? explicit != bloc : fromExplicit) {
             release();
         }
     }

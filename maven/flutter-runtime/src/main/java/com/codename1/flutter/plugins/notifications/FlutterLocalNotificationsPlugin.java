@@ -106,7 +106,16 @@ public class FlutterLocalNotificationsPlugin {
             Object matchDateTimeComponents, Object uiLocalNotificationDateInterpretation) {
         long at = scheduledDate instanceof DateTime
                 ? ((DateTime) scheduledDate).millisecondsSinceEpoch() : System.currentTimeMillis() + 10;
-        schedule(id, title, body, details, payload, at, LocalNotification.REPEAT_NONE);
+        // matchDateTimeComponents makes the schedule recur: time is every day at that
+        // time, dayOfWeekAndTime every week. LocalNotification has no monthly or yearly
+        // interval, so dayOfMonthAndTime and dateAndTime fire once, at the first date.
+        int repeat = LocalNotification.REPEAT_NONE;
+        if (matchDateTimeComponents == DateTimeComponents.time) {
+            repeat = LocalNotification.REPEAT_DAY;
+        } else if (matchDateTimeComponents == DateTimeComponents.dayOfWeekAndTime) {
+            repeat = LocalNotification.REPEAT_WEEK;
+        }
+        schedule(id, title, body, details, payload, at, repeat);
         return Future.value(null);
     }
 

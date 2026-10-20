@@ -51,6 +51,8 @@ public class HttpClientRequest {
     private long contentLength = -1;
     private Object encoding;
     private Completer<HttpClientResponse> done;
+    /// The request in flight once close() queued it, so abort() can kill it.
+    private ConnectionRequest sent;
 
     HttpClientRequest(HttpClient client, String method, DartUri uri) {
         this.client = client;
@@ -150,8 +152,18 @@ public class HttpClientRequest {
     }
 
     public void abort(Object exception, Object stackTrace) {
-        if (done != null && !done.isCompleted()) {
+        // Terminal either way: before close() it settles `done` so close() never sends;
+        // after, it also kills the queued request so it neither runs on nor mutates the
+        // server behind a cancelled call.
+        if (done == null) {
+            done = new Completer<HttpClientResponse>();
+        }
+        if (!done.isCompleted()) {
             done.completeError(exception != null ? exception : new HttpException("Request aborted", uri));
+        }
+        if (sent != null) {
+            sent.kill();
+            sent = null;
         }
     }
 
@@ -260,6 +272,7 @@ public class HttpClientRequest {
         if (hasBody && headers.value(HttpHeaders.contentTypeHeader) != null) {
             req.setContentType(headers.value(HttpHeaders.contentTypeHeader));
         }
+        sent = req;
         NetworkManager.getInstance().addToQueue(req);
         return done.future();
     }

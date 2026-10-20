@@ -459,6 +459,11 @@ public final class FlutterProjectImporter {
         java.util.ArrayDeque<String[]> work = new java.util.ArrayDeque<String[]>();
         List<String> own = new ArrayList<String>();
         collectDartSources(libDir, "", own);
+        // Seeded from EVERY lib/ file, not just the entry point's import graph: all of
+        // lib/ is copied and the transpiler compiles the whole program, so a file nothing
+        // imports is still compiled, and the packages it imports must resolve too.
+        // Reporting them here names the problem; skipping them would only move it to a
+        // compile error in the transpiler.
         for (String f : own) {
             work.add(new String[] {null, f});
             seen.add("\u0000" + f);
@@ -873,7 +878,7 @@ public final class FlutterProjectImporter {
         if (push) {
             b.append("\n    @Override\n")
                     .append("    public void push(String value) {\n")
-                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.deliver(value, false);\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.pushReceived(value);\n")
                     .append("    }\n\n")
                     .append("    @Override\n")
                     .append("    public void registeredForPush(String deviceId) {\n")

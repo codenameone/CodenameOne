@@ -189,58 +189,89 @@ public class FirebaseAuth {
 
     Future<Object> sendOob(User user, String type, String email) {
         final Completer<Object> done = new Completer<Object>();
-        DartMap<String, Object> body = DartMap.<String, Object>of("requestType", type);
+        final DartMap<String, Object> body = DartMap.<String, Object>of("requestType", type);
         if (email != null) {
             body.put("email", email);
         }
-        if (user != null) {
-            body.put("idToken", user.idToken);
-        }
-        call(TOOLKIT + "sendOobCode?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
+        final Funcs.VoidFunc1<Map<String, Object>> sent = new Funcs.VoidFunc1<Map<String, Object>>() {
             @Override
             public void call(Map<String, Object> r) {
                 done.complete(null);
             }
-        }, done);
+        };
+        if (user == null) {
+            call(TOOLKIT + "sendOobCode?key=", body, sent, done);
+        } else {
+            withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
+                @Override
+                public void call(String token) {
+                    body.put("idToken", token);
+                    FirebaseAuth.call(TOOLKIT + "sendOobCode?key=", body, sent, done);
+                }
+            });
+        }
         return done.future();
     }
 
     Future<Object> updateProfile(final User user, final String name, final String photo) {
         final Completer<Object> done = new Completer<Object>();
-        DartMap<String, Object> body = DartMap.<String, Object>of("idToken", user.idToken,
-                "returnSecureToken", Boolean.FALSE);
+        final DartMap<String, Object> body = DartMap.<String, Object>of("returnSecureToken", Boolean.FALSE);
         if (name != null) {
             body.put("displayName", name);
         }
         if (photo != null) {
             body.put("photoUrl", photo);
         }
-        call(TOOLKIT + "update?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
+        withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
             @Override
-            public void call(Map<String, Object> r) {
-                user.displayName = name;
-                user.photoURL = photo;
-                persist();
-                publish();
-                done.complete(null);
-            }
-        }, done);
-        return done.future();
-    }
-
-    Future<Object> deleteUser(User user) {
-        final Completer<Object> done = new Completer<Object>();
-        call(TOOLKIT + "delete?key=", DartMap.<String, Object>of("idToken", user.idToken),
-                new Funcs.VoidFunc1<Map<String, Object>>() {
+            public void call(String token) {
+                body.put("idToken", token);
+                FirebaseAuth.call(TOOLKIT + "update?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
                     @Override
                     public void call(Map<String, Object> r) {
-                        current = null;
+                        user.displayName = name;
+                        user.photoURL = photo;
                         persist();
                         publish();
                         done.complete(null);
                     }
                 }, done);
+            }
+        });
         return done.future();
+    }
+
+    Future<Object> deleteUser(User user) {
+        final Completer<Object> done = new Completer<Object>();
+        withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
+            @Override
+            public void call(String token) {
+                FirebaseAuth.call(TOOLKIT + "delete?key=", DartMap.<String, Object>of("idToken", token),
+                        new Funcs.VoidFunc1<Map<String, Object>>() {
+                            @Override
+                            public void call(Map<String, Object> r) {
+                                current = null;
+                                persist();
+                                publish();
+                                done.complete(null);
+                            }
+                        }, done);
+            }
+        });
+        return done.future();
+    }
+
+    /// Runs {@code then} with a usable ID token. A session restored from Preferences
+    /// keeps only the refresh token, and a live one expires after an hour, so the
+    /// account calls go through {@link #idToken} -- which refreshes when needed --
+    /// rather than reading {@code user.idToken}, which may be null or stale.
+    private void withFreshToken(User user, final Completer<?> failed, final Funcs.VoidFunc1<String> then) {
+        idToken(user, false).then(then, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object err) {
+                failed.completeError(err);
+            }
+        });
     }
 
     Future<String> idToken(final User user, boolean force) {

@@ -77,8 +77,9 @@ final class PopGuards {
                 vetoed = true;
             }
         }
+        // The caller reports the outcome to the PopScopes exactly once, whichever guard
+        // refused -- a WillPopScope veto included -- so nothing is notified here.
         if (vetoed) {
-            notifyPopScopes(scopes, false, result);
             return Future.value(Boolean.FALSE);
         }
         Completer<Boolean> done = new Completer<Boolean>();

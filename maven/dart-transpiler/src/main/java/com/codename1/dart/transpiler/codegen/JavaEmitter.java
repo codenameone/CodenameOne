@@ -1111,12 +1111,12 @@ public final class JavaEmitter {
     private boolean emitDynamicMembers(ClassDecl c, StringBuilder body, Ctx ctx) {
         boolean inherits = c.superclass != null && program.classes.containsKey(c.superclass.name)
                 && !program.classes.get(c.superclass.name).isMixin;
-        // A widget, State, or other framework lifecycle class is not the model data
-        // dynamic code reaches into; leave it out rather than add three switch methods
-        // to every widget of an app. Any other runtime superclass -- Equatable,
-        // ChangeNotifier -- is ordinary model data (`dynamic pet; pet.name`), and the
-        // class declares the members itself.
-        if (c.superclass != null && !inherits && isFrameworkLifecycleClass(c.superclass.name)) {
+        // A class extending a framework or runtime class (a widget, a State, a
+        // BoxPainter, a RestorableProperty) is not the model data dynamic code reaches
+        // into, and its overrides of stub methods have no return type of their own to
+        // dispatch with; leave it out. A pure value base -- Equatable -- is the
+        // exception: `dynamic pet; pet.name` on a `Pet extends Equatable` is model data.
+        if (c.superclass != null && !inherits && !MODEL_BASES.contains(c.superclass.name)) {
             return false;
         }
         if (inherits && !hasDynamicMembers(program.classes.get(c.superclass.name))) {
@@ -1402,7 +1402,11 @@ public final class JavaEmitter {
             // Positional arguments go to the stub superclass's Java constructor --
             // `class C extends Cubit<int> { C() : super(0); }` -- which a stub declares when
             // its runtime class has no no-arg constructor. Named ones stay setters.
-            if (!ct.superInit.args.positional.isEmpty() && ct.superInit.namedCtor == null) {
+            // Only when the stub declares an unnamed constructor taking positionals: one
+            // that declares none (the gallery's BoxPainter) has just Java's no-arg one,
+            // and the Dart super arguments have nowhere to go.
+            if (!ct.superInit.args.positional.isEmpty() && ct.superInit.namedCtor == null
+                    && stubTakesPositionals(stubClassOf(c.superclass))) {
                 StringBuilder sa = new StringBuilder();
                 for (Expr e : ct.superInit.args.positional) {
                     if (sa.length() > 0) {
@@ -10746,10 +10750,9 @@ public final class JavaEmitter {
      * Whether {@code sub} is (transitively) a subtype of {@code sup} across the program and stub
      * class hierarchies. Used to decide when a generic cross-type assignment needs an erasing cast.
      */
-    private boolean isFrameworkLifecycleClass(String name) {
-        return isSubtypeName(name, "Widget") || isSubtypeName(name, "State")
-                || isSubtypeName(name, "Element") || isSubtypeName(name, "RenderObject");
-    }
+    /** Runtime superclasses whose subclasses are plain model data (see emitDynamicMembers). */
+    private static final java.util.Set<String> MODEL_BASES =
+            new java.util.HashSet<String>(java.util.Arrays.asList("Equatable"));
 
     private boolean isSubtypeName(String sub, String sup) {
         if (sub == null || sup == null) {
@@ -11908,6 +11911,13 @@ public final class JavaEmitter {
             // Java's own inference and must not be pinned by a cast.
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
         }
+        // A dynamic value (a Dyn.get member read) landing in a concrete slot -- a typed
+        // local, a switch expression's result temp -- is Dart's implicit downcast. Only for
+        // a fully concrete target: a type variable is left to Java's own inference.
+        if (o.type != null && isDynamicType(o.type) && !isDynamicType(target) && isFullyConcrete(target)
+                && !target.is("void") && o.code.startsWith("Dyn.")) {
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
+        }
         return o.code;
     }
 
@@ -12055,6 +12065,19 @@ public final class JavaEmitter {
             sup = pc != null ? pc.superclass : null;
         }
         return null;
+    }
+
+    private static boolean stubTakesPositionals(Ast.ClassDecl stub) {
+        for (Ast.CtorDecl k : stub.ctors) {
+            if (k.name == null) {
+                for (Param p : k.params) {
+                    if (!p.named) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private Ast.ClassDecl stubClassOf(TypeRef t) {
