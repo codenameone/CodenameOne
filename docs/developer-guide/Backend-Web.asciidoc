@@ -727,6 +727,48 @@ Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They'
 excluded rather than tolerated: accepting their result as a pass would also accept
 it for a case that used to work.
 
+[[backend-web-client]]
+=== Calling other services
+
+`Web` makes an outbound HTTP or HTTPS request: `Web.get`, `Web.getJson`,
+`Web.postJson` and `Web.request`. The server's certificate and its host name are
+always verified, and there is no option to turn that off. A `WebClient` is the
+same request with settings of its own:
+
+* a client certificate, for a service that authenticates its callers with mutual
+  TLS. `ClientCertificate.pem` takes a PEM certificate and key, and
+  `ClientCertificate.pkcs12` takes a `.p12` archive and its password.
+* `setRequireHttp2(true)`, which makes the request over HTTP/2 or fails it. A
+  server that only speaks HTTP/1.1 never receives the request.
+* a connect timeout, a read timeout (how long the transfer may stall) and a
+  request timeout (the whole request).
+* a pool of connections, so the next request to the same server skips the TCP
+  and TLS handshakes. `setReuseConnections(false)` opens a new connection for
+  each request.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/PartnerApi.java[tag=backend-web-client,indent=0]
+----
+
+Create a client once and share it between requests. Its settings are fixed by its
+first request, and two clients never share a connection, so a connection
+authenticated with one certificate is never used for a request made with another.
+`close()` releases the pool.
+
+`Web.Result.getProtocol()` names the protocol the response used. Without the
+requirement, the packaged server offers HTTP/2 and uses HTTP/1.1 when the other
+side declines.
+
+The local Java SE runtime speaks HTTP/1.1 only, so there a client that requires
+HTTP/2 fails every request with an exception that says so. It reads PKCS#12
+archives, and PEM keys in unencrypted PKCS#8 or RSA form. The packaged server also
+reads encrypted PEM keys. A PKCS#12 archive works the same in both.
+
+A static binary in a `scratch` image has no certificate store. Copy a
+`ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or
+`SSL_CERT_FILE`.
+
 [[backend-push]]
 === Sending push notifications
 

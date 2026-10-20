@@ -45,6 +45,10 @@
 #include <poll.h>
 #endif
 #include <curl/curl.h>
+/* For the ALPN answer of a connection libcurl made through OpenSSL; see
+   cn1WebRequireH2Prereq. Both packaging targets link OpenSSL, and this file is
+   compiled only when TLS is (build.sh drops it with CN1_BACKEND_HTTPS=0). */
+#include <openssl/ssl.h>
 
 #ifndef _WIN32
 /* Defined in cn1_backend_server.c, beside the virtual-thread scheduler. */
@@ -117,37 +121,60 @@ static int cn1WebTimerCallback(CURLM* multi, long timeoutMillis, void* userp) {
  * LOW_SPEED_TIME -- is libcurl's own logic unchanged. Falls back to the blocking
  * call when the multi handle cannot be had.
  */
-static CURLcode cn1WebPerformParked(CURL* curl) {
-    CURLM* multi = curl_multi_init();
-    CN1WebWatch watch;
+static void cn1WebWatchMulti(CURLM* multi, CN1WebWatch* watch) {
+    memset(watch, 0, sizeof(*watch));
+    watch->timeoutMillis = -1;
+    curl_multi_setopt(multi, CURLMOPT_SOCKETFUNCTION, cn1WebSocketCallback);
+    curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, watch);
+    curl_multi_setopt(multi, CURLMOPT_TIMERFUNCTION, cn1WebTimerCallback);
+    curl_multi_setopt(multi, CURLMOPT_TIMERDATA, watch);
+}
+
+/* Drives one transfer on `multi`, whose socket and timer callbacks report into
+ * `watch` (cn1WebWatchMulti). With `park` the waits park the virtual thread;
+ * without it they block this thread in poll(), which is what a WebClient's
+ * pooled multi does off a virtual thread -- the pool's connections live in the
+ * multi, so a request that cannot park still has to go through it to reuse
+ * one, and a multi driven by the socket API must never be driven any other way.
+ *
+ * With a NULL `multi` a multi of the transfer's own is made and discarded, which
+ * is the static Web path: no pool, the behaviour it has always had. */
+static CURLcode cn1WebDrive(CURLM* pooled, CN1WebWatch* pooledWatch, CURL* curl, int park) {
+    CURLM* multi = pooled;
+    CN1WebWatch ownWatch;
+    CN1WebWatch* w = pooledWatch;
     CURLcode rc = CURLE_FAILED_INIT;
     CURLMsg* msg;
     int running = 0;
     int left;
     if(multi == NULL) {
-        return curl_easy_perform(curl);
+        multi = curl_multi_init();
+        if(multi == NULL) {
+            return curl_easy_perform(curl);
+        }
+        w = &ownWatch;
+        cn1WebWatchMulti(multi, w);
     }
-    memset(&watch, 0, sizeof(watch));
-    watch.timeoutMillis = -1;
-    curl_multi_setopt(multi, CURLMOPT_SOCKETFUNCTION, cn1WebSocketCallback);
-    curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, &watch);
-    curl_multi_setopt(multi, CURLMOPT_TIMERFUNCTION, cn1WebTimerCallback);
-    curl_multi_setopt(multi, CURLMOPT_TIMERDATA, &watch);
     if(curl_multi_add_handle(multi, curl) != CURLM_OK) {
-        curl_multi_cleanup(multi);
-        return curl_easy_perform(curl);
+        if(pooled == NULL) {
+            curl_multi_cleanup(multi);
+            return curl_easy_perform(curl);
+        }
+        /* A pooled multi that refuses a handle is not one to fall back from by
+           creating a second transfer on it; fail this request. */
+        return CURLE_FAILED_INIT;
     }
     curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
     while(running) {
         int fds[CN1_WEB_MAX_SOCKETS];
         int events[CN1_WEB_MAX_SOCKETS];
         struct pollfd probe[CN1_WEB_MAX_SOCKETS];
-        int n = watch.count;
+        int n = w->count;
         int i;
         int ready = 0;
-        long long timeout = (long long)watch.timeoutMillis;
+        long long timeout = (long long)w->timeoutMillis;
         if(timeout == 0) {
-            watch.timeoutMillis = -1;
+            w->timeoutMillis = -1;
             curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
             continue;
         }
@@ -158,9 +185,9 @@ static CURLcode cn1WebPerformParked(CURL* curl) {
             timeout = 10;
         }
         for(i = 0 ; i < n ; i++) {
-            fds[i] = (int)watch.fd[i];
-            events[i] = ((watch.what[i] & CURL_POLL_IN) ? 1 : 0)
-                      | ((watch.what[i] & CURL_POLL_OUT) ? 2 : 0);
+            fds[i] = (int)w->fd[i];
+            events[i] = ((w->what[i] & CURL_POLL_IN) ? 1 : 0)
+                      | ((w->what[i] & CURL_POLL_OUT) ? 2 : 0);
             probe[i].fd = fds[i];
             probe[i].events = (short)(((events[i] & 1) ? POLLIN : 0)
                                       | ((events[i] & 2) ? POLLOUT : 0));
@@ -171,7 +198,12 @@ static CURLcode cn1WebPerformParked(CURL* curl) {
         if(n > 0) {
             ready = poll(probe, (nfds_t)n, 0);
         }
-        if(ready <= 0) {
+        if(ready <= 0 && !park) {
+            /* Off a virtual thread: block this thread, as curl_easy_perform
+               would. Nothing to watch means only a timer, so sleep it out in
+               poll() with no descriptors. */
+            ready = poll(probe, (nfds_t)n, timeout > 1000 ? 1000 : (int)timeout);
+        } else if(ready <= 0) {
             cn1BackendVtWait(n, fds, events, timeout);
             if(n > 0) {
                 for(i = 0 ; i < n ; i++) {
@@ -206,7 +238,9 @@ static CURLcode cn1WebPerformParked(CURL* curl) {
         }
     }
     curl_multi_remove_handle(multi, curl);
-    curl_multi_cleanup(multi);
+    if(pooled == NULL) {
+        curl_multi_cleanup(multi);
+    }
     return rc;
 }
 #endif
@@ -220,6 +254,8 @@ typedef struct {
     char* headers;
     size_t headerLength;
     long status;
+    /* CURLINFO_HTTP_VERSION: 1 HTTP/1.0, 2 HTTP/1.1, 3 HTTP/2, 30 HTTP/3, 0 unknown. */
+    long httpVersion;
     char error[CURL_ERROR_SIZE];
 } CN1WebResponse;
 
@@ -369,6 +405,169 @@ static size_t cn1WebWrite(void* contents, size_t size, size_t count, void* userp
  * Returns the CURLcode, so a failure is visible to the caller rather than
  * remembered as a successful initialisation.
  */
+/*
+ * A WebClient's connection pool.
+ *
+ * libcurl keeps finished connections in the cache of the handle that ran them --
+ * a multi handle, here -- and hands one to the next transfer on that handle
+ * whose host, port, protocol AND TLS configuration match, client certificate
+ * included. So the pool is a stack of idle multis: a request takes one (or
+ * makes one), runs on it alone, and gives it back with its connections in it.
+ *
+ * Why not a CURLSH sharing CURL_LOCK_DATA_CONNECT, which is the obvious spelling
+ * of "a connection pool": libcurl documents that sharing connections between
+ * concurrent threads is not supported, and HTTP/2 streams on a shared
+ * connection from different threads are not supported either. A multi here is
+ * only ever inside one request at a time, so neither can happen.
+ *
+ * And why connections cannot cross credentials: a pool belongs to ONE WebClient,
+ * whose configuration is fixed by its first request (WebClient.checkUnused), so
+ * every connection in it was authenticated with the same certificate. libcurl's
+ * own matching compares the TLS configuration on top of that. The static Web
+ * methods pass no pool at all, and get a multi of their own per request, as they
+ * always have.
+ *
+ * Windows has no pooled path (no poll(), and the parked path is POSIX only): a
+ * request there makes its own easy handle and closes it, as before. The
+ * packaging targets are musl and glibc Linux.
+ */
+#ifndef _WIN32
+#include <pthread.h>
+
+/* Idle multis kept per client; more concurrent requests than this still run,
+   their multis are simply closed instead of kept. */
+#define CN1_WEB_POOL_IDLE 8
+/* Idle connections kept per multi. Kept well under CN1_WEB_MAX_SOCKETS, so a
+   transfer's own sockets always fit beside anything libcurl still watches. */
+#define CN1_WEB_POOL_MAXCONNECTS 2L
+
+typedef struct {
+    CURLM* multi;
+    CN1WebWatch watch;
+} CN1WebPooled;
+
+typedef struct {
+    pthread_mutex_t lock;
+    CN1WebPooled* idle[CN1_WEB_POOL_IDLE];
+    int count;
+} CN1WebPool;
+
+static CN1WebPooled* cn1WebPooledNew(void) {
+    CN1WebPooled* p = (CN1WebPooled*)calloc(1, sizeof(CN1WebPooled));
+    if(p == NULL) {
+        return NULL;
+    }
+    p->multi = curl_multi_init();
+    if(p->multi == NULL) {
+        free(p);
+        return NULL;
+    }
+    curl_multi_setopt(p->multi, CURLMOPT_MAXCONNECTS, CN1_WEB_POOL_MAXCONNECTS);
+    cn1WebWatchMulti(p->multi, &p->watch);
+    return p;
+}
+
+static void cn1WebPooledFree(CN1WebPooled* p) {
+    if(p != NULL) {
+        curl_multi_cleanup(p->multi);
+        free(p);
+    }
+}
+
+static CN1WebPooled* cn1WebPoolTake(CN1WebPool* pool) {
+    CN1WebPooled* p = NULL;
+    pthread_mutex_lock(&pool->lock);
+    if(pool->count > 0) {
+        p = pool->idle[--pool->count];
+    }
+    pthread_mutex_unlock(&pool->lock);
+    return p != NULL ? p : cn1WebPooledNew();
+}
+
+static void cn1WebPoolGive(CN1WebPool* pool, CN1WebPooled* p) {
+    int kept = 0;
+    pthread_mutex_lock(&pool->lock);
+    if(pool->count < CN1_WEB_POOL_IDLE) {
+        pool->idle[pool->count++] = p;
+        kept = 1;
+    }
+    pthread_mutex_unlock(&pool->lock);
+    if(!kept) {
+        cn1WebPooledFree(p);
+    }
+}
+#endif
+
+JAVA_LONG com_codename1_backend_Web_poolCreateImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+#ifndef _WIN32
+    CN1WebPool* pool = (CN1WebPool*)calloc(1, sizeof(CN1WebPool));
+    if(pool == NULL) {
+        return 0;
+    }
+    if(pthread_mutex_init(&pool->lock, NULL) != 0) {
+        free(pool);
+        return 0;
+    }
+    return (JAVA_LONG)(intptr_t)pool;
+#else
+    /* No pool on Windows; a non-zero handle so a WebClient still works there. */
+    return 1;
+#endif
+}
+
+/* Called by Web.Pool once the client is closed and no request is inside it. */
+JAVA_VOID com_codename1_backend_Web_poolFreeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+#ifndef _WIN32
+    CN1WebPool* pool = (CN1WebPool*)(intptr_t)handle;
+    int i;
+    if(pool == NULL) {
+        return;
+    }
+    for(i = 0 ; i < pool->count ; i++) {
+        cn1WebPooledFree(pool->idle[i]);
+    }
+    pthread_mutex_destroy(&pool->lock);
+    free(pool);
+#else
+    (void)handle;
+#endif
+}
+
+/* Copies a Java byte[] for libcurl, or NULL for null/empty. */
+static char* cn1WebCopyBytes(JAVA_OBJECT arr, size_t* lengthOut) {
+    size_t length;
+    char* out;
+    *lengthOut = 0;
+    if(arr == JAVA_NULL) {
+        return NULL;
+    }
+    length = (size_t)((JAVA_ARRAY)arr)->length;
+    if(length == 0) {
+        return NULL;
+    }
+    out = (char*)malloc(length);
+    if(out != NULL) {
+        memcpy(out, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), length);
+        *lengthOut = length;
+    }
+    return out;
+}
+
+/* Frees a copy that held key material, overwriting it first so a private key or
+   a password does not outlive the request in freed heap. Through a volatile
+   pointer, because a memset of memory about to be freed is a dead store the
+   optimiser is entitled to remove. */
+static void cn1WebFreeSecret(char* secret, size_t length) {
+    if(secret != NULL) {
+        volatile char* p = (volatile char*)secret;
+        size_t i;
+        for(i = 0 ; i < length ; i++) {
+            p[i] = 0;
+        }
+        free(secret);
+    }
+}
+
 JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_STATE) {
     return (JAVA_INT)curl_global_init(CURL_GLOBAL_DEFAULT);
 }
@@ -382,9 +581,77 @@ JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_ST
  * rule below is about what the caller handed over, so it asks this rather than
  * whether the list is empty.
  */
-JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_boolean_R_long(
-        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT method, JAVA_OBJECT url, JAVA_OBJECT headerLines, JAVA_OBJECT body,
-        JAVA_BOOLEAN callerHeaders) {
+/* State for cn1WebRequireH2Prereq. */
+typedef struct {
+    CURL* curl;
+    /* Set when the callback refused the connection, with the protocol the
+       server chose instead ("" for none). */
+    int refused;
+    char chosen[32];
+} CN1WebH2Check;
+
+#if LIBCURL_VERSION_NUM >= 0x075000
+/* Runs after the connection is up -- TLS handshake and ALPN done -- and BEFORE
+ * libcurl writes a byte of the request. The HTTP/2 requirement is decided here.
+ *
+ * CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE alone does not do it over TLS. Measured
+ * against an HTTP/1.1-only server: ALPN offered h2, the server chose nothing,
+ * libcurl took the missing answer to mean HTTP/1.1, and the request was SENT --
+ * the fixture's request counter went up by one -- before the version check
+ * after the transfer could refuse the response. For a POST or a DELETE that is
+ * the state change happening at a server the caller ruled out. So the
+ * connection's own ALPN answer is read here and anything but h2 aborts.
+ *
+ * Only an OpenSSL libcurl exposes that answer (CURLINFO_TLS_SSL_PTR hands out
+ * the SSL*). With another TLS backend -- a macOS host build on SecureTransport --
+ * this cannot tell and lets the transfer go on; the check after the transfer
+ * still refuses an HTTP/1.1 response, but the request has gone out by then.
+ * Both packaging targets are OpenSSL. Plain http:// is not checked here either:
+ * prior knowledge sends the HTTP/2 preface first, and an HTTP/1.1 server reads
+ * that as the unknown method PRI, not as the caller's request. */
+static int cn1WebRequireH2Prereq(void* clientp, char* primaryIp, char* localIp,
+                                 int primaryPort, int localPort) {
+    CN1WebH2Check* check = (CN1WebH2Check*)clientp;
+    struct curl_tlssessioninfo* info = NULL;
+    (void)primaryIp; (void)localIp; (void)primaryPort; (void)localPort;
+    if(curl_easy_getinfo(check->curl, CURLINFO_TLS_SSL_PTR, &info) != CURLE_OK
+            || info == NULL || info->backend != CURLSSLBACKEND_OPENSSL
+            || info->internals == NULL) {
+        return CURL_PREREQFUNC_OK;
+    }
+    {
+        const unsigned char* alpn = NULL;
+        unsigned int length = 0;
+        SSL_get0_alpn_selected((SSL*)info->internals, &alpn, &length);
+        if(length == 2 && alpn[0] == 'h' && alpn[1] == '2') {
+            return CURL_PREREQFUNC_OK;
+        }
+        check->refused = 1;
+        if(length >= sizeof(check->chosen)) {
+            length = sizeof(check->chosen) - 1;
+        }
+        if(length > 0) {
+            memcpy(check->chosen, alpn, length);
+        }
+        check->chosen[length] = 0;
+        return CURL_PREREQFUNC_ABORT;
+    }
+}
+#endif
+
+/* Web.performImpl's flags; see Web.FLAG_*. */
+#define CN1_WEB_FLAG_REQUIRE_HTTP2 1
+#define CN1_WEB_FLAG_CLIENT 2
+#define CN1_WEB_FLAG_NO_REUSE 4
+/* ClientCertificate's types. */
+#define CN1_WEB_CERT_PEM 0
+#define CN1_WEB_CERT_PKCS12 1
+
+JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_boolean_int_int_int_int_byte_1ARRAY_byte_1ARRAY_int_java_lang_String_R_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG poolHandle, JAVA_OBJECT method, JAVA_OBJECT url,
+        JAVA_OBJECT headerLines, JAVA_OBJECT body, JAVA_BOOLEAN callerHeaders, JAVA_INT flags,
+        JAVA_INT connectTimeoutMillis, JAVA_INT readTimeoutMillis, JAVA_INT requestTimeoutMillis,
+        JAVA_OBJECT certificate, JAVA_OBJECT key, JAVA_INT certificateType, JAVA_OBJECT password) {
     CURL* curl;
     CURLcode rc;
     struct curl_slist* headers = NULL;
@@ -394,6 +661,13 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
     char* bodyCopy = NULL;
     JAVA_INT bodyLength = 0;
     int safeMethod;
+    char* certCopy = NULL;
+    size_t certLength = 0;
+    char* keyCopy = NULL;
+    size_t keyLength = 0;
+    char* passwordCopy = NULL;
+    size_t passwordLength = 0;
+    CN1WebH2Check h2check;
 
     if(url == JAVA_NULL) {
         return 0;
@@ -510,8 +784,42 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         }
     }
 
+    /* The credential, copied like everything else before the next Java string
+       is converted. A credential that was given and could not be copied fails
+       the request: sent without it, the request would go out unauthenticated
+       and come back as the server's refusal, which reads as a wrong certificate
+       rather than as the allocation failure it was. */
+    if(certificateType >= 0) {
+        certCopy = cn1WebCopyBytes(certificate, &certLength);
+        if(certificateType == CN1_WEB_CERT_PEM) {
+            keyCopy = cn1WebCopyBytes(key, &keyLength);
+        }
+        if(password != JAVA_NULL) {
+            const char* tmp = stringToUTF8(threadStateData, password);
+            if(tmp != NULL) {
+                passwordLength = strlen(tmp);
+                passwordCopy = (char*)malloc(passwordLength + 1);
+                if(passwordCopy != NULL) {
+                    memcpy(passwordCopy, tmp, passwordLength + 1);
+                }
+            }
+        }
+        if(certCopy == NULL || (certificateType == CN1_WEB_CERT_PEM && keyCopy == NULL)
+                || (password != JAVA_NULL && passwordCopy == NULL)) {
+            cn1WebFreeSecret(certCopy, certLength);
+            cn1WebFreeSecret(keyCopy, keyLength);
+            cn1WebFreeSecret(passwordCopy, passwordLength);
+            free(urlCopy); free(methodCopy); free(bodyCopy);
+            curl_slist_free_all(headers);
+            return 0;
+        }
+    }
+
     r = (CN1WebResponse*)calloc(1, sizeof(CN1WebResponse));
     if(r == NULL) {
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
         free(urlCopy); free(methodCopy); free(bodyCopy);
         curl_slist_free_all(headers);
         return 0;
@@ -519,10 +827,15 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
 
     curl = curl_easy_init();
     if(curl == NULL) {
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
         free(r); free(urlCopy); free(methodCopy); free(bodyCopy);
         curl_slist_free_all(headers);
         return 0;
     }
+    memset(&h2check, 0, sizeof(h2check));
+    h2check.curl = curl;
     curl_easy_setopt(curl, CURLOPT_URL, urlCopy);
     /* HTTP AND HTTPS, AND NOTHING ELSE, on the first request and on every
        redirect. libcurl otherwise speaks whatever its build enabled, and the
@@ -565,6 +878,25 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
 #if LIBCURL_VERSION_NUM >= 0x072A00
     curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);
 #endif
+    /* The CA bundle a deployment names. Web's documentation tells a scratch
+       image to point CURL_CA_BUNDLE or SSL_CERT_FILE at its bundle, "both read
+       by libcurl itself" -- and neither is: CURL_CA_BUNDLE is read by the curl
+       COMMAND, and SSL_CERT_FILE is OpenSSL's default path, which libcurl never
+       consults once it was built with a bundle path of its own, as both shipped
+       builds are. Measured on the musl and the glibc binary: with either
+       variable naming the CA, verification still failed with "self-signed
+       certificate in certificate chain". So they are read here, in that order.
+       This only chooses WHICH anchors verify the server; verification itself
+       stays on. */
+    {
+        const char* bundle = getenv("CURL_CA_BUNDLE");
+        if(bundle == NULL || bundle[0] == 0) {
+            bundle = getenv("SSL_CERT_FILE");
+        }
+        if(bundle != NULL && bundle[0] != 0) {
+            curl_easy_setopt(curl, CURLOPT_CAINFO, bundle);
+        }
+    }
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cn1WebWrite);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, r);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, cn1WebHeader);
@@ -636,9 +968,103 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        under cn1:backend and fails once packaged.
        LOW_SPEED_LIMIT/LOW_SPEED_TIME is libcurl's spelling of the same idea:
        give up when the transfer makes essentially no progress for 30s. */
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
+    if((flags & CN1_WEB_FLAG_CLIENT) == 0) {
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+        curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
+    } else {
+        /* A WebClient's own. 0 is "no limit" in WebClient and in the Java SE
+           twin, but CONNECTTIMEOUT's 0 means libcurl's built-in 300 seconds,
+           so no limit is spelled as the largest value it takes. */
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS,
+                connectTimeoutMillis > 0 ? (long)connectTimeoutMillis : 0x7fffffffL);
+        if(readTimeoutMillis > 0) {
+            /* Whole seconds, rounded UP: a 1500ms stall bound must not become a
+               1s one. Documented on WebClient.setReadTimeoutMillis. */
+            curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+            curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME,
+                    (long)((readTimeoutMillis + 999) / 1000));
+        }
+        if(requestTimeoutMillis > 0) {
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)requestTimeoutMillis);
+        }
+        if(flags & CN1_WEB_FLAG_NO_REUSE) {
+            curl_easy_setopt(curl, CURLOPT_FRESH_CONNECT, 1L);
+            curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+        }
+        if(flags & CN1_WEB_FLAG_REQUIRE_HTTP2) {
+            /* PRIOR KNOWLEDGE, not 2TLS. 2TLS asks for HTTP/2 and settles for
+               HTTP/1.1, and by the time the answer says which was used the
+               request -- a POST, a DELETE -- has already been sent to the peer
+               the caller ruled out. With prior knowledge the only ALPN offered is
+               h2 and the connection speaks HTTP/2 from its first byte, so an
+               HTTP/1.1-only peer fails the handshake or the preface before any
+               request reaches it. The version check after the transfer is the
+               second lock on the same door. */
+            curl_easy_setopt(curl, CURLOPT_HTTP_VERSION,
+                    (long)CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
+#if LIBCURL_VERSION_NUM >= 0x075000
+            curl_easy_setopt(curl, CURLOPT_PREREQFUNCTION, cn1WebRequireH2Prereq);
+            curl_easy_setopt(curl, CURLOPT_PREREQDATA, &h2check);
+#endif
+        } else if(curl_version_info(CURLVERSION_NOW)->features & CURL_VERSION_HTTP2) {
+            /* Offered, and HTTP/1.1 when the server declines -- the default of
+               every libcurl since 7.62, set so an older one behaves the same. */
+            curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_2TLS);
+        }
+    }
+    if(certCopy != NULL) {
+        /* As blobs, so the credential never touches the filesystem, and NOCOPY
+           so the only copy is ours, which is overwritten before it is freed.
+           libcurl takes what it keeps for a connection's TLS configuration from
+           these during the transfer. 7.71.0 is where the blob options appeared;
+           a libcurl older than that fails the request rather than silently
+           sending it without the certificate. */
+#if LIBCURL_VERSION_NUM >= 0x074700
+        struct curl_blob certBlob;
+        certBlob.data = certCopy;
+        certBlob.len = certLength;
+        certBlob.flags = CURL_BLOB_NOCOPY;
+        curl_easy_setopt(curl, CURLOPT_SSLCERT_BLOB, &certBlob);
+        curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE,
+                certificateType == CN1_WEB_CERT_PKCS12 ? "P12" : "PEM");
+        if(keyCopy != NULL) {
+            struct curl_blob keyBlob;
+            keyBlob.data = keyCopy;
+            keyBlob.len = keyLength;
+            keyBlob.flags = CURL_BLOB_NOCOPY;
+            curl_easy_setopt(curl, CURLOPT_SSLKEY_BLOB, &keyBlob);
+            curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
+        }
+        if(passwordCopy != NULL) {
+            curl_easy_setopt(curl, CURLOPT_KEYPASSWD, passwordCopy);
+        }
+#else
+        strncpy(r->error, "this libcurl predates 7.71.0 and cannot present a client "
+                "certificate", CURL_ERROR_SIZE - 1);
+        r->status = -1;
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
+        free(urlCopy); free(methodCopy); free(bodyCopy);
+        return (JAVA_LONG)(intptr_t)r;
+#endif
+    }
+    if((flags & CN1_WEB_FLAG_REQUIRE_HTTP2)
+            && !(curl_version_info(CURLVERSION_NOW)->features & CURL_VERSION_HTTP2)) {
+        strncpy(r->error, "HTTP/2 is required, and this binary's libcurl was built "
+                "without HTTP/2 support", CURL_ERROR_SIZE - 1);
+        r->status = -1;
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
+        free(urlCopy); free(methodCopy); free(bodyCopy);
+        return (JAVA_LONG)(intptr_t)r;
+    }
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "codenameone-backend");
     /* CN1_WEB_VERBOSE=1 makes libcurl narrate the exchange on stderr. Off by
@@ -691,18 +1117,39 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        running every other virtual thread; see cn1WebPerformParked. */
     CN1_YIELD_THREAD;
 #ifndef _WIN32
-    if(cn1BackendCanPark()) {
-        rc = cn1WebPerformParked(curl);
-    } else {
-        rc = curl_easy_perform(curl);
+    {
+        CN1WebPool* pool = (CN1WebPool*)(intptr_t)poolHandle;
+        CN1WebPooled* pooled = pool == NULL ? NULL : cn1WebPoolTake(pool);
+        if(pool != NULL && pooled == NULL) {
+            rc = CURLE_OUT_OF_MEMORY;
+        } else if(pooled != NULL) {
+            rc = cn1WebDrive(pooled->multi, &pooled->watch, curl, cn1BackendCanPark());
+            /* The easy handle leaves the multi inside cn1WebDrive; its
+               connection stays in the multi's cache for the next request. */
+            cn1WebPoolGive(pool, pooled);
+        } else if(cn1BackendCanPark()) {
+            rc = cn1WebDrive(NULL, NULL, curl, 1);
+        } else {
+            rc = curl_easy_perform(curl);
+        }
     }
 #else
+    (void)poolHandle;
     rc = curl_easy_perform(curl);
 #endif
     CN1_RESUME_THREAD;
 
     if(rc == CURLE_OK) {
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &r->status);
+#if LIBCURL_VERSION_NUM >= 0x073200
+        curl_easy_getinfo(curl, CURLINFO_HTTP_VERSION, &r->httpVersion);
+#endif
+        if((flags & CN1_WEB_FLAG_REQUIRE_HTTP2) && r->httpVersion != CURL_HTTP_VERSION_2_0) {
+            r->status = -1;
+            snprintf(r->error, CURL_ERROR_SIZE, "HTTP/2 is required, and the server "
+                    "answered over %s", r->httpVersion == CURL_HTTP_VERSION_1_1 ? "HTTP/1.1"
+                    : r->httpVersion == CURL_HTTP_VERSION_1_0 ? "HTTP/1.0" : "another protocol");
+        }
     } else {
         r->status = -1;
         if(r->error[0] == 0) {
@@ -710,10 +1157,36 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
             strncpy(r->error, msg == NULL ? "transfer failed" : msg, CURL_ERROR_SIZE - 1);
         }
     }
+    if(rc != CURLE_OK && h2check.refused) {
+        snprintf(r->error, CURL_ERROR_SIZE, "HTTP/2 is required, and the server "
+                "negotiated %s%s; the request was not sent",
+                h2check.chosen[0] == 0 ? "no protocol (no ALPN answer)" : h2check.chosen,
+                h2check.chosen[0] == 0 ? ", which is HTTP/1.1" : " instead");
+    } else if(rc != CURLE_OK && (flags & CN1_WEB_FLAG_REQUIRE_HTTP2)
+            && (rc == CURLE_HTTP2 || rc == CURLE_HTTP2_STREAM
+                || rc == CURLE_WEIRD_SERVER_REPLY || rc == CURLE_UNSUPPORTED_PROTOCOL)) {
+        /* An HTTP/1.1-only peer over plain http answers the HTTP/2 preface with
+           something that is not HTTP/2, and libcurl reports what it saw rather
+           than why. Only the protocol failures get this: a TLS or certificate
+           error under the same flag is reported as itself. */
+        char detail[CURL_ERROR_SIZE];
+        memcpy(detail, r->error, CURL_ERROR_SIZE);
+        detail[CURL_ERROR_SIZE - 1] = 0;
+        snprintf(r->error, CURL_ERROR_SIZE, "HTTP/2 is required and could not be "
+                "used with this server: %s", detail);
+    }
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
+    cn1WebFreeSecret(certCopy, certLength);
+    cn1WebFreeSecret(keyCopy, keyLength);
+    cn1WebFreeSecret(passwordCopy, passwordLength);
     free(urlCopy); free(methodCopy); free(bodyCopy);
     return (JAVA_LONG)(intptr_t)r;
+}
+
+JAVA_INT com_codename1_backend_Web_protocolImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
+    return r == NULL ? 0 : (JAVA_INT)r->httpVersion;
 }
 
 JAVA_INT com_codename1_backend_Web_statusImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
