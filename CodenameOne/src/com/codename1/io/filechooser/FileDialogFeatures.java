@@ -36,6 +36,10 @@ public final class FileDialogFeatures {
     /// `OpenFileRequest#directories(boolean)` picks folders.
     public static final int DIRECTORIES = 3;
     /// More than one `FileTypeFilter` is shown as a user-selectable list.
+    ///
+    /// Where `NATIVE` is false, this and `OPTIONS` and `ACCESSORY_COMPONENT`
+    /// describe the Codename One save form; the fallback open dialog shows
+    /// none of the three.
     public static final int FILTER_LIST = 4;
     /// `FileDialogOption` controls are shown.
     public static final int OPTIONS = 5;

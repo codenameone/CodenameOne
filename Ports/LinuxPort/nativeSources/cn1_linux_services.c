@@ -779,6 +779,10 @@ static int cn1FdxAddExtension(GSList* paths, const char* filter, int n) {
     int j;
     for (j = 1; j < n; j++) {
         size_t el = strlen(field);
+        if (strcmp(field, "*") == 0) {
+            /* the all-files filter accepts any name as typed */
+            return 0;
+        }
         if (!first) {
             first = field;
         }
@@ -830,7 +834,10 @@ static void cn1FileDialogExOnMain(void* p) {
             d->acceptLabel ? d->acceptLabel : (d->save ? "_Save" : "_Open"), GTK_RESPONSE_ACCEPT, NULL);
     gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), d->multi && !d->save);
     gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog), d->showHidden);
-    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), d->confirmOverwrite);
+    /* GTK would confirm the typed name, before cn1FdxAddExtension changes it,
+     * and so warn about the wrong file (or miss the real one). The loop below
+     * confirms the final path itself instead. */
+    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), FALSE);
     if (d->initialDir) {
         gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), d->initialDir);
     }
@@ -845,6 +852,11 @@ static void cn1FileDialogExOnMain(void* p) {
         filters[i] = gtk_file_filter_new();
         gtk_file_filter_set_name(filters[i], n > 0 ? fields[0] : "");
         for (j = 1; j < n; j++) {
+            if (strcmp(fields[j], "*") == 0) {
+                /* the all-files extension: "*.*" would hide README */
+                gtk_file_filter_add_pattern(filters[i], "*");
+                continue;
+            }
             /* case-insensitive glob, so "png" also matches IMG.PNG */
             char glob[256];
             int k, o = 0;
@@ -876,17 +888,29 @@ static void cn1FileDialogExOnMain(void* p) {
      * portal can show too; a text option has no choice form and goes into the
      * extra widget. */
     for (i = 0; i < d->optionCount; i++) {
-        char* fields[CN1_FDX_MAX_ITEMS];
-        int n = cn1FdxSplit(d->options[i], fields, CN1_FDX_MAX_ITEMS - 1);
+        /* Sized from the spec itself: a choice option may carry any number of
+         * choices, and a fixed array would silently drop the extra ones. */
+        int max = 1;
+        const char* c;
+        char** fields;
+        int n;
+        for (c = d->options[i]; c && *c; c++) {
+            if (*c == '\n') {
+                max++;
+            }
+        }
+        fields = g_new0(char*, max);
+        n = cn1FdxSplit(d->options[i], fields, max);
         entries[i] = 0;
         if (n < 4) {
+            g_free(fields);
             continue;
         }
         if (fields[0][0] == '1') {
             gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[2], NULL, NULL);
             gtk_file_chooser_set_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[3]);
         } else if (fields[0][0] == '2') {
-            const char* ids[CN1_FDX_MAX_ITEMS];
+            const char** ids = g_new0(const char*, n - 3);
             int k;
             for (k = 4; k < n; k++) {
                 ids[k - 4] = fields[k];
@@ -894,6 +918,7 @@ static void cn1FileDialogExOnMain(void* p) {
             ids[n - 4] = NULL;
             gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[2], ids, ids);
             gtk_file_chooser_set_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[3]);
+            g_free(ids);
         } else {
             GtkWidget* label = gtk_label_new(fields[2]);
             if (!extra) {
@@ -904,6 +929,7 @@ static void cn1FileDialogExOnMain(void* p) {
             gtk_box_pack_start(GTK_BOX(extra), label, FALSE, FALSE, 0);
             gtk_box_pack_start(GTK_BOX(extra), entries[i], FALSE, FALSE, 0);
         }
+        g_free(fields);
     }
     if (extra) {
         gtk_widget_show_all(extra);
@@ -930,13 +956,14 @@ static void cn1FileDialogExOnMain(void* p) {
             d->values[i] = v ? strdup(v) : 0;
         }
         d->paths = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
-        if (d->save && d->paths && d->chosenFilter >= 0
-                && cn1FdxAddExtension(d->paths, d->filters[d->chosenFilter], filterFields[d->chosenFilter])
-                && d->confirmOverwrite
+        if (d->save && d->paths && d->chosenFilter >= 0) {
+            cn1FdxAddExtension(d->paths, d->filters[d->chosenFilter], filterFields[d->chosenFilter]);
+        }
+        if (d->save && d->paths && d->confirmOverwrite
                 && g_file_test((const char*) d->paths->data, G_FILE_TEST_EXISTS)
                 && !cn1FdxConfirmReplace(dialog, (const char*) d->paths->data)) {
-            /* GTK confirmed the typed name, not the one with the extension
-             * added; the user declined replacing that one, so ask again */
+            /* confirmed against the final, extension-adjusted path; the user
+             * declined replacing it, so the dialog is shown again */
             for (i = 0; i < d->optionCount; i++) {
                 free(d->values[i]);
                 d->values[i] = 0;

@@ -8943,7 +8943,13 @@ public abstract class CodenameOneImplementation {
     public boolean isFileDialogFeatureSupported(int feature) {
         // The default open dialog goes through openFileChooser(), which takes no
         // starting folder, so INITIAL_DIRECTORY is left to ports that honour it.
-        return feature == FileDialogFeatures.SAVE_NAME_EDITING;
+        // The fallback save form (FileDialogSupport.showSave) renders the filter
+        // list, every portable option and the accessory, so those are reported;
+        // FileDialogFeatures documents that the fallback open dialog does not.
+        return feature == FileDialogFeatures.SAVE_NAME_EDITING
+                || feature == FileDialogFeatures.FILTER_LIST
+                || feature == FileDialogFeatures.OPTIONS
+                || feature == FileDialogFeatures.ACCESSORY_COMPONENT;
     }
 
     /// Opens the device image gallery
