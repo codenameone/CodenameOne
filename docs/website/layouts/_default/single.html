@@ -147,6 +147,8 @@
     </section>
   </div>
 
+  {{ partial "cn1-flagship-samples.html" (dict "compact" true) }}
+
   {{- if .Content }}
   <section class="post-content cn1-demo-details">
     {{- if not (.Param "disableAnchoredHeadings") }}

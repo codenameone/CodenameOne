@@ -169,3 +169,136 @@ body.dark .cn1-demo-card__thumb img {
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     }
 }
+
+/* Full-stack samples (Savor, Wayline): the head of the demos page, and a
+   compact banner on every individual demo page. */
+.post-single--demo .cn1-flagship {
+    --cn1-demos-card: var(--cn1-demo-card);
+    --cn1-demos-border: var(--cn1-demo-border);
+    --cn1-demos-text: var(--cn1-demo-text);
+    --cn1-demos-muted: var(--cn1-demo-muted);
+    --cn1-demos-accent: var(--cn1-demo-accent);
+    --cn1-demos-chip: var(--cn1-demo-chip);
+}
+
+.cn1-flagship {
+    max-width: 1320px;
+    margin: 28px auto 8px;
+    padding: 0 32px;
+    color: var(--cn1-demos-text);
+}
+
+.cn1-flagship h2 {
+    margin: 6px 0 8px;
+    font-family: "Poppins", sans-serif;
+    font-size: clamp(24px, 2.6vw, 34px);
+    color: var(--cn1-demos-text);
+}
+
+.cn1-flagship__intro p {
+    margin: 0 0 6px;
+    max-width: 820px;
+    color: var(--cn1-demos-muted);
+    font-size: 16px;
+}
+
+.cn1-flagship__intro a {
+    color: var(--cn1-demos-accent);
+}
+
+.cn1-flagship__grid {
+    margin-top: 18px;
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+}
+
+.cn1-flagship-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    border: 1px solid var(--cn1-demos-border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--cn1-demos-card);
+    box-shadow: 0 12px 28px rgba(8, 16, 45, 0.1);
+}
+
+.cn1-flagship-card__shots {
+    display: flex;
+    gap: 8px;
+    padding: 16px;
+    background: var(--cn1-demos-chip);
+}
+
+.cn1-flagship-card__shots img {
+    width: 120px;
+    height: auto;
+    border-radius: 12px;
+    display: block;
+}
+
+.cn1-flagship-card__body {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cn1-flagship-card__body h3 {
+    margin: 0;
+    font-family: "Poppins", sans-serif;
+    font-size: 24px;
+}
+
+.cn1-flagship-card__body h3 a {
+    color: var(--cn1-demos-text);
+    text-decoration: none;
+}
+
+.cn1-flagship-card__body p {
+    margin: 0;
+    color: var(--cn1-demos-muted);
+}
+
+.cn1-flagship-card__kind {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cn1-demos-accent) !important;
+}
+
+.cn1-flagship--compact .cn1-flagship-card__shots img {
+    width: 84px;
+}
+
+.cn1-demos-section-title {
+    max-width: 1320px;
+    margin: 40px auto 0;
+    padding: 0 32px;
+    font-family: "Poppins", sans-serif;
+    font-size: 22px;
+    color: var(--cn1-demos-text);
+}
+
+@media (max-width: 900px) {
+    .cn1-flagship,
+    .cn1-demos-section-title {
+        padding: 0 16px;
+    }
+
+    .cn1-flagship-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cn1-flagship-card__shots {
+        justify-content: center;
+    }
+
+    .cn1-flagship-card__shots img {
+        flex: 0 1 120px;
+        min-width: 0;
+        width: auto;
+        max-width: 31%;
+    }
+}

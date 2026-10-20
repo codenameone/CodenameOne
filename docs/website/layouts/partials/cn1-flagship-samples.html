@@ -1,0 +1,59 @@
+{{- /*
+  The full-stack sample applications the demos section leads with. Every
+  demo page links here too (compact = true), because these are the projects a
+  new application should start from; the older demos are kept as references.
+*/ -}}
+{{- $compact := .compact | default false -}}
+{{- $samples := slice
+  (dict
+    "name" "Savor"
+    "kind" "Food delivery"
+    "url" "/savor/"
+    "summary" "Customer, restaurant, courier and admin apps with a Java backend: menus, cart and checkout, dispatch, live order tracking and payments."
+    "images" (slice "/developer-guide/img/savor-customer-home.png" "/developer-guide/img/savor-order-on-its-way.png" "/developer-guide/img/savor-merchant-queue.png")
+    "guide" "/developer-guide/savor-users-guide/"
+    "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/savor")
+  (dict
+    "name" "Wayline"
+    "kind" "Ride hailing"
+    "url" "/wayline/"
+    "summary" "Rider, driver and admin apps with a Java backend: fare quotes, matching, live trip tracking, earnings and payments."
+    "images" (slice "/developer-guide/img/wayline-rider-home.png" "/developer-guide/img/wayline-ride-driver-on-the-way.png" "/developer-guide/img/wayline-driver-offer.png")
+    "guide" "/developer-guide/wayline-users-guide/"
+    "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/wayline")
+-}}
+<section class="cn1-flagship{{ if $compact }} cn1-flagship--compact{{ end }}">
+  <div class="cn1-flagship__intro">
+    {{- if $compact }}
+    <p class="cn1-demos-eyebrow">Start from a complete application</p>
+    <p>This demo is kept as a reference. For a new project, start from one of the full-stack sample applications: client and server source, free under MIT-0, generated from the <a href="/initializr/">Initializr</a>.</p>
+    {{- else }}
+    <p class="cn1-demos-eyebrow">Full-stack sample applications</p>
+    <h2>Complete apps you can generate, brand and ship</h2>
+    <p>Each one is a working application and its server in a single Java project: every role's screens, the backend, the database and the guides that explain them. Generate one from the <a href="/initializr/">Initializr</a>; the source is free under MIT-0.</p>
+    {{- end }}
+  </div>
+  <div class="cn1-flagship__grid">
+    {{- range $samples }}
+    <article class="cn1-flagship-card">
+      <a class="cn1-flagship-card__shots" href="{{ .url }}">
+        {{- range $i, $img := .images }}
+        {{- if or (not $compact) (eq $i 0) }}
+        <img src="{{ $img }}" alt="{{ $.name }} screen" loading="lazy">
+        {{- end }}
+        {{- end }}
+      </a>
+      <div class="cn1-flagship-card__body">
+        <p class="cn1-flagship-card__kind">{{ .kind }}</p>
+        <h3><a href="{{ .url }}">{{ .name }}</a></h3>
+        <p>{{ .summary }}</p>
+        <div class="cn1-demo-card__actions">
+          <a class="cn1-demo-pill" href="{{ .url }}">Explore {{ .name }}</a>
+          <a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ .guide }}">User's guide</a>
+          <a class="cn1-demo-pill cn1-demo-pill--ghost" href="{{ .source }}" target="_blank" rel="noopener">Source</a>
+        </div>
+      </div>
+    </article>
+    {{- end }}
+  </div>
+</section>
