@@ -437,6 +437,46 @@ public final class LangMembersChecks {
                 Bulk.p(text, java.time.OffsetDateTime.parse(text, f).toString());
             }
         });
+        Bulk.check("Lang.fullLocalizedOffsetNeedsMinutes", () -> {
+            String[] inputs = {"GMT+8 2020-01-01", "GMT+08 2020-01-01", "GMT+08:00 2020-01-01", "GMT 2020-01-01"};
+            String[] patterns = {"OOOO uuuu-MM-dd", "ZZZZ uuuu-MM-dd", "O uuuu-MM-dd"};
+            for (String pattern : patterns) {
+                java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter.ofPattern(pattern);
+                StringBuilder out = new StringBuilder();
+                for (String s : inputs) {
+                    try {
+                        f.parse(s);
+                        out.append("ok,");
+                    } catch (java.time.format.DateTimeParseException e) {
+                        out.append("DTPE,");
+                    }
+                }
+                Bulk.p(pattern, out.toString());
+            }
+        });
+        Bulk.check("Lang.summaryStatisticsToString", () -> {
+            java.util.IntSummaryStatistics i = new java.util.IntSummaryStatistics();
+            i.accept(3);
+            i.accept(4);
+            java.util.LongSummaryStatistics l = new java.util.LongSummaryStatistics();
+            java.util.DoubleSummaryStatistics d = new java.util.DoubleSummaryStatistics();
+            d.accept(1.5);
+            Bulk.p("int", i.toString());
+            Bulk.p("long", l.toString());
+            Bulk.p("double", d.toString());
+        });
+        Bulk.check("Lang.aCompletedDependentSkipsItsAction", () -> {
+            final int[] ran = {0};
+            java.util.concurrent.CompletableFuture<Integer> src = new java.util.concurrent.CompletableFuture<Integer>();
+            java.util.concurrent.CompletableFuture<Integer> dep = src.thenApply(x -> {
+                ran[0]++;
+                return x;
+            });
+            dep.complete(5);
+            src.complete(1);
+            Bulk.p("ran", String.valueOf(ran[0]));
+            Bulk.p("dep", String.valueOf(dep.join()));
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

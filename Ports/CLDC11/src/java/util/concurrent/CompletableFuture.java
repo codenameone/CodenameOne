@@ -637,6 +637,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         whenDone(new Runnable() {
             @Override
             public void run() {
+                if (stage.isDone()) {
+                    // Completed or cancelled by hand first: as in the JDK, the
+                    // action is skipped once its stage holds a result.
+                    return;
+                }
                 final Object outcome = result.get();
                 if (relayFailure && outcome instanceof Failure) {
                     stage.relay(outcome);
@@ -645,6 +650,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 Runnable body = new Runnable() {
                     @Override
                     public void run() {
+                        if (stage.isDone()) {
+                            return;
+                        }
                         try {
                             step.run(outcome, stage);
                         } catch (Throwable t) {

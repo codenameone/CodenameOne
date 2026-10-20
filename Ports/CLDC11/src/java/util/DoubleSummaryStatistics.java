@@ -71,4 +71,10 @@ public class DoubleSummaryStatistics implements DoubleConsumer {
     public final double getAverage() {
         return count > 0 ? (double) getSum() / count : 0.0d;
     }
+
+    /// The count, sum, minimum, average and maximum, as the JDK prints them.
+    @Override
+    public String toString() {
+        return String.format("DoubleSummaryStatistics{count=%d, sum=%f, min=%f, average=%f, max=%f}", getCount(), getSum(), getMin(), getAverage(), getMax());
+    }
 }

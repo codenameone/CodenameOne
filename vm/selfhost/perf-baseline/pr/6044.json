@@ -21,6 +21,26 @@
       "time": 0.5
      }
     }
+   },
+   "objectAllocation": {
+    "all": {
+     "from": {
+      "memory": 0.37,
+      "time": 1.649,
+      "tolerance": {
+       "memory": 0.3,
+       "time": 0.5
+      }
+     },
+     "memory": 0.258,
+     "reason": "objectAllocation RAM measured lower (0.26x vs 0.37x) on the master merge; recorded rather than tolerated",
+     "runs": 1,
+     "time": 1.649,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
    }
   },
   "linux-x64@amd-epyc-9v45-96-core-processor": {

@@ -533,8 +533,9 @@ public final class DateTimeFormatter {
 
     /// `GMT+8` (short) or `GMT+08:00` (full); `GMT` alone for zero.
     /// The localized offset `O` and `ZZZZ` print: GMT, or GMT and a
-    /// signed hours[:minutes[:seconds]] offset.
-    private static void parseLocalizedOffset(Parsed p) {
+    /// signed hours[:minutes[:seconds]] offset. The `full` form (`OOOO`,
+    /// `ZZZZ`) requires two-digit hours and the minutes, as the JDK does.
+    private static void parseLocalizedOffset(Parsed p, boolean full) {
         int start = p.pos;
         p.literal('G');
         p.literal('M');
@@ -542,11 +543,11 @@ public final class DateTimeFormatter {
         if (p.pos < p.text.length() && (p.text.charAt(p.pos) == '+' || p.text.charAt(p.pos) == '-')) {
             boolean negative = p.text.charAt(p.pos) == '-';
             p.pos++;
-            int hours = (int) p.digits(1, 2);
+            int hours = (int) p.digits(full ? 2 : 1, 2);
             int minutes = 0;
             int seconds = 0;
-            if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
-                p.pos++;
+            if (full || p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
+                p.literal(':');
                 minutes = (int) p.digits(2, 2);
                 if (p.pos < p.text.length() && p.text.charAt(p.pos) == ':') {
                     p.pos++;
@@ -985,7 +986,7 @@ public final class DateTimeFormatter {
                 parseZoneId(p);
                 return;
             case 'O':
-                parseLocalizedOffset(p);
+                parseLocalizedOffset(p, count == 4);
                 return;
             case 'X':
             case 'Z':
@@ -996,7 +997,7 @@ public final class DateTimeFormatter {
                 }
                 if (t.letter == 'Z' && count == 4) {
                     // ZZZZ prints the localized form, as OOOO does.
-                    parseLocalizedOffset(p);
+                    parseLocalizedOffset(p, true);
                     return;
                 }
                 p.setOffset(offsetOfWidth(p, count, t.letter == 'Z'), p.pos);

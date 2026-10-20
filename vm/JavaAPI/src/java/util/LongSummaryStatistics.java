@@ -75,4 +75,10 @@ public class LongSummaryStatistics implements LongConsumer {
     public final double getAverage() {
         return count > 0 ? (double) getSum() / count : 0.0d;
     }
+
+    /// The count, sum, minimum, average and maximum, as the JDK prints them.
+    @Override
+    public String toString() {
+        return String.format("LongSummaryStatistics{count=%d, sum=%d, min=%d, average=%f, max=%d}", getCount(), getSum(), getMin(), getAverage(), getMax());
+    }
 }

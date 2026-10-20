@@ -71,4 +71,10 @@ public class IntSummaryStatistics implements IntConsumer {
     public final double getAverage() {
         return count > 0 ? (double) getSum() / count : 0.0d;
     }
+
+    /// The count, sum, minimum, average and maximum, as the JDK prints them.
+    @Override
+    public String toString() {
+        return String.format("IntSummaryStatistics{count=%d, sum=%d, min=%d, average=%f, max=%d}", getCount(), getSum(), getMin(), getAverage(), getMax());
+    }
 }

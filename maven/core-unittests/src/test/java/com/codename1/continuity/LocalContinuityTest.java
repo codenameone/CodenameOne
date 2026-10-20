@@ -73,6 +73,10 @@ public class LocalContinuityTest extends UITestBase {
     @BeforeEach
     public void installBridge() {
         Continuity.reset();
+        // Navigation's dispatcher is static and outlives reset(); a dispatcher another test
+        // class left installed answers a Form for any path, unknown routes included.
+        Navigation.setDispatcher(null);
+        Navigation.clearStack();
         Storage.getInstance().clearStorage();
         // The delivery high-water marks are DURABLE by design, so they outlive reset() -- which
         // is the whole point of them, and which makes them leak from one test into the next

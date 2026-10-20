@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -44,6 +46,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * test shares the {@code com.codename1.router} package.
  */
 class NavigationTest extends UITestBase {
+
+    /** The dispatcher is static: one left installed answers a Form for any path in every
+     * later test class of the JVM. */
+    @AfterEach
+    void uninstallDispatcher() {
+        Navigation.setDispatcher(null);
+        Navigation.clearStack();
+    }
 
     /** A {@link RouteDispatcher} test double: returns a fresh titled Form for any
      * registered path, null for unknown paths, or throws on demand. */
