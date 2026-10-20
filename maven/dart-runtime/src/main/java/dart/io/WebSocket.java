@@ -164,8 +164,10 @@ public class WebSocket extends Stream<Object> {
 
     /** Sends a String as a text frame, anything else as a binary frame. */
     public void add(Object data) {
+        // Adding to a closed sink is a StateError in Dart; dropping the frame silently
+        // hid send/close races as successful sends.
         if (readyState != open) {
-            return;
+            throw new dart.core.StateError("WebSocket is not open (readyState " + readyState + ")");
         }
         if (data instanceof String) {
             socket.send((String) data);

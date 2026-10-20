@@ -264,7 +264,9 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
             byte[] b = new byte[l.size()];
             for (int i = 0; i < b.length; i++) {
                 Object o = l.get(i);
-                if (!(o instanceof Number)) {
+                // a List<int> element: a double (65.5 from JSON) is a TypeError in Dart,
+                // never truncated into a valid byte
+                if (!(o instanceof Long || o instanceof Integer || o instanceof Short || o instanceof Byte)) {
                     throw new dart.core.TypeError("Expected a List<int>");
                 }
                 b[i] = (byte) ((Number) o).intValue();

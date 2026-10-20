@@ -514,10 +514,9 @@ public final class Dyn {
                 return dbl ? (Object) Double.valueOf(Math.abs(d)) : (Object) Long.valueOf(Math.abs(n.longValue()));
             case "toStringAsFixed":
                 return DartRuntime.toStringAsFixed(d, num(arg(a, 0)).longValue());
-            case "compareTo": {
-                double o = num(arg(a, 0)).doubleValue();
-                return Long.valueOf(d < o ? -1 : d > o ? 1 : 0);
-            }
+            case "compareTo":
+                // Dart's total order: NaN after everything, -0.0 before 0.0
+                return Long.valueOf(dart.core.DartComparable.compare(n, num(arg(a, 0))));
             case "clamp": {
                 Number lo = num(arg(a, 0));
                 Number hi = num(arg(a, 1));

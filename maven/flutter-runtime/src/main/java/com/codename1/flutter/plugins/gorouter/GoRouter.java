@@ -34,6 +34,7 @@ import com.codename1.flutter.navigation.Route;
 import com.codename1.flutter.navigation.RouteSettings;
 import com.codename1.flutter.navigation.RouterConfigSource;
 
+import dart.async.Completer;
 import dart.async.Future;
 import dart.core.DartMap;
 import dart.core.DartUri;
@@ -63,6 +64,8 @@ public class GoRouter implements RouterConfigSource {
      * the navigation shows the error page (errorBuilder) instead, as go_router does.
      */
     private Object redirectFailure;
+    /** Set by redirectOf when a redirect answered a Future not yet complete. */
+    private boolean sawPendingRedirect;
     private GoRouterState state;
     private BuildContext appContext;
 
@@ -139,7 +142,47 @@ public class GoRouter implements RouterConfigSource {
         return new Funcs.Func1<RouteSettings, Route>() {
             @Override
             public Route call(RouteSettings settings) {
-                return routeFor(settings.name(), settings.arguments());
+                final Object extra = settings.arguments();
+                sawPendingRedirect = false;
+                Route r = routeFor(settings.name(), extra);
+                if (!sawPendingRedirect) {
+                    return r;
+                }
+                // The initial route had an asynchronous redirect still running (an auth
+                // check reading its session). Mounting what routeFor chose would show the
+                // guarded page; instead the page stays empty until the redirect chain
+                // resolves, then shows wherever it lands (or the error page if it failed).
+                final Completer<String> landed = new Completer<String>();
+                whenRedirected(settings.name(), extra, new Funcs.VoidFunc1<String>() {
+                    @Override
+                    public void call(String to) {
+                        landed.complete(to);
+                    }
+                });
+                MaterialPageRoute<Object> wait = new MaterialPageRoute<Object>();
+                wait.settings(settings);
+                wait.builder(new Funcs.Func1<BuildContext, Widget>() {
+                    @Override
+                    public Widget call(BuildContext ctx) {
+                        com.codename1.flutter.widgets.FutureBuilder<String> fb =
+                                new com.codename1.flutter.widgets.FutureBuilder<String>();
+                        fb.future(landed.future());
+                        fb.builder(new Funcs.Func2<BuildContext,
+                                com.codename1.flutter.widgets.AsyncSnapshot<String>, Widget>() {
+                            @Override
+                            public Widget call(BuildContext c,
+                                    com.codename1.flutter.widgets.AsyncSnapshot<String> snap) {
+                                if (!snap.hasData()) {
+                                    return new com.codename1.flutter.widgets.SizedBox();
+                                }
+                                Route real = routeFor(snap.data(), extra);
+                                return ((MaterialPageRoute<?>) real).getBuilder().call(c);
+                            }
+                        });
+                        return fb;
+                    }
+                });
+                return wait;
             }
         };
     }
@@ -386,7 +429,10 @@ public class GoRouter implements RouterConfigSource {
         Object to = f.call(appContext, s);
         if (to instanceof Future) {
             // FutureOr<String?>: only an already-completed answer can steer a navigation
-            // that is happening now.
+            // that is happening now; a pending one is noted for routeGenerator.
+            if (!((Future<?>) to).completedNow()) {
+                sawPendingRedirect = true;
+            }
             to = ((Future<?>) to).completedValue();
         }
         return to instanceof String ? (String) to : null;

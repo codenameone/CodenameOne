@@ -33,6 +33,8 @@ public final class ContentType {
     private final String primaryType;
     private final String subType;
     private final String charset;
+    /** Parameters other than charset (a multipart boundary), serialized after it. */
+    private final java.util.Map<String, String> parameters = new java.util.LinkedHashMap<String, String>();
 
     public ContentType(String primaryType, String subType) {
         this(primaryType, subType, null);
@@ -44,9 +46,21 @@ public final class ContentType {
         this.charset = charset;
     }
 
-    /** {@code ContentType(primary, sub, charset:, parameters:)}; parameters are ignored. */
+    /** {@code ContentType(primary, sub, charset:, parameters:)}. */
     public ContentType(String primaryType, String subType, String charset, Object parameters) {
         this(primaryType, subType, charset);
+        if (parameters instanceof java.util.Map) {
+            for (java.util.Map.Entry<?, ?> e : ((java.util.Map<?, ?>) parameters).entrySet()) {
+                String k = String.valueOf(e.getKey());
+                if (!"charset".equalsIgnoreCase(k)) {
+                    this.parameters.put(k, e.getValue() == null ? null : String.valueOf(e.getValue()));
+                }
+            }
+        }
+    }
+
+    public java.util.Map<String, String> parameters() {
+        return parameters;
     }
 
     /** Dart's {@code ContentType.parse}: {@code type/subtype; charset=x}. */
@@ -55,6 +69,7 @@ public final class ContentType {
         String mime = parts[0].trim();
         int slash = mime.indexOf('/');
         String cs = null;
+        java.util.Map<String, String> params = new java.util.LinkedHashMap<String, String>();
         for (int i = 1; i < parts.length; i++) {
             String p = parts[i].trim();
             if (p.regionMatches(true, 0, "charset=", 0, 8)) {
@@ -62,10 +77,13 @@ public final class ContentType {
                 if (cs.length() > 1 && cs.startsWith("\"") && cs.endsWith("\"")) {
                     cs = cs.substring(1, cs.length() - 1);
                 }
+            } else if (p.length() > 0) {
+                int eq = p.indexOf('=');
+                params.put(eq < 0 ? p : p.substring(0, eq).trim(), eq < 0 ? null : p.substring(eq + 1).trim());
             }
         }
-        return slash < 0 ? new ContentType(mime, "", cs)
-                : new ContentType(mime.substring(0, slash), mime.substring(slash + 1), cs);
+        return slash < 0 ? new ContentType(mime, "", cs, params)
+                : new ContentType(mime.substring(0, slash), mime.substring(slash + 1), cs, params);
     }
 
     public String primaryType() {
@@ -90,6 +108,16 @@ public final class ContentType {
 
     @Override
     public String toString() {
-        return charset == null ? mimeType() : mimeType() + "; charset=" + charset;
+        StringBuilder sb = new StringBuilder(mimeType());
+        if (charset != null) {
+            sb.append("; charset=").append(charset);
+        }
+        for (java.util.Map.Entry<String, String> e : parameters.entrySet()) {
+            sb.append("; ").append(e.getKey());
+            if (e.getValue() != null) {
+                sb.append('=').append(e.getValue());
+            }
+        }
+        return sb.toString();
     }
 }

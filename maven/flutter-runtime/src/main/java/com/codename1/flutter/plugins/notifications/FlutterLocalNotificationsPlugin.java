@@ -89,21 +89,27 @@ public class FlutterLocalNotificationsPlugin {
     public Future<Object> periodicallyShow(long id, String title, String body, RepeatInterval repeat,
             NotificationOptions details, Object androidScheduleMode, String payload) {
         int r;
+        long interval;
         switch (repeat == null ? RepeatInterval.daily : repeat) {
             case everyMinute:
                 r = LocalNotification.REPEAT_MINUTE;
+                interval = 60000L;
                 break;
             case hourly:
                 r = LocalNotification.REPEAT_HOUR;
+                interval = 3600000L;
                 break;
             case weekly:
                 r = LocalNotification.REPEAT_WEEK;
+                interval = 7L * 86400000L;
                 break;
             default:
                 r = LocalNotification.REPEAT_DAY;
+                interval = 86400000L;
                 break;
         }
-        schedule(id, title, body, details, payload, System.currentTimeMillis() + 10, r);
+        // The plugin's contract: the first one arrives one interval after the call, not now.
+        schedule(id, title, body, details, payload, System.currentTimeMillis() + interval, r);
         return Future.value(null);
     }
 
