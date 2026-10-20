@@ -74,6 +74,12 @@ public class LocalContinuityTest extends UITestBase {
     public void installBridge() {
         Continuity.reset();
         Storage.getInstance().clearStorage();
+        // The route dispatcher and stack are static, and other classes in this JVM (Intents,
+        // Navigation) install dispatchers that answer a form for ANY path without always
+        // removing them. Inherited, one made "a route this build does not register" restore
+        // successfully, depending only on which class surefire happened to run first.
+        Navigation.setDispatcher(null);
+        Navigation.clearStack();
         // The delivery high-water marks are DURABLE by design, so they outlive reset() -- which
         // is the whole point of them, and which makes them leak from one test into the next
         // unless each starts from a clean slate. clearStorage() above now covers them: they moved
