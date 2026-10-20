@@ -1,7 +1,6 @@
 {{- /*
-  The full-stack sample applications the demos section leads with. Every
-  demo page links here too (compact = true), because these are the projects a
-  new application should start from; the older demos are kept as references.
+  The full-stack sample applications the demos section shows. Retired demo
+  pages render the compact form, so an old link still leads to them.
 */ -}}
 {{- $compact := .compact | default false -}}
 {{- $samples := slice
@@ -26,7 +25,7 @@
   <div class="cn1-flagship__intro">
     {{- if $compact }}
     <p class="cn1-demos-eyebrow">Start from a complete application</p>
-    <p>This demo is kept as a reference. For a new project, start from one of the full-stack sample applications: client and server source, free under MIT-0, generated from the <a href="/initializr/">Initializr</a>.</p>
+    <p>Start from one of the full-stack sample applications: client and server source, free under MIT-0, generated from the <a href="/initializr/">Initializr</a>.</p>
     {{- else }}
     <p class="cn1-demos-eyebrow">Full-stack sample applications</p>
     <h2>Complete apps you can generate, brand and ship</h2>

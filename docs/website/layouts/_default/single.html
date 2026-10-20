@@ -69,7 +69,15 @@
   {{- partial "toc.html" . }}
   {{- end }}
 
-  {{- if $isDemo -}}
+  {{- if and $isDemo .Params.discontinued -}}
+  {{- /* Retired demo: the URL stays alive for old links and points to the current samples. */}}
+  <section class="cn1-demo-page-block cn1-demo-discontinued">
+    <p class="cn1-demo-eyebrow">Demo discontinued</p>
+    <h2>{{ .Title }}</h2>
+    <p class="cn1-demo-summary">This demo is no longer available. See the <a href="/demos/">Codename One demos</a> for the current sample applications.</p>
+  </section>
+  {{ partial "cn1-flagship-samples.html" (dict "compact" true) }}
+  {{- else if $isDemo -}}
   {{- $copy := dict
     "ubereats-clone" "A polished food-delivery app template with onboarding, cart, checkout, and profile flows."
     "chat-app" "A full-featured chat UI kit with avatars, message states, and extensible action components."

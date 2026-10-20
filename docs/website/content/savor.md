@@ -45,4 +45,4 @@ Development uses simulated payments. The Stripe integration is a starting point 
 
 ## Looking for ride hailing?
 
-[Wayline](/wayline/) is the sibling sample for taxi and ride-sharing services: rider, driver and admin apps on the same architecture. The older [UberEats clone](/ubereats-clone/) UI template remains available as a reference, but Savor is the starting point for a new delivery project.
+[Wayline](/wayline/) is the sibling sample for taxi and ride-sharing services: rider, driver and admin apps on the same architecture.

@@ -272,18 +272,9 @@ body.dark .cn1-demo-card__thumb img {
     width: 84px;
 }
 
-.cn1-demos-section-title {
-    max-width: 1320px;
-    margin: 40px auto 0;
-    padding: 0 32px;
-    font-family: "Poppins", sans-serif;
-    font-size: 22px;
-    color: var(--cn1-demos-text);
-}
 
 @media (max-width: 900px) {
-    .cn1-flagship,
-    .cn1-demos-section-title {
+    .cn1-flagship {
         padding: 0 16px;
     }
 
