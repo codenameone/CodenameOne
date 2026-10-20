@@ -325,11 +325,66 @@
     return { name: 'RSA-OAEP', hash: cn1CryptoHash(normalized) };
   }
 
-  function cn1RsaSignatureAlgorithm(algorithm, keyAlgorithm) {
-    if (String(keyAlgorithm || '').toUpperCase() !== 'RSA') {
-      throw new Error('Web Crypto bridge currently supports RSA signatures; requested ' + keyAlgorithm);
+  function cn1SignatureAlgorithm(algorithm, keyAlgorithm) {
+    var family = String(keyAlgorithm || '').toUpperCase();
+    var wantsEc = String(algorithm || '').toUpperCase().indexOf('ECDSA') >= 0;
+    if (family === 'EC' && wantsEc) {
+      return { name: 'ECDSA', namedCurve: 'P-256', hash: cn1CryptoHash(algorithm) };
     }
-    return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+    if (family === 'RSA' && !wantsEc) {
+      return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+    }
+    throw new Error(algorithm + ' cannot be used with a ' + keyAlgorithm + ' key');
+  }
+
+  // P-256 key encodings, byte for byte what com.codename1.impl.EcP256Codec
+  // writes, so a key generated in the browser is the same bytes a device
+  // would hand out. Web Crypto's own PKCS#8 export differs between engines.
+  var CN1_EC_SPKI_PREFIX = [0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00];
+  var CN1_EC_PKCS8_HEAD = [0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x04, 0x6d,
+    0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20];
+  var CN1_EC_PKCS8_MID = [0xa1, 0x44, 0x03, 0x42, 0x00];
+
+  function cn1Base64UrlBytes(text) {
+    var b64 = String(text).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var bin = global.atob(b64);
+    var out = [];
+    for (var i = 0; i < bin.length; i++) out.push(bin.charCodeAt(i));
+    return out;
+  }
+
+  // ECDSA signatures: Web Crypto speaks the fixed r||s form, the portable API
+  // (and every other port) DER.
+  function cn1EcdsaRawToDer(raw) {
+    function integer(offset) {
+      var start = offset;
+      while (start < offset + 31 && raw[start] === 0) start++;
+      var bytes = Array.prototype.slice.call(raw, start, offset + 32);
+      if (bytes[0] & 0x80) bytes.unshift(0);
+      return [0x02, bytes.length].concat(bytes);
+    }
+    var body = integer(0).concat(integer(32));
+    return [0x30, body.length].concat(body);
+  }
+
+  function cn1EcdsaDerToRaw(der) {
+    var out = new Uint8Array(64);
+    var p = 2;
+    if (der[0] !== 0x30) throw new Error('ECDSA signature is not DER');
+    if (der[1] & 0x80) p = 2 + (der[1] & 0x7f);
+    for (var k = 0; k < 2; k++) {
+      if (der[p] !== 0x02) throw new Error('ECDSA signature is not DER');
+      var len = der[p + 1];
+      var start = p + 2;
+      while (len > 32 && der[start] === 0) { start++; len--; }
+      if (len > 32) throw new Error('ECDSA signature component too long');
+      out.set(der.slice(start, start + len), k * 32 + 32 - len);
+      p = p + 2 + der[p + 1];
+    }
+    return out;
   }
 
   hostBridge.register('__cn1_crypto__', function(request) {
@@ -370,16 +425,49 @@
         .then(cn1CryptoResult);
     }
     if (op === 'sign' || op === 'verify') {
-      var signatureAlgorithm = cn1RsaSignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var signatureAlgorithm = cn1SignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var isEcdsa = signatureAlgorithm.name === 'ECDSA';
       var signatureUsage = op === 'sign' ? 'sign' : 'verify';
       var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
       return subtle.importKey(signatureKeyFormat, cn1CryptoBytes(request.key), signatureAlgorithm, false, [signatureUsage])
         .then(function(key) {
           if (op === 'sign') {
-            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(cn1CryptoResult);
+            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(function(sig) {
+              return isEcdsa ? cn1EcdsaRawToDer(new Uint8Array(sig)) : cn1CryptoResult(sig);
+            });
           }
-          return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
+          var signature = cn1CryptoBytes(request.signature);
+          if (isEcdsa) {
+            try {
+              signature = cn1EcdsaDerToRaw(signature);
+            } catch (malformed) {
+              return false;
+            }
+          }
+          return subtle.verify(signatureAlgorithm, key, signature, cn1CryptoBytes(request.data));
         });
+    }
+    if (op === 'generateEcKeyPair') {
+      return subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])
+        .then(function(pair) {
+          return Promise.all([subtle.exportKey('raw', pair.publicKey), subtle.exportKey('jwk', pair.privateKey)]);
+        })
+        .then(function(exported) {
+          var point = cn1CryptoResult(exported[0]);
+          var scalar = cn1Base64UrlBytes(exported[1].d);
+          while (scalar.length < 32) scalar.unshift(0);
+          return [CN1_EC_SPKI_PREFIX.concat(point),
+                  CN1_EC_PKCS8_HEAD.concat(scalar, CN1_EC_PKCS8_MID, point)];
+        });
+    }
+    if (op === 'ecdh') {
+      var ecdhAlgorithm = { name: 'ECDH', namedCurve: 'P-256' };
+      return Promise.all([
+        subtle.importKey('pkcs8', cn1CryptoBytes(request.key), ecdhAlgorithm, false, ['deriveBits']),
+        subtle.importKey('spki', cn1CryptoBytes(request.peer), ecdhAlgorithm, false, [])
+      ]).then(function(keys) {
+        return subtle.deriveBits({ name: 'ECDH', public: keys[1] }, keys[0], 256);
+      }).then(cn1CryptoResult);
     }
     if (op === 'pbkdf2') {
       // RFC 8018 PBKDF2, the one password KDF a browser has. The iteration

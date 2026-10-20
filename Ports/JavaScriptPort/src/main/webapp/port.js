@@ -1315,6 +1315,30 @@ bindNative([
   return pair;
 });
 
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_generateEcKeyPair_int_R_byte_2ARRAY"
+], function*(_impl, bits) {
+  if ((bits | 0) !== 256) {
+    throw new Error("Web Crypto bridge supports P-256 only");
+  }
+  const result = yield* cn1CryptoHost({ op: "generateEcKeyPair" });
+  const pair = jvm.newArray(2, "JAVA_BYTE", 2);
+  pair[0] = cn1CryptoJavaBytes(result[0]);
+  pair[1] = cn1CryptoJavaBytes(result[1]);
+  return pair;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_ecdhAgree_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(_impl, key, peer) {
+  const result = yield* cn1CryptoHost({
+    op: "ecdh",
+    key: cn1CryptoByteValues(key),
+    peer: cn1CryptoByteValues(peer)
+  });
+  return cn1CryptoJavaBytes(result);
+});
+
 // --------------------------------------------------------------------------
 // com.codename1.impl.html5.HTML5DeviceProtection -- the browser half of
 // com.codename1.security.vault.

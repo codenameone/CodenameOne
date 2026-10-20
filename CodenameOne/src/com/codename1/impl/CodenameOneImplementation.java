@@ -13486,6 +13486,20 @@ public abstract class CodenameOneImplementation {
         throw cryptoUnsupported("generateRsaKeyPair");
     }
 
+    /// Generates a fresh P-256 key pair. Returns
+    /// `{publicKeyX509, privateKeyPkcs8}`; the PKCS#8 encoding must carry the
+    /// public point, as [EcP256Codec#pkcs8FromScalar(byte[], byte[])] writes it,
+    /// because some providers will not import the private key without it.
+    public byte[][] generateEcKeyPair(int bits) {
+        throw cryptoUnsupported("generateEcKeyPair");
+    }
+
+    /// Computes the P-256 ECDH shared secret (the 32-byte x coordinate) of a
+    /// PKCS#8 private key and an X.509 public key.
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        throw cryptoUnsupported("ecdhAgree");
+    }
+
     /// Generates `bytes` of fresh symmetric key material. The default just
     /// delegates to [#secureRandomBytes(byte[])] (no structure is required
     /// for AES keys).

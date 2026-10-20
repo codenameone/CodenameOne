@@ -2274,6 +2274,24 @@ public class IOSNative {
     /// private-key DER length. Returns 0 on success, negative on error.
     native int generateRsaKeyPair(int bits, byte[] outPub, byte[] outPriv, int[] lengths);
 
+    /// Generates a P-256 key pair into `outX963` (97 bytes): the uncompressed
+    /// public point followed by the private scalar, Security.framework's
+    /// ANSI X9.63 representation. Returns 97, or a negative CN1_CRYPTO_E_* code.
+    native int ecGenerate(byte[] outX963);
+
+    /// P-256 ECDH of an X9.63 private key and a 65-byte public point. Returns
+    /// the bytes written into `out` (32), or a negative code.
+    native int ecdh(byte[] privX963, byte[] peerPoint, byte[] out);
+
+    /// ECDSA over P-256 with an X9.63 private key; DER signature into `out`.
+    /// `algorithm` uses the same codes as [#sign]. Returns bytes written or a
+    /// negative code.
+    native int ecSign(int algorithm, byte[] privX963, byte[] data, byte[] out);
+
+    /// Verifies a DER ECDSA signature with a 65-byte public point. Returns 1
+    /// valid, 0 invalid, negative on error.
+    native int ecVerify(int algorithm, byte[] point, byte[] data, byte[] sig);
+
 
     // --- Nearby devices (Nearby Interaction, MultipeerConnectivity, ----------
     //     AccessorySetupKit) ------------------------------------------------

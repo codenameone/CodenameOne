@@ -22,6 +22,7 @@
  */
 package com.codename1.security;
 
+import com.codename1.impl.EcP256Codec;
 import com.codename1.util.StringUtil;
 
 /// A public key -- paired with a [PrivateKey] to form a key pair. Carries the
@@ -51,6 +52,37 @@ public final class PublicKey extends Key {
     /// Convenience: build an RSA [PublicKey] from a [#fromX509] X.509 blob.
     public static PublicKey rsa(byte[] x509Der) {
         return fromX509(RSA, x509Der);
+    }
+
+    /// Builds a P-256 public key from its uncompressed point, the 65 bytes
+    /// `04 || X || Y`. That is the compact form protocols put on the wire;
+    /// [#toEcPoint()] is the inverse.
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if `point` is not 65 bytes starting with `0x04`
+    public static PublicKey ecFromPoint(byte[] point) {
+        try {
+            return fromX509(EC, EcP256Codec.spkiFromPoint(point));
+        } catch (RuntimeException re) {
+            throw new CryptoException(re.getMessage(), re);
+        }
+    }
+
+    /// Returns the uncompressed point `04 || X || Y` of a P-256 key.
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if this is not a P-256 key
+    public byte[] toEcPoint() {
+        if (!EC.equals(getAlgorithm())) {
+            throw new CryptoException("not an EC key: " + getAlgorithm());
+        }
+        try {
+            return EcP256Codec.pointFromSpki(getEncoded());
+        } catch (RuntimeException re) {
+            throw new CryptoException(re.getMessage(), re);
+        }
     }
 
     /// Parses a PEM-encoded public key, determining the algorithm from the key
