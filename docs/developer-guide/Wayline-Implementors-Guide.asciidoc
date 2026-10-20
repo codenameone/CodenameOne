@@ -112,7 +112,7 @@ without the callback and return the value, and a controller that routes each
 path to it. The server then implements that interface. This is the start of
 the class that does:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/ride/RiderEndpoint.java[tag=wayline-contract-endpoint,indent=0]
 ----
@@ -168,7 +168,7 @@ its fields in snake case, so `Ride` is stored in `ride` and `pickupLat` in
 `pickup_lat`, and a field whose type is an enum, such as `state`, holds the
 constant's name. This is the start of `Ride`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/domain/Ride.java[tag=wayline-entity,indent=0]
 ----
@@ -181,7 +181,7 @@ A repository is an interface marked `@Repository` that extends
 `CrudRepository`, which brings `findById`, `insert` and the other operations
 on one entity:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/repository/RideRepository.java[tag=wayline-repository,indent=0]
 ----
@@ -200,7 +200,7 @@ method returns, with no call to save it: `PhoneVerification.store` sets the
 fields of the `PhoneCode` it read and returns. Methods that only read are
 marked `@Transactional(readOnly = true)`, which PostgreSQL and MySQL enforce:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/ride/Rides.java[tag=wayline-service-readonly,indent=0]
 ----
@@ -224,7 +224,7 @@ contain:
 
 A rider cancelling a ride is one such pair:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/ride/Rides.java[tag=wayline-service-transaction,indent=0]
 ----
@@ -260,7 +260,7 @@ The second chain covers `/api/**`, has no session, and requires a bearer token
 on every request. After the rate limits it declares, its rules are the whole of
 the access policy:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/SecurityConfig.java[tag=wayline-api-rules,indent=0]
 ----
@@ -334,7 +334,7 @@ reached from, and passes them to the statement for that kind of move: the
 rider's, the driver's, a driver taking an offer, a driver giving one back, an
 offer being made, or a move the server makes itself:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/ride/Rides.java[tag=wayline-ride-trymove,indent=0]
 ----
@@ -342,7 +342,7 @@ include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wa
 Each kind is a fixed statement of its own in the repository. This is the one
 for a driver accepting an offer:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/repository/RideRepository.java[tag=wayline-ride-move,indent=0]
 ----
@@ -780,7 +780,7 @@ requested ride waits in `REQUESTED` until somebody assigns it. Keep the part of
 Assigning is the same move the matcher makes, with the driver chosen by a
 person. This is the transaction in `Rides` that makes it for the matcher:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/ride/Rides.java[tag=wayline-ride-offer,indent=0]
 ----
@@ -887,7 +887,7 @@ held. For drivers on a wage, remove `EarningsForm` from the driver's menu.
 
 Every payment goes through one interface on the server, `PaymentProvider`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/pay/PaymentProvider.java[tag=wayline-payment-provider,indent=0]
 ----
@@ -1066,7 +1066,7 @@ A second processor is a second class that implements `PaymentProvider`.
 simulated one takes a typed card. Its setup creates a session on the
 provider's side and hands back the address of the provider's page:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/pay/StripePayments.java[tag=wayline-payment-hosted,indent=0]
 ----
@@ -1075,7 +1075,7 @@ The app opens the provider's page for any setup that says it's hosted, so it
 needs no change. `Services` is where the server picks an implementation from
 `wayline.payments.provider`, and a new provider is one more name there:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/Services.java[tag=wayline-payment-choice,indent=0]
 ----
@@ -1191,7 +1191,7 @@ instances.
 
 The interface is all a provider has to implement:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/sms/SmsSender.java[tag=wayline-sms-sender,indent=0]
 ----
@@ -1200,7 +1200,7 @@ Another provider is another class, with `delivers()` answering `true`. The
 three that come with the sample have one shape: a form posted to the
 provider's API. `VonageSmsSender` is the shortest:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/sms/VonageSmsSender.java[tag=wayline-sms-provider,indent=0]
 ----
@@ -1209,7 +1209,7 @@ include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wa
 `PhoneVerification` turns that into the 503. `Services.smsSender` then needs
 one more name for `wayline.sms.provider`, built the way the Vonage one is:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/Services.java[tag=wayline-sms-choice,indent=0]
 ----
@@ -1252,7 +1252,7 @@ A token is the provider's own, so the server stores it with the provider's name.
 account that signed in on it last, and an account keeps its eight most recent
 phones. Closing an account removes them all.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/PushDevices.java[tag=wayline-push-devices,indent=0]
 ----
@@ -1279,7 +1279,7 @@ include::../../scripts/wayline/common/src/main/java/com/codenameone/examples/way
 `Rides` tells `RidePushes` of every change to a ride once the change is
 committed, at the same moment it tells the live channel:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/RidePushes.java[tag=wayline-push-ride-changed,indent=0]
 ----
@@ -1288,7 +1288,7 @@ A notification is a courtesy on top of what the app reads from the server, so
 nothing that goes wrong sending one fails the change it's about. `RidePushes`
 decides who hears what:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/RidePushes.java[tag=wayline-push-messages,indent=0]
 ----
@@ -1303,7 +1303,7 @@ The switches under **Notifications** in the app's settings decide what's said. A
 switch that's off silences the notification and nothing else, so the lock screen
 still follows the ride:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/RidePushes.java[tag=wayline-push-preferences,indent=0]
 ----
@@ -1337,7 +1337,7 @@ include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wa
 Without the setting, the test profile gets `recording`, the other development
 profiles get `console` and any other profile gets `cloud`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/Services.java[tag=wayline-push-choice,indent=0]
 ----
@@ -1370,7 +1370,7 @@ every notification it can't send. `CloudPushSender` sends on a thread of its own
 so a ride's request never waits on the push service, and it logs a refusal
 rather than throwing it:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/CloudPushSender.java[tag=wayline-push-cloud,indent=0]
 ----
@@ -1378,7 +1378,7 @@ include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wa
 To send through another service, implement `PushSender`, one method, and return
 it from `Services.pushSender`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/PushSender.java[tag=wayline-push-sender,indent=0]
 ----
@@ -1416,7 +1416,7 @@ Once the app is in the background the server keeps the activity current. It
 records the activity's id against the ride, but only the rider's own ride and
 only while a driver is bringing or carrying them:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/RidePushes.java[tag=wayline-push-activity,indent=0]
 ----
@@ -1560,7 +1560,7 @@ Wayline's accounts are named by e-mail address, which is what
 `LinkingOAuth2UserService` matches on: a person whose provider vouches for
 the address of an existing account signs in as that account, with its roles.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SocialLoginConfig.java[tag=backend-security-oauth2-linking,indent=0]
 ----
@@ -1680,7 +1680,7 @@ they take effect on the next request.
 *Read the roles from the token.* Have the provider put the roles in a claim
 and map the claim:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/ResourceServerConfig.java[tag=backend-security-jwt-converter,indent=0]
 ----
@@ -2125,7 +2125,7 @@ columns and the entities read them, and neither is derived from the other. The
 option to bring a pet is the column of `ride` the child seat would sit beside,
 and in `Ride` it's one private field:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/domain/Ride.java[tag=wayline-column-entity,indent=0]
 ----

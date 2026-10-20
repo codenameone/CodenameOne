@@ -256,7 +256,7 @@ fails open:
 The <<Server-side backend>> takes the raw request when a handler needs the
 exact body, which is what signature verification requires:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/PushFeedback.java[tag=push-feedback-backend,indent=0]
 ----

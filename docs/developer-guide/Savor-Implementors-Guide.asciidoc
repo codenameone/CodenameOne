@@ -85,7 +85,7 @@ across without being rewritten.
 What couples the two is when a delivery starts. A customer places an order, and
 the card is held:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/order/Orders.java[tag=savor-place,indent=0]
 ----
@@ -94,12 +94,12 @@ No courier is looked for yet. A courier sent to a restaurant that then turns the
 order down has wasted a trip, so the delivery is created when the kitchen accepts,
 in the same transaction:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/order/Orders.java[tag=savor-accept,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/delivery/Deliveries.java[tag=savor-dispatch,indent=0]
 ----
@@ -116,7 +116,7 @@ come from, so two answers at the same moment can't both win -- a customer
 cancelling while the kitchen accepts, or two couriers taking one offer. It's the
 pattern <<wayline-ride-atomic>> explains:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/delivery/Deliveries.java[tag=savor-delivery-trymove,indent=0]
 ----
@@ -128,7 +128,7 @@ food before anyone cooks it, but shouldn't be charged for an order that never
 arrives. The card is therefore authorized for the total when the order is placed and
 captured when it's delivered:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/pay/Payments.java[tag=savor-authorize,indent=0]
 ----
@@ -137,7 +137,7 @@ The provider interface Wayline's billing chapter describes gained the two calls
 that make it possible, `authorize` and `capture`, and a `release` for a hold that
 is let go:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/pay/PaymentProvider.java[tag=savor-payment-provider,indent=0]
 ----
@@ -167,7 +167,7 @@ ones that deliver to their door. The search takes a box around the point from th
 database and then measures each restaurant in it, as Wayline does to find the
 drivers near a pickup:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/catalog/Catalog.java[tag=savor-nearby,indent=0]
 ----
@@ -199,7 +199,7 @@ commission is what the service keeps of the food; the merchant's sales show the 
 Applying to list a restaurant creates it waiting for approval, owned by the account
 that asked:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/catalog/Restaurants.java[tag=savor-apply,indent=0]
 ----
@@ -209,7 +209,7 @@ under `/api/merchant/restaurants/{id}/...`, and each request checks that the acc
 is a merchant of that restaurant, so one restaurant's staff can't read another's
 orders. The rules are in the same table as the rest of the server's:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/savor/backend/src/main/java/com/codenameone/examples/savor/SecurityConfig.java[tag=savor-api-rules,indent=0]
 ----
