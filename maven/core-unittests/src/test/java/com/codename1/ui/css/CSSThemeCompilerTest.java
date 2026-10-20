@@ -1323,6 +1323,27 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testUniversalDeriveIsIgnored() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base{font-family:native:MainBold;font-size:2mm;}"
+                + " *{cn1-derive:Base;} Component{font-size:20px;}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("Component.derive"));
+        assertEquals("native:MainRegular", fontName((Font) theme.get("Component.font")));
+    }
+
+    @Test
+    void testAliasOfQuotedImageVariableKeepsTheWholeName() {
+        MutableResource res = new MutableResource();
+        res.setImage("my icon", Image.createImage(5, 5));
+        new CSSThemeCompiler().compile("#Constants { --baseImage: \"my icon\"; aliasImage: var(--baseImage); }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals(5, ((Image) theme.get("@baseImage")).getWidth());
+        assertEquals(5, ((Image) theme.get("@aliasImage")).getWidth());
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"

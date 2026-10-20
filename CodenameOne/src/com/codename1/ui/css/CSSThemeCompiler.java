@@ -462,6 +462,11 @@ public class CSSThemeCompiler {
                     }
                 }
                 deferred.put(key, DEFERRED_IMAGE);
+                if (!raw.equals(value)) {
+                    // A quoted image name stays a string token, so an alias of it names the
+                    // whole `"my icon"`, not the leading `my` of a chain.
+                    literalTokens.put(key, raw);
+                }
             } else if (!raw.equals(value)) {
                 deferred.put(key, DEFERRED_LITERAL);
                 literalTokens.put(key, raw);
@@ -836,19 +841,19 @@ public class CSSThemeCompiler {
                 // `B\61se` both name the UIID `Base`.
                 value = derivedUiid(value.trim());
             }
-            if ("cn1-derive".equals(property) && !"press#".equals(statePrefix)) {
-                // The build-time compiler's Element.setParent() promotes a derive to the owning
-                // UIID from every state but pressed.
-                ownerDerives.put(uiid, value.trim());
-            }
             if (universal) {
                 // The build-time compiler ignores universal rules entirely (CSSTheme.apply()
-                // returns before any element), so `*` sets no style property there; its custom
-                // properties, handled above, still count.
+                // returns before any element), so `*` sets no style property and no derive
+                // there; its custom properties, handled above, still count.
                 if ("font-size".equals(property)) {
                     parseFontSize(value);
                 }
                 continue;
+            }
+            if ("cn1-derive".equals(property) && !"press#".equals(statePrefix)) {
+                // The build-time compiler's Element.setParent() promotes a derive to the owning
+                // UIID from every state but pressed.
+                ownerDerives.put(uiid, value.trim());
             }
             if (applyFontProperty(fonts, uiid + "." + statePrefix, property, value)) {
                 continue;
@@ -1652,7 +1657,8 @@ public class CSSThemeCompiler {
             // is one a previous compile into the same theme left: it is already resolved, and
             // any var() still in it was quoted text there.
             String kind = deferredConstants.get("@" + key);
-            if (kind != null && !DEFERRED_LITERAL.equals(kind)) {
+            // A quoted token is text whatever its kind (a quoted image name is one).
+            if (kind != null && !DEFERRED_LITERAL.equals(kind) && token == null) {
                 resolving.add(key);
                 replaceValue = resolveVars(theme, replaceValue, resolving, tokens);
                 resolving.remove(resolving.size() - 1);
