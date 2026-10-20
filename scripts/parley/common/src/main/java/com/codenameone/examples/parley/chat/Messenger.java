@@ -123,7 +123,7 @@ public final class Messenger implements LiveChannel.Handler {
             ready.run();
             return;
         }
-        Api.devices().register(Identity.registration(deviceName(), CN.getPlatformName()),
+        Api.devices().register(Identity.registration(deviceName(), platform()),
                 Net.to(device -> {
                     Identity.registered(device.id());
                     if (instance != null) {
@@ -138,7 +138,7 @@ public final class Messenger implements LiveChannel.Handler {
     /// and the sync start again under the new id.
     private void registerAgain() {
         LiveChannel.stop();
-        Api.devices().register(Identity.registration(deviceName(), CN.getPlatformName()),
+        Api.devices().register(Identity.registration(deviceName(), platform()),
                 Net.to(device -> {
                     Identity.registered(device.id());
                     if (instance == this) {
@@ -198,6 +198,22 @@ public final class Messenger implements LiveChannel.Handler {
                 }
             }
         }));
+    }
+
+    /// The platform in the server's words: `CN.getPlatformName()` says
+    /// `and` and `HTML5`, and a simulator says whichever phone it shows.
+    private static String platform() {
+        if (CN.isSimulator()) {
+            return "simulator";
+        }
+        String platform = CN.getPlatformName();
+        if ("ios".equals(platform)) {
+            return "ios";
+        }
+        if ("and".equals(platform)) {
+            return "android";
+        }
+        return "HTML5".equals(platform) ? "web" : "desktop";
     }
 
     private static String deviceName() {

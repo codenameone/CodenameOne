@@ -3,9 +3,9 @@
 //   URL=http://localhost:18081/ OUT=target/web-e2e node web-e2e.mjs
 //
 // It checks what a person opening the server's address gets: the app loads from
-// the server, reaches the welcome screen, signs in as the demo customer, lands on
-// the home screen with its map, and has its live channel open. Then it signs
-// out, signs in as the demo admin and reaches the admin console.
+// the server, reaches the welcome screen, signs in as a demo user, lands on the
+// chats with the seeded conversations, and has its live channel open. Then it
+// signs out, signs in as the demo admin and opens the admin console.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
 //
 // The app draws on a canvas, so there are no buttons in the page to ask a
@@ -33,7 +33,7 @@ try {
 
 const url = process.env.URL;
 const out = process.env.OUT || 'target/web-e2e';
-const email = process.env.PARLEY_USER || 'customer@parley.example';
+const email = process.env.PARLEY_USER || 'alice@parley.example';
 const password = process.env.PARLEY_PASSWORD || 'parley-demo';
 const admin = process.env.PARLEY_ADMIN || 'admin@parley.example';
 // A cold runner translates nothing at this point, but it does parse several
@@ -63,10 +63,7 @@ const browser = await chromium.launch({
   args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--disable-features=IntensiveWakeUpThrottling']
 });
-// A browser reports where it is, and the restaurants listed are the ones that
-// deliver there: this one is by the seeded restaurants, near Pier 39.
-const page = await browser.newPage({ viewport: { width: 420, height: 860 },
-  geolocation: { latitude: 37.8080, longitude: -122.4120 }, permissions: ['geolocation'] });
+const page = await browser.newPage({ viewport: { width: 420, height: 860 } });
 page.on('console', message => {
   const text = message.text();
   if (text.startsWith('LF-SHIM')) {
@@ -91,6 +88,10 @@ page.on('response', response => {
   // The query says where a list was asked for; it holds no secrets (a token
   // travels in a header).
   note('NET ' + line + (at.pathname.startsWith('/api/') ? at.search : ''));
+  // A refusal says why in its body, which is what the log needs to show.
+  if (response.status() >= 400 && at.pathname.startsWith('/api/')) {
+    response.text().then(body => note('NET   ' + body.slice(0, 300)), () => {});
+  }
 });
 page.on('websocket', socket => {
   const seen = { url: socket.url(), frames: [] };
@@ -192,6 +193,28 @@ async function signInAs(who) {
   say('submitted the sign-in form as ' + who);
 }
 
+/// Opens the toolbar's overflow menu and picks its `index`th command. The
+/// menu's popup is not in the page's accessibility tree and does not move its
+/// focus with the arrow keys, so its rows are clicked where they are drawn: a
+/// column under the menu button, one row per command.
+async function overflowCommand(index) {
+  const more = await openOverflow();
+  const rowHeight = 35;
+  await page.mouse.click(more.x - 60, more.y + more.height + 24 + index * rowHeight);
+  await settled();
+}
+
+/// Opens the toolbar's overflow menu: the rightmost icon button at the top.
+async function openOverflow() {
+  await settled();
+  const more = await waitFor('the overflow menu button', stepSeconds, async () =>
+      (await components()).filter(c => c.role === 'button' && c.y < 140 && c.width < 120
+          && c.width > 20).sort((a, b) => b.x - a.x)[0]);
+  await click(more);
+  await settled();
+  return more;
+}
+
 /// Fails on the dialog the app shows for an error nothing handled.
 async function noErrorDialog() {
   if (/internal application error/i.test(await screenText())) {
@@ -235,19 +258,15 @@ try {
   await click(await waitFor('the usage statistics question', stepSeconds, button('Not now')));
   say('declined usage statistics');
 
-  // 3. The home screen.
-  await waitFor('the home screen', stepSeconds, async () =>
-      (await screenText()).includes('Deliver to'));
-  // The restaurants near the address, read from the server: the seeded ones.
-  const seeded = ['Ember & Crust', 'Harbor Burger Co.', 'Kumo Omakase', 'The Gilded Hen', 'Saffron Grill', 'Jade Bowl', 'Prime & Pepper', 'Luz Taqueria', 'Verde Table', 'Glaze Donut Atelier', 'Velvet Spoon', 'Morning Ritual'];
-  await waitFor('a restaurant near the address', stepSeconds, async () => {
+  // 3. The chats, read from the server: the seeded ones.
+  const seeded = ['Weekend hike', 'Brennan family', 'Parley Bot', 'Parley news'];
+  await waitFor('the seeded chats', stepSeconds, async () => {
     const text = await screenText();
     return seeded.some(name => text.includes(name));
   });
-  // The cards are laid out on the next frame; let the photos and words land.
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: path.join(out, '3-home.png') });
-  say('signed in: the home screen is up');
+  await page.screenshot({ path: path.join(out, '3-chats.png') });
+  say('signed in: the chats are up');
 
   const expected = ['200 POST /login', '200 GET /signin/code', '200 POST /oauth2/token',
     '200 GET /api/me'];
@@ -267,8 +286,8 @@ try {
   }
   say('the live channel is open');
 
-  // Give a late failure -- the first location request, the first map tile --
-  // the moment it needs to show itself.
+  // Give a late failure -- the first sync, the first key upload -- the moment
+  // it needs to show itself.
   await page.waitForTimeout(3000);
   await noErrorDialog();
   await page.screenshot({ path: path.join(out, '4-settled.png') });
@@ -287,30 +306,36 @@ try {
   }
   say('the sign-in session is over (asking for another code is answered ' + again + ')');
 
-  // 6. Signing out, from the menu. Its button is an icon with no words: the
-  //    one button at the top of the screen.
-  await settled();
-  const menu = await waitFor('the menu button', stepSeconds, async () =>
-      (await components()).filter(c => c.role === 'button' && c.y < 140 && c.width < 120
-          && c.width > 20).sort((a, b) => a.x - b.x)[0]);
-  await click(menu);
-  await settled();
-  await click(await waitFor('Sign out in the menu', stepSeconds, button('Sign out')));
+  // 6. Signing out, from Settings in the overflow menu.
+  // New group, Join with a link, Calls, Settings.
+  await overflowCommand(3);
+  // Sign out is at the end of a form taller than the page: scroll to it.
+  await click(await waitFor('Sign out in Settings', stepSeconds, async () => {
+    const found = await button('Sign out')();
+    if (found && found.y + found.height < page.viewportSize().height - 10) {
+      return found;
+    }
+    await page.mouse.move(210, 500);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(400);
+    return null;
+  }));
   await waitFor('the welcome screen after signing out', stepSeconds, button('Create an account'));
   await settled();
   await noErrorDialog();
   await page.screenshot({ path: path.join(out, '5-signed-out.png') });
   say('signed out: the welcome screen is back');
 
-  // 7. The admin, who lands in the console.
+  // 7. The admin, who has the console in the same menu.
   await signInAs(admin);
-  await waitFor('the admin console', stepSeconds, async () => {
-    // "Operations" on a screen this narrow; "Dashboard", down the side, on a
-    // wide one. The figures are the same.
+  await waitFor('the admin\'s chats', stepSeconds, async () => {
     const text = await screenText();
-    // A caption goes onto two lines where its tile is narrow.
-    return /Operations|Dashboard/.test(text) && /Orders\s+paid/.test(text);
+    return seeded.some(name => text.includes(name));
   });
+  // The admin's menu ends with the console, after Settings.
+  await overflowCommand(4);
+  await waitFor('the admin console', stepSeconds, async () =>
+      /Messages\s+today/.test(await screenText()));
   await waitFor('the console to ask the server for its figures', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/admin\//.test(r)));
   await page.waitForTimeout(3000);
