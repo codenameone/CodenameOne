@@ -738,8 +738,16 @@ public class Component implements Animation, StyleListener, Editable {
 
     private boolean hasApplicationPointerListeners(EventDispatcher dispatcher) {
         if (dispatcher != null && dispatcher.hasListeners()) {
-            for (Object listener : dispatcher.getListenerCollection()) {
-                if (!(listener instanceof NativeTextSelectionListener)) {
+            // Indexed rather than an iterator: an iterator throws
+            // ConcurrentModificationException when the list changes during
+            // the walk, which a JavaSE test thread racing the EDT hit.
+            Object listeners = dispatcher.getListenerCollection();
+            if (!(listeners instanceof java.util.List)) {
+                return true;
+            }
+            java.util.List list = (java.util.List) listeners;
+            for (int i = 0; i < list.size(); i++) {
+                if (!(list.get(i) instanceof NativeTextSelectionListener)) {
                     return true;
                 }
             }

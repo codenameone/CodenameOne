@@ -814,13 +814,31 @@ public final class Translator implements Opcodes {
 
     /// Whether Unity serializes a field, which decides what `Instantiate`
     /// copies: an instance field that is public, or marked
-    /// `[SerializeField]`, and neither `readonly` nor `[NonSerialized]`.
+    /// `[SerializeField]`, and neither `readonly` nor `[NonSerialized]`, nor
+    /// a container of containers (`int[][]`, `List<int[]>`), which Unity
+    /// does not serialize.
     public static boolean isSerialized(TypeDef type, FieldDef f) {
         if (f.isStatic() || f.isLiteral() || f.rva != 0 || (f.flags & (FIELD_INIT_ONLY | FIELD_NOT_SERIALIZED)) != 0) {
             return false;
         }
+        CilType inner = containerElement(f.type);
+        if (inner != null && containerElement(inner) != null) {
+            return false;
+        }
         return (f.flags & FIELD_ACCESS_MASK) == FIELD_PUBLIC
                 || type.assembly.attributes(f.token()).contains("UnityEngine.SerializeField");
+    }
+
+    /// The element type of an array or a `List<T>`, or null for anything else.
+    private static CilType containerElement(CilType t) {
+        if (t.kind == CilType.Kind.SZARRAY) {
+            return t.element;
+        }
+        if (t.kind == CilType.Kind.GENERICINST && t.args != null && t.args.length == 1 && t.element != null
+                && "System.Collections.Generic.List`1".equals(t.element.name)) {
+            return t.args[0];
+        }
+        return null;
     }
 
     /// What the runtime needs of a script that reflection would give it
