@@ -84,7 +84,17 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
         }
     }
 
+    /// The element that runs `create` the first time something reads this provider:
+    /// provider's `lazy` (the default) defers creation until the first lookup, so an
+    /// unread provider never starts its requests or allocates its bloc.
+    ProviderElement pendingCreator;
+
     public Object getValue() {
+        if (value == null && pendingCreator != null) {
+            ProviderElement e = pendingCreator;
+            pendingCreator = null;
+            e.createNow(this);
+        }
         return value;
     }
 
@@ -106,13 +116,17 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
 
     @Override
     public Object providedValueFor(Class<?> type) {
-        return providesType(type) ? value : null;
+        return providesType(type) ? getValue() : null;
     }
 
     @Override
     public boolean providesType(Class<?> type) {
         if (type == null) {
             return false;
+        }
+        if (value == null && providedType == null && pendingCreator != null) {
+            // Nothing but the value can say what an untyped provider provides.
+            getValue();
         }
         if (value != null) {
             return type.isInstance(value);

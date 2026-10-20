@@ -1111,10 +1111,12 @@ public final class JavaEmitter {
     private boolean emitDynamicMembers(ClassDecl c, StringBuilder body, Ctx ctx) {
         boolean inherits = c.superclass != null && program.classes.containsKey(c.superclass.name)
                 && !program.classes.get(c.superclass.name).isMixin;
-        // A class extending a framework or runtime class (a widget, a State, a
-        // ChangeNotifier) is not the model data dynamic code reaches into; leave it out
-        // rather than add three switch methods to every widget of an app.
-        if (c.superclass != null && !inherits) {
+        // A widget, State, or other framework lifecycle class is not the model data
+        // dynamic code reaches into; leave it out rather than add three switch methods
+        // to every widget of an app. Any other runtime superclass -- Equatable,
+        // ChangeNotifier -- is ordinary model data (`dynamic pet; pet.name`), and the
+        // class declares the members itself.
+        if (c.superclass != null && !inherits && isFrameworkLifecycleClass(c.superclass.name)) {
             return false;
         }
         if (inherits && !hasDynamicMembers(program.classes.get(c.superclass.name))) {
@@ -10744,6 +10746,11 @@ public final class JavaEmitter {
      * Whether {@code sub} is (transitively) a subtype of {@code sup} across the program and stub
      * class hierarchies. Used to decide when a generic cross-type assignment needs an erasing cast.
      */
+    private boolean isFrameworkLifecycleClass(String name) {
+        return isSubtypeName(name, "Widget") || isSubtypeName(name, "State")
+                || isSubtypeName(name, "Element") || isSubtypeName(name, "RenderObject");
+    }
+
     private boolean isSubtypeName(String sub, String sup) {
         if (sub == null || sup == null) {
             return false;

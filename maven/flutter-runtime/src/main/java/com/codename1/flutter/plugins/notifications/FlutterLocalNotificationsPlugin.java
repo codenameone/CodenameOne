@@ -69,7 +69,7 @@ public class FlutterLocalNotificationsPlugin {
             } catch (NumberFormatException ignore) {
                 // not one of ours after all
             }
-            cb.call(new NotificationResponse(id, PAYLOADS.get(notificationId)));
+            cb.call(new NotificationResponse(id, payload(notificationId)));
         }
     }
 
@@ -113,7 +113,7 @@ public class FlutterLocalNotificationsPlugin {
     private static void schedule(long id, String title, String body, NotificationOptions details,
             String payload, long at, int repeat) {
         String key = PREFIX + id;
-        PAYLOADS.put(key, payload);
+        putPayload(key, payload);
         shown++;
         if (!Display.isInitialized()) {
             return;
@@ -136,7 +136,7 @@ public class FlutterLocalNotificationsPlugin {
 
     public Future<Object> cancel(long id, String tag) {
         String key = PREFIX + id;
-        PAYLOADS.remove(key);
+        removePayload(key);
         if (Display.isInitialized()) {
             Display.getInstance().cancelLocalNotification(key);
         }
@@ -144,13 +144,71 @@ public class FlutterLocalNotificationsPlugin {
     }
 
     public Future<Object> cancelAll() {
-        for (String key : PAYLOADS.keySet().toArray(new String[0])) {
+        for (String key : payloadKeys()) {
             if (Display.isInitialized()) {
                 Display.getInstance().cancelLocalNotification(key);
             }
+            removePayload(key);
         }
-        PAYLOADS.clear();
         return Future.value(null);
+    }
+
+    // Payloads are persisted: a scheduled notification usually fires after the process
+    // that scheduled it is gone, and the tap that restarts the app still needs the
+    // payload to route. The map is this process's cache; Preferences outlives it.
+    private static final String PAYLOAD_PREF = "cn1.flutter.notifications.payload.";
+    private static final String KEYS_PREF = "cn1.flutter.notifications.keys";
+
+    private static void putPayload(String key, String payload) {
+        PAYLOADS.put(key, payload);
+        if (Display.isInitialized()) {
+            java.util.Set<String> keys = payloadKeys();
+            keys.add(key);
+            com.codename1.io.Preferences.set(KEYS_PREF, join(keys));
+            if (payload == null) {
+                com.codename1.io.Preferences.delete(PAYLOAD_PREF + key);
+            } else {
+                com.codename1.io.Preferences.set(PAYLOAD_PREF + key, payload);
+            }
+        }
+    }
+
+    private static String payload(String key) {
+        if (PAYLOADS.containsKey(key)) {
+            return PAYLOADS.get(key);
+        }
+        return Display.isInitialized() ? com.codename1.io.Preferences.get(PAYLOAD_PREF + key, (String) null) : null;
+    }
+
+    private static void removePayload(String key) {
+        PAYLOADS.remove(key);
+        if (Display.isInitialized()) {
+            java.util.Set<String> keys = payloadKeys();
+            keys.remove(key);
+            com.codename1.io.Preferences.set(KEYS_PREF, join(keys));
+            com.codename1.io.Preferences.delete(PAYLOAD_PREF + key);
+        }
+    }
+
+    private static java.util.Set<String> payloadKeys() {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<String>(PAYLOADS.keySet());
+        if (Display.isInitialized()) {
+            String stored = com.codename1.io.Preferences.get(KEYS_PREF, "");
+            for (String k : com.codename1.util.StringUtil.tokenize(stored, ',')) {
+                if (k.length() > 0) {
+                    keys.add(k);
+                }
+            }
+        }
+        return keys;
+    }
+
+    private static String join(java.util.Set<String> keys) {
+        StringBuilder sb = new StringBuilder();
+        for (String k : keys) {
+            sb.append(sb.length() == 0 ? "" : ",").append(k);
+        }
+        return sb.toString();
     }
 
     /** How many notifications this process has shown or scheduled. */

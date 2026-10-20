@@ -40,6 +40,8 @@ public class AppLinks {
     private static final StreamController<String> LINKS = StreamController.broadcast();
     private static String initial;
     private static boolean initialRead;
+    /// The most recent link received, launch or resume; getLatestLink answers it.
+    private static String latest;
 
     public AppLinks() {
     }
@@ -57,6 +59,7 @@ public class AppLinks {
         if (!initialRead && initial == null) {
             initial = arg;
         }
+        latest = arg;
         LINKS.add(arg);
     }
 
@@ -78,7 +81,13 @@ public class AppLinks {
     }
 
     public Future<DartUri> getLatestLink() {
-        return getInitialLink();
+        initialLink();
+        return Future.value(latest == null ? null : DartUri.parse(latest));
+    }
+
+    public Future<String> getLatestLinkString() {
+        initialLink();
+        return Future.value(latest);
     }
 
     public Stream<String> stringLinkStream() {

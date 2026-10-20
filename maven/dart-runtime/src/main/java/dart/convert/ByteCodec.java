@@ -80,7 +80,54 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
         if (kind == BASE64 || kind == BASE64_URL) {
             return Uint8List.fromBytes(unbase64((String) input));
         }
-        return text(bytesOf(input));
+        byte[] b = bytesOf(input);
+        if (kind == UTF8 && !Boolean.TRUE.equals(allowMalformed)) {
+            checkUtf8(b, b.length);
+        }
+        return text(b);
+    }
+
+    /**
+     * Dart's decoder throws FormatException on malformed UTF-8 unless allowMalformed;
+     * Java's String constructor would silently substitute U+FFFD instead.
+     */
+    static void checkUtf8(byte[] b, int end) {
+        int i = 0;
+        while (i < end) {
+            int v = b[i] & 0xff;
+            int n;
+            int min;
+            if (v < 0x80) {
+                i++;
+                continue;
+            } else if (v >= 0xc2 && v <= 0xdf) {
+                n = 1;
+                min = 0x80;
+            } else if (v >= 0xe0 && v <= 0xef) {
+                n = 2;
+                min = 0x800;
+            } else if (v >= 0xf0 && v <= 0xf4) {
+                n = 3;
+                min = 0x10000;
+            } else {
+                throw new FormatException("Unexpected extension byte (at offset " + i + ")");
+            }
+            if (i + n >= end) {
+                throw new FormatException("Unfinished UTF-8 octet sequence (at offset " + i + ")");
+            }
+            int cp = v & (0x3f >> n);
+            for (int k = 1; k <= n; k++) {
+                int c = b[i + k] & 0xff;
+                if ((c & 0xc0) != 0x80) {
+                    throw new FormatException("Missing extension byte (at offset " + (i + k) + ")");
+                }
+                cp = (cp << 6) | (c & 0x3f);
+            }
+            if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
+                throw new FormatException("Invalid UTF-8 encoding (at offset " + i + ")");
+            }
+            i += n + 1;
+        }
     }
 
     /**

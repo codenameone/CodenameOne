@@ -119,7 +119,14 @@ abstract class Fs {
             if (path.startsWith("file:")) {
                 return path;
             }
-            return path.startsWith("/") ? "file://" + path : path;
+            if (path.startsWith("/")) {
+                return "file://" + path;
+            }
+            // Dart resolves a relative path against Directory.current (the app home
+            // here); FileSystemStorage would use the process working directory, which
+            // on Android is not even writable.
+            String base = Directory.current.path();
+            return "file://" + (base.endsWith("/") ? base : base + "/") + path;
         }
 
         static String plain(String url) {

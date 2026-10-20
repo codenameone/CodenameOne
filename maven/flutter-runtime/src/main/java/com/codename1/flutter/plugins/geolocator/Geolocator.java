@@ -96,22 +96,50 @@ public final class Geolocator {
         return Future.value(l == null ? null : Position.of(l));
     }
 
+    /// The position streams someone is listening to. LocationManager holds a single
+    /// listener for the process, so one listener fans out to all of them; it is
+    /// installed with the first and removed with the last, which stops GPS updates
+    /// once every subscription is cancelled.
+    private static final java.util.List<StreamController<Position>> LISTENING =
+            new java.util.ArrayList<StreamController<Position>>();
+
+    private static final LocationListener FAN_OUT = new LocationListener() {
+        @Override
+        public void locationUpdated(Location location) {
+            Position p = Position.of(location);
+            for (StreamController<Position> c : new java.util.ArrayList<StreamController<Position>>(LISTENING)) {
+                c.add(p);
+            }
+        }
+
+        @Override
+        public void providerStateChanged(int newState) {
+        }
+    };
+
     /** Positions as the device reports them, while anything listens. */
     public static Stream<Position> getPositionStream(LocationSettings locationSettings) {
         final StreamController<Position> out = StreamController.broadcast();
-        LocationManager lm = manager();
-        if (lm != null) {
-            lm.setLocationListener(new LocationListener() {
-                @Override
-                public void locationUpdated(Location location) {
-                    out.add(Position.of(location));
+        out.onListen(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                LISTENING.add(out);
+                LocationManager lm = manager();
+                if (LISTENING.size() == 1 && lm != null) {
+                    lm.setLocationListener(FAN_OUT);
                 }
-
-                @Override
-                public void providerStateChanged(int newState) {
+            }
+        });
+        out.onCancel(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                LISTENING.remove(out);
+                LocationManager lm = manager();
+                if (LISTENING.isEmpty() && lm != null) {
+                    lm.setLocationListener(null);
                 }
-            });
-        }
+            }
+        });
         return out.stream();
     }
 

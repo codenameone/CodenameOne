@@ -29,8 +29,11 @@ import com.codename1.io.ConnectionRequest;
 public class CancelToken {
     private boolean cancelled;
     private Object reason;
-    private ConnectionRequest active;
-    private Runnable onCancel;
+    /// Every request this token was handed, with its cancel callback: one token is
+    /// often shared by several concurrent requests, and cancel() stops all of them. A
+    /// request that already finished ignores both (its completion is guarded).
+    private final java.util.List<ConnectionRequest> requests = new java.util.ArrayList<ConnectionRequest>();
+    private final java.util.List<Runnable> callbacks = new java.util.ArrayList<Runnable>();
 
     public CancelToken() {
     }
@@ -53,16 +56,24 @@ public class CancelToken {
         }
         cancelled = true;
         reason = why;
-        if (active != null) {
-            active.kill();
-        }
-        if (onCancel != null) {
-            onCancel.run();
+        ConnectionRequest[] reqs = requests.toArray(new ConnectionRequest[requests.size()]);
+        Runnable[] cbs = callbacks.toArray(new Runnable[callbacks.size()]);
+        requests.clear();
+        callbacks.clear();
+        for (int i = 0; i < reqs.length; i++) {
+            reqs[i].kill();
+            cbs[i].run();
         }
     }
 
     void attach(ConnectionRequest req, Runnable cancelled) {
-        this.active = req;
-        this.onCancel = cancelled;
+        if (this.cancelled) {
+            // dio fails a request made with an already-cancelled token straight away.
+            req.kill();
+            cancelled.run();
+            return;
+        }
+        requests.add(req);
+        callbacks.add(cancelled);
     }
 }

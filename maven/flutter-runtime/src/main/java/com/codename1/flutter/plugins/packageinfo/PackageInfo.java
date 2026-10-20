@@ -73,7 +73,34 @@ public class PackageInfo {
             version = full.substring(0, last);
             build = full.substring(last + 1);
         }
+        String imported = importedBuildNumber();
+        if (imported != null) {
+            build = imported;
+        }
         return Future.value(new PackageInfo(name, pkg, version, build, "", null));
+    }
+
+    /// Written by the Flutter importer from pubspec's `version: 1.2.3+42`; the 42 goes
+    /// to the native build-number hints, which no device property reports back.
+    static final String BUILD_NUMBER_RESOURCE = "cn1-flutter-build-number.txt";
+
+    private static String importedBuildNumber() {
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        java.io.InputStream in = Display.getInstance().getResourceAsStream(PackageInfo.class,
+                "/" + BUILD_NUMBER_RESOURCE);
+        if (in == null) {
+            return null;
+        }
+        try {
+            String s = com.codename1.io.Util.readToString(in, "UTF-8").trim();
+            return s.length() == 0 ? null : s;
+        } catch (java.io.IOException e) {
+            return null;
+        } finally {
+            com.codename1.io.Util.cleanup(in);
+        }
     }
 
     /** Fixes what {@link #fromPlatform} answers, for tests. */

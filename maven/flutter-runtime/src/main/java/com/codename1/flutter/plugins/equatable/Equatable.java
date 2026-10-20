@@ -164,6 +164,7 @@ public abstract class Equatable {
             }
             return h;
         }
-        return o.hashCode();
+        // deepEquals compares through DartRuntime.eq, where 1 == 1.0; the hash must agree.
+        return dart.runtime.DartRuntime.hashOf(o);
     }
 }

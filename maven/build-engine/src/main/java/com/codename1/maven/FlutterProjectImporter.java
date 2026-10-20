@@ -613,17 +613,43 @@ public final class FlutterProjectImporter {
     }
 
     /// Removes `//` and `/* */` comments, keeping string literals intact enough for
-    /// directive matching (a directive is never inside a string).
+    /// directive matching (a directive is never inside a string). A triple-quoted
+    /// string's contents are blanked, newlines kept: it spans lines, and a line of it
+    /// that reads like `import 'package:x/x.dart';` is text, not a dependency. A raw
+    /// string (`r'...'`) has no escapes.
     static String stripComments(String s) {
         StringBuilder out = new StringBuilder(s.length());
         int i = 0;
         int n = s.length();
         char quote = 0;
+        boolean rawQuote = false;
         while (i < n) {
             char ch = s.charAt(i);
+            if (quote == 0 && (ch == '\'' || ch == '"') && i + 2 < n
+                    && s.charAt(i + 1) == ch && s.charAt(i + 2) == ch) {
+                boolean raw = i > 0 && (s.charAt(i - 1) == 'r' || s.charAt(i - 1) == 'R');
+                String close = new String(new char[] {ch, ch, ch});
+                out.append(close);
+                i += 3;
+                while (i < n && !s.startsWith(close, i)) {
+                    char c = s.charAt(i);
+                    if (c == '\\' && !raw && i + 1 < n) {
+                        out.append(s.charAt(i + 1) == '\n' ? "\n " : "  ");
+                        i += 2;
+                        continue;
+                    }
+                    out.append(c == '\n' ? '\n' : ' ');
+                    i++;
+                }
+                if (i < n) {
+                    out.append(close);
+                    i += 3;
+                }
+                continue;
+            }
             if (quote != 0) {
                 out.append(ch);
-                if (ch == '\\' && i + 1 < n) {
+                if (ch == '\\' && i + 1 < n && !rawQuote) {
                     out.append(s.charAt(i + 1));
                     i += 2;
                     continue;
@@ -663,6 +689,7 @@ public final class FlutterProjectImporter {
             }
             if (ch == '\'' || ch == '"') {
                 quote = ch;
+                rawQuote = i > 0 && (s.charAt(i - 1) == 'r' || s.charAt(i - 1) == 'R');
             }
             out.append(ch);
             i++;
@@ -716,6 +743,9 @@ public final class FlutterProjectImporter {
     /// (`CodenameOne/src/.../buildhints/Ios.java`, which backs
     /// `CFBundleVersion`) -- added rather than updated-if-present, since the
     /// archetype's settings file never declares either by default.
+    /// Must match com.codename1.flutter.plugins.packageinfo.PackageInfo.
+    static final String BUILD_NUMBER_RESOURCE = "cn1-flutter-build-number.txt";
+
     private void updateSettings(File commonDir, Pubspec pubspec) throws IOException {
         File settings = new File(commonDir, "codenameone_settings.properties");
         if (!settings.isFile()) {
@@ -731,6 +761,11 @@ public final class FlutterProjectImporter {
                 String buildNumber = pubspec.version.substring(plus + 1);
                 updated = setOrAppendProperty(updated, "codename1.arg.android.versionCode", buildNumber);
                 updated = setOrAppendProperty(updated, "codename1.arg.ios.bundleVersion", buildNumber);
+                // No device property reports the native build number, so package_info_plus
+                // reads it from here (PackageInfo.BUILD_NUMBER_RESOURCE).
+                File res = new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE);
+                res.getParentFile().mkdirs();
+                Files.write(res.toPath(), buildNumber.getBytes(Charset.forName("UTF-8")));
             }
         }
         if (pubspec.name != null) {

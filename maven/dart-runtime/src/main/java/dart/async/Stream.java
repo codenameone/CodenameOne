@@ -715,16 +715,48 @@ public class Stream<T> {
         });
     }
 
-    /** Dart's {@code Stream.fromFutures}: each value in the order the futures are listed. */
+    /**
+     * Dart's {@code Stream.fromFutures}: each value or error as its future completes,
+     * not in list order, so a slow first future does not hold back the others. Done
+     * once every future has completed.
+     */
     public static <T> Stream<T> fromFutures(final Iterable<? extends Future<T>> futures) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+        final StreamController<T> c = new StreamController<T>();
+        final int[] pending = {1};
+        final Funcs.VoidFunc0 settle = new Funcs.VoidFunc0() {
             @Override
-            public void call(AsyncStar.Sink<T> s) {
-                for (Future<T> f : futures) {
-                    s.yield$(Await.await$(f));
+            public void call() {
+                if (--pending[0] == 0) {
+                    c.close();
                 }
             }
+        };
+        // Registered on listen: a stream here does not buffer for a listener that is
+        // not there yet, and these futures usually complete synchronously.
+        c.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                for (Future<T> f : futures) {
+                    pending[0]++;
+                    f.then(new Funcs.VoidFunc1<T>() {
+                        @Override
+                        public void call(T v) {
+                            c.add(v);
+                            settle.call();
+                        }
+                    }, new Funcs.VoidFunc1<Object>() {
+                        @Override
+                        public void call(Object e) {
+                            c.addError(e);
+                            settle.call();
+                        }
+                    });
+                }
+                // The extra count held the stream open while the futures were registered.
+                settle.call();
+            }
         });
+        return c.stream();
     }
 
     /** Dart's {@code Stream.periodic}; a null computation yields nulls. */

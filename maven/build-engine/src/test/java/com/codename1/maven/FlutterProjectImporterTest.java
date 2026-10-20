@@ -688,4 +688,16 @@ public class FlutterProjectImporterTest {
             assertTrue(p, FlutterProjectImporter.COVERED.containsKey(p));
         }
     }
+
+    @Test
+    public void importLookingTextInTripleQuotedStringsIsNotADirective() {
+        String src = "import 'package:real/real.dart';\n"
+                + "const doc = \"\"\"\nimport 'package:fake/fake.dart';\n\"\"\";\n"
+                + "const raw = r'''\nimport 'package:fake2/x.dart';\\\n''';\n"
+                + "const re = r'\\d';\nimport 'package:after/after.dart';\n";
+        String out = FlutterProjectImporter.stripComments(src);
+        assertTrue(out, out.contains("package:real/real.dart"));
+        assertTrue(out, out.contains("package:after/after.dart"));
+        assertFalse(out, out.contains("fake"));
+    }
 }

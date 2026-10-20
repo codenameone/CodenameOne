@@ -39,6 +39,8 @@ import java.util.ArrayDeque;
 public final class StreamIterator<T> {
 
     private static final Object DONE = new Object();
+    /** Stands in for a null event: ArrayDeque rejects null, and a stream may carry one. */
+    private static final Object NULL = new Object();
 
     private final Stream<T> stream;
     private final ArrayDeque<Object> queue = new ArrayDeque<Object>();
@@ -110,7 +112,7 @@ public final class StreamIterator<T> {
     }
 
     private void push(Object event) {
-        queue.addLast(event);
+        queue.addLast(event == null ? NULL : event);
         Completer<Boolean> c = waiting;
         if (c != null && deliver(c)) {
             waiting = null;
@@ -139,7 +141,7 @@ public final class StreamIterator<T> {
             }
             return true;
         }
-        current = (T) e;
+        current = e == NULL ? null : (T) e;
         c.complete(Boolean.TRUE);
         return true;
     }

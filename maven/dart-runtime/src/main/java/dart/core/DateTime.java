@@ -100,10 +100,8 @@ public final class DateTime {
         if (frac != null) {
             String six = (frac + "000000").substring(0, 6);
             long all = Long.parseLong(six);
-            // Dart rounds a seventh digit and beyond into the microseconds.
-            if (frac.length() > 6 && frac.charAt(6) >= '5') {
-                all++;
-            }
+            // Digits past the sixth are dropped, not rounded, as the Dart VM does:
+            // .9999999 stays in the same second.
             milli = all / 1000;
             micro = all % 1000;
         }

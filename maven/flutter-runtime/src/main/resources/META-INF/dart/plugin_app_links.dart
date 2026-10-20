@@ -7,6 +7,7 @@ class AppLinks {
   external Future<Uri?> getInitialLink();
   external Future<String?> getInitialLinkString();
   external Future<Uri?> getLatestLink();
+  external Future<String?> getLatestLinkString();
   external Stream<String> get stringLinkStream;
   external Stream<Uri> get uriLinkStream;
 }

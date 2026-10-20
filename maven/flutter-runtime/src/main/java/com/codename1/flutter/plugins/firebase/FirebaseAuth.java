@@ -90,15 +90,25 @@ public class FirebaseAuth {
     /** A stream that starts with the current user, as firebase_auth's does. */
     private Stream<User> changes() {
         final StreamController<User> c = new StreamController<User>();
+        // Registered only while listened to: a stream every rebuild asks for and then
+        // cancels must not stay on the singleton for the life of the process.
         c.onListen(new Funcs.VoidFunc0() {
             @Override
             public void call() {
+                synchronized (listeners) {
+                    listeners.add(c);
+                }
                 c.add(currentUser());
             }
         });
-        synchronized (listeners) {
-            listeners.add(c);
-        }
+        c.onCancel(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                synchronized (listeners) {
+                    listeners.remove(c);
+                }
+            }
+        });
         return c.stream();
     }
 

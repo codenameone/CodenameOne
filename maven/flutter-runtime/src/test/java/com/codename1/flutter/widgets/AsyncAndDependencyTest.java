@@ -65,9 +65,9 @@ class AsyncAndDependencyTest {
     private static FutureBuilder<Object> futureBuilder(Object future, final AsyncSnapshot[] seen) {
         FutureBuilder<Object> fb = new FutureBuilder<Object>();
         fb.future(future);
-        fb.builder(new Funcs.Func2<BuildContext, AsyncSnapshot, Widget>() {
+        fb.builder(new Funcs.Func2<BuildContext, AsyncSnapshot<Object>, Widget>() {
             @Override
-            public Widget call(BuildContext context, AsyncSnapshot snapshot) {
+            public Widget call(BuildContext context, AsyncSnapshot<Object> snapshot) {
                 seen[0] = snapshot;
                 return new ProbeBox(1, 1);
             }

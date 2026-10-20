@@ -413,6 +413,9 @@ public class Dio {
                             token.cancelError(), null));
                 }
             });
+            if (token.isCancelled()) {
+                return;
+            }
         }
         NetworkManager.getInstance().addToQueue(req);
     }
