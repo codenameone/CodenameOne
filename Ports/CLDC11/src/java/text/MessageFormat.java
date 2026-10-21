@@ -602,16 +602,16 @@ public class MessageFormat extends Format {
 
     /// A copy of this format, built by applying its pattern again:
     /// `Object.clone()` answers `null` on the device for anything but an
-    /// array. A format installed with `setFormat` that the pattern cannot
-    /// spell is carried over as the same object, since it cannot be copied
-    /// the same way.
+    /// array. Each subformat is then replaced by a clone of the source's own,
+    /// so state the pattern cannot spell (custom symbols, parse settings)
+    /// carries over; a format of a class with no `clone` of its own is
+    /// shared as the same object.
     @Override
     public Object clone() {
         MessageFormat copy = new MessageFormat(toPattern(), locale);
         for (int i = 0; i < formats.length && i < copy.formats.length; i++) {
-            Format custom = unspelled(formats[i]);
-            if (custom != null) {
-                copy.formats[i] = custom;
+            if (formats[i] != null) {
+                copy.formats[i] = copyOf(formats[i]);
             }
         }
         return copy;
@@ -620,6 +620,22 @@ public class MessageFormat extends Format {
     /// `f` when `toPattern()` cannot spell it, otherwise null.
     private Format unspelled(Format f) {
         return f != null && describeFormat(f).length() == 0 ? f : null;
+    }
+
+    private static Format copyOf(Format f) {
+        Object c = null;
+        if (f instanceof DecimalFormat) {
+            c = ((DecimalFormat) f).clone();
+        } else if (f instanceof SimpleDateFormat) {
+            c = ((SimpleDateFormat) f).clone();
+        } else if (f instanceof DateFormat) {
+            c = ((DateFormat) f).clone();
+        } else if (f instanceof ChoiceFormat) {
+            c = ((ChoiceFormat) f).clone();
+        } else if (f instanceof MessageFormat) {
+            c = ((MessageFormat) f).clone();
+        }
+        return c instanceof Format ? (Format) c : f;
     }
 
     @Override

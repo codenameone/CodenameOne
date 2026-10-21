@@ -399,6 +399,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     // ------------------------------------------------------------------
 
     /// The executor the `...Async` methods use when given none.
+    // Every instance async method without an explicit executor goes through
+    // this, so a subclass overriding it routes its continuations; the
+    // static factories keep the shared pool.
     public Executor defaultExecutor() {
         return pool();
     }
@@ -480,7 +483,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     public CompletableFuture<T> completeAsync(Supplier<? extends T> supplier) {
-        return completeAsync(supplier, pool());
+        return completeAsync(supplier, defaultExecutor());
     }
 
     public CompletableFuture<T> completeAsync(final Supplier<? extends T> supplier, Executor executor) {
@@ -704,7 +707,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public <U> CompletableFuture<U> thenApplyAsync(Function<? super T, ? extends U> fn) {
-        return apply(pool(), fn);
+        return apply(defaultExecutor(), fn);
     }
 
     @Override
@@ -732,7 +735,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public CompletableFuture<Void> thenAcceptAsync(Consumer<? super T> action) {
-        return accept(pool(), action);
+        return accept(defaultExecutor(), action);
     }
 
     @Override
@@ -760,7 +763,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public CompletableFuture<Void> thenRunAsync(Runnable action) {
-        return run(pool(), action);
+        return run(defaultExecutor(), action);
     }
 
     @Override
@@ -799,7 +802,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public <U> CompletableFuture<U> thenComposeAsync(Function<? super T, ? extends CompletionStage<U>> fn) {
-        return compose(pool(), fn);
+        return compose(defaultExecutor(), fn);
     }
 
     @Override
@@ -832,7 +835,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public <U> CompletableFuture<U> handleAsync(BiFunction<? super T, Throwable, ? extends U> fn) {
-        return handled(pool(), fn);
+        return handled(defaultExecutor(), fn);
     }
 
     @Override
@@ -878,7 +881,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public CompletableFuture<T> whenCompleteAsync(BiConsumer<? super T, ? super Throwable> action) {
-        return completed(pool(), action);
+        return completed(defaultExecutor(), action);
     }
 
     @Override
@@ -909,7 +912,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     public CompletableFuture<T> exceptionallyAsync(Function<Throwable, ? extends T> fn) {
-        return recovered(pool(), fn);
+        return recovered(defaultExecutor(), fn);
     }
 
     public CompletableFuture<T> exceptionallyAsync(Function<Throwable, ? extends T> fn, Executor executor) {
@@ -1005,7 +1008,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     @Override
     public <U, V> CompletableFuture<V> thenCombineAsync(CompletionStage<? extends U> other,
             BiFunction<? super T, ? super U, ? extends V> fn) {
-        return both(pool(), other, fn);
+        return both(defaultExecutor(), other, fn);
     }
 
     @Override
@@ -1037,7 +1040,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     @Override
     public <U> CompletableFuture<Void> thenAcceptBothAsync(CompletionStage<? extends U> other,
             BiConsumer<? super T, ? super U> action) {
-        return acceptBoth(pool(), other, action);
+        return acceptBoth(defaultExecutor(), other, action);
     }
 
     @Override
@@ -1066,7 +1069,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public CompletableFuture<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action) {
-        return runBoth(pool(), other, action);
+        return runBoth(defaultExecutor(), other, action);
     }
 
     @Override
@@ -1137,7 +1140,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     @Override
     public <U> CompletableFuture<U> applyToEitherAsync(CompletionStage<? extends T> other,
             Function<? super T, U> fn) {
-        return either(pool(), other, fn);
+        return either(defaultExecutor(), other, fn);
     }
 
     @Override
@@ -1168,7 +1171,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     @Override
     public CompletableFuture<Void> acceptEitherAsync(CompletionStage<? extends T> other,
             Consumer<? super T> action) {
-        return acceptFirst(pool(), other, action);
+        return acceptFirst(defaultExecutor(), other, action);
     }
 
     @Override
@@ -1205,7 +1208,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     @Override
     public CompletableFuture<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action) {
-        return runFirst(pool(), other, action);
+        return runFirst(defaultExecutor(), other, action);
     }
 
     @Override

@@ -632,6 +632,26 @@ public final class LangMembersChecks {
             java.util.List<String> cow = new java.util.concurrent.CopyOnWriteArrayList<String>(java.util.Arrays.asList("a", "b"));
             try { cow.subList(1, 0); Bulk.p("reversed", "ok"); } catch (IllegalArgumentException e) { Bulk.p("reversed", "iae"); } catch (IndexOutOfBoundsException e) { Bulk.p("reversed", "ioobe"); }
         });
+        Bulk.check("Lang.anOffsetOnlyPatternParsesToAnOffset", () -> {
+            Bulk.p("offset", java.time.format.DateTimeFormatter.ofPattern("XXX").parse("+01:00", java.time.ZoneOffset::from));
+            java.text.MessageFormat mf = new java.text.MessageFormat("{0}");
+            java.text.DecimalFormat df = new java.text.DecimalFormat("0.##");
+            df.setParseIntegerOnly(true);
+            mf.setFormat(0, df);
+            java.text.MessageFormat copy = (java.text.MessageFormat) mf.clone();
+            Bulk.p("integerOnly", ((java.text.DecimalFormat) copy.getFormats()[0]).isParseIntegerOnly());
+            Bulk.p("distinct", copy.getFormats()[0] != df);
+            final java.util.List<String> ran = new java.util.ArrayList<String>();
+            java.util.concurrent.CompletableFuture<String> cf = new java.util.concurrent.CompletableFuture<String>() {
+                @Override
+                public java.util.concurrent.Executor defaultExecutor() {
+                    return r -> { ran.add("custom"); r.run(); };
+                }
+            };
+            cf.complete("x");
+            Bulk.p("applied", cf.thenApplyAsync(s -> s + "y").join());
+            Bulk.p("routed", ran.size() > 0);
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

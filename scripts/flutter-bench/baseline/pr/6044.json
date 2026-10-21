@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "java.* additions (suppressed-exception printing in Throwable, unmodifiable-collection mutator overrides) add ~4 KB of executable code",
+     "reason": "java.* additions (Map.of views, unmodifiable mutator overrides) add ~12 KB to the zipped download",
      "runs": 1,
-     "value": 84684096
+     "value": 84696069
     }
    }
   }

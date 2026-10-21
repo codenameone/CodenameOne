@@ -1330,6 +1330,11 @@ public final class DateTimeFormatter {
             if (time != null) {
                 return time;
             }
+            if (offset != null) {
+                // An offset-only pattern ("XXX"): ZoneOffset.from and the
+                // offset query recognize the offset itself.
+                return offset;
+            }
             return this;
         }
 
