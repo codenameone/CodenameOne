@@ -68,6 +68,11 @@ public class Directory extends FileSystemEntity {
     public void createSync(Boolean recursive) {
         Fs fs = Fs.get();
         if (fs.exists(path)) {
+            if (!fs.isDirectory(path)) {
+                // Dart fails when another entity occupies the path; answering a
+                // Directory that was never created only moves the failure.
+                throw new FileSystemException("Creation failed", path);
+            }
             return;
         }
         if (recursive != null && recursive.booleanValue()) {
@@ -139,6 +144,11 @@ public class Directory extends FileSystemEntity {
         if (to.startsWith(from + "/")) {
             // The emulated copy would create the target inside the tree it is
             // enumerating and recurse into it forever; the OS rejects this move too.
+            throw new FileSystemException("Rename failed", path);
+        }
+        if (fs.exists(newPath) && (!fs.isDirectory(newPath) || !new Directory(newPath).listSync().isEmpty())) {
+            // Dart fails onto a non-empty directory (or a file) on every platform; the
+            // emulated move below would merge into it and overwrite same-named files.
             throw new FileSystemException("Rename failed", path);
         }
         fs.mkdirs(newPath);

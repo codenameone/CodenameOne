@@ -52,11 +52,15 @@ public class AppLinks {
             return;
         }
         String arg = Display.getInstance().getProperty("AppArg", null);
+        // Only the first start can carry the launch link: a cold start without one
+        // settles the slot, so a later resume link is never replayed as initial.
+        boolean first = !initialRead;
+        initialRead = true;
         if (arg == null || arg.length() == 0) {
             return;
         }
         Display.getInstance().setProperty("AppArg", null);
-        if (!initialRead && initial == null) {
+        if (first) {
             initial = arg;
         }
         latest = arg;
@@ -66,7 +70,6 @@ public class AppLinks {
     private static String initialLink() {
         if (!initialRead) {
             appStarted();
-            initialRead = true;
         }
         return initial;
     }

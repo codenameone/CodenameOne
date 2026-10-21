@@ -167,6 +167,12 @@ public class Stream<T> {
      * event channel overrides this to call the platform
      * {@code StreamHandler.onListen}.
      */
+    /// The stream a new listener actually subscribes to: this one, except for a
+    /// stream that replays from scratch for every listener (Stream.fromIterable).
+    Stream<T> perListener() {
+        return this;
+    }
+
     protected void onFirstListener() {
     }
 
@@ -213,6 +219,10 @@ public class Stream<T> {
      */
     public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
             Boolean cancelOnError) {
+        Stream<T> target = perListener();
+        if (target != this) {
+            return target.listen(onData, onError, onDone, cancelOnError);
+        }
         Sub sub = new Sub();
         sub.onData = onData;
         sub.onError = onError;
@@ -682,16 +692,23 @@ public class Stream<T> {
 
     /** Dart's {@code Stream.fromIterable}: each element in turn, then done. */
     public static <T> Stream<T> fromIterable(final Iterable<? extends T> elements) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+        // Dart lets this stream be listened to more than once, each listener getting
+        // its own iteration; one async* run would hand a second listener only done.
+        return new Stream<T>() {
             @Override
-            public void call(AsyncStar.Sink<T> s) {
-                if (elements != null) {
-                    for (T e : elements) {
-                        s.yield$(e);
+            Stream<T> perListener() {
+                return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+                    @Override
+                    public void call(AsyncStar.Sink<T> s) {
+                        if (elements != null) {
+                            for (T e : elements) {
+                                s.yield$(e);
+                            }
+                        }
                     }
-                }
+                });
             }
-        });
+        };
     }
 
     /** Dart's {@code Stream.value}. */
@@ -816,11 +833,22 @@ public class Stream<T> {
             @Override
             public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
                 while (it.next()) {
-                    Iterable<? extends R> items = convert.call(it.current());
-                    if (items != null) {
-                        for (R r : items) {
-                            s.yield$(r);
+                    // A failure converting or iterating one element is one error event
+                    // and the stream goes on, as Dart's expand does.
+                    List<R> out = new ArrayList<R>();
+                    try {
+                        Iterable<? extends R> items = convert.call(it.current());
+                        if (items != null) {
+                            for (R r : items) {
+                                out.add(r);
+                            }
                         }
+                    } catch (Throwable t) {
+                        s.addError(t);
+                        continue;
+                    }
+                    for (R r : out) {
+                        s.yield$(r);
                     }
                 }
             }

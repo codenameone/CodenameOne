@@ -61,6 +61,22 @@ public class Dio {
 
     private boolean closed;
 
+    /// A header value as it goes on the wire: Dio accepts a list for a header with
+    /// several values, which joins with ", " per HTTP, never Java's "[a, b]".
+    static String headerText(Object v) {
+        if (!(v instanceof Iterable)) {
+            return String.valueOf(v);
+        }
+        StringBuilder b = new StringBuilder();
+        for (Object o : (Iterable<?>) v) {
+            if (b.length() > 0) {
+                b.append(", ");
+            }
+            b.append(o);
+        }
+        return b.toString();
+    }
+
     public Dio(BaseOptions options) {
         this.options = options == null ? new BaseOptions() : options;
     }
@@ -421,7 +437,7 @@ public class Dio {
         }
         for (Map.Entry<String, Object> e : ro.headers().entrySet()) {
             if (e.getValue() != null && !"content-type".equals(Headers.fold(e.getKey()))) {
-                req.addRequestHeader(e.getKey(), String.valueOf(e.getValue()));
+                req.addRequestHeader(e.getKey(), headerText(e.getValue()));
             }
         }
         if (contentType[0] != null && payload != null) {

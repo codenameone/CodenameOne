@@ -167,6 +167,10 @@ public class HttpClientRequest {
         }
     }
 
+    boolean finished() {
+        return done != null && done.isCompleted();
+    }
+
     public Future<HttpClientResponse> done() {
         return done == null ? close() : done.future();
     }

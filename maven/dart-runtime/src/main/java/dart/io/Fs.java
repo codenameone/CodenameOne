@@ -224,7 +224,9 @@ abstract class Fs {
         }
 
         private static String key(String path) {
-            return trimSlash(Storage.plain(path));
+            // Relative paths resolve against Directory.current, as the device-backed
+            // Storage does, so File('a.txt') and its absolute() are one entry.
+            return trimSlash(Storage.plain(FileSystemEntity.absolutePath(path)));
         }
 
         @Override

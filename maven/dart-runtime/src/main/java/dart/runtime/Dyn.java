@@ -285,6 +285,19 @@ public final class Dyn {
             }
         } else if (name.equals("call") && isFunction(o)) {
             return invoke(o, args);
+        } else if (named != null && !named.isEmpty()
+                && (o instanceof Map || o instanceof Iterable || o instanceof String || o instanceof Number)) {
+            // Named arguments arrive apart from the positional ones; the built-ins that
+            // take any are handled here, and any other name is a mismatched call.
+            if (o instanceof Iterable && named.size() == 1 && args.length == 0 && name.equals("toList")
+                    && named.containsKey("growable")) {
+                return DartList.from((Iterable<Object>) o, !Boolean.FALSE.equals(named.get("growable")));
+            }
+            if (o instanceof Iterable && named.size() == 1 && args.length == 1 && named.containsKey("orElse")
+                    && name.equals("firstWhere")) {
+                return call(o, name, new Object[] {args[0], named.get("orElse")}, null);
+            }
+            throw noSuch(o, name + "()");
         } else if (args.length > builtinMaxArgs(name)
                 && (o instanceof Map || o instanceof Iterable || o instanceof String || o instanceof Number)) {
             // Dart rejects a mismatched invocation before running anything: m.clear(42)

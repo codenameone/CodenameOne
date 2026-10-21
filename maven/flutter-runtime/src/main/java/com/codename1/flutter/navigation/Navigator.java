@@ -974,7 +974,9 @@ public class Navigator extends StatelessWidget {
                 // one onPopInvoked per request: didPop false for any refusal, a
                 // WillPopScope's included, as Flutter reports it
                 PopGuards.notifyPopScopes(scopes, pop, result);
-                done.complete(Boolean.valueOf(pop));
+                // true either way: a route that declines to pop has handled the request
+                // (Flutter's doNotPop); false is reserved for "nothing here, bubble up".
+                done.complete(Boolean.TRUE);
             }
         }, null);
         return done.future();

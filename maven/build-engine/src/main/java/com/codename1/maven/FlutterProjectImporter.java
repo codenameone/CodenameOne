@@ -426,12 +426,6 @@ public final class FlutterProjectImporter {
     static final Set<String> SUPPORTED_DART_LIBRARIES = new HashSet<String>(java.util.Arrays.asList(
             "core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
 
-    /// `dart:` libraries with no Codename One counterpart: a package that imports
-    /// one cannot be transpiled.
-    static final Set<String> UNSUPPORTED_DART_LIBRARIES = new HashSet<String>(java.util.Arrays.asList(
-            "ffi", "html", "js", "js_util", "js_interop", "js_interop_unsafe", "mirrors", "indexed_db",
-            "web_audio", "web_gl", "svg", "isolate"));
-
     private static final Pattern DIRECTIVE = Pattern.compile(
             "(?m)^\\s*(import|export|part)\\s+(?!of\\b)(['\"])([^'\"]+)\\2([^;]*);");
     private static final Pattern CONDITIONAL = Pattern.compile(
@@ -495,7 +489,10 @@ public final class FlutterProjectImporter {
                 String uri = selectUri(m.group(3), m.group(4));
                 if (uri.startsWith("dart:")) {
                     String lib = uri.substring(5);
-                    if (pkg != null && UNSUPPORTED_DART_LIBRARIES.contains(lib)
+                    // Anything the transpiler does not implement is unsupported, not only
+                    // the libraries listed as such: dart:developer copied through would
+                    // only fail later, in the transpiler, instead of in this report.
+                    if (pkg != null && !SUPPORTED_DART_LIBRARIES.contains(lib)
                             && !r.unsupportedPackages.containsKey(pkg)) {
                         r.unsupportedPackages.put(pkg, "needs dart:" + lib + ", which has no Codename One "
                                 + "counterpart (" + rel + ")");
@@ -771,6 +768,10 @@ public final class FlutterProjectImporter {
                 File res = new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE);
                 res.getParentFile().mkdirs();
                 Files.write(res.toPath(), buildNumber.getBytes(Charset.forName("UTF-8")));
+            } else {
+                // A reimport after the pubspec dropped its +build part: the resource an
+                // earlier import wrote would keep reporting the old build number.
+                Files.deleteIfExists(new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE).toPath());
             }
         }
         if (pubspec.name != null) {
@@ -897,6 +898,7 @@ public final class FlutterProjectImporter {
                     .append("    @Override\n")
                     .append("    public void pushRegistrationError(String error, int errorCode) {\n")
                     .append("        com.codename1.io.Log.p(\"Push registration failed: \" + error);\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.registrationFailed(error);\n")
                     .append("    }\n");
         }
         return b.append("}\n").toString();

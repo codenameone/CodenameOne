@@ -54,6 +54,8 @@ public class CachedNetworkImage extends StatelessWidget {
         this.width = v;
     }
 
+    private java.util.Map<?, ?> httpHeaders;
+
     public void height(Double v) {
         this.height = v;
     }
@@ -70,8 +72,10 @@ public class CachedNetworkImage extends StatelessWidget {
     public void errorWidget(Funcs.Func3<BuildContext, String, Object, Widget> v) {
     }
 
-    /** Accepted for source compatibility. */
+    /// Sent with the image request, so an endpoint behind Authorization or a cookie
+    /// serves the image instead of refusing a bare request.
     public void httpHeaders(Object v) {
+        this.httpHeaders = v instanceof java.util.Map ? (java.util.Map<?, ?>) v : null;
     }
 
     /** Accepted for source compatibility. */
@@ -92,6 +96,6 @@ public class CachedNetworkImage extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        return Image.network(imageUrl == null ? "" : imageUrl, null, width, height, fit);
+        return Image.networkWithHeaders(imageUrl == null ? "" : imageUrl, null, width, height, fit, httpHeaders);
     }
 }

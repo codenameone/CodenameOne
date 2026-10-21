@@ -100,7 +100,34 @@ public class FirebaseMessaging {
 
     /** Called when the push key is registered. */
     public static void tokenRegistered(String token) {
+        settlePending(token, null);
         TOKENS.add(token);
+    }
+
+    /** Called when push registration fails: a getToken waiting on it fails too. */
+    public static void registrationFailed(String error) {
+        settlePending(null, error);
+    }
+
+    /// getToken calls waiting for the registration they started.
+    private static final java.util.List<dart.async.Completer<String>> PENDING =
+            new java.util.ArrayList<dart.async.Completer<String>>();
+
+    private static void settlePending(String token, String error) {
+        dart.async.Completer<String>[] waiting;
+        synchronized (PENDING) {
+            @SuppressWarnings("unchecked")
+            dart.async.Completer<String>[] w = PENDING.toArray(new dart.async.Completer[PENDING.size()]);
+            waiting = w;
+            PENDING.clear();
+        }
+        for (dart.async.Completer<String> c : waiting) {
+            if (error != null) {
+                c.completeError(new dart.core.StateError("Push registration failed: " + error));
+            } else {
+                c.complete(token);
+            }
+        }
     }
 
     public static void onBackgroundMessage(Funcs.Func1<RemoteMessage, ?> handler) {
@@ -121,7 +148,22 @@ public class FirebaseMessaging {
 
     public Future<String> getToken(String vapidKey) {
         Funcs.Func0<String> src = tokenSource;
-        return Future.value(Display.isInitialized() && src != null ? src.call() : null);
+        if (!Display.isInitialized() || src == null) {
+            return Future.value(null);
+        }
+        String known = src.call();
+        if (known != null) {
+            return Future.value(known);
+        }
+        // A fresh install has no key until registration runs, and on platforms with no
+        // permission prompt nothing else starts it: getToken is what obtains the token
+        // in Firebase, so it registers and completes when registeredForPush answers.
+        dart.async.Completer<String> c = new dart.async.Completer<String>();
+        synchronized (PENDING) {
+            PENDING.add(c);
+        }
+        Display.getInstance().registerPush();
+        return c.future();
     }
 
     public Future<String> getAPNSToken() {

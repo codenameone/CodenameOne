@@ -66,7 +66,7 @@ class PopScopeTest {
     void canPopFalseVetoesMaybePopAndReportsTheAttempt() {
         List<String> heard = new ArrayList<String>();
         pushMounted(scope(false, heard));
-        assertEquals(Boolean.FALSE, Navigator.maybePop(null, "x").getNow());
+        assertEquals(Boolean.TRUE, Navigator.maybePop(null, "x").getNow(), "a veto is a handled request");
         assertEquals(1, Navigator.stackSize());
         assertEquals("[false:x]", heard.toString());
 

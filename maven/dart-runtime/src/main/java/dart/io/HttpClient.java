@@ -40,6 +40,8 @@ public class HttpClient {
     private String userAgent = "Dart/3.0 (dart:io)";
     private boolean autoUncompress = true;
     private boolean closed;
+    /// Requests opened and not yet settled, so close(force: true) can abort them.
+    private final java.util.List<HttpClientRequest> open = new java.util.ArrayList<HttpClientRequest>();
     private Object badCertificateCallback;
 
     public HttpClient() {
@@ -101,6 +103,12 @@ public class HttpClient {
             return Future.error(new StateErrorClosed());
         }
         HttpClientRequest r = new HttpClientRequest(this, method, url);
+        for (int i = open.size() - 1; i >= 0; i--) {
+            if (open.get(i).finished()) {
+                open.remove(i);
+            }
+        }
+        open.add(r);
         if (userAgent != null) {
             r.headers().set(HttpHeaders.userAgentHeader, userAgent);
         }
@@ -152,6 +160,15 @@ public class HttpClient {
 
     public void close(Boolean force) {
         closed = true;
+        if (force != null && force.booleanValue()) {
+            // Dart terminates active connections on a forced close and fails their
+            // futures; otherwise a queued request could still reach the server.
+            HttpClientRequest[] active = open.toArray(new HttpClientRequest[open.size()]);
+            open.clear();
+            for (HttpClientRequest r : active) {
+                r.abort(new HttpException("HttpClient was forcefully closed", r.uri()), null);
+            }
+        }
     }
 
     /** Dart's StateError for a request on a closed client. */

@@ -57,25 +57,77 @@ public class Emitter<S> {
         done = true;
     }
 
-    /// `await emit.forEach(stream, onData: (d) => state)`: emits what onData maps
-    /// each event to, until the stream ends.
+    /// `await emit.forEach(stream, onData: (d) => state, onError: (e, st) => state)`:
+    /// emits what onData maps each event to, until the stream ends. A source error
+    /// goes to onError, whose state is emitted, as Bloc does; with no onError the
+    /// error fails the handler.
     public <T> Future<Object> forEach(Stream<T> stream, final Object onData, final Object onError) {
-        return stream.forEach(new Funcs.VoidFunc1<T>() {
-            @Override
-            @SuppressWarnings("unchecked")
-            public void call(T value) {
-                Emitter.this.call((S) Dyn.invoke(onData, value));
-            }
-        });
+        return drive(stream, onData, onError, true);
     }
 
-    /// `await emit.onEach(stream, onData: (d) { ... })`.
+    /// `await emit.onEach(stream, onData: (d) { ... }, onError: (e, st) { ... })`.
     public <T> Future<Object> onEach(Stream<T> stream, final Object onData, final Object onError) {
-        return stream.forEach(new Funcs.VoidFunc1<T>() {
+        return drive(stream, onData, onError, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Future<Object> drive(Stream<T> stream, final Object onData, final Object onError,
+            final boolean emitResults) {
+        final dart.async.Completer<Object> result = new dart.async.Completer<Object>();
+        final dart.async.StreamSubscription<?>[] sub = new dart.async.StreamSubscription<?>[1];
+        sub[0] = stream.listen(new Funcs.VoidFunc1<T>() {
             @Override
             public void call(T value) {
-                Dyn.invoke(onData, value);
+                try {
+                    Object v = Dyn.invoke(onData, value);
+                    if (emitResults) {
+                        Emitter.this.call((S) v);
+                    }
+                } catch (RuntimeException t) {
+                    fail(sub[0], result, t);
+                }
             }
-        });
+        }, new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object err) {
+                if (onError == null) {
+                    fail(sub[0], result, err);
+                    return;
+                }
+                try {
+                    Object e = err instanceof Throwable ? dart.runtime.DartRuntime.caught((Throwable) err) : err;
+                    Object v = invokeOnError(onError, e);
+                    if (emitResults) {
+                        Emitter.this.call((S) v);
+                    }
+                } catch (RuntimeException t) {
+                    fail(sub[0], result, t);
+                }
+            }
+        }, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (!result.isCompleted()) {
+                    result.complete(null);
+                }
+            }
+        }, Boolean.FALSE);
+        return result.future();
+    }
+
+    private void fail(dart.async.StreamSubscription<?> sub, dart.async.Completer<Object> result, Object err) {
+        if (sub != null) {
+            sub.cancel();
+        }
+        if (!result.isCompleted()) {
+            result.completeError(err);
+        }
+    }
+
+    private static Object invokeOnError(Object handler, Object err) {
+        if (handler instanceof Funcs.Func2 || handler instanceof Funcs.VoidFunc2) {
+            return Dyn.invoke(handler, err, null);
+        }
+        return Dyn.invoke(handler, err);
     }
 }
