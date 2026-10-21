@@ -10,12 +10,12 @@
       },
       "value": 13338532
      },
-     "reason": "java.* additions, re-measured after master's baseline fold and the Unity merge",
+     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
      "runs": 1,
      "tolerance": {
       "value": 0.005
      },
-     "value": 13358630
+     "value": 13449368
     },
     "install_bytes": {
      "from": {
@@ -39,25 +39,25 @@
      "from": {
       "value": 14523602
      },
-     "reason": "java.* additions, re-measured after master's baseline fold and the Unity merge",
+     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
      "runs": 1,
-     "value": 14583698
+     "value": 14705154
     },
     "install_bytes": {
      "from": {
       "value": 116342496
      },
-     "reason": "java.* additions, re-measured after master's baseline fold and the Unity merge",
+     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
      "runs": 1,
-     "value": 116513952
+     "value": 116679264
     },
     "wire_bytes": {
      "from": {
       "value": 84685068
      },
-     "reason": "java.* additions, re-measured after master's baseline fold and the Unity merge",
+     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
      "runs": 1,
-     "value": 84699311
+     "value": 84763550
     }
    }
   }

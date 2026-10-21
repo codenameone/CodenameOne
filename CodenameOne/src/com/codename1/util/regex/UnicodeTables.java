@@ -523,10 +523,10 @@ final class UnicodeTables {
             }
         }
         String[] aliases = split(SCRIPT_ALIASES, ' ');
-        for (int k = 0; k < aliases.length; k++) {
-            int eq = aliases[k].indexOf('=');
-            if (aliases[k].substring(0, eq).equals(upper)) {
-                return Integer.parseInt(aliases[k].substring(eq + 1));
+        for (String alias : aliases) {
+            int eq = alias.indexOf('=');
+            if (alias.substring(0, eq).equals(upper)) {
+                return Integer.parseInt(alias.substring(eq + 1));
             }
         }
         return -1;
@@ -544,9 +544,9 @@ final class UnicodeTables {
         for (int k = 0; k < blockNames.length; k++) {
             start += blockRanges[2 * k];
             String[] keys = split(blockNames[k], '|');
-            for (int j = 0; j < keys.length; j++) {
+            for (String key : keys) {
                 // Each name is also accepted with its spaces left out.
-                if (keys[j].equals(upper) || withoutSpaces(keys[j]).equals(upper)) {
+                if (key.equals(upper) || withoutSpaces(key).equals(upper)) {
                     return new int[] {start, start + blockRanges[2 * k + 1]};
                 }
             }

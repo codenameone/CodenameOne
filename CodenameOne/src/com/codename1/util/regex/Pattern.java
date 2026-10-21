@@ -746,8 +746,11 @@ public final class Pattern {
             int j = i;
             if (mode == Parser.RELUCTANT) {
                 while (n < min) {
-                    int c;
-                    if (j >= to || !atom.is(c = codePointAt(text, j, to))) {
+                    if (j >= to) {
+                        return false;
+                    }
+                    int c = codePointAt(text, j, to);
+                    if (!atom.is(c)) {
                         return false;
                     }
                     j += c > 0xffff ? 2 : 1;
@@ -757,8 +760,11 @@ public final class Pattern {
                     if (next.match(m, j)) {
                         return true;
                     }
-                    int c;
-                    if (n >= max || j >= to || !atom.is(c = codePointAt(text, j, to))) {
+                    if (n >= max || j >= to) {
+                        return false;
+                    }
+                    int c = codePointAt(text, j, to);
+                    if (!atom.is(c)) {
                         return false;
                     }
                     j += c > 0xffff ? 2 : 1;
