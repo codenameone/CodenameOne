@@ -86,6 +86,10 @@ public final class Messenger implements LiveChannel.Handler {
     static final String KIND_RECEIPT = "RECEIPT";
     static final String KIND_TYPING = "TYPING";
 
+    /// The body of a typing envelope, which carries nothing: one zero byte,
+    /// since the server takes no empty ciphertext.
+    private static final String TYPING_BODY = "AA==";
+
     /// Who is typing where: conversation -> username -> until when.
     public interface TypingListener {
         void typing(String conversationId);
@@ -604,6 +608,15 @@ public final class Messenger implements LiveChannel.Handler {
         byte[] plaintext = Codec.utf8(Codec.json(job.payload));
         List<EnvelopeCopyDto> copies = new ArrayList<EnvelopeCopyDto>();
         for (DeviceAddressDto each : targets(job, known)) {
+            if (KIND_TYPING.equals(job.kind)) {
+                // Typing is not sealed. The server drops it for a device that
+                // is offline, and on the ratchet every dropped one would be a
+                // message key the receiver must skip: past the skip limit
+                // the next real message would not open. It says nothing the
+                // server, which relays it to this chat now, does not know.
+                copies.add(new EnvelopeCopyDto(each.username(), each.deviceId(), "", TYPING_BODY));
+                continue;
+            }
             String[] sealed = Sessions.encrypt(each.username(), each.deviceId(), plaintext,
                     job.conversationId);
             copies.add(new EnvelopeCopyDto(each.username(), each.deviceId(), sealed[0], sealed[1]));
@@ -758,6 +771,11 @@ public final class Messenger implements LiveChannel.Handler {
         toAck.clear();
         Api.messages().ack(Identity.deviceId(), new AckDto(ids), Net.to(ok -> {
             savePendingAcks();
+            // The server will not send these again: their plaintext, kept in
+            // case it did, can go.
+            for (String each : ids) {
+                Vault.remove(inbox(each));
+            }
             if (then != null) {
                 then.run();
             }
@@ -812,6 +830,13 @@ public final class Messenger implements LiveChannel.Handler {
         if (body == null) {
             return;
         }
+        if (KIND_TYPING.equals(kind)) {
+            // Typing goes outside the ratchet; see sendTyping.
+            if (!sender.equals(me)) {
+                typing(conversationId, sender);
+            }
+            return;
+        }
         if (header.length() == 0) {
             if (!Store.bridged(conversationId) && !"SYSTEM".equals(kind)) {
                 // In an encrypted chat a user's message always carries a
@@ -824,9 +849,20 @@ public final class Messenger implements LiveChannel.Handler {
             return;
         }
         Map<String, Object> payload;
+        Map<String, Object> journaled = Vault.get(inbox(id));
         try {
-            payload = Codec.parse(Codec.text(Sessions.decrypt(sender, senderDevice, header, body,
-                    conversationId)));
+            if (journaled != null) {
+                // Opened before a crash or a failed write, and its key spent
+                // then: this is the plaintext kept for exactly this retry.
+                payload = Codec.parse(Codec.str(journaled.get("p")));
+            } else {
+                payload = Codec.parse(Codec.text(Sessions.decrypt(sender, senderDevice, header, body,
+                        conversationId, plain -> {
+                            Map<String, Object> entry = new HashMap<String, Object>();
+                            entry.put("p", Codec.text(plain));
+                            Vault.put(inbox(id), entry);
+                        })));
+            }
         } catch (CryptoException | IllegalArgumentException undecryptable) {
             Log.p("Could not decrypt a message from " + sender + ": " + undecryptable.getMessage());
             if (KIND_MESSAGE.equals(kind)) {
@@ -844,7 +880,25 @@ public final class Messenger implements LiveChannel.Handler {
             return;
         }
         topUpPreKeysLater();
+        String type = Codec.str(payload.get("t"));
+        boolean fits = KIND_MESSAGE.equals(kind)
+                ? MSG.equals(type) || REACT.equals(type) || EDIT.equals(type) || DELETE.equals(type)
+                : KIND_RECEIPT.equals(kind) && RECEIPT.equals(type);
+        if (!fits) {
+            // The server enforces its rules -- who may post in an admins-only
+            // group, what is pushed and logged -- by the envelope's kind, the
+            // one thing it can read. A message sealed inside a receipt would
+            // step around them, so a payload must be what its kind says.
+            Log.p("Dropped a " + type + " sent as " + kind + " by " + sender);
+            return;
+        }
         apply(conversationId, sender, payload, sentAt, expiresAt);
+    }
+
+    /// The vault document that holds a received message's plaintext from the
+    /// moment it opens until the server has its acknowledgement.
+    private static String inbox(String envelopeId) {
+        return "in." + envelopeId;
     }
 
     private void plain(String id, String conversationId, String sender, String kind, String text,
@@ -932,18 +986,20 @@ public final class Messenger implements LiveChannel.Handler {
                     Store.save(conversationId);
                 }
             }
-        } else if (TYPING.equals(type) && !sender.equals(me)) {
-            Map<String, Long> who = typing.get(conversationId);
-            if (who == null) {
-                who = new HashMap<String, Long>();
-                typing.put(conversationId, who);
-            }
-            who.put(sender, Long.valueOf(System.currentTimeMillis() + 6000));
-            if (typingListener != null) {
-                typingListener.typing(conversationId);
-                final TypingListener told = typingListener;
-                CN.setTimeout(6500, () -> CN.callSerially(() -> told.typing(conversationId)));
-            }
+        }
+    }
+
+    private void typing(String conversationId, String sender) {
+        Map<String, Long> who = typing.get(conversationId);
+        if (who == null) {
+            who = new HashMap<String, Long>();
+            typing.put(conversationId, who);
+        }
+        who.put(sender, Long.valueOf(System.currentTimeMillis() + 6000));
+        if (typingListener != null) {
+            typingListener.typing(conversationId);
+            final TypingListener told = typingListener;
+            CN.setTimeout(6500, () -> CN.callSerially(() -> told.typing(conversationId)));
         }
     }
 

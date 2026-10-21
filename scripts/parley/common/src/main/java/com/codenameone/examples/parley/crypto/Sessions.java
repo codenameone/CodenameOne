@@ -74,6 +74,16 @@ public final class Sessions {
         return out;
     }
 
+    /// Told the plaintext of a message after it opens and before the session
+    /// state that opening moved on is saved. Once that state is saved the
+    /// message key is gone for good, so this is the caller's one chance to
+    /// make the plaintext durable: a crash after the save and before the
+    /// message is stored would otherwise lose it, the server's retry no longer
+    /// opening.
+    public interface Journal {
+        void opened(byte[] plaintext);
+    }
+
     /// Decrypts a message from one device, trying the current session, the
     /// previous one, and a new one when the header starts one.
     ///
@@ -82,7 +92,7 @@ public final class Sessions {
     /// - `CryptoException`: when none of them opens it, or its header names a
     ///   conversation other than `context`
     public static byte[] decrypt(String username, String device, String headerText,
-            byte[] ciphertext, String context) {
+            byte[] ciphertext, String context, Journal journal) {
         Map<String, Object> header = Codec.parse(headerText);
         if (header == null) {
             throw new CryptoException("That message has no header");
@@ -105,6 +115,7 @@ public final class Sessions {
                 try {
                     Ratchet trial = current.copy();
                     byte[] plain = trial.decrypt(header, headerText, ciphertext);
+                    journal.opened(plain);
                     keep(username, device, trial, null);
                     return plain;
                 } catch (CryptoException failed) {
@@ -115,6 +126,7 @@ public final class Sessions {
                 try {
                     Ratchet trial = previous.copy();
                     byte[] plain = trial.decrypt(header, headerText, ciphertext);
+                    journal.opened(plain);
                     Vault.put(name("p", username, device), trial.toMap());
                     return plain;
                 } catch (CryptoException failed) {
@@ -125,6 +137,7 @@ public final class Sessions {
         if (Ratchet.starts(header)) {
             Ratchet started = Ratchet.respond(header);
             byte[] plain = started.decrypt(header, headerText, ciphertext);
+            journal.opened(plain);
             keep(username, device, started, current);
             // Only now, with the message authenticated and the session it
             // opened saved, is the one-time prekey it named spent. Before
