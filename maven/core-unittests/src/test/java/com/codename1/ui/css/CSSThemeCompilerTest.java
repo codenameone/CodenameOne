@@ -1376,6 +1376,28 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testEscapedCommaStaysInsideTheFamilyName() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Label{font-family:foo\\,monospace, native\\:MainBold;font-size:2mm;}",
+                res, "Theme");
+        assertEquals("native:MainBold", fontName((Font) res.getTheme("Theme").get("Label.font")));
+    }
+
+    @Test
+    void testPercentageFallbackIsRejectedLikeADirectOne() {
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                new CSSThemeCompiler().compile("#Constants { progress: var(--missing, 50%); }",
+                        new MutableResource(), "Theme"));
+    }
+
+    @Test
+    void testFullwidthLetterIsNotAHexEscape() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { message: \"\\\uff21\"; }", res, "Theme");
+        assertEquals("\uff21", res.getTheme("Theme").get("@message"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"

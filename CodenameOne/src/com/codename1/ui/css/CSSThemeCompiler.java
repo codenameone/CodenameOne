@@ -554,7 +554,7 @@ public class CSSThemeCompiler {
                 // An escaped character, `my\ icon`'s space among them, is part of the token, and
                 // so is the one whitespace ending a hex escape (`\41 x` is `Ax`).
                 int j = i + 1;
-                while (j < value.length() && j - i <= 6 && Character.digit(value.charAt(j), 16) >= 0) {
+                while (j < value.length() && j - i <= 6 && hexDigit(value.charAt(j)) >= 0) {
                     j++;
                 }
                 if (j > i + 1 && skipEscapeTerminator(value, j) > j) {
@@ -618,7 +618,14 @@ public class CSSThemeCompiler {
                 }
                 return isCssNumber(first) ? buildConstant(key.substring(1), first, first) : first;
             }
-            return typedAlias(key, value, resolved);
+            String typed = typedAlias(key, value, resolved);
+            if (typed.equals(text) && !isCssNumber(text) && !isColorLiteral(text) && isUriOrDimension(text)) {
+                // `var(--missing, 50%)` is the percentage token itself, which the build-time
+                // emitter leaves out; it is rejected here exactly as `progress: 50%` written
+                // directly is, so the preview never shows a constant the application lacks.
+                buildConstant(key.substring(1), text, text);
+            }
+            return typed;
         } finally {
             declaredOnly = null;
             if (own != null) {
@@ -798,8 +805,8 @@ public class CSSThemeCompiler {
             }
             int digits = 0;
             int code = 0;
-            while (digits < 6 && i + digits < end && Character.digit(v.charAt(i + digits), 16) > -1) {
-                code = code * 16 + Character.digit(v.charAt(i + digits), 16);
+            while (digits < 6 && i + digits < end && hexDigit(v.charAt(i + digits)) > -1) {
+                code = code * 16 + hexDigit(v.charAt(i + digits));
                 digits++;
             }
             if (digits == 0) {
@@ -1365,8 +1372,8 @@ public class CSSThemeCompiler {
                 }
                 int j = i + 1;
                 int code = 0;
-                while (j < n && j - i <= 6 && Character.digit(t.charAt(j), 16) >= 0) {
-                    code = code * 16 + Character.digit(t.charAt(j), 16);
+                while (j < n && j - i <= 6 && hexDigit(t.charAt(j)) >= 0) {
+                    code = code * 16 + hexDigit(t.charAt(j));
                     j++;
                 }
                 if (j == i + 1) {
@@ -2359,11 +2366,42 @@ public class CSSThemeCompiler {
         return out.toArray(new String[out.size()]);
     }
 
+    /// The value of an ASCII hex digit, or -1. CSS escapes take only `0-9a-fA-F`;
+    /// `Character.digit` would also accept fullwidth and other Unicode digits.
+    private static int hexDigit(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
+    /// Splits a family list on its commas, except an escaped one (`foo\,monospace` is one
+    /// identifier) or one inside a quoted name.
     private String[] splitOnComma(String input) {
         ArrayList<String> parts = new ArrayList<String>();
         int start = 0;
+        char quote = 0;
         for (int i = 0; i < input.length(); i++) {
-            if (input.charAt(i) == ',') {
+            char c = input.charAt(i);
+            if (c == '\\') {
+                i++;
+                continue;
+            }
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == ',') {
                 String token = input.substring(start, i).trim();
                 if (token.length() > 0) {
                     parts.add(token);
