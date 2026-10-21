@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class PaymentCustomer {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String reference = "";
 
     public PaymentCustomer() {

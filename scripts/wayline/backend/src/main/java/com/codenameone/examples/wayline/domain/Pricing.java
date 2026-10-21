@@ -59,7 +59,7 @@ public class Pricing {
     @Column(nullable = false)
     private long updatedAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String updatedBy = "";
 
     public Pricing() {

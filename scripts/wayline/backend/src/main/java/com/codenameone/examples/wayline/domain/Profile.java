@@ -29,49 +29,49 @@ import com.codename1.annotations.Id;
 @Entity
 public class Profile {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String displayName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String phone = "";
 
     @Column(nullable = false)
     private boolean phoneVerified;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String vehicle = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String plate = "";
 
     @Column(nullable = false)
     private long createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String gender = "unspecified";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(8)")
     private String language = "en";
 
     @Column(nullable = false)
     private boolean flagged;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String flagReason = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String emergencyName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String emergencyPhone = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String homeAddress = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String workAddress = "";
 
     public Profile() {

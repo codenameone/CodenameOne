@@ -26,13 +26,13 @@ import com.codename1.annotations.Id;
 @Entity
 public class MenuSection {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String restaurantId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(80)")
     private String name = "";
 
     @Column(nullable = false)
