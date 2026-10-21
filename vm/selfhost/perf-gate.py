@@ -42,7 +42,9 @@ A ratio more than the tolerance above its baseline in vm/selfhost/perf-baseline/
 regression and the exit status is 1. A ratio more than the tolerance BELOW it is an
 improvement: it is reported, with the rebaseline command, but does NOT fail. Failing on it
 turned every real VM win into a red master for every open pull request until someone
-rebaselined, and RAM ratios that sit just past the tolerance flipped jobs at random. A
+rebaselined, and RAM ratios that sit just past the tolerance flipped jobs at random.
+Instead perf-baseline.yml lowers a row nightly once master has beaten it consistently
+(tighten-perf-baseline.py), so a win is still locked in and giving it back fails. A
 MISSING baseline still fails -- a benchmark with no row, or a runner
 whose CPU model has none -- because a gate that goes quiet whenever it cannot judge stops
 preventing regressions without anyone noticing. Each of these is fixed in the pull
