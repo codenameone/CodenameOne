@@ -297,6 +297,7 @@ public class SecurityConfig {
     public SecurityFilterChain api(HttpSecurity http, JwkSource signingKeys,
             @Value("${" + ISSUER_KEY + ":}") final String issuer,
             @Value("${bastion.register.per-hour:20}") int registrationsPerHour,
+            @Value("${bastion.transfer.per-minute:20}") int movementsPerMinute,
             JdbcUserDetailsManager users) throws IOException {
         DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(signingKeys).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
@@ -344,6 +345,17 @@ public class SecurityConfig {
             .rateLimit("/api/account/mfa/**",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(10, 600))
+            // Moving money, and the steps before it: a script with a stolen
+            // token and device key still moves it no faster than a person.
+            .rateLimit("/api/transfers",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(movementsPerMinute, 60))
+            .rateLimit("/api/payees",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(movementsPerMinute, 60))
+            .rateLimit("/api/devices",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(movementsPerMinute, 60))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()
