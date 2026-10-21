@@ -407,6 +407,18 @@ public class Conversations {
             erase(id);
             return;
         }
+        if (DIRECT.equals(row.getKind())) {
+            // A direct chat is its two people; with one gone it is a chat
+            // with nobody, listed without a peer and sending to no one. It
+            // goes, and the one left is told, so their app drops it too.
+            List<String> left = new ArrayList<String>();
+            for (int iter = 0; iter < rest.size(); iter++) {
+                left.add(rest.get(iter).getUsername());
+            }
+            erase(id);
+            changed(id, left);
+            return;
+        }
         if (OWNER.equals(mine.getRole())) {
             // The longest-serving admin takes over, or failing one, the
             // longest-serving member: a group is never left without an owner.

@@ -75,6 +75,12 @@ class CallTest {
                 post("/api/calls/" + id + "/signal"), Chat.map("callId", id, "type", "ACCEPT",
                         "payload", "", "fromDevice", alices)), bob)));
         assertEquals("ACCEPTED", signal(bob, id, "ACCEPT", bobs).get("state"));
+        // Bob's other phone answered a moment too late: it goes no further,
+        // or the caller would get two answers.
+        String bobsOther = Chat.device(mvc, bob);
+        assertEquals(409, Chat.statusOf(mvc, People.asUser(Chat.body(
+                post("/api/calls/" + id + "/signal"), Chat.map("callId", id, "type", "ACCEPT",
+                        "payload", "", "fromDevice", bobsOther)), bob)));
         signal(bob, id, "ANSWER", bobs);
         assertEquals("ENDED", signal(alice, id, "END", alices).get("state"));
         List history = Chat.list(mvc, People.asUser(get("/api/calls"), bob));

@@ -48,7 +48,12 @@ public class CallEndpoint implements CallApiServer {
         } catch (RuntimeException lostTheLine) {
             // Another caller claimed the callee's line in the same moment;
             // the unique key on call_line rejected this commit. To the caller
-            // that is a busy line, not a server error.
+            // that is a busy line, not a server error. Only if a line really
+            // is taken now, though: any other failure (a deadlock, a lost
+            // connection) is reported as what it is, not recorded as BUSY.
+            if (call == null || !calls.lineTaken(username, call.conversationId())) {
+                throw lostTheLine;
+            }
             return calls.start(username, call, true);
         }
         calls.ring(started);

@@ -30,6 +30,15 @@ import java.util.List;
 /// Calls, live and past.
 @Repository(entity = CallRecord.class, key = String.class)
 public interface CallRecordRepository extends CrudRepository<CallRecord, String> {
+    /// Makes the rest of the transaction wait behind any other that holds
+    /// the same call: the row is written to the value it has, and a written
+    /// row is kept by its writer until it commits. Call it before reading.
+    ///
+    /// @return 1, or 0 when there is no such call
+    @Modifying
+    @Query("update CallRecord c set c.startedAt = c.startedAt where c.id = :id")
+    int hold(@Param("id") String id);
+
     @Query("select c from CallRecord c where c.caller = :username or c.callee = :username order by c.startedAt desc")
     List<CallRecord> historyOf(@Param("username") String username);
 

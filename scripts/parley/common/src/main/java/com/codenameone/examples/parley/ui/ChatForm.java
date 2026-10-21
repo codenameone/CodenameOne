@@ -50,6 +50,7 @@ import com.codenameone.examples.parley.store.Store;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Timer;
 import java.util.Map;
 
 /// One conversation: its history as bubbles, and the composer under it.
@@ -75,6 +76,8 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
     private Message editing;
     private int shown = PAGE;
     private Media recorder;
+    /// Ticks the recording clock while a voice note is recorded.
+    private Timer recordingClock;
     private String recording;
     private long recordingStarted;
 
@@ -87,8 +90,17 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
         setName("Chat");
         Ui.watch(this);
         Ui.fit(this);
-        Ui.back(this, previous);
+        // Leaving drops a voice note still recording, so the microphone is
+        // not left open behind a screen with no way to stop it, and stops
+        // the store calling a screen nobody will see again. Not on hiding:
+        // a dialog or a screen opened from here comes back to this one.
+        Ui.back(this, () -> {
+            stopRecording(false);
+            Store.unlisten(this);
+            previous.showBack();
+        });
     }
+
 
     public String conversationId() {
         return conversationId;
@@ -701,7 +713,7 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
         replyBar.setHidden(false);
         sendIcon();
         revalidate();
-        CN.setInterval(500, new Runnable() {
+        recordingClock = CN.setInterval(500, new Runnable() {
             @Override
             public void run() {
                 CN.callSerially(() -> clock.setText("Recording "
@@ -723,6 +735,10 @@ public final class ChatForm extends Form implements Store.Listener, Messenger.Ty
     private void stopRecording(boolean keep) {
         if (recorder == null) {
             return;
+        }
+        if (recordingClock != null) {
+            recordingClock.cancel();
+            recordingClock = null;
         }
         String path = recording;
         long length = System.currentTimeMillis() - recordingStarted;

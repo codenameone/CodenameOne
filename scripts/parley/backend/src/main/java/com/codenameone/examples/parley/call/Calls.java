@@ -188,6 +188,24 @@ public class Calls {
         return toDto(row);
     }
 
+    /// Whether the caller, or anyone else in the conversation, holds a call
+    /// line now: what a [#start] that failed at commit lost the race for.
+    @Transactional(readOnly = true)
+    public boolean lineTaken(String username, String conversationId) {
+        if (lines.findById(username) != null) {
+            return true;
+        }
+        if (conversationId == null) {
+            return false;
+        }
+        for (String member : conversations.usernames(conversationId)) {
+            if (lines.findById(member) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Rings the callee of a call [#start] committed. A callee who blocked the
     /// caller is never rung, and the caller is not told why: to them it looks
     /// like a call nobody answered.
@@ -221,6 +239,11 @@ public class Calls {
     /// for those that do that.
     @Transactional(rollbackFor = IOException.class)
     public CallDto signal(String username, String id, CallSignalDto signal) throws IOException {
+        // Signals of one call take turns. Two of the callee's devices
+        // answering together, or an ACCEPT racing a DECLINE, would otherwise
+        // both read RINGING and both move the call on; held, the second
+        // reads what the first committed and is the late signal it is.
+        calls.hold(id);
         CallRecord row = calls.findById(id);
         if (row == null || !(username.equals(row.getCaller()) || username.equals(row.getCallee()))) {
             throw new ResponseStatusException(404, "No such call");
@@ -238,6 +261,13 @@ public class Calls {
         }
         boolean caller = username.equals(row.getCaller());
         String device = signal.fromDevice() == null ? "" : signal.fromDevice();
+        if (!caller && !RINGING.equals(row.getState()) && row.getCalleeDevice().length() > 0
+                && !row.getCalleeDevice().equals(device)) {
+            // Another of the callee's devices answered first. This one's
+            // answer and candidates would reach the caller as a second,
+            // conflicting answer, so they go no further.
+            throw new ResponseStatusException(409, "The call was answered on another device");
+        }
         // The device becomes where the other side's signals are routed, and
         // device ids are visible to everyone in a conversation: one that is
         // not the sender's own would steer the call to a stranger's phone.
@@ -257,7 +287,9 @@ public class Calls {
             row.setCalleeDevice(device);
             // The callee's other devices are still ringing.
             pushes.cancelRing(row.getCallee(), uuid(row.getId()));
-            live.toUsers(Arrays.asList(row.getCallee()), frame(row, "answered"));
+            Map<String, Object> answered = frame(row, "answered");
+            answered.put("answeredBy", device);
+            live.toUsers(Arrays.asList(row.getCallee()), answered);
             replay(row);
         } else if (DECLINE.equals(type) && !caller && RINGING.equals(row.getState())) {
             end(row, DECLINED, now);

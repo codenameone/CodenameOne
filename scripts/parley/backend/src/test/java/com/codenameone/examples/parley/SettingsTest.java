@@ -151,6 +151,7 @@ class SettingsTest {
         String token = SignIn.token(mvc, who, People.PASSWORD);
         Chat.device(mvc, who);
         String group = Chat.conversation(mvc, who, "GROUP", "Farewell", friend);
+        String direct = Chat.conversation(mvc, who, "DIRECT", "", friend);
 
         // Not on the strength of a token: the password is asked for again.
         mvc.perform(People.asUser(post("/api/account/delete"), who))
@@ -176,6 +177,9 @@ class SettingsTest {
         // The group goes on without them, handed to the one who is left.
         mvc.perform(People.asUser(get("/api/conversations/" + group), friend))
                 .andExpect(jsonPath("$.myRole").value("OWNER"));
+        // A direct chat with nobody on the other side is not left behind.
+        mvc.perform(People.asUser(get("/api/conversations/" + direct), friend))
+                .andExpect(status().isNotFound());
         // And the address is retired with it: whoever registered it next
         // would be taken for them by everyone who knew it.
         mvc.perform(post("/api/account/register").contentType("application/json")

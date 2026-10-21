@@ -54,13 +54,15 @@ public final class Sessions {
                 bundle.deviceId()));
     }
 
-    /// Encrypts for one device; answers header and ciphertext.
-    public static String[] encrypt(String username, String device, byte[] plaintext) {
+    /// Encrypts for one device, in the conversation `context`; answers header
+    /// and ciphertext.
+    public static String[] encrypt(String username, String device, byte[] plaintext,
+            String context) {
         Ratchet session = current(username, device);
         if (session == null) {
             throw new CryptoException("No session with " + username + "/" + device);
         }
-        String[] out = session.encrypt(plaintext);
+        String[] out = session.encrypt(plaintext, context);
         try {
             Vault.put(name("s", username, device), session.toMap());
         } catch (Vault.WriteFailed unsaved) {
@@ -77,12 +79,20 @@ public final class Sessions {
     ///
     /// #### Throws
     ///
-    /// - `CryptoException`: when none of them opens it
+    /// - `CryptoException`: when none of them opens it, or its header names a
+    ///   conversation other than `context`
     public static byte[] decrypt(String username, String device, String headerText,
-            byte[] ciphertext) {
+            byte[] ciphertext, String context) {
         Map<String, Object> header = Codec.parse(headerText);
         if (header == null) {
             throw new CryptoException("That message has no header");
+        }
+        // Checked before anything is opened: the header is authenticated, so
+        // a message the server moved to another chat fails here, and fails
+        // without spending its key, so it still opens where it belongs.
+        Object named = header.get("c");
+        if (!(named instanceof String) || !named.equals(context)) {
+            throw new CryptoException("That message belongs to another conversation");
         }
         Ratchet current = current(username, device);
         Ratchet previous = load(name("p", username, device));

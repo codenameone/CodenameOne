@@ -177,6 +177,12 @@ public final class Messenger implements LiveChannel.Handler {
     }
 
     public static void stop() {
+        // A call outlives no session: hanging up releases the microphone,
+        // camera and peer connection, and leaves no call behind for the
+        // next account to inherit. The END goes out while there is still a
+        // session to send it with; if it is lost the server's reaper ends
+        // the call.
+        Calls.hangUp();
         if (instance != null) {
             if (instance.ackTimer != null) {
                 instance.ackTimer.cancel();
@@ -598,7 +604,8 @@ public final class Messenger implements LiveChannel.Handler {
         byte[] plaintext = Codec.utf8(Codec.json(job.payload));
         List<EnvelopeCopyDto> copies = new ArrayList<EnvelopeCopyDto>();
         for (DeviceAddressDto each : targets(job, known)) {
-            String[] sealed = Sessions.encrypt(each.username(), each.deviceId(), plaintext);
+            String[] sealed = Sessions.encrypt(each.username(), each.deviceId(), plaintext,
+                    job.conversationId);
             copies.add(new EnvelopeCopyDto(each.username(), each.deviceId(), sealed[0], sealed[1]));
         }
         if (copies.isEmpty() && !KIND_MESSAGE.equals(job.kind)) {
@@ -818,7 +825,8 @@ public final class Messenger implements LiveChannel.Handler {
         }
         Map<String, Object> payload;
         try {
-            payload = Codec.parse(Codec.text(Sessions.decrypt(sender, senderDevice, header, body)));
+            payload = Codec.parse(Codec.text(Sessions.decrypt(sender, senderDevice, header, body,
+                    conversationId)));
         } catch (CryptoException | IllegalArgumentException undecryptable) {
             Log.p("Could not decrypt a message from " + sender + ": " + undecryptable.getMessage());
             if (KIND_MESSAGE.equals(kind)) {

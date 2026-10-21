@@ -568,8 +568,11 @@ public final class Calls {
             return;
         }
         if ("answered".equals(event)) {
-            // Another of this account's devices answered: stop ringing here.
-            if (RINGING.equals(call.state)) {
+            // Another of this account's devices answered: stop ringing here,
+            // or stop connecting, if this one answered too and lost.
+            String by = text(frame, "answeredBy");
+            if (!call.outgoing && (RINGING.equals(call.state)
+                    || (by.length() > 0 && !by.equals(Identity.deviceId())))) {
                 finish(call, CallEndReason.REMOTE_ENDED);
             }
             return;

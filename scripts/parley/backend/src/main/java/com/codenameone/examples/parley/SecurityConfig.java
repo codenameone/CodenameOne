@@ -355,7 +355,7 @@ public class SecurityConfig {
         http.securityMatcher("/api/**")
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // Opening accounts and sending text messages are the two things
+            // Opening accounts and sending SMS codes are the two things
             // here that cost something each time and that a stranger can ask
             // for. One limiter per rule: a shared one would share its count.
             .rateLimit("/api/account/register", RateLimitKeys.clientAddress(),
@@ -386,6 +386,14 @@ public class SecurityConfig {
             .rateLimit("/api/contacts/search",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 60))
+            // Each message is an envelope per recipient device and may wake
+            // them all with a push. A minute's allowance is well past anyone
+            // typing, and past the burst an app resending its queue after a
+            // reconnect makes. The exact path: sync and ack, below it, are
+            // not sends.
+            .rateLimit("/api/messages",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(120, 60))
             .rateLimit("/api/reports",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(20, 3600))

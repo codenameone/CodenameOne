@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.parley.chat;
 
+import com.codename1.backend.Transactions;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Isolation;
+import com.codename1.backend.annotations.Propagation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +46,34 @@ public class Relays {
         relays.add(relay);
     }
 
+    /// Hands a posted message to the relays once its transaction commits:
+    /// a bridge sends it on to Telegram or WhatsApp, and a message Parley
+    /// rolled back must not reach a chat outside it, nor reach it twice when
+    /// the user sends it again.
     void posted(String conversationId, String sender, String senderName, String text) {
+        if (!Transactions.isActive()) {
+            dispatch(conversationId, sender, senderName, text);
+            return;
+        }
+        Transactions.registerSynchronization(new Transactions.Synchronization() {
+            @Override
+            public void afterCommit() {
+                // The relays read the conversation, which takes a transaction
+                // of its own once this one is over.
+                try {
+                    Transactions.execute(Propagation.REQUIRES_NEW, false, 0, Isolation.DEFAULT,
+                            () -> {
+                                dispatch(conversationId, sender, senderName, text);
+                                return null;
+                            });
+                } catch (Exception failed) {
+                    System.err.println("[relay] could not relay: " + failed);
+                }
+            }
+        });
+    }
+
+    private void dispatch(String conversationId, String sender, String senderName, String text) {
         List<Relay> now;
         synchronized (this) {
             now = new ArrayList<Relay>(relays);

@@ -204,9 +204,14 @@ public final class Ratchet {
         return ephemeralSeen;
     }
 
-    /// Encrypts one message. Answers the header (JSON, sent in the clear but
-    /// authenticated) and the ciphertext.
-    public String[] encrypt(byte[] plaintext) {
+    /// Encrypts one message for the conversation `context`. Answers the
+    /// header (JSON, sent in the clear but authenticated) and the ciphertext.
+    ///
+    /// A session is between two devices, not two devices in one chat, so the
+    /// header names the conversation: the server could otherwise move a
+    /// message into another chat the same two devices share, and it would
+    /// open there. [Sessions#decrypt] refuses one whose header names another.
+    public String[] encrypt(byte[] plaintext, String context) {
         byte[] messageKey = chainKey(sendChain, CHAIN_MESSAGE);
         sendChain = chainKey(sendChain, CHAIN_NEXT);
         Map<String, Object> header = new LinkedHashMap<String, Object>();
@@ -214,6 +219,7 @@ public final class Ratchet {
         header.put("dh", Codec.b64(myRatchetPublic));
         header.put("pn", Long.valueOf(previous));
         header.put("n", Long.valueOf(sent));
+        header.put("c", context);
         if (pending != null) {
             header.putAll(pending);
         }
