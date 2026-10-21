@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The scripts of a small 2D scene, compiled the way the Unity editor would
+    compile an Assets folder: one assembly, against UnityEngine. Here
+    UnityEngine is this repository's own reference assembly.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Assembly-CSharp</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Assets/**/*.cs" />
+    <ProjectReference Include="../../../maven/unity-compat/src/main/csharp/UnityEngine/UnityEngine.csproj" />
+    <ProjectReference Include="../../../maven/unity-compat/src/main/csharp/UnityEngine.Values/UnityEngine.Values.csproj" />
+  </ItemGroup>
+</Project>

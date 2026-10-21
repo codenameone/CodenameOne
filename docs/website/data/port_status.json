@@ -130,6 +130,22 @@
       ]
     },
     {
+      "id": "unity-compatibility",
+      "category": "Application runtime",
+      "name": "Unity 2D projects (UnityEngine and C# scripts)",
+      "description": "Runs an unmodified Unity 2D project -- C# scripts, scenes and prefabs, sprites, 2D physics, the UI canvas, tilemaps, animators, particle systems, TextMeshPro and Cinemachine -- through the Unity compatibility runtime, drawn by the GPU.",
+      "tests": [
+        "UnityCompatSpritesScreenshotTest",
+        "UnityCompatPhysicsScreenshotTest",
+        "UnityCompatCanvasScreenshotTest",
+        "UnityCompatTilemapScreenshotTest",
+        "UnityCompatAnimatorScreenshotTest",
+        "UnityCompatParticlesScreenshotTest",
+        "UnityCompatTextMeshProScreenshotTest",
+        "UnityCompatCinemachineScreenshotTest"
+      ]
+    },
+    {
       "id": "ads",
       "category": "Application runtime",
       "name": "Advertising components",
@@ -1584,6 +1600,38 @@
     {
       "pattern": "AndroidCompatKotlin",
       "test": "AndroidCompatKotlinScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatSprites",
+      "test": "UnityCompatSpritesScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatPhysics",
+      "test": "UnityCompatPhysicsScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatCanvas",
+      "test": "UnityCompatCanvasScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatTilemap",
+      "test": "UnityCompatTilemapScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatAnimator",
+      "test": "UnityCompatAnimatorScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatParticles",
+      "test": "UnityCompatParticlesScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatTextMeshPro",
+      "test": "UnityCompatTextMeshProScreenshotTest"
+    },
+    {
+      "pattern": "UnityCompatCinemachine",
+      "test": "UnityCompatCinemachineScreenshotTest"
     }
   ]
 }

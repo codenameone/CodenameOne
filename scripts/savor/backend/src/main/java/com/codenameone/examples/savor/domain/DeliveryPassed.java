@@ -26,11 +26,11 @@ import com.codename1.annotations.Id;
 @Entity
 public class DeliveryPassed {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String deliveryId = "";
 
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String courier = "";
 
     public DeliveryPassed() {

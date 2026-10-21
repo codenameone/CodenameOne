@@ -382,9 +382,11 @@ class PushTest {
         String rider = People.rider(accounts, "push-rey-rider");
         String driver = People.driver(accounts, "push-rey-driver");
         register(rider, "apns", "rey-rider-phone");
-        Trips.online(mvc, driver, 64.1466, -21.9426);
+        // Edinburgh: Reykjavik is the first test's, whose driver would be just as
+        // near and could be offered this ride instead.
+        Trips.online(mvc, driver, 55.9533, -3.1883);
         String id = (String) Trips.json(mvc, People.asRider(body(post("/api/rides"),
-                People.ride(64.1467, -21.9425, 64.1500, -21.9000)), rider)).get("id");
+                People.ride(55.9534, -3.1882, 55.9560, -3.1840)), rider)).get("id");
         mvc.perform(People.asDriver(post("/api/driver/offers/" + id + "/accept"), driver))
                 .andExpect(status().isOk());
         mvc.perform(People.asRider(body(post("/api/rides/" + id + "/activity"),

@@ -296,6 +296,15 @@ never uploads. It does still require a `central` server entry in `settings.xml` 
 NPEs before staging, which is why the workflow's `setup-java` steps keep `server-id:
 central` with no credentials attached.
 
+**The .NET SDK.** The core reactor publishes `codenameone-cil-translator` and
+`codenameone-unity-compat`, which sit in the `unity-compat` profile because building the
+second compiles C#. A release therefore needs a .NET SDK on the `PATH`, network access to
+nuget.org for the `NETStandard.Library.Ref` reference pack, and `-Dunity-compat` on the
+reactor's `mvn deploy`. Leaving the flag off does not fail the build -- the two modules drop
+out of the reactor and the staging tree is simply two artifacts short -- so the workflow's
+*Confirm artifacts on R2* step asks for both poms, both jars and the `references` classifier
+jar, and the release is not marked complete without them.
+
 The R2 token is scoped to Object Read & Write on `cn1-maven` only, so it deliberately cannot
 list buckets or read zones through the Cloudflare REST API. That is correct least privilege,
 not a misconfiguration.
@@ -307,7 +316,8 @@ export R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET
 
 # Produce a staging tree without uploading to Central. A release version needs a `central`
 # server in settings.xml even with skipPublishing, or the plugin NPEs before it stages.
-mvn -s /tmp/central-dummy-settings.xml -DskipPublishing=true deploy
+# -Dunity-compat is part of a release: see "The .NET SDK" below.
+mvn -s /tmp/central-dummy-settings.xml -DskipPublishing=true -Dunity-compat deploy
 
 bash maven/scripts/r2/publish-staging-to-r2.sh maven/target/central-staging
 # ...repeat for each scripts/<editor>/target/central-staging, then:

@@ -3851,7 +3851,17 @@ public abstract class CodenameOneImplementation {
         if (dragActivationCounter == 0 && x[0] != pointerPressedX && y[0] != pointerPressedY) {
             hasDragStarted(pointerPressedX, pointerPressedY);
             if (hasDragStarted(x, y)) {
+                // The single point overloads all hand over the same two arrays, so a
+                // release that came through pointerReleased(int, int) IS those arrays,
+                // and the drag synthesized at the press position below writes over it:
+                // the drag meant for the release point and then the release itself
+                // were both delivered at the press point, and the component under the
+                // real release point never heard it.
+                int releasedX = x[0];
+                int releasedY = y[0];
                 pointerDragged(pointerPressedX, pointerPressedY);
+                x[0] = releasedX;
+                y[0] = releasedY;
                 pointerDragged(x, y);
             }
         }
@@ -5247,12 +5257,17 @@ public abstract class CodenameOneImplementation {
         if (cmd == null) {
             return;
         }
-        if (!cmd.isEnabled()) {
-            // A disabled Command must not run because its menu item was clicked. The row format
-            // carries no enabled flag, so the native item is created enabled and stays
-            // clickable; greying it out as well needs another field and a matching change in
-            // every native parser. This is the half that prevents the damage.
+        if (!cmd.isEnabled() || cmd.isDesktopSeparator()) {
+            // The native item is greyed out too (NativeMenuEncoder.FLAG_ENABLED), but a menu
+            // published before the command was disabled can still deliver a click.
             return;
+        }
+        // A check item flips and a radio item becomes the checked one of its group BEFORE the
+        // command runs, as a native toggle does, so the action reads the new state.
+        if (cmd.getDesktopRadioGroup() != null) {
+            cmd.setDesktopChecked(true);
+        } else if (cmd.isDesktopCheckable()) {
+            cmd.setDesktopChecked(!cmd.isDesktopChecked());
         }
         Form current = Display.getInstance().getCurrent();
         ActionEvent ev = new ActionEvent(cmd);
@@ -11184,6 +11199,39 @@ public abstract class CodenameOneImplementation {
     /// if the title is native(e.g the android action bar), notify the native title
     /// that is needs to be refreshed
     public void refreshNativeTitle() {
+    }
+
+    /// The title a desktop port shows in the OS title bar of the main window for a form: the
+    /// form's title, with the leading `*` Windows and Linux applications use for a document
+    /// with unsaved changes. A port with its own indicator for that state reads
+    /// `Form#isDocumentModified()` itself and uses `Form#getTitle()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    ///
+    /// #### Returns
+    ///
+    /// the title to show, never null
+    public String getNativeWindowTitle(Form f) {
+        String t = f.getTitle();
+        if (t == null) {
+            t = "";
+        }
+        return f.isDocumentModified() ? "*" + t : t;
+    }
+
+    /// Called when a form's document-modified state changes, see
+    /// `Form#setDocumentModified(boolean)`. The default refreshes the native title, which
+    /// `#getNativeWindowTitle(Form)` marks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    public void documentModifiedChanged(Form f) {
+        if (f == getCurrentForm()) { //NOPMD CompareObjectsWithEquals
+            refreshNativeTitle();
+        }
     }
 
     /// Indicates the way commands should be added to a form as one of the ocmmand constants defined

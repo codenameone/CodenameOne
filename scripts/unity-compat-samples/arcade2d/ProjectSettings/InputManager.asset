@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!13 &1
+InputManager:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Axes:
+  - serializedVersion: 3
+    m_Name: Horizontal
+    negativeButton: left
+    positiveButton: right
+    altNegativeButton: a
+    altPositiveButton: d
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Horizontal
+    negativeButton:
+    positiveButton:
+    altNegativeButton:
+    altPositiveButton:
+    type: 2
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Glide
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    gravity: 1
+    dead: 0.001
+    sensitivity: 6
+    snap: 0
+    invert: 0
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Snappy
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    gravity: 6
+    dead: 0.001
+    sensitivity: 1.5
+    snap: 1
+    invert: 0
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Plain
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Flipped
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    invert: 1
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Mixed
+    negativeButton: q
+    positiveButton: e
+    altNegativeButton:
+    altPositiveButton:
+    type: 0
+    axis: 0
+  - serializedVersion: 3
+    m_Name: Mixed
+    negativeButton:
+    positiveButton:
+    altNegativeButton:
+    altPositiveButton:
+    sensitivity: 0.01
+    type: 1
+    axis: 0

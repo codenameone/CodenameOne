@@ -162,6 +162,16 @@ class AppKitWindowManager extends WindowManager {
         }
     }
 
+    /// The dot in the close button, the macOS indicator, rather than the default's
+    /// "*" in the title.
+    @Override
+    public void setDocumentModified(Object p, boolean modified, String title) {
+        int s = slot(p);
+        if (s >= 0) {
+            nativeInstance.macWindowSetDocumentEdited(s, modified);
+        }
+    }
+
     @Override
     public void setBounds(Object p, int x, int y, int width, int height) {
         int s = slot(p);

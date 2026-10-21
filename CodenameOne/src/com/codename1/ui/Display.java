@@ -88,6 +88,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Vector;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedList;
@@ -5121,6 +5122,85 @@ public final class Display extends CN1Constants {
     /// use setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE)
     public void setNativeCommands(boolean nativeCommands) {
         setCommandBehavior(COMMAND_BEHAVIOR_NATIVE);
+    }
+
+    private static boolean nativeMenuRefreshPending;
+
+    /// Republishes the commands of the current form and of open windows to their native menus, so
+    /// each menu shows their current label, enabled and checked state. Commands already do this when
+    /// `Command#setEnabled(boolean)` or `Command#setDesktopChecked(boolean)` change them; call
+    /// it after changing anything else about a command that is in the menu, such as its name
+    /// or icon. Does nothing on a platform without a native menu bar.
+    public void refreshNativeMenu() {
+        if (impl == null || !impl.isNativeCommandsSupported()) {
+            return;
+        }
+        Window[] windows = Desktop.getInstance().getWindows();
+        for (Window w : windows) {
+            w.republishNativeMenu();
+        }
+        Form f = getCurrent();
+        if (f == null || !f.isInitialized()) {
+            return;
+        }
+        Vector v = f.nativeMenuCommands();
+        if (v != null) {
+            impl.setNativeCommands(v);
+        }
+    }
+
+    /// Schedules one `#refreshNativeMenu()` for the next EDT cycle, so a batch of state changes
+    /// rebuilds the native menu once rather than once per change.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changed`: the command that changed; nothing is scheduled unless a native menu shows it,
+    /// so a command that only backs a button never rebuilds a menu
+    static void refreshNativeMenuIfPublished(Command changed) {
+        if (impl == null || nativeMenuRefreshPending || !impl.isNativeCommandsSupported()) {
+            return;
+        }
+        if (!isOnPublishedNativeMenu(changed)) {
+            return;
+        }
+        nativeMenuRefreshPending = true;
+        getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                nativeMenuRefreshPending = false;
+                getInstance().refreshNativeMenu();
+            }
+        });
+    }
+
+    private static boolean isOnPublishedNativeMenu(Command c) {
+        for (java.util.List surface : getInstance().getPublishedNativeMenuSurfaces()) {
+            for (Object o : surface) {
+                if (o == c) { //NOPMD CompareObjectsWithEquals
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The command lists of every published native menu surface: the current form's and each
+    /// open window's.
+    java.util.List<java.util.List> getPublishedNativeMenuSurfaces() {
+        ArrayList<java.util.List> out = new ArrayList<java.util.List>();
+        if (impl == null) {
+            return out;
+        }
+        Form f = getCurrent();
+        Vector v = f == null ? null : f.nativeMenuCommands();
+        if (v != null) {
+            out.add(v);
+        }
+        Window[] windows = Desktop.getInstance().getWindows();
+        for (Window w : windows) {
+            out.add(w.publishedNativeMenuCommands());
+        }
+        return out;
     }
 
     /// Exits the application...

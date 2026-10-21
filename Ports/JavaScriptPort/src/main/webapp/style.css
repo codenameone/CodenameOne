@@ -426,6 +426,46 @@ div#cn1-video-capture > video {
 #cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
     opacity: 0.45;
 }
+#cn1-desktop-chrome .cn1-chrome-separator {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(0, 0, 0, 0.14);
+}
+#cn1-desktop-chrome .cn1-chrome-check {
+    display: inline-block;
+    width: 1em;
+    flex-shrink: 0;
+}
+/* A submenu flies out to the right of its title while the pointer or focus is inside it. */
+/* Submenus expand in place under their title. A flyout beside the panel would be clipped:
+   the panel scrolls (overflow-y: auto), which makes its other axis clip too. */
+#cn1-desktop-chrome .cn1-chrome-submenu-title {
+    list-style: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title::-webkit-details-marker {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title::after {
+    content: "\25B8";
+    float: right;
+    margin-left: 24px;
+    opacity: 0.6;
+}
+#cn1-desktop-chrome .cn1-chrome-submenu[open] > .cn1-chrome-submenu-title::after {
+    content: "\25BE";
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-title:hover,
+#cn1-desktop-chrome .cn1-chrome-submenu-title:focus-visible {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-submenu-items {
+    display: flex;
+    flex-direction: column;
+    padding-left: 12px;
+}
 #cn1-desktop-chrome .cn1-chrome-icon {
     display: inline-flex;
     align-items: center;

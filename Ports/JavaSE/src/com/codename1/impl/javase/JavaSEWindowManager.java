@@ -501,6 +501,30 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     /**
+     * On macOS the modified state is the dot in the close button, which Swing exposes as the
+     * {@code Window.documentModified} root pane property; elsewhere it is the title's "*".
+     */
+    @Override
+    public void setDocumentModified(Object peerObj, final boolean modified, final String title) {
+        if (!JavaSEPort.IS_MAC) {
+            super.setDocumentModified(peerObj, modified, title);
+            return;
+        }
+        final Peer p = peer(peerObj);
+        if (p != null) {
+            runOnAwt(new Runnable() {
+                @Override
+                public void run() {
+                    if (p.frame instanceof javax.swing.RootPaneContainer) {
+                        ((javax.swing.RootPaneContainer) p.frame).getRootPane()
+                                .putClientProperty("Window.documentModified", Boolean.valueOf(modified));
+                    }
+                }
+            });
+        }
+    }
+
+    /**
      * Applied on the AWT thread <em>before returning</em>, not queued.
      *
      * <p>Geometry is read back synchronously: {@code setWindowSize()} followed by
@@ -982,11 +1006,14 @@ public class JavaSEWindowManager extends WindowManager {
                 }
             }
         }
+        // Encoded and rendered here, on the Codename One EDT that owns the commands and their
+        // icons; only the Swing menu is built on AWT.
+        final Object[] menu = named.isEmpty() ? null : port.encodeWindowMenu(named);
         runOnAwt(new Runnable() {
             @Override
             public void run() {
-                javax.swing.JMenuBar bar = named.isEmpty()
-                        ? null : port.buildWindowMenuBar(named, owner);
+                javax.swing.JMenuBar bar = menu == null
+                        ? null : port.buildWindowMenuBar(menu, owner);
                 if (p.frame instanceof javax.swing.JFrame) {
                     ((javax.swing.JFrame) p.frame).setJMenuBar(bar);
                 } else if (p.frame instanceof javax.swing.JDialog) {
