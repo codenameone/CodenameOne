@@ -23,6 +23,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.api.AccountDto;
+import com.codenameone.examples.bastion.api.AssetDto;
 import com.codenameone.examples.bastion.api.BankingApiServer;
 import com.codenameone.examples.bastion.api.CardDto;
 import com.codenameone.examples.bastion.api.CardLimitDto;
@@ -37,6 +38,7 @@ import com.codenameone.examples.bastion.api.PostingDto;
 import com.codenameone.examples.bastion.api.ReceiptDto;
 import com.codenameone.examples.bastion.api.TransferDto;
 import com.codenameone.examples.bastion.audit.Audit;
+import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.Card;
 import com.codenameone.examples.bastion.domain.Device;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
@@ -80,6 +82,15 @@ public class BankingEndpoint implements BankingApiServer {
         this.signing = signing;
         this.audit = audit;
         this.config = config;
+    }
+
+    @Override
+    public List<AssetDto> assets() throws Exception {
+        List<AssetDto> out = new ArrayList<AssetDto>();
+        for (Asset a : ledger.assets()) {
+            out.add(new AssetDto(a.getCode(), a.getName(), a.getKind(), a.getDecimals()));
+        }
+        return out;
     }
 
     @Override

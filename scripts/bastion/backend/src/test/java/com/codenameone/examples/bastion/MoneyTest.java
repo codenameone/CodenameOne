@@ -23,6 +23,10 @@ import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.security.crypto.Der;
+import com.codename1.backend.security.webauthn.CredentialRecord;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository;
+import com.codename1.backend.security.webauthn.UserCredentialRepository;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
@@ -44,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.codename1.backend.test.MockMvcRequestBuilders.delete;
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,6 +66,12 @@ class MoneyTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private UserCredentialRepository passkeys;
+
+    @Autowired
+    private PublicKeyCredentialUserEntityRepository passkeyHolders;
 
     @Autowired
     private JwkSource signingKeys;
@@ -194,6 +205,54 @@ class MoneyTest {
     private static String internal(String from, String to, long amount) {
         return "{\"fromAccountId\":\"" + from + "\",\"toAccountId\":\"" + to + "\",\"amount\":"
                 + amount + ",\"memo\":\"save\"}";
+    }
+
+    @Test
+    void listsAndRemovesOnlyTheCallersPasskeys() throws Exception {
+        Customer c = new Customer(false);
+        Customer other = new Customer(false);
+        byte[] handle = UUID.randomUUID().toString().getBytes("UTF-8");
+        passkeyHolders.save(new PublicKeyCredentialUserEntity(c.name, handle, c.name));
+        byte[] credentialId = UUID.randomUUID().toString().getBytes("UTF-8");
+        passkeys.save(CredentialRecord.builder().credentialId(credentialId)
+                .userEntityUserId(handle).algorithm(-7).publicKey(new byte[] {1})
+                .label("phone").created(1).lastUsed(2).build());
+        String id = Base64Url.encode(credentialId);
+
+        List listed = (List) Json.parse(c.send(get("/api/account/passkeys")).getContentAsString());
+        assertEquals(1, listed.size());
+        assertEquals("phone", ((Map) listed.get(0)).get("label"));
+        assertEquals(id, ((Map) listed.get(0)).get("id"));
+        assertEquals(0, ((List) Json.parse(other.send(get("/api/account/passkeys"))
+                .getContentAsString())).size());
+
+        assertEquals(404, other.send(delete("/api/account/passkeys/" + id)).getStatus());
+        MockResponse removed = c.send(delete("/api/account/passkeys/" + id));
+        assertEquals(200, removed.getStatus(), removed.getContentAsString());
+        assertEquals(0, ((List) Json.parse(removed.getContentAsString())).size());
+        assertTrue(passkeys.findByCredentialId(credentialId) == null);
+        assertTrue(audit.verify().isEmpty());
+    }
+
+    @Test
+    void listsTheLedgersAssets() throws Exception {
+        Customer c = new Customer(false);
+        MockResponse answer = c.send(get("/api/assets"));
+        assertEquals(200, answer.getStatus(), answer.getContentAsString());
+        int seen = 0;
+        for (Object o : (List) Json.parse(answer.getContentAsString())) {
+            Map asset = (Map) o;
+            if ("USD".equals(asset.get("code"))) {
+                assertEquals(2, ((Number) asset.get("decimals")).intValue());
+                assertEquals("FIAT", asset.get("kind"));
+                seen++;
+            } else if ("ETH".equals(asset.get("code"))) {
+                assertEquals(9, ((Number) asset.get("decimals")).intValue());
+                assertEquals("CRYPTO", asset.get("kind"));
+                seen++;
+            }
+        }
+        assertEquals(2, seen);
     }
 
     @Test

@@ -64,12 +64,12 @@ public final class HomeForm {
 
     private static void load(final Container content) {
         Ui.loading(content);
-        Api.banking().accounts(Net.to((List<AccountDto> accounts) ->
+        Assets.load(() -> Api.banking().accounts(Net.to((List<AccountDto> accounts) ->
                 Api.exchange().markets(Net.to((List<MarketDto> markets) ->
                         fill(content, accounts, markets),
                         // Without prices the balances are still worth showing.
                         (status, message) -> fill(content, accounts, new ArrayList<MarketDto>()))),
-                (status, message) -> Ui.failed(content, message, () -> load(content))));
+                (status, message) -> Ui.failed(content, message, () -> load(content)))));
     }
 
     private static void fill(final Container content, List<AccountDto> accounts,
@@ -186,7 +186,11 @@ public final class HomeForm {
             }
         }
         final String[] names = labels.toArray(new String[labels.size()]);
-        Picker which = Ui.picker(names, 0);
+        final String[] ids = new String[names.length];
+        for (int iter = 0; iter < ids.length; iter++) {
+            ids[iter] = choices.get(iter)[0] + "/" + choices.get(iter)[1];
+        }
+        Picker which = Ui.picker(ids, names, null);
         TextField name = Ui.field("Name (optional)", TextField.ANY);
         Container body = new Container(BoxLayout.y());
         body.addAll(which, name);
@@ -195,7 +199,7 @@ public final class HomeForm {
                 != open) {
             return;
         }
-        int index = Ui.picked(which, names);
+        int index = Ui.indexOf(ids, Ui.pickedId(which));
         if (index < 0) {
             return;
         }

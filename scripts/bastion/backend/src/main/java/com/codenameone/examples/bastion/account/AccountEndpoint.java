@@ -21,12 +21,15 @@ package com.codenameone.examples.bastion.account;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.api.AccountApiServer;
+import com.codenameone.examples.bastion.api.PasskeyDto;
 import com.codenameone.examples.bastion.api.PasswordChangeDto;
 import com.codenameone.examples.bastion.api.RecoveryCodesDto;
 import com.codenameone.examples.bastion.api.RegisterDto;
 import com.codenameone.examples.bastion.api.TotpCodeDto;
 import com.codenameone.examples.bastion.api.TotpEnrollmentDto;
 import com.codenameone.examples.bastion.api.UserDto;
+
+import java.util.List;
 
 /// [com.codenameone.examples.bastion.api.AccountApi], served. Every call but
 /// `register` acts on the caller's own account, named by their token and
@@ -35,10 +38,12 @@ import com.codenameone.examples.bastion.api.UserDto;
 public class AccountEndpoint implements AccountApiServer {
     private final Accounts accounts;
     private final SecondFactor secondFactor;
+    private final PasskeyList passkeys;
 
-    public AccountEndpoint(Accounts accounts, SecondFactor secondFactor) {
+    public AccountEndpoint(Accounts accounts, SecondFactor secondFactor, PasskeyList passkeys) {
         this.accounts = accounts;
         this.secondFactor = secondFactor;
+        this.passkeys = passkeys;
     }
 
     @Override
@@ -70,5 +75,15 @@ public class AccountEndpoint implements AccountApiServer {
     @Override
     public RecoveryCodesDto newRecoveryCodes(TotpCodeDto code) throws Exception {
         return secondFactor.renew(Caller.name(), code == null ? null : code.code());
+    }
+
+    @Override
+    public List<PasskeyDto> passkeys() throws Exception {
+        return passkeys.of(Caller.name());
+    }
+
+    @Override
+    public List<PasskeyDto> removePasskey(String id) throws Exception {
+        return passkeys.remove(Caller.name(), id);
     }
 }

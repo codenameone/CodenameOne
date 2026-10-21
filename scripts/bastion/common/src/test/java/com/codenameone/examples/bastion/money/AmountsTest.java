@@ -18,12 +18,27 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.api.AssetDto;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /// Amounts go to text and back exactly, without a `double` anywhere.
 class AmountsTest {
+    /// The rows `GET /api/assets` answers for the seeded ledger (V2__ledger.sql).
+    @BeforeAll
+    static void serverAssets() {
+        Assets.replace(Arrays.asList(
+                new AssetDto("BTC", "Bitcoin", Assets.CRYPTO, 8),
+                new AssetDto("ETH", "Ether", Assets.CRYPTO, 9),
+                new AssetDto("EUR", "Euro", Assets.FIAT, 2),
+                new AssetDto("USD", "US Dollar", Assets.FIAT, 2)));
+        assertEquals("EUR", Assets.all()[0].code);
+    }
+
     @Test
     void formatsWithTheAssetsDecimals() {
         assertEquals("$1,234.56", Amounts.format(123456, "USD"));

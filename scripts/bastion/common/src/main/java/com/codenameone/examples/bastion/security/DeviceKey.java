@@ -20,6 +20,10 @@ package com.codenameone.examples.bastion.security;
 
 import com.codename1.io.Preferences;
 import com.codename1.security.DeviceIntegrity;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.KeyPair;
+import com.codename1.security.PrivateKey;
+import com.codename1.security.PublicKey;
 import com.codename1.security.SecureRandom;
 import com.codename1.security.SecureStorage;
 import com.codename1.security.vault.AssociatedData;
@@ -35,7 +39,9 @@ import com.codenameone.examples.bastion.net.Net;
 /// This device's signing key: the second thing, after the session, that the
 /// server asks for before money leaves an account.
 ///
-/// The private key is a P-256 scalar ([P256]). It is kept sealed: an
+/// The key is an EC P-256 pair from [KeyGenerator#ecP256()], made by the
+/// platform's own crypto provider; the server gets its X.509 public half and
+/// the PKCS#8 private half never leaves the device. It is kept sealed: an
 /// AES-256-GCM [SecureEnvelope] whose associated data names the account and
 /// purpose (so a blob copied to another account's slot does not open), under
 /// a 256-bit wrapping key that lives in [SecureStorage] -- the iOS Keychain or
@@ -50,7 +56,7 @@ public final class DeviceKey {
     private static final String ID_KEY = "bastion.device.id";
     private static final String OWNER_KEY = "bastion.device.owner";
 
-    private static byte[] cached;
+    private static PrivateKey cached;
 
     private DeviceKey() {
     }
@@ -70,7 +76,7 @@ public final class DeviceKey {
     /// The private key, unsealed, or null when there is none (or the wrapping
     /// key is gone: a restored backup on a new phone, which is then simply a
     /// device to register again).
-    public static byte[] privateKey() {
+    public static PrivateKey privateKey() {
         if (Lock.isLocked()) {
             return null;
         }
@@ -84,7 +90,8 @@ public final class DeviceKey {
             return null;
         }
         try {
-            cached = SecureEnvelope.parse(Base64.decodeUrlSafe(sealed)).open(wrap, aad(owner));
+            cached = PrivateKey.fromPkcs8(PublicKey.EC,
+                    SecureEnvelope.parse(Base64.decodeUrlSafe(sealed)).open(wrap, aad(owner)));
             return cached;
         } catch (RuntimeException tamperedOrForeign) {
             // A blob that does not open under this device's key, or for this
@@ -114,8 +121,9 @@ public final class DeviceKey {
     /// otherwise. The sign-in must be a few minutes old.
     public static void register(final String owner, final String password,
             final Net.Ok<DeviceDto> done, final Net.Failed failed) {
-        final byte[] key = P256.newPrivateKey(SecureRandom.bytes(48));
-        final String publicKey = Base64.encodeUrlSafe(P256.publicKey(key));
+        KeyPair pair = KeyGenerator.ecP256();
+        final PrivateKey key = pair.getPrivateKey();
+        final String publicKey = Base64.encodeUrlSafe(pair.getPublicKey().getEncoded());
         final boolean rooted = DeviceIntegrity.isDeviceCompromised();
         if (DeviceIntegrity.isAttestationSupported()) {
             // Play Integrity / App Attest over the public key, so the token is
@@ -136,7 +144,7 @@ public final class DeviceKey {
         send(owner, password, key, publicKey, rooted, null, done, failed);
     }
 
-    private static void send(final String owner, String password, final byte[] key,
+    private static void send(final String owner, String password, final PrivateKey key,
             String publicKey, boolean rooted, String token, final Net.Ok<DeviceDto> done,
             Net.Failed failed) {
         DeviceRegistrationDto request = new DeviceRegistrationDto(publicKey,
@@ -147,7 +155,7 @@ public final class DeviceKey {
                 failed.failed(0, "This device has no secure storage for the key.");
                 return;
             }
-            byte[] sealed = SecureEnvelope.seal(wrap, "device-key", 1, aad(owner), key);
+            byte[] sealed = SecureEnvelope.seal(wrap, "device-key", 1, aad(owner), key.getEncoded());
             Preferences.set(SEALED_KEY, Base64.encodeUrlSafe(sealed));
             Preferences.set(ID_KEY, device.id());
             Preferences.set(OWNER_KEY, owner);

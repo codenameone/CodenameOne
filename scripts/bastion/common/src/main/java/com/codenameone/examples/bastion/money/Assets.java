@@ -18,14 +18,20 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.api.AssetDto;
+import com.codenameone.examples.bastion.net.Api;
+import com.codenameone.examples.bastion.net.Net;
+
+import java.util.List;
+
 /// The assets the bank holds, and how many decimal places each is counted in.
 ///
 /// The ledger keeps every amount as a whole number of the asset's smallest
 /// unit -- cents for dollars, satoshi for bitcoin -- and `decimals` says how
 /// many of those make one: an `AccountDto.balance` of `150` in USD is $1.50.
-/// The server's `asset` table is the source; this mirrors its rows
-/// (`V2__ledger.sql`) because the API has no call that lists them, and an
-/// asset missing here is shown in raw units rather than guessed at.
+/// The server's `asset` table is the source, read once per run through
+/// `GET /api/assets` ([#load]); until then, and for an asset it does not
+/// list, amounts are shown in raw units rather than guessed at.
 public final class Assets {
     public static final String FIAT = "FIAT";
     public static final String CRYPTO = "CRYPTO";
@@ -33,13 +39,8 @@ public final class Assets {
     /// The currency balances are totalled in on the dashboard.
     public static final String REPORTING = "USD";
 
-    private static final Asset[] ALL = {
-        new Asset("USD", "US Dollar", FIAT, 2),
-        new Asset("EUR", "Euro", FIAT, 2),
-        new Asset("BTC", "Bitcoin", CRYPTO, 8),
-        // 9, not the chain's 18: see the comment beside the row on the server.
-        new Asset("ETH", "Ether", CRYPTO, 9),
-    };
+    private static Asset[] all = new Asset[0];
+    private static boolean loaded;
 
     /// One asset.
     public static final class Asset {
@@ -63,9 +64,38 @@ public final class Assets {
     private Assets() {
     }
 
+    /// Reads the list from the server once, then runs `then` (also when the
+    /// call failed: the screens still work, in raw units, and the next call
+    /// tries again).
+    public static void load(final Runnable then) {
+        if (loaded) {
+            then.run();
+            return;
+        }
+        Api.banking().assets(Net.to((List<AssetDto> list) -> {
+            replace(list);
+            then.run();
+        }, (status, message) -> then.run()));
+    }
+
+    /// Replaces the table with the server's answer, fiat first.
+    static void replace(List<AssetDto> list) {
+        Asset[] out = new Asset[list.size()];
+        int at = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            for (AssetDto dto : list) {
+                if (CRYPTO.equals(dto.kind()) == (pass == 1)) {
+                    out[at++] = new Asset(dto.code(), dto.name(), dto.kind(), dto.decimals());
+                }
+            }
+        }
+        all = out;
+        loaded = true;
+    }
+
     /// The asset named `code`, or null.
     public static Asset get(String code) {
-        for (Asset asset : ALL) {
+        for (Asset asset : all) {
             if (asset.code.equals(code)) {
                 return asset;
             }
@@ -87,8 +117,8 @@ public final class Assets {
 
     /// Every asset, fiat first.
     public static Asset[] all() {
-        Asset[] copy = new Asset[ALL.length];
-        System.arraycopy(ALL, 0, copy, 0, ALL.length);
+        Asset[] copy = new Asset[all.length];
+        System.arraycopy(all, 0, copy, 0, all.length);
         return copy;
     }
 }

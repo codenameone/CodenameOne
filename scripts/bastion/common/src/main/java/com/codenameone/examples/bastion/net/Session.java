@@ -456,6 +456,7 @@ public final class Session {
 
     /// Ends a session kept for [#addPasskey] that was not used.
     public static void endPasskeySession() {
+        keepForPasskey = false;
         if (ceremonyCookie != null) {
             endServerSession(ceremonyServer, ceremonyCookie);
         }

@@ -100,21 +100,25 @@ public final class TransferForm {
             return;
         }
         final String[] fromLabels = labels(accounts);
-        final Picker from = Ui.picker(fromLabels, initial);
+        final String[] accountIds = ids(accounts);
+        final Picker from = Ui.picker(accountIds, fromLabels, accountIds[Math.min(initial, accountIds.length - 1)]);
         final Container target = new Container(BoxLayout.y());
         final Picker[] to = new Picker[1];
         final boolean[] payee = {toPayee};
         final String[][] toLabels = new String[1][];
+        final String[][] toIds = new String[1][];
         Container mode = Ui.segments(new String[] {"My accounts", "A payee"}, toPayee ? 1 : 0,
                 index -> {
                     payee[0] = index == 1;
                     target.removeAll();
                     toLabels[0] = payee[0] ? payeeLabels(payees) : labels(accounts);
+                    toIds[0] = payee[0] ? payeeIds(payees) : accountIds;
                     if (toLabels[0].length == 0) {
                         target.add(Ui.empty("Add a payee first, under Payees."));
                         to[0] = null;
                     } else {
-                        to[0] = Ui.picker(toLabels[0], payee[0] ? 0 : Math.min(1, toLabels[0].length - 1));
+                        to[0] = Ui.picker(toIds[0], toLabels[0],
+                                toIds[0][payee[0] ? 0 : Math.min(1, toIds[0].length - 1)]);
                         target.add(to[0]);
                     }
                     target.revalidate();
@@ -137,12 +141,16 @@ public final class TransferForm {
         content.addAll(amount, memo, error, review);
         review.addActionListener(evt -> {
             Ui.showError(error, null);
-            AccountDto source = accounts.get(Math.max(0, Ui.picked(from, fromLabels)));
+            AccountDto source = accounts.get(Math.max(0, Ui.indexOf(accountIds, Ui.pickedId(from))));
             if (to[0] == null) {
                 Ui.showError(error, Lang.tr("Choose who to pay."));
                 return;
             }
-            int picked = Ui.picked(to[0], toLabels[0]);
+            int picked = Ui.indexOf(toIds[0], Ui.pickedId(to[0]));
+            if (picked < 0) {
+                Ui.showError(error, Lang.tr("Choose who to pay."));
+                return;
+            }
             long units = Amounts.parse(amount.getText(), source.asset());
             if (units <= 0) {
                 Ui.showError(error, Lang.tr("Enter an amount, like 25.00."));
@@ -203,6 +211,22 @@ public final class TransferForm {
         for (int iter = 0; iter < out.length; iter++) {
             AccountDto a = accounts.get(iter);
             out[iter] = a.name() + " (" + Amounts.format(a.balance(), a.asset()) + ")";
+        }
+        return out;
+    }
+
+    static String[] ids(List<AccountDto> accounts) {
+        String[] out = new String[accounts.size()];
+        for (int iter = 0; iter < out.length; iter++) {
+            out[iter] = accounts.get(iter).id();
+        }
+        return out;
+    }
+
+    private static String[] payeeIds(List<PayeeDto> payees) {
+        String[] out = new String[payees.size()];
+        for (int iter = 0; iter < out.length; iter++) {
+            out[iter] = payees.get(iter).id();
         }
         return out;
     }

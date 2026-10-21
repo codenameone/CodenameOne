@@ -55,6 +55,11 @@ import java.util.List;
 /// A null header argument is left out of the request.
 @RestClient
 public interface BankingApi {
+    /// The assets the bank holds, from the ledger's own table: the app counts
+    /// every amount in the decimals named here rather than in a copy of them.
+    @GET("/api/assets")
+    void assets(OnComplete<Response<List<AssetDto>>> callback);
+
     @GET("/api/accounts")
     void accounts(OnComplete<Response<List<AccountDto>>> callback);
 

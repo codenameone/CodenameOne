@@ -198,27 +198,59 @@ public final class Ui {
         row.repaint();
     }
 
-    /// A picker of `labels`, starting at `initial`.
-    public static Picker picker(String[] labels, int initial) {
+    /// A picker of the things named by `ids`, shown as `labels` (one per id),
+    /// starting at `initialId` (the first when it is null or absent). Read
+    /// the choice with [#pickedId]: it answers the id, never the label, so
+    /// two payees with one nickname are still two payees.
+    ///
+    /// A string picker only knows its strings, so labels that repeat are made
+    /// distinct with a counter (`Rent`, `Rent (2)`) before it sees them.
+    public static Picker picker(String[] ids, String[] labels, String initialId) {
+        String[] shown = distinct(labels);
         Picker picker = new Picker();
         picker.setType(Display.PICKER_TYPE_STRINGS);
-        picker.setStrings(labels);
-        if (labels.length > 0) {
-            picker.setSelectedString(labels[Math.max(0, Math.min(initial, labels.length - 1))]);
+        // setStrings localizes the array in place, so `shown` stays the
+        // picker's own strings and their positions stay those of `ids`.
+        picker.setStrings(shown);
+        picker.putClientProperty(IDS, ids.clone());
+        if (shown.length > 0) {
+            picker.setSelectedStringIndex(Math.max(0, indexOf(ids, initialId)));
         }
         picker.setUIID("BnField");
         return picker;
     }
 
-    /// The index `picker` is on, among the `labels` it was made with.
-    public static int picked(Picker picker, String[] labels) {
-        String selected = picker.getSelectedString();
-        for (int iter = 0; iter < labels.length; iter++) {
-            if (labels[iter].equals(selected)) {
+    /// The id of what `picker` is on, or null when it is on nothing.
+    public static String pickedId(Picker picker) {
+        String[] ids = (String[]) picker.getClientProperty(IDS);
+        int index = picker.getSelectedStringIndex();
+        return ids == null || index < 0 || index >= ids.length ? null : ids[index];
+    }
+
+    /// Where `id` is in `ids`, or -1.
+    public static int indexOf(String[] ids, String id) {
+        for (int iter = 0; id != null && iter < ids.length; iter++) {
+            if (id.equals(ids[iter])) {
                 return iter;
             }
         }
         return -1;
+    }
+
+    private static final String IDS = "BnPickerIds";
+
+    static String[] distinct(String[] labels) {
+        String[] out = new String[labels.length];
+        for (int iter = 0; iter < labels.length; iter++) {
+            String label = labels[iter];
+            int n = 1;
+            while (indexOf(out, label) >= 0) {
+                n++;
+                label = labels[iter] + " (" + n + ")";
+            }
+            out[iter] = label;
+        }
+        return out;
     }
 
     /// Asks a yes-or-no question about money that is about to move; `yes`

@@ -122,13 +122,16 @@ public final class WithdrawForm {
             final List<CryptoAddressDto> addresses, final long now, final Runnable back) {
         final Container panel = new Container(BoxLayout.y(), "BnPanel");
         final String[] walletLabels = TransferForm.labels(wallets);
-        final Picker wallet = Ui.picker(walletLabels, initial);
+        final String[] walletIds = TransferForm.ids(wallets);
+        final Picker wallet = Ui.picker(walletIds, walletLabels,
+                walletIds[Math.min(initial, walletIds.length - 1)]);
         final Container target = new Container(BoxLayout.y());
         final List<CryptoAddressDto> usable = new ArrayList<CryptoAddressDto>();
         final Picker[] to = new Picker[1];
         final String[][] toLabels = new String[1][];
+        final String[][] toIds = new String[1][];
         final Runnable retarget = () -> {
-            AccountDto from = wallets.get(Math.max(0, Ui.picked(wallet, walletLabels)));
+            AccountDto from = wallets.get(Math.max(0, Ui.indexOf(walletIds, Ui.pickedId(wallet))));
             usable.clear();
             for (CryptoAddressDto address : addresses) {
                 if (address.asset().equals(from.asset()) && address.usableAt() <= now) {
@@ -137,14 +140,16 @@ public final class WithdrawForm {
             }
             target.removeAll();
             toLabels[0] = new String[usable.size()];
+            toIds[0] = new String[usable.size()];
             for (int iter = 0; iter < usable.size(); iter++) {
+                toIds[0][iter] = usable.get(iter).id();
                 toLabels[0][iter] = usable.get(iter).label() + " - " + shorten(usable.get(iter).address());
             }
             if (usable.isEmpty()) {
                 to[0] = null;
                 target.add(Ui.empty(Lang.tr("No {0} address is ready yet.", from.asset())));
             } else {
-                to[0] = Ui.picker(toLabels[0], 0);
+                to[0] = Ui.picker(toIds[0], toLabels[0], null);
                 target.add(to[0]);
             }
             target.revalidate();
@@ -159,12 +164,12 @@ public final class WithdrawForm {
         final String[] key = new String[1];
         send.addActionListener(evt -> {
             Ui.showError(error, null);
-            final AccountDto from = wallets.get(Math.max(0, Ui.picked(wallet, walletLabels)));
+            final AccountDto from = wallets.get(Math.max(0, Ui.indexOf(walletIds, Ui.pickedId(wallet))));
             if (to[0] == null) {
                 Ui.showError(error, Lang.tr("Choose an address."));
                 return;
             }
-            CryptoAddressDto address = usable.get(Math.max(0, Ui.picked(to[0], toLabels[0])));
+            CryptoAddressDto address = usable.get(Math.max(0, Ui.indexOf(toIds[0], Ui.pickedId(to[0]))));
             long units = Amounts.parse(amount.getText(), from.asset());
             if (units <= 0 || units > from.balance()) {
                 Ui.showError(error, Lang.tr(units <= 0 ? "Enter an amount."
@@ -201,7 +206,7 @@ public final class WithdrawForm {
             }
         }
         final String[] codes = coins.toArray(new String[coins.size()]);
-        Picker coin = Ui.picker(codes, 0);
+        Picker coin = Ui.picker(codes, codes, null);
         TextField address = Ui.field("Address", TextField.ANY);
         TextField label = Ui.field("Label, like My hardware wallet", TextField.ANY);
         Container body = new Container(BoxLayout.y());
@@ -210,7 +215,7 @@ public final class WithdrawForm {
         if (Dialog.show(Lang.tr("Add an address"), body, ok, new Command(Lang.tr("Cancel"))) != ok) {
             return;
         }
-        final NewCryptoAddressDto added = new NewCryptoAddressDto(coin.getSelectedString(),
+        final NewCryptoAddressDto added = new NewCryptoAddressDto(Ui.pickedId(coin),
                 address.getText().trim(), label.getText().trim());
         DeviceSetup.withDevice(failed -> Api.exchange().addAddress(
                 RequestSigner.sign("POST", ADDRESSES, added), added,

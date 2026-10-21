@@ -20,7 +20,9 @@ package com.codenameone.examples.bastion.security;
 
 import com.codename1.mapping.Mappers;
 import com.codename1.security.Hash;
+import com.codename1.security.PrivateKey;
 import com.codename1.security.SecureRandom;
+import com.codename1.security.Signature;
 import com.codename1.util.Base64;
 import com.codenameone.examples.bastion.api.SignedRequest;
 
@@ -43,7 +45,7 @@ public final class RequestSigner {
     /// needs one, and the app offers to register the device.
     public static String sign(String method, String target, Object body) {
         String deviceId = DeviceKey.deviceId();
-        byte[] key = DeviceKey.privateKey();
+        PrivateKey key = DeviceKey.privateKey();
         if (deviceId == null || key == null) {
             return null;
         }
@@ -62,11 +64,40 @@ public final class RequestSigner {
     /// The header for the given parts; the deterministic core of
     /// [#sign(String, String, Object)], which the tests check against the
     /// server's form.
-    public static String header(String deviceId, byte[] privateKey, String method,
+    public static String header(String deviceId, PrivateKey privateKey, String method,
             String target, byte[] body, String nonce, long ts) {
         String text = SignedRequest.canonical(method, target, Hash.sha256(body), nonce, ts);
-        byte[] signature = P256.sign(privateKey, utf8(text));
-        return SignedRequest.header(deviceId, ts, nonce, Base64.encodeUrlSafe(signature));
+        byte[] der = Signature.sign(Signature.SHA256_WITH_ECDSA, privateKey, utf8(text));
+        return SignedRequest.header(deviceId, ts, nonce, Base64.encodeUrlSafe(jose(der)));
+    }
+
+    /// The DER `SEQUENCE { INTEGER r, INTEGER s }` the platform signs into, as
+    /// the 64-byte JOSE `r || s` the header carries (ES256, RFC 7518 3.4).
+    static byte[] jose(byte[] der) {
+        if (der == null || der.length < 8 || der[0] != 0x30) {
+            throw new IllegalArgumentException("not a DER ECDSA signature");
+        }
+        int at = (der[1] & 0x80) != 0 ? 2 + (der[1] & 0x7f) : 2;
+        byte[] out = new byte[64];
+        for (int part = 0; part < 2; part++) {
+            if (der[at] != 0x02) {
+                throw new IllegalArgumentException("not a DER ECDSA signature");
+            }
+            int len = der[at + 1] & 0xff;
+            int start = at + 2;
+            int from = start;
+            int n = len;
+            while (n > 32 && der[from] == 0) {
+                from++;
+                n--;
+            }
+            if (n > 32) {
+                throw new IllegalArgumentException("not a P-256 signature");
+            }
+            System.arraycopy(der, from, out, part * 32 + 32 - n, n);
+            at = start + len;
+        }
+        return out;
     }
 
     /// 128 random bits, base64url: 22 characters, in the server's alphabet.

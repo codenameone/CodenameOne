@@ -19,6 +19,10 @@
 package com.codenameone.examples.bastion.security;
 
 import com.codenameone.examples.bastion.api.SignedRequest;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.KeyPair;
+import com.codename1.impl.javase.JavaSEPort;
+import com.codename1.io.Util;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -56,12 +60,11 @@ class RequestSignerTest {
 
     @Test
     void headerVerifiesWithTheJdkAsTheServerDoes() throws Exception {
-        byte[] seed = new byte[48];
-        for (int iter = 0; iter < seed.length; iter++) {
-            seed[iter] = (byte) (iter * 7 + 3);
-        }
-        byte[] privateKey = P256.newPrivateKey(seed);
-        String header = RequestSigner.header("dev1", privateKey, "POST",
+        // The JavaSE port's crypto (the JDK's provider) without a Display,
+        // which would need a window: the tests run headless.
+        Util.setImplementation(new JavaSEPort());
+        KeyPair pair = KeyGenerator.ecP256();
+        String header = RequestSigner.header("dev1", pair.getPrivateKey(), "POST",
                 "/api/accounts/a1/withdraw", BODY.getBytes("UTF-8"), NONCE, TS);
         assertTrue(header.startsWith("v1;device=dev1;ts=" + TS + ";nonce=" + NONCE + ";sig="),
                 header);
@@ -69,11 +72,19 @@ class RequestSignerTest {
         assertEquals(64, jose.length);
 
         PublicKey key = KeyFactory.getInstance("EC").generatePublic(
-                new X509EncodedKeySpec(P256.publicKey(privateKey)));
+                new X509EncodedKeySpec(pair.getPublicKey().getEncoded()));
         Signature verifier = Signature.getInstance("SHA256withECDSA");
         verifier.initVerify(key);
         verifier.update(CANONICAL.getBytes("UTF-8"));
         assertTrue(verifier.verify(der(jose)));
+    }
+
+    @Test
+    void joseRoundTripsShortAndPaddedIntegers() {
+        byte[] jose = new byte[64];
+        jose[0] = (byte) 0x80; // r needs a leading zero in DER
+        jose[63] = 5;          // s is one byte long
+        org.junit.jupiter.api.Assertions.assertArrayEquals(jose, RequestSigner.jose(der(jose)));
     }
 
     /// JOSE `r || s` to the DER the JDK verifies.
