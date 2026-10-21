@@ -15,8 +15,11 @@ and metric:
 
   - at least --min-runs master runs (default 3) were judged against the row's CURRENT
     value (a run judged against an older value says nothing about this one);
-  - every one of them is below the baseline by more than half the row's tolerance, and
-    for RAM by more than the policy floor in absolute terms;
+  - every one of them is far enough below the baseline that the tightened row's
+    regression threshold (new value times one plus the tolerance) falls BELOW the old
+    value, and for RAM the gap is also larger than the policy floor in absolute terms.
+    A smaller margin would lower the row without protecting anything: with a 20%
+    tolerance, tightening 1.00 to 0.89 still lets the run go back to 1.00 unflagged;
   - no pull request overlay is pending for the row (the fold runs first and normally
     leaves none).
 
@@ -86,7 +89,8 @@ def plan(seen, base, policy, overlay_rows, min_runs):
         tolerance = max(row.get('tolerance', {}).get(metric, 0.0), policy['tolerance'][metric])
         floor = policy.get('floor', {}).get(metric, 0.0)
         worst = max(medians)
-        if worst < current * (1 - tolerance / 2) and current - worst > floor:
+        # Only tighten when giving the whole win back would fail the gate afterwards.
+        if worst * (1 + tolerance) < current and current - worst > floor:
             changes.append((key, bench, cores, metric, current, round(worst, 3), len(medians)))
     return changes
 

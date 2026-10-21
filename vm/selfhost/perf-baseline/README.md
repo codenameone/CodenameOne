@@ -11,7 +11,8 @@ ParparVM / JDK 25 ratios that `vm/selfhost/perf-gate.py` holds every platform bu
 A ratio past its tolerance BELOW the baseline is reported but does not fail the gate.
 The same nightly job then runs `../tighten-perf-baseline.py` over the `perf-results-*`
 artifacts of master's last seven days of gate runs: a row that at least three of them
-beat by more than half its tolerance (and by the RAM floor) is lowered to the worst of
+beat by enough that the lowered row would flag a return to the old value (and, for RAM,
+by more than the floor) is lowered to the worst of
 those runs, so a later change that gives the win back fails as a regression.
 
 The format and the rules for combining overlays are in `../perf_baseline.py`.
