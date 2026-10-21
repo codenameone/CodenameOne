@@ -1218,6 +1218,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// and a 56-byte message that spills the padding into a second block), and
     /// the project id against the value the website beacon test pins for the
     /// same package -- the two must agree or downloads and builds stop joining.
+    private static boolean isLowerHex64(String s) {
+        if (s == null || s.length() != 64) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void validateSha256Vectors() {
         assertEqual("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Sha256.hex(""),
                 "SHA-256 of the empty string");
@@ -1228,9 +1241,21 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "SHA-256 of the two-block FIPS vector");
         assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
                 Sha256.hex("com.example.myapp"), "SHA-256 of com.example.myapp");
-        assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
-                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Example.MyApp").projectId(),
+        assertEqual(Sha256.hex("com.acme.myapp"),
+                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Acme.MyApp").projectId(),
                 "The project id hashes the LOWER-CASED package name, like the website beacon");
+        // The default package is everyone's: such a download gets its own random id,
+        // stable for that download (beacon, launchers and pom agree), new for the next.
+        GeneratorModel first = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Example.MyApp");
+        GeneratorModel second = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "com.example.myapp");
+        assertEqual(first.projectId(), first.projectId(), "one download keeps one id");
+        assertTrue(isLowerHex64(first.projectId()), "the random id has the hash's shape");
+        assertFalse(first.projectId().equals(Sha256.hex("com.example.myapp")), "not the shared hash");
+        assertFalse(first.projectId().equals(second.projectId()), "each default-package download is its own");
+        assertEqual("id:" + first.projectId(), first.beaconKey(), "the page is given the id, not the package");
+        assertEqual("COM.Acme.MyApp",
+                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Acme.MyApp").beaconKey(),
+                "any other package is still hashed by the page");
     }
 
     /// Initializr Maven downloads report build progress from build.sh/build.bat:

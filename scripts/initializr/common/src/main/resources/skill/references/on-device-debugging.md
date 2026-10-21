@@ -6,7 +6,7 @@
 
 Both platforms need a build made with an on-device-debug build hint, because the flag is baked into the binary. A release build cannot be attached to.
 
-**Gradle projects.** The settings file is `codenameone_settings.properties` at the root and the sources are `src/main/java` (drop the `common/` below). The builds are Gradle tasks: `./gradlew buildAndroid -Pcodename1.arg.android.onDeviceDebug=true` or `./gradlew buildAndroidGradleProject` for Android, and `./gradlew buildIos -Pcodename1.arg.ios.onDeviceDebug=true` or `./gradlew buildIosXcodeProject` for iOS. The device-side helpers -- `cn1:android-on-device-debugging` (install, launch, forward JDWP) and `cn1:ios-on-device-debugging` (the JDWP proxy) -- are Maven goals with no Gradle task yet; under Gradle, do the Android steps with `adb` by hand (`adb install`, `adb shell am set-debug-app -w <package>`, `adb forward tcp:5005 jdwp:<pid>`) and say so if the iOS proxy is needed.
+**Gradle projects.** The settings file is `codenameone_settings.properties` at the root and the sources are `src/main/java` (drop the `common/` below). The builds are Gradle tasks: `./gradlew buildAndroid -Pcodename1.arg.android.onDeviceDebug=true` or `./gradlew buildAndroidGradleProject -Pcodename1.open=false` for Android, and `./gradlew buildIos -Pcodename1.arg.ios.onDeviceDebug=true` or `./gradlew buildIosXcodeProject -Pcodename1.open=false` for iOS. The device-side helpers -- `cn1:android-on-device-debugging` (install, launch, forward JDWP) and `cn1:ios-on-device-debugging` (the JDWP proxy) -- are Maven goals with no Gradle task yet; under Gradle, do the Android steps with `adb` by hand (`adb install`, `adb shell am set-debug-app -w <package>`, `adb forward tcp:5005 jdwp:<pid>`) and say so if the iOS proxy is needed.
 
 ## Android
 
@@ -29,7 +29,7 @@ That flips the generated `AndroidManifest.xml` to `debuggable="true"` and disabl
 mvn cn1:buildAndroidOnDeviceDebug
 
 # Or fully local: generate the Gradle project and assemble it yourself.
-mvn cn1:buildAndroidGradleProject
+mvn cn1:buildAndroidGradleProject -Dopen=false
 cd android/target/*-android-source && ./gradlew assembleDebug && cd -
 ```
 
@@ -88,7 +88,7 @@ A LAN address means the app is reaching the **local network**, which iOS 14 gate
 mvn cn1:buildIosOnDeviceDebug
 
 # Or generate a local Xcode project (macOS with Xcode only) and run it from there.
-mvn cn1:buildIosXcodeProject
+mvn cn1:buildIosXcodeProject -Dopen=false
 ```
 
 **3. Start the proxy** and leave it running:

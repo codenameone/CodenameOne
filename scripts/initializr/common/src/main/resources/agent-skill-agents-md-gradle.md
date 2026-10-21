@@ -32,6 +32,9 @@ task.
   see `.agent-skills/codename-one/references/on-device-debugging.md`.
 - Native cloud builds are tasks: `./gradlew buildAndroid`, `./gradlew buildIos`,
   `./gradlew buildJavascript`, `./gradlew buildMacDesktop`; `./gradlew tasks` lists them all.
+- Local native-project builds (`./gradlew buildIosXcodeProject`,
+  `buildAndroidGradleProject`) open Xcode / Android Studio when they finish. Always
+  add `-Pcodename1.open=false` so you generate the sources without launching an IDE.
 - cn1libs are declared by Maven coordinates in `build.gradle.kts`:
   `dependencies { cn1lib("group:artifact-lib:version") }`.
 - A `backend/` directory, when present, is the app's server:

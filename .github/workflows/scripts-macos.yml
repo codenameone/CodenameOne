@@ -347,6 +347,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-results-macos-arm64
+          path: artifacts/macos-ui-tests/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Fail on a ParparVM performance regression
         if: success() || failure()
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/macos-ui-tests/perf

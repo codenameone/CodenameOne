@@ -864,7 +864,7 @@ public class Initializr extends Lifecycle {
             new Thread(() -> {
                 boolean sent;
                 try {
-                    sent = bridge.requestSteps(address, model.getPackageName(), model.templateId(), model.ideId(),
+                    sent = bridge.requestSteps(address, model.beaconKey(), model.templateId(), model.ideId(),
                             model.buildKind());
                 } catch (Throwable t) {
                     sent = false;
