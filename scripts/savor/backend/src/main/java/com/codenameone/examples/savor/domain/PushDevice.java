@@ -29,20 +29,20 @@ import com.codename1.annotations.Id;
 @Entity
 public class PushDevice {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
     /// `fcm`, `apns`, `huawei`, `wns` or `web`.
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String provider = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(1024)")
     private String token = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String platform = "";
 
     @Column(nullable = false)
