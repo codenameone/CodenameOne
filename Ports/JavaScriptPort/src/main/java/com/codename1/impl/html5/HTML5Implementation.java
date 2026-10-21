@@ -6669,6 +6669,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 } catch (IOException err) {
                     Log.e(err);
                     result.setError(err);
+                } catch (RuntimeException err) {
+                    // an unchecked failure in the application's writer
+                    Log.e(err);
+                    result.setError(err);
                 } catch (OutOfMemoryError err) {
                     out = null;
                     result.setError(new IOException("The document is too large to download from the browser"));

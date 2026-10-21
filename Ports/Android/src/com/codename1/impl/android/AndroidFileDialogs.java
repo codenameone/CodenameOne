@@ -345,7 +345,20 @@ final class AndroidFileDialogs {
             deliver(callback, r);
             return;
         }
-        AndroidNativeUtil.startActivityForResult(intent, REQUEST_CODE, listener);
+        try {
+            AndroidNativeUtil.startActivityForResult(intent, REQUEST_CODE, listener);
+        } catch (RuntimeException e) {
+            // No activity resolves the intent (ActivityNotFoundException) or the
+            // launch was refused. The listener is already installed and the
+            // activity marked busy, and no result will ever arrive to undo
+            // that, so the default channel is restored here.
+            if (activity instanceof CodenameOneActivity) {
+                ((CodenameOneActivity) activity).restoreIntentResultListener();
+            }
+            FileDialogResult r = FileDialogResult.cancelled(request);
+            r.setError(e);
+            deliver(callback, r);
+        }
     }
 
     private static void applyInitialUri(FileDialogRequest<?> request, Intent intent) {

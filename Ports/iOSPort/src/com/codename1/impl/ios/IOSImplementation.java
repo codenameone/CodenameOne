@@ -6989,23 +6989,32 @@ public class IOSImplementation extends CodenameOneImplementation {
                     } finally {
                         out.close();
                     }
-                } catch (final IOException err) {
-                    deleteExportStaging(temp);
-                    Display.getInstance().callSerially(new Runnable() {
-                        @Override
-                        public void run() {
-                            com.codename1.io.filechooser.FileDialogResult r =
-                                    com.codename1.io.filechooser.FileDialogResult.cancelled(request);
-                            r.setError(err);
-                            callback.onSucess(r);
-                        }
-                    });
+                } catch (IOException err) {
+                    failStaging(temp, err);
+                    return;
+                } catch (RuntimeException err) {
+                    // An unchecked failure in the application's writer: the
+                    // staging still goes and the callback is still owed.
+                    failStaging(temp, err);
                     return;
                 }
                 int id = registerFileDialog(new PendingFileDialog(request, callback, temp));
                 nativeInstance.showSaveFileDialog(temp,
                         !request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.IOS_EXPORT_AS_MOVE, false),
                         stripFileScheme(request.getInitialDirectory()), id);
+            }
+
+            private void failStaging(String temp, final Throwable err) {
+                deleteExportStaging(temp);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        com.codename1.io.filechooser.FileDialogResult r =
+                                com.codename1.io.filechooser.FileDialogResult.cancelled(request);
+                        r.setError(err);
+                        callback.onSucess(r);
+                    }
+                });
             }
         });
     }

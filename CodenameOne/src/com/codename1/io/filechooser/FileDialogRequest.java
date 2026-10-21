@@ -336,6 +336,11 @@ public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
         StringBuilder sb = new StringBuilder();
         for (FileTypeFilter f : filters) {
             for (String e : f.getExtensions()) {
+                if ("*".equals(e)) {
+                    // One filter takes every file, so the union of them all
+                    // does too; any narrower token would hide files.
+                    return null;
+                }
                 append(sb, e);
             }
             for (String m : f.getMimeTypes()) {
