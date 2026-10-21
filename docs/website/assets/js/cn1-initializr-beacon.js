@@ -38,6 +38,12 @@
   }
 
   function hashPackageName(packageName) {
+    // A project that kept the Initializr's default package is identified by a
+    // random per-download id instead (GeneratorModel#beaconKey): sent as is.
+    var given = /^id:([0-9a-f]{64})$/.exec(String(packageName));
+    if (given) {
+      return Promise.resolve(given[1]);
+    }
     var subtle = window.crypto && window.crypto.subtle;
     if (!subtle || typeof TextEncoder === "undefined") {
       return Promise.resolve(null);

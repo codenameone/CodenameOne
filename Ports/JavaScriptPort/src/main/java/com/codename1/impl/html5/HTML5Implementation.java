@@ -1125,6 +1125,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             NativeOverlay o = (NativeOverlay)c.getNativeOverlay();
             o.updateNativeEditorText(text);
         }
+        if (!(c.getNativeOverlay() instanceof SelectionTextOverlay)) {
+            // The legacy editor is a transparent <input> over the canvas, and the hint
+            // (nativeEditorPaintsHint() is false) is painted on the canvas beneath it.
+            // TextArea.setText() skips its own repaint while native editing, so without
+            // this the hint painted for the empty field stays under the typed text.
+            c.repaint();
+        }
     }
     
     

@@ -69,7 +69,7 @@ Every path in this skill and its references is written relative to the **app dir
 | Compile the CSS theme | `mvn -pl common cn1:css` (runs with every build) | `./gradlew cn1Css` |
 | Android cloud build | `mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` |
 | iOS cloud build (debug / App Store) | `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (`ios-device-release`) | `./gradlew buildIos` / `./gradlew buildIosRelease` |
-| Xcode / Android Studio project, locally | `-Dcodename1.buildTarget=ios-source` / `android-source` | `./gradlew buildIosXcodeProject` / `./gradlew buildAndroidGradleProject` |
+| Xcode / Android Studio project, locally | `-Dcodename1.buildTarget=ios-source` / `android-source`, always with `-Dopen=false` | `./gradlew buildIosXcodeProject -Pcodename1.open=false` / `./gradlew buildAndroidGradleProject -Pcodename1.open=false` |
 | Web app, locally / in the cloud | `mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` (`javascript`) | `./gradlew buildJavascriptLocal` / `./gradlew buildJavascript` |
 | Desktop app (JVM) | `-Dcodename1.buildTarget=mac-os-x-desktop` / `windows-desktop` | `./gradlew buildMacDesktop` / `./gradlew buildWindowsDesktop` |
 | Native desktop | `windows-device` / `linux-device` / `mac-os-x-native` | `./gradlew buildWindowsDevice` / `buildLinuxDevice` / `buildMacNative` |
