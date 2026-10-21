@@ -36,9 +36,9 @@ import com.codenameone.examples.bastion.ledger.Leg;
 import com.codenameone.examples.bastion.repository.TradeOrderRepository;
 
 import java.io.IOException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /// A simulated price feed and market maker, so a development server's
 /// exchange has prices and a book to trade against.
@@ -66,7 +66,9 @@ public class MarketMaker {
     private final Ledger ledger;
     private final TradeOrderRepository orders;
     private final boolean enabled;
-    private final SecureRandom random = new SecureRandom();
+    // A price walk for a demo book, not a secret: java.util.Random, which a
+    // compiled server's class library has (java.security does not exist there).
+    private final Random random = new Random();
 
     public MarketMaker(Exchange exchange, Markets markets, Ledger ledger,
             TradeOrderRepository orders, Config config,

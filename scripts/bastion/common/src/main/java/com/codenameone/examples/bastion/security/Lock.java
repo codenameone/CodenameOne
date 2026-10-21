@@ -59,15 +59,24 @@ public final class Lock {
 
     public static void install(Screens app) {
         screens = app;
-        if (idle == null) {
-            idle = UITimer.timer(5000, true, Lock::checkIdle);
-        }
     }
 
-    /// Called by every form the app shows: a touch anywhere is activity.
+    /// Called by every form the app shows: a touch anywhere is activity, and
+    /// the idle check moves to the form.
+    ///
+    /// A UITimer runs only while the form it is bound to is showing, so the
+    /// check is bound again to each new form rather than once at start --
+    /// where, before the first form, there is nothing to bind it to (the
+    /// browser has no current form at that point at all).
     public static void watch(Form form) {
         form.addPointerPressedListener(evt -> touched());
         form.addPointerDraggedListener(evt -> touched());
+        if (idle == null) {
+            idle = new UITimer(Lock::checkIdle);
+        } else {
+            idle.cancel();
+        }
+        idle.schedule(5000, true, form);
     }
 
     public static void touched() {

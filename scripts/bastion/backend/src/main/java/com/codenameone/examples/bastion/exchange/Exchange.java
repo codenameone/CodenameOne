@@ -205,7 +205,7 @@ public class Exchange {
             }
             if (buy) {
                 long most = Markets.ceilDiv(exact(r.price(), r.quantity()), scale);
-                held = Math.addExact(most, fee(most));
+                held = Markets.addExact(most, fee(most));
             } else {
                 held = r.quantity();
             }
@@ -264,12 +264,15 @@ public class Exchange {
     /// Cancels `owner`'s open order `id` and releases what it still holds.
     @Transactional(rollbackFor = Exception.class)
     public OrderDto cancel(String owner, String id) throws IOException {
-        TradeOrder peek = id == null ? null : orders.findById(id);
-        if (peek == null || !peek.getOwner().equals(owner)) {
+        String market = id == null ? null : orders.marketOf(id, owner);
+        if (market == null) {
             throw new ResponseStatusException(404, "No such order");
         }
-        Market m = lock(peek.getMarket());
-        // Read again behind the lock: it may have filled while we waited.
+        Market m = lock(market);
+        // The first read of the row, and behind the lock: it may have filled
+        // while we waited. Loading it before the lock would keep that stale
+        // copy in the session (PostgreSQL and MySQL let a fill commit in
+        // between; SQLite serializes the writers and hid it).
         TradeOrder o = orders.findById(id);
         if (!OPEN.equals(o.getStatus())) {
             throw new ResponseStatusException(409, "That order is already " + o.getStatus());
@@ -367,9 +370,9 @@ public class Exchange {
     /// at `price` is added; [Long#MAX_VALUE] when that does not fit a long.
     private long cost(TradeOrder o, long price, long quantity, long scale) {
         try {
-            long quote = Markets.ceilDiv(Math.addExact(o.getNotional(),
-                    Math.multiplyExact(price, quantity)), scale);
-            return Math.addExact(quote, fee(quote));
+            long quote = Markets.ceilDiv(Markets.addExact(o.getNotional(),
+                    Markets.multiplyExact(price, quantity)), scale);
+            return Markets.addExact(quote, fee(quote));
         } catch (ArithmeticException tooLarge) {
             return Long.MAX_VALUE;
         }
@@ -380,8 +383,8 @@ public class Exchange {
     private void trade(Market m, long scale, TradeOrder buy, TradeOrder sell, long price,
             long quantity, TradeOrder taker, List<String[]> events) throws IOException {
         long product = exact(price, quantity);
-        long buyNotional = Math.addExact(buy.getNotional(), product);
-        long sellNotional = Math.addExact(sell.getNotional(), product);
+        long buyNotional = Markets.addExact(buy.getNotional(), product);
+        long sellNotional = Markets.addExact(sell.getNotional(), product);
         long paidTotal = Markets.ceilDiv(buyNotional, scale);
         long gotTotal = sellNotional / scale;
         long paid = paidTotal - buy.getSettled();
@@ -521,12 +524,12 @@ public class Exchange {
 
     /// The taker fee on `quote`, rounded up.
     long fee(long quote) {
-        return Markets.ceilDiv(Math.multiplyExact(quote, feeBps), 10000L);
+        return Markets.ceilDiv(Markets.multiplyExact(quote, feeBps), 10000L);
     }
 
     private static long exact(long a, long b) {
         try {
-            return Math.multiplyExact(a, b);
+            return Markets.multiplyExact(a, b);
         } catch (ArithmeticException tooLarge) {
             throw new ResponseStatusException(400, "That order is too large");
         }
@@ -534,7 +537,7 @@ public class Exchange {
 
     private static void add(Map<String, Long> sums, String account, long amount) {
         Long was = sums.get(account);
-        sums.put(account, Long.valueOf(Math.addExact(was == null ? 0L : was.longValue(),
+        sums.put(account, Long.valueOf(Markets.addExact(was == null ? 0L : was.longValue(),
                 amount)));
     }
 

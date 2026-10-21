@@ -1,0 +1,118 @@
+[[bastion-users-guide]]
+== Bastion: A bank that shows its locks
+
+Bastion is a virtual bank written in Codename One from end to end: a phone and desktop app, and the server it talks to. It holds money in several currencies and coins, moves it between accounts and people, issues cards, and runs a small exchange where customers trade bitcoin and ether against dollars. It's built to show the security a financial app needs, and every protection it has is listed, with its real state, on one screen of the app.
+
+The sample lives in `scripts/bastion`. This chapter is about using it: what a customer and an administrator see and do. The next chapter, <<bastion-implementors-guide>>, is about how it's built and what a real bank would still have to add.
+
+Nothing in Bastion is real money. Deposits are a counter, cards spend nowhere, coins never touch a blockchain, and the exchange trades against a simulated market. The security is real: the passwords, codes, passkeys, signatures and audit chain work exactly as they would in production.
+
+=== Trying it
+
+The server runs on the JVM with an in-memory database and demo accounts, with nothing to install but a JDK 17:
+
+[source,bash]
+----
+cd scripts/bastion
+CN1_PROFILE=dev backend/server.sh run
+----
+
+The app then runs in the simulator from another terminal:
+
+[source,bash]
+----
+cd scripts/bastion
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates three demo accounts, all with the password `bastion-demo-password`:
+
+[cols="1,2",options="header"]
+|===
+|Account |What it's for
+|`customer@bastion.example` |A customer with money in a checking account
+|`customer2@bastion.example` |A second customer, to pay and to trade with
+|`admin@bastion.example` |The administrator
+|===
+
+On the development profile a small market maker also keeps the exchange's books moving, so that there is something to trade against.
+
+=== Opening an account
+
+*Open an account* on the sign-in screen walks through the steps a new customer takes:
+
+. *E-mail and password.* The password has to be at least twelve characters, and the server checks it, not only the app.
+. *Authenticator app.* The app shows a QR code and a secret. Scanning the code with any authenticator app and typing the six digits it shows turns on the second factor. The secret can be copied instead; the app wipes it from the clipboard after a short while, so that it doesn't stay where other apps can read it. Bastion then shows ten recovery codes, once. Each opens the account once if the phone is lost; keep them somewhere other than the phone.
+. *Passkey.* Where the device supports passkeys, one can be added now, so that later sign-ins need no password at all.
+. *This device.* The app makes a signing key that never leaves the device and registers it with the bank. Payments to other people are signed with this key, so the device itself is a second proof of who is paying.
+. *Unlock with biometrics.* An option: the app can ask for a fingerprint or a face instead of signing in again whenever it locks.
+
+A new account starts with a dollar checking account. Others, in euros or as coin wallets, are opened from the dashboard.
+
+=== Signing in
+
+Signing in takes the e-mail and password, then a code from the authenticator app when the account has one. A passkey replaces both where one is set up. Five wrong passwords in a row lock the account for fifteen minutes; the lock is per account, so guessing from many places at once doesn't help.
+
+The app locks itself after it has been in the background for a while, and after a few minutes without a touch. Locked, it shows nothing of the account and can't sign a payment until it's unlocked again, with biometrics when that's turned on and with the password when it's not.
+
+=== The dashboard
+
+The dashboard lists every account with its balance, and the total in dollars at the exchange's current prices. Tapping an account opens its history: every posting, newest first, with what it was for.
+
+Balances, card numbers and codes are on *sensitive screens*. On Android those screens can't be captured or recorded, and the recent-apps list shows them blank; on iOS the app switcher shows a cover instead of the screen.
+
+=== Moving money
+
+*Transfer* moves money two ways:
+
+* *Between your own accounts*, in the same currency.
+* *To a payee*: another Bastion customer, added by e-mail on the *Payees* screen.
+
+Every transfer carries a key that makes it happen once: a payment retried after a dropped connection isn't paid twice. The receipt shows the entry it made in the ledger.
+
+Some transfers ask for more:
+
+* A payment to someone else is signed with this device's key. On a device that has no key yet, the app offers to register one first, then sends the same payment.
+* A new payee is in a cooling-off period for its first day, in which it can receive only a small amount. Someone who has taken over a session can't add an account of their own and empty yours into it.
+* A move between your own accounts above a threshold is signed with the device key too.
+* Every transfer is held to a limit per transfer and per day; one past either is refused.
+
+=== Cards
+
+*Cards* issues a card on a checking account, freezes and unfreezes it, and sets its spending limit. A frozen card is refused at once. The card number is on a sensitive screen.
+
+=== The exchange
+
+*Exchange* lists the markets, BTC-USD and ETH-USD, with their last price. A market opens its order book, its recent trades and a ticket:
+
+* A *limit order* names a price and a quantity, and rests on the book until another order meets it, or until it's cancelled.
+* A *market order* takes what the book offers now, up to a budget for a buy or a quantity for a sell.
+
+Placing an order sets aside what it could spend; the rest of the balance stays free. Fills move both sides and the fee in one ledger entry, so a trade is never half done. The *Open orders* list shows what's still resting, each with a cancel button.
+
+=== Withdrawing coins
+
+Coins leave the bank only to an address on the account's *allow-list*, and the list is guarded:
+
+* Adding an address is signed by this device.
+* A new address waits a day before anything can be sent to it.
+* Every withdrawal is signed by this device, and is held to a limit per withdrawal and per day.
+
+=== Security Center
+
+*Security Center* lists every protection the app has and whether it's in force on this device, in this build, now: the connection rules and certificate pins, where the device key is kept, the app lock, the screen protections, whether the device looks rooted or jailbroken, whether it passed the platform's integrity check, and the hardening the build applied.
+
+It's honest by design. A protection the simulator can't provide, such as a hardware keystore, says so. One that only a build from the Codename One build server applies, such as code hardening or Play Integrity, says that instead of claiming to be on. A development exemption in use, such as the unpinned connection to a server on this machine, is shown as a warning.
+
+=== Settings
+
+*Settings* changes the password (which ends every other sign-in), turns biometric unlock on and off, lists and removes passkeys and adds new ones, and lists the devices registered to the account, any of which can be removed. A removed device can no longer sign anything.
+
+=== The administrator
+
+An administrator signs in like a customer and sees *Admin* in the menu. It runs the two checks a bank's auditors ask for:
+
+* *Verify the ledger*: every entry sums to zero in each currency, and every balance equals the sum of its postings.
+* *Verify the audit chain*: every security and money event is a link in a hash chain, and the check reports any row that was changed, removed or inserted out of order.
+
+No request can make an administrator. Outside the development profile, the one administrator account comes from the server's environment when it starts.

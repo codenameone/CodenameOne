@@ -813,3 +813,9 @@ Cinemachine
 # The sample application the Wayline chapters walk through.
 Savor
 Wayline
+# The sample application the Bastion chapters walk through, and the units its ledger keeps coins in.
+Bastion
+satoshi
+gwei
+wei
+cleartext

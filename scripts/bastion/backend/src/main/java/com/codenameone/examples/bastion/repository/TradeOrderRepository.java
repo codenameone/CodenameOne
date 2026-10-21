@@ -46,6 +46,13 @@ public interface TradeOrderRepository extends CrudRepository<TradeOrder, String>
     List<TradeOrder> bids(@Param("market") String market, @Param("side") String side,
             @Param("status") String status, @Param("price") long price);
 
+    /// The market of `owner`'s order `id`, or null. A projection, not the
+    /// row: an order loaded before its market's lock stays in the session
+    /// as it was read, and a re-read behind the lock would answer that copy
+    /// rather than what a concurrent fill committed.
+    @Query("select o.market from TradeOrder o where o.id = :id and o.owner = :owner")
+    String marketOf(@Param("id") String id, @Param("owner") String owner);
+
     @Query("select sum(o.held) from TradeOrder o where o.owner = :owner and o.status = :status "
             + "and o.side = :side")
     Long held(@Param("owner") String owner, @Param("status") String status,

@@ -22,8 +22,8 @@ import com.codename1.security.DeviceIntegrity;
 import com.codename1.security.TapjackingPolicy;
 import com.codename1.security.shield.ShieldSignal;
 import com.codename1.security.shield.ShieldSignals;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
-import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.bastion.AppConfig;
 
 /// Screen and input protection.
@@ -71,7 +71,9 @@ public final class Protect {
     public static void copy(final String text) {
         Display.getInstance().copyToClipboard(text);
         copied = text;
-        UITimer.timer((int) AppConfig.CLIPBOARD_CLEAR_MILLIS, false, () -> {
+        // CN.setTimeout, not a UITimer: a UITimer runs only while the form it
+        // is bound to is showing, and the user moves on after copying.
+        CN.setTimeout((int) AppConfig.CLIPBOARD_CLEAR_MILLIS, () -> {
             Object now = Display.getInstance().getPasteDataFromClipboard();
             // Only what this app put there: never wipe something the user
             // copied from elsewhere since.

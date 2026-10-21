@@ -42,7 +42,7 @@ import java.util.List;
 /// **Integer arithmetic only.** A price is quote ledger units per one whole
 /// base unit (cents per bitcoin); a quantity is base ledger units (satoshi).
 /// The value of a quantity is `price * quantity / 10^decimals(base)`, computed
-/// with [Math#multiplyExact], so a product too large for a `long` is refused
+/// with [#multiplyExact(long,long)], so a product too large for a `long` is refused
 /// rather than wrapped into a small, plausible number.
 @Component
 public class Markets {
@@ -61,8 +61,8 @@ public class Markets {
 
     @PostConstruct
     public void seed() throws IOException {
-        for (String one : configured.split(",")) {
-            String[] f = one.trim().split(":");
+        for (String one : split(configured, ',')) {
+            String[] f = split(one.trim(), ':');
             if (f.length != 5) {
                 throw new IllegalArgumentException("bastion.markets: '" + one
                         + "' is not id:base:quote:lot:indexPrice");
@@ -152,7 +152,7 @@ public class Markets {
         }
         Asset base = ledger.asset(asset);
         try {
-            return ceilDiv(Math.multiplyExact(m.getIndexPrice(), amount), scale(base));
+            return ceilDiv(multiplyExact(m.getIndexPrice(), amount), scale(base));
         } catch (ArithmeticException tooLarge) {
             return Long.MAX_VALUE;
         }
@@ -162,9 +162,48 @@ public class Markets {
     static long scale(Asset asset) {
         long s = 1;
         for (int i = 0; i < asset.getDecimals(); i++) {
-            s = Math.multiplyExact(s, 10L);
+            s = multiplyExact(s, 10L);
         }
         return s;
+    }
+
+    /// `a + b`, refused when it does not fit a `long`. Written out, as is
+    /// [#multiplyExact(long,long)], because the class library a compiled
+    /// server links has no `Math.addExact`.
+    static long addExact(long a, long b) {
+        long r = a + b;
+        if (((a ^ r) & (b ^ r)) < 0) {
+            throw new ArithmeticException("long overflow");
+        }
+        return r;
+    }
+
+    /// `a * b`, refused when it does not fit a `long`.
+    static long multiplyExact(long a, long b) {
+        long r = a * b;
+        long ax = Math.abs(a);
+        long ay = Math.abs(b);
+        if (((ax | ay) >>> 31) != 0) {
+            if ((b != 0 && r / b != a) || (a == Long.MIN_VALUE && b == -1)) {
+                throw new ArithmeticException("long overflow");
+            }
+        }
+        return r;
+    }
+
+    /// `text` cut at every `separator`, empty pieces kept (String.split is
+    /// not in a compiled server's class library either).
+    static String[] split(String text, char separator) {
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        int from = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == separator) {
+                parts.add(text.substring(from, i));
+                from = i + 1;
+            }
+        }
+        parts.add(text.substring(from));
+        return parts.toArray(new String[parts.size()]);
     }
 
     /// `a / b` rounded up, for `a >= 0` and `b > 0`.

@@ -155,6 +155,10 @@ include::Savor-Users-Guide.asciidoc[]
 
 include::Savor-Implementors-Guide.asciidoc[]
 
+include::Bastion-Users-Guide.asciidoc[]
+
+include::Bastion-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

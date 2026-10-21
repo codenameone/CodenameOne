@@ -15,6 +15,7 @@ on:
       - 'docs/demos/**'
       - 'scripts/wayline/**'
       - 'scripts/savor/**'
+      - 'scripts/bastion/**'
       - 'docs/website/content/blog/**'
       - 'CodenameOne/src/**/*.java'
       - 'Ports/CLDC11/src/**/*.java'

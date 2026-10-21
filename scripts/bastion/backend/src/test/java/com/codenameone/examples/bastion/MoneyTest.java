@@ -19,10 +19,10 @@
 package com.codenameone.examples.bastion;
 
 import com.codename1.backend.Base64Url;
+import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.security.crypto.Der;
 import com.codename1.backend.security.webauthn.CredentialRecord;
 import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity;
 import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository;
@@ -39,14 +39,8 @@ import com.codenameone.examples.bastion.audit.Audit;
 
 import org.junit.jupiter.api.Test;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
-import java.security.Signature;
-import java.security.spec.ECGenParameterSpec;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.delete;
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
@@ -87,11 +81,11 @@ class MoneyTest {
         final String name;
         String token;
         final String checking;
-        KeyPair key;
+        TestKeys key;
         String device;
 
         Customer(boolean rooted) throws Exception {
-            name = SignIn.register(mvc, "m" + UUID.randomUUID().toString().substring(0, 12)
+            name = SignIn.register(mvc, "m" + TestKeys.random().substring(0, 12)
                     + "@bastion.example", PASSWORD);
             token = SignIn.token(mvc, name, PASSWORD);
             checking = String.valueOf(((Map) accounts().get(0)).get("id"));
@@ -99,9 +93,9 @@ class MoneyTest {
             device = register(key, rooted);
         }
 
-        String register(KeyPair pair, boolean rooted) throws Exception {
+        String register(TestKeys pair, boolean rooted) throws Exception {
             MockResponse answer = send(json("/api/devices", "{\"publicKey\":\""
-                    + Base64Url.encode(pair.getPublic().getEncoded()) + "\",\"platform\":\"and\","
+                    + Base64Url.encode(pair.publicKey) + "\",\"platform\":\"and\","
                     + "\"rooted\":" + rooted + ",\"attested\":true,\"integrityToken\":\"t\","
                     + "\"password\":\"" + PASSWORD + "\"}"));
             assertEquals(200, answer.getStatus(), answer.getContentAsString());
@@ -144,7 +138,7 @@ class MoneyTest {
         }
 
         /// POSTs `body` to `path`, signed by `pair` as device `device`.
-        MockResponse signed(String path, String body, KeyPair pair, long ts, String nonce,
+        MockResponse signed(String path, String body, TestKeys pair, long ts, String nonce,
                 String idempotencyKey) throws Exception {
             MockRequestBuilder request = json(path, body)
                     .header("Bastion-Signature", signature("POST", path, body, pair, ts, nonce));
@@ -158,15 +152,12 @@ class MoneyTest {
             return signed(path, body, key, System.currentTimeMillis(), nonce(), idempotencyKey);
         }
 
-        String signature(String method, String path, String body, KeyPair pair, long ts,
+        String signature(String method, String path, String body, TestKeys pair, long ts,
                 String nonce) throws Exception {
             String text = method + "|" + path + "|"
-                    + Ids.hex(MessageDigest.getInstance("SHA-256").digest(body.getBytes("UTF-8")))
+                    + Ids.hex(Crypto.sha256(body.getBytes("UTF-8")))
                     + "|" + nonce + "|" + ts;
-            Signature signer = Signature.getInstance("SHA256withECDSA");
-            signer.initSign(pair.getPrivate());
-            signer.update(text.getBytes("UTF-8"));
-            byte[] jose = Der.ecdsaDerToJose(signer.sign(), 32);
+            byte[] jose = pair.sign(text.getBytes("UTF-8"));
             return "v1;device=" + device + ";ts=" + ts + ";nonce=" + nonce + ";sig="
                     + Base64Url.encode(jose);
         }
@@ -189,17 +180,15 @@ class MoneyTest {
     }
 
     private static String key() {
-        return UUID.randomUUID().toString();
+        return TestKeys.random();
     }
 
     private static String nonce() {
-        return UUID.randomUUID().toString().replace("-", "");
+        return TestKeys.random();
     }
 
-    private static KeyPair newKey() throws Exception {
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
-        generator.initialize(new ECGenParameterSpec("secp256r1"));
-        return generator.generateKeyPair();
+    private static TestKeys newKey() {
+        return TestKeys.next();
     }
 
     private static String internal(String from, String to, long amount) {
@@ -211,9 +200,9 @@ class MoneyTest {
     void listsAndRemovesOnlyTheCallersPasskeys() throws Exception {
         Customer c = new Customer(false);
         Customer other = new Customer(false);
-        byte[] handle = UUID.randomUUID().toString().getBytes("UTF-8");
+        byte[] handle = TestKeys.random().getBytes("UTF-8");
         passkeyHolders.save(new PublicKeyCredentialUserEntity(c.name, handle, c.name));
-        byte[] credentialId = UUID.randomUUID().toString().getBytes("UTF-8");
+        byte[] credentialId = TestKeys.random().getBytes("UTF-8");
         passkeys.save(CredentialRecord.builder().credentialId(credentialId)
                 .userEntityUserId(handle).algorithm(-7).publicKey(new byte[] {1})
                 .label("phone").created(1).lastUsed(2).build());
@@ -396,7 +385,7 @@ class MoneyTest {
         Customer b = new Customer(false);
         a.deposit(a.checking, 50000);
         String payee = a.addPayee(b);
-        KeyPair rooted = newKey();
+        TestKeys rooted = newKey();
         a.device = a.register(rooted, true);
         a.key = rooted;
         assertEquals(403, a.signed("/api/transfers", a.payBody(payee, 1000), key()).getStatus());
@@ -458,7 +447,7 @@ class MoneyTest {
     @Test
     void addingADeviceNeedsAFreshSignInAndThePassword() throws Exception {
         Customer c = new Customer(false);
-        String key = Base64Url.encode(newKey().getPublic().getEncoded());
+        String key = Base64Url.encode(newKey().publicKey);
         String noPassword = "{\"publicKey\":\"" + key + "\",\"platform\":\"and\","
                 + "\"rooted\":false,\"attested\":true,\"integrityToken\":\"t\"}";
         assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());

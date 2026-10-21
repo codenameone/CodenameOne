@@ -1,0 +1,114 @@
+= Bastion
+
+A virtual bank and its server, in one Maven project and one language. Customers
+hold dollars, euros, bitcoin and ether, move money between their accounts and to
+other customers, issue and freeze cards, trade on a small exchange and withdraw
+coins to addresses they have allowed; an administrator verifies the ledger and the
+audit chain. Every security feature a financial app needs is wired in, and the
+app's Security Center lists each one with its real state on the device it runs on.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together when security is the point, with a ledger general enough to be the base
+of a crypto exchange. Nothing in it is real money.
+
+== Start here
+
+Two chapters of the developer guide cover this project:
+
+* https://www.codenameone.com/developer-guide/#bastion-users-guide[The user's guide]
+  (link:../../docs/developer-guide/Bastion-Users-Guide.asciidoc[source]) shows the
+  app as a customer and an administrator use it, with the demo accounts.
+* https://www.codenameone.com/developer-guide/#bastion-implementors-guide[The implementor's guide]
+  (link:../../docs/developer-guide/Bastion-Implementors-Guide.asciidoc[source])
+  explains how it is built, every security feature and where it lives, the threat
+  model, what only a cloud build turns on, and what a real bank still has to add.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared` | Transfer objects, the `@RestClient` contracts and the canonical form of a signed request.
+| `backend` | The server: ledger, sign-in with a second factor and passkeys, money movement with request signing and limits, the exchange, the audit chain.
+| `common` | The app: every screen, the network guard, the device key, the app lock, the screen protections and the Security Center.
+|===
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, and a market maker keeps the exchange's books moving.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates these accounts, all with the password
+`bastion-demo-password`:
+
+[cols="2,3"]
+|===
+| `customer@bastion.example`, `customer2@bastion.example` | customers with money in their checking accounts
+| `admin@bastion.example` | the administrator
+|===
+
+`backend/server.sh run --web` also builds the app for the browser and serves it at
+`/`.
+
+== What is real and what is simulated
+
+Real: the passwords, the authenticator codes, passkeys, the device keys and the
+signatures over every payment, the limits and cooling-off periods, the ledger's
+double entry and the audit chain.
+
+Simulated: deposits (a counter), card spending, the coins (entries in the ledger,
+never on a chain), the market (a random walk on the development profile), and the
+device integrity check (`SimulatedIntegrityVerifier` believes the device). The
+hardening build hints take effect only in a build from the Codename One build
+server; the Security Center says so.
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+CN1_TEST_DATABASE_URL=... ../ci/sample-server-tests-on-database.sh .   # <3>
+mvn -Dcodename1.platform=javase -Djava.awt.headless=true package   # <4>
+./run-e2e.sh   # <5>
+./run-web-e2e.sh   # <6>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> The server's tests on PostgreSQL or MySQL. MySQL has to run at READ
+    COMMITTED; the server refuses to start otherwise (`ledger/IsolationCheck.java`).
+<4> The app's own tests, headless: the request signer, the network guard, the
+    declared build hints, the bundle and the QR encoder.
+<5> Starts the server on the `test` profile and drives it over HTTP the way the
+    app does (`e2e/LiveE2e.java`): it registers two customers, enrols an
+    authenticator and signs in with it, registers device keys, makes a signed
+    payment and has the unsigned and replayed copies refused, fills an order
+    between the two, and has a withdrawal refused until its address is allowed
+    and cooled off. Pass `--native` to run it against the compiled server.
+<6> Builds the browser version of the application, starts the server hosting
+    it, and opens it in a headless browser: it loads from the server and shows
+    its sign-in form. Needs Node with Playwright and its Chromium (`npm ci` and
+    `npx playwright install chromium` in `scripts/`). Screenshots and logs go to
+    `target/web-e2e`.
+
+`.github/workflows/bastion.yml` runs all of them, and builds the application for
+Android and iOS through `scripts/build-android-app.sh` and
+`scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/bastion`.
+
+== Licence
+
+Bastion is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep.

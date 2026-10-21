@@ -38,7 +38,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,7 +74,7 @@ class ExchangeTest {
 
     /// A customer with `cents` in a checking account and `sats` in a wallet.
     private String trader(long cents, long sats) throws Exception {
-        String owner = "x-" + UUID.randomUUID().toString().substring(0, 12) + "@bastion.example";
+        String owner = "x-" + TestKeys.random().substring(0, 12) + "@bastion.example";
         owners.add(owner);
         LedgerAccount usd = ledger.open(owner, "USD", AccountKinds.CHECKING, "c");
         LedgerAccount btc = ledger.open(owner, "BTC", AccountKinds.WALLET, "w");
@@ -114,7 +113,7 @@ class ExchangeTest {
     }
 
     private static String key() {
-        return UUID.randomUUID().toString();
+        return TestKeys.random();
     }
 
     private void booksBalance() throws Exception {
