@@ -54,20 +54,26 @@ reset_schema() {
       # as the backend's Database.Url does -- bracketed IPv6 hosts, percent
       # escapes decoded, 3306 when the port is absent -- so the reset empties
       # the database the server then connects to.
-      # The TLS options go across too (sslmode, sslrootcert), so the reset is
-      # no less strict about the endpoint than the server is. The database
+      # The query options Database.Url reads go across too -- user and
+      # password override the authority's, sslmode/ssl and sslrootcert/sslca
+      # set TLS -- so the reset signs in as the server will and is no less
+      # strict about the endpoint. The database
       # name is quoted with any backtick in it doubled, as MySQL requires.
       local parts user password host port db ssl_mode ssl_ca
       parts="$(python3 -c '
 import sys, urllib.parse as u
 p = u.urlsplit(sys.argv[1])
 q = dict(u.parse_qsl(p.query))
-mode = {"disable": "DISABLED", "require": "REQUIRED", "verify-ca": "VERIFY_CA",
-        "verify-full": "VERIFY_IDENTITY"}.get(q.get("sslmode", ""), "")
-print("\n".join([u.unquote(p.username or ""), u.unquote(p.password or ""),
-                  p.hostname or "localhost", str(p.port or 3306),
+user = q.get("user", u.unquote(p.username or ""))
+password = q.get("password", u.unquote(p.password or ""))
+mode = {"disable": "DISABLED", "prefer": "PREFERRED", "require": "REQUIRED"}.get(
+    q.get("sslmode", q.get("ssl", "")), "")
+ca = q.get("sslrootcert", q.get("sslca", ""))
+if ca and mode == "REQUIRED":
+    mode = "VERIFY_CA"
+print("\n".join([user, password, p.hostname or "localhost", str(p.port or 3306),
                   u.unquote(p.path.lstrip("/")).replace("`", "``"),
-                  mode, q.get("sslrootcert", "")]))' "$URL")"
+                  mode, ca]))' "$URL")"
       { IFS= read -r user; IFS= read -r password; IFS= read -r host
         IFS= read -r port; IFS= read -r db; IFS= read -r ssl_mode
         IFS= read -r ssl_ca; } <<< "$parts" || true  # $(...) drops empty trailing lines
