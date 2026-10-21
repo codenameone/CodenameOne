@@ -9,6 +9,9 @@ date: '2018-01-03'
 author: Shai Almog
 ---
 
+> **Starting a new ride-hailing project?** [Meet Wayline](/wayline/), the full-stack Java application with rider, driver, admin and backend source. [Follow the current tutorial](/blog/create-an-uber-clone-in-1-minute/). The article below describes the original Uber Clone.
+
+
 ![Header Image](/blog/uber-clone-trickling-down/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
 > **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).

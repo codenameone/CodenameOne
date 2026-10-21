@@ -842,6 +842,15 @@ public class ByteCodeClass {
     }
     
     public static void addArrayType(String type, int dimenstions) {
+        // The runtime has array classes for one to three dimensions only. A deeper
+        // type used to translate into C naming class_array4__..., which nothing
+        // defines, so the build failed later in the C compiler on an undeclared
+        // identifier in a file the developer never wrote. Say what is wrong instead.
+        if (dimenstions > 3) {
+            throw new IllegalStateException("Arrays of more than three dimensions are not "
+                    + "supported: " + type.replace('_', '.') + " with " + dimenstions
+                    + " dimensions. Nest a three-dimensional array in an object instead.");
+        }
         String arr = dimenstions + "_" + type;
         if(!arrayTypes.contains(arr)) {
             arrayTypes.add(arr);

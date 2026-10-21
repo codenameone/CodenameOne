@@ -1,9 +1,9 @@
 {
  "arrayRandom": {
   "all": {
-   "memory": 0.207,
+   "memory": 0.225,
    "runs": 1,
-   "time": 1.023,
+   "time": 1.038,
    "tolerance": {
     "time": 0.45
    }
@@ -13,7 +13,7 @@
   "all": {
    "memory": 0.356,
    "runs": 1,
-   "time": 3.38,
+   "time": 2.906,
    "tolerance": {
     "time": 0.3
    }
@@ -21,9 +21,9 @@
  },
  "hashMapChurn": {
   "all": {
-   "memory": 0.091,
+   "memory": 0.087,
    "runs": 1,
-   "time": 1.206,
+   "time": 1.309,
    "tolerance": {
     "memory": 0.25,
     "time": 0.55
@@ -32,9 +32,9 @@
  },
  "hello": {
   "all": {
-   "memory": 0.86,
+   "memory": 0.84,
    "runs": 1,
-   "time": 0.952,
+   "time": 0.917,
    "tolerance": {
     "memory": 0.2,
     "time": 0.5
@@ -43,9 +43,9 @@
  },
  "intArithmetic": {
   "all": {
-   "memory": 0.074,
+   "memory": 0.055,
    "runs": 1,
-   "time": 0.999,
+   "time": 0.998,
    "tolerance": {
     "memory": 0.55
    }
@@ -53,9 +53,9 @@
  },
  "longArithmetic": {
   "all": {
-   "memory": 0.074,
+   "memory": 0.073,
    "runs": 1,
-   "time": 0.994,
+   "time": 0.995,
    "tolerance": {
     "memory": 0.5
    }
@@ -63,9 +63,9 @@
  },
  "mathTranscendental": {
   "all": {
-   "memory": 0.076,
+   "memory": 0.057,
    "runs": 1,
-   "time": 1.192,
+   "time": 1.199,
    "tolerance": {
     "memory": 0.4,
     "time": 0.3
@@ -87,7 +87,7 @@
   "all": {
    "memory": 0.111,
    "runs": 1,
-   "time": 1.056,
+   "time": 1.062,
    "tolerance": {
     "memory": 0.25
    }
@@ -95,9 +95,9 @@
  },
  "recursion": {
   "all": {
-   "memory": 0.075,
+   "memory": 0.076,
    "runs": 1,
-   "time": 1.35,
+   "time": 1.339,
    "tolerance": {
     "time": 0.2
    }
@@ -105,9 +105,9 @@
  },
  "stringBuilding": {
   "all": {
-   "memory": 0.259,
+   "memory": 0.216,
    "runs": 1,
-   "time": 1.557,
+   "time": 1.577,
    "tolerance": {
     "time": 0.2
    }

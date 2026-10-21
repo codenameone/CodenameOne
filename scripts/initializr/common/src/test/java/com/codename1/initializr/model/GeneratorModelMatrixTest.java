@@ -370,8 +370,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// What a full-stack template adds to an app with a backend: the contract
     /// module both halves compile against, the template's own server in place of
     /// the generic one, and nothing left that still carries the template's name.
-    private void assertFullStackProject(Map<String, byte[]> entries, byte[] zipData, String packageName,
-                                        String mainClassName, String label) throws IOException {
+    private void assertFullStackProject(Template template, Map<String, byte[]> entries, byte[] zipData,
+                                        String packageName, String mainClassName, String label) throws IOException {
+        boolean rides = template == Template.WAYLINE;
+        String name = template.SOURCE_MAIN_CLASS;
+        String upper = template.name();
+        String lower = GeneratorModel.toLowerCaseInvariant(name);
         String packagePath = StringUtil.replaceAll(packageName, ".", "/");
         String artifact = GeneratorModel.toLowerCaseInvariant(mainClassName);
         String rootPom = removeWhitespace(getText(entries, "pom.xml"));
@@ -379,6 +383,14 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "the shared module is built ahead of the app");
         assertTrue(rootPom.indexOf("<module>shared</module>") == rootPom.lastIndexOf("<module>shared</module>"),
                 label + "the shared module is in the reactor once");
+        // The README describes the app this template really is: a food-delivery
+        // project once got the ride-hailing accounts and chapters.
+        String readme = getText(entries, "README.md");
+        assertContains(readme, rides ? "ride-hailing app" : "food-delivery app", label + "README names the app");
+        assertContains(readme, (rides ? "`rider@" : "`customer@") + artifact + ".example`",
+                label + "README lists the template's own demo accounts");
+        assertFalse(readme.indexOf(rides ? "courier@" : "rider@") >= 0,
+                label + "README carries no other template's accounts");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
@@ -388,15 +400,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + "/api/RiderApi.java"),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (rides ? "/api/RiderApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/V1__accounts.sql"),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + "/RideFlowTest.java"),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (rides ? "/RideFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + "/rider/RiderForm.java"),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (rides ? "/rider/RiderForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
         // The generic server every other project gets, which this one replaces.
@@ -416,13 +428,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String path = entry.getKey();
-            assertFalse(path.indexOf("wayline") >= 0 || path.indexOf("Wayline") >= 0,
+            assertFalse(path.indexOf(lower) >= 0 || path.indexOf(name) >= 0,
                     label + "the template's name is still in the path " + path);
             if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")) {
                 continue;
             }
             String text = StringUtil.newString(entry.getValue());
-            assertFalse(text.indexOf("wayline") >= 0 || text.indexOf("Wayline") >= 0 || text.indexOf("WAYLINE") >= 0,
+            assertFalse(text.indexOf(lower) >= 0 || text.indexOf(name) >= 0 || text.indexOf(upper) >= 0,
                     label + "the template's name is still in " + path);
             assertFalse(text.indexOf("myappname") >= 0 || text.indexOf("MyAppName") >= 0
                             || text.indexOf("MYAPPNAME") >= 0,
@@ -678,7 +690,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
         }
         if (template.isFullStack()) {
-            assertFullStackProject(entries, zipData, packageName, mainClassName, label);
+            assertFullStackProject(template, entries, zipData, packageName, mainClassName, label);
         } else {
             assertNull(entries.get("shared/pom.xml"), label + "only a full-stack template has a shared module");
             assertFalse(rootPom.indexOf("<module>shared</module>") >= 0,
@@ -1203,6 +1215,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// and a 56-byte message that spills the padding into a second block), and
     /// the project id against the value the website beacon test pins for the
     /// same package -- the two must agree or downloads and builds stop joining.
+    private static boolean isLowerHex64(String s) {
+        if (s == null || s.length() != 64) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void validateSha256Vectors() {
         assertEqual("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Sha256.hex(""),
                 "SHA-256 of the empty string");
@@ -1213,9 +1238,21 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "SHA-256 of the two-block FIPS vector");
         assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
                 Sha256.hex("com.example.myapp"), "SHA-256 of com.example.myapp");
-        assertEqual("f110a249cb67c33e0d30f847bc485759068f15989484537ed28d97c7c63ecae7",
-                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Example.MyApp").projectId(),
+        assertEqual(Sha256.hex("com.acme.myapp"),
+                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Acme.MyApp").projectId(),
                 "The project id hashes the LOWER-CASED package name, like the website beacon");
+        // The default package is everyone's: such a download gets its own random id,
+        // stable for that download (beacon, launchers and pom agree), new for the next.
+        GeneratorModel first = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Example.MyApp");
+        GeneratorModel second = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "com.example.myapp");
+        assertEqual(first.projectId(), first.projectId(), "one download keeps one id");
+        assertTrue(isLowerHex64(first.projectId()), "the random id has the hash's shape");
+        assertFalse(first.projectId().equals(Sha256.hex("com.example.myapp")), "not the shared hash");
+        assertFalse(first.projectId().equals(second.projectId()), "each default-package download is its own");
+        assertEqual("id:" + first.projectId(), first.beaconKey(), "the page is given the id, not the package");
+        assertEqual("COM.Acme.MyApp",
+                GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "MyApp", "COM.Acme.MyApp").beaconKey(),
+                "any other package is still hashed by the page");
     }
 
     /// Initializr Maven downloads report build progress from build.sh/build.bat:

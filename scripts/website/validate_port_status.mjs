@@ -25,6 +25,27 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 
+// A ratio within this factor of 1.00 is even, neither green nor red. Kept in step
+// with layouts/partials/port-status-outcome.html.
+const EVEN_BAND = 1.05;
+
+// Every ratio cell carries is-win, is-loss or is-even, and the class agrees with
+// the number: a colour that contradicts its figure is worse than no colour.
+function checkOutcomes(html, lowerIsBetter, label) {
+    for (const [, cls, value] of html.matchAll(/<span class="cn1-port-status__ratio\s*([^"]*)">[^<]*?(\d+\.\d\d)x/g)) {
+        const ratio = Number(value);
+        const advantage = lowerIsBetter ? 1 / ratio : ratio;
+        // Two decimals are rounded, so a value printed on the band's edge may go either way.
+        const edge = Math.abs(advantage - EVEN_BAND) < 0.01 || Math.abs(advantage - 1 / EVEN_BAND) < 0.01;
+        const expected = advantage >= EVEN_BAND ? "is-win" : advantage <= 1 / EVEN_BAND ? "is-loss" : "is-even";
+        if (!/\bis-(?:win|loss|even)\b/.test(cls)) {
+            fail(`${label}: a ratio cell (${value}x) carries no win/loss class`);
+        } else if (!edge && !cls.split(/\s+/).includes(expected)) {
+            fail(`${label}: ${value}x is coloured ${cls.trim()} but should be ${expected}`);
+        }
+    }
+}
+
 const publicDirectory = path.resolve(process.argv[2] || "docs/website/public");
 
 function fail(message) {
@@ -148,6 +169,33 @@ function validate() {
                 fail("every Flutter benchmark row must state its ratio");
             }
         }
+        // The web leg is published but deliberately not compared: Flutter's web
+        // build computes wrong results there. A JavaScript column would put those
+        // numbers back on the page, and dropping the erratum would hide why the
+        // column is missing.
+        if (/\bdata-platform=["']?javascript\b/i.test(section)) {
+            fail("the Flutter benchmark must not compare the JavaScript port");
+        }
+        const benchmarkData = path.resolve(publicDirectory, "..", "data", "port_status_flutter_benchmark.json");
+        if (fs.existsSync(benchmarkData) &&
+            JSON.parse(fs.readFileSync(benchmarkData, "utf8")).platforms?.javascript &&
+            !/\bdata-flutter-benchmark-erratum=["']?javascript\b/i.test(section)) {
+            fail("the Flutter benchmark omits JavaScript without its erratum");
+        }
+        // iOS is shown with sizes only (a device build needs signing; the simulator
+        // runs Flutter's debug JIT). Its blank rows need the erratum that says why.
+        const iosData = fs.existsSync(benchmarkData) &&
+            JSON.parse(fs.readFileSync(benchmarkData, "utf8")).platforms?.ios;
+        if (iosData?.status === "measured" &&
+            (Object.values(iosData.metrics || {}).some((m) => !m.ratio) || iosData.compute?.status !== "measured") &&
+            !/\bdata-flutter-benchmark-erratum=["']?ios\b/i.test(section)) {
+            fail("the Flutter benchmark shows iOS without the erratum for what it does not measure");
+        }
+        if (!/\bdata-flutter-benchmark-bottom-line\b/.test(section)) {
+            fail("the Flutter benchmark has no bottom line");
+        }
+        // Above 1.00x Codename One wins here.
+        checkOutcomes(section, false, "Flutter benchmark");
     }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);
@@ -202,6 +250,12 @@ function validate() {
             attribute(tag, "title").startsWith(`${platform.name}:`))) {
             fail(`JDK 25 cells for ${platform.name} must identify the platform in their tooltip`);
         }
+    }
+    const jdkSection = page.match(/<section\b[^>]*data-jdk25-evidence[\s\S]*?<\/section>/)?.[0] || "";
+    // Below 1.00x ParparVM wins here.
+    checkOutcomes(jdkSection, true, "ParparVM against JDK 25");
+    if (!/\bdata-jdk25-bottom-line\b/.test(jdkSection)) {
+        fail("the ParparVM against JDK 25 table has no bottom line");
     }
     if (/Not measured/.test(page.match(/data-jdk25-evidence[\s\S]*?<\/section>/)?.[0] || "")) {
         fail("a gated platform is missing a benchmark the gate measures everywhere");

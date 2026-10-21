@@ -9,6 +9,9 @@ date: '2017-11-20'
 author: Shai Almog
 ---
 
+> **Starting a new ride-hailing project?** [Meet Wayline](/wayline/), the full-stack Java application with rider, driver, admin and backend source. [Follow the current tutorial](/blog/create-an-uber-clone-in-1-minute/). The article below describes the original Uber Clone.
+
+
 ![Header Image](/blog/uber/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
 I’ve been working on creating a clone of the Uber app for our upcoming update of the [Build Real World Full Stack Mobile Apps in Java](http://codenameone.teachable.com/courses/build-real-world-full-stack-mobile-apps-in-java/) course. There is a lot to go through there but the basics are surprisingly easy.

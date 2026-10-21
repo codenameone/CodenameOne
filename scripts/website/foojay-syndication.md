@@ -26,35 +26,25 @@ removal use the shared renderer.
 The shared Codename One aside leaves its background unset so Foojay's light
 and dark themes control its contrast, as requested by the Foojay editors.
 
-## One-time GitHub setup
+## Where it runs
 
-The Actions `GITHUB_TOKEN` is scoped to the CN1 repository and cannot submit
-articles to another repository. The old `FOOJAY_USER` / `FOOJAY_PASSWORD`
-secrets are no longer used.
+Submissions run on the signed-in local syndication runner
+(`run-syndication.sh`), next to Medium and Hashnode, not in GitHub Actions.
+The runner uses its own `gh` login (`gh auth login`, keyring-stored), so no
+repository secret is involved. That login needs the `repo` and `workflow`
+scopes and a fork of `foojayio/website` (`gh repo fork foojayio/website
+--clone=false`); the runner passes it as `--head-repo <owner>/website`.
 
-1. Use an account with direct write access to `foojayio/website`, or create a
-   fork in that account. For example:
-   `gh repo fork foojayio/website --clone=false`.
-2. Set CN1's Actions variable `FOOJAY_HEAD_REPO` to the writable `owner/website`
-   repository. If unset, it defaults to `foojayio/website` for direct contributors.
-3. Set CN1's Actions secret `FOOJAY_GITHUB_TOKEN` to a token that can write Git
-   contents in the head repository and open pull requests against the public
-   upstream repository. Choose credentials that support the fork-to-upstream
-   route; a token restricted to CN1 alone cannot do this. Keep the token out of
-   command arguments and logs.
-4. Grant the token workflow permission too (fine-grained: Workflows read and
-   write; classic: the `workflow` scope). Before creating a submission branch
-   the script syncs the fork's default branch with upstream, because the
-   branch is built on upstream's head: when Foojay has edited
-   `.github/workflows` since the fork last synced, creating the branch adds
-   workflow files to the fork, and GitHub refuses that as a bare HTTP 404.
-   The sync needs the same permission. Without it the script names the
-   missing upstream commit; sync by hand with
-   `gh repo sync <owner>/website --source foojayio/website`.
+The `workflow` scope matters: before creating a submission branch the script
+syncs the fork's default branch with upstream, and when Foojay has edited
+`.github/workflows` since the last sync GitHub refuses the branch as a bare
+HTTP 404 without it. Sync by hand with
+`gh repo sync <owner>/website --source foojayio/website`.
 
 The script verifies write permission, fork ancestry, and the upstream author
-profile before creating a branch. A missing token fails an eligible CI
-submission with a setup message instead of silently dropping Foojay.
+profile before creating a branch. It refuses `--submit` inside GitHub Actions
+without `FOOJAY_GITHUB_TOKEN`, because the workflow `GITHUB_TOKEN` cannot
+write to another repository; the daily workflow therefore runs `--dry-run`.
 
 ## Preview and submission
 
@@ -70,8 +60,7 @@ Prepare an eligible bundle for review without submitting or changing state:
 python3 scripts/website/syndicate_foojay_posts.py --output-dir /tmp/foojay-review
 ```
 
-After configuration, the daily workflow uses `--submit`. To explicitly submit
-the next eligible article locally, use authenticated `gh` or the token above:
+To submit the next eligible article by hand, as the runner does:
 
 ```sh
 python3 scripts/website/syndicate_foojay_posts.py --submit --head-repo YOUR_ACCOUNT/website

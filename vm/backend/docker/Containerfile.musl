@@ -7,7 +7,12 @@
 # Alpine's prebuilt libcurl.a is compiled with brotli, libpsl, nghttp2 and c-ares,
 # whose static archives are LTO objects lld cannot resolve. Rather than chase
 # those, curl is built here with only what a server-side HTTP client needs:
-# OpenSSL for TLS, zlib for content encoding, nothing else. Verification stays
+# OpenSSL for TLS, zlib for content encoding, and nghttp2 for HTTP/2 -- the one
+# of the four whose static archive links (link.sh always named -lnghttp2).
+# Without it the static binary spoke HTTP/1.1 only while the glibc one, on
+# Debian's libcurl, negotiated HTTP/2: the same program behaved differently by
+# libc, and a WebClient that requires HTTP/2 could not work on musl at all.
+# tests/web-mtls-h2.sh runs both and holds them to the same answers. Verification stays
 # curl's, which is the reason for using curl instead of hand-rolled TLS.
 #
 # Only lib/ and include/ are built: the curl COMMAND needs perl to generate its
@@ -19,14 +24,14 @@ FROM alpine:3.20
 ARG CURL_VER=8.7.1
 
 RUN apk add --no-cache clang lld musl-dev openssl-dev openssl-libs-static \
-        zlib-dev zlib-static nghttp2-dev nghttp2-static curl tar make
+        zlib-dev zlib-static nghttp2-dev nghttp2-static pkgconf curl tar make
 
 RUN cd /tmp \
  && curl -fsSL "https://curl.se/download/curl-${CURL_VER}.tar.gz" -o curl.tar.gz \
  && tar xzf curl.tar.gz \
  && cd "curl-${CURL_VER}" \
- && ./configure --disable-shared --enable-static --with-openssl \
-        --without-brotli --without-libpsl --without-nghttp2 --without-libidn2 \
+ && ./configure --disable-shared --enable-static --with-openssl --with-nghttp2 \
+        --without-brotli --without-libpsl --without-libidn2 \
         --without-zstd --disable-ares --disable-ldap --disable-ldaps \
         --disable-rtsp --disable-dict --disable-telnet --disable-tftp \
         --disable-pop3 --disable-imap --disable-smtp --disable-gopher \

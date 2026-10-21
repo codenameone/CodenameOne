@@ -151,6 +151,10 @@ include::Wayline-Users-Guide.asciidoc[]
 
 include::Wayline-Implementors-Guide.asciidoc[]
 
+include::Savor-Users-Guide.asciidoc[]
+
+include::Savor-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

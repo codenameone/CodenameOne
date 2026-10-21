@@ -71,12 +71,16 @@ class FetchAsMappedListTest extends UITestBase {
     }
 
     @Test
-    void unregisteredTypeYieldsEmptyList() {
+    void unregisteredTypeNeverAnswersWithAnEmptyList() {
+        // A missing @Mapped used to answer an empty list, which a screen shows
+        // as "nothing here" with no hint of the cause. It fails instead.
         prepareJson(BASE_URL + "/unmapped", "[{\"title\":\"A\"}]");
 
         Response<List<Unmapped>> response = fetch(BASE_URL + "/unmapped", Unmapped.class);
-        assertNotNull(response);
-        assertTrue(response.getResponseData().isEmpty());
+        assertNotNull(response, "the callback must still run so the caller does not hang");
+        assertEquals(-1, response.getResponseCode());
+        assertNull(response.getResponseData());
+        assertTrue(response.getResponseErrorMessage().contains("@Mapped"), response.getResponseErrorMessage());
     }
 
     @Test

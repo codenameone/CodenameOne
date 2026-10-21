@@ -121,7 +121,13 @@ if git -C "${REPO_ROOT}" show "FETCH_HEAD:benchmarks/flutter.json" > "${benchmar
       .schema_version == 1 and
       (.generated_at | type == "string") and
       (.platforms | type == "object") and
-      any(.platforms[]; .status == "measured")
+      # The page lays the matrix out from these; a document written before
+      # port_status.py emitted them renders no columns, so it is not used.
+      (.platform_order | type == "array") and
+      (.metric_order | type == "array") and
+      (.workload_order | type == "array") and
+      # A platform the page shows: it leaves JavaScript out (see port-status.html).
+      any(.platforms | to_entries[]; .key != "javascript" and .value.status == "measured")
    ' "${benchmark_candidate}" >/dev/null; then
   cp "${benchmark_candidate}" "${benchmark_target}"
   echo "Resolved the Flutter benchmark from ${DATA_REF}."

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc"><title id="title">The performance advantage is not uniform across platforms</title><desc id="desc">Startup speedup relative to Flutter: Android 3.60, Windows 1.70, Linux 1.56, macOS 1.24. Idle RAM reduction: Android 42 percent, Windows 37 percent, Linux 63 percent, macOS 31 percent. iOS and web startup and memory are not measured.</desc><metadata>Source: https://github.com/codenameone/CodenameOne/blob/2c2beba40ce177e5e028f0e34961bfbf41c952b8/benchmarks/flutter.json; measured 2026-10-18; Flutter 3.35.4; CN1 d2d7ec3f25.</metadata><rect width="1000" height="500" rx="20" fill="#10182e"/><g font-family="system-ui, sans-serif">
+<text x="32" y="46" fill="#e9eefc" font-size="29" font-weight="700">The advantage is not uniform across platforms</text>
+<text x="32" y="80" fill="#e9eefc" font-size="18" font-weight="400">Startup speedup over Flutter · larger is better · one shared scale</text>
+<path d="M 210 117 V 380" stroke="#35415c"/>
+<text x="202" y="407" fill="#e9eefc" font-size="17" font-weight="400">0×</text>
+<path d="M 355 117 V 380" stroke="#35415c"/>
+<text x="347" y="407" fill="#e9eefc" font-size="17" font-weight="400">1×</text>
+<path d="M 500 117 V 380" stroke="#35415c"/>
+<text x="492" y="407" fill="#e9eefc" font-size="17" font-weight="400">2×</text>
+<path d="M 645 117 V 380" stroke="#35415c"/>
+<text x="637" y="407" fill="#e9eefc" font-size="17" font-weight="400">3×</text>
+<path d="M 790 117 V 380" stroke="#35415c"/>
+<text x="782" y="407" fill="#e9eefc" font-size="17" font-weight="400">4×</text>
+<path d="M 355 117 V 380" stroke="#e9eefc" stroke-dasharray="5 5"/>
+<text x="802" y="110" fill="#e9eefc" font-size="18" font-weight="400">Idle RAM</text>
+<text x="32" y="159" fill="#e9eefc" font-size="18" font-weight="400">Android emulator</text>
+<rect x="210" y="140" width="522.00" height="24" rx="4" fill="#66e0c2"/>
+<text x="742.0" y="159" fill="#e9eefc" font-size="18" font-weight="400">3.60×</text>
+<text x="802" y="159" fill="#e9eefc" font-size="18" font-weight="400">42% lower</text>
+<text x="32" y="221" fill="#e9eefc" font-size="18" font-weight="400">Windows</text>
+<rect x="210" y="202" width="246.21" height="24" rx="4" fill="#aab8ff"/>
+<text x="466.21" y="221" fill="#e9eefc" font-size="18" font-weight="400">1.70×</text>
+<text x="802" y="221" fill="#e9eefc" font-size="18" font-weight="400">37% lower</text>
+<text x="32" y="283" fill="#e9eefc" font-size="18" font-weight="400">Linux</text>
+<rect x="210" y="264" width="226.49" height="24" rx="4" fill="#aab8ff"/>
+<text x="446.49" y="283" fill="#e9eefc" font-size="18" font-weight="400">1.56×</text>
+<text x="802" y="283" fill="#e9eefc" font-size="18" font-weight="400">63% lower</text>
+<text x="32" y="345" fill="#e9eefc" font-size="18" font-weight="400">macOS</text>
+<rect x="210" y="326" width="180.38" height="24" rx="4" fill="#aab8ff"/>
+<text x="400.38" y="345" fill="#e9eefc" font-size="18" font-weight="400">1.24×</text>
+<text x="802" y="345" fill="#e9eefc" font-size="18" font-weight="400">31% lower</text>
+<text x="32" y="449" fill="#e9eefc" font-size="18" font-weight="400">1× = equal startup time. Android leads startup; Linux leads RAM reduction.</text>
+<text x="32" y="478" fill="#e9eefc" font-size="17" font-weight="400">iOS and web: startup and RAM not measured. Same-source Gallery, October 18, 2026.</text>
+</g></svg>

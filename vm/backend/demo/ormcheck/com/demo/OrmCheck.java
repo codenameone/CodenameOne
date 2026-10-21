@@ -74,6 +74,7 @@ public class OrmCheck {
             notes.createTable();
             try {
                 generatedRepositories(em, pool.dialect().getName());
+                nativeDatesRoundTripInUtc(em);
                 roundTripsEveryColumn(notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
@@ -106,6 +107,51 @@ public class OrmCheck {
         System.out.println(failures.isEmpty() ? "ORMCHECK OK" : "ORMCHECK FAILED");
         if(!failures.isEmpty()) {
             System.exit(1);
+        }
+    }
+
+    /// @Temporal columns hold the UTC instant and day the field names, on every
+    /// engine, through the same text conversion the JVM uses; a legacy Date stays
+    /// epoch milliseconds, and a Set without a position column is keyed by value.
+    private static void nativeDatesRoundTripInUtc(EntityManager em) {
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            s.createTables();
+            s.beginTransaction();
+            s.createQuery("delete from com.demo.Appointment").executeUpdate();
+            Appointment a = new Appointment();
+            a.setStartsAt(new Date(1709214306789L));
+            a.setDay(new Date(-14256000000L));
+            a.setReminded(new Date(1672628645000L));
+            a.getLabels().add("dentist");
+            a.getLabels().add("urgent");
+            s.persist(a);
+            s.commitTransaction();
+            check("private @PrePersist", "booked", a.getStatus());
+            check("stored temporal form", "1", "" + s.createNativeQuery("SELECT COUNT(*) FROM appointment WHERE starts_at = '2024-02-29 13:45:06.789'"
+                    + " AND day = '1969-07-20' AND reminded = 1672628645000", Long.class).first());
+            s.clear();
+            Appointment back = s.find(Appointment.class, Long.valueOf(a.getId()));
+            check("timestamp millis", "1709214306789", "" + back.getStartsAt().getTime());
+            check("date millis", "-14256000000", "" + back.getDay().getTime());
+            check("legacy date millis", "1672628645000", "" + back.getReminded().getTime());
+            check("value-keyed labels", "2 true true", back.getLabels().size() + " " + back.getLabels().contains("dentist") + " " + back.getLabels().contains("urgent"));
+            boolean clean = true;
+            for (Object issue : s.schemaReport().getIssues()) {
+                String table = ((com.codename1.orm.session.SchemaReport.Issue) issue).getTable();
+                if (table.startsWith("appointment")) {
+                    clean = false;
+                    note("schema report: " + issue);
+                }
+            }
+            check("schema report for created tables", "true", "" + clean);
+            s.beginTransaction();
+            s.remove(back);
+            s.commitTransaction();
+        } catch (RuntimeException err) {
+            check("native dates", "no exception", "" + err);
+        } finally {
+            s.close();
         }
     }
 

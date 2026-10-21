@@ -40,19 +40,32 @@ public final class ProjectIO {
             return null;
         }
         InputStream in = null;
+        String url = fsUrl(path);
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        boolean opened = false;
         try {
-            String url = fsUrl(path);
-            FileSystemStorage fs = FileSystemStorage.getInstance();
             if (!fs.exists(url)) {
                 return null;
             }
             in = fs.openInputStream(url);
+            opened = true;
             ProjectBinding b = ProjectBinding.parse(Util.readToString(in, "UTF-8"));
             return b.isValid() ? b : null;
         } catch (IOException ex) {
             return null;
         } finally {
             Util.cleanup(in);
+            // Launch bindings are single-use. Maven arguments may include
+            // credentials; retain them only in the parsed in-memory binding.
+            // Close first so deletion also works on Windows. Discard invalid
+            // or partially read bindings too, rather than leaving their data.
+            if (opened) {
+                fs.delete(url);
+                if (fs.exists(url)) {
+                    System.err.println("Unable to delete Settings launch binding: " + path);
+                    fs.deleteRetry(url, 3);
+                }
+            }
         }
     }
 

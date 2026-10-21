@@ -159,9 +159,25 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 // file does not, so a tool reading the file looked at a different
                 // class than the build and reported the annotations on the
                 // selected one as absent.
+                + bindingValue("mavenHome", System.getProperty("maven.home"))
+                + mavenArgumentsBinding()
                 + bindingValue("mainName", effective("codename1.mainName"))
                 + bindingValue("packageName", effective("codename1.packageName"));
         try {
+            // User properties can contain credentials. Restrict access before
+            // writing, including when replacing an existing binding on POSIX.
+            java.nio.file.Path path = inputFile.toPath();
+            java.nio.file.Files.createDirectories(path.toAbsolutePath().getParent());
+            if (path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                java.util.Set<java.nio.file.attribute.PosixFilePermission> permissions =
+                        java.nio.file.attribute.PosixFilePermissions.fromString("rw-------");
+                if (!java.nio.file.Files.exists(path)) {
+                    java.nio.file.Files.createFile(path,
+                            java.nio.file.attribute.PosixFilePermissions.asFileAttribute(permissions));
+                } else {
+                    java.nio.file.Files.setPosixFilePermissions(path, permissions);
+                }
+            }
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to write Settings binding", ex);
@@ -219,6 +235,44 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
     /// loaded them -- which is how the tests drive `writeBinding` directly.
     private String effective(String key) {
         return properties == null ? null : properties.getProperty(key);
+    }
+
+    /// Forward resolved session options rather than reparsing a shell command.
+    /// Each argument is encoded separately so whitespace, newlines and equals
+    /// signs in paths/property values survive the line-oriented binding.
+    private String mavenArgumentsBinding() {
+        MavenSession session = getSession();
+        if (session == null || session.getRequest() == null) return "";
+        org.apache.maven.execution.MavenExecutionRequest request = session.getRequest();
+        java.util.List<String> args = new java.util.ArrayList<>();
+        if (request.getUserSettingsFile() != null && request.getUserSettingsFile().isFile()) {
+            args.add("--settings");
+            args.add(request.getUserSettingsFile().getAbsolutePath());
+        }
+        if (request.getGlobalSettingsFile() != null && request.getGlobalSettingsFile().isFile()) {
+            args.add("--global-settings");
+            args.add(request.getGlobalSettingsFile().getAbsolutePath());
+        }
+        if (request.isOffline()) args.add("--offline");
+        if (request.isUpdateSnapshots()) args.add("--update-snapshots");
+        if (request.isNoSnapshotUpdates()) args.add("--no-snapshot-updates");
+        for (String profile : request.getActiveProfiles()) args.add("-P" + profile);
+        for (String profile : request.getInactiveProfiles()) args.add("-P!" + profile);
+        java.util.Properties user = session.getUserProperties();
+        if (user != null) {
+            for (String key : new java.util.TreeSet<String>(user.stringPropertyNames())) {
+                args.add("-D" + key + "=" + user.getProperty(key));
+            }
+        }
+        if (request.getLocalRepositoryPath() != null) {
+            args.add("-Dmaven.repo.local=" + request.getLocalRepositoryPath().getAbsolutePath());
+        }
+        StringBuilder out = new StringBuilder();
+        for (String arg : args) {
+            out.append(bindingValue("mavenArgument", java.util.Base64.getEncoder()
+                    .encodeToString(arg.getBytes(StandardCharsets.UTF_8))));
+        }
+        return out.toString();
     }
 
     private static String bindingValue(String key, String value) {

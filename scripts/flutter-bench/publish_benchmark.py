@@ -46,6 +46,10 @@ import benchlib  # noqa: E402
 
 TARGET = "benchmarks/flutter.json"
 
+# Kept in step with $excluded in docs/website/layouts/_default/port-status.html
+# and the jq check in scripts/website/sync_port_status_reports.sh.
+PAGE_EXCLUDED = ("javascript",)
+
 
 def refusal(report):
     """Why `report` must not replace the published one, or None if it may.
@@ -66,10 +70,13 @@ def refusal(report):
     missing = [p for p in benchlib.PLATFORM_IDS if p not in present]
     if missing:
         return "no result for %s; publishing would drop it from the page" % ", ".join(missing)
-    measured = [p for p in present.values()
-                if isinstance(p, dict) and p.get("status") == "measured"]
+    # Only platforms the Port Status page shows count: it leaves JavaScript out
+    # (Flutter's web build computes wrong results), so a night measured only
+    # there would replace the last good numbers with an empty table.
+    measured = [k for k, p in present.items()
+                if k not in PAGE_EXCLUDED and isinstance(p, dict) and p.get("status") == "measured"]
     if not measured:
-        return "no measured platforms"
+        return "no measured platforms the page shows"
     return None
 
 

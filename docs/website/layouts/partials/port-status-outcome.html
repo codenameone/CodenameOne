@@ -1,0 +1,11 @@
+{{- /* Classifies a ratio oriented so that above 1.00 is Codename One's advantage
+       (callers invert a ParparVM / JDK ratio first). Inside the band it is called
+       even rather than painted a win or a loss: paired CI rounds move a few percent
+       between nights, and a colour that flips on noise says nothing.
+       Kept in step with EVEN_BAND in scripts/website/validate_port_status.mjs. */ -}}
+{{- $advantage := float . -}}
+{{- $outcome := "is-even" -}}
+{{- if ge $advantage 1.05 -}}{{- $outcome = "is-win" -}}
+{{- else if le $advantage (div 1.0 1.05) -}}{{- $outcome = "is-loss" -}}
+{{- end -}}
+{{- return $outcome -}}

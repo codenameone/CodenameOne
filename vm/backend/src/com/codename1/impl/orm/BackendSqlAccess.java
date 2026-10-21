@@ -29,6 +29,7 @@ import com.codename1.backend.sql.Dialect;
 import com.codename1.orm.session.LockMode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,18 +60,50 @@ public final class BackendSqlAccess implements SqlAccess {
     @Override
     public List<Object[]> describe(String table) throws IOException {
         if ("sqlite".equals(dialect())) {
-            List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]);
-            List<Object[]> result = new ArrayList<Object[]>();
-            for (Object[] row : raw) {
-                result.add(new Object[]{row[1], row[2], row[3], row[5]});
+            List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
+                    new Object[]{table}, new int[1]);
+            Object createSql = definition.isEmpty() ? null : definition.get(0)[0];
+            Map<String, String> collations = new HashMap<String, String>();
+            for (String index : SessionImpl.sqliteUniqueIndexes(query("PRAGMA index_list(" + quote(table) + ")",
+                    new Object[0], new int[5]))) {
+                SessionImpl.sqliteKeyCollations(collations, query("PRAGMA index_xinfo(" + quote(index) + ")",
+                        new Object[0], new int[6]));
             }
-            return result;
+            return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
+                    createSql instanceof String ? (String) createSql : null, collations);
         }
-        String schema = "mysql".equals(dialect()) ? "DATABASE()" : "current_schema()";
-        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key "
+        boolean mysql = "mysql".equals(dialect());
+        // PostgreSQL: the schema an unqualified name resolves to through the
+        // whole search_path, which is the table the ORM's SQL actually reads.
+        String schema = mysql ? "DATABASE()"
+                : "(SELECT n.nspname FROM pg_catalog.pg_class r INNER JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace WHERE r.oid=to_regclass(quote_ident(?)))";
+        // A literal NULL default fills nothing. MySQL's DEFAULT_GENERATED is a
+        // CURRENT_TIMESTAMP default, not a generated column.
+        String filled = mysql
+                ? "CASE WHEN c.column_default IS NOT NULL OR c.extra LIKE '%auto_increment%' OR c.extra LIKE '%DEFAULT_GENERATED%' OR c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.column_default IS NOT NULL AND upper(c.column_default) <> 'NULL' AND upper(c.column_default) NOT LIKE 'NULL::%' OR c.is_identity='YES' OR c.is_generated='ALWAYS' THEN 1 ELSE 0 END";
+        String keyGenerated = mysql ? "CASE WHEN c.extra LIKE '%auto_increment%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.is_identity='YES' OR c.column_default LIKE 'nextval(%' THEN 1 ELSE 0 END";
+        // ON UPDATE CURRENT_TIMESTAMP rewrites the column on every update the
+        // mapping makes without writing it, so the entity keeps a stale value;
+        // it counts as a column the database writes.
+        String readOnly = mysql ? "CASE WHEN c.extra LIKE '%VIRTUAL GENERATED%' OR c.extra LIKE '%STORED GENERATED%' OR c.extra LIKE '%on update%' THEN 1 ELSE 0 END"
+                : "CASE WHEN c.is_generated='ALWAYS' OR c.is_identity='YES' AND c.identity_generation='ALWAYS' THEN 1 ELSE 0 END";
+        // PostgreSQL: a nondeterministic collation can find distinct strings
+        // equal, which a text key cannot allow; SessionImpl reads the mark.
+        // Read through to_jsonb: PostgreSQL 10 and 11 have no such column (and
+        // no such collations), and naming it would fail every describe.
+        String collation = mysql ? "c.collation_name"
+                : "CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_collation pc INNER JOIN pg_catalog.pg_namespace cn ON cn.oid = pc.collnamespace WHERE pc.collname = c.collation_name AND cn.nspname = c.collation_schema AND to_jsonb(pc) ->> 'collisdeterministic' = 'false') THEN 'nondeterministic ' || c.collation_name ELSE c.collation_name END";
+        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type || COALESCE('(' || c.character_maximum_length || ')', CASE WHEN c.data_type LIKE 'time%' THEN '(' || c.datetime_precision || ')' END, '')") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, " + collation + ", " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
                 + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
-                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
-        return query(statement, new Object[]{table}, new int[4]);
+                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=?"
+                // MySQL compares catalog strings without case, while
+                // lower_case_table_names=0 (the Linux default) resolves table
+                // names with it: only the table the ORM's SQL reads may match.
+                + (mysql ? " AND (@@lower_case_table_names <> 0 OR BINARY c.table_name = BINARY ?)" : "")
+                + " ORDER BY c.ordinal_position";
+        return query(statement, new Object[]{table, table}, new int[8]);
     }
 
     @Override

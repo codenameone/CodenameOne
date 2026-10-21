@@ -27,7 +27,9 @@ import com.codename1.db.Database;
 import com.codename1.db.Row;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// SQLite adapter used by managed sessions; the entity manager owns the database.
 /// Internal connection adapter; not an application API.
@@ -55,11 +57,18 @@ public final class SessionSqlAccess implements SqlAccess {
         List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0],
                 new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
                         Attribute.INTEGER});
-        List<Object[]> result = new ArrayList<Object[]>();
-        for (Object[] row : raw) {
-            result.add(new Object[] {row[1], row[2], row[3], row[5]});
+        List<Object[]> definition = query("SELECT sql FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
+                new Object[] {table}, new int[] {Attribute.TEXT});
+        Map<String, String> collations = new HashMap<String, String>();
+        for (String index : SessionImpl.sqliteUniqueIndexes(query("PRAGMA index_list(" + quote(table) + ")",
+                new Object[0], new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
+                        Attribute.INTEGER}))) {
+            SessionImpl.sqliteKeyCollations(collations, query("PRAGMA index_xinfo(" + quote(index) + ")",
+                    new Object[0], new int[] {Attribute.INTEGER, Attribute.INTEGER, Attribute.TEXT,
+                            Attribute.INTEGER, Attribute.TEXT, Attribute.INTEGER}));
         }
-        return result;
+        return SessionImpl.sqliteColumns(raw, definition.isEmpty() ? null : (String) definition.get(0)[0],
+                collations);
     }
     @Override
     public String quote(String name) {

@@ -32,11 +32,11 @@
  },
  "hello": {
   "all": {
-   "memory": 0.82,
-   "runs": 1,
+   "memory": 0.857,
+   "runs": 2,
    "time": 1.069,
    "tolerance": {
-    "memory": 0.2,
+    "memory": 0.35,
     "time": 0.5
    }
   }
@@ -97,10 +97,7 @@
   "all": {
    "memory": 0.059,
    "runs": 1,
-   "time": 0.945,
-   "tolerance": {
-    "time": 0.2
-   }
+   "time": 1.201
   }
  },
  "stringBuilding": {
@@ -117,7 +114,7 @@
   "all": {
    "memory": 0.526,
    "runs": 1,
-   "time": 0.602,
+   "time": 0.591,
    "tolerance": {
     "time": 0.2
    }

@@ -45,6 +45,102 @@ public class OpenSettingsMojoTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void forwardsSnapshotUpdateSuppressionIndependentlyOfForcedUpdates() throws Exception {
+        for (boolean suppress : new boolean[]{false, true}) {
+            org.apache.maven.execution.MavenExecutionRequest request =
+                    new org.apache.maven.execution.DefaultMavenExecutionRequest();
+            request.setNoSnapshotUpdates(suppress);
+            final org.apache.maven.execution.MavenSession session = new org.apache.maven.execution.MavenSession(
+                    null, null, request, new org.apache.maven.execution.DefaultMavenExecutionResult());
+            OpenSettingsMojo mojo = new OpenSettingsMojo() {
+                @Override protected org.apache.maven.execution.MavenSession getSession() { return session; }
+            };
+            File input = tmp.newFile("snapshot-" + suppress + ".input");
+            mojo.writeBinding(input, tmp.newFolder("common-" + suppress));
+            String content = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+            String flag = java.util.Base64.getEncoder().encodeToString(
+                    "--no-snapshot-updates".getBytes(StandardCharsets.UTF_8));
+            assertEquals(suppress, content.contains("mavenArgument=" + flag + "\n"));
+        }
+    }
+
+    @Test
+    public void forwardsMavenSessionOptionsInPrivateBinding() throws Exception {
+        org.apache.maven.execution.MavenExecutionRequest request =
+                new org.apache.maven.execution.DefaultMavenExecutionRequest();
+        File userSettings = new File(tmp.getRoot(), "user settings.xml");
+        File globalSettings = new File(tmp.getRoot(), "global settings.xml");
+        Files.write(userSettings.toPath(), "<settings/>".getBytes(StandardCharsets.UTF_8));
+        Files.write(globalSettings.toPath(), "<settings/>".getBytes(StandardCharsets.UTF_8));
+        File repository = new File(tmp.getRoot(), "private repo");
+        request.setUserSettingsFile(userSettings).setGlobalSettingsFile(globalSettings)
+                .setLocalRepositoryPath(repository).setOffline(true).setUpdateSnapshots(true)
+                .setActiveProfiles(Arrays.asList("private", "desktop"))
+                .setInactiveProfiles(Arrays.asList("public"));
+        java.util.Properties properties = new java.util.Properties();
+        properties.setProperty("custom", "spaces & equals=and\nnewlines Ω ");
+        request.setUserProperties(properties);
+        final org.apache.maven.execution.MavenSession session = new org.apache.maven.execution.MavenSession(
+                null, null, request, new org.apache.maven.execution.DefaultMavenExecutionResult());
+        OpenSettingsMojo mojo = new OpenSettingsMojo() {
+            @Override protected org.apache.maven.execution.MavenSession getSession() { return session; }
+        };
+        for (String fileName : Arrays.asList("existing.input", "new.input")) {
+            File input = new File(tmp.getRoot(), fileName);
+            if (fileName.startsWith("existing")) Files.write(input.toPath(), new byte[0]);
+            mojo.writeBinding(input, tmp.newFolder(fileName + "-common"));
+            List<String> arguments = new java.util.ArrayList<>();
+            for (String line : Files.readAllLines(input.toPath(), StandardCharsets.UTF_8)) {
+                if (line.startsWith("mavenArgument=")) {
+                    arguments.add(new String(java.util.Base64.getDecoder().decode(
+                            line.substring("mavenArgument=".length())), StandardCharsets.UTF_8));
+                }
+            }
+            assertEquals(Arrays.asList("--settings", userSettings.getAbsolutePath(),
+                    "--global-settings", globalSettings.getAbsolutePath(), "--offline", "--update-snapshots",
+                    "-Pprivate", "-Pdesktop", "-P!public", "-Dcustom=" + properties.getProperty("custom"),
+                    "-Dmaven.repo.local=" + repository.getAbsolutePath()), arguments);
+            if (input.toPath().getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+                        Files.getPosixFilePermissions(input.toPath()));
+            }
+        }
+    }
+
+    @Test
+    public void absentDefaultSettingsFilesDoNotBecomeRequiredCliFiles() throws Exception {
+        org.apache.maven.execution.MavenExecutionRequest request =
+                new org.apache.maven.execution.DefaultMavenExecutionRequest();
+        request.setUserSettingsFile(new File(tmp.getRoot(), "absent-user.xml"))
+                .setGlobalSettingsFile(new File(tmp.getRoot(), "absent-global.xml"));
+        final org.apache.maven.execution.MavenSession session = new org.apache.maven.execution.MavenSession(
+                null, null, request, new org.apache.maven.execution.DefaultMavenExecutionResult());
+        OpenSettingsMojo mojo = new OpenSettingsMojo() {
+            @Override protected org.apache.maven.execution.MavenSession getSession() { return session; }
+        };
+        File input = tmp.newFile("binding.input");
+        mojo.writeBinding(input, tmp.newFolder("common"));
+        assertFalse(new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8)
+                .contains("mavenArgument="));
+    }
+
+    @Test
+    public void forwardsMavenHomeToSettingsBinding() throws Exception {
+        String previous = System.getProperty("maven.home");
+        try {
+            System.setProperty("maven.home", "/tools/maven with spaces");
+            File common = tmp.newFolder("binding-common");
+            File input = tmp.newFile("binding.input");
+            new OpenSettingsMojo().writeBinding(input, common);
+            assertTrue(new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8)
+                    .contains("mavenHome=/tools/maven with spaces\n"));
+        } finally {
+            if (previous == null) System.clearProperty("maven.home");
+            else System.setProperty("maven.home", previous);
+        }
+    }
+
+    @Test
     public void extractsPackagedIconForDesktopLaunchers() throws Exception {
         File jar = jarWithIcon("settings.jar");
         File runtimeDir = tmp.newFolder("runtime");

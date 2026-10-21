@@ -2,15 +2,19 @@
  "gallery": {
   "code_bytes": {
    "runs": 1,
-   "value": 73212360
+   "value": 36989896
+  },
+  "idle_memory_ratio": {
+   "runs": 7,
+   "value": 0.682
   },
   "install_bytes": {
    "runs": 1,
-   "value": 168810517
+   "value": 132515373
   },
   "wire_bytes": {
    "runs": 1,
-   "value": 109700753
+   "value": 90694082
   }
  }
 }

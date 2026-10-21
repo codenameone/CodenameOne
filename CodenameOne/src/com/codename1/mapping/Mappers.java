@@ -96,6 +96,21 @@ public final class Mappers {
         return (Mapper<T>) BY_NAME.get(type.getName());
     }
 
+    /// The mapper for `type`, failing loudly when there is none. A response
+    /// mapped with no mapper would otherwise read as empty: a list with nothing
+    /// in it, an object that is null, and no hint that `@Mapped` is missing.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when no mapper is registered for `type`
+    public static <T> Mapper<T> require(Class<T> type) {
+        Mapper<T> m = get(type);
+        if (m == null) {
+            throw missing(type);
+        }
+        return m;
+    }
+
     /// Serializes `instance` to JSON. Throws `IllegalStateException` when
     /// no mapper is registered for its concrete class; that always points
     /// at a missing `@Mapped` annotation or a build that ran without the
@@ -188,8 +203,7 @@ public final class Mappers {
         if (m == null) {
             throw missing(type);
         }
-        XMLParser p = new XMLParser();
-        Element root = p.parse(new StringReader(xml));
+        Element root = newXmlParser().parse(new StringReader(xml));
         return m.readXml(root);
     }
 
@@ -202,9 +216,18 @@ public final class Mappers {
         if (m == null) {
             throw missing(type);
         }
-        XMLParser p = new XMLParser();
-        Element root = p.parse(xml);
+        Element root = newXmlParser().parse(xml);
         return m.readXml(root);
+    }
+
+    /// The generated readers look names up exactly as `toXml` wrote them and
+    /// read a value as its text, so strict mode suits them: no case folding
+    /// and no whitespace munging, which lets a value with leading or only
+    /// whitespace round-trip, and it is the parser's fast path.
+    private static XMLParser newXmlParser() {
+        XMLParser p = new XMLParser();
+        p.setStrict(true);
+        return p;
     }
 
     private static IllegalStateException missing(Class<?> type) {

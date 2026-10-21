@@ -115,6 +115,13 @@ public class CN1Playground extends Lifecycle {
     private int historySequence;
     private WebsiteThemeNative websiteThemeNative;
     private boolean websiteThemeInitialized;
+    /// Embedded under a documentation snippet (``?mode=inline``): a compact
+    /// editor and preview, no side panels, and nothing read from or written to
+    /// the reader's saved Playground state -- trying a snippet must not replace
+    /// the script they were working on in the full Playground.
+    private boolean inlineMode;
+    /// The snippet as the page shows it, for Reset.
+    private String inlineOriginalScript = "";
 
     static final int LAYOUT_NONE = -1;
     static final int LAYOUT_MOBILE = 0;
@@ -159,9 +166,13 @@ public class CN1Playground extends Lifecycle {
         // the default back when the iOS / Android native theme overlays load.
         Dialog.setDefaultInteractionDialogMode(true);
         theme = Resources.getGlobalResources();
+        inlineMode = isInlineRequested();
         currentScript = resolveInitialScript();
         currentCss = resolveInitialCss();
-        currentMode = PlaygroundStateStore.loadMode(PlaygroundTopBar.MODE_CODE);
+        currentMode = inlineMode ? PlaygroundTopBar.MODE_CODE : PlaygroundStateStore.loadMode(PlaygroundTopBar.MODE_CODE);
+        if (inlineMode) {
+            inlineOriginalScript = currentScript;
+        }
 
         appForm = new Form("Playground", new BorderLayout());
         appForm.setUIID("PlaygroundForm");
@@ -196,13 +207,16 @@ public class CN1Playground extends Lifecycle {
                 projectExporter.export(currentScript, currentCss);
             }
         });
+        if (inlineMode) {
+            topBar.setInline(() -> setScript(inlineOriginalScript, true));
+        }
 
         PlaygroundActivityBar.Item[] activityItems = new PlaygroundActivityBar.Item[]{
                 new PlaygroundActivityBar.Item(PANEL_SAMPLES, "Samples", FontImage.MATERIAL_DASHBOARD),
                 new PlaygroundActivityBar.Item(PANEL_INSPECTOR, "Inspector", FontImage.MATERIAL_ACCOUNT_TREE),
                 new PlaygroundActivityBar.Item(PANEL_HISTORY, "History", FontImage.MATERIAL_HISTORY)
         };
-        currentActivity = PlaygroundStateStore.loadPanel(PlaygroundActivityBar.NONE);
+        currentActivity = inlineMode ? PlaygroundActivityBar.NONE : PlaygroundStateStore.loadPanel(PlaygroundActivityBar.NONE);
         activityBar = new PlaygroundActivityBar(activityItems, currentActivity, websiteDarkMode, this::handleActivitySelected);
 
         samplesPanel = new PlaygroundSamplesPanel(websiteDarkMode, () -> handleActivitySelected(PlaygroundActivityBar.NONE), this::handleSampleSelected);
@@ -214,8 +228,10 @@ public class CN1Playground extends Lifecycle {
         String device = PlaygroundStateStore.loadDevice(PlaygroundPreviewColumn.DEVICE_IPHONE);
         String orientation = PlaygroundStateStore.loadOrientation(PlaygroundPreviewColumn.ORIENTATION_PORTRAIT);
         previewColumn = new PlaygroundPreviewColumn(device, orientation, websiteDarkMode, () -> {
-            PlaygroundStateStore.saveDevice(previewColumn.getDevice());
-            PlaygroundStateStore.saveOrientation(previewColumn.getOrientation());
+            if (!inlineMode) {
+                PlaygroundStateStore.saveDevice(previewColumn.getDevice());
+                PlaygroundStateStore.saveOrientation(previewColumn.getOrientation());
+            }
             // Re-run the script when the native theme flips (iOS <-> Material):
             // switching themes resets the theme CONSTANTS, but layout-shaping
             // components like Tabs read constants (tabPlacementInt, glass /
@@ -258,7 +274,9 @@ public class CN1Playground extends Lifecycle {
 
         applyLayoutForCurrentSize();
         applyMode(currentMode, false);
-        applyActivity(currentActivity);
+        if (!inlineMode) {
+            applyActivity(currentActivity);
+        }
 
         applyWebsiteTheme(appForm, websiteDarkMode);
         applyDeviceTheme(previewColumn.getDevice());
@@ -431,7 +449,9 @@ public class CN1Playground extends Lifecycle {
         lastLayout = layout;
 
         bodyContainer.removeAll();
-        if (layout == LAYOUT_MOBILE) {
+        if (inlineMode) {
+            assembleInlineLayout(layout != LAYOUT_MOBILE);
+        } else if (layout == LAYOUT_MOBILE) {
             assembleMobileLayout();
         } else {
             assembleDesktopLayout(layout == LAYOUT_TABLET);
@@ -490,6 +510,36 @@ public class CN1Playground extends Lifecycle {
 
         bodyContainer.add(BorderLayout.CENTER, bodyInner);
 
+        attachEditorsToHost();
+    }
+
+    /// The editor and the preview side by side when the frame is wide enough for
+    /// both, stacked otherwise. The frame sits inside a documentation page, so
+    /// there are no side panels, no bottom navigation and no tab strip: the
+    /// reader edits the snippet and watches it run.
+    private void assembleInlineLayout(boolean wide) {
+        topBar.setCompact(!wide);
+        topBar.setMobile(false);
+        previewColumn.setCompact(true);
+        // A narrow frame drops the device skin, as the mobile shell does: a
+        // phone bezel shrunk into half of a short frame leaves no room for the UI.
+        previewColumn.setMobile(!wide);
+
+        detach(editorHost);
+        detach(previewContainer);
+        detach(previewColumn);
+        if (previewColumn.getParent() == null) {
+            previewContainer.removeAll();
+            previewContainer.add(BorderLayout.CENTER, previewColumn);
+        }
+
+        SplitPane.Settings splitSettings = new SplitPane.Settings(
+                wide ? SplitPane.HORIZONTAL_SPLIT : SplitPane.VERTICAL_SPLIT, "25%", "55%", "75%")
+                .showExpandCollapseButtons(false)
+                .showDragHandle(false)
+                .dividerThicknessMM(0.8f)
+                .dividerUIID("PlaygroundSplitDivider");
+        bodyContainer.add(BorderLayout.CENTER, new SplitPane(splitSettings, editorHost, previewContainer));
         attachEditorsToHost();
     }
 
@@ -637,6 +687,9 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void handleActivitySelected(String key) {
+        if (inlineMode) {
+            return;
+        }
         currentActivity = key == null ? PlaygroundActivityBar.NONE : key;
         if (activityBar != null) {
             activityBar.setActive(currentActivity);
@@ -725,7 +778,9 @@ public class CN1Playground extends Lifecycle {
         if (topBar != null) {
             topBar.setMode(mode);
         }
-        PlaygroundStateStore.saveMode(mode);
+        if (!inlineMode) {
+            PlaygroundStateStore.saveMode(mode);
+        }
         attachEditorsToHost();
         if (userInitiated) {
             refreshMobileTabContent();
@@ -789,7 +844,44 @@ public class CN1Playground extends Lifecycle {
             cssEditor.setUiidCompletions(visibleUiids);
             applyCurrentCss();
             persistCurrentState();
+            if (inlineMode) {
+                notifyInlineResult(hasErrors, diagnostics);
+            }
         });
+    }
+
+    private void notifyInlineResult(boolean hasErrors, List<PlaygroundRunner.Diagnostic> diagnostics) {
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+        String summary = "";
+        if (hasErrors) {
+            for (int i = 0; i < diagnostics.size(); i++) {
+                PlaygroundRunner.Diagnostic d = diagnostics.get(i);
+                if ("error".equalsIgnoreCase(d.severity)) {
+                    summary = d.line + ": " + d.message;
+                    break;
+                }
+            }
+        }
+        String url = currentSourceUrl();
+        websiteThemeNative.notifyInlineResult(!hasErrors, summary, url == null ? "" : url);
+    }
+
+    /// Polled with the website theme: a snippet the host page asked this frame to
+    /// show instead of the current one.
+    private void pollInlineCode() {
+        if (!inlineMode || websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+        String code = websiteThemeNative.takeInlineCode();
+        if (code != null) {
+            inlineOriginalScript = code;
+            // A different snippet: the last one's UI must not linger under a
+            // "Preview paused" chip if this one does not compile.
+            replacePreview(null);
+            setScript(code, true);
+        }
     }
 
     private boolean listenerErrorReportingInstalled;
@@ -897,8 +989,16 @@ public class CN1Playground extends Lifecycle {
         }
     }
 
+    private boolean isInlineRequested() {
+        String href = browserHref();
+        return href != null && "inline".equals(queryParam(href, "mode"));
+    }
+
     private String resolveInitialScript() {
         String sharedScript = scriptFromUrl();
+        if (inlineMode) {
+            return sharedScript == null ? "" : sharedScript;
+        }
         if (sharedScript != null) {
             PlaygroundStateStore.saveCurrentState(sharedScript, resolveInitialCss(), PlaygroundStateStore.loadCurrentOutput());
             return sharedScript;
@@ -931,6 +1031,9 @@ public class CN1Playground extends Lifecycle {
 
     private String resolveInitialCss() {
         String sharedCss = cssFromUrl();
+        if (inlineMode) {
+            return sharedCss == null ? "" : sharedCss;
+        }
         return sharedCss == null ? PlaygroundStateStore.loadCurrentCss() : sharedCss;
     }
 
@@ -1006,9 +1109,18 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void copyCurrentSourceUrl() {
+        String url = currentSourceUrl();
+        if (url != null) {
+            Display.getInstance().copyToClipboard(url);
+        }
+    }
+
+    /// This Playground's URL carrying the current script and CSS, without the
+    /// query (``mode=inline`` among it) the frame was opened with.
+    private String currentSourceUrl() {
         String base = browserHref();
         if (base == null || base.isEmpty()) {
-            return;
+            return null;
         }
 
         int query = base.indexOf('?');
@@ -1022,7 +1134,7 @@ public class CN1Playground extends Lifecycle {
 
         String encoded = encodeSharedScript(currentScript);
         if (encoded.isEmpty()) {
-            return;
+            return null;
         }
 
         StringBuilder shareUrl = new StringBuilder(base).append("?code=").append(encoded);
@@ -1030,8 +1142,7 @@ public class CN1Playground extends Lifecycle {
             String encodedCss = encodeSharedScript(currentCss);
             shareUrl.append("&css=").append(encodedCss);
         }
-
-        Display.getInstance().copyToClipboard(shareUrl.toString());
+        return shareUrl.toString();
     }
 
     private String encodeSharedScript(String script) {
@@ -1244,6 +1355,9 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void persistCurrentState() {
+        if (inlineMode) {
+            return;
+        }
         PlaygroundStateStore.saveCurrentState(currentScript, currentCss, joinMessages(currentMessages, currentCssMessages));
     }
 
@@ -1270,7 +1384,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void scheduleHistorySnapshot() {
-        if (appForm == null) {
+        if (appForm == null || inlineMode) {
             return;
         }
         final int snapshot = ++historySequence;
@@ -1300,6 +1414,9 @@ public class CN1Playground extends Lifecycle {
         websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
+        if (inlineMode) {
+            UITimer.timer(250, true, form, this::pollInlineCode);
+        }
     }
 
     private void notifyWebsiteUiReady() {

@@ -83,6 +83,15 @@ public class GeneratorModel {
     /// colour is chosen. GeneratorModelMatrixTest holds the two together.
     public static final int FULL_STACK_BRAND = 0x1f5eff;
 
+    /// The food-delivery template's `--brand`, held to its theme.css the same way.
+    public static final int SAVOR_BRAND = 0x7ac943;
+
+    /// The brand colour `template` ships with: the one its icon is painted with
+    /// when the developer keeps the template's own scheme.
+    public static int brandOf(Template template) {
+        return template == Template.SAVOR ? SAVOR_BRAND : FULL_STACK_BRAND;
+    }
+
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {
@@ -310,7 +319,7 @@ public class GeneratorModel {
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
             return false;
         }
-        if (downloadWebsiteProject(fileName, bytes, packageName, templateId())) {
+        if (downloadWebsiteProject(fileName, bytes, beaconKey(), templateId())) {
             return true;
         }
         if (downloadBytesAsFile(fileName, bytes)) {
@@ -411,8 +420,55 @@ public class GeneratorModel {
     /// hash and BuildCloud computes it for every cloud build, which is how a
     /// download, its launcher runs and its first cloud build are joined without
     /// the package name leaving the machine.
+    ///
+    /// Except for a project that kept the default package (`com.example.myapp`):
+    /// its hash is the same for everyone who did, so every such download, launch
+    /// and build merged into one subject (in production most downloads did). It
+    /// gets a random id instead, made once per download and used everywhere the
+    /// hash would be -- the download beacon (see `beaconKey`), the launchers and
+    /// the IDE build reporting -- so its own steps still join. Joining it to a
+    /// cloud build by package was meaningless anyway: that package is everyone's.
     String projectId() {
+        if (isDefaultPackage()) {
+            if (randomProjectId == null) {
+                randomProjectId = newRandomProjectId();
+            }
+            return randomProjectId;
+        }
         return Sha256.hex(toLowerCaseInvariant(packageName == null ? "" : packageName));
+    }
+
+    private String randomProjectId;
+
+    /// 32 bytes from the platform's secure random source, as hex. Not
+    /// java.util.Random: on the JavaScript port it is seeded from the clock alone,
+    /// so two browsers generating a project in the same millisecond would get the
+    /// same "per-download" id and merge again. A port without a secure source
+    /// falls back to clock, a time-seeded Random and this object's identity --
+    /// weaker, but still per download in practice.
+    private String newRandomProjectId() {
+        try {
+            return Sha256.hex(com.codename1.security.SecureRandom.bytes(32));
+        } catch (RuntimeException unavailable) {
+            return Sha256.hex("cn1-download:" + System.currentTimeMillis() + ":"
+                    + new java.util.Random().nextLong() + ":" + System.identityHashCode(this));
+        }
+    }
+
+    /// The package the Initializr suggests (`Initializr`'s package field), which
+    /// many developers keep.
+    public static final String DEFAULT_PACKAGE = "com.example.myapp";
+
+    boolean isDefaultPackage() {
+        return packageName == null || packageName.length() == 0
+                || DEFAULT_PACKAGE.equals(toLowerCaseInvariant(packageName));
+    }
+
+    /// What the website page reports for this download (it hashes a package name
+    /// itself): the package name, or `id:<projectId>` for a default-package
+    /// project, which the page sends as is (cn1-initializr-beacon.js).
+    public String beaconKey() {
+        return isDefaultPackage() ? "id:" + projectId() : packageName;
     }
 
     /// Initializr downloads -- and only those; the archetype's launchers are not
@@ -1884,13 +1940,22 @@ public class GeneratorModel {
                     .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
         }
         if (template.isFullStack()) {
+            boolean food = template == Template.SAVOR;
+            String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append("This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
+                    .append(food
+                            ? "This project is a working food-delivery app: a customer, a restaurant, a courier "
+                            + "and an admin mode in one "
+                            : "This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append("- `backend/` is the server: accounts and roles, phone verification, driver applications, ")
-                    .append("rides, matching, payments, the live channel and the database migrations.\n")
+                    .append(food
+                            ? "- `backend/` is the server: accounts and roles, phone verification, restaurants and "
+                            + "their menus, orders, courier applications, deliveries, payments, the live channel "
+                            + "and the database migrations.\n"
+                            : "- `backend/` is the server: accounts and roles, phone verification, driver applications, "
+                            + "rides, matching, payments, the live channel and the database migrations.\n")
                     .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
                     .append("radius every screen takes its look from.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
@@ -1899,11 +1964,13 @@ public class GeneratorModel {
                     .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
                     .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
-                    .append("password `").append(toLowerCaseInvariant(appName)).append("-demo`: `rider@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, `driver@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, `admin@")
-                    .append(toLowerCaseInvariant(appName)).append(".example` and `applicant@")
-                    .append(toLowerCaseInvariant(appName)).append(".example`, who has applied to drive ")
+                    .append("password `").append(lower).append("-demo`: ")
+                    .append(food
+                            ? "`customer@" + lower + ".example`, `merchant@" + lower + ".example`, who runs the "
+                            + "first restaurant's kitchen, `courier@" + lower + ".example`, `admin@" + lower
+                            + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
+                            : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
+                            + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
                     .append("and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append("configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the ")
@@ -1914,11 +1981,15 @@ public class GeneratorModel {
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append("cover the sample this project started as: \"A ride-hailing app from three sides\" ")
-                    .append("shows it as a rider, a driver and an admin see it, and \"Building on the sample\" ")
-                    .append("explains how it is built and what to change: billing, maps and demo data, native ")
-                    .append("maps and the ")
-                    .append("database.\n\n");
+                    .append(food
+                            ? "cover the sample this project started as: \"A food-delivery app from four sides\" "
+                            + "shows it as a customer, a restaurant, a courier and an admin see it, and "
+                            + "\"Building on the sample\" explains how it is built and what to change, including "
+                            + "running it as a restaurant's own delivery service.\n\n"
+                            : "cover the sample this project started as: \"A ride-hailing app from three sides\" "
+                            + "shows it as a rider, a driver and an admin see it, and \"Building on the sample\" "
+                            + "explains how it is built and what to change: billing, maps and demo data, native "
+                            + "maps and the database.\n\n");
         }
 
         out.append("## Signing\n\n")
