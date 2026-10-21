@@ -2306,6 +2306,11 @@ public class AndroidGradleBuilder extends Executor {
         try {
             debug("Extracting "+sourceZip);
             unzip(sourceZip, dummyClassesDir, assetsDir, srcDir, libsDir, xmlDir);
+            // This builder overrides unzip, so Executor's prune never ran here: every
+            // Flutter plugin pack reached the class scan below, and FirebaseMessaging's
+            // com/codename1/push reference turned on FCM (and its google-services.json
+            // requirement) for apps that never use push.
+            pruneUnusedFlutterPlugins(dummyClassesDir);
             // The application's own libraries, listed before anything else lands in libs:
             // native-theme pruning scans them too (a library's bytecode stays in its jar).
             appLibraryJars = NativeThemes.jarsIn(libsDir);
