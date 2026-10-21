@@ -151,6 +151,12 @@ public final class Rewards {
         // A scrolling body: showPacked clamped the height
         // first, and the last child -- the button -- absorbed the shortfall.
         d.getContentPane().setScrollableY(true);
+        // A wrapping title packs to its narrowest, so an empty strut gives the
+        // card its width.
+        Label strut = new Label("", "Container");
+        strut.setPreferredW(Math.min(CN.convertToPixels(70), CN.getDisplayWidth() - CN.convertToPixels(16)));
+        strut.setPreferredH(1);
+        d.add(strut);
         d.showPacked(BorderLayout.CENTER, true);
     }
 

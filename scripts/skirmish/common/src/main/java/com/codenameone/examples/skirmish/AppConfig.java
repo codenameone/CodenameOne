@@ -146,6 +146,55 @@ public final class AppConfig {
         return clean(url).equals(current);
     }
 
+    /// Whether the app was opened with `skirmish://tour`, the self-driving
+    /// walkthrough the promotional video is recorded from. A `server=`
+    /// parameter in the link points the app at that server first.
+    /// A `skirmish-tour.txt` in the app's home directory, holding the server
+    /// address, asks for the same thing: a simulator can be given that file
+    /// with no hands on the screen (`xcrun simctl get_app_container` names the
+    /// directory), where a link would stop at the system's "Open in" prompt.
+    /// The file is consumed, so the next launch is an ordinary one.
+    public static boolean tourRequested() {
+        String file = tourFile();
+        if (file != null) {
+            if (file.length() > 0) {
+                setServerUrl(file);
+            }
+            return true;
+        }
+        String link = CN.getProperty("AppArg", null);
+        if (link == null || !link.startsWith("skirmish://tour")) {
+            return false;
+        }
+        int at = link.indexOf("server=");
+        if (at >= 0) {
+            int end = link.indexOf('&', at);
+            setServerUrl(link.substring(at + 7, end < 0 ? link.length() : end));
+        }
+        return true;
+    }
+
+    private static String tourFile() {
+        com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+        String path = fs.getAppHomePath() + "skirmish-tour.txt";
+        if (!fs.exists(path)) {
+            return null;
+        }
+        try {
+            java.io.InputStream in = fs.openInputStream(path);
+            try {
+                String text = com.codename1.io.Util.readToString(in).trim();
+                return text;
+            } finally {
+                in.close();
+            }
+        } catch (java.io.IOException err) {
+            return "";
+        } finally {
+            fs.delete(path);
+        }
+    }
+
     /// The challenge code the app was opened with -- a challenge link opened in
     /// a browser, or handed to the installed app -- or null.
     public static String challengeCode() {

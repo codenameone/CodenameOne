@@ -154,6 +154,40 @@ public final class Tutorial {
         this.battle = battle;
     }
 
+    /// The lesson on screen, for [Tour] to end its free fight early.
+    private static Tutorial active;
+
+    /// What the lesson waits for, read by [Tour]: "next", "free", "wait",
+    /// or the card to pick ("choose:id") or place ("place:id:x:y").
+    static String tourState() {
+        Tutorial t = active;
+        Step s = t == null ? null : t.current();
+        if (s == null) {
+            return "wait";
+        }
+        switch (s.kind) {
+            case TAP:
+                return "next";
+            case FREE:
+                return "free";
+            case CHOOSE:
+                return t.mayChoose(s.card) ? "choose:" + s.card : "wait";
+            case PLACE:
+                return "place:" + s.card + ":" + s.targetX + ":" + s.targetY;
+            default:
+                return "wait";
+        }
+    }
+
+    /// Ends the lesson as a win: the walkthrough's shortcut past the free
+    /// fight, which otherwise lasts until a king tower falls.
+    static void finishForTour() {
+        if (active != null) {
+            active.finished(0);
+            active = null;
+        }
+    }
+
     /// The training battle, from the home screen's "How to play" or on a new
     /// player's first visit.
     public static void start() {
@@ -161,6 +195,7 @@ public final class Tutorial {
         TutorialDriver d = new TutorialDriver();
         BattleForm f = BattleForm.tutorial(d);
         Tutorial t = new Tutorial(d, f);
+        active = t;
         f.setCoach(t);
         t.attach(f.form());
         f.begin();

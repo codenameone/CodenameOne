@@ -55,8 +55,12 @@ public class Skirmish extends Lifecycle implements PurchaseCallback {
         Sfx.load();
         Telemetry.start();
         Ads.start();
+        boolean tour = AppConfig.tourRequested();
         Session.start(AppConfig.serverUrl());
         Nav.launch();
+        if (tour) {
+            com.codenameone.examples.skirmish.ui.Tour.start();
+        }
     }
 
     @Override
