@@ -67,8 +67,14 @@ public class ResultAfterRelaunchTest {
                     Activity child = ActivityThread.getTopActivity();
                     assertTrue(child instanceof AndroidTestSupport.UiModeHandlingActivity);
 
-                    HeadlessImplementation.darkMode = true;
+                    // From light mode whatever an earlier test left: the flag
+                    // is process-global, and arriving already dark made the
+                    // switch below change nothing.
+                    HeadlessImplementation.darkMode = false;
                     ResourceManager rm = ResourceManager.get();
+                    rm.refresh();
+                    ActivityThread.onConfigurationChanged(rm.configuration());
+                    HeadlessImplementation.darkMode = true;
                     assertTrue("dark mode did not change the configuration", rm.refresh());
                     ActivityThread.onConfigurationChanged(rm.configuration());
                     assertTrue("the child handles uiMode and must stay", child == ActivityThread.getTopActivity());

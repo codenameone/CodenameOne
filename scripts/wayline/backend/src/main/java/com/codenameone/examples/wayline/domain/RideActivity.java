@@ -26,14 +26,14 @@ import com.codename1.annotations.Id;
 @Entity
 public class RideActivity {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String rideId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
     /// The id the phone's platform gave the activity.
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String activityId = "";
 
     /// When the server last sent it a state, for spacing out the updates.

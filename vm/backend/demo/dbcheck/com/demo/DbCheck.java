@@ -201,6 +201,23 @@ public class DbCheck {
             check("the decimal value is exact", exact, String.valueOf(amount));
         }
 
+        // A statement MySQL will not prepare. ALTER DATABASE answers PREPARE
+        // with error 1295, and a migration that sets the database's collation
+        // is exactly where one is written. It is sent as text instead; the
+        // collation it sets is the one the database already has.
+        if(mysql) {
+            List schema = db.query("SELECT DEFAULT_COLLATION_NAME AS c FROM information_schema.SCHEMATA "
+                    + "WHERE SCHEMA_NAME = DATABASE()", null);
+            String collation = String.valueOf(((Map)schema.get(0)).get("c"));
+            String outcome = "ran";
+            try {
+                db.execute("ALTER DATABASE COLLATE " + collation, null);
+            } catch(Exception err) {
+                outcome = String.valueOf(err.getMessage());
+            }
+            check("a statement the server will not prepare still runs", "ran", outcome);
+        }
+
         // Binding, not interpolation. A value containing a quote would end the
         // statement early if this were concatenated.
         db.execute("INSERT INTO cn1_check (name, size) VALUES (" + placeholders(postgres, 2) + ")",

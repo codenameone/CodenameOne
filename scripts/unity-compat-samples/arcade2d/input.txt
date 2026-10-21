@@ -1,0 +1,23 @@
+# Two shots straight up at the target, which takes two; then a turn to the
+# right with the alternative key, and a third shot that flies off and expires.
+5 space down
+8 space up
+60 space down
+63 space up
+120 d down
+150 d up
+160 space down
+163 space up
+# Three axes on one pair of keys, each with its own gravity, sensitivity and
+# snap: held, reversed in one frame, and let go.
+200 e down
+215 e up
+215 q down
+230 q up
+# Two axes named Mixed, e and the mouse's x at a hundredth: while e is held
+# the mouse moving 20 pixels is the weaker of the two, and with e let go it
+# is all there is.
+205 pointer:100,100 move
+206 pointer:120,100 move
+235 pointer:100,100 move
+236 pointer:120,100 move

@@ -26,34 +26,34 @@ import com.codename1.annotations.Id;
 @Entity
 public class Payment {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String rideId = "";
 
     @Column(nullable = false)
     private long amountCents;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(3)")
     private String currency = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String providerRef = "";
 
     @Column(nullable = false)
     private long createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String tipRef = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String refundRef = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String tipRefundRef = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String refundReason = "";
 
     @Column(nullable = false)

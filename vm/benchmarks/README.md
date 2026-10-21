@@ -353,7 +353,7 @@ not with it.
 ## Mandatory compiler flags
 
 Generated C **must** be compiled with
-`-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf`.
+`-fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off`.
 Java integer arithmetic wraps; without `-fwrapv`, clang -O3 provably
 miscompiles accumulation loops (checksum off by 2^32 per overflow). The
 build scripts, the Xcode template, and the cmake writer all carry these —

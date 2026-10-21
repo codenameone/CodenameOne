@@ -27,25 +27,25 @@ import com.codename1.annotations.Id;
 @Entity
 public class Dish {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String restaurantId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String sectionId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String name = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(500)")
     private String description = "";
 
     @Column(nullable = false)
     private long priceCents;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String photoId = "";
 
     @Column(nullable = false)

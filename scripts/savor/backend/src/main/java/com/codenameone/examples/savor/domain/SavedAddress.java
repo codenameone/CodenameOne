@@ -26,16 +26,16 @@ import com.codename1.annotations.Id;
 @Entity
 public class SavedAddress {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(40)")
     private String label = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String address = "";
 
     @Column(nullable = false)
@@ -44,7 +44,7 @@ public class SavedAddress {
     @Column(nullable = false)
     private double lng;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String note = "";
 
     @Column(nullable = false)

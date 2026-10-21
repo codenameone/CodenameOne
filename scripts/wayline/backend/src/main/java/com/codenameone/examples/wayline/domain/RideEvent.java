@@ -27,16 +27,16 @@ import com.codenameone.examples.wayline.api.RideState;
 @Entity
 public class RideEvent {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String rideId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private RideState state;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String actor = "";
 
     @Column(nullable = false)

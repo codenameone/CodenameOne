@@ -26,16 +26,16 @@ import com.codename1.annotations.Id;
 @Entity
 public class PayoutAccount {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String holder = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(80)")
     private String bankName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(4)")
     private String last4 = "";
 
     public PayoutAccount() {

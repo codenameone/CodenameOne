@@ -26,43 +26,43 @@ import com.codename1.annotations.Id;
 @Entity
 public class DriverApplication {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String legalName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(10)")
     private String dateOfBirth = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(40)")
     private String licenceNumber = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(10)")
     private String licenceExpiry = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(40)")
     private String vehicleMake = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(40)")
     private String vehicleModel = "";
 
     @Column(nullable = false)
     private int vehicleYear;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private String vehicleColor = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String vehiclePlate = "";
 
     @Column(nullable = false)
     private int vehicleSeats;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String product = "";
 
     @Column(nullable = false)
@@ -71,7 +71,7 @@ public class DriverApplication {
     @Column(nullable = false)
     private boolean pets;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String rejectionReason = "";
 
     @Column(nullable = false)
@@ -83,7 +83,7 @@ public class DriverApplication {
     @Column(nullable = false)
     private long reviewedAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String reviewedBy = "";
 
     public DriverApplication() {

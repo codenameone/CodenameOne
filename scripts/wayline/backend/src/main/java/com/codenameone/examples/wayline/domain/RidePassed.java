@@ -26,11 +26,11 @@ import com.codename1.annotations.Id;
 @Entity
 public class RidePassed {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String rideId = "";
 
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String driver = "";
 
     public RidePassed() {
