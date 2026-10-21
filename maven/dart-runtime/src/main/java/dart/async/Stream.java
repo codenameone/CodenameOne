@@ -1049,10 +1049,33 @@ public class Stream<T> {
         throw new dart.core.UnsupportedError("Not a stream transformer: " + transformer);
     }
 
-    /** Dart's {@code cast}; elements are not checked. */
+    /** Dart's {@code cast} with no type the emitter could name (dynamic); nothing to check. */
     @SuppressWarnings("unchecked")
     public final <R> Stream<R> cast() {
         return (Stream<R>) (Stream<?>) this;
+    }
+
+    /**
+     * Dart's {@code cast<R>()}: every data event that is not an {@code R} becomes a
+     * TypeError error event instead of reaching a listener typed for {@code R}.
+     * {@code type} is the transpiler's witness for {@code R}; {@code admitsNull} says
+     * whether {@code R} is nullable (Class.isInstance(null) is false).
+     */
+    @SuppressWarnings("unchecked")
+    public final <R> Stream<R> cast(final Class<?> type, final boolean admitsNull) {
+        if (type == null) {
+            return (Stream<R>) (Stream<?>) this;
+        }
+        return map(new Funcs.Func1<T, R>() {
+            @Override
+            public R call(T v) {
+                if (v == null ? admitsNull : type.isInstance(v)) {
+                    return (R) v;
+                }
+                throw new dart.core.TypeError("type '" + (v == null ? "Null" : v.getClass().getName())
+                        + "' is not a subtype of type '" + type.getName() + "' in type cast");
+            }
+        });
     }
 
     /** Dart's {@code asBroadcastStream}; every stream here already accepts several listeners. */

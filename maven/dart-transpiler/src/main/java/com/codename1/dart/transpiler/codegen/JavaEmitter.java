@@ -8744,6 +8744,22 @@ public final class JavaEmitter {
         TypeRef tt = target.type;
         String n = c.name;
         List<Expr> pos = c.args.positional;
+        if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
+            // Stream.cast<R>() checks each event, so the runtime takes R as a witness the
+            // way whereType does; an erased type variable has none and stays unchecked.
+            TypeRef sub = c.typeArgs.get(0);
+            // Generic code (a library's cast<T>()) is common, so a type variable is not
+            // diagnosed as whereType's is: it keeps the old unchecked behaviour.
+            boolean dyn = sub.is("dynamic") || sub.is("var") || sub.is("Object") || isTypeVariable(sub, ctx);
+            String jt = dyn ? null : javaType(sub, true, ctx);
+            if (jt == null) {
+                return new Out(target.code + ".cast()", TypeRef.of("Stream", sub));
+            }
+            // A class literal names the raw type: List<int> is checked as a List.
+            String raw = jt.indexOf('<') >= 0 ? jt.substring(0, jt.indexOf('<')) : jt;
+            return new Out(target.code + ".<" + jt + ">cast(" + raw + ".class, " + sub.nullable + ")",
+                    TypeRef.of("Stream", sub));
+        }
         if (tt.is("String")) {
             ctx.importClass("dart.core.DString");
             if (n.equals("substring")) {

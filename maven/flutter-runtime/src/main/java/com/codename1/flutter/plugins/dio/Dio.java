@@ -194,7 +194,7 @@ public class Dio {
         ro.followRedirects = b.followRedirects;
         if (opts != null) {
             if (opts.headers != null) {
-                h.putAll(opts.headers);
+                putHeaders(h, opts.headers);
             }
             if (opts.extra != null) {
                 x.putAll(opts.extra);
@@ -224,6 +224,23 @@ public class Dio {
             ro.responseType = ResponseType.json;
         }
         return ro;
+    }
+
+    /// Header names are case-insensitive: a request option's `authorization`
+    /// replaces a base option's `Authorization` rather than sitting beside it.
+    private static void putHeaders(DartMap<String, Object> into, java.util.Map<String, Object> from) {
+        for (java.util.Map.Entry<String, Object> e : from.entrySet()) {
+            String k = e.getKey();
+            if (k != null) {
+                for (java.util.Iterator<String> it = into.keySet().iterator(); it.hasNext();) {
+                    String have = it.next();
+                    if (have != null && have.equalsIgnoreCase(k)) {
+                        it.remove();
+                    }
+                }
+            }
+            into.put(k, e.getValue());
+        }
     }
 
     private static String pick(String a, String b, String c, String d) {

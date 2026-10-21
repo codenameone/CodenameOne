@@ -144,9 +144,40 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                 // Only the BOM at the very start of the stream is dropped; one opening a
                 // later chunk is a real U+FEFF in the middle of the text.
                 boolean atStart = true;
+                // Base64 works in whole groups -- three bytes encode to four characters --
+                // so a chunk's incomplete group is carried into the next one and finished
+                // only when the stream closes; per-chunk padding would corrupt the output.
+                boolean b64 = kind == BASE64 || kind == BASE64_URL;
+                StringBuilder textCarry = new StringBuilder();
                 try {
                     while (it.next()) {
                         Object chunk = it.current();
+                        if (b64 && chunk instanceof String) {
+                            textCarry.append((String) chunk);
+                            // Padding only ends the input, so text holding '=' waits for the end.
+                            int cut = textCarry.indexOf("=") >= 0 ? 0 : textCarry.length() - textCarry.length() % 4;
+                            if (cut > 0) {
+                                String head = textCarry.substring(0, cut);
+                                textCarry.delete(0, cut);
+                                sink.yield$(convert(head));
+                            }
+                            continue;
+                        }
+                        if (b64) {
+                            byte[] in = bytesOf(chunk);
+                            byte[] all = new byte[carry.length + in.length];
+                            System.arraycopy(carry, 0, all, 0, carry.length);
+                            System.arraycopy(in, 0, all, carry.length, in.length);
+                            int cut = all.length - all.length % 3;
+                            carry = new byte[all.length - cut];
+                            System.arraycopy(all, cut, carry, 0, carry.length);
+                            if (cut > 0) {
+                                byte[] head = new byte[cut];
+                                System.arraycopy(all, 0, head, 0, cut);
+                                sink.yield$(base64(head, kind == BASE64_URL));
+                            }
+                            continue;
+                        }
                         if (kind != UTF8 || chunk instanceof String) {
                             sink.yield$(convert(chunk));
                             continue;
@@ -166,6 +197,15 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                             sink.yield$(text(head, atStart));
                             atStart = false;
                         }
+                    }
+                    if (b64) {
+                        if (textCarry.length() > 0) {
+                            sink.yield$(convert(textCarry.toString()));
+                        }
+                        if (carry.length > 0) {
+                            sink.yield$(base64(carry, kind == BASE64_URL));
+                        }
+                        return;
                     }
                     if (carry.length > 0) {
                         // An incomplete sequence left at the end of the stream is malformed.

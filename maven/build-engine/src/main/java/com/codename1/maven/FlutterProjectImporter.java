@@ -776,8 +776,16 @@ public final class FlutterProjectImporter {
                 Files.write(res.toPath(), buildNumber.getBytes(Charset.forName("UTF-8")));
             } else {
                 // A reimport after the pubspec dropped its +build part: the resource an
-                // earlier import wrote would keep reporting the old build number.
-                Files.deleteIfExists(new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE).toPath());
+                // earlier import wrote would keep reporting the old build number, and the
+                // native hints it appended would keep building with it. A hint whose value
+                // is not the one this importer wrote was set by hand and is kept.
+                File res = new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE);
+                if (res.isFile()) {
+                    String old = new String(Files.readAllBytes(res.toPath()), Charset.forName("UTF-8")).trim();
+                    updated = removePropertyIfValue(updated, "codename1.arg.android.versionCode", old);
+                    updated = removePropertyIfValue(updated, "codename1.arg.ios.bundleVersion", old);
+                    Files.delete(res.toPath());
+                }
             }
         }
         if (pubspec.name != null) {
@@ -787,6 +795,13 @@ public final class FlutterProjectImporter {
             Files.write(settings.toPath(), updated.getBytes(Charset.forName("UTF-8")));
             log.info("Set codename1.version/codename1.displayName from pubspec.yaml");
         }
+    }
+
+    /// Removes the `key=value` line whose value is exactly `value`; any other
+    /// value (or no line) leaves the file untouched.
+    static String removePropertyIfValue(String properties, String key, String value) {
+        return properties.replaceAll("(?m)^" + Pattern.quote(key) + "\\s*=\\s*" + Pattern.quote(value)
+                + "[ \\t]*(\\r?\\n|$)", "");
     }
 
     /// Replaces the value of a `key=value` line in a `.properties` file,

@@ -31,6 +31,15 @@ class NotificationAppLaunchDetails {
   external NotificationResponse? get notificationResponse;
 }
 
+@JavaName('com.codename1.flutter.plugins.notifications.PendingNotificationRequest')
+class PendingNotificationRequest {
+  external PendingNotificationRequest(int id, String? title, String? body, String? payload);
+  external int get id;
+  external String? get title;
+  external String? get body;
+  external String? get payload;
+}
+
 @JavaName('com.codename1.flutter.plugins.notifications.NotificationResponse')
 class NotificationResponse {
   external int? get id;
@@ -102,7 +111,7 @@ class FlutterLocalNotificationsPlugin {
   external Future<void> cancel(int id, {String? tag});
   external Future<void> cancelAll();
   external Future<NotificationAppLaunchDetails?> getNotificationAppLaunchDetails();
-  external Future<List<Object>> pendingNotificationRequests();
+  external Future<List<PendingNotificationRequest>> pendingNotificationRequests();
   external T? resolvePlatformSpecificImplementation<T>([Type? witness]);
 }
 

@@ -81,8 +81,15 @@ abstract class BlocWidgetState<W extends StatefulWidget> extends State<W> {
                 previous = bloc.state();
                 bloc.addListener(listener);
             }
+            onBlocChanged();
         }
         return bloc;
+    }
+
+    /// The bloc this widget follows was replaced (a new provider or `bloc:`). A
+    /// subclass drops whatever it cached from the old bloc's states here, so the next
+    /// build shows the new bloc's current state rather than the old one's last.
+    protected void onBlocChanged() {
     }
 
     /// The state a builder should be shown, before any change arrives.

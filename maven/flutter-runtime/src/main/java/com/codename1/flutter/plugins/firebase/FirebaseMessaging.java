@@ -201,11 +201,23 @@ public class FirebaseMessaging {
         return Future.value(m);
     }
 
+    /// Codename One's Push topic API (FCM topics on Android); a port without topic
+    /// support ignores it, as it does for a native Codename One app.
     public Future<Object> subscribeToTopic(String topic) {
+        try {
+            com.codename1.push.Push.subscribeToTopic(topic);
+        } catch (RuntimeException e) {
+            return Future.error(e);
+        }
         return Future.value(null);
     }
 
     public Future<Object> unsubscribeFromTopic(String topic) {
+        try {
+            com.codename1.push.Push.unsubscribeFromTopic(topic);
+        } catch (RuntimeException e) {
+            return Future.error(e);
+        }
         return Future.value(null);
     }
 

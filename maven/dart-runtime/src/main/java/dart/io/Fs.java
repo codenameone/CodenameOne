@@ -98,13 +98,27 @@ abstract class Fs {
         return p;
     }
 
-    /** Creates {@code path} and every missing parent. */
+    /**
+     * Creates {@code path} and every missing parent. An existing component that is
+     * a file, or a directory that could not be created, is a FileSystemException:
+     * nothing can live under a file, and the device backend's mkdir reports no
+     * failure of its own.
+     */
     void mkdirs(String path) {
-        if (path.equals("/") || path.equals(".") || exists(path)) {
+        if (path.equals("/") || path.equals(".")) {
+            return;
+        }
+        if (exists(path)) {
+            if (!isDirectory(path)) {
+                throw new FileSystemException("Creation failed", path);
+            }
             return;
         }
         mkdirs(parentOf(path));
         mkdir(path);
+        if (!isDirectory(path)) {
+            throw new FileSystemException("Creation failed", path);
+        }
     }
 
     /** FileSystemStorage, with Dart paths mapped to file:// URLs. */

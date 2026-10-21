@@ -72,6 +72,12 @@ public class BlocSelector<B, S, T> extends StatefulWidget {
             }
 
             @Override
+            protected void onBlocChanged() {
+                hasSelected = false;
+                selected = null;
+            }
+
+            @Override
             @SuppressWarnings("unchecked")
             protected void onState(Object before, Object next) {
                 T v = widget().selector.call((S) next);
@@ -85,8 +91,11 @@ public class BlocSelector<B, S, T> extends StatefulWidget {
             @Override
             @SuppressWarnings("unchecked")
             public Widget build(BuildContext context) {
+                // currentState() first: it is what notices a replaced bloc and clears
+                // the cached selection.
+                Object s = currentState();
                 if (!hasSelected) {
-                    selected = widget().selector.call((S) currentState());
+                    selected = widget().selector.call((S) s);
                     hasSelected = true;
                 }
                 return widget().builder.call(context, selected);

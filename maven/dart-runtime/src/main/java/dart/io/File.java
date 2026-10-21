@@ -114,6 +114,14 @@ public class File extends FileSystemEntity {
 
     public dart.async.Stream<Object> openRead(Long start, Long end) {
         try {
+            // Dart rejects a negative bound or an end before the start; clamping them
+            // made a bad range look like an empty file.
+            if (start != null && start.longValue() < 0) {
+                throw new dart.core.RangeError("Invalid value: start must be non-negative: " + start);
+            }
+            if (end != null && (end.longValue() < 0 || end.longValue() < (start == null ? 0 : start.longValue()))) {
+                throw new dart.core.RangeError("Invalid value: end must not be before start: " + end);
+            }
             byte[] all = Fs.get().read(path);
             int s = start == null ? 0 : (int) Math.min(all.length, start.longValue());
             int e = end == null ? all.length : (int) Math.min(all.length, end.longValue());

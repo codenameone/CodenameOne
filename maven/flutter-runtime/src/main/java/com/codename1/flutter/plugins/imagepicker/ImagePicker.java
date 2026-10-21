@@ -60,12 +60,12 @@ public class ImagePicker {
 
     public Future<DartList<XFile>> pickMultiImage(Double maxWidth, Double maxHeight,
             Long imageQuality, Long limit, Boolean requestFullMetadata) {
-        return pickMany(Display.GALLERY_IMAGE_MULTI, Display.GALLERY_IMAGE);
+        return pickMany(Display.GALLERY_IMAGE_MULTI, Display.GALLERY_IMAGE, limit);
     }
 
     public Future<DartList<XFile>> pickMultipleMedia(Double maxWidth, Double maxHeight,
             Long imageQuality, Long limit, Boolean requestFullMetadata) {
-        return pickMany(Display.GALLERY_ALL_MULTI, Display.GALLERY_ALL);
+        return pickMany(Display.GALLERY_ALL_MULTI, Display.GALLERY_ALL, limit);
     }
 
     private static Future<DartList<XFile>> asList(Future<XFile> one) {
@@ -87,7 +87,14 @@ public class ImagePicker {
      * The multi-select gallery where the platform offers it (iOS needs the
      * ios.enableGalleryMultiselect build hint), else a single pick as a list.
      */
-    private static Future<DartList<XFile>> pickMany(int multiType, int singleType) {
+    /// `limit` is the plugin's maximum selection. Codename One's gallery cannot be told
+    /// a maximum, so the picker may let the user choose more; the result is capped to
+    /// the first `limit` files, so the app never receives more than it allowed.
+    private static Future<DartList<XFile>> pickMany(int multiType, int singleType, Long limit) {
+        if (limit != null && limit.longValue() < 2) {
+            return Future.error(new dart.core.ArgumentError("cannot be lower than 2: limit"));
+        }
+        final long max = limit == null ? Long.MAX_VALUE : limit.longValue();
         if (!Display.isInitialized()) {
             return Future.value(new DartList<XFile>());
         }
@@ -102,6 +109,9 @@ public class ImagePicker {
                 Object src = evt == null ? null : evt.getSource();
                 if (src instanceof String[]) {
                     for (String path : (String[]) src) {
+                        if (out.size() >= max) {
+                            break;
+                        }
                         out.add(new XFile(path));
                     }
                 } else if (src instanceof String) {

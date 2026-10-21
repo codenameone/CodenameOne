@@ -71,6 +71,12 @@ public class BlocBuilder<B, S> extends StatefulWidget {
             }
 
             @Override
+            protected void onBlocChanged() {
+                hasShown = false;
+                shown = null;
+            }
+
+            @Override
             protected void onState(Object before, Object next) {
                 if (test(widget().buildWhen, before, next)) {
                     shown = next;

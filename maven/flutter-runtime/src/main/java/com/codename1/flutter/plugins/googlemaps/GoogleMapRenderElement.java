@@ -104,13 +104,23 @@ public class GoogleMapRenderElement extends RenderElement {
                     }
                 }
             });
+            // CameraChangeListener fires once the camera settles, which is onCameraIdle.
+            // onCameraMove must follow the gesture, so while a pointer is down (and until
+            // the camera settles) the camera is sampled every frame-ish tick and each
+            // change is reported as it happens.
+            ActionListener startTracking = new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    startMoveTracking();
+                }
+            };
+            view.asComponent().addPointerPressedListener(startTracking);
+            view.asComponent().addPointerDraggedListener(startTracking);
             view.addCameraChangeListener(new CameraChangeListener() {
                 @Override
                 public void cameraChanged(MapSurface m, com.codename1.maps.CameraPosition p) {
-                    camera = CameraPosition.of(p);
-                    if (map().onCameraMove != null) {
-                        map().onCameraMove.call(camera);
-                    }
+                    stopMoveTracking();
+                    reportMove(p);
                     if (map().onCameraIdle != null) {
                         map().onCameraIdle.call();
                     }
@@ -120,6 +130,56 @@ public class GoogleMapRenderElement extends RenderElement {
         }
         notifyCreated();
         return view == null ? null : view.asComponent();
+    }
+
+    private com.codename1.ui.util.UITimer moveTimer;
+    private com.codename1.maps.CameraPosition lastMove;
+
+    private void startMoveTracking() {
+        if (moveTimer != null || view == null || map().onCameraMove == null) {
+            return;
+        }
+        Component c = view.asComponent();
+        if (c.getComponentForm() == null) {
+            return;
+        }
+        moveTimer = new com.codename1.ui.util.UITimer(new Runnable() {
+            @Override
+            public void run() {
+                if (view != null) {
+                    reportMove(view.getCameraPosition());
+                }
+            }
+        });
+        moveTimer.schedule(50, true, c.getComponentForm());
+    }
+
+    private void stopMoveTracking() {
+        if (moveTimer != null) {
+            moveTimer.cancel();
+            moveTimer = null;
+        }
+    }
+
+    /// Reports the camera to onCameraMove when it differs from the last report.
+    private void reportMove(com.codename1.maps.CameraPosition p) {
+        if (p == null) {
+            return;
+        }
+        camera = CameraPosition.of(p);
+        if (lastMove != null && sameCamera(lastMove, p)) {
+            return;
+        }
+        lastMove = p;
+        if (map().onCameraMove != null) {
+            map().onCameraMove.call(camera);
+        }
+    }
+
+    private static boolean sameCamera(com.codename1.maps.CameraPosition a, com.codename1.maps.CameraPosition b) {
+        return a.getZoom() == b.getZoom() && a.getBearing() == b.getBearing() && a.getTilt() == b.getTilt()
+                && a.getTarget().getLatitude() == b.getTarget().getLatitude()
+                && a.getTarget().getLongitude() == b.getTarget().getLongitude();
     }
 
     @Override

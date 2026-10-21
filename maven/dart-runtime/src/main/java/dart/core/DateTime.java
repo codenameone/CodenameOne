@@ -105,16 +105,24 @@ public final class DateTime {
             milli = all / 1000;
             micro = all % 1000;
         }
-        if (m.group(8) == null) {
-            return new DateTime(year, month, day, hour, minute, second, milli, micro);
+        // A well-formed date outside DateTime's range is still unparseable: tryParse
+        // answers null (and parse a FormatException), never the constructor's error.
+        try {
+            if (m.group(8) == null) {
+                return new DateTime(year, month, day, hour, minute, second, milli, micro);
+            }
+            DateTime u = utc(year, month, day, hour, minute, second, milli, micro);
+            if (m.group(9) != null) {
+                long offset = num(m.group(10)) * 60 + num(m.group(11));
+                long sign = m.group(9).equals("-") ? -1 : 1;
+                long at = u.epochMicros - sign * offset * 60000000L;
+                checkMicrosRange(at);
+                return new DateTime(at, true);
+            }
+            return u;
+        } catch (ArgumentError outOfRange) {
+            return null;
         }
-        DateTime u = utc(year, month, day, hour, minute, second, milli, micro);
-        if (m.group(9) != null) {
-            long offset = num(m.group(10)) * 60 + num(m.group(11));
-            long sign = m.group(9).equals("-") ? -1 : 1;
-            return new DateTime(u.epochMicros - sign * offset * 60000000L, true);
-        }
-        return u;
     }
 
     private static long num(String s) {

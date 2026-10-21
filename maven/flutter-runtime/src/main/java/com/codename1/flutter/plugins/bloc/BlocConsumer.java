@@ -80,6 +80,12 @@ public class BlocConsumer<B, S> extends StatefulWidget {
             }
 
             @Override
+            protected void onBlocChanged() {
+                hasShown = false;
+                shown = null;
+            }
+
+            @Override
             @SuppressWarnings("unchecked")
             protected void onState(Object before, Object next) {
                 BlocConsumer<B, S> w = widget();

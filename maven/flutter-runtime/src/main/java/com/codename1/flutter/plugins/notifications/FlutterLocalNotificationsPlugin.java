@@ -136,6 +136,7 @@ public class FlutterLocalNotificationsPlugin {
             String payload, long at, int repeat) {
         String key = PREFIX + id;
         putPayload(key, payload);
+        putMeta(key, title, body, at, repeat);
         shown++;
         if (!Display.isInitialized()) {
             return;
@@ -204,6 +205,7 @@ public class FlutterLocalNotificationsPlugin {
 
     private static void removePayload(String key) {
         PAYLOADS.remove(key);
+        removeMeta(key);
         if (Display.isInitialized()) {
             java.util.Set<String> keys = payloadKeys();
             keys.remove(key);
@@ -243,8 +245,73 @@ public class FlutterLocalNotificationsPlugin {
         return Future.value(new NotificationAppLaunchDetails(r != null, r));
     }
 
-    public Future<DartList<Object>> pendingNotificationRequests() {
-        return Future.value(new DartList<Object>());
+    /// Every scheduled notification that has not been cancelled and has not yet
+    /// fired for the last time: a repeating one stays pending, a one-shot one until
+    /// its time passes. Read from what schedule() persisted, so it survives a restart.
+    public Future<DartList<PendingNotificationRequest>> pendingNotificationRequests() {
+        DartList<PendingNotificationRequest> out = new DartList<PendingNotificationRequest>();
+        long now = System.currentTimeMillis();
+        for (String key : payloadKeys()) {
+            String[] m = meta(key);
+            if (m == null) {
+                continue;
+            }
+            long at = parseLong(m[2]);
+            int repeat = (int) parseLong(m[3]);
+            if (repeat == LocalNotification.REPEAT_NONE && at <= now) {
+                continue;
+            }
+            out.add(new PendingNotificationRequest(parseLong(key.substring(PREFIX.length())),
+                    m[0], m[1], payload(key)));
+        }
+        return Future.value(out);
+    }
+
+    private static long parseLong(String s) {
+        try {
+            return s == null ? 0 : Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    // Title, body, time and repeat of each scheduled notification, beside its payload.
+    private static final Map<String, String[]> META = new HashMap<String, String[]>();
+    private static final String META_PREF = "cn1.flutter.notifications.meta.";
+
+    private static void putMeta(String key, String title, String body, long at, int repeat) {
+        String[] m = {title, body, String.valueOf(at), String.valueOf(repeat)};
+        META.put(key, m);
+        if (Display.isInitialized()) {
+            com.codename1.io.Preferences.set(META_PREF + key + ".title", title == null ? "" : title);
+            com.codename1.io.Preferences.set(META_PREF + key + ".body", body == null ? "" : body);
+            com.codename1.io.Preferences.set(META_PREF + key + ".at", at);
+            com.codename1.io.Preferences.set(META_PREF + key + ".repeat", repeat);
+        }
+    }
+
+    private static String[] meta(String key) {
+        String[] m = META.get(key);
+        if (m != null || !Display.isInitialized()) {
+            return m;
+        }
+        long at = com.codename1.io.Preferences.get(META_PREF + key + ".at", -1L);
+        if (at < 0) {
+            return null;
+        }
+        return new String[] {com.codename1.io.Preferences.get(META_PREF + key + ".title", ""),
+            com.codename1.io.Preferences.get(META_PREF + key + ".body", ""), String.valueOf(at),
+            String.valueOf(com.codename1.io.Preferences.get(META_PREF + key + ".repeat", 0))};
+    }
+
+    private static void removeMeta(String key) {
+        META.remove(key);
+        if (Display.isInitialized()) {
+            com.codename1.io.Preferences.delete(META_PREF + key + ".title");
+            com.codename1.io.Preferences.delete(META_PREF + key + ".body");
+            com.codename1.io.Preferences.delete(META_PREF + key + ".at");
+            com.codename1.io.Preferences.delete(META_PREF + key + ".repeat");
+        }
     }
 
     /**
