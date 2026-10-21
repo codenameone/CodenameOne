@@ -198,6 +198,8 @@ public class Window extends Container implements TopLevelContainer {
 
     private String pendingTitle = "";
     private boolean documentModified;
+    // See Form.documentModifiedReported.
+    private boolean documentModifiedReported;
     private int pendingX;
     private int pendingY;
     /// Whether the application chose a position. A negative coordinate is a perfectly
@@ -513,6 +515,7 @@ public class Window extends Container implements TopLevelContainer {
     /// - `modified`: true while the document has unsaved changes
     public void setDocumentModified(final boolean modified) {
         documentModified = modified;
+        documentModifiedReported = true;
         Command.followDocumentModified(commands, modified);
         onPeer(new Runnable() {
             @Override
@@ -581,6 +584,9 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         Command.settleRadioGroups(commands);
+        if (documentModifiedReported) {
+            Command.followDocumentModified(commands, documentModified);
+        }
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));
     }

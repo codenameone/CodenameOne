@@ -890,23 +890,64 @@ public class Command implements ActionListener<ActionEvent> {
     /// #### Returns
     ///
     /// the new command
-    public static Command createDesktopRole(String role, final ActionListener listener) {
-        String label = NativeMenuConventions.labelOf(NativeMenuConventions.current(), role);
-        if (label == null) {
-            // A role this platform does not show still gets a name for the application's
-            // own menus: the Windows one, which every platform's users read correctly.
-            label = NativeMenuConventions.labelOf(NativeMenuConventions.WINDOWS, role);
-        }
-        Command c = new Command(label == null ? role : label) {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                if (listener != null) {
-                    listener.actionPerformed(evt);
-                }
-            }
-        };
+    public static Command createDesktopRole(String role, ActionListener listener) {
+        Command c = new RoleCommand(role, listener);
         c.setDesktopRole(role);
         return c;
+    }
+
+    /// The command `#createDesktopRole(String, ActionListener)` makes. The platform's name is
+    /// looked up when it is read, not when the command is made: a command created from a
+    /// static or field initializer exists before Display knows the platform. That lasts until
+    /// the application names the command itself.
+    private static final class RoleCommand extends Command {
+        private final String role;
+        private final ActionListener listener;
+        private boolean named;
+
+        RoleCommand(String role, ActionListener listener) {
+            super(null);
+            this.role = role;
+            this.listener = listener;
+        }
+
+        @Override
+        public String getCommandName() {
+            if (named) {
+                return super.getCommandName();
+            }
+            String label = NativeMenuConventions.labelOf(NativeMenuConventions.current(), role);
+            if (label == null) {
+                // A role this platform does not show still gets a name for the application's
+                // own menus: the Windows one, which every platform's users read correctly.
+                label = NativeMenuConventions.labelOf(NativeMenuConventions.WINDOWS, role);
+            }
+            return label == null ? role : label;
+        }
+
+        @Override
+        public void setCommandName(String command) {
+            named = true;
+            super.setCommandName(command);
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (listener != null) {
+                listener.actionPerformed(evt);
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return super.equals(obj) && named == ((RoleCommand) obj).named
+                    && listener == ((RoleCommand) obj).listener; //NOPMD CompareObjectsWithEquals
+        }
+
+        @Override
+        public int hashCode() {
+            return super.hashCode() * 2 + (named ? 1 : 0);
+        }
     }
 
     /// Publishes this command on the native menu bar of the listed platforms only, for a

@@ -175,6 +175,52 @@ static NSMenuItem *cn1StockItem(NSMenu *menu, SEL action) {
     return nil;
 }
 
+/// The stock item for a role: in the menu the row lands in first, then in every other
+/// top-level menu, since a role the application moved (a Copy placed in Tools) still has to
+/// replace the stock Copy in Edit rather than sit beside it with the stock shortcut active.
+static NSMenuItem *cn1StockItemAnywhere(NSMenu *mainMenu, NSMenu *target, SEL action) {
+    NSMenuItem *found = cn1StockItem(target, action);
+    if (found != nil || action == NULL) {
+        return found;
+    }
+    for (NSMenuItem *top in mainMenu.itemArray) {
+        if (top.submenu != nil && top.submenu != target) {
+            found = cn1StockItem(top.submenu, action);
+            if (found != nil) {
+                return found;
+            }
+        }
+    }
+    return nil;
+}
+
+/// Drops the separators this file added that end up leading, trailing or next to another
+/// separator once hidden stock items are discounted: a role About replacing the stock one
+/// keeps AppKit's own separator below it, and the application's group adds another.
+static void cn1NormalizeSeparators(NSMenu *menu) {
+    NSMutableArray *visible = [NSMutableArray array];
+    for (NSMenuItem *item in menu.itemArray) {
+        if (!item.hidden) {
+            [visible addObject:item];
+        }
+    }
+    BOOL prevSeparator = YES;
+    for (NSUInteger i = 0; i < visible.count; i++) {
+        NSMenuItem *item = visible[i];
+        if (!item.separatorItem) {
+            prevSeparator = NO;
+            continue;
+        }
+        BOOL ours = item.target == [CN1MacMenuTarget sharedTarget];
+        BOOL nextSeparator = i + 1 >= visible.count || ((NSMenuItem *)visible[i + 1]).separatorItem;
+        if (ours && (prevSeparator || nextSeparator)) {
+            [menu removeItem:item];
+            continue;
+        }
+        prevSeparator = YES;
+    }
+}
+
 /// Removes every item this file added on a previous pass, so a rebuild replaces
 /// the commands rather than appending a second copy of them.
 static void cn1RemovePreviousCommands(NSMenu *menu) {
@@ -453,15 +499,17 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         // A standard role takes the place of the stock item of that role (Quit, Copy,
         // Minimize), which is hidden until the next pass rather than left beside it.
         NSMenuItem *stock = (rowFlags & 16) ? nil
-                : cn1StockItem(target, cn1StockActionForRole((rowFlags >> 8) & 0xff));
+                : cn1StockItemAnywhere(mainMenu, target, cn1StockActionForRole((rowFlags >> 8) & 0xff));
         if (stock != nil) {
-            [target insertItem:item atIndex:[target indexOfItem:stock]];
             stock.hidden = YES;
             if (cn1HiddenStockItems == nil) {
                 cn1HiddenStockItems = [[NSMutableArray alloc] init];
             }
             [cn1HiddenStockItems addObject:stock];
-            continue;
+            if (stock.menu == target) {
+                [target insertItem:item atIndex:[target indexOfItem:stock]];
+                continue;
+            }
         }
         cn1AddMenuItem(target, item, placeAtStart, appended);
     }
@@ -473,6 +521,11 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
             NSMenuItem *sep = [NSMenuItem separatorItem];
             sep.target = [CN1MacMenuTarget sharedTarget];
             [appMenu insertItem:sep atIndex:cn1AppMenuStart(appMenu) + count.integerValue];
+        }
+    }
+    for (NSMenuItem *top in mainMenu.itemArray) {
+        if (top.submenu != nil) {
+            cn1NormalizeSeparators(top.submenu);
         }
     }
 }

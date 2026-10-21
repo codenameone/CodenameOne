@@ -634,7 +634,8 @@ public final class NativeMenuEncoder {
         return sb.toString();
     }
 
-    /// The command's icon, falling back to its material icon, or null.
+    /// The command's icon, or null. A material (or icon-font) glyph wins over the image when
+    /// both are set, as it does on the command's button (`Button#setCommand`).
     ///
     /// #### Parameters
     ///
@@ -648,7 +649,7 @@ public final class NativeMenuEncoder {
             return null;
         }
         Image img = c.getIcon();
-        if (img == null && c.getMaterialIcon() != 0) {
+        if (c.getMaterialIcon() != 0) {
             Style s = UIManager.getInstance().getComponentStyle("Command");
             Font font = c.getIconFont();
             if (font == null) {

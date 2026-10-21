@@ -2942,6 +2942,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// the encoded menu and its icons
     Object[] encodeWindowMenu(java.util.List<com.codename1.ui.Command> commands) {
         com.codename1.impl.NativeMenuEncoder encoded = encodeMenu(commands);
+        if (encoded.getRows().isEmpty()) {
+            // Every command was filtered out for this platform (a platform list, a role this
+            // platform lacks): no bar at all, rather than an empty strip.
+            return null;
+        }
         return new Object[]{encoded, menuIcons(encoded, null)};
     }
 

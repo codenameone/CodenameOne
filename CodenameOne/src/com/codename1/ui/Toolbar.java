@@ -1505,6 +1505,7 @@ public class Toolbar extends Container {
             Vector published = getAllNativeMenuCommands();
             // A command added after show publishes here, not through Form.nativeMenuCommands().
             Command.settleRadioGroups(published);
+            host.applyDocumentModified(published);
             Display.impl.setNativeCommands(published);
         }
     }

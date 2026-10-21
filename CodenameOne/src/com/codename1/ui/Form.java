@@ -126,6 +126,9 @@ public class Form extends Container implements TopLevelContainer {
     private Command sourceCommand;
     private boolean globalAnimationLock;
     private boolean documentModified;
+    // Whether the application has reported a modified state at all; until it does, commands
+    // that follow the state are left as the application set them.
+    private boolean documentModifiedReported;
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
@@ -3314,6 +3317,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - `modified`: true while the document has unsaved changes
     public void setDocumentModified(boolean modified) {
         documentModified = modified;
+        documentModifiedReported = true;
         java.util.Vector published = nativeMenuCommands();
         if (published == null) {
             published = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
@@ -3355,8 +3359,17 @@ public class Form extends Container implements TopLevelContainer {
         }
         if (v != null) {
             Command.settleRadioGroups(v);
+            applyDocumentModified(v);
         }
         return v;
+    }
+
+    /// Applies the reported modified state to commands as they are published, so a Save
+    /// command added after `#setDocumentModified(boolean)` still follows it.
+    void applyDocumentModified(java.util.List commands) {
+        if (documentModifiedReported) {
+            Command.followDocumentModified(commands, documentModified);
+        }
     }
 
     /// {@inheritDoc}

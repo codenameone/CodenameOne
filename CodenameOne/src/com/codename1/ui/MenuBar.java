@@ -494,6 +494,9 @@ public class MenuBar extends Container implements ActionListener {
             // Settled here too: a command added after show publishes through this path, not
             // through Form.nativeMenuCommands().
             Command.settleRadioGroups(commands);
+            if (parent != null) {
+                parent.applyDocumentModified(commands);
+            }
             Display.getInstance().getImplementation().setNativeCommands(commands);
             return;
         }

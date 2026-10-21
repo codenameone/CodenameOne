@@ -208,4 +208,27 @@ class NativeMenuConventionsTest extends UITestBase {
         f.setDocumentModified(false);
         assertEquals("Doc", implementation.getNativeWindowTitle(f));
     }
+
+    @FormTest
+    void aSaveAddedLaterFollowsTheReportedState() {
+        implementation.setDesktop(true);
+        implementation.setDesktopTitleBarMode("native");
+        Toolbar.setGlobalToolbar(true);
+        Form f = new Form("Doc");
+        f.show();
+        DisplayTest.flushEdt();
+        f.setDocumentModified(false);
+        Command save = Command.createDesktopRole(Command.DESKTOP_ROLE_SAVE, null);
+        f.getToolbar().addCommandToOverflowMenu(save);
+        assertFalse(save.isEnabled(), "a clean document disables a Save added after the state");
+    }
+
+    @FormTest
+    void aRoleNameIsLookedUpWhenRead() {
+        Command c = Command.createDesktopRole(Command.DESKTOP_ROLE_QUIT, null);
+        assertEquals(NativeMenuConventions.labelOf(NativeMenuConventions.current(), Command.DESKTOP_ROLE_QUIT),
+                c.getCommandName());
+        c.setCommandName("Leave");
+        assertEquals("Leave", c.getCommandName(), "the application's own name wins");
+    }
 }

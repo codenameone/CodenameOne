@@ -1291,6 +1291,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     // The stock items the application's own About, Hide and Quit replace, by the role ordinal
     // the flags carry (NativeMenuEncoder.FLAG_ROLE_SHIFT).
     NSMutableArray<UIMenuIdentifier> *replacedStock = [NSMutableArray array];
+    // The stock commands of the other roles the application supplies, by action; they share
+    // their menus with stock commands the application does not replace, so they are filtered
+    // out one by one rather than removing the menu.
+    NSMutableSet<NSString *> *replacedActions = [NSMutableSet set];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
         NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
@@ -1336,6 +1340,15 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
             case 1: [replacedStock addObject:UIMenuAbout]; break;
             case 2: [replacedStock addObject:UIMenuHide]; break;
             case 3: [replacedStock addObject:UIMenuQuit]; break;
+            case 4: [replacedActions addObject:@"undo:"]; break;
+            case 5: [replacedActions addObject:@"redo:"]; break;
+            case 6: [replacedActions addObject:@"cut:"]; break;
+            case 7: [replacedActions addObject:@"copy:"]; break;
+            case 8: [replacedActions addObject:@"paste:"]; break;
+            case 9: [replacedActions addObject:@"selectAll:"]; break;
+            case 10: [replacedActions addObject:@"performMiniaturize:"]; break;
+            case 11: [replacedActions addObject:@"performZoom:"]; break;
+            case 12: [replacedActions addObject:@"toggleFullScreen:"]; break;
             default: break;
         }
         UIImage *image = nil;
@@ -1421,6 +1434,24 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     // before the stock About it replaces goes.
     for (UIMenuIdentifier stock in replacedStock) {
         [builder removeMenuForIdentifier:stock];
+    }
+    if (replacedActions.count > 0) {
+        NSArray<UIMenuIdentifier> *stockMenus = @[UIMenuUndoRedo, UIMenuStandardEdit, UIMenuFullscreen,
+                UIMenuMinimizeAndZoom];
+        for (UIMenuIdentifier stockMenu in stockMenus) {
+            [builder replaceChildrenOfMenuForIdentifier:stockMenu
+                                      fromChildrenBlock:^NSArray<UIMenuElement *> *(NSArray<UIMenuElement *> *children) {
+                NSMutableArray<UIMenuElement *> *kept = [NSMutableArray array];
+                for (UIMenuElement *child in children) {
+                    if ([child isKindOfClass:[UICommand class]] && ((UICommand *)child).action != NULL
+                            && [replacedActions containsObject:NSStringFromSelector(((UICommand *)child).action)]) {
+                        continue;
+                    }
+                    [kept addObject:child];
+                }
+                return kept;
+            }];
+        }
     }
 }
 
