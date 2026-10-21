@@ -312,6 +312,7 @@ public final class Ast {
         public String name;
         public boolean named;
         public boolean required;
+        public boolean optional;                  // [optional positional]
         public boolean isThis;                    // this.x
         public boolean isSuper;                   // super.x
         public Expr defaultValue;                 // nullable

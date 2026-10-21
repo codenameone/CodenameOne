@@ -32,6 +32,13 @@
 //    Future.then's onError:. See dart.async.Stream's class comment for the
 //    full detail.
 
+@JavaName('dart.async.TimeoutException')
+class TimeoutException implements Exception {
+  external TimeoutException(String? message, [Duration? duration]);
+  external String? get message;
+  external Duration? get duration;
+}
+
 @JavaName('dart.async.StreamSubscription')
 abstract class StreamSubscription<T> {
   external Future<void> cancel();

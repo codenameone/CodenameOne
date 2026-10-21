@@ -84,7 +84,7 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
         if (kind == UTF8 && !Boolean.TRUE.equals(allowMalformed)) {
             checkUtf8(b, b.length);
         }
-        return text(b);
+        return text(b, true);
     }
 
     /**
@@ -141,6 +141,9 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
             public void call(dart.async.AsyncStar.Sink<Object> sink) {
                 dart.async.StreamIterator<Object> it = new dart.async.StreamIterator<Object>(source);
                 byte[] carry = new byte[0];
+                // Only the BOM at the very start of the stream is dropped; one opening a
+                // later chunk is a real U+FEFF in the middle of the text.
+                boolean atStart = true;
                 try {
                     while (it.next()) {
                         Object chunk = it.current();
@@ -160,13 +163,14 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                         if (cut > 0) {
                             // Strict as decode() is: Java's decoder would substitute U+FFFD.
                             checkUtf8(head, head.length);
-                            sink.yield$(text(head));
+                            sink.yield$(text(head, atStart));
+                            atStart = false;
                         }
                     }
                     if (carry.length > 0) {
                         // An incomplete sequence left at the end of the stream is malformed.
                         checkUtf8(carry, carry.length);
-                        sink.yield$(text(carry));
+                        sink.yield$(text(carry, atStart));
                     }
                 } finally {
                     it.cancel();
@@ -231,10 +235,10 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
         }
     }
 
-    private String text(byte[] b) {
+    private String text(byte[] b, boolean atStart) {
         try {
             if (kind == UTF8) {
-                int off = b.length >= 3 && (b[0] & 0xff) == 0xef && (b[1] & 0xff) == 0xbb
+                int off = atStart && b.length >= 3 && (b[0] & 0xff) == 0xef && (b[1] & 0xff) == 0xbb
                         && (b[2] & 0xff) == 0xbf ? 3 : 0;
                 return new String(b, off, b.length - off, "UTF-8");
             }

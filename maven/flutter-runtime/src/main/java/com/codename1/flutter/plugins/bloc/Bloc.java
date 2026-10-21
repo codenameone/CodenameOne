@@ -96,9 +96,10 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
                     public void call(Object err) {
                         emitter.complete();
                         onError(err, null);
-                        // Bloc notifies onError and then rethrows, so zones, tests and
-                        // crash reporting still see the failure.
-                        throw dart.runtime.DartRuntime.asError(err);
+                        // Bloc notifies onError and then rethrows into the zone. Throwing
+                        // here would only fail the future then() returns, which nobody
+                        // holds, so report it as uncaught the way the zone would.
+                        reportUncaught(dart.runtime.DartRuntime.asError(err));
                     }
                 });
             } else {
@@ -106,10 +107,25 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
             }
         }
         if (!handled) {
-            onError(new dart.core.StateError("add(" + event + ") was called without a registered "
+            dart.core.StateError err = new dart.core.StateError("add(" + event + ") was called without a registered "
                     + "event handler. Make sure to register a handler via on<"
-                    + (event == null ? "?" : event.getClass().getSimpleName()) + ">((event, emit) {...})"),
-                    null);
+                    + (event == null ? "?" : event.getClass().getSimpleName()) + ">((event, emit) {...})");
+            onError(err, null);
+            // Bloc notifies onError and then throws the StateError at the caller of add.
+            throw err;
+        }
+    }
+
+    /**
+     * Logs an asynchronous handler failure that nothing awaits. Logging needs an
+     * installed implementation, which a headless test lacks, and reporting must
+     * never throw.
+     */
+    private static void reportUncaught(Throwable t) {
+        try {
+            com.codename1.io.Log.e(t);
+        } catch (Throwable loggingFailed) {
+            // Nothing to log through; nothing more to do.
         }
     }
 

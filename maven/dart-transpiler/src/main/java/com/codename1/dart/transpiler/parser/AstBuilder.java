@@ -911,6 +911,7 @@ public final class AstBuilder {
                     if (param == null) {
                         continue;
                     }
+                    param.optional = true;
                     if (dp.expr() != null) {
                         param.defaultValue = buildExpr(dp.expr());
                     }

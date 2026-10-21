@@ -562,8 +562,14 @@ public final class FlutterProjectImporter {
                     String ps = it.next();
                     if (ps.startsWith(prefix)) {
                         it.remove();
-                        imported.remove(ps);
+                        String written = imported.remove(ps);
                         File f = new File(target, ps.replace('/', File.separatorChar));
+                        // Only a file that is still exactly the importer's copy goes. One
+                        // edited locally (copy() kept it, recording the earlier hash) is
+                        // left for removeStaleImports, which keeps it with a warning.
+                        if (f.isFile() && (written == null || !written.equals(sha256(f)))) {
+                            continue;
+                        }
                         if (f.isFile() && !f.delete()) {
                             log.warn("Could not remove " + f);
                         }

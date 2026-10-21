@@ -384,15 +384,15 @@ public class GoRouter implements RouterConfigSource {
             m = match(loc);
             GoRouterState s = stateOf(loc, m, extra, null);
             String to = redirectOf(redirect, s);
-            if (to == null && m != null) {
+            if (to == null && m != null && redirectFailure == null) {
                 for (GoRoute r : m.chain) {
                     to = redirectOf(r.redirectFunc(), s);
-                    if (to != null) {
+                    if (to != null || redirectFailure != null) {
                         break;
                     }
                 }
             }
-            if (to == null || samePath(to, loc)) {
+            if (to == null || samePath(to, loc) || redirectFailure != null) {
                 break;
             }
             if (i == redirectLimit) {
@@ -434,6 +434,14 @@ public class GoRouter implements RouterConfigSource {
             // that is happening now; a pending one is noted for routeGenerator.
             if (!((Future<?>) to).completedNow()) {
                 sawPendingRedirect = true;
+            }
+            Throwable failed = ((Future<?>) to).completedError();
+            if (failed != null) {
+                // An already-failed redirect (Future.error) is a navigation failure,
+                // exactly as one that fails later: routeFor shows the error page rather
+                // than building the guarded route as if no redirect existed.
+                redirectFailure = failed;
+                return null;
             }
             to = ((Future<?>) to).completedValue();
         }

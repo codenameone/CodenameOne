@@ -202,6 +202,7 @@ public final class Program {
                 p.name = sp.name;
                 p.named = sp.named;
                 p.required = sp.required;
+                p.optional = sp.optional;
                 p.isSuper = true;
                 p.defaultValue = sp.defaultValue;
                 fc.params.add(p);

@@ -53,21 +53,42 @@ import dart.runtime.Funcs;
  */
 public class FirebaseAuth {
     /** {@code FirebaseAuth.instance}. */
-    public static final FirebaseAuth instance = new FirebaseAuth();
+    public static final FirebaseAuth instance = new FirebaseAuth(Firebase.DEFAULT_APP_NAME);
+
+    /// One instance per FirebaseApp: a secondary app authenticates against its own
+    /// project (its own apiKey) and keeps its own current user and persisted session.
+    private static final Map<String, FirebaseAuth> BY_APP = new java.util.HashMap<String, FirebaseAuth>();
 
     private static final String TOOLKIT = "https://identitytoolkit.googleapis.com/v1/accounts:";
     private static final String SECURE_TOKEN = "https://securetoken.googleapis.com/v1/token?key=";
-    private static final String PREF = "cn1_firebase_auth_";
 
     private final List<StreamController<User>> listeners = new ArrayList<StreamController<User>>();
     private User current;
     private boolean restored;
+    private final String appName;
+    /// Preferences key prefix; the default app keeps the original keys so existing
+    /// sessions survive, other apps get their own.
+    private final String pref;
 
-    FirebaseAuth() {
+    FirebaseAuth(String appName) {
+        this.appName = appName;
+        this.pref = Firebase.DEFAULT_APP_NAME.equals(appName) ? "cn1_firebase_auth_"
+                : "cn1_firebase_auth_" + appName + "_";
     }
 
     public static FirebaseAuth instanceFor(FirebaseApp app, Object persistence) {
-        return instance;
+        String name = app == null ? Firebase.DEFAULT_APP_NAME : app.name();
+        if (Firebase.DEFAULT_APP_NAME.equals(name)) {
+            return instance;
+        }
+        synchronized (BY_APP) {
+            FirebaseAuth a = BY_APP.get(name);
+            if (a == null) {
+                a = new FirebaseAuth(name);
+                BY_APP.put(name, a);
+            }
+            return a;
+        }
     }
 
     public User currentUser() {
@@ -206,7 +227,7 @@ public class FirebaseAuth {
                 @Override
                 public void call(String token) {
                     body.put("idToken", token);
-                    FirebaseAuth.call(TOOLKIT + "sendOobCode?key=", body, sent, done);
+                    FirebaseAuth.this.call(TOOLKIT + "sendOobCode?key=", body, sent, done);
                 }
             });
         }
@@ -226,7 +247,7 @@ public class FirebaseAuth {
             @Override
             public void call(String token) {
                 body.put("idToken", token);
-                FirebaseAuth.call(TOOLKIT + "update?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
+                FirebaseAuth.this.call(TOOLKIT + "update?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
                     @Override
                     public void call(Map<String, Object> r) {
                         user.displayName = name;
@@ -246,7 +267,7 @@ public class FirebaseAuth {
         withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String token) {
-                FirebaseAuth.call(TOOLKIT + "lookup?key=", DartMap.<String, Object>of("idToken", token),
+                FirebaseAuth.this.call(TOOLKIT + "lookup?key=", DartMap.<String, Object>of("idToken", token),
                         new Funcs.VoidFunc1<Map<String, Object>>() {
                             @Override
                             public void call(Map<String, Object> r) {
@@ -275,7 +296,7 @@ public class FirebaseAuth {
         withFreshToken(user, done, new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String token) {
-                FirebaseAuth.call(TOOLKIT + "delete?key=", DartMap.<String, Object>of("idToken", token),
+                FirebaseAuth.this.call(TOOLKIT + "delete?key=", DartMap.<String, Object>of("idToken", token),
                         new Funcs.VoidFunc1<Map<String, Object>>() {
                             @Override
                             public void call(Map<String, Object> r) {
@@ -324,8 +345,8 @@ public class FirebaseAuth {
 
     // --- transport --------------------------------------------------------------
 
-    private static String apiKey() {
-        FirebaseApp app = Firebase.find(Firebase.DEFAULT_APP_NAME);
+    private String apiKey() {
+        FirebaseApp app = Firebase.find(appName);
         return app == null ? null : app.options().apiKey();
     }
 
@@ -334,7 +355,7 @@ public class FirebaseAuth {
      * and hands the decoded JSON reply to {@code ok}, or fails {@code failed} with the
      * FirebaseAuthException the reply's error code maps to.
      */
-    private static void call(String url, Object body, final Funcs.VoidFunc1<Map<String, Object>> ok,
+    private void call(String url, Object body, final Funcs.VoidFunc1<Map<String, Object>> ok,
             final Completer<?> failed) {
         String key = apiKey();
         if (key == null) {
@@ -477,15 +498,15 @@ public class FirebaseAuth {
             return;
         }
         if (current == null) {
-            Preferences.delete(PREF + "uid");
+            Preferences.delete(pref + "uid");
             return;
         }
-        Preferences.set(PREF + "uid", current.uid);
-        Preferences.set(PREF + "email", current.email == null ? "" : current.email);
-        Preferences.set(PREF + "name", current.displayName == null ? "" : current.displayName);
-        Preferences.set(PREF + "refresh", current.refreshToken == null ? "" : current.refreshToken);
-        Preferences.set(PREF + "anonymous", current.anonymous ? "true" : "false");
-        Preferences.set(PREF + "verified", current.emailVerified ? "true" : "false");
+        Preferences.set(pref + "uid", current.uid);
+        Preferences.set(pref + "email", current.email == null ? "" : current.email);
+        Preferences.set(pref + "name", current.displayName == null ? "" : current.displayName);
+        Preferences.set(pref + "refresh", current.refreshToken == null ? "" : current.refreshToken);
+        Preferences.set(pref + "anonymous", current.anonymous ? "true" : "false");
+        Preferences.set(pref + "verified", current.emailVerified ? "true" : "false");
     }
 
     private void restore() {
@@ -493,15 +514,15 @@ public class FirebaseAuth {
             return;
         }
         restored = true;
-        String uid = Preferences.get(PREF + "uid", null);
+        String uid = Preferences.get(pref + "uid", null);
         if (uid == null || current != null) {
             return;
         }
-        User u = new User(uid, blankToNull(Preferences.get(PREF + "email", "")),
-                "true".equals(Preferences.get(PREF + "anonymous", "false")));
-        u.displayName = blankToNull(Preferences.get(PREF + "name", ""));
-        u.emailVerified = "true".equals(Preferences.get(PREF + "verified", "false"));
-        u.refreshToken = blankToNull(Preferences.get(PREF + "refresh", ""));
+        User u = new User(uid, blankToNull(Preferences.get(pref + "email", "")),
+                "true".equals(Preferences.get(pref + "anonymous", "false")));
+        u.displayName = blankToNull(Preferences.get(pref + "name", ""));
+        u.emailVerified = "true".equals(Preferences.get(pref + "verified", "false"));
+        u.refreshToken = blankToNull(Preferences.get(pref + "refresh", ""));
         current = u;
     }
 

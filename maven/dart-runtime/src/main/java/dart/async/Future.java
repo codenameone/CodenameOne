@@ -94,6 +94,13 @@ public class Future<T> {
         }
     }
 
+    /** The error of a future that has already failed, else null (Java side only). */
+    public Throwable completedError() {
+        synchronized (lock) {
+            return done ? error : null;
+        }
+    }
+
     /** An already-completed future. */
     public static <T> Future<T> value(T v) {
         Future<T> f = new Future<T>();

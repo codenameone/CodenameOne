@@ -701,6 +701,46 @@ public final class Dyn {
         return o == null ? "Null" : o.getClass().getName();
     }
 
+    /**
+     * Validates a dynamic call to a transpiled method against its declaration, as
+     * Dart does before invoking: {@code minPos..maxPos} positional arguments, only the
+     * {@code named} parameters, and every one of {@code requiredNamed}. Generated
+     * {@code $dcall} code calls this; a null array means none.
+     */
+    public static void checkArgs(Object o, String member, Object[] a, java.util.Map<String, Object> n,
+            int minPos, int maxPos, String[] named, String[] requiredNamed) {
+        int count = a == null ? 0 : a.length;
+        if (count < minPos || count > maxPos) {
+            throw noSuch(o, member);
+        }
+        if (n != null) {
+            for (String k : n.keySet()) {
+                if (!contains(named, k)) {
+                    throw noSuch(o, member);
+                }
+            }
+        }
+        if (requiredNamed != null) {
+            for (String k : requiredNamed) {
+                if (n == null || !n.containsKey(k)) {
+                    throw noSuch(o, member);
+                }
+            }
+        }
+    }
+
+    private static boolean contains(String[] names, String k) {
+        if (names == null) {
+            return false;
+        }
+        for (String s : names) {
+            if (s.equals(k)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static NoSuchMethodError noSuch(Object o, String member) {
         if (o == null) {
             return new NoSuchMethodError("The getter or method '" + member + "' was called on null.");

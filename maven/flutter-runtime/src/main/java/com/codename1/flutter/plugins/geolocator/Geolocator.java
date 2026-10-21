@@ -70,16 +70,26 @@ public final class Geolocator {
         if (lm == null) {
             return Future.error(new LocationServiceDisabledException());
         }
+        // The explicit timeLimit wins over LocationSettings.timeLimit, as in the plugin.
+        // With a limit, a missing fix is a TimeoutException at that deadline; without
+        // one the plugin waits indefinitely, which here is a 30 s cap reported as the
+        // service being unavailable.
+        final Object limit = timeLimit != null ? timeLimit
+                : locationSettings == null ? null : locationSettings.timeLimit;
+        final long waitMs = limit instanceof dart.core.Duration
+                ? Math.max(0L, ((dart.core.Duration) limit).inMilliseconds()) : 30000L;
         final Completer<Position> done = new Completer<Position>();
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
-                final Location l = lm.getCurrentLocationSync(30000);
+                final Location l = lm.getCurrentLocationSync(waitMs);
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
                         if (l == null) {
-                            done.completeError(new LocationServiceDisabledException());
+                            done.completeError(limit != null
+                                    ? new dart.async.TimeoutException("Time limit reached while waiting for position update.", limit)
+                                    : new LocationServiceDisabledException());
                         } else {
                             done.complete(Position.of(l));
                         }

@@ -1231,6 +1231,26 @@ public final class JavaEmitter {
             TypeRef rt = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
             String invoke = "this." + javaMethodName(m.name) + "(" + args + ")";
             call.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": ");
+            // Dart checks a dynamic call's shape before running the method: a missing
+            // required argument, an extra positional one or an unknown name is a
+            // NoSuchMethodError, never a silent null or a later unboxing failure.
+            int minPos = 0;
+            StringBuilder named = new StringBuilder();
+            StringBuilder requiredNamed = new StringBuilder();
+            for (Param p : m.params) {
+                if (p.named) {
+                    named.append(named.length() > 0 ? ", " : "").append('"').append(p.name).append('"');
+                    if (p.required) {
+                        requiredNamed.append(requiredNamed.length() > 0 ? ", " : "").append('"').append(p.name).append('"');
+                    }
+                } else if (!p.optional && p.defaultValue == null) {
+                    minPos++;
+                }
+            }
+            call.append("dart.runtime.Dyn.checkArgs(this, \"").append(m.name).append("\", a, n, ").append(minPos).append(", ")
+                    .append(positional).append(", ")
+                    .append(named.length() == 0 ? "null" : "new String[] {" + named + "}").append(", ")
+                    .append(requiredNamed.length() == 0 ? "null" : "new String[] {" + requiredNamed + "}").append("); ");
             if (rt.is("void") || overridesVoid(c, m.name)) {
                 call.append(invoke).append("; return null;\n");
             } else {
@@ -12240,6 +12260,7 @@ public final class JavaEmitter {
                 q.name = p.name;
                 q.named = p.named;
                 q.required = p.required;
+                q.optional = p.optional;
                 q.isThis = p.isThis;
                 q.isSuper = p.isSuper;
                 q.defaultValue = p.defaultValue;
