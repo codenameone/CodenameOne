@@ -259,7 +259,7 @@ def main(argv=None):
 
     for line in benchlib.render_regressions(adapter.id, report.get("advisories") or []):
         print("note: " + line)
-    if report.get("advisories"):
+    if report.get("advisories") and report["gate"].get("fix"):
         print("note: to tighten: %s" % report["gate"]["fix"])
     if findings or stale:
         print("\nGATE FAILED")
@@ -267,7 +267,9 @@ def main(argv=None):
             print("  " + line)
         if stale:
             print("  this pull request's own overlay is stale: %s" % report["gate"]["stale_overlay"])
-        if report.get("regressions") or stale:
+        # No "fix" when the baselines could not be read at all: the message above is
+        # the whole answer, and a KeyError here used to bury it under a traceback.
+        if (report.get("regressions") or stale) and report["gate"].get("fix"):
             print("  to accept the move: %s" % report["gate"]["fix"])
         return 1
     return 0
