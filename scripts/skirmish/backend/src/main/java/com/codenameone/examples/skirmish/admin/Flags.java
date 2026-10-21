@@ -85,7 +85,10 @@ public class Flags {
         return raise(accused, REPORT, why, matchId, reporter);
     }
 
-    /// Something the server noticed itself.
+    /// Something the server noticed itself. Transactional on its own because
+    /// the demo seeding calls it with no transaction open; inside one (a match
+    /// being recorded) it joins that one.
+    @Transactional(rollbackFor = IOException.class)
     public void auto(String username, String reason, String matchId) {
         try {
             raise(username, AUTO, reason, matchId == null ? "" : matchId, "");

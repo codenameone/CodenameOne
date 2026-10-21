@@ -24,8 +24,13 @@ import com.codenameone.examples.skirmish.Clock;
 import com.codenameone.examples.skirmish.admin.Flags;
 import com.codenameone.examples.skirmish.domain.MatchRecord;
 import com.codenameone.examples.skirmish.domain.Profile;
+import com.codenameone.examples.skirmish.progress.Progression;
 import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
+import com.codenameone.examples.skirmish.rules.CardDef;
+import com.codenameone.examples.skirmish.rules.Cards;
+import com.codenameone.examples.skirmish.rules.Command;
+import com.codenameone.examples.skirmish.rules.Replay;
 import com.codenameone.examples.skirmish.rules.Match;
 import com.codenameone.examples.skirmish.rules.RulesVersion;
 import java.io.IOException;
@@ -55,11 +60,14 @@ public class Results {
     private final MatchRecordRepository matches;
     private final ProfileRepository profiles;
     private final Flags flags;
+    private final Progression progression;
 
-    public Results(MatchRecordRepository matches, ProfileRepository profiles, Flags flags) {
+    public Results(MatchRecordRepository matches, ProfileRepository profiles, Flags flags,
+            Progression progression) {
         this.matches = matches;
         this.profiles = profiles;
         this.flags = flags;
+        this.progression = progression;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -79,6 +87,16 @@ public class Results {
     Outcome[] save(MatchRoom room) throws IOException {
         int result = room.result();
         boolean bot = room.seats[1].isBot();
+        Replay replay = room.replay();
+        int[] cards = new int[2];
+        int[] spells = new int[2];
+        for (Command c : replay.commands()) {
+            cards[c.player]++;
+            CardDef def = Cards.get(c.cardId);
+            if (def != null && def.kind == CardDef.SPELL) {
+                spells[c.player]++;
+            }
+        }
         Outcome[] out = new Outcome[2];
         for (int i = 0; i < 2; i++) {
             Seat s = room.seats[i];
@@ -107,6 +125,8 @@ public class Results {
             p.setCoins(p.getCoins() + coins);
             p.setLeftStreak(room.forfeit == i ? p.getLeftStreak() + 1 : 0);
             p.setLastSeen(Clock.now());
+            progression.afterMatch(p, result == i, result == Match.DRAW, room.match.player(i).crowns(),
+                    cards[i], spells[i]);
             profiles.save(p);
             out[i] = new Outcome(trophies, coins);
         }
@@ -124,7 +144,7 @@ public class Results {
         m.setTicks(room.match.tick());
         m.setEndedAt(Clock.now());
         m.setRulesVersion(RulesVersion.ID);
-        m.setReplay(room.replay().encode());
+        m.setReplay(replay.encode());
         matches.insert(m);
         return out;
     }
