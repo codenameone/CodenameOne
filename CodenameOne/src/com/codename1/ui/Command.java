@@ -659,7 +659,12 @@ public class Command implements ActionListener<ActionEvent> {
     /// ignored
     ///
     /// - `modified`: the new modified state
-    static void followDocumentModified(java.util.List commands, boolean modified, Object surface) {
+    ///
+    /// - `surface`: the form or window reporting it
+    ///
+    /// - `revision`: the surface's report count, see
+    /// `#applyDocumentModifiedOnPublish(java.util.List, boolean, Object, int)`
+    static void followDocumentModified(java.util.List commands, boolean modified, Object surface, int revision) {
         // An explicit report: applies to every command and makes this surface their owner.
         if (commands == null) {
             return;
@@ -667,14 +672,16 @@ public class Command implements ActionListener<ActionEvent> {
         for (Object o : commands) {
             if (o instanceof Command && ((Command) o).isDesktopEnabledWhenModified()) {
                 ((Command) o).documentStateSurface = surface;
+                ((Command) o).documentStateRevision = revision;
                 ((Command) o).setEnabled(modified);
             }
         }
     }
 
-    /// As `#followDocumentModified(java.util.List, boolean, Object)`, called as a surface publishes.
-    /// It reaches only the commands this surface's state has not reached yet -- a Save added
-    /// after the state was reported, or moved here from another form or window. Publishing
+    /// As `#followDocumentModified(java.util.List, boolean, Object, int)`, called as a surface
+    /// publishes. It reaches only the commands this surface's current state has not reached --
+    /// a Save added after the state was reported, moved here from another form or window, or
+    /// removed and re-added here across a later report (the revision tells those apart). Publishing
     /// never re-applies a surface's state to a command it already set: a command shared by a
     /// clean form and a modified window would otherwise flip on every publish, and each flip
     /// schedules the next republish, forever.
@@ -686,20 +693,28 @@ public class Command implements ActionListener<ActionEvent> {
     /// - `modified`: the reported modified state
     ///
     /// - `surface`: the form or window publishing them
-    static void applyDocumentModifiedOnPublish(java.util.List commands, boolean modified, Object surface) {
+    ///
+    /// - `revision`: how many times the surface has reported a state
+    static void applyDocumentModifiedOnPublish(java.util.List commands, boolean modified, Object surface,
+            int revision) {
         if (commands == null) {
             return;
         }
         for (Object o : commands) {
             if (o instanceof Command && ((Command) o).isDesktopEnabledWhenModified()) {
                 Command c = (Command) o;
-                if (surface != null && c.documentStateSurface != null
-                        && stillPublishes(c.documentStateSurface, c)) {
-                    // Set by this surface already, or owned by another that still shows it:
-                    // re-applying is what would make a shared command flip forever.
+                if (c.documentStateSurface == surface) { //NOPMD CompareObjectsWithEquals
+                    if (c.documentStateRevision == revision) {
+                        // This state reached it already.
+                        continue;
+                    }
+                } else if (c.documentStateSurface != null && stillPublishes(c.documentStateSurface, c)) {
+                    // Owned by another surface that still shows it: taking it over is what
+                    // would make a shared command flip forever.
                     continue;
                 }
                 c.documentStateSurface = surface;
+                c.documentStateRevision = revision;
                 c.setEnabled(modified);
             }
         }
@@ -730,6 +745,8 @@ public class Command implements ActionListener<ActionEvent> {
     // The form or window whose document-modified state last set this command's enabled
     // state, null when none has.
     private Object documentStateSurface;
+    // That surface's report count when it did.
+    private int documentStateRevision;
 
     /// Leaves at most one checked member in each radio group among the given commands, the
     /// most recently checked one. Called on every surface as it is published, which settles a

@@ -234,6 +234,24 @@ class NativeMenuConventionsTest extends UITestBase {
     }
 
     @FormTest
+    void aSaveReaddedAfterALaterReportTakesIt() {
+        implementation.setDesktop(true);
+        implementation.setDesktopTitleBarMode("native");
+        Toolbar.setGlobalToolbar(true);
+        Form f = new Form("Doc");
+        Command save = Command.createDesktopRole(Command.DESKTOP_ROLE_SAVE, null);
+        f.getToolbar().addCommandToOverflowMenu(save);
+        f.show();
+        DisplayTest.flushEdt();
+        f.setDocumentModified(false);
+        assertFalse(save.isEnabled());
+        f.getToolbar().removeOverflowCommand(save);
+        f.setDocumentModified(true);
+        f.getToolbar().addCommandToOverflowMenu(save);
+        assertTrue(save.isEnabled(), "the later report reaches the re-added command");
+    }
+
+    @FormTest
     void aRoleNameIsLookedUpWhenRead() {
         Command c = Command.createDesktopRole(Command.DESKTOP_ROLE_QUIT, null);
         assertEquals(NativeMenuConventions.labelOf(NativeMenuConventions.current(), Command.DESKTOP_ROLE_QUIT),

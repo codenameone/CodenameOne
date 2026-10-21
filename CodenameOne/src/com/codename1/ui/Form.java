@@ -129,6 +129,8 @@ public class Form extends Container implements TopLevelContainer {
     // Whether the application has reported a modified state at all; until it does, commands
     // that follow the state are left as the application set them.
     private boolean documentModifiedReported;
+    // Counts the reports, so a command re-added after a later one still takes it.
+    private int documentModifiedRevision;
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
@@ -3318,11 +3320,12 @@ public class Form extends Container implements TopLevelContainer {
     public void setDocumentModified(boolean modified) {
         documentModified = modified;
         documentModifiedReported = true;
+        documentModifiedRevision++;
         java.util.Vector published = nativeMenuCommands();
         if (published == null) {
             published = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
         }
-        Command.followDocumentModified(published, modified, this);
+        Command.followDocumentModified(published, modified, this, documentModifiedRevision);
         Display.impl.documentModifiedChanged(this);
     }
 
@@ -3374,7 +3377,7 @@ public class Form extends Container implements TopLevelContainer {
     /// command added after `#setDocumentModified(boolean)` still follows it.
     void applyDocumentModified(java.util.List commands) {
         if (documentModifiedReported) {
-            Command.applyDocumentModifiedOnPublish(commands, documentModified, this);
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this, documentModifiedRevision);
         }
     }
 

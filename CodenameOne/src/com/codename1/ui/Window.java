@@ -200,6 +200,8 @@ public class Window extends Container implements TopLevelContainer {
     private boolean documentModified;
     // See Form.documentModifiedReported.
     private boolean documentModifiedReported;
+    // Counts the reports, so a command re-added after a later one still takes it.
+    private int documentModifiedRevision;
     private int pendingX;
     private int pendingY;
     /// Whether the application chose a position. A negative coordinate is a perfectly
@@ -516,7 +518,8 @@ public class Window extends Container implements TopLevelContainer {
     public void setDocumentModified(final boolean modified) {
         documentModified = modified;
         documentModifiedReported = true;
-        Command.followDocumentModified(commands, modified, this);
+        documentModifiedRevision++;
+        Command.followDocumentModified(commands, modified, this, documentModifiedRevision);
         onPeer(new Runnable() {
             @Override
             public void run() {
@@ -585,7 +588,7 @@ public class Window extends Container implements TopLevelContainer {
         }
         Command.settleRadioGroups(commands);
         if (documentModifiedReported) {
-            Command.applyDocumentModifiedOnPublish(commands, documentModified, this);
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this, documentModifiedRevision);
         }
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));
