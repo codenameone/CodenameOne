@@ -60,6 +60,11 @@ static NSArray *cn1MenuRows = nil;
     return shared;
 }
 
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+    id enabled = item.representedObject;
+    return ![enabled isKindOfClass:[NSNumber class]] || [enabled boolValue];
+}
+
 - (void)cn1MenuAction:(id)sender {
     if (![sender isKindOfClass:[NSMenuItem class]]) {
         return;
@@ -73,13 +78,15 @@ static NSArray *cn1MenuRows = nil;
 
 /// Maps a command's desktop menu hint onto one of the standard menus. Returns
 /// nil for a hint that names a menu of the application's own.
+///
+/// Core resolves the standard roles (NativeMenuConventions) and spells the standard
+/// menus one way, so About, Settings and Quit arrive here already under "App".
 static NSString *cn1StandardMenuForHint(NSString *hint, BOOL *placeAtStart) {
     *placeAtStart = NO;
     NSString *h = [hint lowercaseString];
-    if ([h isEqualToString:@"app"] || [h isEqualToString:@"about"]
-            || [h isEqualToString:@"preferences"] || [h isEqualToString:@"quit"]) {
-        // Into the application menu, above the About item, which is where a Mac
-        // application puts its own top-level entries.
+    if ([h isEqualToString:@"app"]) {
+        // Into the application menu, below About, which is where a Mac application
+        // puts its own entries (Settings first among them).
         *placeAtStart = YES;
         return @"__app__";
     }
@@ -130,9 +137,113 @@ static NSMenu *cn1TopLevelMenu(NSMenu *mainMenu, NSString *title, BOOL createIfM
 /// worse bug than the one this fixes.
 static NSMutableSet *cn1GeneratedMenuTitles = nil;
 
+/// The stock items a role command took the place of on the previous pass, shown
+/// again before every rebuild so a form without that command gets the stock one back.
+static NSMutableArray *cn1HiddenStockItems = nil;
+
+/// The stock action of each role ordinal (NativeMenuEncoder.FLAG_ROLE_SHIFT): the
+/// item an application's own command of that role replaces in place, rather than
+/// sitting beside a second Quit or Copy. NULL for a role with no stock item.
+static SEL cn1StockActionForRole(int ordinal) {
+    switch (ordinal) {
+        case 1: return @selector(orderFrontStandardAboutPanel:);
+        case 2: return @selector(hide:);
+        case 3: return @selector(terminate:);
+        case 4: return @selector(undo:);
+        case 5: return @selector(redo:);
+        case 6: return @selector(cut:);
+        case 7: return @selector(copy:);
+        case 8: return @selector(paste:);
+        case 9: return @selector(selectAll:);
+        case 10: return @selector(performMiniaturize:);
+        case 11: return @selector(performZoom:);
+        case 12: return @selector(toggleFullScreen:);
+        default: return NULL;
+    }
+}
+
+/// The stock item in `menu` (not in its submenus) carrying `action`, or nil.
+static NSMenuItem *cn1StockItem(NSMenu *menu, SEL action) {
+    if (action == NULL) {
+        return nil;
+    }
+    for (NSMenuItem *item in menu.itemArray) {
+        if (item.action == action && item.target != [CN1MacMenuTarget sharedTarget]) {
+            return item;
+        }
+    }
+    return nil;
+}
+
+/// The stock item for a role: in the menu the row lands in first, then in every other
+/// top-level menu, since a role the application moved (a Copy placed in Tools) still has to
+/// replace the stock Copy in Edit rather than sit beside it with the stock shortcut active.
+static NSMenuItem *cn1StockItemAnywhere(NSMenu *mainMenu, NSMenu *target, SEL action) {
+    NSMenuItem *found = cn1StockItem(target, action);
+    if (found != nil || action == NULL) {
+        return found;
+    }
+    for (NSMenuItem *top in mainMenu.itemArray) {
+        if (top.submenu != nil && top.submenu != target) {
+            found = cn1StockItem(top.submenu, action);
+            if (found != nil) {
+                return found;
+            }
+        }
+    }
+    return nil;
+}
+
+/// Drops the separators that end up leading, trailing or next to another separator once
+/// hidden stock items are discounted: a role About replacing the stock one keeps AppKit's own
+/// separator below it, and the application's group adds another; a role moved to another
+/// menu leaves the stock separator that framed it. Ours are removed; a stock separator is
+/// hidden like a replaced stock item, so the next pass shows it again.
+static void cn1NormalizeSeparators(NSMenu *menu) {
+    NSMutableArray *visible = [NSMutableArray array];
+    for (NSMenuItem *item in menu.itemArray) {
+        if (!item.hidden) {
+            [visible addObject:item];
+        }
+    }
+    BOOL prevSeparator = YES;
+    for (NSUInteger i = 0; i < visible.count; i++) {
+        NSMenuItem *item = visible[i];
+        if (!item.separatorItem) {
+            prevSeparator = NO;
+            continue;
+        }
+        BOOL ours = item.target == [CN1MacMenuTarget sharedTarget];
+        BOOL nextSeparator = i + 1 >= visible.count || ((NSMenuItem *)visible[i + 1]).separatorItem;
+        // A doubled pair keeps the stock one and drops ours; between two stock separators the
+        // second goes.
+        BOOL nextIsOursOnly = !ours && !prevSeparator && i + 1 < visible.count
+                && ((NSMenuItem *)visible[i + 1]).target == [CN1MacMenuTarget sharedTarget];
+        if (prevSeparator || (nextSeparator && !nextIsOursOnly)) {
+            if (ours) {
+                [menu removeItem:item];
+            } else {
+                item.hidden = YES;
+                if (cn1HiddenStockItems == nil) {
+                    cn1HiddenStockItems = [[NSMutableArray alloc] init];
+                }
+                [cn1HiddenStockItems addObject:item];
+            }
+            continue;
+        }
+        prevSeparator = YES;
+    }
+}
+
 /// Removes every item this file added on a previous pass, so a rebuild replaces
 /// the commands rather than appending a second copy of them.
 static void cn1RemovePreviousCommands(NSMenu *menu) {
+    if (cn1HiddenStockItems != nil) {
+        for (NSMenuItem *stock in cn1HiddenStockItems) {
+            stock.hidden = NO;
+        }
+        [cn1HiddenStockItems removeAllObjects];
+    }
     NSMutableArray *doomed = [NSMutableArray array];
     for (NSMenuItem *item in menu.itemArray) {
         if (item.target == [CN1MacMenuTarget sharedTarget]) {
@@ -249,6 +360,38 @@ void CN1MacReleaseStartupMenu(void) {
     }
 }
 
+/// Where the application's own items start in the application menu: below the
+/// About item and the separator under it, the place macOS applications put
+/// Settings. Looked up on every insertion, because a role About inserted before the
+/// stock one moves it down.
+static NSInteger cn1AppMenuStart(NSMenu *menu) {
+    for (NSInteger i = 0; i < menu.numberOfItems; i++) {
+        NSMenuItem *item = [menu itemAtIndex:i];
+        if (item.action == @selector(orderFrontStandardAboutPanel:)
+                && item.target != [CN1MacMenuTarget sharedTarget]) {
+            NSInteger at = i + 1;
+            if (at < menu.numberOfItems && [menu itemAtIndex:at].isSeparatorItem) {
+                at++;
+            }
+            return at;
+        }
+    }
+    return 0;
+}
+
+/// Appends an item, or for the application menu inserts it after the ones this pass
+/// already put at its start, below the About item.
+static void cn1AddMenuItem(NSMenu *target, NSMenuItem *item, BOOL placeAtStart, NSMutableDictionary *appended) {
+    if (placeAtStart) {
+        NSNumber *seen = appended[[NSValue valueWithNonretainedObject:target]];
+        NSInteger count = seen != nil ? seen.integerValue : 0;
+        [target insertItem:item atIndex:cn1AppMenuStart(target) + count];
+        appended[[NSValue valueWithNonretainedObject:target]] = @(count + 1);
+    } else {
+        [target addItem:item];
+    }
+}
+
 static void cn1ApplyMenuCommands(NSArray *rows) {
 #ifndef CN1_USE_ARC
     [cn1MenuRows release];
@@ -270,9 +413,16 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
     NSMenu *appMenu = mainMenu.numberOfItems > 0 ? [mainMenu itemAtIndex:0].submenu : nil;
     NSMutableDictionary *appended = [NSMutableDictionary dictionary];
 
+    // Submenus created on this pass, by the full path that named them.
+    NSMutableDictionary *submenus = [NSMutableDictionary dictionary];
+    NSString *pathSeparator = [NSString stringWithFormat:@"%C", (unichar)0x1f];
+
     for (NSUInteger i = 0; i < rows.count; i++) {
+        // The NativeMenuEncoder row: path, label, key, modifiers, id, flags, icon.
         NSArray *cols = [rows[i] componentsSeparatedByString:@"\t"];
-        NSString *hint = cols.count > 0 ? cols[0] : @"";
+        NSString *pathField = cols.count > 0 ? cols[0] : @"";
+        NSArray *path = [pathField componentsSeparatedByString:pathSeparator];
+        NSString *hint = path.count > 0 ? path[0] : @"";
         NSString *label = cols.count > 1 ? cols[1] : rows[i];
         int keyChar = cols.count > 2 ? [cols[2] intValue] : 0;
         int modifiers = cols.count > 3 ? [cols[3] intValue] : 0;
@@ -282,7 +432,8 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         // would then name whichever command had since taken that position. An id names
         // one command for as long as anything can still click it.
         NSInteger commandId = cols.count > 4 ? (NSInteger)[cols[4] intValue] : (NSInteger)i;
-        NSMenuItem *item = cn1MakeCommandItem(label, keyChar, modifiers, commandId);
+        int rowFlags = cols.count > 5 ? [cols[5] intValue] : 1;
+        NSString *iconPng = cols.count > 6 ? cols[6] : @"";
 
         BOOL placeAtStart = NO;
         NSString *standard = cn1StandardMenuForHint(hint, &placeAtStart);
@@ -306,13 +457,89 @@ static void cn1ApplyMenuCommands(NSArray *rows) {
         if (target == nil) {
             continue;
         }
-        if (placeAtStart) {
-            NSNumber *seen = appended[[NSValue valueWithNonretainedObject:target]];
-            NSInteger at = seen != nil ? seen.integerValue : 0;
-            [target insertItem:item atIndex:at];
-            appended[[NSValue valueWithNonretainedObject:target]] = @(at + 1);
+        // Rows arrive depth first, so a submenu is created by its first row and lands at
+        // its place among the parent's items. Its container item carries the shared
+        // target too, which is how cn1RemovePreviousCommands takes the whole subtree.
+        // Keyed by the physical menu, not the hint as written: hints the mapping treats as
+        // one menu ("File", "file", the application-menu aliases) share their submenus.
+        NSString *key = [NSString stringWithFormat:@"%p%d", (void *)target, placeAtStart ? 1 : 0];
+        for (NSUInteger p = 1; p < path.count; p++) {
+            key = [key stringByAppendingFormat:@"%@%@", pathSeparator, path[p]];
+            NSMenu *sub = submenus[key];
+            if (sub == nil) {
+                NSMenuItem *holder = [[NSMenuItem alloc] initWithTitle:path[p] action:NULL keyEquivalent:@""];
+                sub = [[NSMenu alloc] initWithTitle:path[p]];
+                holder.submenu = sub;
+                holder.target = [CN1MacMenuTarget sharedTarget];
+                cn1AddMenuItem(target, holder, p == 1 && placeAtStart, appended);
+                submenus[key] = sub;
+#ifndef CN1_USE_ARC
+                [holder release];
+                [sub release];
+#endif
+            }
+            target = sub;
+            placeAtStart = NO;
+        }
+        NSMenuItem *item;
+        if (rowFlags & 16) {
+            item = [NSMenuItem separatorItem];
+            item.target = [CN1MacMenuTarget sharedTarget];
         } else {
-            [target addItem:item];
+            item = cn1MakeCommandItem(label, keyChar, modifiers, commandId);
+            // FLAG_ENABLED=1, FLAG_CHECKABLE=2, FLAG_CHECKED=4. A radio item shows the
+            // same checkmark: that is how AppKit draws one, and Java keeps the group
+            // exclusive.
+            // The standard menus auto-enable (Cut/Copy follow the responder chain), so the
+            // enabled flag is answered from validateMenuItem: rather than item.enabled,
+            // which AppKit would overwrite.
+            item.representedObject = @((rowFlags & 1) != 0);
+            if (rowFlags & 2) {
+                item.state = (rowFlags & 4) ? NSControlStateValueOn : NSControlStateValueOff;
+            }
+            if (iconPng.length > 0) {
+                NSData *png = [[NSData alloc] initWithBase64EncodedString:iconPng options:0];
+                NSImage *image = png == nil ? nil : [[NSImage alloc] initWithData:png];
+                if (image != nil) {
+                    image.size = NSMakeSize(16, 16);
+                    item.image = image;
+                }
+#ifndef CN1_USE_ARC
+                [image release];
+                [png release];
+#endif
+            }
+        }
+        // A standard role takes the place of the stock item of that role (Quit, Copy,
+        // Minimize), which is hidden until the next pass rather than left beside it.
+        NSMenuItem *stock = (rowFlags & 16) ? nil
+                : cn1StockItemAnywhere(mainMenu, target, cn1StockActionForRole((rowFlags >> 8) & 0xff));
+        if (stock != nil) {
+            stock.hidden = YES;
+            if (cn1HiddenStockItems == nil) {
+                cn1HiddenStockItems = [[NSMutableArray alloc] init];
+            }
+            [cn1HiddenStockItems addObject:stock];
+            if (stock.menu == target) {
+                [target insertItem:item atIndex:[target indexOfItem:stock]];
+                continue;
+            }
+        }
+        cn1AddMenuItem(target, item, placeAtStart, appended);
+    }
+    // The application's own items in the application menu are a group of their own,
+    // closed by a separator above Services.
+    if (appMenu != nil) {
+        NSNumber *count = appended[[NSValue valueWithNonretainedObject:appMenu]];
+        if (count != nil && count.integerValue > 0) {
+            NSMenuItem *sep = [NSMenuItem separatorItem];
+            sep.target = [CN1MacMenuTarget sharedTarget];
+            [appMenu insertItem:sep atIndex:cn1AppMenuStart(appMenu) + count.integerValue];
+        }
+    }
+    for (NSMenuItem *top in mainMenu.itemArray) {
+        if (top.submenu != nil) {
+            cn1NormalizeSeparators(top.submenu);
         }
     }
 }
