@@ -203,6 +203,10 @@ public class Locale {
         int index = 0;
         int extlangs = 0;
         int baseLanguageLength = 0;
+        // Grandfathered tags ("i-klingon", "no-bok") are not mapped to their
+        // registered replacements: they were deprecated in 2005, and
+        // carrying the IANA table on every device costs more than the
+        // handful of legacy systems that still send one.
         for (int i = 0; i <= n; i++) {
             // Only '-' separates subtags: "en_US" is not a language tag, and the
             // JDK reads it as the root locale.

@@ -506,14 +506,16 @@ public final class DateTimeFormatter {
     /// count of `X`: 1 `+HHmm`, 2 `+HHMM`, 3 `+HH:MM`, 4 `+HHMMss`, 5
     /// `+HH:MM:ss`.
     private static void offset(StringBuilder out, int total, int style, String zeroText) {
-        if (total == 0) {
-            out.append(zeroText);
-            return;
-        }
         int abs = Math.abs(total);
         int hours = abs / 3600;
         int minutes = (abs / 60) % 60;
         int seconds = abs % 60;
+        // Zero as printed, not only zero: -30s under a style without
+        // seconds prints the zero text, never a signed "-00".
+        if (hours == 0 && minutes == 0 && (style < 4 || seconds == 0)) {
+            out.append(zeroText);
+            return;
+        }
         boolean colon = style == 3 || style == 5;
         out.append(total < 0 ? '-' : '+');
         pad(out, hours, 2);
@@ -772,7 +774,14 @@ public final class DateTimeFormatter {
                 nano *= 10;
             }
         }
-        parseOffsetId(p);
+        // ISO_INSTANT takes Z or an offset with its minutes: "+12" alone
+        // is refused, as the JDK refuses it.
+        if (p.pos < p.text.length() && (p.text.charAt(p.pos) == 'Z' || p.text.charAt(p.pos) == 'z')) {
+            p.pos++;
+            p.offset = ZoneOffset.UTC;
+        } else {
+            p.offset = ZoneOffset.ofTotalSeconds(p.offsetSeconds(true, 2, 3));
+        }
         if (p.pos < p.text.length()) {
             throw new DateTimeParseException("Text '" + p.text + "' could not be parsed, unparsed text found at index "
                     + p.pos, p.text, p.pos);

@@ -280,24 +280,6 @@
    }
   },
   "windows-x64@intel64-family-6-model-207-genuineintel": {
-   "recursion": {
-    "all": {
-     "from": {
-      "memory": 0.059,
-      "time": 0.945,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.059,
-     "reason": "Runner variance on 8c578a54ae: linux-x64 EPYC translator RAM and valueEscape time, windows-x64 Intel recursion time; that commit changed no ParparVM code these benchmarks exercise",
-     "runs": 1,
-     "time": 1.203,
-     "tolerance": {
-      "time": 0.2
-     }
-    }
-   },
    "translator": {
     "all": {
      "from": {

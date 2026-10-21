@@ -123,6 +123,10 @@ public class Properties extends Hashtable<Object, Object> {
                 buf = newBuf;
             }
             if (mode == UNICODE) {
+                // A line continuation inside the four hex digits of an
+                // escape is refused rather than joined: no writer produces
+                // one (store() never wraps), so the JDK's acceptance of it
+                // is not carried over.
                 int digit = Character.digit(nextChar, 16);
                 if (digit >= 0) {
                     unicode = (unicode << 4) + digit;

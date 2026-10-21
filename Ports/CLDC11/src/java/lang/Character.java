@@ -1139,8 +1139,9 @@ public final class Character implements Comparable<Character> {
         if (codePoint < 0x1000) {
             return false;
         }
-        // OGHAM SPACE MARK or MONGOLIAN VOWEL SEPARATOR?
-        if (codePoint == 0x1680 || codePoint == 0x180e) {
+        // OGHAM SPACE MARK. MONGOLIAN VOWEL SEPARATOR (U+180E) has been a
+        // format character, not a space, since Unicode 6.3.
+        if (codePoint == 0x1680) {
             return true;
         }
         if (codePoint < 0x2000) {

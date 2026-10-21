@@ -657,6 +657,16 @@ public final class LangMembersChecks {
             l.reversed().addAll(l.reversed());
             Bulk.p("list", l);
         });
+        Bulk.check("Lang.aSubMinuteOffsetPrintsAsZero", () -> {
+            java.time.OffsetDateTime t = java.time.OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, java.time.ZoneOffset.ofTotalSeconds(-30));
+            Bulk.p("X", java.time.format.DateTimeFormatter.ofPattern("X").format(t));
+            Bulk.p("Z", java.time.format.DateTimeFormatter.ofPattern("Z").format(t));
+            Bulk.p("XXXXX", java.time.format.DateTimeFormatter.ofPattern("XXXXX").format(t));
+            try { Bulk.p("hourOnly", java.time.Instant.parse("2020-02-29T12:34:56+12")); } catch (java.time.format.DateTimeParseException e) { Bulk.p("hourOnly", "refused"); }
+            Bulk.p("withMinutes", java.time.Instant.parse("2020-02-29T12:34:56+12:00"));
+            Bulk.p("mvs", Character.isWhitespace((char) 0x180E));
+            Bulk.p("blank", String.valueOf((char) 0x180E).isBlank());
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {
