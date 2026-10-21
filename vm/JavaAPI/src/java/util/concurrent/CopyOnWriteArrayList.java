@@ -60,6 +60,9 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
     private Object[] array;
     /// Guards [#array]; every mutation runs whole under it, so two threads
     /// never both copy the same array and lose one of their changes.
+    // Never reinitialized after deserialization because nothing deserializes
+    // one: Codename One has no Java object serialization (no
+    // ObjectInputStream on any device runtime).
     private final transient Object lock = new Object();
 
     private Object[] getArray() {
@@ -534,6 +537,8 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
     @Override
     public List<E> subList(int fromIndex, int toIndex) {
         Object[] elements = getArray();
+        // A reversed range is an IndexOutOfBoundsException, as List.subList
+        // documents and the JDK's CopyOnWriteArrayList throws.
         if (fromIndex < 0 || toIndex > elements.length || fromIndex > toIndex) {
             throw new IndexOutOfBoundsException();
         }

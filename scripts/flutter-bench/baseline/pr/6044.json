@@ -39,25 +39,25 @@
      "from": {
       "value": 14523602
      },
-     "reason": "java-api-additions: round 28 runtime fixes (script letter table, date conflicts) grew linux code by 1 KB",
+     "reason": "java.* additions (suppressed-exception printing in Throwable, unmodifiable-collection mutator overrides) add ~4 KB of executable code",
      "runs": 1,
-     "value": 14572498
+     "value": 14576466
     },
     "install_bytes": {
      "from": {
       "value": 116342496
      },
-     "reason": "java-api-additions: java.time and CompletableFuture review fixes; linux download size moved by 395 bytes",
+     "reason": "java.* additions (suppressed-exception printing in Throwable, unmodifiable-collection mutator overrides) add ~4 KB of executable code",
      "runs": 1,
-     "value": 116501664
+     "value": 116505760
     },
     "wire_bytes": {
      "from": {
       "value": 84685068
      },
-     "reason": "java-api-additions: round 28 runtime fixes (script letter table, date conflicts) grew linux code by 1 KB",
+     "reason": "java.* additions (suppressed-exception printing in Throwable, unmodifiable-collection mutator overrides) add ~4 KB of executable code",
      "runs": 1,
-     "value": 84690108
+     "value": 84684096
     }
    }
   }

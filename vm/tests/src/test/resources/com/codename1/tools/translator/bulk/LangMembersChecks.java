@@ -626,6 +626,12 @@ public final class LangMembersChecks {
             StringBuffer sb = new StringBuffer("x");
             Bulk.p("self", sb.compareTo(sb));
         });
+        Bulk.check("Lang.anEmptyMapOfRejectsClearingItsViews", () -> {
+            try { java.util.Map.of().keySet().clear(); Bulk.p("keySet", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("keySet", "uoe"); }
+            try { java.util.Map.of().values().clear(); Bulk.p("values", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("values", "uoe"); }
+            java.util.List<String> cow = new java.util.concurrent.CopyOnWriteArrayList<String>(java.util.Arrays.asList("a", "b"));
+            try { cow.subList(1, 0); Bulk.p("reversed", "ok"); } catch (IllegalArgumentException e) { Bulk.p("reversed", "iae"); } catch (IndexOutOfBoundsException e) { Bulk.p("reversed", "ioobe"); }
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

@@ -169,6 +169,10 @@ final class ImmutableCollections {
         }
     }
 
+    // None of the factory collections implements Serializable: Codename One
+    // has no Java object serialization (no ObjectOutputStream on any device
+    // runtime), so the JDK's serialization contract for List.of, Set.of and
+    // Map.of has nothing to apply to.
     static final class ImmutableList<E> extends AbstractList<E> implements RandomAccess {
 
         private final Object[] elements;
@@ -392,6 +396,19 @@ final class ImmutableCollections {
         @Override
         public Set<Map.Entry<K, V>> entrySet() {
             return entrySet;
+        }
+
+        // AbstractMap's views clear through their iterator, which on an
+        // empty map removes nothing and so returns normally; these throw
+        // on every mutation, empty or not.
+        @Override
+        public Set<K> keySet() {
+            return Collections.unmodifiableSet(super.keySet());
+        }
+
+        @Override
+        public Collection<V> values() {
+            return Collections.unmodifiableCollection(super.values());
         }
 
         @Override

@@ -420,13 +420,20 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         }
         int exit = process.waitFor();
         if (exit != 0) {
+            // Keep the END of the output: Maven reports the failure last, and
+            // the first 12k characters of a cold build are all downloads.
             StringBuilder sb = new StringBuilder();
-            for (String line : output) {
-                if (sb.length() > 12000) {
-                    sb.append("\n...[truncated]");
-                    break;
-                }
-                sb.append(line).append('\n');
+            int first = output.size();
+            int size = 0;
+            while (first > 0 && size + output.get(first - 1).length() + 1 <= 12000) {
+                first--;
+                size += output.get(first).length() + 1;
+            }
+            if (first > 0) {
+                sb.append("...[truncated]\n");
+            }
+            for (int i = first; i < output.size(); i++) {
+                sb.append(output.get(i)).append('\n');
             }
             System.out.println(sb.toString());
         }
