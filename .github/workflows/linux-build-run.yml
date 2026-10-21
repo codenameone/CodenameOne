@@ -492,6 +492,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-linux-${{ matrix.arch }}
+          path: artifacts/linux-port/raw/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Fail on a ParparVM performance regression (${{ matrix.arch }})
         if: success() || failure()
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/linux-port/raw/perf
