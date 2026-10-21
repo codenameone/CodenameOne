@@ -247,25 +247,28 @@ the same file name. MariaDB reads the `mysql` directory. A version needs either
 the one common script or a script for each engine the server runs on, never
 both.
 
-On MySQL and MariaDB, give the database a case-sensitive NO PAD collation
-before the first table is created. The server refuses to start when a text key
-column uses the default, `utf8mb4_0900_ai_ci`, because that collation treats
-`"A"` and `"a"`, or `"token"` and `"token "`, as the same key. The two server
-families name the collation differently, and executable comments let one
-script in the `mysql` directory serve both:
+On MySQL and MariaDB, text key columns need a case-sensitive NO PAD collation.
+The server refuses to start when one uses the default, `utf8mb4_0900_ai_ci`,
+because that collation treats `"A"` and `"a"`, or `"token"` and `"token "`, as
+the same key. The two server families name the collation differently, and
+executable comments let one script in the `mysql` directory serve both:
 
 [source,sql]
 ----
 ALTER DATABASE CHARACTER SET utf8mb4
     COLLATE /*!80000 utf8mb4_0900_bin */ /*M!100400 utf8mb4_nopad_bin */;
+ALTER TABLE account CONVERT TO CHARACTER SET utf8mb4
+    COLLATE /*!80000 utf8mb4_0900_bin */ /*M!100400 utf8mb4_nopad_bin */;
 ----
 
-MySQL runs the first comment and skips the second, which only MariaDB reads.
-MariaDB runs the second and skips the first. A script like this, with a version
-lower than every other script, makes each table created after it inherit the
-collation. The same version then needs a script in the `sqlite` and
-`postgresql` directories too. Their text is already case sensitive and NO PAD,
-so a `SELECT 1;` is all those scripts have to hold.
+MySQL runs the first comment of each pair and skips the second, which only
+MariaDB reads. MariaDB runs the second and skips the first. The first statement
+sets the default that tables created later inherit. Tables that already exist
+keep their collation, so convert each of them too. Give the script a new, higher
+version than any applied one. A database that has already applied later
+versions refuses a script that sorts before them. The same version then needs a
+script in the `sqlite` and `postgresql` directories too. Their text is already
+case sensitive and NO PAD, so a `SELECT 1;` is all those scripts have to hold.
 
 ==== What happens at start-up
 

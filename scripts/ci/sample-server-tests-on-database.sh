@@ -54,8 +54,11 @@ reset_schema() {
       local rest="${URL#mysql://}" auth host db
       auth="${rest%%@*}"; rest="${rest#*@}"
       host="${rest%%/*}"; db="${rest#*/}"; db="${db%%\?*}"
+      # The port is optional in the URL, as it is to the server: 3306 when absent.
+      local port=3306
+      case "$host" in *:*) port="${host##*:}" ;; esac
       MYSQL_PWD="${auth#*:}" mysql --protocol=TCP -u "${auth%%:*}" -h "${host%%:*}" \
-          -P "${host##*:}" -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`"
+          -P "$port" -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`"
       ;;
     *)
       log "unsupported database URL: $URL"
