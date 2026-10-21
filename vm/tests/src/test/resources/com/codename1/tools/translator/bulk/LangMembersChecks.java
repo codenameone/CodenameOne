@@ -667,6 +667,25 @@ public final class LangMembersChecks {
             Bulk.p("mvs", Character.isWhitespace((char) 0x180E));
             Bulk.p("blank", String.valueOf((char) 0x180E).isBlank());
         });
+        Bulk.check("Lang.aContinuationCanJoinANestedDependent", () -> {
+            final java.util.concurrent.CompletableFuture<Integer> nested = new java.util.concurrent.CompletableFuture<Integer>();
+            final java.util.concurrent.CompletableFuture<Integer> dependent = nested.thenApply(x -> x + 1);
+            final int[] seen = new int[1];
+            java.util.concurrent.CompletableFuture<Void> outer = new java.util.concurrent.CompletableFuture<Void>();
+            outer.thenRun(() -> {
+                nested.complete(41);
+                seen[0] = dependent.join();
+            });
+            outer.complete(null);
+            Bulk.p("joined", seen[0]);
+            java.util.concurrent.ConcurrentHashMap<String, Integer> map = new java.util.concurrent.ConcurrentHashMap<String, Integer>();
+            map.put("key", 1);
+            map.values().removeIf(v -> { map.put("key", 2); return v == 1; });
+            Bulk.p("values", map);
+            map.put("key", 1);
+            map.entrySet().removeIf(e -> { map.put("key", 3); return e.getValue() == 1; });
+            Bulk.p("entries", map);
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

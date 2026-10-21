@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /// `java.util.concurrent.ConcurrentHashMap` for the Codename One runtime,
 /// over a `HashMap`.
@@ -520,11 +521,36 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
         }
     }
 
+    /// The mappings as they are now, each an immutable pair.
+    List<Map.Entry<K, V>> snapshotEntries() {
+        List<Map.Entry<K, V>> out = new ArrayList<Map.Entry<K, V>>();
+        for (Map.Entry<K, V> e : entrySet()) {
+            out.add(new AbstractMap.SimpleImmutableEntry<K, V>(e.getKey(), e.getValue()));
+        }
+        return out;
+    }
+
     private static final class ValuesView<K, V> extends AbstractCollection<V> {
         private final ConcurrentHashMap<K, V> owner;
 
         ValuesView(ConcurrentHashMap<K, V> owner) {
             this.owner = owner;
+        }
+
+        // Removes the tested pair only, never a mapping that replaced it
+        // after the test; Iterator.remove() would remove the key outright.
+        @Override
+        public boolean removeIf(Predicate<? super V> filter) {
+            if (filter == null) {
+                throw new NullPointerException();
+            }
+            boolean removed = false;
+            for (Map.Entry<K, V> e : owner.snapshotEntries()) {
+                if (filter.test(e.getValue()) && owner.remove(e.getKey(), e.getValue())) {
+                    removed = true;
+                }
+            }
+            return removed;
         }
 
         @Override
@@ -554,6 +580,21 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
 
         EntrySetView(ConcurrentHashMap<K, V> owner) {
             this.owner = owner;
+        }
+
+        // As ValuesView.removeIf: only the tested pair goes.
+        @Override
+        public boolean removeIf(Predicate<? super Map.Entry<K, V>> filter) {
+            if (filter == null) {
+                throw new NullPointerException();
+            }
+            boolean removed = false;
+            for (Map.Entry<K, V> e : owner.snapshotEntries()) {
+                if (filter.test(e) && owner.remove(e.getKey(), e.getValue())) {
+                    removed = true;
+                }
+            }
+            return removed;
         }
 
         @Override

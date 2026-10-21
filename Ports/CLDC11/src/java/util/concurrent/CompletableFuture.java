@@ -254,6 +254,21 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         if (outcome != null) {
             return outcome;
         }
+        // Waiting from inside a continuation: the actions nested completions
+        // queued on this thread run only once that continuation returns, so
+        // one this future depends on would never run while it blocks. Run
+        // them here until this future is done.
+        LinkedList<Runnable> queue = DRAINING.get();
+        if (queue != null) {
+            Runnable next;
+            while (result.get() == null && (next = queue.poll()) != null) {
+                next.run();
+            }
+            outcome = result.get();
+            if (outcome != null) {
+                return outcome;
+            }
+        }
         if (millis == 0) {
             throw new TimeoutException();
         }
