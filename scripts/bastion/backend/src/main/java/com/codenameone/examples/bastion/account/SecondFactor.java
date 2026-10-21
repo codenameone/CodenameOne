@@ -1,0 +1,89 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bastion.account;
+
+import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.annotations.Component;
+import com.codename1.backend.security.mfa.RecoveryCodeService;
+import com.codename1.backend.security.mfa.TotpEnrollment;
+import com.codename1.backend.security.mfa.TotpService;
+import com.codenameone.examples.bastion.api.RecoveryCodesDto;
+import com.codenameone.examples.bastion.api.TotpEnrollmentDto;
+import com.codenameone.examples.bastion.audit.Audit;
+
+import java.io.IOException;
+
+/// Adding an authenticator app to an account, and the recovery codes that
+/// stand in for it.
+///
+/// Once an account has a confirmed app, `http.mfa(...)` in
+/// [com.codenameone.examples.bastion.SecurityConfig] holds every password
+/// sign-in back until a code from it is posted to `/login/mfa`. The codes are
+/// checked, used up and counted by [TotpService]; nothing here sees one at
+/// sign-in.
+@Component
+public class SecondFactor {
+    private final TotpService totp;
+    private final RecoveryCodeService recoveryCodes;
+    private final Audit audit;
+
+    public SecondFactor(TotpService totp, RecoveryCodeService recoveryCodes, Audit audit) {
+        this.totp = totp;
+        this.recoveryCodes = recoveryCodes;
+        this.audit = audit;
+    }
+
+    /// Makes a secret for the caller's app. Refused when they already have
+    /// one: starting over replaces the secret and turns the second factor off
+    /// until it is confirmed again, which would let somebody holding only an
+    /// access token strip the account of its second factor.
+    public TotpEnrollmentDto start(String username) throws IOException {
+        if (totp.isEnabled(username)) {
+            throw new ResponseStatusException(409,
+                    "This account already has an authenticator app");
+        }
+        TotpEnrollment enrollment = totp.beginEnrollment(username);
+        audit.append(username, "TOTP_STARTED", username, "");
+        return new TotpEnrollmentDto(enrollment.getSecret(), enrollment.getOtpauthUri());
+    }
+
+    /// Confirms the app with a code it shows, and makes the recovery codes.
+    public RecoveryCodesDto confirm(String username, String code) throws IOException {
+        if (code == null || !totp.confirmEnrollment(username, code)) {
+            audit.append(username, "TOTP_CONFIRM_FAILED", username, "");
+            throw new ResponseStatusException(400, "That code is not the one your app shows");
+        }
+        audit.append(username, "TOTP_ENROLLED", username, "");
+        return new RecoveryCodesDto(recoveryCodes.generate(username));
+    }
+
+    /// New recovery codes in place of the old, for a caller who proves they
+    /// still have the app.
+    public RecoveryCodesDto renew(String username, String code) throws IOException {
+        if (!totp.isEnabled(username)) {
+            throw new ResponseStatusException(409, "Add an authenticator app first");
+        }
+        if (code == null || !totp.verify(username, code)) {
+            audit.append(username, "RECOVERY_CODES_REFUSED", username, "");
+            throw new ResponseStatusException(403, "That code is not the one your app shows");
+        }
+        audit.append(username, "RECOVERY_CODES_RENEWED", username, "");
+        return new RecoveryCodesDto(recoveryCodes.generate(username));
+    }
+}
