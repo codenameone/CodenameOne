@@ -97,7 +97,33 @@ jobs:
         with:
           ref: master
 
-      - name: Fold merged overlays into base/
+      # The gate passes a pull request that beats its baseline (failing it turned every
+      # VM win into a red master until someone rebaselined). What keeps such a win from
+      # being given back unnoticed is this: master's recent gate results, and a row every
+      # one of them beat clearly is lowered to the worst of them
+      # (vm/selfhost/tighten-perf-baseline.py has the rule).
+      - name: Collect master's recent performance gate results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/perf-results"
+          mkdir -p "${dest}"
+          since="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          for wf in linux-build-run.yml parparvm-tests-windows.yml scripts-macos.yml; do
+            for run in $(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${wf}" \
+                --branch master --limit 30 --json databaseId,createdAt \
+                --jq ".[] | select(.createdAt >= \"${since}\") | .databaseId"); do
+              for name in $(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}/artifacts" \
+                  --jq '.artifacts[] | select(.name | startswith("perf-results-")) | select(.expired | not) | .name'); do
+                gh run download "${run}" --repo "${GITHUB_REPOSITORY}" -n "${name}" \
+                  -D "${dest}/${run}-${name}" || echo "could not download ${name} of run ${run}"
+              done
+            done
+          done
+          find "${dest}" -name perf-results.json | wc -l | xargs echo "perf-results.json files:"
+
+      - name: Fold merged overlays into base/ and tighten consistently beaten rows
         id: fold
         run: |
           set -euo pipefail
@@ -112,13 +138,23 @@ jobs:
             python3 vm/selfhost/perf_baseline.py fold
             python3 scripts/flutter-bench/flutter_baseline.py fold
             git add -A vm/selfhost/perf-baseline scripts/flutter-bench/baseline
+            folded=true
+            git diff --staged --quiet && folded=false
+            python3 vm/selfhost/tighten-perf-baseline.py "${RUNNER_TEMP}/perf-results" | tee "${RUNNER_TEMP}/tightened.txt"
+            git add -A vm/selfhost/perf-baseline
             if git diff --staged --quiet; then
-              echo "No overlays to fold."
+              echo "No overlays to fold and no row to tighten."
               echo "folded=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             git diff --staged --stat
-            git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/"
+            if grep -q '^tightened ' "${RUNNER_TEMP}/tightened.txt"; then
+              subject="ci: tighten performance baselines master beat consistently"
+              [ "${folded}" = true ] && subject="ci: fold merged performance baselines and tighten consistently beaten rows"
+              git commit --quiet -m "${subject}" -m "$(grep '^tightened ' "${RUNNER_TEMP}/tightened.txt")"
+            else
+              git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/"
+            fi
             if git push origin HEAD:master; then
               echo "folded=true" >> "$GITHUB_OUTPUT"
               exit 0

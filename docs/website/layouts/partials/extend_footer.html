@@ -1,3 +1,40 @@
-{{- /* Intentionally left empty. The {{< mermaid >}} shortcode emits its own
-       loader inline so the diagram works regardless of partialCached behaviour
-       on the surrounding footer. */ -}}
+{{- /* The {{< mermaid >}} shortcode emits its own loader inline so the diagram
+       works regardless of partialCached behaviour on the surrounding footer. */ -}}
+{{- /* Campaign hand-off to BuildCloud. A post links here with utm_* parameters,
+       but the sign-up/console/IDE links on these pages went to
+       cloud.codenameone.com without them, so every such arrival reached
+       BuildCloud unattributed. The first tagged landing in this tab is kept (24h,
+       the same first-touch window BuildCloud applies) and added to every
+       cloud.codenameone.com link; a link that already carries a utm_* value
+       keeps its own. Nothing is sent anywhere by this script. */ -}}
+<script>
+(function () {
+  try {
+    var KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+    var STORE = 'cn1.firstTouchUtm', DAY = 24 * 60 * 60 * 1000;
+    var kept = null;
+    try { kept = JSON.parse(sessionStorage.getItem(STORE) || 'null'); } catch (e) {}
+    if (!kept || !(Date.now() - kept.at < DAY)) {
+      var query = new URLSearchParams(location.search), found = {}, any = false;
+      KEYS.forEach(function (k) { var v = query.get(k); if (v) { found[k] = v.slice(0, 128); any = true; } });
+      kept = any ? { at: Date.now(), utm: found } : null;
+      try { if (kept) sessionStorage.setItem(STORE, JSON.stringify(kept)); } catch (e) {}
+    }
+    if (!kept) return;
+    var tag = function (a) {
+      var url;
+      try { url = new URL(a.href); } catch (e) { return; }
+      if (url.host !== 'cloud.codenameone.com') return;
+      if (KEYS.some(function (k) { return url.searchParams.has(k); })) return;
+      KEYS.forEach(function (k) { if (kept.utm[k]) url.searchParams.set(k, kept.utm[k]); });
+      a.href = url.toString();
+    };
+    document.querySelectorAll('a[href*="cloud.codenameone.com"]').forEach(tag);
+    // Links added after load (menus, the Initializr panel) are tagged as they are used.
+    document.addEventListener('click', function (event) {
+      var a = event.target && event.target.closest && event.target.closest('a[href*="cloud.codenameone.com"]');
+      if (a) tag(a);
+    }, true);
+  } catch (e) {}
+})();
+</script>
