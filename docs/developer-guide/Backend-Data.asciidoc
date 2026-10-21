@@ -265,7 +265,7 @@ keep their collation, so convert each of them too. Give the script a new, higher
 version than any applied one. A database that has already applied later
 versions refuses a script that sorts before them. The same version then needs a
 script in the `sqlite` and `postgresql` directories too. Their text is already
-case sensitive and NO PAD, so a `SELECT 1;` is all those scripts have to hold.
+case-sensitive and NO PAD, so a `SELECT 1;` is all those scripts have to hold.
 
 ==== What happens at start-up
 

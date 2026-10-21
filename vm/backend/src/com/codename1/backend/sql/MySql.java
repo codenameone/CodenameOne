@@ -401,7 +401,14 @@ public final class MySql {
         if (head == OK_PACKET) {
             Reader reader = new Reader(packet.body);
             reader.skip(1);
-            return reader.lengthEncoded();
+            long affected = reader.lengthEncoded();
+            long generated = reader.lengthEncoded();
+            // Kept as runPrepared keeps it: an SQL-level EXECUTE of an INSERT
+            // arrives here, and lastInsertId() is the most recent insert's.
+            if (generated != 0) {
+                lastInsertId = generated;
+            }
+            return affected;
         }
         if (head == EOF_PACKET) {
             return 0;

@@ -54,17 +54,29 @@ reset_schema() {
       # as the backend's Database.Url does -- bracketed IPv6 hosts, percent
       # escapes decoded, 3306 when the port is absent -- so the reset empties
       # the database the server then connects to.
-      local parts user password host port db
+      # The TLS options go across too (sslmode, sslrootcert), so the reset is
+      # no less strict about the endpoint than the server is. The database
+      # name is quoted with any backtick in it doubled, as MySQL requires.
+      local parts user password host port db ssl_mode ssl_ca
       parts="$(python3 -c '
 import sys, urllib.parse as u
 p = u.urlsplit(sys.argv[1])
+q = dict(u.parse_qsl(p.query))
+mode = {"disable": "DISABLED", "require": "REQUIRED", "verify-ca": "VERIFY_CA",
+        "verify-full": "VERIFY_IDENTITY"}.get(q.get("sslmode", ""), "")
 print("\n".join([u.unquote(p.username or ""), u.unquote(p.password or ""),
                   p.hostname or "localhost", str(p.port or 3306),
-                  u.unquote(p.path.lstrip("/"))]))' "$URL")"
+                  u.unquote(p.path.lstrip("/")).replace("`", "``"),
+                  mode, q.get("sslrootcert", "")]))' "$URL")"
       { IFS= read -r user; IFS= read -r password; IFS= read -r host
-        IFS= read -r port; IFS= read -r db; } <<< "$parts"
+        IFS= read -r port; IFS= read -r db; IFS= read -r ssl_mode
+        IFS= read -r ssl_ca; } <<< "$parts" || true  # $(...) drops empty trailing lines
+      local tls=()
+      [ -n "$ssl_mode" ] && tls+=("--ssl-mode=$ssl_mode")
+      [ -n "$ssl_ca" ] && tls+=("--ssl-ca=$ssl_ca")
       MYSQL_PWD="$password" mysql --protocol=TCP -u "$user" -h "$host" \
-          -P "$port" -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`"
+          -P "$port" ${tls[@]+"${tls[@]}"} \
+          -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`"
       ;;
     *)
       log "unsupported database URL: $URL"
