@@ -5513,6 +5513,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // multi-image folder, so the canvas must not accept what the build would reject. It
             // looks in the res folder beside the stylesheet, then the one a level up (a Maven
             // project's src/main/res, an Ant project's own res).
+            // The theme.res the build writes is deliberately not consulted. The CSS CLI loads it
+            // only for an incremental rebuild (its selector cache present and no asset newer);
+            // a clean build -- CI, `mvn clean`, a fresh checkout -- starts without it, so an
+            // image found only there is one the next clean build rejects. Matching that build
+            // means rejecting it here too; the image belongs in a res/<Theme>/ folder.
             com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
             int slash = cssDir.lastIndexOf('/');
             String[] roots = slash < 0 ? new String[]{cssDir + "/res"}

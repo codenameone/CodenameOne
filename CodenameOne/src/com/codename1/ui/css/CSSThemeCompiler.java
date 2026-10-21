@@ -414,7 +414,10 @@ public class CSSThemeCompiler {
             deferred.put(key, DEFERRED_PLAIN);
             literalTokens.remove(key);
             boolean alias = raw.equals(value) && value.indexOf("var(--") > -1;
-            if (name.endsWith("Image") && (!raw.equals(value) || (!isColorLiteral(value) && !isCssNumber(value)))) {
+            // Of a chain such as `#f00 extra` the build-time compiler types the leading unit, so
+            // that is what decides whether an `...Image` name is looked up as an image.
+            String typed = !legacy && raw.equals(value) && !alias ? leadingToken(value) : value;
+            if (name.endsWith("Image") && (!raw.equals(value) || (!isColorLiteral(typed) && !isCssNumber(typed)))) {
                 // The build-time compiler looks an image up only for a string or identifier
                 // token; a color or number named `...Image` is stored as a color or number. An alias is
                 // resolved where it is declared, as below, so a later redefinition of its
@@ -432,8 +435,9 @@ public class CSSThemeCompiler {
                 boolean fromText = false;
                 if (alias && declaration.snapshot != null) {
                     value = declaration.snapshot;
-                    // An alias of a quoted constant names the image by text, as written.
-                    fromText = aliasesQuotedText(raw);
+                    // An alias of a quoted constant names the image by text, as written, and so
+                    // does a quoted fallback: `var(--missing, "my icon")` is `my icon`.
+                    fromText = aliasesQuotedText(raw) || quotedFallbackApplies(raw);
                 }
                 if (alias && declaration.snapshot != null && !fromText
                         && (isColorLiteral(value) || isCssNumber(value))) {
@@ -746,7 +750,16 @@ public class CSSThemeCompiler {
     }
 
     private static boolean isConstantsSelector(String selector) {
-        return "@constants".equalsIgnoreCase(selector) || "#Constants".equalsIgnoreCase(selector);
+        if ("@constants".equalsIgnoreCase(selector)) {
+            return true;
+        }
+        if (!selector.startsWith("#")) {
+            return false;
+        }
+        // The build-time parser decodes the ID before its special-selector check, so
+        // `#\\43 onstants` is `#Constants` too.
+        String decoded = decodeIdentifier(selector.substring(1));
+        return "Constants".equalsIgnoreCase(decoded != null ? decoded : selector.substring(1));
     }
 
     /// Strips one pair of matching quotes, decoding backslash escapes inside them. Anything
@@ -844,10 +857,8 @@ public class CSSThemeCompiler {
             if (universal) {
                 // The build-time compiler ignores universal rules entirely (CSSTheme.apply()
                 // returns before any element), so `*` sets no style property and no derive
-                // there; its custom properties, handled above, still count.
-                if ("font-size".equals(property)) {
-                    parseFontSize(value);
-                }
+                // there; its custom properties, handled above, still count. Nothing is validated
+                // either: `* { font-size: smaller; }` builds.
                 continue;
             }
             if ("cn1-derive".equals(property) && !"press#".equals(statePrefix)) {

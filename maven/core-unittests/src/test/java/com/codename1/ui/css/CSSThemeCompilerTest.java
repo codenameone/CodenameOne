@@ -1344,6 +1344,38 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testQuotedFallbackNamesTheWholeImage() {
+        MutableResource res = new MutableResource();
+        res.setImage("my icon", Image.createImage(5, 5));
+        new CSSThemeCompiler().compile("#Constants { navImage: var(--missing, \"my icon\"); }", res, "Theme");
+        assertEquals(5, ((Image) res.getTheme("Theme").get("@navImage")).getWidth());
+    }
+
+    @Test
+    void testImageNamedChainIsTypedByItsLeadingToken() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { placeholderImage: #f00 extra; countImage: 2 extra; }",
+                res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals(0xff0000, Integer.parseInt((String) theme.get("@placeholderImage"), 16));
+        assertEquals("2", String.valueOf(theme.get("@countImage")));
+    }
+
+    @Test
+    void testUniversalFontSizeIsNotValidated() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("* { font-size: smaller; } Label { color: red; }", res, "Theme");
+        assertEquals("ff0000", res.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
+    void testEscapedConstantsSelector() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#\\43 onstants { accent: blue; }", res, "Theme");
+        assertEquals("blue", res.getTheme("Theme").get("@accent"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
