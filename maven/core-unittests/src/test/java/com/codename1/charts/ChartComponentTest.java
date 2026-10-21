@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.charts;
 
 import com.codename1.charts.compat.Canvas;
@@ -54,6 +76,47 @@ class ChartComponentTest extends UITestBase {
         Point screenPoint = component.chartToScreenCoord(12, 16);
         assertEquals(20f, screenPoint.getX());
         assertEquals(30f, screenPoint.getY());
+    }
+
+    /// Painting a chart leaves the graphics with the transform it was handed,
+    /// whatever the chart did to it on the way. A chart rotates the canvas for
+    /// a label and rotates it back, which in float arithmetic is not an exact
+    /// undo, and the component used to put the transform back only when it had
+    /// one of its own: everything painted after a chart then ran under the
+    /// residue. Here the chart leaves a whole rotation behind, which the
+    /// component must undo just the same.
+    @Test
+    void paintRestoresTheTransformItWasHanded() {
+        TurningChart chart = new TurningChart();
+        ChartComponent component = new ChartComponent(chart);
+        component.setWidth(80);
+        component.setHeight(60);
+        com.codename1.ui.Graphics g = com.codename1.ui.Image.createImage(100, 100).getGraphics();
+        assertTrue(g.isTransformSupported());
+
+        assertTrue(g.getTransform().isIdentity());
+        component.paint(g);
+        assertTrue(chart.drawn, "the chart was painted");
+        assertFalse(chart.identityWhileDrawing, "the chart turned the canvas");
+        assertTrue(g.getTransform().isIdentity(), "painting a chart left a transform behind");
+
+        // And a transform that was already there comes back as it was.
+        Transform before = Transform.makeTranslation(7, 9);
+        g.setTransform(before);
+        chart.drawn = false;
+        component.paint(g);
+        assertTrue(chart.drawn);
+        float[] at = g.getTransform().transformPoint(new float[] {1, 2, 0});
+        assertEquals(8f, at[0], 0f);
+        assertEquals(11f, at[1], 0f);
+
+        // The component's own transform is applied for the chart alone.
+        g.setTransform(Transform.makeIdentity());
+        component.setTransform(Transform.makeScale(2, 2));
+        chart.drawn = false;
+        component.paint(g);
+        assertTrue(chart.drawn);
+        assertTrue(g.getTransform().isIdentity(), "the component's own transform outlived its paint");
     }
 
     @Test
@@ -258,6 +321,35 @@ class ChartComponentTest extends UITestBase {
         public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
             lastPoint = screenPoint;
             return selectionToReturn;
+        }
+
+        @Override
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 0;
+        }
+
+        @Override
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
+        }
+    }
+
+    /// A chart that turns the canvas and does not turn it back.
+    private static class TurningChart extends AbstractChart {
+        boolean drawn;
+        boolean identityWhileDrawing;
+
+        @Override
+        public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+            canvas.rotate(30, x + 5, y + 5);
+            Transform now = Transform.makeIdentity();
+            canvas.getTransform(now);
+            identityWhileDrawing = now.isIdentity();
+            drawn = true;
+        }
+
+        @Override
+        public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
+            return null;
         }
 
         @Override

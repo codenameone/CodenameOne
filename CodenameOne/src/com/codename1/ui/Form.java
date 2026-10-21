@@ -220,6 +220,7 @@ public class Form extends Container implements TopLevelContainer {
     private boolean cyclicFocus = true;
     private int tactileTouchDuration;
     private EventDispatcher orientationListener;
+    private EventDispatcher pointerCancelledListener;
     private EventDispatcher sizeChangedListener;
     private EventDispatcher pasteListener;
     private UIManager uiManager;
@@ -1034,6 +1035,33 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         orientationListener.removeListener(l);
+    }
+
+    /// Listens for the platform abandoning a gesture in progress (see
+    /// `Display#pointerCancelled(int, int)`). No pointer-released listener hears
+    /// such a gesture end, so whatever a press left held -- a game's pointer, an
+    /// on-screen control -- is let go of here. The event carries the last point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addPointerCancelledListener(ActionListener l) {
+        if (pointerCancelledListener == null) {
+            pointerCancelledListener = new EventDispatcher();
+        }
+        pointerCancelledListener.addListener(l);
+    }
+
+    /// Stops listening for cancelled gestures.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removePointerCancelledListener(ActionListener l) {
+        if (pointerCancelledListener == null) {
+            return;
+        }
+        pointerCancelledListener.removeListener(l);
     }
 
     /// This listener is invoked when device size is changed
@@ -5005,6 +5033,9 @@ public class Form extends Container implements TopLevelContainer {
                 indicator.removeAll();
                 indicator.revalidate();
             }
+        }
+        if (pointerCancelledListener != null && pointerCancelledListener.hasListeners()) {
+            pointerCancelledListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Other, x, y));
         }
         repaint();
     }

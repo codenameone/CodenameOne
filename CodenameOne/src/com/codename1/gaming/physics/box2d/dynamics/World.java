@@ -211,6 +211,14 @@ public class World {
     final ShapeType type2 = fixtureB.getType();
 
     final ContactRegister reg = contactStacks[type1.ordinal()][type2.ordinal()];
+    // Codename One: two shapes with no collision routine between them -- a chain
+    // against a chain, an edge against an edge or a chain -- have no register at
+    // all, and Box2D's answer for such a pair is no contact. Reading the creator
+    // of a null register threw here the moment a dynamic body made of chains
+    // came near another chain.
+    if (reg == null) {
+      return null;
+    }
     final IDynamicStack<Contact> creator = reg.creator;
     if (creator != null) {
       if (reg.primary) {

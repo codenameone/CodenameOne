@@ -15,6 +15,16 @@ name: Health (Health Connect) integration
 'on':
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/health-android.yml'
       - 'CodenameOne/src/com/codename1/health/**'
       - 'CodenameOne/src/com/codename1/impl/health/**'
@@ -30,6 +40,16 @@ name: Health (Health Connect) integration
     branches:
       - master
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/health-android.yml'
       - 'CodenameOne/src/com/codename1/health/**'
       - 'CodenameOne/src/com/codename1/impl/health/**'
@@ -49,7 +69,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   health-android:
+    needs: unity-gallery
     name: Health Connect Android
     permissions:
       contents: read
@@ -88,6 +115,11 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Make the smoke app a health app
         run: |
           set -euo pipefail

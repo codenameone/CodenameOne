@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.HashMap;
 import java.util.List;
@@ -47,8 +48,10 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class NavigationTest extends UITestBase {
 
-    /** The dispatcher is static: one left installed answers a Form for any path in every
-     * later test class of the JVM. */
+    /** The dispatcher is process-global too: one left installed answered the
+     * routes of whichever test ran next, which made
+     * LocalContinuityTest's "unknown route" known whenever this class ran
+     * before it. */
     @AfterEach
     void uninstallDispatcher() {
         Navigation.setDispatcher(null);
