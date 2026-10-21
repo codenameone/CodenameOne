@@ -75,8 +75,32 @@ public class HttpClientResponse extends Stream<Object> {
         return headers;
     }
 
+    /// Set when the body was gunzipped here: the advertised length is the compressed one.
+    boolean uncompressed;
+
+    /// The length the server declared up front (Content-Length), -1 when it declared none
+    /// or the body was decompressed -- not the bytes buffered: a HEAD response has none.
     public long contentLength() {
-        return body.length;
+        if (uncompressed) {
+            return -1;
+        }
+        String v = headers.value(HttpHeaders.contentLengthHeader);
+        if (v == null) {
+            return -1;
+        }
+        v = v.trim();
+        if (v.length() == 0 || v.length() > 18) {
+            return -1;
+        }
+        long n = 0;
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c < '0' || c > '9') {
+                return -1;
+            }
+            n = n * 10 + (c - '0');
+        }
+        return n;
     }
 
     public boolean isRedirect() {

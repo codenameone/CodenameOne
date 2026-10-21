@@ -42,7 +42,34 @@ public abstract class FileSystemEntity {
     }
 
     public dart.core.DartUri uri() {
-        return dart.core.DartUri.parse(path.startsWith("/") ? "file://" + path : path);
+        // Escaped first: a literal '#', '?' or '%' in a file name is part of the name, and
+        // parsing it raw would turn it into a fragment, a query or an escape (a/b#c, a%20b).
+        if (path.startsWith("file://")) {
+            return dart.core.DartUri.parse("file://" + escapePath(path.substring(7)));
+        }
+        return dart.core.DartUri.parse(path.startsWith("/") ? "file://" + escapePath(path) : escapePath(path));
+    }
+
+    /// Percent-encodes everything but RFC 3986 unreserved characters and '/', as UTF-8.
+    static String escapePath(String p) {
+        StringBuilder sb = new StringBuilder(p.length());
+        byte[] bytes;
+        try {
+            bytes = p.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e.toString());
+        }
+        String hex = "0123456789ABCDEF";
+        for (byte b : bytes) {
+            int c = b & 0xff;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || c == '-' || c == '.' || c == '_' || c == '~' || c == '/') {
+                sb.append((char) c);
+            } else {
+                sb.append('%').append(hex.charAt(c >> 4)).append(hex.charAt(c & 15));
+            }
+        }
+        return sb.toString();
     }
 
     public boolean existsSync() {

@@ -67,6 +67,10 @@ public class GoRouter implements RouterConfigSource {
     /** Set by redirectOf when a redirect answered a Future not yet complete. */
     private boolean sawPendingRedirect;
     private GoRouterState state;
+    /// Where the base (runApp) route landed after its redirects; null until it is built.
+    private String baseLocation;
+    /// The location routeFor's last call landed on after redirects.
+    private String resolvedLocation;
     private BuildContext appContext;
 
     public GoRouter() {
@@ -146,6 +150,7 @@ public class GoRouter implements RouterConfigSource {
                 sawPendingRedirect = false;
                 Route r = routeFor(settings.name(), extra);
                 if (!sawPendingRedirect) {
+                    baseLocation = resolvedLocation;
                     return r;
                 }
                 // The initial route had an asynchronous redirect still running (an auth
@@ -156,6 +161,7 @@ public class GoRouter implements RouterConfigSource {
                 whenRedirected(settings.name(), extra, new Funcs.VoidFunc1<String>() {
                     @Override
                     public void call(String to) {
+                        baseLocation = to;
                         landed.complete(to);
                     }
                 });
@@ -198,13 +204,17 @@ public class GoRouter implements RouterConfigSource {
         while (Navigator.stackSize() > 0) {
             Navigator.pop(null);
         }
-        if (samePath(location, initialLocation)) {
-            return;
-        }
+        // Redirects run first, even for the initial location: '/' that sent a signed-out
+        // user to /login must reach the home page after sign-in, not re-expose the login
+        // page the base route still shows. Only a location that lands where the base
+        // page already is reuses it (with state updated to this navigation).
         whenRedirected(location, extra, new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String loc) {
                 Route r = routeFor(loc, extra);
+                if (samePath(resolvedLocation, baseLocation != null ? baseLocation : initialLocation)) {
+                    return;
+                }
                 if (r != null) {
                     Navigator.push(appContext, r);
                 }
@@ -406,6 +416,7 @@ public class GoRouter implements RouterConfigSource {
         if (failure != null) {
             m = null;
         }
+        resolvedLocation = loc;
         final Match match = m;
         final GoRouterState s = stateOf(loc, match, extra, failure != null ? failure
                 : match == null ? new dart.core.DartException("no routes for location: " + loc) : null);

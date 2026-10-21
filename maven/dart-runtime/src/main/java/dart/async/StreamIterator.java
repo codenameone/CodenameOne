@@ -104,6 +104,17 @@ public final class StreamIterator<T> {
         return c.future();
     }
 
+    /// Subscribes now rather than at the first moveNext; events wait in the queue.
+    void start() {
+        boolean go;
+        synchronized (this) {
+            go = sub == null && !finished;
+        }
+        if (go) {
+            subscribe();
+        }
+    }
+
     /** The blocking step {@code await for} is lowered to. */
     public boolean next() {
         Boolean more = Await.await$(moveNext());

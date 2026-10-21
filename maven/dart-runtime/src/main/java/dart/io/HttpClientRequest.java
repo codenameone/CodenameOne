@@ -280,8 +280,26 @@ public class HttpClientRequest {
                     result.completeError(new SocketException(String.valueOf(failure.getMessage())));
                     return;
                 }
-                result.complete(new HttpClientResponse(getResponseCode(), getResponseErrorMessage(),
-                        responseHeaders, received.toByteArray()));
+                byte[] body = received.toByteArray();
+                boolean inflated = false;
+                // We asked for gzip (autoUncompress), so we undo it. Checked by magic as well
+                // as header: iOS decompresses natively but keeps Content-Encoding, while
+                // JavaSE and Android hand over the compressed bytes.
+                if (client.autoUncompress() && body.length > 2 && (body[0] & 0xff) == 0x1f
+                        && (body[1] & 0xff) == 0x8b
+                        && "gzip".equalsIgnoreCase(String.valueOf(responseHeaders.value(HttpHeaders.contentEncodingHeader)).trim())) {
+                    try {
+                        body = gunzip(body);
+                        inflated = true;
+                    } catch (java.io.IOException e) {
+                        result.completeError(new HttpException("Failed to decompress the response: " + e.getMessage()));
+                        return;
+                    }
+                }
+                HttpClientResponse res = new HttpClientResponse(getResponseCode(), getResponseErrorMessage(),
+                        responseHeaders, body);
+                res.uncompressed = inflated;
+                result.complete(res);
             }
         };
         req.setUrl(uri.toString());
@@ -312,5 +330,21 @@ public class HttpClientRequest {
         sent = req;
         NetworkManager.getInstance().addToQueue(req);
         return done.future();
+    }
+
+    static byte[] gunzip(byte[] gz) throws java.io.IOException {
+        com.codename1.io.gzip.GZIPInputStream in =
+                new com.codename1.io.gzip.GZIPInputStream(new java.io.ByteArrayInputStream(gz));
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(gz.length * 4);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } finally {
+            in.close();
+        }
     }
 }

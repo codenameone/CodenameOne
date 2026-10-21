@@ -506,9 +506,14 @@ public final class Dyn {
             case "trim":
                 return DString.trim(s);
             case "contains":
-                return Boolean.valueOf(s.contains(String.valueOf(arg(a, 0))));
+                // The optional offset goes to DString's range-checked overloads, as a typed call would.
+                return Boolean.valueOf(a.length > 1 && a[1] != null
+                        ? DString.contains(s, String.valueOf(a[0]), num(a[1]).longValue())
+                        : s.contains(String.valueOf(arg(a, 0))));
             case "startsWith":
-                return Boolean.valueOf(s.startsWith(String.valueOf(arg(a, 0))));
+                return Boolean.valueOf(a.length > 1 && a[1] != null
+                        ? DString.startsWith(s, String.valueOf(a[0]), num(a[1]).longValue())
+                        : s.startsWith(String.valueOf(arg(a, 0))));
             case "endsWith":
                 return Boolean.valueOf(s.endsWith(String.valueOf(arg(a, 0))));
             case "split":
@@ -519,7 +524,9 @@ public final class Dyn {
             case "replaceAll":
                 return DString.replaceAll(s, String.valueOf(arg(a, 0)), String.valueOf(arg(a, 1)));
             case "indexOf":
-                return Long.valueOf(DString.indexOf(s, String.valueOf(arg(a, 0))));
+                return Long.valueOf(a.length > 1 && a[1] != null
+                        ? DString.indexOf(s, String.valueOf(a[0]), num(a[1]).longValue())
+                        : DString.indexOf(s, String.valueOf(arg(a, 0))));
             case "codeUnitAt":
                 return Long.valueOf(DString.codeUnitAt(s, num(arg(a, 0)).longValue()));
             case "padLeft":

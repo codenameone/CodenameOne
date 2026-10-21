@@ -235,11 +235,22 @@ public class Navigator extends StatelessWidget {
      * does and completes the popped route's future with {@code result}.
      */
     public static void pop(BuildContext context, Object result) {
-        if (Dialogs.popTopDialog(result)) {
-            return;
+        // An explicit pop skips canPop, but its PopScopes still hear that it happened
+        // (onPopInvokedWithResult(true, result)). Collected first: the pop unmounts them.
+        List<Widget> scopes;
+        if (Dialogs.openDialogCount() > 0) {
+            scopes = PopGuards.collect(Dialogs.topDialogRoot());
+            if (Dialogs.popTopDialog(result)) {
+                PopGuards.notifyPopScopes(scopes, true, result);
+                return;
+            }
         }
+        scopes = stack.isEmpty() ? null : PopGuards.collect(stack.get(stack.size() - 1).rootElement);
         RouteEntry e = popPage();
         if (e != null) {
+            if (scopes != null) {
+                PopGuards.notifyPopScopes(scopes, true, result);
+            }
             e.popped.complete(result);
         }
     }
@@ -971,9 +982,11 @@ public class Navigator extends StatelessWidget {
                 if (pop) {
                     pop(context, result);
                 }
-                // one onPopInvoked per request: didPop false for any refusal, a
-                // WillPopScope's included, as Flutter reports it
-                PopGuards.notifyPopScopes(scopes, pop, result);
+                // one onPopInvoked per request: a pop reports itself (didPop true) from
+                // pop(); a refusal, a WillPopScope's included, reports didPop false here
+                if (!pop) {
+                    PopGuards.notifyPopScopes(scopes, false, result);
+                }
                 // true either way: a route that declines to pop has handled the request
                 // (Flutter's doNotPop); false is reserved for "nothing here, bubble up".
                 done.complete(Boolean.TRUE);

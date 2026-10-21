@@ -123,10 +123,20 @@ public final class AsyncStar {
     }
 
     public static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body) {
+        return asyncStar(body, null);
+    }
+
+    /// {@code onListen} runs synchronously inside listen(), before the body's timer: a
+    /// derived stream subscribes to its source there, so an event the source emits right
+    /// after the downstream listen() is buffered rather than lost to a broadcast stream.
+    static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body, final Funcs.VoidFunc0 onListen) {
         final Sink<T> sink = new Sink<T>();
         sink.controller.onListen(new Funcs.VoidFunc0() {
             @Override
             public void call() {
+                if (onListen != null) {
+                    onListen.call();
+                }
                 // Started from a timer, never inside listen() itself, as Dart does.
                 new Timer(dart.core.Duration.zero, new Funcs.VoidFunc0() {
                     @Override
