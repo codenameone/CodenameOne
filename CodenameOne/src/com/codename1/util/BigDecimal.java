@@ -120,8 +120,8 @@ public class BigDecimal {
 
     public BigInteger floor() {
         BigInteger out = new BigInteger(peer.toBigInteger());
-        if (peer.signum() < 0) {
-            return out.subtract(new BigInteger("1", 0));
+        if (peer.signum() < 0 && peer.compareTo(new TBigDecimal(out.peer, 0)) != 0) {
+            return out.subtract(BigInteger.ONE);
         }
         return out;
     }
@@ -134,9 +134,13 @@ public class BigDecimal {
         BigDecimal nextD = new BigDecimal(next, 0);
 
         BigDecimal diffThis = new BigDecimal(outD.peer.abs().subtract(peer.abs()).abs());
-        BigDecimal diffNext = new BigDecimal(outD.peer.abs().subtract(nextD.peer.abs()).abs());
+        // Distance from this value to the next integer away from zero. It used to
+        // measure out-to-next, which is always 1, so every value rounded away
+        // from zero; a wrong bitLength(int) in TBigDecimal hid that until the
+        // comparison below started reading the real magnitudes.
+        BigDecimal diffNext = new BigDecimal(nextD.peer.abs().subtract(peer.abs()).abs());
 
-        return diffThis.compareTo(diffNext) > 0 ? out : next;
+        return diffThis.compareTo(diffNext) < 0 ? out : next;
 
     }
 

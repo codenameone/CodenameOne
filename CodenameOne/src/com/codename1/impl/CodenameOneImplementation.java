@@ -13534,6 +13534,15 @@ public abstract class CodenameOneImplementation {
         throw cryptoUnsupported("generateRsaKeyPair");
     }
 
+    /// Generates a fresh elliptic-curve key pair. `curve` is "P-256"
+    /// (secp256r1), the only curve defined. Returns `{publicKeyX509,
+    /// privateKeyPkcs8}`. The iOS port can only load a PKCS#8 EC key whose
+    /// ECPrivateKey carries the optional `publicKey` field, so a port should
+    /// emit it.
+    public byte[][] generateEcKeyPair(String curve) {
+        throw cryptoUnsupported("generateEcKeyPair");
+    }
+
     /// Generates `bytes` of fresh symmetric key material. The default just
     /// delegates to [#secureRandomBytes(byte[])] (no structure is required
     /// for AES keys).

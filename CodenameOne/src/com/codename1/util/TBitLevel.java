@@ -104,14 +104,14 @@ final class TBitLevel {
         int i = val.getFirstNonzeroDigit();
         if (val.sign > 0) {
             for (; i < val.numberLength; i++) {
-                bCount += TBigDecimal.bitCount(val.digits[i]);
+                bCount += TBigDecimal.bitCount(val.digits[i] & 0xffffffffL);
             }
         } else {
             // (sign < 0)
             // this digit absorbs the carry
-            bCount += TBigDecimal.bitCount(-val.digits[i]);
+            bCount += TBigDecimal.bitCount(-val.digits[i] & 0xffffffffL);
             for (i++; i < val.numberLength; i++) {
-                bCount += TBigDecimal.bitCount(~val.digits[i]);
+                bCount += TBigDecimal.bitCount(~val.digits[i] & 0xffffffffL);
             }
             // We take the complement sum:
             bCount = (val.numberLength << 5) - bCount;
@@ -165,7 +165,7 @@ final class TBitLevel {
     static void inplaceShiftLeft(TBigInteger val, int count) {
         int intCount = count >> 5; // count of integers
         val.numberLength += intCount +
-                (TBigDecimal.numberOfLeadingZeros(val.digits[val.numberLength - 1]) - (count & 31) >= 0 ? 0 : 1);
+                (numberOfLeadingZeros(val.digits[val.numberLength - 1]) - (count & 31) >= 0 ? 0 : 1);
         shiftLeft(val.digits, val.digits, intCount, count & 31);
         val.cutOffLeadingZeroes();
         val.unCache();

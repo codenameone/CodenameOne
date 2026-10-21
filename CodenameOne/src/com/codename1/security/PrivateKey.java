@@ -32,8 +32,21 @@ import com.codename1.util.StringUtil;
 /// level entry point for callers that already hold the DER bytes.
 public final class PrivateKey extends Key {
 
+    private byte[] signingForm;
+
     PrivateKey(String algorithm, byte[] encoded, String format) {
         super(algorithm, encoded, format == null ? "PKCS#8" : format);
+    }
+
+    /// The encoding handed to the port for signing: an EC key gains its
+    /// public point when it lacks one (see [EcKeys]), anything else is
+    /// [#getEncoded] as is. Computed once and kept.
+    byte[] signingForm() {
+        if (signingForm == null) {
+            byte[] enc = rawEncoded();
+            signingForm = PublicKey.EC.equals(getAlgorithm()) ? EcKeys.withPublicPoint(enc) : enc;
+        }
+        return signingForm;
     }
 
     /// Wraps a PKCS#8 DER blob. This is the format produced by `openssl

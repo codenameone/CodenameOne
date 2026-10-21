@@ -152,4 +152,10 @@ int cn1_crypto_generate_rsa_keypair(int bits,
                                     uint8_t* outPub,  int pubCap,  int* pubLen,
                                     uint8_t* outPriv, int privCap, int* privLen);
 
+/// Generates an EC P-256 key pair: X.509 SubjectPublicKeyInfo (91 bytes) into
+/// `outPub` and PKCS#8 (138 bytes, ECPrivateKey with its public point) into
+/// `outPriv`. Returns 0 on success, negative on error.
+int cn1_crypto_generate_ec_keypair(uint8_t* outPub,  int pubCap,  int* pubLen,
+                                   uint8_t* outPriv, int privCap, int* privLen);
+
 #endif /* CN1Crypto_h */

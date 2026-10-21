@@ -2274,6 +2274,10 @@ public class IOSNative {
     /// private-key DER length. Returns 0 on success, negative on error.
     native int generateRsaKeyPair(int bits, byte[] outPub, byte[] outPriv, int[] lengths);
 
+    /// EC P-256 counterpart of [#generateRsaKeyPair]; same `lengths` and
+    /// return contract.
+    native int generateEcKeyPair(byte[] outPub, byte[] outPriv, int[] lengths);
+
 
     // --- Nearby devices (Nearby Interaction, MultipeerConnectivity, ----------
     //     AccessorySetupKit) ------------------------------------------------

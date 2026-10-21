@@ -19009,6 +19009,17 @@ JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_b
     return rc;
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_generateEcKeyPair___byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    int pubLen = 0, privLen = 0;
+    int rc = cn1_crypto_generate_ec_keypair(
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPub),  (int) CN1_PRIM_ARR_LEN(outPub),  &pubLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPriv), (int) CN1_PRIM_ARR_LEN(outPriv), &privLen);
+    JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+    lens[0] = pubLen;
+    lens[1] = privLen;
+    return rc;
+}
+
 #else /* CN1_INCLUDE_CRYPTO */
 
 /*
@@ -19060,6 +19071,16 @@ JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
     (void) instanceObject; (void) bits; (void) outPub; (void) outPriv;
+    if (lengths != JAVA_NULL) {
+        JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+        lens[0] = 0;
+        lens[1] = 0;
+    }
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateEcKeyPair___byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    (void) instanceObject; (void) outPub; (void) outPriv;
     if (lengths != JAVA_NULL) {
         JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
         lens[0] = 0;
@@ -23088,6 +23109,10 @@ JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
     return com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, bits, outPub, outPriv, lengths);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateEcKeyPair___byte_1ARRAY_byte_1ARRAY_int_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    return com_codename1_impl_ios_IOSNative_generateEcKeyPair___byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, outPub, outPriv, lengths);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {

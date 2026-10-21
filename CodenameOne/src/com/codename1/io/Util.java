@@ -1884,6 +1884,12 @@ public final class Util {
         return cryptoImpl().generateRsaKeyPair(bits);
     }
 
+    /// Generates an EC key pair on the named curve (only "P-256" is
+    /// defined). Returns `{publicKeyX509, privateKeyPkcs8}`.
+    public static byte[][] generateEcKeyPair(String curve) {
+        return cryptoImpl().generateEcKeyPair(curve);
+    }
+
     /// Generates `bytes` of fresh symmetric key material.
     public static byte[] generateSymmetricKey(int bytes) {
         return cryptoImpl().generateSymmetricKey(bytes);

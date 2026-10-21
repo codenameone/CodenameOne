@@ -493,7 +493,7 @@ public class MacOSNativeBuilderScanTest {
     public void theUtilCryptoDelegatesCount() {
         String[] crypto = {
             "secureRandomBytes", "aesEncrypt", "aesDecrypt", "rsaEncrypt", "rsaDecrypt",
-            "cryptoSign", "cryptoVerify", "generateRsaKeyPair", "generateSymmetricKey"
+            "cryptoSign", "cryptoVerify", "generateRsaKeyPair", "generateEcKeyPair", "generateSymmetricKey"
         };
         for (String m : crypto) {
             assertTrue("Util." + m + " reaches the crypto natives and must enable them",

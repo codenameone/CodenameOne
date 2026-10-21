@@ -107,4 +107,15 @@ class UtilBigNumberTest extends UITestBase {
         assertEquals(decimal.intValue(), decimal.floor().intValue());
         assertEquals(decimal.longValue(), decimal.floor().longValue());
     }
+
+    @FormTest
+    void bigDecimalRoundAndFloor() {
+        assertEquals(new BigInteger("12"), new BigDecimal(new BigInteger("124"), 1).round());
+        assertEquals(new BigInteger("13"), new BigDecimal(new BigInteger("125"), 1).round());
+        assertEquals(new BigInteger("13"), new BigDecimal(new BigInteger("126"), 1).round());
+        assertEquals(new BigInteger("-12"), new BigDecimal(new BigInteger("-124"), 1).round());
+        assertEquals(new BigInteger("-13"), new BigDecimal(new BigInteger("-126"), 1).round());
+        assertEquals(new BigInteger("-3"), new BigDecimal(new BigInteger("-3"), 0).floor());
+        assertEquals(new BigInteger("-4"), new BigDecimal(new BigInteger("-32"), 1).floor());
+    }
 }

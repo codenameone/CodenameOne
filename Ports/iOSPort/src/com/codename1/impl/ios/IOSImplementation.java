@@ -16334,4 +16334,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (rc < 0) throw new RuntimeException("RSA keypair generation failed: code " + rc);
         return new byte[][]{ cryptoTrim(pubBuf, lens[0]), cryptoTrim(privBuf, lens[1]) };
     }
+
+    @Override
+    public byte[][] generateEcKeyPair(String curve) {
+        if (!"P-256".equals(curve)) {
+            throw new RuntimeException("unsupported EC curve: " + curve);
+        }
+        // P-256 encodes to exactly 91 (X.509) and 138 (PKCS#8) bytes.
+        byte[] pubBuf = new byte[128];
+        byte[] privBuf = new byte[192];
+        int[] lens = new int[2];
+        int rc = nativeInstance.generateEcKeyPair(pubBuf, privBuf, lens);
+        if (rc < 0) throw new RuntimeException("EC keypair generation failed: code " + rc);
+        return new byte[][]{ cryptoTrim(pubBuf, lens[0]), cryptoTrim(privBuf, lens[1]) };
+    }
 }

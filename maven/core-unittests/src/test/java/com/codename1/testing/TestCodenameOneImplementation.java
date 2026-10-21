@@ -4837,6 +4837,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public byte[][] generateEcKeyPair(String curve) {
+        if (!"P-256".equals(curve)) {
+            throw new RuntimeException("unsupported EC curve: " + curve);
+        }
+        try {
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
+            kpg.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("EC keypair generation failed: " + e.getMessage());
+        }
+    }
+
     public static final class TestDatabase extends Database {
         private final String name;
         private boolean inTransaction;

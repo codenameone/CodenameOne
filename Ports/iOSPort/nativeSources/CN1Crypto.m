@@ -438,6 +438,106 @@ int cn1_crypto_rsa_decrypt(int paddingKind,
     return rc;
 }
 
+/* --- EC P-256 ---------------------------------------------------------- */
+
+/* The AlgorithmIdentifier every P-256 key carries:
+ * SEQUENCE { OID id-ecPublicKey, OID prime256v1 }. */
+static const uint8_t CN1_EC_P256_ALG_ID[] = {
+    0x30, 0x13,
+    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07
+};
+
+/* Reads a DER tag and length at *p, checks the tag and that the content fits
+ * in `n`, and leaves *p at the first content byte. Returns the content length
+ * or -1. */
+static int cn1_der_enter(const uint8_t* b, int n, int* p, uint8_t tag) {
+    if (*p + 2 > n || b[*p] != tag) return -1;
+    (*p)++;
+    int len;
+    uint8_t first = b[(*p)++];
+    if ((first & 0x80) == 0) {
+        len = first;
+    } else {
+        int sl = first & 0x7f;
+        if (sl < 1 || sl > 3 || *p + sl > n) return -1;
+        len = 0;
+        for (int i = 0; i < sl; i++) len = (len << 8) | b[(*p)++];
+    }
+    if (len < 0 || *p + len > n) return -1;
+    return len;
+}
+
+/* Checks the AlgorithmIdentifier at *p names P-256 and steps over it. */
+static int cn1_der_skip_p256_alg(const uint8_t* b, int n, int* p) {
+    int len = (int) sizeof(CN1_EC_P256_ALG_ID);
+    if (*p + len > n || memcmp(b + *p, CN1_EC_P256_ALG_ID, len) != 0) return -1;
+    *p += len;
+    return 0;
+}
+
+static SecKeyRef cn1_ec_create(NSData* keyData, CFStringRef keyClass) {
+    NSDictionary* attrs = @{
+        (id) kSecAttrKeyType:  (id) kSecAttrKeyTypeECSECPrimeRandom,
+        (id) kSecAttrKeyClass: (__bridge id) keyClass,
+        (id) kSecAttrKeySizeInBits: @256
+    };
+    CFErrorRef error = NULL;
+    SecKeyRef key = SecKeyCreateWithData((__bridge CFDataRef) keyData,
+                                         (__bridge CFDictionaryRef) attrs,
+                                         &error);
+    if (error) CFRelease(error);
+    return key;
+}
+
+/* X.509 SubjectPublicKeyInfo -> SecKey. SecKey takes the bare X9.63 point
+ * (0x04 || X || Y), which is the BIT STRING's content. */
+static SecKeyRef cn1_load_ec_public(const uint8_t* x509, int x509Len) {
+    int p = 0;
+    if (cn1_der_enter(x509, x509Len, &p, 0x30) < 0) return NULL;
+    if (cn1_der_skip_p256_alg(x509, x509Len, &p) != 0) return NULL;
+    int bitLen = cn1_der_enter(x509, x509Len, &p, 0x03);
+    if (bitLen != 66 || x509[p] != 0x00 || x509[p + 1] != 0x04) return NULL;
+    return cn1_ec_create([NSData dataWithBytes:(x509 + p + 1) length:65],
+                         kSecAttrKeyClassPublic);
+}
+
+/* PKCS#8 -> SecKey. SecKey wants 0x04 || X || Y || D, so the ECPrivateKey
+ * (RFC 5915) must carry its optional [1] publicKey: SecKey cannot derive the
+ * point from D. Keys this port and the Android port generate carry it; a
+ * PKCS#8 without it is reported as a bad key rather than guessed at. */
+static SecKeyRef cn1_load_ec_private(const uint8_t* pkcs8, int pkcs8Len) {
+    int p = 0, len;
+    if (cn1_der_enter(pkcs8, pkcs8Len, &p, 0x30) < 0) return NULL;
+    if ((len = cn1_der_enter(pkcs8, pkcs8Len, &p, 0x02)) < 0) return NULL;
+    p += len;
+    if (cn1_der_skip_p256_alg(pkcs8, pkcs8Len, &p) != 0) return NULL;
+    if (cn1_der_enter(pkcs8, pkcs8Len, &p, 0x04) < 0) return NULL;
+    int ecEnd;
+    if ((len = cn1_der_enter(pkcs8, pkcs8Len, &p, 0x30)) < 0) return NULL;
+    ecEnd = p + len;
+    if ((len = cn1_der_enter(pkcs8, ecEnd, &p, 0x02)) < 0) return NULL;
+    p += len;
+    int dLen = cn1_der_enter(pkcs8, ecEnd, &p, 0x04);
+    if (dLen < 1 || dLen > 32) return NULL;
+    uint8_t raw[97];
+    memset(raw, 0, sizeof(raw));
+    memcpy(raw + 65 + (32 - dLen), pkcs8 + p, dLen);
+    p += dLen;
+    if (p < ecEnd && pkcs8[p] == 0xa0) {
+        if ((len = cn1_der_enter(pkcs8, ecEnd, &p, 0xa0)) < 0) return NULL;
+        p += len;
+    }
+    if (cn1_der_enter(pkcs8, ecEnd, &p, 0xa1) < 0) return NULL;
+    int bitLen = cn1_der_enter(pkcs8, ecEnd, &p, 0x03);
+    if (bitLen != 66 || pkcs8[p] != 0x00 || pkcs8[p + 1] != 0x04) return NULL;
+    memcpy(raw, pkcs8 + p + 1, 65);
+    SecKeyRef key = cn1_ec_create([NSData dataWithBytes:raw length:sizeof(raw)],
+                                  kSecAttrKeyClassPrivate);
+    memset(raw, 0, sizeof(raw));
+    return key;
+}
+
 static SecKeyAlgorithm signature_alg(int algorithm) {
     switch (algorithm) {
         case 0: return kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA256;
@@ -456,9 +556,12 @@ int cn1_crypto_sign(int algorithm,
                     uint8_t* out, int outCap) {
     SecKeyAlgorithm alg = signature_alg(algorithm);
     if (!alg) return CN1_CRYPTO_E_UNSUPPORTED;
-    // ECDSA keys go through a separate loader; here we assume RSA. ECDSA
-    // support would parse the PKCS#8 EC body and pass kSecAttrKeyTypeECSECPrimeRandom.
-    SecKeyRef key = cn1_load_rsa_private(pkcs8, pkcs8Len);
+    // Codes 3-5 are ECDSA. The X9.62 algorithms produce (and verify) the DER
+    // SEQUENCE { r, s } that java.security's SHAxxxwithECDSA returns on the
+    // JavaSE and Android ports; Jwt converts to the JOSE r||s form itself.
+    SecKeyRef key = algorithm >= 3
+        ? cn1_load_ec_private(pkcs8, pkcs8Len)
+        : cn1_load_rsa_private(pkcs8, pkcs8Len);
     if (!key) return CN1_CRYPTO_E_BAD_KEY;
     int rc = cn1_seckey_op(key, alg, 2, data, dataLen, out, outCap);
     CFRelease(key);
@@ -471,7 +574,9 @@ int cn1_crypto_verify(int algorithm,
                       const uint8_t* sig,  int sigLen) {
     SecKeyAlgorithm alg = signature_alg(algorithm);
     if (!alg) return CN1_CRYPTO_E_UNSUPPORTED;
-    SecKeyRef key = cn1_load_rsa_public(x509, x509Len);
+    SecKeyRef key = algorithm >= 3
+        ? cn1_load_ec_public(x509, x509Len)
+        : cn1_load_rsa_public(x509, x509Len);
     if (!key) return CN1_CRYPTO_E_BAD_KEY;
     CFErrorRef error = NULL;
     NSData* dataObj = [NSData dataWithBytes:data length:dataLen];
@@ -483,6 +588,58 @@ int cn1_crypto_verify(int algorithm,
     if (error) CFRelease(error);
     CFRelease(key);
     return ok ? 1 : 0;
+}
+
+int cn1_crypto_generate_ec_keypair(uint8_t* outPub,  int pubCap,  int* pubLen,
+                                   uint8_t* outPriv, int privCap, int* privLen) {
+    if (!pubLen || !privLen) return CN1_CRYPTO_E_BAD_INPUT;
+    *pubLen = 0;
+    *privLen = 0;
+    if (pubCap < 91 || privCap < 138) return CN1_CRYPTO_E_BAD_INPUT;
+    NSDictionary* attrs = @{
+        (id) kSecAttrKeyType: (id) kSecAttrKeyTypeECSECPrimeRandom,
+        (id) kSecAttrKeySizeInBits: @256,
+        (id) kSecPrivateKeyAttrs: @{ (id) kSecAttrIsPermanent: @NO }
+    };
+    CFErrorRef error = NULL;
+    SecKeyRef priv = SecKeyCreateRandomKey((__bridge CFDictionaryRef) attrs, &error);
+    if (!priv || error) {
+        if (error) CFRelease(error);
+        if (priv) CFRelease(priv);
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    /* 0x04 || X || Y || D, 97 bytes for P-256. */
+    NSData* raw = (__bridge_transfer NSData*) SecKeyCopyExternalRepresentation(priv, &error);
+    if (error) { CFRelease(error); error = NULL; }
+    CFRelease(priv);
+    if (!raw || [raw length] != 97) return CN1_CRYPTO_E_GENERIC;
+    const uint8_t* r = (const uint8_t*) [raw bytes];
+
+    /* SubjectPublicKeyInfo: SEQUENCE(89) { algId, BIT STRING(66) { 0, point } } */
+    uint8_t* p = outPub;
+    *p++ = 0x30; *p++ = 0x59;
+    memcpy(p, CN1_EC_P256_ALG_ID, sizeof(CN1_EC_P256_ALG_ID)); p += sizeof(CN1_EC_P256_ALG_ID);
+    *p++ = 0x03; *p++ = 0x42; *p++ = 0x00;
+    memcpy(p, r, 65);
+    *pubLen = 91;
+
+    /* PKCS#8: SEQUENCE(135) { INT 0, algId, OCTET STRING(109) {
+     *   ECPrivateKey SEQUENCE(107) { INT 1, OCTET STRING(32) D,
+     *                                [1] { BIT STRING(66) { 0, point } } } } } */
+    uint8_t* q = outPriv;
+    *q++ = 0x30; *q++ = 0x81; *q++ = 0x87;
+    *q++ = 0x02; *q++ = 0x01; *q++ = 0x00;
+    memcpy(q, CN1_EC_P256_ALG_ID, sizeof(CN1_EC_P256_ALG_ID)); q += sizeof(CN1_EC_P256_ALG_ID);
+    *q++ = 0x04; *q++ = 0x6d;
+    *q++ = 0x30; *q++ = 0x6b;
+    *q++ = 0x02; *q++ = 0x01; *q++ = 0x01;
+    *q++ = 0x04; *q++ = 0x20;
+    memcpy(q, r + 65, 32); q += 32;
+    *q++ = 0xa1; *q++ = 0x44;
+    *q++ = 0x03; *q++ = 0x42; *q++ = 0x00;
+    memcpy(q, r, 65);
+    *privLen = 138;
+    return 0;
 }
 
 /* --- RSA key-pair generation ------------------------------------------ */
@@ -626,6 +783,13 @@ int cn1_crypto_verify(int a, const uint8_t* x, int xl, const uint8_t* d, int dl,
 int cn1_crypto_generate_rsa_keypair(int bits, uint8_t* outPub, int pubCap, int* pubLen,
                                     uint8_t* outPriv, int privCap, int* privLen) {
     (void) bits; (void) outPub; (void) pubCap; (void) outPriv; (void) privCap;
+    if (pubLen) *pubLen = 0;
+    if (privLen) *privLen = 0;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_generate_ec_keypair(uint8_t* outPub, int pubCap, int* pubLen,
+                                   uint8_t* outPriv, int privCap, int* privLen) {
+    (void) outPub; (void) pubCap; (void) outPriv; (void) privCap;
     if (pubLen) *pubLen = 0;
     if (privLen) *privLen = 0;
     return CN1_CRYPTO_E_UNSUPPORTED;
