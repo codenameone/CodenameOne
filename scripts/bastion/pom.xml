@@ -19,7 +19,7 @@
     <!-- What the app and its server have in common: the REST contract and the
          objects it transfers. Always built, first, because both depend on it. -->
     <module>shared</module>
-    <!-- The app joins once its screens exist; see the plan. -->
+    <module>common</module>
   </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>

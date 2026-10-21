@@ -26,6 +26,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.SecurityExchange;
 import com.codename1.backend.security.crypto.Der;
 import com.codenameone.examples.bastion.Ids;
+import com.codenameone.examples.bastion.api.SignedRequest;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.Device;
 import com.codenameone.examples.bastion.domain.UsedNonce;
@@ -67,10 +68,10 @@ import java.io.IOException;
 /// the request's transaction so the record survives the refusal.
 @Component
 public class RequestSigning {
-    public static final String HEADER = "Bastion-Signature";
+    public static final String HEADER = SignedRequest.HEADER;
     /// Two minutes either way. Phones' clocks are set by the network and are
     /// rarely more than seconds out.
-    public static final long SKEW_MILLIS = 120000L;
+    public static final long SKEW_MILLIS = SignedRequest.SKEW_MILLIS;
 
     private final Devices devices;
     private final UsedNonceRepository nonces;
@@ -109,7 +110,7 @@ public class RequestSigning {
         if (header == null || header.length() == 0) {
             return "missing";
         }
-        if (!header.startsWith("v1;")) {
+        if (!header.startsWith(SignedRequest.SCHEME + ";")) {
             return "unknown scheme";
         }
         String deviceId = field(header, "device");
@@ -133,7 +134,7 @@ public class RequestSigning {
         if (at < now - SKEW_MILLIS || at > now + SKEW_MILLIS) {
             return "clock skew";
         }
-        if (!nonceShaped(nonce)) {
+        if (!SignedRequest.nonceShaped(nonce)) {
             return "malformed";
         }
         byte[] signature = Devices.decode(sig);
@@ -142,9 +143,9 @@ public class RequestSigning {
             return "bad signature";
         }
         byte[] body = request.getBodyBytes();
-        String signed = request.getMethod() + "|" + request.getTarget() + "|"
-                + Ids.hex(Crypto.sha256(body == null ? new byte[0] : body)) + "|" + nonce + "|"
-                + ts;
+        // The form both sides read from shared: the app signs exactly this.
+        String signed = SignedRequest.canonical(request.getMethod(), request.getTarget(),
+                Crypto.sha256(body == null ? new byte[0] : body), nonce, at);
         boolean valid;
         try {
             valid = Crypto.verify("ES256", key, signed.getBytes("UTF-8"),
@@ -195,39 +196,8 @@ public class RequestSigning {
         return nonces.findById(id) != null;
     }
 
-    private static boolean nonceShaped(String nonce) {
-        if (nonce.length() < 16 || nonce.length() > 64) {
-            return false;
-        }
-        for (int iter = 0; iter < nonce.length(); iter++) {
-            char c = nonce.charAt(iter);
-            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                    || c == '-' || c == '_';
-            if (!ok) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// The value of `name=` among the header's `;`-separated fields, or null.
     static String field(String header, String name) {
-        if (header == null) {
-            return null;
-        }
-        String wanted = name + "=";
-        int start = 0;
-        while (start <= header.length()) {
-            int end = header.indexOf(';', start);
-            if (end < 0) {
-                end = header.length();
-            }
-            if (header.startsWith(wanted, start)) {
-                return header.substring(start + wanted.length(), end);
-            }
-            start = end + 1;
-        }
-        return null;
+        return SignedRequest.field(header, name);
     }
 
     private static HttpServer.Request request() {

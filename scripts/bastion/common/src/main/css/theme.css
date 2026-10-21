@@ -1,0 +1,260 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of the app.
+ *
+ * COLOURS AND SHAPE -- change these and nothing else to re-skin the app. Each
+ * colour has a second value for dark mode, used by the block at the end.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    device-desktop-font-scale: "1.25";
+    endsWith3PointsBool: true;
+    transitionSpeedInt: "200";
+
+    --brand: #1f3a8a;
+    --brand-pressed: #2c4fb8;
+    --brand-contrast: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #f1f3f7;
+    --surface-press: #e3e7ef;
+    --text: #141821;
+    --text-muted: #5d6576;
+    --line: #dde1e8;
+    --success: #12805c;
+    --warning: #9a5a00;
+    --danger: #c5292a;
+    --success-tint: #e4f4ed;
+    --warning-tint: #fcf0df;
+    --danger-tint: #fcebeb;
+
+    --brand-dark: #8fa8ff;
+    --brand-pressed-dark: #6f8cf0;
+    --brand-contrast-dark: #0b1330;
+    --surface-dark: #11141b;
+    --surface-alt-dark: #1c2130;
+    --surface-press-dark: #2a3144;
+    --text-dark: #e6e9f0;
+    --text-muted-dark: #a7aebd;
+    --line-dark: #2e3547;
+    --success-dark: #47c79a;
+    --warning-dark: #f0a24b;
+    --danger-dark: #ff7a7a;
+    --success-tint-dark: #15302a;
+    --warning-tint-dark: #33270f;
+    --danger-tint-dark: #3a1f22;
+
+    --radius: 2mm;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+BnForm {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+BnPage {
+    background-color: var(--surface);
+    padding: 3mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+BnRow {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+
+BnSpacer {
+    background-color: transparent;
+    padding: 1mm;
+    margin: 0;
+}
+
+/* -------------------------------------------------------------------- text */
+
+BnTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnLabel {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnRowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnRowDetail {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ----------------------------------------------------------------- badges */
+
+BnBadgeGood {
+    color: var(--success);
+    background-color: var(--success-tint);
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    margin: 0 0 0 1.6mm;
+}
+
+BnBadgeWarn {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    margin: 0 0 0 1.6mm;
+}
+
+BnBadgeBad {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    margin: 0 0 0 1.6mm;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+BnPrimary {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+BnPrimary.pressed {
+    background-color: var(--brand-pressed);
+}
+
+BnPrimary.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-press);
+}
+
+BnSecondary {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+BnSecondary.pressed {
+    background-color: var(--surface-press);
+}
+
+BnField {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 1mm 0 1mm 0;
+}
+
+/* --------------------------------------------------------------- dark mode */
+
+@media (prefers-color-scheme: dark) {
+    BnForm { background-color: var(--surface-dark); }
+    BnPage { background-color: var(--surface-dark); }
+    BnRow { background-color: var(--surface-alt-dark); }
+    BnTitle { color: var(--text-dark); }
+    BnText { color: var(--text-dark); }
+    BnMuted { color: var(--text-muted-dark); }
+    BnLabel { color: var(--text-muted-dark); }
+    BnError { color: var(--danger-dark); }
+    BnRowTitle { color: var(--text-dark); }
+    BnRowDetail { color: var(--text-muted-dark); }
+    BnBadgeGood { color: var(--success-dark); background-color: var(--success-tint-dark); }
+    BnBadgeWarn { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    BnBadgeBad { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    BnPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    BnPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    BnPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    BnSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    BnSecondary.pressed { background-color: var(--surface-press-dark); }
+    BnField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+}
