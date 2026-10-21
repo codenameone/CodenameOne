@@ -5566,14 +5566,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     String file = stripSlash(listed);
                     if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)
                             || isDirectory(folder + "/" + file)) continue;
-                    if (density.equals(file)) {
+                    // Several files classified medium (medium.png and any unrecognised name):
+                    // EditableResources.MultiImage.getBest() replaces its pick on every equal
+                    // DPI, so the build keeps the LAST one in its File.listFiles() order, and
+                    // the canvas keeps the last in its own listing.
+                    if (density.equals(file) && !"medium.png".equals(density)) {
                         match = file;
                         break;
                     }
-                    // Several files classified medium: the build keeps whichever File.listFiles()
-                    // returns first, an order the platform does not define, so no preview can
-                    // promise to match it. The named medium.png is the stable choice.
-                    if ("medium.png".equals(density) && match == null && !isDensityName(file)) {
+                    if ("medium.png".equals(density) && (density.equals(file) || !isDensityName(file))) {
                         match = file;
                     }
                 }

@@ -623,6 +623,11 @@ public class CSSThemeCompiler {
                 // `var(--missing, 50%)` is the percentage token itself, which the build-time
                 // emitter leaves out; it is rejected here exactly as `progress: 50%` written
                 // directly is, so the preview never shows a constant the application lacks.
+                // An `...Image` constant is the exception: a direct `navImage: url(icon.png)` is
+                // left out silently, so its fallback is too.
+                if (key.endsWith("Image")) {
+                    return null;
+                }
                 buildConstant(key.substring(1), text, text);
             }
             return typed;
@@ -665,7 +670,10 @@ public class CSSThemeCompiler {
             return false;
         }
         String fallback = inner.substring(comma + 1).trim();
-        return !unquote(fallback).equals(fallback);
+        // The fallback that applies keeps its lexical type through any nesting:
+        // `var(--missing, var(--text))` is text when `--text` is.
+        return !unquote(fallback).equals(fallback) || aliasesQuotedText(fallback)
+                || quotedFallbackApplies(fallback);
     }
 
     /// Whether `value` is an alias that ends, through every intermediate alias, at a quoted
@@ -933,6 +941,12 @@ public class CSSThemeCompiler {
             slot = 0;
         } else if ("font-size".equals(property)) {
             slot = 1;
+            if (value.trim().length() == 0) {
+                // `var(--optional-size)` left undefined: the build-time compiler keeps the
+                // unresolved function and its font falls back to the default size, so the
+                // declaration is passed over rather than rejecting the stylesheet.
+                return true;
+            }
             // Validated here so the error is reported while the rule is being read.
             parseFontSize(value);
         } else {

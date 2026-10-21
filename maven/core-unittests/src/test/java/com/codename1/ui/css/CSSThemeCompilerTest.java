@@ -1398,6 +1398,30 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testNestedQuotedFallbackStaysText() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --text: \"#f00\"; accent: var(--missing, var(--text)); }",
+                res, "Theme");
+        assertEquals("#f00", res.getTheme("Theme").get("@accent"));
+    }
+
+    @Test
+    void testUrlFallbackOfAnImageConstantIsLeftOut() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { navImage: var(--missing, url(icon.png)); other: x; }",
+                res, "Theme");
+        org.junit.jupiter.api.Assertions.assertNull(res.getTheme("Theme").get("@navImage"));
+        assertEquals("x", res.getTheme("Theme").get("@other"));
+    }
+
+    @Test
+    void testUndefinedFontSizeVariableIsPassedOver() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Label { font-size: var(--optional-size); color: red; }", res, "Theme");
+        assertEquals("ff0000", res.getTheme("Theme").get("Label.fgColor"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
