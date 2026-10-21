@@ -146,7 +146,7 @@ public class BankingEndpoint implements BankingApiServer {
         Device device = null;
         // A signature that is sent is always checked, even where none is
         // needed: one that is wrong is never ignored.
-        if (money.needsSignature(transfer.amount(), leaves) || RequestSigning.present()) {
+        if (money.needsSignature(from, transfer.amount(), leaves) || RequestSigning.present()) {
             device = signing.require(owner);
         }
         if (!leaves) {

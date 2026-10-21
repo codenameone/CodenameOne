@@ -26,11 +26,13 @@ import com.codenameone.examples.bastion.api.ReceiptDto;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.Card;
+import com.codenameone.examples.bastion.domain.CryptoAddress;
 import com.codenameone.examples.bastion.domain.Device;
 import com.codenameone.examples.bastion.domain.JournalEntry;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
 import com.codenameone.examples.bastion.domain.Payee;
 import com.codenameone.examples.bastion.domain.Transfer;
+import com.codenameone.examples.bastion.exchange.Markets;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
 import com.codenameone.examples.bastion.ledger.Ledger;
 import com.codenameone.examples.bastion.ledger.Leg;
@@ -54,8 +56,9 @@ import java.util.Arrays;
 ///    to a payee or out of the bank -- while `bastion.device.policy.enforce`
 ///    is on, since that is how the server knows which device asked.
 /// 3. **The device** is trusted ([Devices]) for money leaving the caller.
-/// 4. **The limits** (fiat only; see [#checkLimits]): per movement, per 24
-///    hours, and per new payee during its cooling-off period.
+/// 4. **The limits** ([#checkLimits]): per movement, per 24 hours, and per
+///    new payee during its cooling-off period -- fiat in its own units, crypto
+///    valued in USD at the index price.
 ///
 /// A retry of a movement already made skips 2 to 4's counting -- the money
 /// moved, and counting it again would refuse a retry of a payment that was
@@ -75,9 +78,14 @@ public class Money {
     private final long coolOffMillis;
     private final long coolOffLimit;
     private final boolean enforceDevices;
+    private final Markets markets;
+    private final long cryptoPerMove;
+    private final long cryptoDaily;
 
     public Money(Ledger ledger, Audit audit, TransferRepository transfers,
-            JournalEntryRepository entries, ProfileRepository profiles,
+            JournalEntryRepository entries, ProfileRepository profiles, Markets markets,
+            @Value("${bastion.crypto.limit.per-withdrawal:1000000}") String cryptoPerMove,
+            @Value("${bastion.crypto.limit.daily:2000000}") String cryptoDaily,
             @Value("${bastion.limit.per-transfer:500000}") String perTransfer,
             @Value("${bastion.limit.daily:1000000}") String daily,
             @Value("${bastion.stepup.threshold:100000}") String stepUp,
@@ -98,6 +106,11 @@ public class Money {
         this.coolOffMillis = Long.parseLong(coolOffHours.trim()) * 3600L * 1000L;
         this.coolOffLimit = Long.parseLong(coolOffLimit.trim());
         this.enforceDevices = "true".equalsIgnoreCase(enforceDevices.trim());
+        this.markets = markets;
+        // In USD cents at the index price, across every coin together:
+        // 10,000.00 a movement, 20,000.00 a day.
+        this.cryptoPerMove = Long.parseLong(cryptoPerMove.trim());
+        this.cryptoDaily = Long.parseLong(cryptoDaily.trim());
     }
 
     public long coolOffMillis() {
@@ -108,10 +121,19 @@ public class Money {
         return enforceDevices;
     }
 
-    /// Whether a movement of `amount` that does or does not leave the caller
-    /// must be signed.
-    public boolean needsSignature(long amount, boolean leaves) {
-        return amount > stepUp || (leaves && enforceDevices);
+    /// Whether a movement of `amount` out of `from` that does or does not
+    /// leave the caller must be signed. The threshold is in fiat units; a
+    /// coin amount is valued in USD at the index price first, or 0.001 BTC
+    /// and 1,000 BTC would be the same number of satoshi short of it.
+    public boolean needsSignature(LedgerAccount from, long amount, boolean leaves)
+            throws IOException {
+        if (leaves && enforceDevices) {
+            return true;
+        }
+        Asset asset = ledger.asset(from.getAsset());
+        long value = "FIAT".equals(asset.getKind()) ? amount
+                : markets.value(asset.getCode(), Math.max(amount, 0L), "USD");
+        return value > stepUp;
     }
 
     /// Refuses a device that may not send money away, when the policy says so.
@@ -144,6 +166,17 @@ public class Money {
             String memo) throws IOException {
         LedgerAccount cash = ledger.system(from.getAsset(), AccountKinds.SYS_CASH);
         return move(new Move(owner, key, "WITHDRAWAL", from, cash, "", amount, true, memo, null));
+    }
+
+    /// Coins out of the bank to an allow-listed address: into SYS_CHAIN,
+    /// standing for the blockchain transaction a real exchange would
+    /// broadcast. The caller has checked the address is the owner's, for this
+    /// asset, and past its cooling-off.
+    public ReceiptDto withdrawCrypto(String owner, String key, LedgerAccount from,
+            CryptoAddress address, long amount) throws IOException {
+        LedgerAccount chain = ledger.system(from.getAsset(), AccountKinds.SYS_CHAIN);
+        return move(new Move(owner, key, "CRYPTO_OUT", from, chain, address.getId(), amount,
+                true, "to " + address.getAddress(), null));
     }
 
     /// Simulated money in, from SYS_CASH. Not counted against any limit.
@@ -234,14 +267,17 @@ public class Money {
         return receipt(t);
     }
 
-    /// The limits, in ledger units of the asset, applied to fiat only. A coin
-    /// is not a cent: a real exchange states its crypto limits in a reference
-    /// currency at the current price, which needs the prices phase 4 brings.
-    /// Until then a crypto withdrawal is held by the signature and the trusted
-    /// device alone.
+    /// The limits. A fiat movement is counted in its own asset's units. A
+    /// coin is not a cent, so a crypto movement is valued in USD at the index
+    /// price ([Markets#value], rounded up) and counted against limits shared
+    /// by every coin: someone draining an account takes the BTC and the ETH
+    /// both, and one limit per coin would let them take twice. The index
+    /// price is the bank's own feed, not the last trade, which two colluding
+    /// customers could print low to slip a withdrawal under the limit.
     private void checkLimits(Move m) throws IOException {
         Asset asset = ledger.asset(m.from.getAsset());
         if (!"FIAT".equals(asset.getKind())) {
+            checkCryptoLimits(m, asset);
             return;
         }
         long now = System.currentTimeMillis();
@@ -265,6 +301,35 @@ public class Money {
                 throw new ResponseStatusException(409, "That is over the card's daily limit");
             }
         }
+    }
+
+    private void checkCryptoLimits(Move m, Asset asset) throws IOException {
+        long now = System.currentTimeMillis();
+        long value = markets.value(asset.getCode(), m.amount, "USD");
+        if (value > cryptoPerMove) {
+            throw new ResponseStatusException(409, "That is more than one crypto movement may move");
+        }
+        long sent = value;
+        for (Asset coin : ledger.assets()) {
+            if (!"FIAT".equals(coin.getKind())) {
+                Long moved = transfers.sentSince(m.owner, coin.getCode(), now - DAY);
+                if (moved != null && moved.longValue() > 0) {
+                    sent = saturatedAdd(sent, markets.value(coin.getCode(), moved.longValue(),
+                            "USD"));
+                }
+            }
+        }
+        if (sent > cryptoDaily) {
+            throw new ResponseStatusException(409, "That would pass your crypto limit for the day");
+        }
+        // No payee branch: a payee is paid into a fiat checking account, so
+        // coins leave a customer only by withdrawal, to an allow-listed address
+        // whose cooling-off is its own.
+    }
+
+    private static long saturatedAdd(long a, long b) {
+        long sum = a + b;
+        return ((a ^ sum) & (b ^ sum)) < 0 ? Long.MAX_VALUE : sum;
     }
 
     static ReceiptDto receipt(Transfer t) {

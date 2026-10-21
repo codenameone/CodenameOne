@@ -72,6 +72,11 @@ public class Audit {
         event.setHash(hash(event));
         events.insert(event);
         head.advance(event.getSeq(), event.getHash());
+        // The update above bypasses the session, whose copy of the head would
+        // otherwise still say the old seq: a second append in the same
+        // transaction -- an order and its trades -- would reuse it.
+        tail.setSeq(event.getSeq());
+        tail.setHash(event.getHash());
         return event;
     }
 

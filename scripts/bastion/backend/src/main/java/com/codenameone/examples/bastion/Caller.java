@@ -23,6 +23,7 @@ import com.codename1.backend.security.Authentication;
 import com.codename1.backend.security.GrantedAuthority;
 import com.codename1.backend.security.SecurityContextHolder;
 import com.codename1.backend.security.SecurityExchange;
+import com.codename1.backend.security.oauth2.server.resource.JwtAuthenticationToken;
 
 import java.util.Iterator;
 
@@ -58,6 +59,19 @@ public final class Caller {
 
     /// The client's address as the server saw it, for the audit log; empty
     /// outside a request.
+    /// When the caller's token says they last proved who they are -- the
+    /// `auth_time` claim, epoch seconds, which [SecurityConfig] copies from
+    /// the sign-in into every access token, refreshed ones included -- or -1
+    /// when the caller has no such token.
+    public static long authTime() {
+        Authentication who = SecurityContextHolder.getContext().getAuthentication();
+        if (!(who instanceof JwtAuthenticationToken)) {
+            return -1L;
+        }
+        Long at = ((JwtAuthenticationToken) who).getToken().getClaimAsLong("auth_time");
+        return at == null ? -1L : at.longValue();
+    }
+
     public static String address() {
         SecurityExchange exchange = SecurityExchange.current();
         if (exchange == null) {

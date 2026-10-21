@@ -37,6 +37,9 @@ public final class AccountKinds {
     /// withdrawn goes into it.
     public static final String SYS_CASH = "SYS_CASH";
     public static final String SYS_FEES = "SYS_FEES";
+    /// The blockchain, simulated: coins withdrawn to an outside address go
+    /// here, as fiat withdrawn goes to SYS_CASH.
+    public static final String SYS_CHAIN = "SYS_CHAIN";
 
     private AccountKinds() {
     }

@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion;
 
 import com.codename1.backend.Base64Url;
+import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.security.crypto.Der;
@@ -26,7 +27,12 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codename1.backend.test.MockResponse;
+import com.codename1.backend.security.crypto.JwkSource;
+import com.codename1.backend.security.oauth2.jwt.DefaultJwtEncoder;
+import com.codename1.backend.security.oauth2.jwt.JwtClaimsSet;
+import com.codename1.backend.security.oauth2.jwt.JwtEncoderParameters;
 import com.codenameone.examples.bastion.audit.Audit;
+
 import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
@@ -51,8 +57,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// would make them on a phone; only the public half is ever sent.
 @BackendTest
 class MoneyTest {
+    static final String PASSWORD = "a long passphrase for money";
+
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private JwkSource signingKeys;
+
+    @Autowired
+    private DataSource db;
 
     @Autowired
     private Audit audit;
@@ -60,15 +74,15 @@ class MoneyTest {
     /// A customer signed in, with a registered device.
     private final class Customer {
         final String name;
-        final String token;
+        String token;
         final String checking;
         KeyPair key;
         String device;
 
         Customer(boolean rooted) throws Exception {
             name = SignIn.register(mvc, "m" + UUID.randomUUID().toString().substring(0, 12)
-                    + "@bastion.example", "a long passphrase for money");
-            token = SignIn.token(mvc, name, "a long passphrase for money");
+                    + "@bastion.example", PASSWORD);
+            token = SignIn.token(mvc, name, PASSWORD);
             checking = String.valueOf(((Map) accounts().get(0)).get("id"));
             key = newKey();
             device = register(key, rooted);
@@ -77,7 +91,8 @@ class MoneyTest {
         String register(KeyPair pair, boolean rooted) throws Exception {
             MockResponse answer = send(json("/api/devices", "{\"publicKey\":\""
                     + Base64Url.encode(pair.getPublic().getEncoded()) + "\",\"platform\":\"and\","
-                    + "\"rooted\":" + rooted + ",\"attested\":true,\"integrityToken\":\"t\"}"));
+                    + "\"rooted\":" + rooted + ",\"attested\":true,\"integrityToken\":\"t\","
+                    + "\"password\":\"" + PASSWORD + "\"}"));
             assertEquals(200, answer.getStatus(), answer.getContentAsString());
             Map device = Json.parseObject(answer.getContentAsString());
             assertEquals(Boolean.valueOf(!rooted), device.get("trusted"));
@@ -363,5 +378,81 @@ class MoneyTest {
         assertEquals(200, a.send(post("/api/cards/" + card.get("id") + "/unfreeze")).getStatus());
         assertEquals(200, a.send(json(spend, coffee).header("Idempotency-Key", key())).getStatus());
         assertEquals(49100, a.balance(a.checking));
+    }
+
+    /// The token's sign-in, `minutes` older: the same claims, re-signed with
+    /// the server's key, as a token kept alive by refreshing would carry.
+    private String aged(String token, long minutes) throws Exception {
+        String payload = token.substring(token.indexOf('.') + 1, token.lastIndexOf('.'));
+        Map claims = Json.parseObject(new String(Base64Url.decode(payload), "UTF-8"));
+        JwtClaimsSet.Builder b = JwtClaimsSet.builder();
+        for (Object e : claims.entrySet()) {
+            Map.Entry entry = (Map.Entry) e;
+            b.claim((String) entry.getKey(), entry.getValue());
+        }
+        long authTime = ((Number) claims.get("auth_time")).longValue();
+        b.claim("auth_time", Long.valueOf(authTime - minutes * 60L));
+        return new DefaultJwtEncoder(signingKeys).encode(JwtEncoderParameters.from(b.build()))
+                .getTokenValue();
+    }
+
+    @Test
+    void addingADeviceNeedsAFreshSignInAndThePassword() throws Exception {
+        Customer c = new Customer(false);
+        String key = Base64Url.encode(newKey().getPublic().getEncoded());
+        String noPassword = "{\"publicKey\":\"" + key + "\",\"platform\":\"and\","
+                + "\"rooted\":false,\"attested\":true,\"integrityToken\":\"t\"}";
+        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        String wrong = noPassword.replace("}", ",\"password\":\"not my password at all\"}");
+        assertEquals(403, c.send(json("/api/devices", wrong)).getStatus());
+        String right = noPassword.replace("}", ",\"password\":\"" + PASSWORD + "\"}");
+        // A token whose sign-in is half an hour old is refused even with the
+        // password: it is what a stolen, refreshed token looks like.
+        String fresh = c.token;
+        c.token = aged(fresh, 30);
+        assertEquals(403, c.send(json("/api/devices", right)).getStatus());
+        c.token = aged(fresh, 1);
+        assertEquals(200, c.send(json("/api/devices", right)).getStatus());
+        assertTrue(audit.verify().isEmpty());
+    }
+
+    @Test
+    void coinsLeaveOnlySignedToAnAllowListedAddress() throws Exception {
+        Customer c = new Customer(false);
+        String wallet = c.open("BTC", "WALLET");
+        // 0.5 BTC: 30,000.00 at the test index of 60,000.00.
+        c.deposit(wallet, 50000000L);
+        String path = "/api/accounts/" + wallet + "/crypto-withdraw";
+        String nowhere = "{\"addressId\":\"nope\",\"amount\":100000}";
+        assertEquals(403, c.send(json(path, nowhere).header("Idempotency-Key", key()))
+                .getStatus());
+        assertEquals(403, c.signed(path, nowhere, key()).getStatus());
+        // Adding an address is signed too.
+        String add = "{\"asset\":\"BTC\",\"address\":\"bc1qexampleexampleexample0000\","
+                + "\"label\":\"cold\"}";
+        assertEquals(403, c.send(json("/api/crypto/addresses", add)).getStatus());
+        MockResponse added = c.signed("/api/crypto/addresses", add, null);
+        assertEquals(200, added.getStatus(), added.getContentAsString());
+        String id = (String) Json.parseObject(added.getContentAsString()).get("id");
+        String body = "{\"addressId\":\"" + id + "\",\"amount\":100000}";
+        assertEquals(409, c.signed(path, body, key()).getStatus(), "still cooling off");
+        // A day later, as far as the address is concerned.
+        db.execute("UPDATE crypto_address SET usable_at = ? WHERE id = ?",
+                new Object[] {Long.valueOf(System.currentTimeMillis() - 1000L), id});
+        assertEquals(403, c.send(json(path, body).header("Idempotency-Key", key())).getStatus());
+        MockResponse sent = c.signed(path, body, key());
+        assertEquals(200, sent.getStatus(), sent.getContentAsString());
+        assertEquals(50000000L - 100000L, c.balance(wallet));
+        // 0.2 BTC is 12,000.00: over the 10,000.00 a crypto movement may move.
+        assertEquals(409, c.signed(path, "{\"addressId\":\"" + id + "\",\"amount\":20000000}",
+                key()).getStatus());
+        // 0.16 BTC is 9,600.00, within a movement; the third in a day passes
+        // the day's 20,000.00.
+        String big = "{\"addressId\":\"" + id + "\",\"amount\":16000000}";
+        assertEquals(200, c.signed(path, big, key()).getStatus());
+        assertEquals(200, c.signed(path, big, key()).getStatus());
+        assertEquals(409, c.signed(path, big, key()).getStatus());
+        assertEquals(50000000L - 32100000L, c.balance(wallet));
+        assertTrue(audit.verify().isEmpty());
     }
 }

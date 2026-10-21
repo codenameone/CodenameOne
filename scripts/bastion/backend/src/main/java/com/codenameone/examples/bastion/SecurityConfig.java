@@ -63,6 +63,7 @@ import com.codename1.backend.security.oauth2.server.authorization.AuthorizationS
 import com.codename1.backend.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.JdbcRegisteredClientRepository;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import com.codename1.backend.security.oauth2.server.authorization.OAuth2TokenContext;
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClient;
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClientRepository;
 import com.codename1.backend.security.oauth2.server.authorization.TokenSettings;
@@ -285,9 +286,24 @@ public class SecurityConfig {
                     new InMemoryRateLimiter(signInsPerMinute, 60))
             .rateLimit("/login/webauthn", RateLimitKeys.clientAddress(),
                     new InMemoryRateLimiter(signInsPerMinute, 60))
+            // The access token carries `auth_time`, when the person behind it
+            // last signed in. The server records it on the sign-in; a refresh
+            // keeps the original, so a token kept alive for twelve hours still
+            // says the sign-in was twelve hours ago. Devices reads it: adding a
+            // signing key needs a sign-in minutes old, not just any token.
             .authorizationServer(server -> server
                     .settings(AuthorizationServerSettings.builder()
-                            .defaultAudience(AUDIENCE).build()));
+                            .defaultAudience(AUDIENCE).build())
+                    .tokenCustomizer(context -> {
+                        if (OAuth2TokenContext.ACCESS_TOKEN.equals(context.getTokenType())
+                                && context.getAuthorization() != null) {
+                            Object at = context.getAuthorization().getAttribute("auth_time");
+                            if (at instanceof Number) {
+                                context.getClaims().claim("auth_time",
+                                        Long.valueOf(((Number) at).longValue()));
+                            }
+                        }
+                    }));
         return http.build();
     }
 

@@ -22,7 +22,12 @@ import com.codename1.backend.Base64Url;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.backend.annotations.Value;
+import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
 import com.codename1.backend.security.crypto.Der;
+import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codename1.backend.security.mfa.TotpService;
+import com.codenameone.examples.bastion.account.SignInGuard;
 import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.Ids;
 import com.codenameone.examples.bastion.api.DeviceDto;
@@ -44,10 +49,25 @@ import java.util.List;
 /// an untrusted one is held to moving money between the customer's own
 /// accounts, which is the most malware on a rooted phone could then do.
 ///
-/// Registering needs only the access token, which is the weak point a real
-/// bank closes by binding registration to a fresh sign-in with the second
-/// factor, or to a code sent to the phone number on file. It is audited, and
-/// the customer's device list shows every key.
+/// **Registering a key needs more than a token.** A device key is what
+/// signs money out of the bank, so a stolen access token -- or a refresh
+/// token kept alive for hours -- must not be enough to add one. Two checks:
+///
+/// 1. **A fresh sign-in.** The token's `auth_time` claim ([Caller#authTime])
+///    must be under `bastion.device.fresh-minutes` (10) old. A refresh keeps
+///    the original sign-in time, so only someone who signed in just now
+///    passes.
+/// 2. **The second factor, or the password again.** An account with an
+///    authenticator app cannot finish a sign-in without the code, so its
+///    fresh sign-in already *was* a second-factor sign-in. An account without
+///    one must type its password into the registration as well; a wrong one
+///    counts toward the sign-in lockout like any other. (A passkey-only
+///    account is asked too: the token does not say *how* its sign-in was
+///    made, and a passkey account can still sign in by password. Carrying an
+///    `amr` claim would let a passkey sign-in skip it.)
+///
+/// Every registration and every refusal is audited, and the customer's
+/// device list shows every key.
 @Component
 public class Devices {
     /// A customer with more keys than this is a customer whose token is being
@@ -57,18 +77,54 @@ public class Devices {
     private final DeviceRepository devices;
     private final IntegrityVerifier integrity;
     private final Audit audit;
+    private final TotpService totp;
+    private final JdbcUserDetailsManager users;
+    private final PasswordEncoder encoder;
+    private final SignInGuard guard;
+    private final long freshSeconds;
 
-    public Devices(DeviceRepository devices, IntegrityVerifier integrity, Audit audit) {
+    public Devices(DeviceRepository devices, IntegrityVerifier integrity, Audit audit,
+            TotpService totp, JdbcUserDetailsManager users, PasswordEncoder encoder,
+            SignInGuard guard, @Value("${bastion.device.fresh-minutes:10}") String freshMinutes) {
         this.devices = devices;
         this.integrity = integrity;
         this.audit = audit;
+        this.totp = totp;
+        this.users = users;
+        this.encoder = encoder;
+        this.guard = guard;
+        this.freshSeconds = Long.parseLong(freshMinutes.trim()) * 60L;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    /// Registers a key once the caller has shown a fresh sign-in, and the
+    /// password when there is no second factor; see the class comment. The
+    /// refusals are audited here, outside the registration's transaction.
     public DeviceDto register(String owner, DeviceRegistrationDto request) throws IOException {
         if (request == null || request.publicKey() == null) {
             throw new ResponseStatusException(400, "Send the device's public key");
         }
+        long age = System.currentTimeMillis() / 1000L - Caller.authTime();
+        if (Caller.authTime() < 0 || age > freshSeconds || age < -60L) {
+            audit.append(owner, "DEVICE_REFUSED", owner, "sign-in not fresh");
+            throw new ResponseStatusException(403,
+                    "Sign in again to add a device: the sign-in must be a few minutes old");
+        }
+        if (!totp.isEnabled(owner)) {
+            String password = request.password();
+            if (password == null
+                    || !encoder.matches(password, users.loadUserByUsername(owner).getPassword())) {
+                guard.failed(owner);
+                audit.append(owner, "DEVICE_REFUSED", owner, "password");
+                throw new ResponseStatusException(403,
+                        "Enter your password to add a device, or turn on an authenticator app");
+            }
+        }
+        return registerOnce(owner, request);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    private DeviceDto registerOnce(String owner, DeviceRegistrationDto request)
+            throws IOException {
         byte[] key = decode(request.publicKey());
         // A P-256 key and nothing else: that is the curve ES256 is defined
         // over, and the one every phone's secure hardware can hold.
