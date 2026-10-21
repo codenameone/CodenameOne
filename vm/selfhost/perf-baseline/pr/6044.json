@@ -26,8 +26,8 @@
        "time": 0.5
       }
      },
-     "memory": 0.258,
-     "reason": "objectAllocation RAM measured lower (0.26x vs 0.37x) on the master merge; recorded rather than tolerated",
+     "memory": 0.353,
+     "reason": "linux x64 EPYC: translator time 0.64x (rounds 0.52-0.69) and objectAllocation RAM 0.35x, back near master's 0.37x; the earlier 0.26x was one low run",
      "runs": 1,
      "time": 1.649,
      "tolerance": {
@@ -52,6 +52,21 @@
      "tolerance": {
       "time": 0.2
      }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.519,
+      "time": 0.508,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.519,
+     "reason": "linux x64 EPYC: translator time 0.64x (rounds 0.52-0.69) and objectAllocation RAM 0.35x, back near master's 0.37x; the earlier 0.26x was one low run",
+     "runs": 1,
+     "time": 0.638
     }
    }
   },
