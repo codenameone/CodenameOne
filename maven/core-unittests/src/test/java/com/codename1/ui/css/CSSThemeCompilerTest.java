@@ -1422,6 +1422,21 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testFontReachesEveryState() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("ReviewLabel { font-family: monospace; font-size: large; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        for (String state : new String[]{"", "sel#", "press#", "dis#"}) {
+            Font font = (Font) theme.get("ReviewLabel." + state + "font");
+            org.junit.jupiter.api.Assertions.assertNotNull(font, state);
+            assertEquals(Font.FACE_MONOSPACE, font.getFace(), state);
+        }
+        com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(theme);
+        assertEquals(Font.FACE_MONOSPACE, com.codename1.ui.plaf.UIManager.getInstance()
+                .getComponentSelectedStyle("ReviewLabel").getFont().getFace());
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"

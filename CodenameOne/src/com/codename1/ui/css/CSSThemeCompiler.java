@@ -979,6 +979,21 @@ public class CSSThemeCompiler {
         if (!Display.isInitialized()) {
             return;
         }
+        // The build-time compiler writes a UIID's font into every state, and UIManager does not
+        // fall back from `sel#font` to `font`: `Label { font-family: monospace; }` alone would
+        // be monospace unselected and the system face once selected. A state with no font of
+        // its own gets an empty spec, which the unselected pass below fills from `Label`.
+        String[] states = {"sel#", "press#", "dis#"};
+        for (String keyPrefix : new ArrayList<String>(fonts.keySet())) {
+            if (!keyPrefix.endsWith(".") || keyPrefix.indexOf('.') != keyPrefix.length() - 1) {
+                continue;
+            }
+            for (String state : states) {
+                if (!fonts.containsKey(keyPrefix + state)) {
+                    fonts.put(keyPrefix + state, new String[2]);
+                }
+            }
+        }
         for (Map.Entry<String, String[]> entry : fonts.entrySet()) {
             String keyPrefix = entry.getKey();
             String[] spec = entry.getValue();
