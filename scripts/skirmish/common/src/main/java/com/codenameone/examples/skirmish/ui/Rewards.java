@@ -105,12 +105,18 @@ public final class Rewards {
         d.setDialogUIID("RewardDialog");
         d.getContentPane().setUIID("RewardBody");
         d.getTitleComponent().setUIID("Container");
-        d.setTransitionInAnimator(CommonTransitions.createDialogPulsate());
+        // A fade, not the pulsate transition: pulsate scales a snapshot of the
+        // dialog whose rounded corners were captured opaque, so it spun in on
+        // a white box.
+        d.setTransitionInAnimator(CommonTransitions.createFade(250));
+        d.setTransitionOutAnimator(CommonTransitions.createFade(200));
         d.setDisposeWhenPointerOutOfBounds(false);
-        Label title = new Label(r.title(), r.levelUp() ? "LevelUpTitle" : "RewardTitle");
-        d.add(FlowLayout.encloseCenter(title));
+        // Wraps rather than truncating "Training co...".
+        SpanLabel title = Ui.text(r.title(), r.levelUp() ? "LevelUpTitle" : "RewardTitle");
+        title.setTextBlockAlign(Component.CENTER);
+        d.add(title);
         String hero = CardArt.heroOf(Session.user() == null ? null : Session.user().username());
-        Image art = CardArt.hero(hero, CN.convertToPixels(r.levelUp() ? 22 : 20));
+        Image art = CardArt.hero(hero, CN.convertToPixels(r.levelUp() ? 17 : 16));
         Label heroLabel = new Label(art, "RewardHero");
         d.add(FlowLayout.encloseCenter(heroLabel));
         if (r.levelUp()) {
@@ -142,6 +148,9 @@ public final class Rewards {
             Session.refreshUser(() -> Ui.later(done), (s, m) -> Ui.later(done));
         });
         d.add(collect);
+        // A scrolling body: showPacked clamped the height
+        // first, and the last child -- the button -- absorbed the shortfall.
+        d.getContentPane().setScrollableY(true);
         d.showPacked(BorderLayout.CENTER, true);
     }
 

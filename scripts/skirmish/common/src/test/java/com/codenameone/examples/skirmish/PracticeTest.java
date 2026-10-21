@@ -49,6 +49,14 @@ public class PracticeTest extends E2e {
         waitFor(2500);
         shot("battle");
 
+        // The finishing camera sweep, halfway and landed.
+        onEdt(() -> view.previewFinale(0));
+        waitFor(1700);
+        shot("finale-sweep");
+        until(() -> !view.finaleRunning(), 5000, "the camera to land");
+        waitFor(300);
+        shot("finale");
+
         // The replay is what was played so far, run again by the same rules.
         final String replay = ((PracticeDriver) view.driver()).replay();
         onEdt(() -> {

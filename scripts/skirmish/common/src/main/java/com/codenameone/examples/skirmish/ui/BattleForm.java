@@ -307,8 +307,15 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
     }
 
     @Override
-    public void ended(int result, int crowns0, int crowns1, int trophies, int coins, String matchId) {
+    public void ended(final int result, final int crowns0, final int crowns1, final int trophies, final int coins,
+            final String matchId) {
         over = true;
+        if (view.finaleRunning()) {
+            // Let the finishing camera sweep land before the result screen.
+            com.codename1.ui.util.UITimer.timer(200, false, form,
+                    () -> ended(result, crowns0, crowns1, trophies, coins, matchId));
+            return;
+        }
         finish(result, crowns0, crowns1, trophies, coins, matchId, null, driver.match().tick());
     }
 

@@ -33,6 +33,12 @@
     defaultSourceDPIInt: "0";
     endsWith3PointsBool: true;
     transitionSpeedInt: "250";
+    /* Alerts fade in on the game's own dialog, with carved buttons, instead
+       of the native theme's pop-in white card. */
+    dialogTransitionIn: "fade";
+    dialogTransitionOut: "fade";
+    dlgCommandGridBool: false;
+    dlgButtonCommandUIID: "DialogWood";
     /* tag::skirmish-palette[] */
     --night: #141a2e;
     --night-alt: #1f2843;
@@ -796,14 +802,14 @@ RewardTitle, LevelUpTitle {
     background-color: transparent;
     color: var(--gold);
     font-family: "native:MainBold";
-    font-size: 5mm;
+    font-size: 4mm;
     text-align: center;
 }
 
 LevelUpTitle {
     background-color: transparent;
     color: #ffffff;
-    font-size: 5.5mm;
+    font-size: 4.4mm;
 }
 
 RewardHero {
@@ -816,9 +822,9 @@ RewardCoins, RewardGems, RewardXp, RewardChest {
     background-color: #0e1224;
     border-radius: 2mm;
     font-family: "native:MainBold";
-    font-size: 3.4mm;
-    padding: 1mm 2mm;
-    margin: 0.8mm;
+    font-size: 2.8mm;
+    padding: 0.8mm 1.6mm;
+    margin: 0.6mm;
 }
 
 RewardCoins { color: #ffc94a; }
@@ -893,3 +899,38 @@ CardTile {
     text-align: center;
 }
 /* end::skirmish-progress-css[] */
+
+/* The toolbar's back arrow: a bare gold glyph, no native button chrome. */
+BackCommand, BackCommand.pressed, TitleCommand, TitleCommand.pressed {
+    background-color: transparent;
+    border: none;
+    color: var(--gold);
+    padding: 1mm;
+    margin: 0;
+}
+
+BackCommand.pressed, TitleCommand.pressed {
+    color: var(--wood-light);
+}
+
+DialogCommandArea {
+    background-color: transparent;
+    padding: 1.5mm 0 0 0;
+}
+
+DialogWood {
+    background: linear-gradient(to bottom, var(--wood-light), var(--wood));
+    border: 0.5mm solid var(--wood-dark);
+    border-radius: 1.5mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.5mm 4mm;
+    margin: 0 1mm;
+}
+
+DialogWood.pressed {
+    background-color: var(--wood-dark);
+    color: var(--parchment);
+}

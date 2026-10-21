@@ -96,6 +96,11 @@ public class BattleView extends GameView {
     private int lastTick = -1;
     private boolean ended;
     private boolean cheered;
+    /// Seconds into the finishing camera sweep, or -1 before the match ends.
+    private float finale = -1f;
+    private float finaleX;
+    private float finaleZ;
+    private static final float FINALE_SECONDS = 3.4f;
     private float sign = 1f;
 
     public BattleView(Driver driver) {
@@ -388,6 +393,7 @@ public class BattleView extends GameView {
         spells(m);
         if (m.isOver() && !cheered) {
             cheered = true;
+            startFinale(m);
             int winner = m.result();
             for (Actor a : actors.values()) {
                 if ((a.mine && winner == driver.me()) || (!a.mine && winner >= 0 && winner != driver.me())) {
@@ -395,8 +401,63 @@ public class BattleView extends GameView {
                 }
             }
         }
+        if (finale >= 0f) {
+            finale(dt);
+        }
         effects.update(dt, getCamera());
     }
+
+    // tag::skirmish-finale[]
+    /// The finishing move: once the match is decided the camera leaves its
+    /// fixed battle view, swings around the field and comes down low beside
+    /// the fallen king tower, so the last blow is seen from the ground. The
+    /// rules are already over, so this is purely the renderer's -- a replay
+    /// or a spectator sees the same sweep.
+    private void startFinale(Match m) {
+        previewFinale(m.result());
+    }
+
+    /// Runs the sweep toward `winner`'s victory (or a draw) without the match
+    /// being over: the screenshot tests use it to photograph the finale.
+    public void previewFinale(int winner) {
+        int loser = winner < 0 ? -1 : 1 - winner;
+        if (loser < 0) {
+            // A draw: look at the bridge between the two sides.
+            finaleX = 0f;
+            finaleZ = 0f;
+        } else {
+            int ky = loser == 0 ? Arena.KING_Y_BOTTOM : Arena.mirrorY(Arena.KING_Y_BOTTOM);
+            finaleX = wx(Arena.KING_X, ky);
+            finaleZ = wz(Arena.KING_X, ky);
+        }
+        finale = 0f;
+    }
+
+    private void finale(float dt) {
+        finale = Math.min(FINALE_SECONDS, finale + dt);
+        float t = finale / FINALE_SECONDS;
+        // Ease in and out, so the sweep starts and settles without a jolt.
+        float e = t * t * (3f - 2f * t);
+        // Orbit from straight behind the player's side to a three-quarter view
+        // beside the tower, dropping from the battle height to eye level.
+        double angle = Math.toRadians(e * 125f);
+        float radius = 42f - e * 22f;
+        float height = 33f - e * 24f;
+        float cx = finaleX * e;
+        float cz = 1.6f + (finaleZ - 1.6f) * e;
+        float ex = cx + (float) Math.sin(angle) * radius;
+        float ez = cz + (float) Math.cos(angle) * radius * (30f / 42f + e * (1f - 30f / 42f))
+                - 1.6f * (1f - e);
+        GameCamera cam = getCamera();
+        cam.setPosition(ex, height, ez);
+        cam.setTarget(cx, 1.6f * e, cz);
+    }
+
+    /// True while the finishing sweep still has frames to show.
+    public boolean finaleRunning() {
+        return finale >= 0f && finale < FINALE_SECONDS;
+    }
+    // end::skirmish-finale[]
 
     /// A fire orb arcs from its caster's king tower to where it will land;
     /// arrows start falling as the volley is about to hit.
@@ -559,6 +620,10 @@ public class BattleView extends GameView {
             return;
         }
         if (m.isOver() && !ended) {
+            if (finaleRunning()) {
+                // The result screen waits for the camera to land.
+                return;
+            }
             ended = true;
             CN.callSerially(() -> {
                 driver.finished();
