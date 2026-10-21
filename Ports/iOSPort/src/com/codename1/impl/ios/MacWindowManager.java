@@ -383,11 +383,13 @@ public class MacWindowManager extends WindowManager {
         }
     }
 
-    /// Nothing: a Mac window marks unsaved changes with the dot in its close button,
-    /// which UIKit does not reach, and the default's "*" in the title is not how a
-    /// Mac application shows it.
+    /// A Mac window marks unsaved changes with the dot in its close button, which UIKit does
+    /// not reach. The title carries it instead, the way macOS itself names an edited document
+    /// in the title bar ("Title -- Edited"), rather than the default's "*".
     @Override
     public void setDocumentModified(Object p, boolean modified, String title) {
+        String t = title == null ? "" : title;
+        setTitle(p, modified ? t + " \u2014 Edited" : t);
     }
 
     @Override

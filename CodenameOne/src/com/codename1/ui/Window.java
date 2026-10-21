@@ -593,7 +593,7 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Whether this window still lists `c` among its commands.
     boolean publishesDocumentCommand(Command c) {
-        return commands.contains(c);
+        return Command.containsIdentical(commands, c);
     }
 
     /// The commands this window shows in its native menu, empty while it has no native peer.

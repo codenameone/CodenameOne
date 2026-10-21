@@ -1338,7 +1338,8 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         }
         switch ((rowFlags >> 8) & 0xff) {
             case 1: [replacedStock addObject:UIMenuAbout]; break;
-            case 2: [replacedStock addObject:UIMenuHide]; break;
+            // Not the whole Hide menu: it also holds Hide Others and Show All.
+            case 2: [replacedActions addObject:@"hide:"]; break;
             case 3: [replacedStock addObject:UIMenuQuit]; break;
             case 4: [replacedActions addObject:@"undo:"]; break;
             case 5: [replacedActions addObject:@"redo:"]; break;
@@ -1436,8 +1437,8 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         [builder removeMenuForIdentifier:stock];
     }
     if (replacedActions.count > 0) {
-        NSArray<UIMenuIdentifier> *stockMenus = @[UIMenuUndoRedo, UIMenuStandardEdit, UIMenuFullscreen,
-                UIMenuMinimizeAndZoom];
+        NSArray<UIMenuIdentifier> *stockMenus = @[UIMenuHide, UIMenuUndoRedo, UIMenuStandardEdit,
+                UIMenuFullscreen, UIMenuMinimizeAndZoom];
         for (UIMenuIdentifier stockMenu in stockMenus) {
             [builder replaceChildrenOfMenuForIdentifier:stockMenu
                                       fromChildrenBlock:^NSArray<UIMenuElement *> *(NSArray<UIMenuElement *> *children) {

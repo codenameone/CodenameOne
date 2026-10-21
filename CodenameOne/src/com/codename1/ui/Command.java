@@ -705,6 +705,21 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
+    /// Whether `list` holds `c` itself. By identity: `Command#equals(Object)` is structural, so
+    /// an equal command left behind on a surface would otherwise make that surface still look
+    /// like the owner of one moved away from it.
+    static boolean containsIdentical(java.util.List list, Command c) {
+        if (list == null) {
+            return false;
+        }
+        for (Object o : list) {
+            if (o == c) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean stillPublishes(Object surface, Command c) {
         if (surface instanceof Form) {
             return ((Form) surface).publishesDocumentCommand(c);

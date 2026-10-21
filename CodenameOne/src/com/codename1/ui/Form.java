@@ -3367,7 +3367,7 @@ public class Form extends Container implements TopLevelContainer {
     /// Whether this form still publishes `c` in its native menu or command surface.
     boolean publishesDocumentCommand(Command c) {
         java.util.Vector v = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
-        return v != null && v.contains(c);
+        return Command.containsIdentical(v, c);
     }
 
     /// Applies the reported modified state to commands as they are published, so a Save
