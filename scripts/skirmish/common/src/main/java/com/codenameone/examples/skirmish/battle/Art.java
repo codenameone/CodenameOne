@@ -43,6 +43,8 @@ public final class Art {
     public static final int BLUE = 0x2f7bff;
     public static final int RED = 0xe0453a;
     public static final int FRAMES = 4;
+    /// Ground texture pixels per arena tile.
+    public static final int TILE_PX = 32;
 
     /// A colour per card, in the order of [Cards#at].
     private static final Map<String, Integer> CARD_COLORS = new HashMap<String, Integer>();
@@ -151,6 +153,106 @@ public final class Art {
             SHEETS.put(key, sheet);
         }
         return sheet;
+    }
+
+    /// The field's ground texture, `TILE_PX` pixels per tile, laid out in rules
+    /// coordinates (row 0 is player 1's back line). Checkered turf, worn lanes,
+    /// sandy banks and the river; the bridges are 3D models on top of it.
+    public static Image field() {
+        int t = TILE_PX;
+        int w = 18 * t;
+        int h = 32 * t;
+        Image img = Image.createImage(w, h, 0xff5a9644);
+        Graphics g = img.getGraphics();
+        g.setAntiAliased(true);
+        for (int ty = 0; ty < 32; ty++) {
+            for (int tx = 0; tx < 18; tx++) {
+                g.setColor((tx + ty) % 2 == 0 ? 0x5f9e47 : 0x578f41);
+                g.fillRect(tx * t, ty * t, t, t);
+            }
+        }
+        // Worn lanes, wider near the towers.
+        g.setColor(0xc9b27a);
+        g.setAlpha(150);
+        for (int lane = 0; lane < 2; lane++) {
+            int lx = Arena.laneX(lane) * t / Arena.TILE;
+            g.fillRoundRect(lx - t * 3 / 4, t * 5, t * 3 / 2, h - t * 10, t, t);
+        }
+        // the cross path between the king towers and the lanes
+        g.fillRoundRect(Arena.LEFT_LANE_X * t / Arena.TILE, t * 5 / 2, (Arena.RIGHT_LANE_X - Arena.LEFT_LANE_X)
+                * t / Arena.TILE, t, t, t);
+        g.fillRoundRect(Arena.LEFT_LANE_X * t / Arena.TILE, h - t * 7 / 2, (Arena.RIGHT_LANE_X - Arena.LEFT_LANE_X)
+                * t / Arena.TILE, t, t, t);
+        g.setAlpha(255);
+        // Banks, then the water with a lighter centre.
+        int r1 = Arena.RIVER_TOP * t / Arena.TILE;
+        int r2 = Arena.RIVER_BOTTOM * t / Arena.TILE;
+        g.setColor(0xd8c48e);
+        g.fillRect(0, r1 - t / 4, w, r2 - r1 + t / 2);
+        g.fillLinearGradient(0x2f7fc8, 0x46a6e8, 0, r1, w, (r2 - r1) / 2, false);
+        g.fillLinearGradient(0x46a6e8, 0x2f7fc8, 0, r1 + (r2 - r1) / 2, w, (r2 - r1) / 2, false);
+        g.setColor(0xffffff);
+        g.setAlpha(60);
+        for (int i = 0; i < 18; i++) {
+            int wx = (i * 37) % w;
+            g.fillRoundRect(wx, r1 + ((i * 13) % (r2 - r1 - 6)), t, 3, 3, 3);
+        }
+        g.setAlpha(255);
+        // Plank bridges over the river.
+        for (int lane = 0; lane < 2; lane++) {
+            int bx = (Arena.laneX(lane) - Arena.BRIDGE_HALF_WIDTH) * t / Arena.TILE;
+            int bw = 2 * Arena.BRIDGE_HALF_WIDTH * t / Arena.TILE;
+            g.setColor(0x5a3a1c);
+            g.fillRect(bx - 3, r1 - t / 3, bw + 6, r2 - r1 + t * 2 / 3);
+            for (int py = r1 - t / 3; py < r2 + t / 3; py += 8) {
+                g.setColor((py / 8) % 2 == 0 ? 0xa8743e : 0x9a6835);
+                g.fillRect(bx, py, bw, 7);
+            }
+        }
+        // A low stone border around the play area.
+        g.setColor(0x8f8a7c);
+        g.drawRect(0, 0, w - 1, h - 1);
+        g.drawRect(1, 1, w - 3, h - 3);
+        return img;
+    }
+
+    /// The ground beyond the field.
+    public static Image meadow() {
+        int s = 128;
+        Image img = Image.createImage(s, s, 0xff4f8f3e);
+        Graphics g = img.getGraphics();
+        for (int i = 0; i < 260; i++) {
+            int x = (i * 53) % s;
+            int y = (i * 97 + i / 3) % s;
+            g.setColor(i % 3 == 0 ? 0x5a9c47 : 0x467f36);
+            g.fillRect(x, y, 2 + i % 3, 2);
+        }
+        return img;
+    }
+
+    /// A soft-edged ring for the circle under a unit's feet, white so a
+    /// material color tints it.
+    public static int[] ring(int size) {
+        int[] argb = new int[size * size];
+        float r = size / 2f;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                float dx = (x + 0.5f - r) / r;
+                float dy = (y + 0.5f - r) / r;
+                float d = (float) Math.sqrt(dx * dx + dy * dy);
+                float a;
+                if (d > 1f) {
+                    a = 0f;
+                } else if (d > 0.78f) {
+                    a = 1f - Math.abs(d - 0.89f) / 0.11f;
+                } else {
+                    a = 0.18f;
+                }
+                int c = (int) (Math.max(0f, a) * 255f);
+                argb[y * size + x] = (c << 24) | 0xffffff;
+            }
+        }
+        return argb;
     }
 
     /// The arena seen from `me`'s side, `w` x `h` pixels with the arena

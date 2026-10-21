@@ -18,12 +18,18 @@
  */
 package com.codenameone.examples.skirmish.battle;
 
-import com.codename1.gaming.AnimatedSprite;
+import com.codename1.gaming.AnimatedModel;
+import com.codename1.gaming.GameCamera;
 import com.codename1.gaming.GameInput;
 import com.codename1.gaming.GameView;
-import com.codename1.gaming.Scene;
-import com.codename1.gaming.Sprite;
-import com.codename1.gaming.SpriteSheet;
+import com.codename1.gaming.Model;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Matrix4;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.Primitives;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Texture;
 import com.codename1.ui.CN;
 import com.codenameone.examples.skirmish.rules.Arena;
 import com.codenameone.examples.skirmish.rules.CardDef;
@@ -36,20 +42,24 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
-/// The arena, drawn with `com.codename1.gaming`.
+/// The arena in 3D, drawn with `com.codename1.gaming`: animated glTF
+/// characters ([Actor]), glTF towers and scenery, and particle effects
+/// ([Effects]) under a perspective camera that looks down the field from
+/// behind the player's king.
 ///
 /// The simulation advances in fixed 50 ms ticks -- the rules' clock -- while
 /// the screen redraws as fast as the device allows. Between two ticks every
-/// unit is drawn part of the way from where it was to where it is
-/// ([#alpha]), so a 20 Hz simulation still moves smoothly at 60 or 120 Hz.
+/// unit is drawn part of the way from where it was to where it is, so a 20 Hz
+/// simulation still moves smoothly at 60 or 120 Hz.
 ///
 /// Nothing here decides anything. Units, hits and deaths all come from the
-/// [Match] the [Driver] steps; this class only turns them into sprites,
-/// effects and sound. Placing a card is the one input: a card chosen in the
-/// hand (a styled `Button` under the arena) and a press, drag and release on
-/// the field. A drag that starts on a card and ends on the field works too,
-/// because [GameView] reads the pointer at the form level.
+/// [Match] the [Driver] steps; this class only turns them into models,
+/// animation, effects and sound. Placing a card is the one input: a card
+/// chosen in the hand (a styled `Button` under the arena) and a press, drag
+/// and release on the field. The press is turned into a point on the ground
+/// by casting a ray from the camera through it.
 // tag::skirmish-battle-view[]
 public class BattleView extends GameView {
     /// The widgets around the arena: told about ticks and about the end.
@@ -63,27 +73,34 @@ public class BattleView extends GameView {
 
     public static final double TICK = 1.0 / Match.TICKS_PER_SECOND;
     private static final int MAX_STEPS_PER_FRAME = 12;
-    private static final int Z_GROUND = 100;
-    private static final int Z_AIR = 6000;
-    private static final int Z_EFFECT = 9000;
+    private static final float FOV = 34f;
 
     private final Driver driver;
+    private final Map<Integer, Actor> actors = new HashMap<Integer, Actor>();
+    private final Map<Integer, Model> orbs = new HashMap<Integer, Model>();
+    private final List<AnimatedModel> ruins = new ArrayList<AnimatedModel>();
+    private final Random fx = new Random(7);
+    private final float[] inverse = new float[16];
     private Hud hud;
-    private Viewport viewport;
-    private Sprite background;
-    private Sprite zone;
-    private Sprite ghost;
-    private final Map<Integer, UnitSprites> units = new HashMap<Integer, UnitSprites>();
-    private final List<AnimatedSprite> effects = new ArrayList<AnimatedSprite>();
+    private GraphicsDevice device;
+    private Effects effects;
+    private Mesh quad;
+    private Mesh sphere;
+    private Texture ringTexture;
+    private Model ghost;
+    private Model zone;
     private double accumulator;
-    private double alpha;
+    private float alpha;
     private String selected;
     private int hudTick = -1;
+    private int lastTick = -1;
     private boolean ended;
+    private boolean cheered;
+    private float sign = 1f;
 
     public BattleView(Driver driver) {
         this.driver = driver;
-        setClearColor(0xff1d3322);
+        setClearColor(0xff8fc4e8);
         setFocusable(true);
     }
 
@@ -104,16 +121,98 @@ public class BattleView extends GameView {
         return selected;
     }
 
+    // tag::skirmish-3d-setup[]
+    @Override
+    protected void onSetup(GraphicsDevice d) {
+        device = d;
+        sign = driver.me() == 0 ? 1f : -1f;
+        getLight().setDirection(-0.35f, -1f, -0.45f).setColor(0xfffff4e0).setAmbientColor(0xff8a8f9a);
+        GameCamera cam = getCamera();
+        cam.setPerspective(FOV, 1f, 200f);
+        cam.setPosition(0f, 33f, 30f);
+        cam.setTarget(0f, 0f, 1.6f);
+
+        quad = Primitives.quad(d, 1f);
+        sphere = Primitives.sphere(d, 0.45f, 10, 14, false);
+        ringTexture = d.createTexture(64, 64, Art.ring(64));
+        ringTexture.setFilter(Texture.Filter.LINEAR);
+
+        // The world beyond the field, then the field itself.
+        Texture meadow = d.createTexture(Art.meadow());
+        meadow.setWrap(Texture.Wrap.REPEAT);
+        Model outside = flat(new Material(Material.Type.LAMBERT).setTexture(meadow), 120f, 120f);
+        outside.setPosition(0f, -0.05f, 0f);
+        addModel(outside);
+        Texture fieldTexture = d.createTexture(Art.field());
+        fieldTexture.setFilter(Texture.Filter.LINEAR);
+        Model field = flat(new Material(Material.Type.LAMBERT).setTexture(fieldTexture), 18f, 32f);
+        field.setRotation(-90f, sign > 0 ? 0f : 180f, 0f);
+        addModel(field);
+
+        scenery();
+
+        zone = flat(new Material(Material.Type.UNLIT).setColor(0x50e0302a)
+                .setRenderState(RenderState.transparent()), 18f, Arena.RIVER_TOP / (float) Arena.TILE);
+        zone.setPosition(0f, 0.04f, -16f + Arena.RIVER_TOP / (float) Arena.TILE / 2f);
+        zone.setVisible(false);
+        addModel(zone);
+        ghost = Actor.ringModel(d, quad, ringTexture, true, 1f);
+        ghost.setVisible(false);
+        addModel(ghost);
+        effects = new Effects(d, this);
+    }
+    // end::skirmish-3d-setup[]
+
+    /// A flat rectangle lying on the ground, `w` by `h` world units.
+    private Model flat(Material m, float w, float h) {
+        Model model = new Model(quad, m);
+        model.setRotation(-90f, 0f, 0f);
+        model.setScale(w, h, 1f);
+        return model;
+    }
+
+    private AnimatedModel prop(String name, float x, float y, float z, float footprint) {
+        AnimatedModel m = new AnimatedModel(device, Models.scene(name));
+        float[] b = Actor.bounds(m);
+        float s = footprint / Math.max(0.01f, Math.max(b[3] - b[0], b[5] - b[2]));
+        m.setScale(s);
+        m.setPosition(x, y - b[1] * s, z);
+        m.addTo(this);
+        return m;
+    }
+
+    /// Trees, hills and rocks around the field, the same every match.
+    private void scenery() {
+        Random r = new Random(42);
+        String[] kinds = {"trees", "tree", "rock", "hill", "trees", "tree"};
+        for (int i = 0; i < 26; i++) {
+            float side = i % 2 == 0 ? -1f : 1f;
+            float x = side * (10.5f + r.nextFloat() * 6f);
+            float z = -18f + r.nextFloat() * 36f;
+            String kind = kinds[i % kinds.length];
+            float size = "hill".equals(kind) ? 5f : "rock".equals(kind) ? 1.4f : 2.6f + r.nextFloat();
+            AnimatedModel m = prop(kind, x, 0f, z, size);
+            m.setRotation(0f, r.nextFloat() * 360f, 0f);
+        }
+        for (int i = 0; i < 10; i++) {
+            float x = -9f + i * 2f;
+            prop(i % 3 == 0 ? "trees" : "tree", x, 0f, -19.5f - (i % 2), 2.8f);
+        }
+    }
+
+    /// Rules coordinates to world: the player's own side is toward the camera.
+    private float wx(int ax, int ay) {
+        return sign * (ax - Arena.WIDTH / 2) / (float) Arena.TILE;
+    }
+
+    private float wz(int ax, int ay) {
+        return sign * (ay - Arena.HEIGHT / 2) / (float) Arena.TILE;
+    }
+
     @Override
     protected void update(double dt) {
-        int w = getWidth();
-        int h = getHeight();
-        if (w <= 0 || h <= 0) {
+        if (effects == null || getWidth() <= 0 || getHeight() <= 0) {
             return;
-        }
-        if (viewport == null || viewport.width() != w || viewport.height() != h
-                || viewport.me() != driver.me()) {
-            layoutArena(w, h);
         }
         // tag::skirmish-fixed-tick[]
         accumulator += dt * driver.speedPercent() / 100.0;
@@ -124,93 +223,216 @@ public class BattleView extends GameView {
                 accumulator = Math.min(accumulator, TICK);
                 break;
             }
-            remember();
             driver.step();
-            effects(driver.match().events());
+            sync();
+            events(driver.match().events());
             accumulator -= TICK;
             steps++;
         }
-        alpha = Math.min(1, accumulator / TICK);
+        alpha = (float) Math.min(1, accumulator / TICK);
         // end::skirmish-fixed-tick[]
-        draw();
+        if (lastTick < 0) {
+            sync();
+        }
+        frame((float) dt);
         input();
         notifyHud();
     }
 
-    /// Where every unit stood before this tick, to draw it between ticks.
-    private void remember() {
-        for (UnitSprites s : units.values()) {
-            s.fromX = s.toX;
-            s.fromY = s.toY;
-        }
-    }
-
-    private void layoutArena(int w, int h) {
-        Scene scene = getScene();
-        scene.clear();
-        units.clear();
-        effects.clear();
-        viewport = new Viewport(driver.me(), w, h);
-        background = new Sprite(Art.arena(w, h, viewport));
-        background.setPosition(w / 2.0, h / 2.0);
-        background.setZOrder(0);
-        scene.add(background);
-
-        // The part of the field the player may not drop troops on, shaded
-        // while a card is held.
-        zone = new Sprite(Art.pixel());
-        int riverTop = Math.min(viewport.sy(0, Arena.RIVER_TOP), viewport.sy(0, Arena.RIVER_BOTTOM));
-        int fieldTop = Math.min(viewport.sy(0, 0), viewport.sy(0, Arena.HEIGHT));
-        zone.setAnchor(0, 0);
-        zone.setPosition(Math.min(viewport.sx(0, 0), viewport.sx(Arena.WIDTH, 0)), fieldTop);
-        zone.setSize(viewport.px(Arena.WIDTH), riverTop - fieldTop + viewport.px(2 * Arena.TILE));
-        zone.setColor(0xffd0302a);
-        zone.setAlpha(70);
-        zone.setVisible(false);
-        zone.setZOrder(1);
-        scene.add(zone);
-
-        ghost = new Sprite(Art.pixel());
-        ghost.setVisible(false);
-        ghost.setAlpha(150);
-        ghost.setZOrder(Z_EFFECT + 500);
-        scene.add(ghost);
-        accumulator = 0;
-        hudTick = -1;
-    }
-
-    /// Brings the sprites in line with the match's units and places them.
-    private void draw() {
+    /// One tick happened: every live unit gets its new position, a unit the
+    /// match no longer has starts to die.
+    private void sync() {
         Match m = driver.match();
-        Scene scene = getScene();
+        lastTick = m.tick();
         List<Unit> live = m.units();
         for (int i = 0; i < live.size(); i++) {
             Unit u = live.get(i);
-            UnitSprites s = units.get(Integer.valueOf(u.id()));
-            if (s == null) {
-                s = new UnitSprites(u, viewport, scene);
-                units.put(Integer.valueOf(u.id()), s);
+            CardDef card = u.card();
+            if (card.kind == CardDef.SPELL) {
+                continue;
             }
-            s.seen = m.tick();
-            s.toX = viewport.sx(u.x(), u.y());
-            s.toY = viewport.sy(u.x(), u.y());
-            s.place(u, alpha);
+            Integer key = Integer.valueOf(u.id());
+            Actor a = actors.get(key);
+            if (a == null) {
+                a = create(u);
+                actors.put(key, a);
+            }
+            a.seen = lastTick;
+            a.moveTo(wx(u.x(), u.y()), wz(u.x(), u.y()));
         }
-        for (Iterator<UnitSprites> it = units.values().iterator(); it.hasNext();) {
-            UnitSprites s = it.next();
-            if (s.seen != m.tick()) {
-                s.remove(scene);
+        for (Iterator<Actor> it = actors.values().iterator(); it.hasNext();) {
+            Actor a = it.next();
+            if (a.seen != lastTick && a.dying < 0f) {
+                kill(a);
+            }
+        }
+    }
+
+    private Actor create(Unit u) {
+        CardDef card = u.card();
+        boolean mine = u.owner() == driver.me();
+        Models.Look look = Models.of(card.id);
+        String name;
+        float footprint = 2f;
+        if (Cards.KING_TOWER.equals(card.id)) {
+            name = mine ? "castle_blue" : "castle_red";
+            footprint = 3.6f;
+        } else if (Cards.PRINCESS_TOWER.equals(card.id)) {
+            name = mine ? "tower_blue" : "tower_red";
+            footprint = 2.5f;
+        } else {
+            name = look == null ? "knight" : look.model;
+            footprint = look == null ? 2f : look.size;
+        }
+        AnimatedModel model = new AnimatedModel(device, Models.scene(name));
+        float radius = Math.max(0.35f, card.radius() / (float) Arena.TILE);
+        Model ring = Actor.ringModel(device, quad, ringTexture, mine, radius);
+        Actor a = new Actor(u, mine, model, look, ring, footprint);
+        if (a.structure) {
+            float[] b = Actor.bounds(model);
+            model.setPosition(0f, -b[1] * a.scale, 0f);
+        }
+        addModel(ring);
+        model.addTo(this);
+        getScene().add(a.barBack);
+        getScene().add(a.bar);
+        if (!a.structure && lastTick > 0) {
+            effects.spawn(wx(u.x(), u.y()), wz(u.x(), u.y()), mine);
+        }
+        return a;
+    }
+
+    private void kill(Actor a) {
+        a.die();
+        if (a.structure) {
+            effects.explosion(a.toX, 1.5f, a.toZ, 3f);
+            a.model.setVisible(false);
+            AnimatedModel ruin = prop("ruin", a.toX, 0f, a.toZ, 3f);
+            ruins.add(ruin);
+            Sfx.boom();
+        }
+    }
+
+    // tag::skirmish-events-3d[]
+    private void events(List<Event> events) {
+        Match m = driver.match();
+        for (int i = 0; i < events.size(); i++) {
+            Event e = events.get(i);
+            float x = wx(e.x, e.y);
+            float z = wz(e.x, e.y);
+            switch (e.kind) {
+                case Event.ATTACK: {
+                    Actor attacker = actors.get(Integer.valueOf(e.source));
+                    Actor target = actors.get(Integer.valueOf(e.target));
+                    if (attacker != null) {
+                        attacker.attacked(x, z);
+                    }
+                    if (target != null) {
+                        target.hit();
+                        effects.hit(target.toX, Math.min(1.2f, target.height * 0.6f), target.toZ);
+                    } else {
+                        effects.hit(x, 0.6f, z);
+                    }
+                    Sfx.hit();
+                    break;
+                }
+                case Event.SPELL: {
+                    Unit spell = m.unit(e.source);
+                    CardDef sd = spell == null ? null : spell.card();
+                    float size = sd == null ? 2.5f : sd.splash() / (float) Arena.TILE;
+                    if (sd != null && "arrow-rain".equals(sd.id)) {
+                        effects.volley(x, z, size * 0.7f, 30, fx);
+                        effects.dust(x, z);
+                    } else {
+                        effects.explosion(x, 0.4f, z, size);
+                    }
+                    Model orb = orbs.remove(Integer.valueOf(e.source));
+                    if (orb != null) {
+                        removeModel(orb);
+                    }
+                    Sfx.boom();
+                    break;
+                }
+                case Event.DEATH: {
+                    Actor a = actors.get(Integer.valueOf(e.source));
+                    if (a != null && a.dying < 0f) {
+                        kill(a);
+                    }
+                    break;
+                }
+                case Event.TOWER_DOWN:
+                    effects.explosion(x, 1.5f, z, 3.5f);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    // end::skirmish-events-3d[]
+
+    /// Everything that moves between ticks: actors, falling spells, effects.
+    private void frame(float dt) {
+        Match m = driver.match();
+        for (Iterator<Actor> it = actors.values().iterator(); it.hasNext();) {
+            Actor a = it.next();
+            Unit u = a.dying < 0f ? m.unit(a.id) : null;
+            a.frame(u, alpha, dt);
+            if (a.gone()) {
+                a.model.removeFrom(this);
+                removeModel(a.ring);
+                getScene().remove(a.barBack);
+                getScene().remove(a.bar);
                 it.remove();
             }
         }
-        for (Iterator<AnimatedSprite> it = effects.iterator(); it.hasNext();) {
-            AnimatedSprite e = it.next();
-            if (!e.isPlaying()) {
-                scene.remove(e);
-                it.remove();
+        spells(m);
+        if (m.isOver() && !cheered) {
+            cheered = true;
+            int winner = m.result();
+            for (Actor a : actors.values()) {
+                if ((a.mine && winner == driver.me()) || (!a.mine && winner >= 0 && winner != driver.me())) {
+                    a.cheer();
+                }
             }
         }
-        scene.markSortDirty();
+        effects.update(dt, getCamera());
+    }
+
+    /// A fire orb arcs from its caster's king tower to where it will land;
+    /// arrows start falling as the volley is about to hit.
+    private void spells(Match m) {
+        List<Unit> live = m.units();
+        for (int i = 0; i < live.size(); i++) {
+            Unit u = live.get(i);
+            CardDef card = u.card();
+            if (card.kind != CardDef.SPELL || !u.isDeploying()) {
+                continue;
+            }
+            float tx = wx(u.x(), u.y());
+            float tz = wz(u.x(), u.y());
+            float total = Math.max(1, card.deployTicks());
+            float p = 1f - Math.max(0f, (u.deployTimer() - alpha)) / total;
+            if ("arrow-rain".equals(card.id)) {
+                if (p > 0.5f && fx.nextInt(3) == 0) {
+                    effects.volley(tx, tz, card.splash() / (float) Arena.TILE * 0.7f, 2, fx);
+                }
+                continue;
+            }
+            Integer key = Integer.valueOf(u.id());
+            Model orb = orbs.get(key);
+            if (orb == null) {
+                orb = new Model(sphere, new Material(Material.Type.UNLIT).setColor(0xffffb040));
+                orbs.put(key, orb);
+                addModel(orb);
+            }
+            boolean mine = u.owner() == driver.me();
+            float sz = mine ? 13f : -13f;
+            float x = 0f + (tx - 0f) * p;
+            float z = sz + (tz - sz) * p;
+            float y = 3f + (0.3f - 3f) * p + 9f * p * (1f - p);
+            orb.setPosition(x, y, z);
+            effects.trail(x, y, z);
+        }
     }
 
     // tag::skirmish-touch[]
@@ -221,20 +443,25 @@ public class BattleView extends GameView {
         int px = in.getPointerX();
         int py = in.getPointerY();
         boolean inside = px >= 0 && py >= 0 && px < getWidth() && py < getHeight();
-        if (holding && in.isPointerDown() && inside) {
+        float[] ground = holding && inside ? pick(px, py) : null;
+        if (holding && in.isPointerDown() && ground != null) {
             CardDef def = Cards.get(card);
-            int size = Math.max(16, viewport.px(Math.max(def.radius() * 2, def.splash() * 2)));
-            ghost.setImage(Art.cardIcon(card, size));
-            ghost.setPosition(px, py);
+            int ax = ax(ground[0], ground[1]);
+            int ay = ay(ground[0], ground[1]);
+            boolean ok = driver.match().canPlay(driver.me(), card, ax, ay);
+            float r = Math.max(def.radius(), def.splash()) / (float) Arena.TILE;
+            ghost.setScale(Math.max(1f, r * 2f + 0.4f));
+            ghost.setPosition(ground[0], 0.06f, ground[1]);
+            ghost.getMaterial().setColor(ok ? 0xe0ffffff : 0xe0ff4040);
             ghost.setVisible(true);
             zone.setVisible(def.kind != CardDef.SPELL);
         } else {
             ghost.setVisible(false);
             zone.setVisible(false);
         }
-        if (holding && in.wasPointerReleased() && inside) {
-            int x = viewport.ax(px, py);
-            int y = viewport.ay(px, py);
+        if (holding && in.wasPointerReleased() && ground != null) {
+            int x = ax(ground[0], ground[1]);
+            int y = ay(ground[0], ground[1]);
             if (driver.match().canPlay(driver.me(), card, x, y)) {
                 driver.play(card, x, y);
                 Sfx.deploy();
@@ -249,52 +476,54 @@ public class BattleView extends GameView {
     }
     // end::skirmish-touch[]
 
-    private void effects(List<Event> events) {
-        for (int i = 0; i < events.size(); i++) {
-            Event e = events.get(i);
-            switch (e.kind) {
-                case Event.ATTACK:
-                    burst(e.x, e.y, Math.max(10, viewport.px(600)), 0xfff2e6c0, 0.04);
-                    Sfx.hit();
-                    break;
-                case Event.SPELL:
-                    // A spell lands where it was cast, splash wide.
-                    Unit spell = driver.match().unit(e.source);
-                    CardDef sd = spell == null ? null : spell.card();
-                    burst(e.x, e.y, Math.max(24, viewport.px(sd == null ? 2500 : sd.splash() * 2)),
-                            0xff000000 | (sd == null ? 0xffaa33 : Art.colorOf(sd.id)), 0.06);
-                    Sfx.boom();
-                    break;
-                case Event.DEATH:
-                    burst(e.x, e.y, Math.max(14, viewport.px(1200)), 0xff9aa0a6, 0.06);
-                    break;
-                case Event.TOWER_DOWN:
-                    burst(e.x, e.y, Math.max(40, viewport.px(4000)), 0xffff8c2a, 0.09);
-                    Sfx.boom();
-                    break;
-                case Event.SPAWN:
-                    Unit u = driver.match().unit(e.source);
-                    burst(e.x, e.y, Math.max(16, viewport.px(1400)),
-                            u != null && u.owner() == driver.me() ? 0xff8fb8ff : 0xffff9a8f, 0.05);
-                    break;
-                default:
-                    break;
-            }
-        }
+    private int ax(float x, float z) {
+        return Math.round(x * sign * Arena.TILE) + Arena.WIDTH / 2;
     }
 
-    private void burst(int x, int y, int size, int argb, double frameSeconds) {
-        int sheetSize = size <= 24 ? 24 : size <= 64 ? 64 : 128;
-        SpriteSheet sheet = Art.burst(sheetSize);
-        AnimatedSprite s = new AnimatedSprite(sheet, new int[] {0, 1, 2, 3, 4, 5}, frameSeconds);
-        s.setLooping(false);
-        s.setScale((float) size / sheetSize);
-        s.setColor(argb);
-        s.setPosition(viewport.sx(x, y), viewport.sy(x, y));
-        s.setZOrder(Z_EFFECT);
-        s.play();
-        getScene().add(s);
-        effects.add(s);
+    private int ay(float x, float z) {
+        return Math.round(z * sign * Arena.TILE) + Arena.HEIGHT / 2;
+    }
+
+    /// Where the ray from the camera through screen point `(px, py)` meets
+    /// the ground, as `{x, z}`, or null when it misses.
+    // tag::skirmish-pick[]
+    float[] pick(int px, int py) {
+        GameCamera c = getCamera();
+        float aspect = (float) getWidth() / Math.max(1, getHeight());
+        float[] proj = Matrix4.perspective((float) Math.toRadians(c.getFov()), aspect, 1f, 200f);
+        float[] view = Matrix4.lookAt(c.getEyeX(), c.getEyeY(), c.getEyeZ(),
+                c.getTargetX(), c.getTargetY(), c.getTargetZ(), 0f, 1f, 0f);
+        float[] vp = new float[16];
+        Matrix4.multiply(proj, view, vp);
+        if (!Matrix4.invert(vp, inverse)) {
+            return null;
+        }
+        float nx = 2f * (px + 0.5f) / getWidth() - 1f;
+        float ny = 1f - 2f * (py + 0.5f) / getHeight();
+        float[] near = unproject(nx, ny, -1f);
+        float[] far = unproject(nx, ny, 1f);
+        float dy = far[1] - near[1];
+        if (Math.abs(dy) < 1e-6f) {
+            return null;
+        }
+        float t = -near[1] / dy;
+        if (t < 0f) {
+            return null;
+        }
+        return new float[] {near[0] + (far[0] - near[0]) * t, near[2] + (far[2] - near[2]) * t};
+    }
+    // end::skirmish-pick[]
+
+    private float[] unproject(float x, float y, float z) {
+        float[] m = inverse;
+        float rx = m[0] * x + m[4] * y + m[8] * z + m[12];
+        float ry = m[1] * x + m[5] * y + m[9] * z + m[13];
+        float rz = m[2] * x + m[6] * y + m[10] * z + m[14];
+        float rw = m[3] * x + m[7] * y + m[11] * z + m[15];
+        if (rw == 0f) {
+            rw = 1e-6f;
+        }
+        return new float[] {rx / rw, ry / rw, rz / rw};
     }
 
     private void notifyHud() {
@@ -315,80 +544,6 @@ public class BattleView extends GameView {
         if (m.tick() / 5 != hudTick) {
             hudTick = m.tick() / 5;
             CN.callSerially(() -> hud.ticked(m));
-        }
-    }
-
-    /// The sprites of one unit: its body and, once hurt, a health bar.
-    private static final class UnitSprites {
-        final Sprite body;
-        final Sprite barBack;
-        final Sprite bar;
-        final int size;
-        final boolean structure;
-        int fromX = Integer.MIN_VALUE;
-        int fromY;
-        int toX;
-        int toY;
-        int seen;
-
-        UnitSprites(Unit u, Viewport v, Scene scene) {
-            CardDef card = u.card();
-            structure = card.kind == CardDef.TOWER || card.kind == CardDef.BUILDING;
-            int team = u.owner() == v.me() ? 0 : 1;
-            size = Math.max(14, v.px(card.radius() * 2 + (structure ? 400 : 300)));
-            if (card.kind == CardDef.SPELL) {
-                body = new Sprite(Art.cardIcon(card.id, size));
-            } else {
-                SpriteSheet sheet = Art.unitSheet(card.id, team, size);
-                AnimatedSprite a = new AnimatedSprite(sheet, new int[] {0, 1, 2, 3},
-                        structure ? 0.4 : 0.14);
-                a.setLooping(true);
-                a.play();
-                body = a;
-            }
-            barBack = new Sprite(Art.pixel());
-            barBack.setColor(0xff1b1b1b);
-            bar = new Sprite(Art.pixel());
-            bar.setColor(team == 0 ? 0xff4fa3ff : 0xffff5a4f);
-            barBack.setAnchor(0, 0.5);
-            bar.setAnchor(0, 0.5);
-            scene.add(body);
-            scene.add(barBack);
-            scene.add(bar);
-        }
-
-        void place(Unit u, double alpha) {
-            if (fromX == Integer.MIN_VALUE) {
-                fromX = toX;
-                fromY = toY;
-            }
-            double x = fromX + (toX - fromX) * alpha;
-            double y = fromY + (toY - fromY) * alpha;
-            body.setPosition(x, y);
-            boolean air = u.card().isFlying();
-            int z = (air ? Z_AIR : Z_GROUND) + (int) y;
-            body.setZOrder(z);
-            body.setAlpha(u.isDeploying() ? 140 : 255);
-            boolean hurt = u.hp() < u.maxHp() || structure;
-            barBack.setVisible(hurt && u.card().kind != CardDef.SPELL);
-            bar.setVisible(barBack.isVisible());
-            if (hurt) {
-                int bw = Math.max(10, size * 4 / 5);
-                int bh = Math.max(3, size / 10);
-                double top = y - size / 2.0 - bh;
-                barBack.setSize(bw, bh);
-                barBack.setPosition(x - bw / 2.0, top);
-                bar.setSize(Math.max(1, bw * u.hp() / Math.max(1, u.maxHp())), bh);
-                bar.setPosition(x - bw / 2.0, top);
-                barBack.setZOrder(z + 1);
-                bar.setZOrder(z + 2);
-            }
-        }
-
-        void remove(Scene scene) {
-            scene.remove(body);
-            scene.remove(barBack);
-            scene.remove(bar);
         }
     }
 }

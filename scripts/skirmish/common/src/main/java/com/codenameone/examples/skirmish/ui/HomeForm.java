@@ -43,6 +43,9 @@ public final class HomeForm {
         f.getToolbar().hideToolbar();
         Container body = new Container(BoxLayout.y());
         body.setScrollableY(true);
+        // The toolbar is hidden here, so nothing else keeps the wallet out
+        // from under the notch.
+        f.getContentPane().setSafeArea(true);
         body.add(Ui.wallet(p));
         body.add(Ui.centered(Ui.label(p.displayName(), "PlayerBanner")));
         if (p.suspended()) {

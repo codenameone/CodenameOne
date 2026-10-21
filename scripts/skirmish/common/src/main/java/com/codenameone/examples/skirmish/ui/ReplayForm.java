@@ -105,6 +105,7 @@ public final class ReplayForm implements BattleView.Hud {
         });
         Container controls = new Container(new BorderLayout());
         controls.setUIID("ReplayBar");
+        controls.setSafeArea(true);
         controls.add(BorderLayout.WEST, BoxLayout.encloseX(pause, speed));
         controls.add(BorderLayout.CENTER, scrub);
         controls.add(BorderLayout.EAST, clock);

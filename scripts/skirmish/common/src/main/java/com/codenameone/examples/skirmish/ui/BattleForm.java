@@ -121,6 +121,9 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
     private Container top() {
         Container names = new Container(new BorderLayout());
         names.setUIID("BattleTop");
+        // Clear of the notch and the rounded corners; the arena below it
+        // can run to the edges, but nothing a player reads or presses may.
+        names.setSafeArea(true);
         Label them = new Label(driver.name(1 - driver.me()), "EnemyName");
         Label us = new Label(driver.name(driver.me()), "PlayerName");
         names.add(BorderLayout.WEST, BoxLayout.encloseY(them, us));
@@ -160,6 +163,8 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
             south.add(emotes);
         }
         south.setUIID("BattleBottom");
+        // Above the home indicator, where a press would be taken for a swipe.
+        south.setSafeArea(true);
         return south;
     }
 
