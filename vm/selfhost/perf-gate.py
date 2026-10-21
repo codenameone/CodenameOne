@@ -39,9 +39,11 @@ Every run is verified: translation output byte for byte against the first run, w
 checksums across arms and rounds. A ratio can never come from doing less work.
 
 A ratio more than the tolerance above its baseline in vm/selfhost/perf-baseline/ is a
-regression and the exit status is 1. So is a ratio more than the tolerance BELOW it: an
-improvement that is not written down as the new baseline lets a later change give it back
-without failing anything. So is a MISSING baseline -- a benchmark with no row, or a runner
+regression and the exit status is 1. A ratio more than the tolerance BELOW it is an
+improvement: it is reported, with the rebaseline command, but does NOT fail. Failing on it
+turned every real VM win into a red master for every open pull request until someone
+rebaselined, and RAM ratios that sit just past the tolerance flipped jobs at random. A
+MISSING baseline still fails -- a benchmark with no row, or a runner
 whose CPU model has none -- because a gate that goes quiet whenever it cannot judge stops
 preventing regressions without anyone noticing. Each of these is fixed in the pull
 request's own pr/<number>.json, which calibrate-perf-baseline.py writes from the run's
@@ -378,7 +380,7 @@ def verdict(ratio, base, tolerance, floor=0.0):
     `floor` above it in absolute terms. The floor is for RAM: a workload whose ParparVM
     footprint is a few MB against the JVM's ~40MB sits at ratios near 0.05, where under a
     megabyte of jitter is a +30% change that means nothing. An improvement is the mirror
-    image, floor included, and FAILS the gate as well until it is rebaselined."""
+    image, floor included; it is reported but does not fail the gate."""
     if base is None:
         return 'uncalibrated'
     if ratio > base * (1 + tolerance) and ratio - base > floor:
@@ -458,7 +460,7 @@ def status_cell(entry):
                                 (entry[m]['median'] / entry[m]['baseline'] - 1) * 100)
                 for m in ('time', 'memory') if entry[m]['verdict'] == 'improved']
     if improved:
-        return '**IMPROVED: rebaseline** (%s)' % ', '.join(improved)
+        return 'improved: rebaseline to lock in (%s)' % ', '.join(improved)
     return 'ok'
 
 
@@ -543,16 +545,16 @@ def render_markdown(report):
         lines += ['- ' + r for r in regressions]
         lines.append('')
     if improvements:
-        lines.append('**%d improvement%s past the baseline, which fail%s until rebaselined:**'
+        lines.append('**%d improvement%s past the baseline (not a failure; rebaseline to lock %s in):**'
                      % (len(improvements), '' if len(improvements) == 1 else 's',
-                        's' if len(improvements) == 1 else ''))
+                        'it' if len(improvements) == 1 else 'them'))
         lines += ['- ' + r for r in improvements]
         lines.append('')
     lines += ['Ratios are **ParparVM / JDK 25**: below 1.00x ParparVM is faster (time) or '
               'smaller (RAM). Median of %d interleaved, paired rounds; every run\'s output '
-              'was verified. A ratio more than %d%% (time) / %d%% (RAM) away from its baseline in '
-              '`vm/selfhost/perf-baseline/` fails: above it is a regression, below it an '
-              'improvement that has to be rebaselined (a row whose calibration runs were '
+              'was verified. A ratio more than %d%% (time) / %d%% (RAM) above its baseline in '
+              '`vm/selfhost/perf-baseline/` is a regression and fails; one that far below '
+              'is an improvement, reported but not failed (a row whose calibration runs were '
               'noisier carries a wider tolerance), and for RAM the change must also exceed '
               '0.05x in absolute terms.%s'
               % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100),
@@ -608,9 +610,9 @@ def render_markdown(report):
         ('gate did not complete' if report.get('error') else
          ('benchmark failed' if report.get('failures') else
           ('no baseline: calibration required' if missing_baselines(report)
-           else ('improved past the baseline: rebaseline required' if improvements
-                 else ('stale overlay: re-measure required' if report.get('stale_overlay')
-                       else 'no regression'))))))]
+           else ('stale overlay: re-measure required' if report.get('stale_overlay')
+                 else ('no regression (improved past the baseline: consider rebaselining)'
+                       if improvements else 'no regression'))))))]
     return '\n'.join(lines) + '\n'
 
 
@@ -773,7 +775,10 @@ def main(argv):
                     # A row may carry its own tolerance: where two calibration runs of
                     # unchanged code already disagreed by more than the global one, the
                     # global one would fail on noise alone.
-                    row_tolerance = base.get('tolerance', {}).get(metric, tolerance[metric])
+                    # It only ever widens the global one: a row calibrated from a single
+                    # quiet run must not be stricter than the policy.
+                    row_tolerance = max(base.get('tolerance', {}).get(metric, 0.0),
+                                        tolerance[metric])
                     floor = baseline.get('floor', {}).get(metric, 0.0)
                     entry[metric] = dict(paired(values), baseline=base.get(metric),
                                          tolerance=row_tolerance,
@@ -810,9 +815,9 @@ def main(argv):
     print('perf-gate: %s' % ('REGRESSION' if report['regression'] else
                              ('FAILED' if failed else
                               ('NO BASELINE' if uncalibrated else
-                               ('IMPROVED: REBASELINE' if improved else
-                                ('STALE OVERLAY' if stale else 'OK'))))))
-    return 1 if report['regression'] or failed or uncalibrated or improved or stale else 0
+                               ('STALE OVERLAY' if stale else
+                                ('OK (IMPROVED: consider rebaselining)' if improved else 'OK'))))))
+    return 1 if report['regression'] or failed or uncalibrated or stale else 0
 
 
 if __name__ == '__main__':

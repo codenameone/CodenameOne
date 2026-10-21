@@ -18,6 +18,9 @@ public class WebServiceProxyCallTest extends UITestBase {
     public void resetNetworkManager() {
         // Ensure NetworkManager is in a clean state
         try {
+            // Stop the workers first; clearing the fields alone leaks them, still
+            // draining the shared queue, into every later test class.
+            NetworkManager.getInstance().shutdown();
             java.lang.reflect.Field runningField = NetworkManager.class.getDeclaredField("running");
             runningField.setAccessible(true);
             runningField.setBoolean(NetworkManager.getInstance(), false);

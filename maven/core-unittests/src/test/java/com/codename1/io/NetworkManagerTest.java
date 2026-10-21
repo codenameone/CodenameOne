@@ -274,6 +274,11 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
     }
 
     private void resetManagerState() throws Exception {
+        // Stop the workers before forgetting them. Clearing the fields alone left
+        // them alive and draining the shared queue beside the next start()'s, so
+        // every later test class ran with several network threads -- which made
+        // TelemetryTest's retry race fail on CI.
+        manager.shutdown();
         Field runningField = NetworkManager.class.getDeclaredField("running");
         runningField.setAccessible(true);
         runningField.setBoolean(manager, false);

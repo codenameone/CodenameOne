@@ -2011,6 +2011,34 @@ public final class NetworkManager {
             return true;
         }
 
+        /// The first pending request no OTHER worker is running, or -1. A listener
+        /// that calls retry() on the EDT queues the request while the worker
+        /// that ran the attempt is still finishing it; with more than one network
+        /// thread a second worker took it at once and the same request object ran
+        /// on two threads, sharing its connection, streams, response code and
+        /// tracer attempt -- the first attempt's span was overwritten and lost.
+        /// Called with LOCK held.
+        private int nextRunnableIndex() {
+            NetworkThread[] workers = networkThreads;
+            int size = pending.size();
+            for (int i = 0; i < size; i++) {
+                Object candidate = pending.elementAt(i);
+                boolean busy = false;
+                if (workers != null) {
+                    for (NetworkThread w : workers) {
+                        if (w != null && w != this && w.currentRequest == candidate) { //NOPMD CompareObjectsWithEquals
+                            busy = true;
+                            break;
+                        }
+                    }
+                }
+                if (!busy) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         @Override
         public void run() {
             threadInstance = Thread.currentThread();
@@ -2022,8 +2050,21 @@ public final class NetworkManager {
                         if (pending.isEmpty()) {
                             continue;
                         }
-                        currentRequest = (ConnectionRequest) pending.elementAt(0);
-                        pending.removeElementAt(0);
+                        int next = nextRunnableIndex();
+                        if (next < 0) {
+                            // Everything pending is a request another worker is
+                            // still running: a retry or redirect queued from the
+                            // EDT before that worker finished the attempt. Wait
+                            // for it; the worker notifies when it lets go.
+                            try {
+                                LOCK.wait(20);
+                            } catch (InterruptedException ex) {
+                                ex.printStackTrace();
+                            }
+                            continue;
+                        }
+                        currentRequest = (ConnectionRequest) pending.elementAt(next);
+                        pending.removeElementAt(next);
                         currentRequest.prepare();
                         if (currentRequest.isKilled()) {
                             // Killed while it waited: runCurrentRequest, whose
@@ -2053,6 +2094,12 @@ public final class NetworkManager {
                         }
                     }
                     if (!runCurrentRequest(currentRequest)) {
+                        // Let go of it here too: a worker still naming a request
+                        // it handed back would keep the others from taking it.
+                        synchronized (LOCK) {
+                            currentRequest = null;
+                            LOCK.notifyAll();
+                        }
                         continue;
                     }
 

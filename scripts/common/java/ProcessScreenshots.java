@@ -399,6 +399,12 @@ public class ProcessScreenshots {
                         .filter(n -> n.endsWith(".png"))
                         .map(n -> n.substring(0, n.length() - ".png".length()))
                         .filter(name -> !deliveredTests.contains(name))
+                        // A golden whose row the spec scopes to OTHER platforms
+                        // (platforms: macos) is never rendered here by design; the
+                        // reference apps still capture it. Counting it as missing failed
+                        // every Windows and GNOME run on DesktopSeparator.
+                        .filter(name -> specPlatform == null || specByComponent == null
+                                || resolveSpecInfo(specByComponent, name) != null)
                         .forEach(missingTests::add);
             }
             Collections.sort(missingTests);

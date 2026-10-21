@@ -91,14 +91,14 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('**no baseline for this CPU model** -- the gate fails', text)
         self.assertIn('**Result: no baseline: calibration required**', text)
 
-    def test_an_improvement_fails_and_says_how_to_rebaseline(self):
+    def test_an_improvement_passes_and_says_how_to_rebaseline(self):
         r = report({'quicksort': {'all': (metric(0.7, 1.0, 'improved'), metric(0.9, 0.9, 'ok'))}})
         r['pr'] = 5931
         text = gate.render_markdown(r)
-        self.assertIn('**IMPROVED: rebaseline** (time -30.0%)', text)
+        self.assertIn('improved: rebaseline to lock in (time -30.0%)', text)
         self.assertIn('vm/selfhost/perf-baseline/pr/5931.json', text)
         self.assertIn('--pr 5931 --reason', text)
-        self.assertIn('**Result: improved past the baseline: rebaseline required**', text)
+        self.assertIn('**Result: no regression (improved past the baseline: consider rebaselining)**', text)
 
     def test_a_calibration_names_this_pull_requests_overlay(self):
         r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
@@ -831,10 +831,10 @@ class VerdictStepTests(unittest.TestCase):
         self.assertIn('NO BASELINE', r.stdout)
         self.assertIn('calibrate-perf-baseline.py', r.stdout)
 
-    def test_an_improvement_fails_the_job(self):
+    def test_an_improvement_passes_the_job(self):
         r = self.verdict({'platform': 'linux-x64', 'pr': 5931, 'labels': {},
                           'results': {'quicksort': self.row('improved')}, 'regression': False})
-        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('IMPROVED', r.stdout)
         self.assertIn('perf-baseline/pr/5931.json', r.stdout)
 
