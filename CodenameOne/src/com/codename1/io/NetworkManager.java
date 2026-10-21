@@ -2042,6 +2042,20 @@ public final class NetworkManager {
         @Override
         public void run() {
             threadInstance = Thread.currentThread();
+            try {
+                runLoop();
+            } finally {
+                // A worker that leaves abnormally (an override throwing outside
+                // runCurrentRequest's catch) must not keep naming its request:
+                // nextRunnableIndex() would treat a retry of it as busy forever.
+                synchronized (LOCK) {
+                    currentRequest = null;
+                    LOCK.notifyAll();
+                }
+            }
+        }
+
+        private void runLoop() {
             while (running && !stopped) {
                 if (!pending.isEmpty()) {
                     // the synchronization here isn't essential, only for good measure
