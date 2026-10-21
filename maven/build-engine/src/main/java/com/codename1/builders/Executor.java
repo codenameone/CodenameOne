@@ -3719,8 +3719,92 @@ public abstract class Executor {
             }
             zis.close();
             source.close();
+            pruneUnusedFlutterPlugins(classesDir);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    static final String FLUTTER_PLUGINS = "com/codename1/flutter/plugins/";
+
+    /// Removes every flutter-runtime plugin pack the application never references.
+    ///
+    /// The runtime jar carries one package per supported pub plugin (geolocator,
+    /// firebase, image_picker, ...), and the application jar merges it whole. The
+    /// builders decide permissions, manifest entries and native dependencies from
+    /// the classes they find, so an unused pack was not just dead weight: every
+    /// Flutter app on Android asked for location, microphone and notification
+    /// permissions and shipped Play Services location (about 760 KB of dex). A pack
+    /// is kept when a class outside the plugin tree names it -- the transpiled app
+    /// calls into the packs it imports -- or a kept pack does (share uses crossfile).
+    /// Nothing in the runtime outside the plugin tree refers to a pack, and nothing
+    /// loads one reflectively, so a pack no one names is unreachable.
+    static void pruneUnusedFlutterPlugins(File classesDir) throws IOException {
+        File root = new File(classesDir, FLUTTER_PLUGINS.replace('/', File.separatorChar));
+        String[] names = root.list();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        java.util.Set<String> packs = new java.util.TreeSet<String>();
+        for (String n : names) {
+            if (new File(root, n).isDirectory()) {
+                packs.add(n);
+            }
+        }
+        java.util.Set<String> kept = new java.util.TreeSet<String>();
+        collectPluginRefs(classesDir, root, packs, kept);
+        java.util.List<String> todo = new java.util.ArrayList<String>(kept);
+        while (!todo.isEmpty()) {
+            String pack = todo.remove(todo.size() - 1);
+            java.util.Set<String> more = new java.util.TreeSet<String>();
+            collectPluginRefs(new File(root, pack), null, packs, more);
+            for (String m : more) {
+                if (kept.add(m)) {
+                    todo.add(m);
+                }
+            }
+        }
+        for (String pack : packs) {
+            if (!kept.contains(pack)) {
+                // Forced: disableDelete keeps build scratch for debugging, but a pack left
+                // here is one the permission scan would act on.
+                File dead = new File(root, pack);
+                delTree(dead, true);
+                dead.delete();
+            }
+        }
+    }
+
+    /// Adds to `out` every plugin pack named by a class under `dir`, skipping `skip`.
+    private static void collectPluginRefs(File dir, File skip, java.util.Set<String> packs,
+            java.util.Set<String> out) throws IOException {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            if (f.equals(skip)) {
+                continue;
+            }
+            if (f.isDirectory()) {
+                collectPluginRefs(f, skip, packs, out);
+            } else if (f.getName().endsWith(".class")) {
+                // Class names sit in the constant pool as plain modified-UTF-8, which
+                // for these ASCII names is the bytes of the string itself.
+                String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "ISO-8859-1");
+                int at = text.indexOf(FLUTTER_PLUGINS);
+                while (at >= 0) {
+                    int start = at + FLUTTER_PLUGINS.length();
+                    int end = text.indexOf('/', start);
+                    if (end > start) {
+                        String pack = text.substring(start, end);
+                        if (packs.contains(pack)) {
+                            out.add(pack);
+                        }
+                    }
+                    at = text.indexOf(FLUTTER_PLUGINS, start);
+                }
+            }
         }
     }
 
