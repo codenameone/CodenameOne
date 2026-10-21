@@ -585,7 +585,7 @@ public class Window extends Container implements TopLevelContainer {
         }
         Command.settleRadioGroups(commands);
         if (documentModifiedReported) {
-            Command.followDocumentModified(commands, documentModified);
+            Command.followDocumentModified(commands, documentModified, true);
         }
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));

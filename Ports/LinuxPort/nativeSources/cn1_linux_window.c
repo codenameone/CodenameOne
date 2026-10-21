@@ -1231,10 +1231,19 @@ static const char* cn1MenuTitleForHint(const char* hint) {
 /* The chosen item's slot, carried as the widget's own data so the callback needs no
  * lookup table beyond the id array. */
 static void cn1OnMenuItem(GtkMenuItem* item, gpointer data) {
-    (void) item;
     int slot = GPOINTER_TO_INT(data);
     if (slot < 0 || slot >= cn1MenuItemCount) {
         return;
+    }
+    /* A radio is a check item drawn as one, so GTK toggles a selected radio off when it is
+     * clicked again. Choosing a radio always leaves it selected, and Java, already checked,
+     * would not republish the menu to put it back: restore it here, without re-entering. */
+    if (GTK_IS_CHECK_MENU_ITEM(item)
+            && gtk_check_menu_item_get_draw_as_radio(GTK_CHECK_MENU_ITEM(item))
+            && !gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(item))) {
+        g_signal_handlers_block_by_func(item, (gpointer) cn1OnMenuItem, data);
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), TRUE);
+        g_signal_handlers_unblock_by_func(item, (gpointer) cn1OnMenuItem, data);
     }
     /* Queued, not run here: this is the GTK thread. The EDT drains it through pollEvent,
      * which is the rule every other input on this port follows. */

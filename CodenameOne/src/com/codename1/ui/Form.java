@@ -3368,7 +3368,7 @@ public class Form extends Container implements TopLevelContainer {
     /// command added after `#setDocumentModified(boolean)` still follows it.
     void applyDocumentModified(java.util.List commands) {
         if (documentModifiedReported) {
-            Command.followDocumentModified(commands, documentModified);
+            Command.followDocumentModified(commands, documentModified, true);
         }
     }
 

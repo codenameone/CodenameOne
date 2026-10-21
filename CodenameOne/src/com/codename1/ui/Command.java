@@ -660,15 +660,40 @@ public class Command implements ActionListener<ActionEvent> {
     ///
     /// - `modified`: the new modified state
     static void followDocumentModified(java.util.List commands, boolean modified) {
+        followDocumentModified(commands, modified, false);
+    }
+
+    /// As `#followDocumentModified(java.util.List, boolean)`, called as a surface publishes.
+    /// With `onlyNew` it reaches only the commands no state has reached yet -- a Save added after
+    /// the state was reported. Publishing never changes a command that already has one: a
+    /// command shared by a clean form and a modified window would otherwise flip on every
+    /// publish, and each flip schedules the next republish, forever.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands of one form or window
+    ///
+    /// - `modified`: the reported modified state
+    ///
+    /// - `onlyNew`: true to skip commands a state has already reached
+    static void followDocumentModified(java.util.List commands, boolean modified, boolean onlyNew) {
         if (commands == null) {
             return;
         }
         for (Object o : commands) {
             if (o instanceof Command && ((Command) o).isDesktopEnabledWhenModified()) {
-                ((Command) o).setEnabled(modified);
+                Command c = (Command) o;
+                if (onlyNew && c.documentStateApplied) {
+                    continue;
+                }
+                c.documentStateApplied = true;
+                c.setEnabled(modified);
             }
         }
     }
+
+    // Whether a document-modified state has set this command's enabled state yet.
+    private boolean documentStateApplied;
 
     /// Leaves at most one checked member in each radio group among the given commands, the
     /// most recently checked one. Called on every surface as it is published, which settles a
