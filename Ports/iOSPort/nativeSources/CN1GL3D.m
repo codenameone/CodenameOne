@@ -262,7 +262,12 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
         desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
         desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+        // One, not SourceAlpha: the alpha channel accumulates coverage
+        // (a = sa + da * (1 - sa)) so a frame cleared opaque stays opaque.
+        // Weighted by itself it left 0.76 under a 40% quad, which the opaque
+        // layer hides here but which made the same scene translucent on the
+        // ports that read the frame back (RenderState.BlendMode's contract).
+        desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
         desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
     } else if (blendMode == 2) { // ADDITIVE
@@ -272,7 +277,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
         desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
         desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+        // Coverage, as in the ALPHA mode above and on every other backend.
+        desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
     } else {
         desc.colorAttachments[0].blendingEnabled = NO;
     }

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A reference-only UnityEngine: signatures for game scripts to compile
+    against, every body `throw null`. Nothing in it runs or is translated;
+    the classes behind these names are the Java ones in
+    com.codename1.unitycompat.unityengine. Written from the public scripting
+    reference alone.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>UnityEngine</AssemblyName>
+    <RootNamespace>UnityEngine</RootNamespace>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>CS0649;CS0626;CS0660;CS0661</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UnityEngine.Values/UnityEngine.Values.csproj" />
+  </ItemGroup>
+</Project>

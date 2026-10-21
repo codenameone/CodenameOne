@@ -403,8 +403,10 @@ class PushTest {
         String customer = People.customer(accounts, "push-rey-customer");
         String courier = People.courier(accounts, "push-rey-courier");
         register(customer, "apns", "rey-customer-phone");
-        Trips.online(mvc, courier, 64.1466, -21.9426);
-        String id = Trips.ask(mvc, customer, Trips.trip(64.1467, -21.9425, 64.1500, -21.9000));
+        // Edinburgh: Reykjavik is the first test's, whose courier would be just as
+        // near and could be offered this delivery instead.
+        Trips.online(mvc, courier, 55.9533, -3.1883);
+        String id = Trips.ask(mvc, customer, Trips.trip(55.9534, -3.1882, 55.9560, -3.1840));
         courier(courier, id, "accept");
         follow(customer, id, "act-rey", 200);
 

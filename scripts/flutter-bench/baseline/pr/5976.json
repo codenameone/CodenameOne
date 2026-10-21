@@ -1,0 +1,37 @@
+{
+ "pr": 5976,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13238731
+     },
+     "reason": "JavaScript sizes on run 38943915580 (13,338,532 / 108,835,838 bytes) are above a baseline taken on the Flutter branch before later master merges; desktop-compat-layer's run 38946610873, which does not contain this PR, is further above it (13,356,239 / 108,853,545). The Flutter benchmark has no master run to separate this PR's share, which is ParparVM's JS output for float rounding (Math.fround) and the single-rounding long-to-float.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 13338532
+    },
+    "install_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 108271844
+     },
+     "reason": "JavaScript sizes on run 38943915580 (13,338,532 / 108,835,838 bytes) are above a baseline taken on the Flutter branch before later master merges; desktop-compat-layer's run 38946610873, which does not contain this PR, is further above it (13,356,239 / 108,853,545). The Flutter benchmark has no master run to separate this PR's share, which is ParparVM's JS output for float rounding (Math.fround) and the single-rounding long-to-float.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 108835838
+    }
+   }
+  }
+ }
+}

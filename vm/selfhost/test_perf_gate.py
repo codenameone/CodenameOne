@@ -759,6 +759,25 @@ class StaleOverlayGateTests(unittest.TestCase):
             tree.close()
 
 
+class SummaryOverlayTests(unittest.TestCase):
+    """perf_baseline.py summary: the website table is not the gate."""
+
+    def test_a_stale_overlay_is_left_out_of_the_table(self):
+        base = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
+        stale = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {'all': dict(
+            row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'faster sort'})}}}}
+        fine = {'pr': 8, 'rebaseline': {'linux-x64': {'quicksort': {'all': dict(
+            row(0.6, 0.1), **{'from': {'time': 0.8, 'memory': 0.1}, 'reason': 'even faster'})}}}}
+        tree = BaselineTree(base, {7: stale, 8: fine})
+        try:
+            with self.assertRaises(baselines.BaselineError):
+                baselines.load(tree.root)
+            rows = baselines.load_for_summary(tree.root)
+            self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.6)
+        finally:
+            tree.close()
+
+
 class CheckTests(unittest.TestCase):
     """perf_baseline.py check --base: what a pull request may change."""
 
@@ -770,9 +789,13 @@ class CheckTests(unittest.TestCase):
             not migrating if path == 'base' else path in merged)
         baselines.legacy_touched = lambda base_ref: legacy
         baselines.effective_base = lambda base_ref, repo=None: base_ref
+        # A throwaway tree, not the repository's: these test what a change may touch,
+        # and the real overlays of whatever branch runs them are not theirs to judge.
+        tree = BaselineTree()
         try:
-            return baselines.check(baselines.ROOT, 'base-sha', number)
+            return baselines.check(tree.root, 'base-sha', number)
         finally:
+            tree.close()
             (baselines.changed_files, baselines.exists_at, baselines.legacy_touched,
              baselines.effective_base) = originals
 

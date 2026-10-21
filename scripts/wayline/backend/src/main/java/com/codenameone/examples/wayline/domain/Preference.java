@@ -26,13 +26,13 @@ import com.codename1.annotations.Id;
 @Entity
 public class Preference {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(8)")
     private String theme = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(4)")
     private String units = "";
 
     @Column(nullable = false)
@@ -44,7 +44,7 @@ public class Preference {
     @Column(nullable = false)
     private boolean notifyPromotions;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(8)")
     private String driverGender = "";
 
     @Column(nullable = false)
@@ -59,7 +59,7 @@ public class Preference {
     @Column(nullable = false)
     private int defaultTip;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String shareTripsWith = "";
 
     public Preference() {

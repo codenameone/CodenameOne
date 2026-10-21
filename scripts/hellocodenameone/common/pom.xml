@@ -15,6 +15,13 @@
         <!-- The Android compatibility gallery's Android Studio module, compiled
              into this app so its screens run as screenshot tests on every port. -->
         <android.gallery.dir>${project.basedir}/../../android-compat-samples/gallery/app/src/main</android.gallery.dir>
+        <!-- The Unity compatibility gallery's Unity project (Assets and
+             ProjectSettings), compiled into this app so its scenes run as
+             screenshot tests on every port. Its scripts need the .NET SDK only
+             where the compiled output is not already under target/unity:
+             scripts/unity-gallery-prebuilt.sh carries that output to a machine
+             without one. -->
+        <unity.gallery.dir>${project.basedir}/../../unity-compat-samples/gallery</unity.gallery.dir>
     </properties>
 
     <!-- Add your cn1lib dependencies to this section -->
@@ -22,6 +29,11 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-android-compat</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-unity-compat</artifactId>
         </dependency>
 
         <dependency>
@@ -412,6 +424,18 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <!-- The Unity gallery: its scripts as classes, its
+                             scenes as generated Java source. -->
+                        <id>compile-unity</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>compile-unity</goal>
+                        </goals>
+                        <configuration>
+                            <unitySourceDir>${unity.gallery.dir}</unitySourceDir>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -438,6 +462,38 @@
                     </execution>
                 </executions>
 
+            </plugin>
+            <!-- The libraries this application ships besides its own classes,
+                 unpacked for the builds that hand ParparVM its class directories
+                 themselves: the native Linux and Windows suites
+                 (vm/tests, CleanTarget*IntegrationTest) and the JavaScript port
+                 (scripts/build-javascript-port-hellocodenameone.sh). The build
+                 plugin merges every compile-scope dependency into the jar it
+                 submits, so a build that goes through it needs none of this; a
+                 build that does not used to name the libraries one by one, and
+                 the one nobody had named was left out of the translation - the
+                 application then failed in C, on the header of a class no
+                 source directory supplied. Kotlin's runtime is the exception:
+                 those builds stage it themselves. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>stage-translation-libs</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <excludeGroupIds>org.jetbrains.kotlin,org.jetbrains</excludeGroupIds>
+                            <excludes>META-INF/**</excludes>
+                            <outputDirectory>${project.build.directory}/translation-libs</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

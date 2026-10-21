@@ -27,17 +27,17 @@ import com.codename1.annotations.Id;
 @Entity
 public class CourierDocument {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private String kind = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String contentType = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
     @Column(nullable = false)

@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class PhoneCode {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String codeHash = "";
 
     @Column(nullable = false)
@@ -42,7 +42,7 @@ public class PhoneCode {
     private long sentAt;
 
     /// The code sent before this one, while it is still good, or empty.
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String previousHash = "";
 
     @Column(nullable = false)
