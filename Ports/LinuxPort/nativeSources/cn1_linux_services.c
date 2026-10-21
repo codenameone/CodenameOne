@@ -846,9 +846,21 @@ static void cn1FileDialogExOnMain(void* p) {
         gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), d->suggestedName);
     }
     for (i = 0; i < d->filterCount; i++) {
-        char* fields[CN1_FDX_MAX_ITEMS];
-        int n = cn1FdxSplit(d->filters[i], fields, CN1_FDX_MAX_ITEMS);
+        /* Sized from the record, like the option parser below: a filter may
+         * list any number of extensions, and a fixed array would drop the
+         * extra ones from both the glob list and cn1FdxAddExtension. */
+        int max = 1;
+        const char* c;
+        char** fields;
+        int n;
         int j;
+        for (c = d->filters[i]; c && *c; c++) {
+            if (*c == '\n') {
+                max++;
+            }
+        }
+        fields = g_new0(char*, max);
+        n = cn1FdxSplit(d->filters[i], fields, max);
         filterFields[i] = n;
         filters[i] = gtk_file_filter_new();
         gtk_file_filter_set_name(filters[i], n > 0 ? fields[0] : "");
@@ -881,6 +893,7 @@ static void cn1FileDialogExOnMain(void* p) {
             gtk_file_filter_add_pattern(filters[i], "*");
         }
         gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filters[i]);
+        g_free(fields);
     }
     if (d->filterCount > 0 && d->selectedFilter >= 0 && d->selectedFilter < d->filterCount) {
         gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(dialog), filters[d->selectedFilter]);
