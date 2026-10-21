@@ -399,6 +399,12 @@ public class ProcessScreenshots {
                         .filter(n -> n.endsWith(".png"))
                         .map(n -> n.substring(0, n.length() - ".png".length()))
                         .filter(name -> !deliveredTests.contains(name))
+                        // A golden whose row the spec scopes to OTHER platforms
+                        // (platforms: macos) is never rendered here by design; the
+                        // reference apps still capture it. Counting it as missing failed
+                        // every Windows and GNOME run on DesktopSeparator.
+                        .filter(name -> !scopedElsewhere(specPath, referenceDir, specPlatform,
+                                specByComponent, name))
                         .forEach(missingTests::add);
             }
             Collections.sort(missingTests);
@@ -852,6 +858,19 @@ public class ProcessScreenshots {
     /// Maps a delivered test name ("Toolbar_normal_dark") to its component's
     /// spec declaration via longest-id-prefix match at an underscore boundary,
     /// so a future id containing underscores still resolves. Null = unknown.
+    /// True only for a golden whose row the spec DOES declare but scopes to other
+    /// platforms. A golden the spec does not know at all (stale or new) still gets its
+    /// missing_actual record. An empty platform matches every `platforms:` entry, so
+    /// loadSpecInfo with "" answers "every id the spec declares".
+    static boolean scopedElsewhere(Path specPath, Path referenceDir, String platform,
+            Map<String, String[]> included, String testName) {
+        if (platform == null || included == null || resolveSpecInfo(included, testName) != null) {
+            return false;
+        }
+        Map<String, String[]> all = loadSpecInfo(specPath, referenceDir, "");
+        return all != null && resolveSpecInfo(all, testName) != null;
+    }
+
     static String[] resolveSpecInfo(Map<String, String[]> specByComponent, String testName) {
         if (specByComponent == null || testName == null) {
             return null;
