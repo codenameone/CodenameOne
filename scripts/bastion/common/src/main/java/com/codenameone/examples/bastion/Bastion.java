@@ -24,9 +24,9 @@ import com.codenameone.examples.bastion.net.Guard;
 import com.codenameone.examples.bastion.net.Session;
 import com.codenameone.examples.bastion.security.Lock;
 import com.codenameone.examples.bastion.security.Protect;
-import com.codenameone.examples.bastion.ui.HomeForm;
 import com.codenameone.examples.bastion.ui.Lang;
 import com.codenameone.examples.bastion.ui.LockForm;
+import com.codenameone.examples.bastion.ui.Nav;
 import com.codenameone.examples.bastion.ui.SignInForm;
 import com.codenameone.examples.bastion.ui.Ui;
 
@@ -50,6 +50,7 @@ public class Bastion extends Lifecycle {
         Protect.install();
         Session.start(AppConfig.serverUrl());
         Session.onSignedOut(Bastion::signInScreen);
+        Nav.install(Bastion::signInScreen);
         Lock.install(new Lock.Screens() {
             @Override
             public void showLocked() {
@@ -67,12 +68,9 @@ public class Bastion extends Lifecycle {
         });
         Session.restore(() -> {
             // A stored session opens behind the lock: whoever holds the phone
-            // proves they are its owner first.
-            if (Lock.biometricsAvailable()) {
-                Lock.lock();
-            } else {
-                home();
-            }
+            // proves they are its owner first -- with a biometric if they
+            // chose one, else with the password (LockForm).
+            Lock.lock();
         }, Bastion::signInScreen, Bastion::signInScreen);
     }
 
@@ -98,6 +96,6 @@ public class Bastion extends Lifecycle {
     }
 
     static void home() {
-        HomeForm.show(Bastion::signInScreen);
+        Nav.home();
     }
 }

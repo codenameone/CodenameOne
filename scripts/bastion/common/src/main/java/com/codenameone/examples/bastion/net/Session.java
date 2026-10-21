@@ -31,6 +31,7 @@ import com.codename1.io.oidc.PkceChallenge;
 import com.codename1.io.oidc.SecureStorageTokenStore;
 import com.codename1.io.oidc.TokenStore;
 import com.codename1.io.webauthn.PublicKeyCredential;
+import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
 import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
 import com.codename1.io.webauthn.WebAuthnClient;
 import com.codename1.ui.CN;
@@ -74,6 +75,10 @@ public final class Session {
     /// Moved on whenever the server changes or an account signs in or out:
     /// an answer from an earlier session is dropped, never installed.
     private static int session;
+    /// A signed-in server session kept for one passkey ceremony.
+    private static boolean keepForPasskey;
+    private static String ceremonyServer;
+    private static String ceremonyCookie;
 
     private Session() {
     }
@@ -363,10 +368,15 @@ public final class Session {
                     return;
                 }
                 // The server session has done its work; it is ended rather
-                // than left to run out.
-                Step end = new Step("POST", server + "/logout");
-                end.addRequestHeader("Cookie", cookie);
-                end.send(() -> { });
+                // than left to run out -- unless onboarding asked to keep it
+                // for one passkey ceremony, which only a session can run.
+                if (keepForPasskey) {
+                    keepForPasskey = false;
+                    ceremonyServer = server;
+                    ceremonyCookie = cookie;
+                } else {
+                    endServerSession(server, cookie);
+                }
                 session++;
                 authorizer.setTokens(tokens);
                 store.save(storeKey(base), tokens);
@@ -375,9 +385,110 @@ public final class Session {
         });
     }
 
+    /// Asks the next sign-in to keep its server session for one passkey
+    /// ceremony ([#addPasskey]). Passkeys are registered against the signed-in
+    /// session cookie, not the API's bearer token, so onboarding asks for this
+    /// before the sign-in that follows registration.
+    public static void keepSessionForPasskey() {
+        keepForPasskey = true;
+    }
+
+    /// Whether [#addPasskey] can run now: a kept session, on a platform with
+    /// a passkey UI.
+    public static boolean canAddPasskey() {
+        return ceremonyCookie != null && base != null && base.equals(ceremonyServer)
+                && passkeysSupported();
+    }
+
+    /// Creates a passkey for the signed-in account: the server's creation
+    /// options, the platform's passkey sheet, and the new credential back to
+    /// the server under `label`. The kept session is ended either way.
+    public static void addPasskey(final String label, final Runnable done,
+            final Net.Failed failed) {
+        final String server = ceremonyServer;
+        final String cookie = ceremonyCookie;
+        if (!canAddPasskey()) {
+            failed.failed(0, "Sign in again to add a passkey.");
+            return;
+        }
+        final Step options = new Step("POST", server + "/webauthn/register/options");
+        options.addRequestHeader("Cookie", cookie);
+        options.json("{}");
+        options.send(() -> {
+            PublicKeyCredentialCreationOptions create = null;
+            if (options.status == 200) {
+                try {
+                    create = PublicKeyCredentialCreationOptions.fromJson(options.text());
+                } catch (RuntimeException malformed) {
+                    create = null;
+                }
+            }
+            if (create == null || !server.equals(base)) {
+                endPasskeySession();
+                failed.failed(options.status, "Passkeys are not available right now.");
+                return;
+            }
+            WebAuthnClient.getInstance().create(create).ready(new SuccessCallback<PublicKeyCredential>() {
+                @Override
+                public void onSucess(PublicKeyCredential credential) {
+                    final Step register = new Step("POST", server + "/webauthn/register");
+                    register.addRequestHeader("Cookie", cookie);
+                    register.json("{\"publicKey\":{\"credential\":" + credential.toJson()
+                            + ",\"label\":\"" + jsonText(label) + "\"}}");
+                    register.send(() -> {
+                        endPasskeySession();
+                        if (register.status == 200 && "true".equals(register.answer("success"))) {
+                            done.run();
+                        } else {
+                            failed.failed(register.status, "That passkey was not saved.");
+                        }
+                    });
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable err) {
+                    endPasskeySession();
+                    failed.failed(-1, "Creating the passkey was cancelled.");
+                }
+            });
+        });
+    }
+
+    /// Ends a session kept for [#addPasskey] that was not used.
+    public static void endPasskeySession() {
+        if (ceremonyCookie != null) {
+            endServerSession(ceremonyServer, ceremonyCookie);
+        }
+        ceremonyCookie = null;
+        ceremonyServer = null;
+    }
+
+    private static void endServerSession(String server, String cookie) {
+        Step end = new Step("POST", server + "/logout");
+        end.addRequestHeader("Cookie", cookie);
+        end.send(() -> { });
+    }
+
+    /// `text` as the inside of a JSON string.
+    static String jsonText(String text) {
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < text.length(); iter++) {
+            char c = text.charAt(iter);
+            if (c == '"' || c == '\\') {
+                out.append('\\').append(c);
+            } else if (c < 0x20) {
+                out.append(' ');
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
     /// Signs out: the refresh token is revoked at the server and the tokens
     /// are wiped here, whether or not the server answers.
     public static void signOut(final Runnable done) {
+        endPasskeySession();
         OidcTokens tokens = authorizer.getTokens();
         if (tokens != null && tokens.getRefreshToken() != null) {
             client.revoke(tokens.getRefreshToken());

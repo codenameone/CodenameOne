@@ -18,70 +18,203 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
+import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.spinner.Picker;
+import com.codenameone.examples.bastion.api.AccountDto;
+import com.codenameone.examples.bastion.api.MarketDto;
+import com.codenameone.examples.bastion.api.OpenAccountDto;
 import com.codenameone.examples.bastion.api.UserDto;
+import com.codenameone.examples.bastion.money.Amounts;
+import com.codenameone.examples.bastion.money.Assets;
+import com.codenameone.examples.bastion.net.Api;
+import com.codenameone.examples.bastion.net.Net;
 import com.codenameone.examples.bastion.net.Session;
-import com.codenameone.examples.bastion.security.DeviceKey;
+import java.util.ArrayList;
+import java.util.List;
 
-/// The signed-in home screen. The accounts, transfers, cards and exchange
-/// screens arrive in the next phase; until then this is the way to the
-/// Security Center, to registering this device's signing key, and out.
+/// The dashboard: every account with its balance in its own asset, and the
+/// total of all of them in dollars.
+///
+/// The total is a valuation, not a balance. A crypto holding is priced at its
+/// market's index price, rounded down ([Amounts#value]); an asset with no
+/// dollar market (euros, here) is left out of the total and the screen says
+/// so, rather than converting at a rate the bank never quoted.
 public final class HomeForm {
     private HomeForm() {
     }
 
-    public static void show(final Runnable signedOut) {
+    public static void show() {
         UserDto user = Session.user();
-        Form form = Ui.form("Bastion");
-        form.add(Ui.title(user == null || user.displayName() == null ? "Welcome"
-                : user.displayName()));
-        form.add(Ui.muted(Lang.tr("Accounts, transfers, cards and the exchange are on their way.")));
-        final Label status = new Label("", "BnMuted");
-        refresh(status);
-        form.add(status);
-        Button register = Ui.secondary("Register this device");
-        register.addActionListener(evt -> register(status, user));
-        Button center = Ui.primary("Security Center");
-        center.addActionListener(evt -> SecurityCenterForm.show(() -> show(signedOut)));
-        Button out = Ui.secondary("Sign out");
-        out.addActionListener(evt -> Session.signOut(signedOut));
-        form.addAll(center, register, out);
+        Form form = Nav.form("Bastion", null);
+        String name = user == null ? null : user.displayName();
+        form.add(Ui.title(name == null ? Lang.tr("Welcome") : Lang.tr("Hello, {0}", name)));
+        final Container content = new Container(BoxLayout.y());
+        form.add(content);
         Ui.show(form, true);
+        load(content);
     }
 
-    private static void refresh(Label status) {
-        status.setText(DeviceKey.deviceId() == null
-                ? Lang.tr("This device cannot sign payments yet.")
-                : Lang.tr("This device signs your payments."));
+    private static void load(final Container content) {
+        Ui.loading(content);
+        Api.banking().accounts(Net.to((List<AccountDto> accounts) ->
+                Api.exchange().markets(Net.to((List<MarketDto> markets) ->
+                        fill(content, accounts, markets),
+                        // Without prices the balances are still worth showing.
+                        (status, message) -> fill(content, accounts, new ArrayList<MarketDto>()))),
+                (status, message) -> Ui.failed(content, message, () -> load(content))));
     }
 
-    private static void register(final Label status, UserDto user) {
-        final String owner = user == null ? null : user.username();
-        if (owner == null) {
+    private static void fill(final Container content, List<AccountDto> accounts,
+            List<MarketDto> markets) {
+        content.removeAll();
+        if (!DeviceSetup.registered()) {
+            content.add(deviceBanner(content));
+        }
+        long total = 0;
+        List<String> unpriced = new ArrayList<String>();
+        for (AccountDto account : accounts) {
+            if (Assets.REPORTING.equals(account.asset())) {
+                total += account.balance();
+                continue;
+            }
+            long price = price(markets, account.asset(), Assets.REPORTING);
+            if (price > 0) {
+                total += Amounts.value(account.balance(), Assets.decimals(account.asset()), price);
+            } else if (account.balance() != 0 && !unpriced.contains(account.asset())) {
+                unpriced.add(account.asset());
+            }
+        }
+        Container hero = new Container(BoxLayout.y(), "BnHero");
+        hero.add(new Label(Lang.tr("Total balance"), "BnHeroLabel"));
+        hero.add(new Label(Amounts.format(total, Assets.REPORTING), "BnHeroAmount"));
+        if (!unpriced.isEmpty()) {
+            SpanLabel note = new SpanLabel(Lang.tr("Not counted, no dollar price: {0}",
+                    join(unpriced)));
+            note.setTextUIID("BnHeroNote");
+            hero.add(note);
+        }
+        content.add(hero);
+
+        Button move = Ui.primary("Move money");
+        move.addActionListener(evt -> TransferForm.show(null, false, HomeForm::show));
+        Button pay = Ui.secondary("Pay someone");
+        pay.addActionListener(evt -> TransferForm.show(null, true, HomeForm::show));
+        Button trade = Ui.secondary("Trade");
+        trade.addActionListener(evt -> ExchangeForm.show(HomeForm::show));
+        content.add(Ui.across(move, pay, trade));
+
+        content.add(Ui.section("Accounts"));
+        if (accounts.isEmpty()) {
+            content.add(Ui.empty("You have no accounts yet."));
+        }
+        for (final AccountDto account : accounts) {
+            String detail = kindName(account.kind()) + " - " + account.asset()
+                    + (account.frozen() ? " - " + Lang.tr("Frozen") : "");
+            content.add(Ui.row(account.name(), detail,
+                    Amounts.format(account.balance(), account.asset()),
+                    account.frozen() ? "BnRowValueMuted" : "BnRowValue",
+                    () -> AccountForm.show(account.id(), HomeForm::show)));
+        }
+        Button open = Ui.secondary("Open an account");
+        open.addActionListener(evt -> openAccount(content));
+        content.add(open);
+        content.revalidate();
+    }
+
+    /// The price of one whole `base` in `quote` units, or 0 when no market
+    /// quotes it.
+    static long price(List<MarketDto> markets, String base, String quote) {
+        for (MarketDto market : markets) {
+            if (market.base().equals(base) && market.quote().equals(quote)) {
+                return market.indexPrice();
+            }
+        }
+        return 0;
+    }
+
+    static String kindName(String kind) {
+        if ("CHECKING".equals(kind)) {
+            return Lang.tr("Checking");
+        }
+        if ("SAVINGS".equals(kind)) {
+            return Lang.tr("Savings");
+        }
+        if ("WALLET".equals(kind)) {
+            return Lang.tr("Wallet");
+        }
+        return kind;
+    }
+
+    private static Container deviceBanner(final Container content) {
+        Container banner = new Container(BoxLayout.y(), "BnBanner");
+        banner.add(new Label(Lang.tr("This device cannot sign payments yet"), "BnBannerTitle"));
+        SpanLabel why = new SpanLabel(Lang.tr("Payments to other people and crypto withdrawals "
+                + "need a key that lives only on this phone."));
+        why.setTextUIID("BnBannerText");
+        banner.add(why);
+        final Label error = Ui.error();
+        Button register = Ui.primary("Register this device");
+        register.addActionListener(evt -> DeviceSetup.register(() -> load(content),
+                (status, message) -> Ui.showError(error, Lang.tr(message))));
+        banner.addAll(error, register);
+        return banner;
+    }
+
+    /// Opens another account: fiat in a checking or savings account, a coin
+    /// in a wallet -- the server's rule, offered here as the only choices.
+    private static void openAccount(final Container content) {
+        Assets.Asset[] all = Assets.all();
+        List<String> labels = new ArrayList<String>();
+        final List<String[]> choices = new ArrayList<String[]>();
+        for (Assets.Asset asset : all) {
+            if (asset.isCrypto()) {
+                labels.add(Lang.tr("{0} wallet", asset.name));
+                choices.add(new String[] {asset.code, "WALLET"});
+            } else {
+                labels.add(Lang.tr("{0} checking", asset.name));
+                choices.add(new String[] {asset.code, "CHECKING"});
+                labels.add(Lang.tr("{0} savings", asset.name));
+                choices.add(new String[] {asset.code, "SAVINGS"});
+            }
+        }
+        final String[] names = labels.toArray(new String[labels.size()]);
+        Picker which = Ui.picker(names, 0);
+        TextField name = Ui.field("Name (optional)", TextField.ANY);
+        Container body = new Container(BoxLayout.y());
+        body.addAll(which, name);
+        Command open = new Command(Lang.tr("Open"));
+        if (Dialog.show(Lang.tr("Open an account"), body, open, new Command(Lang.tr("Cancel")))
+                != open) {
             return;
         }
-        String password = null;
-        if (!user.totpEnabled()) {
-            // Without an authenticator app the server wants the password as
-            // the second proof that the owner is adding this device.
-            TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
-            Command ok = new Command(Lang.tr("Continue"));
-            if (Dialog.show(Lang.tr("Confirm it is you"), field, ok,
-                    new Command(Lang.tr("Cancel"))) != ok) {
-                return;
-            }
-            password = field.getText();
+        int index = Ui.picked(which, names);
+        if (index < 0) {
+            return;
         }
-        DeviceKey.register(owner, password, device -> refresh(status),
-                (code, message) -> {
-                    status.setText(Lang.tr(message));
-                    status.getComponentForm().revalidate();
-                });
+        String[] choice = choices.get(index);
+        String title = name.getText().trim().length() > 0 ? name.getText().trim() : names[index];
+        Api.banking().open(new OpenAccountDto(choice[0], choice[1], title),
+                Net.to((AccountDto account) -> load(content),
+                        (status, message) -> Dialog.show(Lang.tr("Not opened"), Lang.tr(message),
+                                Lang.tr("OK"), null)));
+    }
+
+    private static String join(List<String> parts) {
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append(part);
+        }
+        return out.toString();
     }
 }

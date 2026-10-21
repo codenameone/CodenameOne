@@ -59,6 +59,9 @@ public final class SignInForm {
                     (status, message) -> Ui.showError(error, Lang.tr(message))));
             form.add(passkey);
         }
+        Button join = Ui.secondary("Open an account");
+        join.addActionListener(evt -> OnboardingForm.show(() -> show(signedIn), signedIn));
+        form.add(join);
         Ui.show(form, false);
     }
 

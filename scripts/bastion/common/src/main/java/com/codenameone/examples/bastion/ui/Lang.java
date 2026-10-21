@@ -35,16 +35,18 @@ import java.util.Map;
 /// it is. So a screen written in English is translated without saying so.
 ///
 /// What a component cannot do by itself is a sentence with something put into
-/// it -- "Pick up Riley". Those go through [#tr(String, Object...)], with the
+/// it -- "Hello, Ana". Those go through [#tr(String, Object...)], with the
 /// whole sentence as the key and `{0}` where the name goes, because where it
 /// goes is the translator's decision.
 ///
-/// To add a string: write it in English in the code, and add a line for it to
-/// each of the four translated files. To add a language: add its file, and its
-/// code to [#CODES].
+/// To add a string: write it in English in the code and add its line to
+/// `Bundle_en.properties`, which lists every key (`BundleTest` checks it). To
+/// add a language: copy that file to `Bundle_<code>.properties`, translate the
+/// values, and add the code to [#CODES].
 public final class Lang {
-    /// The languages there is a translation for. English is the source.
-    public static final String[] CODES = {"en", "es", "fr", "de", "he"};
+    /// The languages there is a translation for. English is the source and,
+    /// so far, the only one; the bundle is ready for others.
+    public static final String[] CODES = {"en"};
 
     private static final String BUNDLE = "Bundle";
     /// The entry each file names its own language in, in that language.

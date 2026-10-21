@@ -21,6 +21,7 @@ package com.codenameone.examples.bastion.ui;
 import com.codename1.ui.Button;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codenameone.examples.bastion.Prefs;
 import com.codenameone.examples.bastion.security.Lock;
 
 /// What is on screen while the app is locked: nothing of the account.
@@ -33,16 +34,34 @@ public final class LockForm {
         Form form = Ui.form("Locked");
         form.add(Ui.title("Bastion is locked"));
         final Label error = Ui.error();
-        Button unlock = Ui.primary(Lock.biometricsAvailable() ? "Unlock" : "Sign in again");
-        unlock.addActionListener(evt -> ask(signInAgain, error));
+        Button unlock = Ui.primary(biometric() ? "Unlock" : "Sign in again");
+        unlock.addActionListener(evt -> {
+            if (biometric()) {
+                ask(signInAgain, error);
+            } else {
+                signInAgain.run();
+            }
+        });
         form.addAll(error, unlock);
         // Locked screens are sensitive too: the last frame before the lock
         // must not survive in the recent-apps list.
         Ui.show(form, true);
-        ask(signInAgain, error);
+        if (biometric()) {
+            ask(signInAgain, error);
+        }
+    }
+
+    /// Whether to ask for a biometric: the device has one and the user chose
+    /// it during onboarding or in Settings. Otherwise the way back in is the
+    /// password, by signing in again.
+    private static boolean biometric() {
+        return Lock.biometricsAvailable() && Prefs.biometricUnlock();
     }
 
     private static void ask(Runnable signInAgain, final Label error) {
+        if (!biometric()) {
+            return;
+        }
         Lock.unlock(signInAgain, () -> Ui.showError(error, Lang.tr("Not recognised. Try again.")));
     }
 }
