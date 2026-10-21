@@ -125,6 +125,22 @@ public abstract class WindowManager {
     /// - `title`: the title to display
     public abstract void setTitle(Object peer, String title);
 
+    /// Shows whether the window's document has unsaved changes. The default marks it the way
+    /// Windows and Linux applications do, with a leading `*` in the title; a port whose
+    /// platform has its own indicator (the dot in the close button on macOS) overrides this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// - `modified`: true while the document has unsaved changes
+    ///
+    /// - `title`: the window's title as the application set it
+    public void setDocumentModified(Object peer, boolean modified, String title) {
+        String t = title == null ? "" : title;
+        setTitle(peer, modified ? "*" + t : t);
+    }
+
     /// Moves and resizes the window.
     ///
     /// #### Parameters

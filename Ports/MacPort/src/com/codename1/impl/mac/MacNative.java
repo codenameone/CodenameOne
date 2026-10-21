@@ -69,6 +69,10 @@ class MacNative {
 
     native void macWindowSetTitle(int slot, String title);
 
+    /// Sets NSWindow.documentEdited, the dot in the close button of a window whose
+    /// document has unsaved changes. A negative slot is the main window.
+    native void macWindowSetDocumentEdited(int slot, boolean edited);
+
     native void macWindowSetBounds(int slot, int x, int y, int width, int height);
 
     /// Fills `out` with x, y, width, height in Codename One pixels.

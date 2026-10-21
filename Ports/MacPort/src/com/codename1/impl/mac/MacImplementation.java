@@ -126,6 +126,19 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// The main window shows the current form's modified state as the dot in its
+    /// close button, so it follows the form as the title does.
+    @Override
+    public void refreshNativeTitle() {
+        super.refreshNativeTitle();
+        com.codename1.ui.Form f = getCurrentForm();
+        if (f != null && isDesktop() && !(f instanceof com.codename1.ui.Dialog)) {
+            macNative.macWindowSetDocumentEdited(-1, f.isDocumentModified());
+        }
+    }
+
+    /// @inheritDoc
+    ///
     /// From the monitor's backing scale, not from how wide the window is.
     ///
     /// The inherited iOS answer reads isTablet() -- true here -- and then treats

@@ -59,25 +59,6 @@ final class JavaScriptDesktopChrome {
         Object renderIcon(HTMLElement into, Command cmd);
     }
 
-    /// The standard top-level menus and where each placement hint lands, in the order desktop
-    /// applications show them. The same table as the Windows port's cn1_windows_menu.cpp, so an
-    /// application's menu looks the same in the browser as it does in the native build. A page
-    /// has no application menu, so the App, About, Preferences and Quit hints go where Windows
-    /// puts them.
-    private static final String[][] MENU_HINTS = {
-        {"File", "File"},
-        {"Edit", "Edit"},
-        {"View", "View"},
-        {"Window", "Window"},
-        {"Help", "Help"},
-        {"About", "Help"},
-        {"Preferences", "File"},
-        {"Quit", "File"},
-        {"App", "File"},
-    };
-
-    private static final String[] MENU_ORDER = {"File", "Edit", "View", "Window"};
-
     private final HTMLDocument document;
     private final HTMLElement root;
     private final HTMLElement title;
@@ -155,7 +136,7 @@ final class JavaScriptDesktopChrome {
         title.setTextContent(text == null ? "" : text);
     }
 
-    /// Replaces the menus with `commands`, grouped by [Command#getDesktopMenu()].
+    /// Replaces the menus with `commands`, one per top-level menu the encoder resolved.
     void setCommands(Vector commands) {
         closeMenus();
         menus.clear();
@@ -163,91 +144,32 @@ final class JavaScriptDesktopChrome {
         commandsById.clear();
         iconImages.clear();
         menuBar.setInnerHTML("");
-        Map<String, List<Command>> groups = group(commands);
-        for (Map.Entry<String, List<Command>> e : groups.entrySet()) {
+        // Encoded once, under the web convention: standard roles, the menu order and the
+        // standard menus' spelling are all resolved by the encoder, and its rows come out
+        // menu by menu in menu-bar order.
+        com.codename1.impl.NativeMenuEncoder encoded =
+                com.codename1.impl.NativeMenuEncoder.encode(commands, 0, true);
+        Map<String, List<com.codename1.impl.NativeMenuEncoder.Row>> byMenu =
+                new java.util.LinkedHashMap<String, List<com.codename1.impl.NativeMenuEncoder.Row>>();
+        for (com.codename1.impl.NativeMenuEncoder.Row row : encoded.getRows()) {
+            String menu = row.getHint().length() == 0 ? "Commands" : row.getHint();
+            List<com.codename1.impl.NativeMenuEncoder.Row> list = byMenu.get(menu);
+            if (list == null) {
+                list = new ArrayList<com.codename1.impl.NativeMenuEncoder.Row>();
+                byMenu.put(menu, list);
+            }
+            list.add(row);
+        }
+        for (Map.Entry<String, List<com.codename1.impl.NativeMenuEncoder.Row>> e : byMenu.entrySet()) {
             menuBar.appendChild(buildMenu(e.getKey(), e.getValue()));
         }
-    }
-
-    /// Commands keyed by top-level menu title, in menu-bar order: the standard menus first, then
-    /// the application's own titles in the order they first appear, then Help last.
-    static Map<String, List<Command>> group(Vector commands) {
-        Map<String, List<Command>> byTitle = new HashMap<String, List<Command>>();
-        List<String> custom = new ArrayList<String>();
-        if (commands != null) {
-            for (int i = 0; i < commands.size(); i++) {
-                Object o = commands.elementAt(i);
-                if (!(o instanceof Command)) {
-                    continue;
-                }
-                Command c = (Command) o;
-                // An icon-only command -- new Command("", icon), a common right-bar action -- is
-                // kept: with the Toolbar hidden this menu is its only way to be reached. The
-                // native desktop ports skip it because their menus take text only; this one can
-                // show the icon itself.
-                if (!hasLabel(c) && !hasIcon(c)) {
-                    continue;
-                }
-                String menu = titleForHint(c.getDesktopMenu());
-                List<Command> list = byTitle.get(menu);
-                if (list == null) {
-                    list = new ArrayList<Command>();
-                    byTitle.put(menu, list);
-                    if (!isStandard(menu)) {
-                        custom.add(menu);
-                    }
-                }
-                list.add(c);
-            }
-        }
-        Map<String, List<Command>> ordered = new java.util.LinkedHashMap<String, List<Command>>();
-        for (String m : MENU_ORDER) {
-            if (byTitle.containsKey(m)) {
-                ordered.put(m, byTitle.get(m));
-            }
-        }
-        for (String m : custom) {
-            ordered.put(m, byTitle.get(m));
-        }
-        if (byTitle.containsKey("Help")) {
-            ordered.put("Help", byTitle.get("Help"));
-        }
-        return ordered;
-    }
-
-    static String titleForHint(String hint) {
-        if (hint == null || hint.length() == 0) {
-            // Where the Windows port puts a command with no placement hint.
-            return "Commands";
-        }
-        for (String[] row : MENU_HINTS) {
-            if (row[0].equalsIgnoreCase(hint)) {
-                return row[1];
-            }
-        }
-        // An unrecognised hint is a menu titled with the hint itself.
-        return hint;
-    }
-
-    private static boolean hasLabel(Command c) {
-        String name = c.getCommandName();
-        return name != null && name.length() > 0;
     }
 
     private static boolean hasIcon(Command c) {
         return c.getIcon() != null || c.getMaterialIcon() != 0;
     }
 
-    private static boolean isStandard(String menu) {
-        for (String m : MENU_ORDER) {
-            if (m.equals(menu)) {
-                return true;
-            }
-        }
-        return "Help".equals(menu);
-    }
-
-    private HTMLElement buildMenu(String menuTitle, List<Command> commands) {
+    private HTMLElement buildMenu(String menuTitle, List<com.codename1.impl.NativeMenuEncoder.Row> rows) {
         final HTMLElement details = document.createElement("details");
         details.setAttribute("class", "cn1-chrome-menu");
         List<Object[]> items = new ArrayList<Object[]>();
@@ -260,11 +182,37 @@ final class JavaScriptDesktopChrome {
         HTMLElement list = document.createElement("div");
         list.setAttribute("class", "cn1-chrome-menu-items");
         list.setAttribute("role", "menu");
-        for (final Command c : commands) {
+        // Item containers by their submenu path below this menu; "" is the menu's own list.
+        Map<String, HTMLElement> containers = new HashMap<String, HTMLElement>();
+        containers.put("", list);
+        for (com.codename1.impl.NativeMenuEncoder.Row row : rows) {
+            HTMLElement parent = containerFor(containers, row.getPath());
+            if (row.isSeparator()) {
+                HTMLElement sep = document.createElement("div");
+                sep.setAttribute("role", "separator");
+                sep.setAttribute("class", "cn1-chrome-separator");
+                parent.appendChild(sep);
+                continue;
+            }
+            final Command c = row.getCommand();
+            int flags = row.getFlags();
             HTMLElement item = document.createElement("button");
             item.setAttribute("type", "button");
-            item.setAttribute("role", "menuitem");
             item.setAttribute("class", "cn1-chrome-menu-item");
+            if ((flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKABLE) != 0) {
+                boolean radio = (flags & com.codename1.impl.NativeMenuEncoder.FLAG_RADIO) != 0;
+                boolean checked = (flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKED) != 0;
+                item.setAttribute("role", radio ? "menuitemradio" : "menuitemcheckbox");
+                item.setAttribute("aria-checked", checked ? "true" : "false");
+                HTMLElement mark = document.createElement("span");
+                mark.setAttribute("class", "cn1-chrome-check");
+                // Checking an item republishes the menu (Command.setDesktopChecked), so the mark
+                // is current every time the menu is rebuilt.
+                mark.setTextContent(checked ? (radio ? "\u2022" : "\u2713") : "");
+                item.appendChild(mark);
+            } else {
+                item.setAttribute("role", "menuitem");
+            }
             // Not the disabled attribute: Command.setEnabled() does not republish the menu, so an
             // item disabled when the menu was built would stay unclickable after the command was
             // enabled again. The look is refreshed each time the menu opens, and a click on a
@@ -274,10 +222,21 @@ final class JavaScriptDesktopChrome {
             String id = String.valueOf(nextCommandId++);
             commandsById.put(id, c);
             item.setAttribute("data-cn1-cmd", id);
-            if (hasLabel(c)) {
+            boolean labelled = row.getLabel().length() > 0;
+            if (labelled && hasIcon(c)) {
+                HTMLElement icon = document.createElement("span");
+                icon.setAttribute("class", "cn1-chrome-icon");
+                item.appendChild(icon);
+                Object image = sink.renderIcon(icon, c);
+                if (image != null) {
+                    iconImages.add(image);
+                }
+            }
+            if (labelled) {
                 HTMLElement label = document.createElement("span");
                 label.setAttribute("class", "cn1-chrome-label");
-                label.setTextContent(c.getCommandName());
+                // The row's label: a standard role's platform name when the command has none.
+                label.setTextContent(row.getLabel());
                 item.appendChild(label);
             } else {
                 HTMLElement icon = document.createElement("span");
@@ -291,8 +250,8 @@ final class JavaScriptDesktopChrome {
                 // own to offer.
                 item.setAttribute("aria-label", "Command " + (items.size()));
             }
-            String shortcut = shortcutText(c, mac);
-            String binding = acceleratorBinding(c);
+            String shortcut = shortcutText(row.getShortcutKeyChar(), row.getShortcutModifiers(), mac);
+            String binding = acceleratorBinding(row.getShortcutKeyChar(), row.getShortcutModifiers());
             if (binding != null) {
                 // browser_bridge.js matches key presses against this on the main thread, where
                 // preventDefault still works -- so Ctrl/Cmd+S runs the command instead of also
@@ -305,20 +264,54 @@ final class JavaScriptDesktopChrome {
                 accel.setTextContent(shortcut);
                 item.appendChild(accel);
             }
-            list.appendChild(item);
+            parent.appendChild(item);
         }
         details.appendChild(list);
         return details;
     }
 
+    /// The element a row's items go in: the menu's own list for a one-segment path, otherwise a
+    /// nested submenu created on its first row, which keeps it at its place among the items.
+    /// A submenu is a `details` element that expands in place: a flyout beside the panel would
+    /// be clipped by the panel's scrolling, and `summary` is focusable and opens with Enter or
+    /// Space, so a keyboard reaches the items without a handler of its own.
+    private HTMLElement containerFor(Map<String, HTMLElement> containers, String[] path) {
+        HTMLElement parent = containers.get("");
+        StringBuilder key = new StringBuilder();
+        for (int p = 1; p < path.length; p++) {
+            // Joined by the unit separator, which no segment can contain: a slash would make
+            // "A//B" (one segment "A/B") collide with the two segments "A" and "B".
+            key.append('\u001f').append(path[p]);
+            String k = key.toString();
+            HTMLElement sub = containers.get(k);
+            if (sub == null) {
+                HTMLElement wrap = document.createElement("details");
+                wrap.setAttribute("class", "cn1-chrome-submenu");
+                wrap.setAttribute("role", "none");
+                HTMLElement head = document.createElement("summary");
+                head.setAttribute("class", "cn1-chrome-submenu-title");
+                head.setAttribute("role", "menuitem");
+                head.setAttribute("aria-haspopup", "menu");
+                head.setTextContent(path[p]);
+                wrap.appendChild(head);
+                sub = document.createElement("div");
+                sub.setAttribute("class", "cn1-chrome-submenu-items");
+                sub.setAttribute("role", "menu");
+                wrap.appendChild(sub);
+                parent.appendChild(wrap);
+                containers.put(k, sub);
+            }
+            parent = sub;
+        }
+        return parent;
+    }
+
     /// The accelerator as text, the way the Windows menu writes it into the label. The page
     /// does not bind the keys itself: the application's own key listeners already see them.
-    static String shortcutText(Command c, boolean mac) {
-        int key = c.getDesktopShortcutKeyChar();
+    static String shortcutText(int key, int mods, boolean mac) {
         if (key <= 0) {
             return null;
         }
-        int mods = c.getDesktopShortcutModifiers();
         StringBuilder sb = new StringBuilder();
         if ((mods & Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
             // The primary modifier is Command on a Mac and Control everywhere else.
@@ -389,9 +382,7 @@ final class JavaScriptDesktopChrome {
     /// the physical key as well as the typed character). Null for a shortcut with neither the
     /// primary modifier nor Alt: a bare or Shift-only key is ordinary typing, and claiming it
     /// would swallow it.
-    static String acceleratorBinding(Command c) {
-        int key = c.getDesktopShortcutKeyChar();
-        int mods = c.getDesktopShortcutModifiers();
+    static String acceleratorBinding(int key, int mods) {
         boolean primary = (mods & Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0;
         boolean alt = (mods & Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0;
         if (key <= 0 || (!primary && !alt)) {

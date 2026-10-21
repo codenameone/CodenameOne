@@ -1193,14 +1193,16 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
 /*
  * The native menu bar.
  *
- * Commands arrive as one encoded row each, the format
- * IOSImplementation.setNativeCommands writes for the macOS menu and
- * WindowsImplementation writes for the Win32 one:
+ * Commands arrive as one encoded row each, written by NativeMenuEncoder in core for this
+ * port, the macOS menu and the Win32 one:
  *
- *   "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"
+ *   "<path>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>\t<flags>\t<icon>"
  *
- * rows separated by '\n'. The three ParparVM desktop ports share it deliberately: a second
- * encoding is a second thing to keep in step with Command's placement constants.
+ * rows separated by '\n'. The path's segments are joined by 0x1f: the first is the
+ * placement hint, the rest nest submenus. Flags: 1 enabled, 2 checkable, 4 checked, 8 radio,
+ * 16 separator. The icon column is not sent to this port: GTK 3 deprecated menu item
+ * images and GNOME does not show them, so an icon here would be a look no GNOME
+ * application has.
  *
  * GtkMenuBar and GtkMenuItem, because this port is GTK 3 -- the GMenu/GtkPopoverMenuBar
  * pair is GTK 4. (The GNOME fidelity reference app IS GTK 4; it is a separate program.)
@@ -1209,46 +1211,39 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
  */
 
 #define CN1_MENU_MAX_ITEMS 512
-#define CN1_MENU_MAX_POPUPS 32
+#define CN1_MENU_MAX_POPUPS 64
+/* A row whose path does not fit is dropped rather than truncated: a truncated path names a
+ * different menu, and the command would sit under a wrong title. 1 KB of UTF-8 is far past any
+ * menu a person can read. */
+#define CN1_MENU_PATH_CAP 1024
 
 static int cn1MenuCommandIds[CN1_MENU_MAX_ITEMS];
 static int cn1MenuItemCount = 0;
 
-/* The standard top-level menus. The hint strings are Command.DESKTOP_MENU_* verbatim;
- * anything else becomes a top-level menu titled with the hint itself, and an empty hint
- * lands in "Commands".
- *
- * About, Preferences and Quit have no application menu to go to -- GNOME has no menu bar
- * app menu the way macOS does -- so they go where a GNOME user looks: About under Help,
- * the other two under File. A placement decision, which is why this table is not simply a
- * copy of the macOS one. */
+/* The title of a top-level menu. Placement is decided in core (NativeMenuConventions): the
+ * rows already name the menu each item belongs in -- Preferences under Edit, Quit and About
+ * where GNOME puts them -- with the standard menus spelled one way, so the only mapping left
+ * is the default menu, the one an empty hint names. */
 static const char* cn1MenuTitleForHint(const char* hint) {
-    if (strcmp(hint, "File") == 0 || strcmp(hint, "Preferences") == 0
-            || strcmp(hint, "Quit") == 0 || strcmp(hint, "App") == 0) {
-        return "File";
-    }
-    if (strcmp(hint, "Edit") == 0) {
-        return "Edit";
-    }
-    if (strcmp(hint, "View") == 0) {
-        return "View";
-    }
-    if (strcmp(hint, "Window") == 0) {
-        return "Window";
-    }
-    if (strcmp(hint, "Help") == 0 || strcmp(hint, "About") == 0) {
-        return "Help";
-    }
     return hint[0] == '\0' ? "Commands" : hint;
 }
 
 /* The chosen item's slot, carried as the widget's own data so the callback needs no
  * lookup table beyond the id array. */
 static void cn1OnMenuItem(GtkMenuItem* item, gpointer data) {
-    (void) item;
     int slot = GPOINTER_TO_INT(data);
     if (slot < 0 || slot >= cn1MenuItemCount) {
         return;
+    }
+    /* A radio is a check item drawn as one, so GTK toggles a selected radio off when it is
+     * clicked again. Choosing a radio always leaves it selected, and Java, already checked,
+     * would not republish the menu to put it back: restore it here, without re-entering. */
+    if (GTK_IS_CHECK_MENU_ITEM(item)
+            && gtk_check_menu_item_get_draw_as_radio(GTK_CHECK_MENU_ITEM(item))
+            && !gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(item))) {
+        g_signal_handlers_block_by_func(item, (gpointer) cn1OnMenuItem, data);
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), TRUE);
+        g_signal_handlers_unblock_by_func(item, (gpointer) cn1OnMenuItem, data);
     }
     /* Queued, not run here: this is the GTK thread. The EDT drains it through pollEvent,
      * which is the rule every other input on this port follows. */
@@ -1325,53 +1320,123 @@ static void cn1MenuRebuild(void* arg) {
     GtkAccelGroup* accels = cn1MenuAccels;
 
     GtkWidget* popups[CN1_MENU_MAX_POPUPS];
-    char titles[CN1_MENU_MAX_POPUPS][64];
+    static char keys[CN1_MENU_MAX_POPUPS][CN1_MENU_PATH_CAP];
     int popupCount = 0;
 
     const char* cursor = spec;
     while (*cursor != '\0' && cn1MenuItemCount < CN1_MENU_MAX_ITEMS) {
-        char hint[64];
+        char path[CN1_MENU_PATH_CAP];
         char label[256];
         char keyField[16];
         char modField[16];
         char idField[24];
-        cn1MenuNextField(&cursor, hint, sizeof(hint));
+        char flagField[16];
+        char iconField[4];
+        size_t pathLen = 0;
+        while (cursor[pathLen] != '\0' && cursor[pathLen] != '\t' && cursor[pathLen] != '\n') {
+            pathLen++;
+        }
+        int pathFits = pathLen < sizeof(path);
+        cn1MenuNextField(&cursor, path, sizeof(path));
         cn1MenuNextField(&cursor, label, sizeof(label));
         cn1MenuNextField(&cursor, keyField, sizeof(keyField));
         cn1MenuNextField(&cursor, modField, sizeof(modField));
         cn1MenuNextField(&cursor, idField, sizeof(idField));
+        cn1MenuNextField(&cursor, flagField, sizeof(flagField));
+        /* Consumed and ignored; see the section header. */
+        cn1MenuNextField(&cursor, iconField, sizeof(iconField));
         if (*cursor == '\n') {
             cursor++;
+        }
+        int flags = flagField[0] == '\0' ? 1 : atoi(flagField);
+
+        /* Walk the path, finding or creating each menu. Rows arrive depth first, so a
+         * submenu appended on its first row sits at its place among the parent's items. */
+        GtkWidget* parent = bar;
+        GtkWidget* popup = 0;
+        if (!pathFits) {
+            continue;
+        }
+        char key[CN1_MENU_PATH_CAP];
+        size_t keyLen = 0;
+        const char* p = path;
+        int first = 1;
+        for (;;) {
+            char segment[CN1_MENU_PATH_CAP];
+            size_t n = 0;
+            while (*p != '\0' && *p != 0x1f && n + 1 < sizeof(segment)) {
+                segment[n++] = *p;
+                p++;
+            }
+            segment[n] = '\0';
+            const char* title = first ? cn1MenuTitleForHint(segment) : segment;
+            size_t tl = strlen(title);
+            if ((*p != '\0' && *p != 0x1f) || keyLen + tl + 2 >= sizeof(key)) {
+                /* Does not fit: no menu, rather than the parent standing in for it. */
+                popup = 0;
+                break;
+            }
+            if (!first) {
+                key[keyLen++] = 0x1f;
+            }
+            memcpy(key + keyLen, title, tl);
+            keyLen += tl;
+            key[keyLen] = '\0';
+            popup = 0;
+            for (int i = 0; i < popupCount; i++) {
+                if (strcmp(keys[i], key) == 0) {
+                    popup = popups[i];
+                    break;
+                }
+            }
+            if (popup == 0) {
+                if (popupCount >= CN1_MENU_MAX_POPUPS) {
+                    popup = 0;
+                    break;
+                }
+                popup = gtk_menu_new();
+                GtkWidget* top = gtk_menu_item_new_with_label(title);
+                gtk_menu_item_set_submenu(GTK_MENU_ITEM(top), popup);
+                gtk_menu_shell_append(GTK_MENU_SHELL(parent), top);
+                popups[popupCount] = popup;
+                strncpy(keys[popupCount], key, CN1_MENU_PATH_CAP - 1);
+                keys[popupCount][CN1_MENU_PATH_CAP - 1] = '\0';
+                popupCount++;
+            }
+            parent = popup;
+            if (*p == '\0') {
+                break;
+            }
+            p++;
+            first = 0;
+        }
+        if (popup == 0) {
+            continue;
+        }
+        if (flags & 16) {
+            gtk_menu_shell_append(GTK_MENU_SHELL(popup), gtk_separator_menu_item_new());
+            continue;
         }
         if (label[0] == '\0') {
             continue;
         }
 
-        const char* title = cn1MenuTitleForHint(hint);
-        GtkWidget* popup = 0;
-        for (int i = 0; i < popupCount; i++) {
-            if (strcmp(titles[i], title) == 0) {
-                popup = popups[i];
-                break;
-            }
-        }
-        if (popup == 0) {
-            if (popupCount >= CN1_MENU_MAX_POPUPS) {
-                continue;
-            }
-            popup = gtk_menu_new();
-            GtkWidget* top = gtk_menu_item_new_with_label(title);
-            gtk_menu_item_set_submenu(GTK_MENU_ITEM(top), popup);
-            gtk_menu_shell_append(GTK_MENU_SHELL(bar), top);
-            popups[popupCount] = popup;
-            strncpy(titles[popupCount], title, 63);
-            titles[popupCount][63] = '\0';
-            popupCount++;
-        }
-
         int slot = cn1MenuItemCount++;
         cn1MenuCommandIds[slot] = atoi(idField);
-        GtkWidget* item = gtk_menu_item_new_with_label(label);
+        GtkWidget* item;
+        if (flags & 2) {
+            /* A check item, drawn as a radio button for a radio group. Not GtkRadioMenuItem:
+             * Java owns the state and keeps the group exclusive, then republishes the menu,
+             * so the widget only needs the look. */
+            item = gtk_check_menu_item_new_with_label(label);
+            gtk_check_menu_item_set_draw_as_radio(GTK_CHECK_MENU_ITEM(item), (flags & 8) != 0);
+            /* Before the handler is connected: set_active emits "activate", which would
+             * otherwise run the command while the menu is being built. */
+            gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), (flags & 4) != 0);
+        } else {
+            item = gtk_menu_item_new_with_label(label);
+        }
+        gtk_widget_set_sensitive(item, (flags & 1) != 0);
         cn1MenuAddAccel(item, accels, atoi(keyField), atoi(modField));
         g_signal_connect(item, "activate", G_CALLBACK(cn1OnMenuItem),
                 GINT_TO_POINTER(slot));
