@@ -1,0 +1,6 @@
+# The screenshot suite (scripts/hellocodenameone) builds this project once,
+# where the .NET SDK is, and every other job reuses what that build wrote for
+# as long as the files here hash to the same thing. A checkout that rewrites
+# line endings -- Git for Windows does by default -- would change every hash
+# and send those jobs looking for an SDK they do not have.
+* -text

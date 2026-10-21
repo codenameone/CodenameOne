@@ -9,6 +9,16 @@ name: Car (CarPlay) integration
 'on':
   pull_request:
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/car-ios.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
@@ -22,6 +32,16 @@ name: Car (CarPlay) integration
     branches:
       - master
     paths:
+      # The application these jobs build compiles a Unity project, from an
+      # archive that unity-gallery-prebuilt.yml makes out of these.
+      - 'scripts/unity-compat-samples/gallery/**'
+      - 'maven/cil-translator/**'
+      - 'maven/unity-compat/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
+      - 'scripts/unity-gallery-prebuilt.sh'
+      - '.github/workflows/unity-gallery-prebuilt.yml'
+      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/car-ios.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
@@ -39,7 +59,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the jobs below as an artifact; none of them installs
+  # the .NET SDK or builds the Unity modules.
+  unity-gallery:
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   car-ios:
+    needs: unity-gallery
     name: Car CarPlay
     permissions:
       contents: read
@@ -85,6 +112,11 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
+
       - name: Build sample iOS app (car-enabled) and compile workspace
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests

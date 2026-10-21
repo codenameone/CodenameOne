@@ -466,10 +466,22 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
         glDisable(GL_BLEND);
     } else {
         glEnable(GL_BLEND);
+        /* The colour is weighted by the source alpha; the ALPHA channel is
+         * not. It accumulates coverage (a = sa + da * (1 - sa)), so a frame
+         * cleared opaque stays opaque whatever is blended onto it. With one
+         * glBlendFunc for all four channels the alpha was weighted by itself
+         * (sa * sa + da * (1 - sa)): a 40% black quad over an opaque clear
+         * left 0.76 in the FBO, cn1GlReadback handed that to cairo as the
+         * frame's own transparency and the form behind showed through the
+         * whole quad -- lighter than the background it was meant to darken.
+         * This is RenderState.BlendMode's contract and what the Direct3D
+         * backend does (cn1_windows_d3d.cpp). */
         if (p->blend == 2) {
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);            /* additive */
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE,
+                    GL_ONE, GL_ONE_MINUS_SRC_ALPHA);      /* additive */
         } else {
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); /* alpha */
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
+                    GL_ONE, GL_ONE_MINUS_SRC_ALPHA);      /* alpha */
         }
     }
     if (p->cull == 0) {

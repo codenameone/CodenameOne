@@ -1,0 +1,275 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.unitycompat.system;
+
+import com.codename1.unitycompat.system.collections.generic.ICollection_1;
+import com.codename1.unitycompat.system.collections.generic.IEnumerator_1;
+
+/// An array seen as the collection interfaces it implements on .NET. The
+/// translator wraps an array in one where C# passes it to a parameter of
+/// such a type -- `keys.Any(...)`, `new List<int>(numbers)` -- because a
+/// JVM array implements nothing. The view reads the array it was made
+/// from, so a change to an element shows through, as it would on .NET.
+///
+/// What it hands out is a value, though, never the array's own element: a
+/// struct is copied on the way out, as a primitive is boxed. An array of
+/// structs is the one collection here whose elements are written in place,
+/// and the code on the other side of the interface is erased -- it passes
+/// what it is given to a delegate, or keeps it in a list, without knowing
+/// what it is. Handing it the element itself let `cells.ToList()` share
+/// its values with the array, and let a lambda that writes the array
+/// change the argument it was still reading.
+///
+/// The view is every collection interface of the runtime that the
+/// translator converts an array to, `ICollection<T>` as well as the
+/// enumerables: a view that implemented only the enumerables failed
+/// `values.Count` on an array held as an `ICollection<int>` with
+/// IncompatibleClassChangeError. `IList<T>`, `IReadOnlyCollection<T>` and
+/// `IReadOnlyList<T>` have no class in the runtime, so a member of one is a
+/// missing member the build names; walking one is all it can be used for.
+@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+public final class ArrayView implements ICollection_1 {
+    private final Object array;
+    private final int length;
+    private final boolean structs;
+    private final boolean unsigned;
+
+    private ArrayView(Object array, int length, boolean structs, boolean unsigned) {
+        this.array = array;
+        this.length = length;
+        this.structs = structs;
+        this.unsigned = unsigned;
+    }
+
+    /// The view of an array the translator knows to hold `byte`, `ushort`,
+    /// `uint` or `ulong`, or null for null. A `uint[]` and an `int[]` are
+    /// one Java class, and the erased code on the other side is handed
+    /// boxes, of which the unsigned types have their own (see ByteBox): as
+    /// with structs, only the translator knows which this array wants.
+    public static ArrayView $ofUnsigned(Object array) {
+        ArrayView signed = $of(array);
+        return signed == null ? null : new ArrayView(array, signed.length, false, true);
+    }
+
+    /// The view of a one-dimensional array the translator knows to hold
+    /// structs, or null for null. Only the translator can know: there is
+    /// no reflection to ask an array what its elements are, and an
+    /// `object[]` may hold boxed structs that are not to be copied.
+    public static ArrayView $ofStructs(Object array) {
+        if (array instanceof Object[]) {
+            return new ArrayView(array, ((Object[]) array).length, true, false);
+        }
+        return $of(array);
+    }
+
+    /// What a cast to `IEnumerable` or `IEnumerable<T>` is given first, and
+    /// an `is` or `as` of them: the view of `o` if it is an array, as one
+    /// is enumerable on .NET, and `o` itself if it is anything else. `kind`
+    /// is what the translator could read off the type cast to: 1 for an
+    /// element type that is a struct, 2 for an unsigned one, 0 for any
+    /// other and for the non-generic interface, which names none -- so an
+    /// `object` holding a `uint[]`, cast to `IEnumerable`, is walked as the
+    /// `int[]` it is here.
+    public static Object $viewIfArray(Object o, int kind) {
+        // First, because it is what most things cast to it are.
+        if (o == null || o instanceof com.codename1.unitycompat.system.collections.IEnumerable) {
+            return o;
+        }
+        if (o instanceof Object[]) {
+            return kind == 1 ? $ofStructs(o) : $of(o);
+        }
+        if (o instanceof MdArray || o instanceof int[] || o instanceof float[] || o instanceof boolean[]
+                || o instanceof char[] || o instanceof byte[] || o instanceof short[] || o instanceof long[]
+                || o instanceof double[]) {
+            // Only four of them have an unsigned reading.
+            return kind == 2 && !(o instanceof float[] || o instanceof boolean[] || o instanceof short[]
+                    || o instanceof double[]) ? $ofUnsigned(o) : $of(o);
+        }
+        return o;
+    }
+
+    /// Whether every struct this view hands out is already a copy, so that
+    /// a collection filling itself from it need not make another.
+    public boolean $copiesStructs() {
+        return structs;
+    }
+
+    /// The view of an array, or null for null.
+    public static ArrayView $of(Object array) {
+        if (array == null) {
+            return null;
+        }
+        int n;
+        if (array instanceof MdArray) {
+            // Every element, last index fastest: the order .NET enumerates
+            // an array of several dimensions in.
+            n = ((MdArray) array).length();
+        } else if (array instanceof Object[]) {
+            n = ((Object[]) array).length;
+        } else if (array instanceof int[]) {
+            n = ((int[]) array).length;
+        } else if (array instanceof float[]) {
+            n = ((float[]) array).length;
+        } else if (array instanceof boolean[]) {
+            n = ((boolean[]) array).length;
+        } else if (array instanceof char[]) {
+            n = ((char[]) array).length;
+        } else if (array instanceof byte[]) {
+            n = ((byte[]) array).length;
+        } else if (array instanceof short[]) {
+            n = ((short[]) array).length;
+        } else if (array instanceof long[]) {
+            n = ((long[]) array).length;
+        } else if (array instanceof double[]) {
+            n = ((double[]) array).length;
+        } else {
+            throw new InvalidCastException();
+        }
+        return new ArrayView(array, n, false, false);
+    }
+
+    @Override
+    public int get_Count() {
+        return length;
+    }
+
+    /// An array has a fixed size: through `ICollection<T>` it is read-only,
+    /// and .NET says so with this exception and this message.
+    @Override
+    public void Clear() {
+        throw new NotSupportedException("Collection is read-only.");
+    }
+
+    public int get_Length() {
+        return length;
+    }
+
+    /// The element, boxed as the erased code that asked expects it.
+    public Object get_Item(int i) {
+        if (i < 0 || i >= length) {
+            throw new IndexOutOfRangeException();
+        }
+        if (unsigned) {
+            return unsignedItem(i);
+        }
+        if (array instanceof MdArray) {
+            return ((MdArray) array).boxed(i);
+        }
+        if (structs) {
+            return ((Struct) ((Object[]) array)[i]).$copyValue();
+        }
+        if (array instanceof Object[]) {
+            return ((Object[]) array)[i];
+        }
+        if (array instanceof int[]) {
+            return Integer.valueOf(((int[]) array)[i]);
+        }
+        if (array instanceof float[]) {
+            return Float.valueOf(((float[]) array)[i]);
+        }
+        if (array instanceof boolean[]) {
+            return ((boolean[]) array)[i] ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if (array instanceof char[]) {
+            return Character.valueOf(((char[]) array)[i]);
+        }
+        if (array instanceof byte[]) {
+            return Byte.valueOf(((byte[]) array)[i]);
+        }
+        if (array instanceof short[]) {
+            return Short.valueOf(((short[]) array)[i]);
+        }
+        if (array instanceof long[]) {
+            return Long.valueOf(((long[]) array)[i]);
+        }
+        return Double.valueOf(((double[]) array)[i]);
+    }
+
+    private Object unsignedItem(int i) {
+        if (array instanceof int[]) {
+            return UInt32Box.valueOf(((int[]) array)[i]);
+        }
+        if (array instanceof byte[]) {
+            return ByteBox.valueOf(((byte[]) array)[i]);
+        }
+        if (array instanceof char[]) {
+            return UInt16Box.valueOf(((char[]) array)[i]);
+        }
+        if (array instanceof long[]) {
+            return UInt64Box.valueOf(((long[]) array)[i]);
+        }
+        // An array of several dimensions boxes its own elements, as the
+        // signed type: the one case that makes two boxes for an element.
+        Object signed = ((MdArray) array).boxed(i);
+        if (signed instanceof Integer) {
+            return UInt32Box.valueOf(((Integer) signed).intValue());
+        }
+        if (signed instanceof Byte) {
+            return ByteBox.valueOf(((Byte) signed).byteValue());
+        }
+        if (signed instanceof Character) {
+            return UInt16Box.valueOf(((Character) signed).charValue());
+        }
+        return UInt64Box.valueOf(((Long) signed).longValue());
+    }
+
+    @Override
+    public IEnumerator_1 GetEnumerator() {
+        return new Walk(this);
+    }
+
+    private static final class Walk implements IEnumerator_1 {
+        private final ArrayView view;
+        private int next;
+        private Object current;
+
+        Walk(ArrayView view) {
+            this.view = view;
+        }
+
+        @Override
+        public boolean MoveNext() {
+            if (next < view.length) {
+                current = view.get_Item(next++);
+                return true;
+            }
+            current = null;
+            return false;
+        }
+
+        @Override
+        public Object get_Current() {
+            return current;
+        }
+
+        @Override
+        public void Reset() {
+            next = 0;
+            current = null;
+        }
+
+        @Override
+        public void Dispose() {
+        }
+    }
+}

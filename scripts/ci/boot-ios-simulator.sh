@@ -60,6 +60,7 @@ LIST_TIMEOUT="${CN1_SIM_LIST_TIMEOUT:-120}"
 CREATE_TIMEOUT="${CN1_SIM_CREATE_TIMEOUT:-180}"
 BOOT_TIMEOUT="${CN1_SIM_BOOT_TIMEOUT:-180}"
 BOOTSTATUS_TIMEOUT="${CN1_SIM_BOOTSTATUS_TIMEOUT:-420}"
+SHUTDOWN_TIMEOUT="${CN1_SIM_SHUTDOWN_TIMEOUT:-120}"
 
 log() { printf '[boot-sim] %s\n' "$*" >&2; }
 
@@ -207,6 +208,35 @@ if [ "$STATUS" -eq 124 ]; then
 fi
 if [ "$STATUS" -ne 0 ]; then
   exit "$STATUS"
+fi
+
+# CN1_SIM_SHUTDOWN_AFTER_BOOT=1: hand back a device that EXISTS and has booted
+# once, but is not running. For a caller whose next step is a long build and
+# whose test script boots the device itself -- scripts/run-ios-ui-tests.sh does,
+# with `simctl boot` and `bootstatus -b`, before it compiles and again before it
+# installs, and both are no different for a device that is shut down.
+#
+# The first boot of a newly created device is the expensive one, and it does not
+# end when bootstatus returns: the runtime goes on migrating and indexing for
+# minutes, on a runner whose next job is something else. On the Xcode 27
+# screenshot leg the Xcode selection that takes 3 seconds in the steps before
+# this one took 2 to 2.7 minutes in the step after it, measured across three
+# runs; a simulator settling underneath it is the likeliest cause and the only
+# difference between the two, though only a run with this on can confirm it.
+# Booting here is still worth it -- this is the only place that boot is on a
+# deadline and sampled when it hangs -- so the device is booted, proven, and
+# then stopped.
+#
+# A shutdown that fails or hits its deadline is a warning, not a failure: the
+# device is usable either way, and the caller's own boot is a no-op on one that
+# is still up.
+if [ "${CN1_SIM_SHUTDOWN_AFTER_BOOT:-0}" = "1" ]; then
+  if run_bounded "$SHUTDOWN_TIMEOUT" "simctl shutdown" "$SIMCTL" shutdown "$UDID"; then
+    log "shut down ${UDID}; the caller boots it when it needs it"
+  else
+    echo "::warning::simctl shutdown did not complete for ${UDID}; leaving it as it is." >&2
+    printf '%s\n' "$LAST_OUTPUT" >&2
+  fi
 fi
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then

@@ -66,6 +66,11 @@
                 <version>${cn1.version}</version>
                 <scope>provided</scope>
             </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-unity-compat</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
             <!--
               Optional desktop media binaries. BrowserComponent receives JCEF
               Maven transitively from codenameone-javase and downloads the native

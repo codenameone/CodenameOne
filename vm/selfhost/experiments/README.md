@@ -19,7 +19,7 @@ Build and run:
 javac -bootclasspath <javaapi-classes> -d /tmp/exp/classes src/com/exp/PinProbe.java
 java -cp <translator>:<asm> com.codename1.tools.translator.ByteCodeTranslator \
      clean "<javaapi-classes>;/tmp/exp/classes" /tmp/exp/out PinProbe com.exp PinProbe 1.0 clean none
-clang -O3 -flto=thin -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
+clang -O3 -flto=thin -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off \
       -DCN1_ALLOC_CENSUS -I<src> <src>/*.c <src>/*.S -lm -lpthread -o /tmp/exp/pinprobe
 CN1_HEAP_REPORT=1 /tmp/exp/pinprobe 2>&1 | grep -E 'PROBE|Pin(Shallow|Deep|Scrub)'
 ```

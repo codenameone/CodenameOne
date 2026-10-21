@@ -422,6 +422,31 @@ class GradleConversionTest {
         assertFalse(GradleConversion.antMatches("a?c.txt", "a/c.txt"));
     }
 
+    /// The Gradle plugin adds the Unity runtime to a project that has
+    /// `src/main/unity`, at its own version and with the translator of that
+    /// version; the declaration cn1:import-unity-project wrote into the pom
+    /// must not be carried over as a second one, while the Unity project
+    /// itself has to arrive.
+    @Test
+    void theUnityRuntimeIsLeftToThePluginAndTheProjectIsCopied() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><artifactId>mvnapp-common</artifactId><dependencies>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-unity-compat</artifactId>"
+                + "<version>1</version></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
+                + "</dependency></dependencies></project>");
+        touch(mvn, "common/src/main/unity/Assets/Scripts/Player.cs", "class Player {}");
+        touch(mvn, "common/src/main/unity/ProjectSettings/ProjectSettings.asset", "x");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertFalse(build.contains("codenameone-unity-compat"), build);
+        assertTrue(build.contains("    implementation(\"org.example:util:2.0\")"), build);
+        assertTrue(new File(out, "src/main/unity/Assets/Scripts/Player.cs").isFile());
+        assertTrue(new File(out, "src/main/unity/ProjectSettings/ProjectSettings.asset").isFile());
+    }
+
     @Test
     void platformModuleDependenciesAreNotDroppedSilently() throws Exception {
         File mvn = mavenApp(UNTOUCHED_API);

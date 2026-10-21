@@ -22,6 +22,11 @@ on:
       port_prepared:
         type: boolean
         default: false
+      # True when the caller already ran unity-gallery-prebuilt.yml in this run:
+      # its artifact has a fixed name and cannot be uploaded twice.
+      unity_prepared:
+        type: boolean
+        default: false
 
 env:
   # A method the translator culled as unreachable is still emitted as a stub,
@@ -40,16 +45,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The application has a Unity project in it. One Linux job compiles it and
+  # hands the result to the job below as an artifact, unless the caller did.
+  unity-gallery:
+    if: ${{ !inputs.unity_prepared }}
+    uses: ./.github/workflows/unity-gallery-prebuilt.yml
+
   build-port:
     if: ${{ !inputs.port_prepared }}
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
     # via the cn1-built cache; first runner to land a fresh SHA populates it
     # and the others skip the rebuild.
     uses: ./.github/workflows/_build-ios-port.yml
+    with:
+      test_server: true
 
   build-mac-catalyst:
-    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') }}
-    needs: build-port
+    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') && (inputs.unity_prepared || needs.unity-gallery.result == 'success') }}
+    needs: [build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -145,6 +158,17 @@ jobs:
           # Replaces the evictable cn1-built cache restore with the artifact
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+          # The test server build-port built for the whole run, when it did.
+          # Without it the suite script builds its own, as it always has.
+          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
+            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
+          fi
+          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
+            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
+            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
+          else
+            echo "No prebuilt test server in the bundle; the suite builds its own."
+          fi
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component for .metal
@@ -160,6 +184,11 @@ jobs:
           cn1_select_xcode || exit 1
           "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
+
+      # After everything that fills the local Maven repository and before the
+      # application is built; this job has no .NET SDK (see the action).
+      - name: Unpack the Unity gallery prebuilt
+        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample Mac Catalyst app and compile workspace
         id: build-mac-catalyst-app
