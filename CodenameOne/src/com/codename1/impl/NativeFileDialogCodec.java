@@ -168,13 +168,24 @@ public final class NativeFileDialogCodec {
         }
         String[] paths = new String[answer.length - first];
         for (int i = 0; i < paths.length; i++) {
-            paths[i] = "file://" + answer[first + i].replace('\\', '/');
+            paths[i] = "file://" + toUrlPath(answer[first + i]);
         }
         if (request instanceof com.codename1.io.filechooser.SaveFileRequest && filter >= 0) {
             FileTypeFilter f = request.getFilters()[filter];
             paths[0] = FileDialogSupport.withExtension(paths[0], f);
         }
         return new FileDialogResult(request, paths, filter, values);
+    }
+
+    /// Converts a native path to the slash form a `file://` URL carries.
+    /// Only a Windows path (`C:\dir` or a `\\server\share` UNC path) has
+    /// backslash separators; on macOS and Linux a backslash is an ordinary
+    /// file name character, and turning it into `/` would name another file.
+    static String toUrlPath(String path) {
+        boolean windows = (path.length() > 2 && path.charAt(1) == ':'
+                && (path.charAt(2) == '\\' || path.charAt(2) == '/'))
+                || path.startsWith("\\\\");
+        return windows ? path.replace('\\', '/') : path;
     }
 
     /// Delivers a result through `Display.callSerially()`, so the callback runs

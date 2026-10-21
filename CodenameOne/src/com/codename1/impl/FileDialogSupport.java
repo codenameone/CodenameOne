@@ -218,16 +218,7 @@ final class FileDialogSupport {
                         deliver(result, callback);
                         return;
                     }
-                    if (request.getContent() == null) {
-                        copyStaged(request.getSourceFile(), result.getPath());
-                    } else {
-                        OutputStream out = FileSystemStorage.getInstance().openOutputStream(result.getPath());
-                        try {
-                            request.writeContent(result, out);
-                        } finally {
-                            out.close();
-                        }
-                    }
+                    saveStaged(request, result);
                 } catch (IOException err) {
                     Log.e(err);
                     result.setError(err);
@@ -242,26 +233,69 @@ final class FileDialogSupport {
         });
     }
 
-    /// Copies a save's source file to its destination through a staged copy.
-    /// The two can be the same file under different spellings (a drive path
-    /// against a `file:` URL, case on a case-insensitive volume, `..`, links),
-    /// which no textual comparison catches; opening the destination first would
-    /// then truncate the source before it was read. Reading the whole source into
-    /// a staging file before the destination is opened is safe for every alias.
-    private static void copyStaged(String source, String destination) throws IOException {
-        if (source == null) {
-            throw new IOException("SaveFileRequest has neither content nor a source file");
-        }
+    /// Writes a save completely before the destination is touched, then
+    /// replaces the destination with rollback.
+    ///
+    /// Opening the destination first would truncate it before the content
+    /// exists: a writer that throws, or a full disk, would then destroy the
+    /// document being replaced. It would also truncate the source of a plain
+    /// copy whose destination is the same file under another spelling (a drive
+    /// path against a `file:` URL, case on a case-insensitive volume, `..`,
+    /// links), which no textual comparison catches. Staging covers both: the
+    /// content, or the whole source, is in the staging file before anything
+    /// opens the destination, and the old destination is kept aside until the
+    /// new one is fully written.
+    static void saveStaged(SaveFileRequest request, FileDialogResult result) throws IOException {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         String home = fs.getAppHomePath();
         String staging = (home.endsWith("/") ? home : home + "/")
                 + ".cn1-save-" + System.currentTimeMillis() + "-" + (stagingCounter++);
         try {
-            copy(fs, source, staging);
-            copy(fs, staging, destination);
+            OutputStream out = fs.openOutputStream(staging);
+            try {
+                request.writeContent(result, out);
+            } finally {
+                out.close();
+            }
+            replace(fs, staging, result.getPath());
         } finally {
             if (fs.exists(staging)) {
                 fs.delete(staging);
+            }
+        }
+    }
+
+    /// Copies the staged file over the destination. An existing destination is
+    /// renamed aside first and restored if the copy fails, so a failed save
+    /// leaves the original document as it was.
+    private static void replace(FileSystemStorage fs, String staging, String destination) throws IOException {
+        String backup = null;
+        String name = destination.substring(destination.lastIndexOf('/') + 1);
+        if (fs.exists(destination)) {
+            String backupName = "." + name + ".cn1-backup-" + System.currentTimeMillis();
+            fs.rename(destination, backupName);
+            String candidate = destination.substring(0, destination.length() - name.length()) + backupName;
+            // A port whose rename cannot move it leaves the original in place;
+            // the copy below then overwrites it without a backup, which is
+            // still after the content was fully staged.
+            if (fs.exists(candidate) && !fs.exists(destination)) {
+                backup = candidate;
+            }
+        }
+        boolean written = false;
+        try {
+            copy(fs, staging, destination);
+            written = true;
+        } finally {
+            if (backup != null) {
+                if (written) {
+                    fs.delete(backup);
+                } else {
+                    if (fs.exists(destination)) {
+                        fs.delete(destination);
+                    }
+                    fs.rename(backup, name);
+                }
             }
         }
     }
