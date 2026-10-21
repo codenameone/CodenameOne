@@ -231,6 +231,11 @@ final class FileDialogSupport {
                 } catch (IOException err) {
                     Log.e(err);
                     result.setError(err);
+                } catch (RuntimeException err) {
+                    // An unchecked failure in the application's writer still
+                    // owes the caller its callback.
+                    Log.e(err);
+                    result.setError(err);
                 }
                 deliver(result, callback);
             }

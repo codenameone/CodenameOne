@@ -9231,15 +9231,40 @@ static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
         [fileManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
         NSString *destinationPath = [folder stringByAppendingPathComponent:fileName];
         NSURL *destinationURL = [NSURL fileURLWithPath:destinationPath];
-        NSError *error = nil;
-        if ([url isFileURL] && [fileManager copyItemAtURL:url toURL:destinationURL error:&error]) {
+        __block NSError *error = nil;
+        __block BOOL copied = NO;
+        if ([url isFileURL]) {
+            // A File Provider (iCloud Drive, a third-party provider) requires
+            // coordinated access to the item, folders above all; an
+            // uncoordinated copy can fail or read a half-updated tree.
+            NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+            NSError *coordError = nil;
+            [coordinator coordinateReadingItemAtURL:url options:NSFileCoordinatorReadingWithoutChanges
+                    error:&coordError byAccessor:^(NSURL *readURL) {
+                NSError *copyError = nil;
+                copied = [[NSFileManager defaultManager] copyItemAtURL:readURL toURL:destinationURL error:&copyError];
+                if (!copied) {
+                    error = copyError;
+                }
+            }];
+            if (coordError != nil && error == nil) {
+                error = coordError;
+            }
+#if !__has_feature(objc_arc)
+            [coordinator release];
+#endif
+        }
+        if (copied) {
             result = destinationPath;
         } else {
-            NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
-            if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&error]) {
+            // A separate local: &error on a __block variable is not a valid
+            // ARC write-back target.
+            NSError *dataError = nil;
+            NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&dataError];
+            if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&dataError]) {
                 result = destinationPath;
             } else {
-                NSLog(@"Codename One file dialog failed to copy selected item: %@", error);
+                NSLog(@"Codename One file dialog failed to copy selected item: %@ %@", error, dataError);
                 // Nothing is returned for this item, so its staging folder,
                 // with whatever a partial folder copy left in it, goes now.
                 [fileManager removeItemAtPath:folder error:nil];

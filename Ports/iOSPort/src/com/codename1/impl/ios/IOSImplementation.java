@@ -6883,6 +6883,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         java.util.ArrayList<String> uts = new java.util.ArrayList<String>();
         java.util.ArrayList<String> exts = new java.util.ArrayList<String>();
+        boolean allFiles = false;
         for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
             String[] u = f.getUtTypes();
             if (u != null && u.length > 0) {
@@ -6897,11 +6898,22 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if (s != null && s.startsWith(".")) {
                         s = s.substring(1);
                     }
+                    if ("*".equals(s)) {
+                        allFiles = true;
+                        continue;
+                    }
                     // Not case folded: UTType resolves extensions case
                     // insensitively, and toLowerCase is locale sensitive.
                     exts.add(s);
                 }
             }
+        }
+        if (allFiles) {
+            // "*" is the all-files extension; sent as a name it would become a
+            // dynamic UTI nothing conforms to. An empty type list makes the
+            // native picker fall back to public.item, i.e. every document.
+            uts.clear();
+            exts.clear();
         }
         int id = registerFileDialog(new PendingFileDialog(request, callback, null));
         nativeInstance.showOpenFileDialog(joinLines(uts), joinLines(exts),

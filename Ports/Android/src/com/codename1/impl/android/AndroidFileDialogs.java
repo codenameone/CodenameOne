@@ -202,7 +202,9 @@ final class AndroidFileDialogs {
         String name = request.getSuggestedName();
         String[] mimes = mimeTypes(request.getFilters(), request.getSelectedFilter());
         String type = mimes.length == 1 ? mimes[0] : commonMime(mimes);
-        if (type == null || type.indexOf('*') >= 0) {
+        // Only an unconstrained type falls back to the name: a family wildcard
+        // such as image/* is what the selected filter asked for.
+        if (type == null || "*/*".equals(type)) {
             String fromName = name == null ? null : mimeForExtension(extensionOf(name));
             if (fromName != null) {
                 type = fromName;
@@ -238,17 +240,41 @@ final class AndroidFileDialogs {
                 new Thread(new Runnable() {
                     public void run() {
                         OutputStream out = null;
+                        File staged = null;
                         try {
+                            // The provider document may be the source file itself
+                            // under another name; opening it truncates the source
+                            // before it is read. A source-backed save is therefore
+                            // copied to the cache first, as completeSave does.
+                            if (request.getContent() == null && request.getSourceFile() != null) {
+                                staged = File.createTempFile("cn1save", null,
+                                        AndroidNativeUtil.getContext().getCacheDir());
+                                OutputStream so = new FileOutputStream(staged);
+                                try {
+                                    request.writeContent(result, so);
+                                } finally {
+                                    so.close();
+                                }
+                            }
                             out = resolver.openOutputStream(uri);
                             if (out == null) {
                                 throw new IOException("Cannot open " + uri);
                             }
-                            request.writeContent(result, out);
+                            if (staged != null) {
+                                copyStream(staged, out);
+                            } else {
+                                request.writeContent(result, out);
+                            }
                         } catch (IOException e) {
                             result.setError(e);
-                        } catch (SecurityException e) {
+                        } catch (RuntimeException e) {
+                            // SecurityException, or an unchecked failure in the
+                            // application's writer; the callback is still owed.
                             result.setError(e);
                         } finally {
+                            if (staged != null && !staged.delete()) {
+                                staged.deleteOnExit();
+                            }
                             if (out != null) {
                                 try {
                                     out.close();
@@ -600,6 +626,19 @@ final class AndroidFileDialogs {
         }
         if (!f.delete()) {
             f.deleteOnExit();
+        }
+    }
+
+    private static void copyStream(File from, OutputStream out) throws IOException {
+        InputStream in = new java.io.FileInputStream(from);
+        try {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) > -1) {
+                out.write(buffer, 0, read);
+            }
+        } finally {
+            in.close();
         }
     }
 
