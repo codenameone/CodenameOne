@@ -2887,6 +2887,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-10-21T17:15:04+00:00"
       }
+    },
+    "gc-memory-budget-performance": {
+      "devto": {
+        "id": 4891205,
+        "url": "https://dev.to/codenameone/pgo-for-faster-apps-and-generationaladaptive-gc-122e",
+        "syndicated_at": "2026-10-21T18:01:09+00:00"
+      }
     }
   }
 }
