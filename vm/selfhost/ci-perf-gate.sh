@@ -81,14 +81,6 @@ if missing or report.get('calibration'):
         print('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s perf-results.json' % number)
     print(json.dumps({key: report.get('calibration') or sorted(missing)}, indent=1))
     sys.exit(1)
-improved = moved('improved')
-if improved:
-    # An improvement that is not written down lets a later change give it back unnoticed.
-    print('ParparVM performance IMPROVED past the baseline on %s:' % report['platform'])
-    print('\n'.join(improved))
-    print('Record the new baseline in %s:' % overlay)
-    print(rebaseline)
-    sys.exit(1)
 if report.get('stale_overlay'):
     # Measured against the baseline without this pull request's overlay, because another
     # merged change moved a row it rebaselines; the overlay has to be re-measured.
@@ -96,6 +88,16 @@ if report.get('stale_overlay'):
     print('Re-measure it from this job\'s perf-results.json:')
     print(rebaseline)
     sys.exit(1)
+improved = moved('improved')
+if improved:
+    # Reported, not failed: failing on a win turned every VM improvement into a red
+    # master (and red pull requests) until someone rebaselined, and RAM ratios hovering
+    # at the tolerance flipped jobs at random. Rebaselining still locks a win in.
+    print('ParparVM performance IMPROVED past the baseline on %s (not a failure):'
+          % report['platform'])
+    print('\n'.join(improved))
+    print('To lock it in, record the new baseline in %s:' % overlay)
+    print(rebaseline)
 print('ParparVM performance gate: no regression on %s' % report['platform'])
 PY
 fi

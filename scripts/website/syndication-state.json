@@ -2866,6 +2866,17 @@
         "url": "https://medium.com/@Codename_One/how-do-you-test-spring-compatibility-162bf6c413d7?postPublishedType=initial",
         "syndicated_at": "2026-10-20T00:01:08+00:00"
       }
+    },
+    "playground-real-java-compiler": {
+      "devto": {
+        "id": 4884999,
+        "url": "https://dev.to/codenameone/try-real-java-in-your-browser-compiler-errors-included-2pfl",
+        "syndicated_at": "2026-10-20T18:39:42+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/try-real-java-in-your-browser-compiler-errors-included-53ac036945c1?postPublishedType=initial",
+        "syndicated_at": "2026-10-20T19:01:41+00:00"
+      }
     }
   }
 }

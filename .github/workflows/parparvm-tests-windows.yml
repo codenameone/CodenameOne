@@ -666,6 +666,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-windows-x64
+          path: artifacts/windows-port/raw/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Fail on a ParparVM performance regression (x64)
         if: success() || failure()
         shell: bash
@@ -884,6 +895,17 @@ jobs:
           name: windows-port-screenshot-raw-arm64
           path: artifacts/windows-port/raw
           if-no-files-found: warn
+          retention-days: 14
+
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-windows-arm64
+          path: artifacts/windows-port/raw/perf/perf-results.json
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Fail on a ParparVM performance regression (arm64)

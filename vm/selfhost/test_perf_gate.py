@@ -91,14 +91,14 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('**no baseline for this CPU model** -- the gate fails', text)
         self.assertIn('**Result: no baseline: calibration required**', text)
 
-    def test_an_improvement_fails_and_says_how_to_rebaseline(self):
+    def test_an_improvement_passes_and_says_how_to_rebaseline(self):
         r = report({'quicksort': {'all': (metric(0.7, 1.0, 'improved'), metric(0.9, 0.9, 'ok'))}})
         r['pr'] = 5931
         text = gate.render_markdown(r)
-        self.assertIn('**IMPROVED: rebaseline** (time -30.0%)', text)
+        self.assertIn('improved: rebaseline to lock in (time -30.0%)', text)
         self.assertIn('vm/selfhost/perf-baseline/pr/5931.json', text)
         self.assertIn('--pr 5931 --reason', text)
-        self.assertIn('**Result: improved past the baseline: rebaseline required**', text)
+        self.assertIn('**Result: no regression (improved past the baseline: consider rebaselining)**', text)
 
     def test_a_calibration_names_this_pull_requests_overlay(self):
         r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
@@ -181,6 +181,85 @@ def row(t, m, runs=3, **tolerance):
     if tolerance:
         r['tolerance'] = tolerance
     return r
+
+
+tighten = load('tighten_perf_baseline', 'tighten-perf-baseline.py')
+
+
+class TightenTest(unittest.TestCase):
+    """tighten-perf-baseline.py: master runs that consistently beat a row lower it."""
+
+    def run_tighten(self, medians, base_row=None, judged=None, pr=None, overlays=None,
+                    metric='time'):
+        import json
+        tree = BaselineTree({'linux-x64': {'quicksort': {'all': base_row or row(1.0, 0.5)}}},
+                            overlays)
+        try:
+            current = (base_row or row(1.0, 0.5))[metric]
+            other = 'memory' if metric == 'time' else 'time'
+            files = []
+            for i, m in enumerate(medians):
+                entry = {metric: {'median': m, 'baseline': current if judged is None else judged},
+                         other: {'median': (base_row or row(1.0, 0.5))[other],
+                                 'baseline': (base_row or row(1.0, 0.5))[other]}}
+                report = {'baseline_key': 'linux-x64', 'results': {'quicksort': {'all': entry}}}
+                if pr:
+                    report['pr'] = pr
+                f = tree.root.parent / ('r%d.json' % i)
+                f.write_text(json.dumps(report))
+                files.append(str(f))
+            changes = tighten.tighten(tree.root, files, 3)
+            rows = baselines.load_base(tree.root)
+            return changes, rows['linux-x64']['quicksort']['all']
+        finally:
+            tree.close()
+
+    def test_consistent_improvement_tightens_to_the_worst_run(self):
+        changes, r = self.run_tighten([0.80, 0.85, 0.82])
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(r['time'], 0.85)
+        self.assertEqual(r['memory'], 0.5)
+
+    def test_one_run_inside_the_margin_blocks_it(self):
+        changes, r = self.run_tighten([0.80, 0.95, 0.82])
+        self.assertEqual(changes, [])
+        self.assertEqual(r['time'], 1.0)
+
+    def test_a_win_too_small_to_protect_does_not_tighten(self):
+        # 0.92 is past half the 15% tolerance, but 0.92 * 1.15 = 1.058: the tightened
+        # row would still let the run go all the way back to 1.0 unflagged.
+        changes, r = self.run_tighten([0.92, 0.92, 0.92])
+        self.assertEqual(changes, [])
+        self.assertEqual(r['time'], 1.0)
+
+    def test_the_rounded_value_must_still_protect_the_win(self):
+        # 0.8695 * 1.15 < 1.0, but it would be recorded as 0.870, and 0.870 * 1.15 > 1.0:
+        # the recorded row would let the run go back to 1.0 unflagged.
+        changes, r = self.run_tighten([0.8695, 0.8695, 0.8695])
+        self.assertEqual(changes, [])
+        self.assertEqual(r['time'], 1.0)
+
+    def test_too_few_runs_do_not_tighten(self):
+        self.assertEqual(self.run_tighten([0.7, 0.7])[0], [])
+
+    def test_runs_judged_against_an_older_value_do_not_count(self):
+        self.assertEqual(self.run_tighten([0.7, 0.7, 0.7], judged=1.2)[0], [])
+
+    def test_pull_request_runs_do_not_count(self):
+        self.assertEqual(self.run_tighten([0.7, 0.7, 0.7], pr=5)[0], [])
+
+    def test_ram_needs_to_clear_the_floor(self):
+        changes, _ = self.run_tighten([0.07, 0.07, 0.07], base_row=row(1.0, 0.10),
+                                      metric='memory')
+        self.assertEqual(changes, [])
+        changes, r = self.run_tighten([0.30, 0.32, 0.31], base_row=row(1.0, 0.50),
+                                      metric='memory')
+        self.assertEqual(r['memory'], 0.32)
+
+    def test_a_row_tolerance_widens_the_margin(self):
+        # Half of a 0.5 tolerance: 0.80 is not far enough below 1.0.
+        changes, _ = self.run_tighten([0.80, 0.80, 0.80], base_row=row(1.0, 0.5, time=0.5))
+        self.assertEqual(changes, [])
 
 
 class CalibrationTest(unittest.TestCase):
@@ -854,10 +933,10 @@ class VerdictStepTests(unittest.TestCase):
         self.assertIn('NO BASELINE', r.stdout)
         self.assertIn('calibrate-perf-baseline.py', r.stdout)
 
-    def test_an_improvement_fails_the_job(self):
+    def test_an_improvement_passes_the_job(self):
         r = self.verdict({'platform': 'linux-x64', 'pr': 5931, 'labels': {},
                           'results': {'quicksort': self.row('improved')}, 'regression': False})
-        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('IMPROVED', r.stdout)
         self.assertIn('perf-baseline/pr/5931.json', r.stdout)
 
