@@ -319,7 +319,7 @@ public class GeneratorModel {
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
             return false;
         }
-        if (downloadWebsiteProject(fileName, bytes, packageName, templateId())) {
+        if (downloadWebsiteProject(fileName, bytes, beaconKey(), templateId())) {
             return true;
         }
         if (downloadBytesAsFile(fileName, bytes)) {
@@ -420,8 +420,41 @@ public class GeneratorModel {
     /// hash and BuildCloud computes it for every cloud build, which is how a
     /// download, its launcher runs and its first cloud build are joined without
     /// the package name leaving the machine.
+    ///
+    /// Except for a project that kept the default package (`com.example.myapp`):
+    /// its hash is the same for everyone who did, so every such download, launch
+    /// and build merged into one subject (in production most downloads did). It
+    /// gets a random id instead, made once per download and used everywhere the
+    /// hash would be -- the download beacon (see `beaconKey`), the launchers and
+    /// the IDE build reporting -- so its own steps still join. Joining it to a
+    /// cloud build by package was meaningless anyway: that package is everyone's.
     String projectId() {
+        if (isDefaultPackage()) {
+            if (randomProjectId == null) {
+                randomProjectId = Sha256.hex("cn1-download:" + System.currentTimeMillis() + ":"
+                        + new java.util.Random().nextLong() + ":" + new java.util.Random().nextLong());
+            }
+            return randomProjectId;
+        }
         return Sha256.hex(toLowerCaseInvariant(packageName == null ? "" : packageName));
+    }
+
+    private String randomProjectId;
+
+    /// The package the Initializr suggests (`Initializr`'s package field), which
+    /// many developers keep.
+    public static final String DEFAULT_PACKAGE = "com.example.myapp";
+
+    boolean isDefaultPackage() {
+        return packageName == null || packageName.length() == 0
+                || DEFAULT_PACKAGE.equals(toLowerCaseInvariant(packageName));
+    }
+
+    /// What the website page reports for this download (it hashes a package name
+    /// itself): the package name, or `id:<projectId>` for a default-package
+    /// project, which the page sends as is (cn1-initializr-beacon.js).
+    public String beaconKey() {
+        return isDefaultPackage() ? "id:" + projectId() : packageName;
     }
 
     /// Initializr downloads -- and only those; the archetype's launchers are not
