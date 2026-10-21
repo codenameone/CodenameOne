@@ -31,6 +31,8 @@ import com.codenameone.examples.parley.live.LiveHub;
 import com.codenameone.examples.parley.push.MessagePushes;
 import com.codenameone.examples.parley.repository.DeviceRepository;
 import com.codenameone.examples.parley.repository.EnvelopeRepository;
+import com.codenameone.examples.parley.repository.MembershipRepository;
+import com.codenameone.examples.parley.domain.Membership;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,9 +58,11 @@ public class Fanout {
     private final DeviceRepository devices;
     private final LiveHub live;
     private final MessagePushes pushes;
+    private final MembershipRepository members;
 
     public Fanout(EnvelopeRepository envelopes, DeviceRepository devices, LiveHub live,
-            MessagePushes pushes) {
+            MessagePushes pushes, MembershipRepository members) {
+        this.members = members;
         this.envelopes = envelopes;
         this.devices = devices;
         this.live = live;
@@ -142,8 +146,15 @@ public class Fanout {
         List<String> wake = new ArrayList<String>();
         if (!"SYSTEM".equals(kind)) {
             for (int iter = 0; iter < to.size(); iter++) {
-                if (!to.get(iter).equals(sender)) {
-                    wake.add(to.get(iter));
+                String member = to.get(iter);
+                if (member.equals(sender)) {
+                    continue;
+                }
+                // A muted conversation still delivers, it only stops pushing,
+                // as the encrypted path does.
+                Membership row = members.findByConversationIdAndUsername(conversationId, member);
+                if (row == null || !row.isMuted()) {
+                    wake.add(member);
                 }
             }
         }

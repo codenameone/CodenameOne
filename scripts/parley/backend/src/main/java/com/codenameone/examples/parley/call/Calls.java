@@ -21,7 +21,10 @@ package com.codenameone.examples.parley.call;
 import com.codename1.backend.Base64;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.Transactions;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Isolation;
+import com.codename1.backend.annotations.Propagation;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
@@ -155,7 +158,10 @@ public class Calls {
         if (callee == null || Conversations.BOT.equals(callee)) {
             throw new ResponseStatusException(400, "There is nobody to call here");
         }
-        if (!calls.liveOf(username).isEmpty()) {
+        // The call lines are what decide who is in a call. A silent call from
+        // someone the callee blocked holds the caller's line only, so it
+        // never makes the callee look busy.
+        if (lines.findById(username) != null) {
             throw new ResponseStatusException(409, "You are already in a call");
         }
         long now = System.currentTimeMillis();
@@ -168,7 +174,8 @@ public class Calls {
         row.setCalleeDevice("");
         row.setVideo(request.video());
         row.setStartedAt(now);
-        if (busy || !calls.liveOf(callee).isEmpty() || lines.findById(callee) != null) {
+        boolean blocked = blocked(username, callee);
+        if (busy || lines.findById(callee) != null) {
             row.setState(BUSY);
             row.setEndedAt(now);
         } else {
@@ -180,7 +187,9 @@ public class Calls {
             // callers ringing one callee at once, the second insert fails on
             // the callee's key and that call never rings.
             lines.insert(new CallLine(username, row.getId()));
-            lines.insert(new CallLine(callee, row.getId()));
+            if (!blocked) {
+                lines.insert(new CallLine(callee, row.getId()));
+            }
             CallSetup setup = new CallSetup();
             setup.setId(row.getId());
             setups.insert(setup);
@@ -212,8 +221,7 @@ public class Calls {
     @Transactional(readOnly = true)
     public void ring(CallDto call) throws IOException {
         CallRecord row = calls.findById(call.id());
-        if (row == null || !RINGING.equals(row.getState())
-                || blocks.findById(Messages.blockId(row.getCallee(), row.getCaller())) != null) {
+        if (row == null || !RINGING.equals(row.getState()) || blocked(row.getCaller(), row.getCallee())) {
             return;
         }
         live.toUsers(Arrays.asList(row.getCallee()), frame(row, "ring"));
@@ -229,7 +237,7 @@ public class Calls {
     public void ringDevice(String username, String device) throws IOException {
         for (CallRecord row : calls.liveOf(username)) {
             if (username.equals(row.getCallee()) && RINGING.equals(row.getState())
-                    && blocks.findById(Messages.blockId(row.getCallee(), row.getCaller())) == null) {
+                    && !blocked(row.getCaller(), row.getCallee())) {
                 live.toDevice(device, frame(row, "ring"));
             }
         }
@@ -286,11 +294,19 @@ public class Calls {
             row.setAnsweredAt(now);
             row.setCalleeDevice(device);
             // The callee's other devices are still ringing.
-            pushes.cancelRing(row.getCallee(), uuid(row.getId()));
+            String ringId = uuid(row.getId());
+            String callee = row.getCallee();
             Map<String, Object> answered = frame(row, "answered");
             answered.put("answeredBy", device);
-            live.toUsers(Arrays.asList(row.getCallee()), answered);
-            replay(row);
+            List<Map<String, Object>> replayed = replay(row);
+            String calleeDevice = row.getCalleeDevice();
+            afterCommit(() -> {
+                pushes.cancelRing(callee, ringId);
+                live.toUsers(Arrays.asList(callee), answered);
+                for (Map<String, Object> f : replayed) {
+                    live.toDevice(calleeDevice, f);
+                }
+            });
         } else if (DECLINE.equals(type) && !caller && RINGING.equals(row.getState())) {
             end(row, DECLINED, now);
         } else if (END.equals(type)) {
@@ -305,11 +321,19 @@ public class Calls {
         frame.put("fromDevice", device);
         String other = caller ? row.getCallee() : row.getCaller();
         String otherDevice = caller ? row.getCalleeDevice() : row.getCallerDevice();
-        // Once a device has answered, the call is between two devices; before
-        // that the offer goes to every device the callee has.
-        if (otherDevice.length() == 0 || !live.toDevice(otherDevice, frame)) {
-            live.toUsers(Arrays.asList(other), frame);
+        if (caller && blocked(row.getCaller(), row.getCallee())) {
+            // A silent call: the callee never hears of it.
+            return toDto(row);
         }
+        // Once a device has answered, the call is between two devices; before
+        // that the offer goes to every device the callee has. Sent after the
+        // commit: a frame for a state that rolled back would close or open a
+        // call the database still holds the other way.
+        afterCommit(() -> {
+            if (otherDevice.length() == 0 || !live.toDevice(otherDevice, frame)) {
+                live.toUsers(Arrays.asList(other), frame);
+            }
+        });
         return toDto(row);
     }
 
@@ -356,12 +380,17 @@ public class Calls {
         for (CallRecord row : calls.openSince(now - RING_MILLIS)) {
             if (RINGING.equals(row.getState())) {
                 end(row, MISSED, now);
-                live.toUsers(Arrays.asList(row.getCaller(), row.getCallee()), frame(row, "signal"));
+                Map<String, Object> frame = frame(row, "signal");
+                List<String> to = blocked(row.getCaller(), row.getCallee())
+                        ? Arrays.asList(row.getCaller()) : Arrays.asList(row.getCaller(), row.getCallee());
+                afterCommit(() -> live.toUsers(to, frame));
             } else if (row.getAnsweredAt() < now - STALE_MILLIS) {
                 end(row, ENDED, now);
                 // Both apps still hold the call; without this they keep it
                 // open and turn every later call away as busy.
-                live.toUsers(Arrays.asList(row.getCaller(), row.getCallee()), frame(row, "signal"));
+                Map<String, Object> frame = frame(row, "signal");
+                List<String> to = Arrays.asList(row.getCaller(), row.getCallee());
+                afterCommit(() -> live.toUsers(to, frame));
             }
         }
     }
@@ -384,12 +413,13 @@ public class Calls {
     /// Sends the device that accepted what the caller sent while it rang. The
     /// app takes an offer it already has once only, so a callee that was
     /// connected all along and saw these live loses nothing.
-    private void replay(CallRecord row) {
+    private List<Map<String, Object>> replay(CallRecord row) {
+        List<Map<String, Object>> out = new ArrayList<>();
         CallSetup setup = setups.findById(row.getId());
         if (setup == null || setup.getOffer().length() == 0) {
-            return;
+            return out;
         }
-        live.toDevice(row.getCalleeDevice(), replayed(row, OFFER, setup.getOffer()));
+        out.add(replayed(row, OFFER, setup.getOffer()));
         // One candidate a line. Walked by hand: the compiled backend has no
         // String.split, which is a regular expression.
         String all = setup.getCandidates();
@@ -400,11 +430,12 @@ public class Calls {
                 end = all.length();
             }
             if (end > start) {
-                live.toDevice(row.getCalleeDevice(), replayed(row, ICE, all.substring(start, end)));
+                out.add(replayed(row, ICE, all.substring(start, end)));
             }
             start = end + 1;
         }
         setups.deleteById(row.getId());
+        return out;
     }
 
     private Map<String, Object> replayed(CallRecord row, String type, String payload) {
@@ -424,7 +455,38 @@ public class Calls {
             setups.deleteById(row.getId());
         }
         if (ringing) {
-            pushes.cancelRing(row.getCallee(), uuid(row.getId()));
+            String callee = row.getCallee();
+            String ringId = uuid(row.getId());
+            afterCommit(() -> pushes.cancelRing(callee, ringId));
+        }
+    }
+
+    private boolean blocked(String caller, String callee) throws IOException {
+        return blocks.findById(Messages.blockId(callee, caller)) != null;
+    }
+
+    /// Runs `send` once the transaction commits, or now outside one.
+    private static void afterCommit(Runnable send) {
+        if (Transactions.isActive()) {
+            Transactions.registerSynchronization(new Transactions.Synchronization() {
+                @Override
+                public void afterCommit() {
+                    // Pushing reads the callee's devices, which takes a
+                    // transaction of its own once this one is over.
+                    try {
+                        Transactions.execute(Propagation.REQUIRES_NEW, false, 0, Isolation.DEFAULT, () -> {
+                            send.run();
+                            return null;
+                        });
+                    } catch (RuntimeException failed) {
+                        throw failed;
+                    } catch (Exception failed) {
+                        throw new IllegalStateException(failed);
+                    }
+                }
+            });
+        } else {
+            send.run();
         }
     }
 

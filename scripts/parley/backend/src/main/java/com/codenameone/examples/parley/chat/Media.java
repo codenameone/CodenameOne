@@ -43,6 +43,11 @@ public class Media {
     /// The largest attachment: a minute or two of phone video.
     public static final int MAX_BYTES = 16 * 1024 * 1024;
 
+    /// The bytes one account may upload in a day.
+    static final long DAILY_BYTES = 256L * 1024 * 1024;
+
+    private static final long DAY_MILLIS = 24L * 60 * 60 * 1000;
+
     private final MediaBlobRepository blobs;
 
     public Media(MediaBlobRepository blobs) {
@@ -58,11 +63,20 @@ public class Media {
         if (data.length > MAX_BYTES) {
             throw new ResponseStatusException(413, "That attachment is too large");
         }
+        // The request limit alone still lets one account store gigabytes an
+        // hour, kept for the 30 days before unclaimed blobs are swept. A
+        // day's bytes are capped as well, well past what anyone sharing
+        // photos and voice notes uploads.
+        long now = System.currentTimeMillis();
+        Long stored = blobs.storedSince(username, now - DAY_MILLIS);
+        if ((stored == null ? 0L : stored.longValue()) + data.length > DAILY_BYTES) {
+            throw new ResponseStatusException(429, "You have uploaded too much today");
+        }
         MediaBlob row = new MediaBlob();
         row.setId(Ids.next());
         row.setOwner(username);
         row.setSize(data.length);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(now);
         row.setData(data);
         blobs.insert(row);
         return new MediaRefDto(row.getId(), data.length);

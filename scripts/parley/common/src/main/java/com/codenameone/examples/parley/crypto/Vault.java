@@ -120,12 +120,24 @@ public final class Vault {
         if (key == null) {
             return;
         }
+        // A side file left by an earlier put that was cut off is the only
+        // current copy. It is promoted over the stale main file before it is
+        // overwritten, so a crash in the write below falls back to it rather
+        // than to the older state, which would roll a ratchet back.
+        Map<String, Object> pending = read(prefix + name + SIDE, name);
+        if (pending != null) {
+            seal(prefix + name, name, pending);
+        }
+        seal(prefix + name + SIDE, name, document);
+        seal(prefix + name, name, document);
+        Storage.getInstance().deleteStorageFile(prefix + name + SIDE);
+    }
+
+    private static void seal(String file, String name, Map<String, ?> document) {
         byte[] nonce = SecureRandom.bytes(12);
         byte[] sealed = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, Codec.utf8(name),
                 Codec.utf8(Codec.json(document)));
-        write(prefix + name + SIDE, nonce, sealed, name);
-        write(prefix + name, nonce, sealed, name);
-        Storage.getInstance().deleteStorageFile(prefix + name + SIDE);
+        write(file, nonce, sealed, name);
     }
 
     private static final String SIDE = ".new";

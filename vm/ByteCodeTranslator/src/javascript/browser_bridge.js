@@ -325,11 +325,33 @@
     return { name: 'RSA-OAEP', hash: cn1CryptoHash(normalized) };
   }
 
-  function cn1SignatureAlgorithm(algorithm, keyAlgorithm) {
+  // The named curve of an encoded EC key, read from its OID, and the byte
+  // length of one coordinate: an imported P-384 or P-521 key signs on the
+  // curve it names, as it does on the JCA ports.
+  var CN1_EC_CURVES = [
+    { name: 'P-256', size: 32, oid: [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07] },
+    { name: 'P-384', size: 48, oid: [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22] },
+    { name: 'P-521', size: 66, oid: [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x23] }
+  ];
+
+  function cn1EcCurve(key) {
+    for (var c = 0; c < CN1_EC_CURVES.length; c++) {
+      var oid = CN1_EC_CURVES[c].oid;
+      for (var i = 0; i + oid.length <= key.length; i++) {
+        var j = 0;
+        while (j < oid.length && key[i + j] === oid[j]) j++;
+        if (j === oid.length) return CN1_EC_CURVES[c];
+      }
+    }
+    throw new Error('EC key names no supported curve');
+  }
+
+  function cn1SignatureAlgorithm(algorithm, keyAlgorithm, key) {
     var family = String(keyAlgorithm || '').toUpperCase();
     var wantsEc = String(algorithm || '').toUpperCase().indexOf('ECDSA') >= 0;
     if (family === 'EC' && wantsEc) {
-      return { name: 'ECDSA', namedCurve: 'P-256', hash: cn1CryptoHash(algorithm) };
+      var curve = cn1EcCurve(key);
+      return { name: 'ECDSA', namedCurve: curve.name, hash: cn1CryptoHash(algorithm), cn1Size: curve.size };
     }
     if (family === 'RSA' && !wantsEc) {
       return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
@@ -358,20 +380,21 @@
 
   // ECDSA signatures: Web Crypto speaks the fixed r||s form, the portable API
   // (and every other port) DER.
-  function cn1EcdsaRawToDer(raw) {
+  function cn1EcdsaRawToDer(raw, n) {
     function integer(offset) {
       var start = offset;
-      while (start < offset + 31 && raw[start] === 0) start++;
-      var bytes = Array.prototype.slice.call(raw, start, offset + 32);
+      while (start < offset + n - 1 && raw[start] === 0) start++;
+      var bytes = Array.prototype.slice.call(raw, start, offset + n);
       if (bytes[0] & 0x80) bytes.unshift(0);
       return [0x02, bytes.length].concat(bytes);
     }
-    var body = integer(0).concat(integer(32));
-    return [0x30, body.length].concat(body);
+    var body = integer(0).concat(integer(n));
+    // A P-521 signature runs past 127 bytes and takes the long length form.
+    return (body.length > 127 ? [0x30, 0x81, body.length] : [0x30, body.length]).concat(body);
   }
 
-  function cn1EcdsaDerToRaw(der) {
-    var out = new Uint8Array(64);
+  function cn1EcdsaDerToRaw(der, n) {
+    var out = new Uint8Array(2 * n);
     var p = 2;
     if (der[0] !== 0x30) throw new Error('ECDSA signature is not DER');
     if (der[1] & 0x80) p = 2 + (der[1] & 0x7f);
@@ -379,9 +402,9 @@
       if (der[p] !== 0x02) throw new Error('ECDSA signature is not DER');
       var len = der[p + 1];
       var start = p + 2;
-      while (len > 32 && der[start] === 0) { start++; len--; }
-      if (len > 32) throw new Error('ECDSA signature component too long');
-      out.set(der.slice(start, start + len), k * 32 + 32 - len);
+      while (len > n && der[start] === 0) { start++; len--; }
+      if (len > n) throw new Error('ECDSA signature component too long');
+      out.set(der.slice(start, start + len), k * n + n - len);
       p = p + 2 + der[p + 1];
     }
     return out;
@@ -425,7 +448,8 @@
         .then(cn1CryptoResult);
     }
     if (op === 'sign' || op === 'verify') {
-      var signatureAlgorithm = cn1SignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var signatureAlgorithm = cn1SignatureAlgorithm(request.algorithm, request.keyAlgorithm,
+          cn1CryptoBytes(request.key));
       var isEcdsa = signatureAlgorithm.name === 'ECDSA';
       var signatureUsage = op === 'sign' ? 'sign' : 'verify';
       var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
@@ -433,13 +457,14 @@
         .then(function(key) {
           if (op === 'sign') {
             return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(function(sig) {
-              return isEcdsa ? cn1EcdsaRawToDer(new Uint8Array(sig)) : cn1CryptoResult(sig);
+              return isEcdsa ? cn1EcdsaRawToDer(new Uint8Array(sig), signatureAlgorithm.cn1Size)
+                : cn1CryptoResult(sig);
             });
           }
           var signature = cn1CryptoBytes(request.signature);
           if (isEcdsa) {
             try {
-              signature = cn1EcdsaDerToRaw(signature);
+              signature = cn1EcdsaDerToRaw(signature, signatureAlgorithm.cn1Size);
             } catch (malformed) {
               return false;
             }

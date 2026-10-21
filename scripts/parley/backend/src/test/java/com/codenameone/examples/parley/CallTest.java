@@ -31,6 +31,7 @@ import java.util.Map;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcRequestBuilders.put;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -130,6 +131,25 @@ class CallTest {
         assertNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {bob}));
         assertNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {alice}));
         assertEquals("RINGING", start(alice, chat, false).get("state"));
+    }
+
+    @Test
+    void aBlockedCallerNeverTakesTheCalleesLine() throws Exception {
+        String alice = People.user(accounts, "blockcall-a");
+        String bob = People.user(accounts, "blockcall-b");
+        String carol = People.user(accounts, "blockcall-c");
+        Chat.device(mvc, alice);
+        Chat.device(mvc, bob);
+        Chat.device(mvc, carol);
+        String chat = Chat.conversation(mvc, alice, Conversations.DIRECT, "", bob);
+        String other = Chat.conversation(mvc, carol, Conversations.DIRECT, "", bob);
+        Chat.json(mvc, People.asUser(put("/api/blocks/" + alice), bob));
+        // To Alice it rings like any call nobody answers...
+        assertEquals("RINGING", start(alice, chat, false).get("state"));
+        assertNotNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {alice}));
+        // ...but Bob's line stays free, so silent calls cannot keep him busy.
+        assertNull(db.queryOne("SELECT id FROM call_line WHERE id = ?", new Object[] {bob}));
+        assertEquals("RINGING", start(carol, other, false).get("state"));
     }
 
     @Test

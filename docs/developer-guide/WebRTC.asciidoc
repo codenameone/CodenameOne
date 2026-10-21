@@ -8,7 +8,7 @@ between them when it doesn't.
 
 The package does one thing. It opens the camera and the microphone, sets up the
 connection and draws the pictures. It doesn't ring, place the call in the system
-call log or wake a sleeping phone -- that's <<call-management,Call Management>>, which a calling
+call log or wake a sleeping phone -- that's <<_call_management,Call Management>>, which a calling
 app uses beside this package -- and it doesn't signal.
 
 === Signalling is yours

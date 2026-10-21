@@ -19,6 +19,8 @@
 package com.codenameone.examples.parley.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.MediaBlob;
 
@@ -28,4 +30,7 @@ public interface MediaBlobRepository extends CrudRepository<MediaBlob, String> {
     int deleteByOwner(String owner);
 
     int deleteByCreatedAtLessThan(long before);
+
+    @Query("select coalesce(sum(m.size), 0) from MediaBlob m where m.owner = :owner and m.createdAt >= :since")
+    Long storedSince(@Param("owner") String owner, @Param("since") long since);
 }

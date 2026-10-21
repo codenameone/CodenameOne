@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.parley.device;
 
+import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
@@ -63,6 +64,9 @@ public class Devices {
 
     /// How many one-time prekeys a device may hold on the server at once.
     public static final int MAX_PREKEYS = 200;
+
+    /// One-time prekeys a device hands out in an hour, whoever asks.
+    private final InMemoryRateLimiter preKeySpend = new InMemoryRateLimiter(30, 3600);
 
     private static final String[] PLATFORMS = {"ios", "android", "web", "desktop", "simulator"};
 
@@ -212,7 +216,13 @@ public class Devices {
         // delete is what claims it, and only the one whose delete removed the
         // row may hand it out. The other tries the next key.
         PreKeyDto oneTime = null;
-        for (int attempt = 0; attempt < 8 && oneTime == null; attempt++) {
+        // The request limit is the requester's, and accounts are cheap: a few
+        // of them could still drain one victim's keys and push every new
+        // session onto the signed-prekey fallback. Past its allowance a device
+        // hands out bundles without a one-time key, which is that same
+        // fallback for those senders only, and its supply is kept.
+        boolean spend = preKeySpend.tryAcquire(row.getId());
+        for (int attempt = 0; spend && attempt < 8 && oneTime == null; attempt++) {
             OneTimePreKey one = preKeys.findFirstByDeviceIdOrderByKeyIdAsc(row.getId());
             if (one == null) {
                 break;

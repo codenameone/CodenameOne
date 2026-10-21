@@ -1,4 +1,3 @@
-[[call-management]]
 == Call Management
 
 Codename One can make a call your app carries look, to the operating system

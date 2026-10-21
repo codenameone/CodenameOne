@@ -20,6 +20,7 @@ package com.codenameone.examples.parley.store;
 
 import com.codenameone.examples.parley.api.ConversationDto;
 import com.codenameone.examples.parley.api.MemberDto;
+import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.crypto.Codec;
 import com.codenameone.examples.parley.crypto.Vault;
 
@@ -349,15 +350,30 @@ public final class Store {
     private static void expire(String id, List<Message> list) {
         long now = System.currentTimeMillis();
         boolean gone = false;
+        // The unread messages are the newest incoming ones; those among them
+        // that expire unread come off the badge with them.
+        int unread = unread(id);
+        String me = Messenger.me();
+        int seen = 0;
+        int lost = 0;
         for (int iter = list.size() - 1; iter >= 0; iter--) {
-            long expires = list.get(iter).expiresAt;
+            Message message = list.get(iter);
+            boolean counted = seen < unread && !message.mine(me) && !Message.SYSTEM.equals(message.kind);
+            if (counted) {
+                seen++;
+            }
+            long expires = message.expiresAt;
             if (expires > 0 && expires <= now) {
                 list.remove(iter);
                 gone = true;
+                if (counted) {
+                    lost++;
+                }
             }
         }
         Map<String, Object> summary = summary(id);
         if (gone) {
+            summary.put("unread", Long.valueOf(unread - lost));
             summary.put("last", list.isEmpty() ? "" : preview(list.get(list.size() - 1)));
             save(id);
         } else if (Codec.num(summary.get("expires")) > 0 && Codec.num(summary.get("expires")) <= now) {

@@ -78,7 +78,7 @@ public final class Media {
             failed.failed(0, "That file could not be read.");
             return;
         }
-        if (plain.length > MAX_BYTES) {
+        if (plain == null) {
             failed.failed(413, "Attachments are limited to 16 MB.");
             return;
         }
@@ -249,12 +249,27 @@ public final class Media {
         }
     }
 
+    /// The file at `path`, or null when it is larger than [#MAX_BYTES]. A
+    /// gallery video can be far larger than the heap, so the size is checked
+    /// before reading where the platform knows it, and no more than the limit
+    /// is ever buffered where it does not.
     private static byte[] read(String path) throws IOException {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if (fs.getLength(path) > MAX_BYTES) {
+            return null;
+        }
         InputStream in = null;
         try {
-            in = FileSystemStorage.getInstance().openInputStream(path);
+            in = fs.openInputStream(path);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            Util.copy(in, out);
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) != -1) {
+                if (out.size() + n > MAX_BYTES) {
+                    return null;
+                }
+                out.write(chunk, 0, n);
+            }
             return out.toByteArray();
         } finally {
             Util.cleanup(in);
