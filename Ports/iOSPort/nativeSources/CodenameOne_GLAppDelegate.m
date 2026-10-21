@@ -1212,11 +1212,53 @@ void CN1SetMacMenuLabels(NSArray *labels) {
 // Maps a Codename One desktop-menu hint (case-insensitive) to a standard UIKit menu identifier.
 // Returns nil for an empty/custom hint (the caller then makes a top-level menu titled by the hint
 // or a default "Commands" menu). placeAtStart is set for the application-menu slots.
+/// A menu under construction: its title and its sections, each an array of UICommands and
+/// child nodes. See buildMenuWithBuilder.
+static NSMutableDictionary *cn1NewMenuNode(NSString *title) API_AVAILABLE(ios(13.0)) {
+    NSMutableDictionary *node = [NSMutableDictionary dictionary];
+    node[@"title"] = title;
+    node[@"sections"] = [NSMutableArray arrayWithObject:[NSMutableArray array]];
+    return node;
+}
+
+/// The node's elements: its only section flat, several sections as inline menus so UIKit
+/// draws a separator between them, child nodes as submenus.
+static NSArray<UIMenuElement *> *cn1MenuNodeChildren(NSDictionary *node) API_AVAILABLE(ios(13.0)) {
+    NSMutableArray<NSArray<UIMenuElement *> *> *built = [NSMutableArray array];
+    for (NSArray *section in node[@"sections"]) {
+        NSMutableArray<UIMenuElement *> *elements = [NSMutableArray array];
+        for (id entry in section) {
+            if ([entry isKindOfClass:[NSDictionary class]]) {
+                NSArray<UIMenuElement *> *children = cn1MenuNodeChildren(entry);
+                if (children.count > 0) {
+                    [elements addObject:[UIMenu menuWithTitle:entry[@"title"] image:nil identifier:nil
+                                                      options:0 children:children]];
+                }
+            } else {
+                [elements addObject:entry];
+            }
+        }
+        if (elements.count > 0) {
+            [built addObject:elements];
+        }
+    }
+    if (built.count == 1) {
+        return built[0];
+    }
+    NSMutableArray<UIMenuElement *> *out = [NSMutableArray array];
+    for (NSArray<UIMenuElement *> *elements in built) {
+        [out addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil
+                                     options:UIMenuOptionsDisplayInline children:elements]];
+    }
+    return out;
+}
+
 static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) API_AVAILABLE(ios(13.0)) {
     *placeAtStart = NO;
     NSString *h = [hint lowercaseString];
-    if ([h isEqualToString:@"app"] || [h isEqualToString:@"about"]
-            || [h isEqualToString:@"preferences"] || [h isEqualToString:@"quit"]) {
+    // Core resolves the standard roles (NativeMenuConventions), so About, Settings and Quit
+    // arrive here already under "App".
+    if ([h isEqualToString:@"app"]) {
         *placeAtStart = YES;
         return UIMenuApplication;
     }
@@ -1233,20 +1275,93 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
         return;
     }
-    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>" rows by hint,
-    // preserving first-seen order. Column 4 is what gets passed back to Java: an id naming one
-    // command, rather than a row number, because Java publishes its map before this menu is rebuilt
-    // and a row number outlives the list that gave it meaning. See IOSImplementation.
+    // NativeMenuEncoder rows: "<path>\t<label>\t<key>\t<modifiers>\t<id>\t<flags>\t<iconPng>",
+    // the path's segments joined by 0x1f, the first being the placement hint. Column 4 is what
+    // gets passed back to Java: an id naming one command, rather than a row number, because Java
+    // publishes its map before this menu is rebuilt and a row number outlives the list that gave
+    // it meaning. See IOSImplementation.
+    //
+    // Each menu is a node holding sections; a separator row starts a new section, and a section
+    // becomes an inline UIMenu, which is how UIKit draws a separator. Rows arrive depth first,
+    // so a submenu node is created by its first row at its place among the parent's items.
+    NSString *pathSeparator = [NSString stringWithFormat:@"%C", (unichar)0x1f];
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
-    NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
+    NSMutableDictionary<NSString *, NSMutableDictionary *> *nodes = [NSMutableDictionary dictionary];
+    NSMutableDictionary<NSString *, NSString *> *rootHints = [NSMutableDictionary dictionary];
+    // The stock items the application's own About, Hide and Quit replace, by the role ordinal
+    // the flags carry (NativeMenuEncoder.FLAG_ROLE_SHIFT).
+    NSMutableArray<UIMenuIdentifier> *replacedStock = [NSMutableArray array];
+    // The stock commands of the other roles the application supplies, by action; they share
+    // their menus with stock commands the application does not replace, so they are filtered
+    // out one by one rather than removing the menu.
+    NSMutableSet<NSString *> *replacedActions = [NSMutableSet set];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
         NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
-        NSString *hint = (cols.count > 0) ? cols[0] : @"";
+        NSArray<NSString *> *path = [((cols.count > 0) ? cols[0] : @"") componentsSeparatedByString:pathSeparator];
+        NSString *hint = path.count > 0 ? path[0] : @"";
         NSString *label = (cols.count > 1) ? cols[1] : row;
         int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
         int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
         NSNumber *commandId = (cols.count > 4) ? @([cols[4] intValue]) : @(i);
+        int rowFlags = (cols.count > 5) ? [cols[5] intValue] : 1;
+        NSString *iconPng = (cols.count > 6) ? cols[6] : @"";
+
+        // A root is keyed by the menu it lands in, not the hint as written: hints the mapping
+        // treats as one menu ("File", "file") share it and its submenus. The separator prefix
+        // keeps a standard menu's key apart from any custom title.
+        BOOL rootAtStart = NO;
+        NSString *rootId = cn1MenuIdentifierForHint(hint, &rootAtStart);
+        NSString *rootKey = rootId == nil ? hint
+                : [NSString stringWithFormat:@"%@%@%d", pathSeparator, rootId, rootAtStart ? 1 : 0];
+        NSMutableDictionary *node = nodes[rootKey];
+        if (node == nil) {
+            node = cn1NewMenuNode(hint);
+            nodes[rootKey] = node;
+            rootHints[rootKey] = hint;
+            [groupOrder addObject:rootKey];
+        }
+        NSString *key = rootKey;
+        for (NSUInteger p = 1; p < path.count; p++) {
+            key = [key stringByAppendingFormat:@"%@%@", pathSeparator, path[p]];
+            NSMutableDictionary *sub = nodes[key];
+            if (sub == nil) {
+                sub = cn1NewMenuNode(path[p]);
+                nodes[key] = sub;
+                [[node[@"sections"] lastObject] addObject:sub];
+            }
+            node = sub;
+        }
+        if (rowFlags & 16) {
+            [node[@"sections"] addObject:[NSMutableArray array]];
+            continue;
+        }
+        switch ((rowFlags >> 8) & 0xff) {
+            case 1: [replacedStock addObject:UIMenuAbout]; break;
+            // Not the whole Hide menu: it also holds Hide Others and Show All.
+            case 2: [replacedActions addObject:@"hide:"]; break;
+            case 3: [replacedStock addObject:UIMenuQuit]; break;
+            case 4: [replacedActions addObject:@"undo:"]; break;
+            case 5: [replacedActions addObject:@"redo:"]; break;
+            case 6: [replacedActions addObject:@"cut:"]; break;
+            case 7: [replacedActions addObject:@"copy:"]; break;
+            case 8: [replacedActions addObject:@"paste:"]; break;
+            case 9: [replacedActions addObject:@"selectAll:"]; break;
+            case 10: [replacedActions addObject:@"performMiniaturize:"]; break;
+            case 11: [replacedActions addObject:@"performZoom:"]; break;
+            case 12: [replacedActions addObject:@"toggleFullScreen:"]; break;
+            default: break;
+        }
+        UIImage *image = nil;
+        if (iconPng.length > 0) {
+            NSData *png = [[NSData alloc] initWithBase64EncodedString:iconPng options:0];
+            if (png != nil) {
+                image = [UIImage imageWithData:png scale:2];
+            }
+#ifndef CN1_USE_ARC
+            [png release];
+#endif
+        }
         UICommand *cmd;
         if (shortcutKeyChar != 0) {
             // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
@@ -1259,28 +1374,34 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
             // control character. See cn1MakeCommandItem in CN1MacChrome.m.
             NSString *input = [[NSString stringWithFormat:@"%C", (unichar)shortcutKeyChar] lowercaseString];
             cmd = [UIKeyCommand commandWithTitle:label
-                                           image:nil
+                                           image:image
                                           action:@selector(cn1MenuAction:)
                                            input:input
                                    modifierFlags:flags
                                     propertyList:commandId];
         } else {
             cmd = [UICommand commandWithTitle:label
-                                        image:nil
+                                        image:image
                                        action:@selector(cn1MenuAction:)
                                  propertyList:commandId];
         }
-        NSMutableArray<UICommand *> *bucket = groups[hint];
-        if (bucket == nil) {
-            bucket = [NSMutableArray array];
-            groups[hint] = bucket;
-            [groupOrder addObject:hint];
+        // FLAG_ENABLED=1, FLAG_CHECKABLE=2, FLAG_CHECKED=4; a radio item shows the same
+        // checkmark, and Java keeps its group exclusive.
+        if ((rowFlags & 1) == 0) {
+            cmd.attributes = UIMenuElementAttributesDisabled;
         }
-        [bucket addObject:cmd];
+        if (rowFlags & 2) {
+            cmd.state = (rowFlags & 4) ? UIMenuElementStateOn : UIMenuElementStateOff;
+        }
+        [[node[@"sections"] lastObject] addObject:cmd];
     }
     NSUInteger customMenuCounter = 0;
-    for (NSString *hint in groupOrder) {
-        NSArray<UICommand *> *bucket = groups[hint];
+    for (NSString *rootKey in groupOrder) {
+        NSString *hint = rootHints[rootKey];
+        NSArray<UIMenuElement *> *bucket = cn1MenuNodeChildren(nodes[rootKey]);
+        if (bucket.count == 0) {
+            continue;
+        }
         BOOL placeAtStart = NO;
         NSString *targetIdentifier = cn1MenuIdentifierForHint(hint, &placeAtStart);
         if (targetIdentifier != nil) {
@@ -1290,7 +1411,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                             identifier:nil
                                                options:UIMenuOptionsDisplayInline
                                               children:bucket];
-            if (placeAtStart) {
+            if (placeAtStart && [builder menuForIdentifier:UIMenuAbout] != nil) {
+                // Below About, where a Mac application puts Settings and its own entries.
+                [builder insertSiblingMenu:inlineMenu afterMenuForIdentifier:UIMenuAbout];
+            } else if (placeAtStart) {
                 [builder insertChildMenu:inlineMenu atStartOfMenuForIdentifier:targetIdentifier];
             } else {
                 [builder insertChildMenu:inlineMenu atEndOfMenuForIdentifier:targetIdentifier];
@@ -1305,6 +1429,29 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                          options:0
                                         children:bucket];
             [builder insertSiblingMenu:menu afterMenuForIdentifier:UIMenuView];
+        }
+    }
+    // After the inserts: the application's group sits beside About, so it has to be placed
+    // before the stock About it replaces goes.
+    for (UIMenuIdentifier stock in replacedStock) {
+        [builder removeMenuForIdentifier:stock];
+    }
+    if (replacedActions.count > 0) {
+        NSArray<UIMenuIdentifier> *stockMenus = @[UIMenuHide, UIMenuUndoRedo, UIMenuStandardEdit,
+                UIMenuFullscreen, UIMenuMinimizeAndZoom];
+        for (UIMenuIdentifier stockMenu in stockMenus) {
+            [builder replaceChildrenOfMenuForIdentifier:stockMenu
+                                      fromChildrenBlock:^NSArray<UIMenuElement *> *(NSArray<UIMenuElement *> *children) {
+                NSMutableArray<UIMenuElement *> *kept = [NSMutableArray array];
+                for (UIMenuElement *child in children) {
+                    if ([child isKindOfClass:[UICommand class]] && ((UICommand *)child).action != NULL
+                            && [replacedActions containsObject:NSStringFromSelector(((UICommand *)child).action)]) {
+                        continue;
+                    }
+                    [kept addObject:child];
+                }
+                return kept;
+            }];
         }
     }
 }

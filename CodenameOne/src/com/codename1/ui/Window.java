@@ -197,6 +197,11 @@ public class Window extends Container implements TopLevelContainer {
     private final EventDispatcher windowListeners = new EventDispatcher();
 
     private String pendingTitle = "";
+    private boolean documentModified;
+    // See Form.documentModifiedReported.
+    private boolean documentModifiedReported;
+    // Counts the reports, so a command re-added after a later one still takes it.
+    private int documentModifiedRevision;
     private int pendingX;
     private int pendingY;
     /// Whether the application chose a position. A negative coordinate is a perfectly
@@ -492,8 +497,45 @@ public class Window extends Container implements TopLevelContainer {
             @Override
             public void run() {
                 manager().setTitle(nativePeer, title);
+                if (documentModified) {
+                    // Again over the title just set: a port that marks the state in the
+                    // title (the default) has to mark the new one.
+                    manager().setDocumentModified(nativePeer, true, title);
+                }
             }
         });
+    }
+
+    /// Marks the document this window shows as having unsaved changes, the way the platform
+    /// shows it: the dot in the close button on macOS, a leading `*` in the title elsewhere.
+    /// `#getTitle()` keeps answering the title as set. Commands that follow the modified
+    /// state (the `Command#DESKTOP_ROLE_SAVE` role by default) are enabled while it is set
+    /// and disabled once it is cleared, see `Command#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modified`: true while the document has unsaved changes
+    public void setDocumentModified(final boolean modified) {
+        documentModified = modified;
+        documentModifiedReported = true;
+        documentModifiedRevision++;
+        Command.followDocumentModified(commands, modified, this, documentModifiedRevision);
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setDocumentModified(nativePeer, modified, pendingTitle);
+            }
+        });
+    }
+
+    /// True while the window's document has unsaved changes, see
+    /// `#setDocumentModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// the modified state
+    public boolean isDocumentModified() {
+        return documentModified;
     }
 
     /// {@inheritDoc}
@@ -544,8 +586,33 @@ public class Window extends Container implements TopLevelContainer {
         if (nativePeer == null) {
             return;
         }
+        Command.settleRadioGroups(commands);
+        if (documentModifiedReported) {
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this, documentModifiedRevision);
+        }
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));
+    }
+
+    /// Whether this window still lists `c` among its commands.
+    boolean publishesDocumentCommand(Command c) {
+        return Command.containsIdentical(commands, c);
+    }
+
+    /// The commands this window shows in its native menu, empty while it has no native peer.
+    java.util.List<Command> publishedNativeMenuCommands() {
+        if (nativePeer == null) {
+            return new ArrayList<Command>();
+        }
+        return commands;
+    }
+
+    /// Republishes the commands, so a change in their enabled or checked state reaches the
+    /// window's native menu, see `Display#refreshNativeMenu()`.
+    void republishNativeMenu() {
+        if (nativePeer != null && !commands.isEmpty()) {
+            publishCommands();
+        }
     }
 
     /// {@inheritDoc}
@@ -2374,6 +2441,9 @@ public class Window extends Container implements TopLevelContainer {
             windowGraphics = Desktop.getInstance().createWindowGraphics(this);
             if (windowIcon != null) {
                 wm.setIcon(nativePeer, windowIcon);
+            }
+            if (documentModified) {
+                wm.setDocumentModified(nativePeer, true, pendingTitle);
             }
             if (alwaysOnTop) {
                 wm.setAlwaysOnTop(nativePeer, true);

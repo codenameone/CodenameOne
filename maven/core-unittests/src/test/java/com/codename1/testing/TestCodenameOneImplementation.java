@@ -695,6 +695,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private boolean nativeCommandsSupported = true;
 
+    /** Resets the record of the last published native commands. */
+    public void setNativeCommandsForTest(java.util.Vector commands) {
+        this.lastNativeCommands = commands;
+    }
+
+    /** Simulates the user choosing a command from the native menu bar. */
+    public void chooseNativeMenuCommand(com.codename1.ui.Command cmd) {
+        dispatchNativeMenuCommand(cmd);
+    }
+
     /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
     public java.util.Vector getLastNativeCommands() {
         return lastNativeCommands;

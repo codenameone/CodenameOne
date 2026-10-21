@@ -7678,7 +7678,10 @@
     var bootstrapKeydown = ctor && ctor.prototype && ctor.prototype.keydown;
     var outsideAccessibilityTree = function(e) {
       var t = e.target;
-      if (t && typeof t.closest === 'function' && t.closest('[id^="cn1-a11y-"]')) {
+      // The accessibility tree and the desktop chrome's menus are ours: Bootstrap would cancel
+      // Space before it reached a submenu's <summary>, which then never opens from the keyboard.
+      if (t && typeof t.closest === 'function'
+          && (t.closest('[id^="cn1-a11y-"]') || t.closest('#cn1-desktop-chrome'))) {
         return undefined;
       }
       return bootstrapKeydown.apply(this, arguments);

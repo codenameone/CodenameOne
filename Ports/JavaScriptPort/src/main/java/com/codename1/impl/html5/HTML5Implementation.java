@@ -5732,8 +5732,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             Style st = UIManager.getInstance().getComponentStyle("Command");
                             st.setFgColor(matchesMediaQuery(DARK_SCHEME_QUERY) ? 0xf0f0f0 : 0x1f1f1f);
                             float size = cmd.getMaterialIconSize();
-                            icon = size > 0 ? FontImage.createMaterial(cmd.getMaterialIcon(), st, size)
-                                    : FontImage.createMaterial(cmd.getMaterialIcon(), st);
+                            com.codename1.ui.Font iconFont = cmd.getIconFont();
+                            if (iconFont != null) {
+                                // A glyph of the command's own icon font, the way its button
+                                // and NativeMenuEncoder.iconOf draw it.
+                                if (iconFont.isTTFNativeFont()) {
+                                    iconFont = iconFont.derive(Display.getInstance().convertToPixels(
+                                            size > 0 ? size : 4), com.codename1.ui.Font.STYLE_PLAIN);
+                                }
+                                icon = FontImage.create("" + cmd.getMaterialIcon(), st, iconFont);
+                            } else {
+                                icon = size > 0 ? FontImage.createMaterial(cmd.getMaterialIcon(), st, size)
+                                        : FontImage.createMaterial(cmd.getMaterialIcon(), st);
+                            }
                         }
                         if (icon == null || icon.getWidth() <= 0 || icon.getHeight() <= 0) {
                             return null;
@@ -5775,7 +5786,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A Dialog is painted inside the form rather than owning the window; letting it retitle
         // the bar would leave the wrong title behind once it is dismissed.
         if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            desktopChrome.setTitle(f.getTitle());
+            desktopChrome.setTitle(getNativeWindowTitle(f));
         }
     }
 
@@ -13166,7 +13177,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            desktopChrome.setTitle(f.getTitle());
+            desktopChrome.setTitle(getNativeWindowTitle(f));
         }
         applyTextSelectionHint(f);
         // A form built before the last scheme or density change still holds the styles it

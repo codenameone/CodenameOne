@@ -3511,8 +3511,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
         com.codename1.ui.Form f = getCurrentForm();
         if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
-            String t = f.getTitle();
-            WindowsNative.mainWindowSetTitle(t == null ? "" : t);
+            // With the "*" of a document that has unsaved changes, see Form.setDocumentModified.
+            WindowsNative.mainWindowSetTitle(getNativeWindowTitle(f));
         }
     }
 
@@ -3554,15 +3554,10 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /// @inheritDoc
     ///
-    /// Encodes one row per command as
-    /// `"<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"`, rows
-    /// separated by newline -- the same encoding IOSImplementation writes for the macOS menu,
-    /// so the three ParparVM desktop ports share one format rather than each inventing its
-    /// own alongside Command's placement constants.
-    ///
-    /// Tabs and newlines are stripped from the two text fields rather than escaped: they are
-    /// the delimiters, neither means anything in a menu item (which renders on one line), and
-    /// an escape would need the native parser to unescape in step with this.
+    /// Publishes the commands in the row format NativeMenuEncoder writes -- the encoding the
+    /// macOS, Windows and Linux ports share, so submenu paths, separators and check state are
+    /// decided once in core. The encoder strips the delimiters from every text field, so a
+    /// label carrying a tab or newline cannot shift columns or split a row.
     @Override
     public void setNativeCommands(java.util.Vector commands) {
         if (!isDesktop()) {
@@ -3570,44 +3565,22 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
         java.util.Map<Integer, com.codename1.ui.Command> published =
                 new java.util.HashMap<Integer, com.codename1.ui.Command>();
-        StringBuilder sb = new StringBuilder();
-        if (commands != null) {
-            for (int i = 0; i < commands.size(); i++) {
-                Object o = commands.elementAt(i);
-                if (!(o instanceof com.codename1.ui.Command)) {
-                    continue;
-                }
-                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
-                String name = c.getCommandName();
-                if (name == null || name.length() == 0) {
-                    continue;
-                }
-                String hint = c.getDesktopMenu();
-                if (hint == null) {
-                    hint = "";
-                }
-                if (sb.length() > 0) {
-                    sb.append('\n');
-                }
-                int commandId = nextMenuCommandId++;
-                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
-                        .append(c.getDesktopShortcutKeyChar()).append('\t')
-                        .append(c.getDesktopShortcutModifiers()).append('\t')
-                        .append(commandId);
-                published.put(Integer.valueOf(commandId), c);
+        // Submenu paths, separator groups and check state are resolved once, in core; see
+        // NativeMenuEncoder for the row format the native parser reads.
+        com.codename1.impl.NativeMenuEncoder encoded =
+                com.codename1.impl.NativeMenuEncoder.encode(commands, nextMenuCommandId);
+        nextMenuCommandId += encoded.getIdCount();
+        for (com.codename1.impl.NativeMenuEncoder.Row row : encoded.getRows()) {
+            if (row.getCommand() != null) {
+                published.put(Integer.valueOf(row.getId()), row.getCommand());
             }
         }
+        String sb = encoded.toWireFormat(false);
         supersededMenuCommands = nativeMenuCommands;
         nativeMenuCommands = published;
-        WindowsNative.menuSetCommands(sb.toString());
+        WindowsNative.menuSetCommands(sb);
     }
 
-    private static String menuField(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
-    }
 
     /// Runs the command the user chose from the native menu bar.
     ///
