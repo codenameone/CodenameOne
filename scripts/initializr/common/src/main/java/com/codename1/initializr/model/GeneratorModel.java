@@ -431,8 +431,7 @@ public class GeneratorModel {
     String projectId() {
         if (isDefaultPackage()) {
             if (randomProjectId == null) {
-                randomProjectId = Sha256.hex("cn1-download:" + System.currentTimeMillis() + ":"
-                        + new java.util.Random().nextLong() + ":" + new java.util.Random().nextLong());
+                randomProjectId = newRandomProjectId();
             }
             return randomProjectId;
         }
@@ -440,6 +439,21 @@ public class GeneratorModel {
     }
 
     private String randomProjectId;
+
+    /// 32 bytes from the platform's secure random source, as hex. Not
+    /// java.util.Random: on the JavaScript port it is seeded from the clock alone,
+    /// so two browsers generating a project in the same millisecond would get the
+    /// same "per-download" id and merge again. A port without a secure source
+    /// falls back to clock, a time-seeded Random and this object's identity --
+    /// weaker, but still per download in practice.
+    private String newRandomProjectId() {
+        try {
+            return Sha256.hex(com.codename1.security.SecureRandom.bytes(32));
+        } catch (RuntimeException unavailable) {
+            return Sha256.hex("cn1-download:" + System.currentTimeMillis() + ":"
+                    + new java.util.Random().nextLong() + ":" + System.identityHashCode(this));
+        }
+    }
 
     /// The package the Initializr suggests (`Initializr`'s package field), which
     /// many developers keep.
