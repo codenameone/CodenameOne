@@ -682,6 +682,7 @@ public class FlutterProjectImporterTest {
         assertTrue(all.contains("FlutterLocalNotificationsPlugin.notificationTapped(notificationId);"));
         assertTrue(all.contains("FirebaseMessaging.pushReceived(value);"));
         assertTrue(all.contains("return com.codename1.push.Push.getPushKey();"));
+        assertTrue(all.contains("com.codename1.push.Push.subscribeToTopic(topic);"));
     }
 
     @Test

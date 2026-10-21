@@ -194,7 +194,7 @@ public class FirebaseAuth {
         call(TOOLKIT + op + "?key=", body, new Funcs.VoidFunc1<Map<String, Object>>() {
             @Override
             public void call(Map<String, Object> r) {
-                User u = new User(str(r.get("localId")), str(r.get("email")), anonymous);
+                User u = new User(FirebaseAuth.this, str(r.get("localId")), str(r.get("email")), anonymous);
                 u.displayName = str(r.get("displayName"));
                 u.idToken = str(r.get("idToken"));
                 u.refreshToken = str(r.get("refreshToken"));
@@ -537,7 +537,7 @@ public class FirebaseAuth {
         if (uid == null || current != null) {
             return;
         }
-        User u = new User(uid, blankToNull(Preferences.get(pref + "email", "")),
+        User u = new User(this, uid, blankToNull(Preferences.get(pref + "email", "")),
                 "true".equals(Preferences.get(pref + "anonymous", "false")));
         u.displayName = blankToNull(Preferences.get(pref + "name", ""));
         u.emailVerified = "true".equals(Preferences.get(pref + "verified", "false"));

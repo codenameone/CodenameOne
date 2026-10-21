@@ -201,22 +201,35 @@ public class FirebaseMessaging {
         return Future.value(m);
     }
 
-    /// Codename One's Push topic API (FCM topics on Android); a port without topic
-    /// support ignores it, as it does for a native Codename One app.
+    /// Codename One's Push topic API (FCM topics on Android), reached through a hook the
+    /// import-generated entry point installs -- like tokenSource, and for the same reason:
+    /// naming com.codename1.push here put it in every app that kept this package (an
+    /// auth-only Firebase app included), and the Android builder then turned on FCM and
+    /// required google-services.json. Arguments: the topic, and true to subscribe. With
+    /// no hook (no firebase_messaging dependency) or a port without topics it is ignored,
+    /// as it is for a native Codename One app.
+    private static Funcs.VoidFunc2<String, Boolean> topicSink;
+
+    public static void topicSink(Funcs.VoidFunc2<String, Boolean> sink) {
+        topicSink = sink;
+    }
+
     public Future<Object> subscribeToTopic(String topic) {
-        try {
-            com.codename1.push.Push.subscribeToTopic(topic);
-        } catch (RuntimeException e) {
-            return Future.error(e);
-        }
-        return Future.value(null);
+        return topic(topic, true);
     }
 
     public Future<Object> unsubscribeFromTopic(String topic) {
-        try {
-            com.codename1.push.Push.unsubscribeFromTopic(topic);
-        } catch (RuntimeException e) {
-            return Future.error(e);
+        return topic(topic, false);
+    }
+
+    private static Future<Object> topic(String topic, boolean subscribe) {
+        Funcs.VoidFunc2<String, Boolean> sink = topicSink;
+        if (sink != null) {
+            try {
+                sink.call(topic, Boolean.valueOf(subscribe));
+            } catch (RuntimeException e) {
+                return Future.error(e);
+            }
         }
         return Future.value(null);
     }

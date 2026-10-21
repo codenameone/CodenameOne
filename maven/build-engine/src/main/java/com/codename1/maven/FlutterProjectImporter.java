@@ -897,6 +897,17 @@ public final class FlutterProjectImporter {
                     .append("                        return com.codename1.push.Push.getPushKey();\n")
                     .append("                    }\n")
                     .append("                });\n");
+            b.append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.topicSink(\n")
+                    .append("                new dart.runtime.Funcs.VoidFunc2<String, Boolean>() {\n")
+                    .append("                    @Override\n")
+                    .append("                    public void call(String topic, Boolean subscribe) {\n")
+                    .append("                        if (subscribe.booleanValue()) {\n")
+                    .append("                            com.codename1.push.Push.subscribeToTopic(topic);\n")
+                    .append("                        } else {\n")
+                    .append("                            com.codename1.push.Push.unsubscribeFromTopic(topic);\n")
+                    .append("                        }\n")
+                    .append("                    }\n")
+                    .append("                });\n");
         }
         b.append("        ").append(flutterPackage).append(".FlutterRegistry.invokeMain();\n")
                 .append("    }\n");

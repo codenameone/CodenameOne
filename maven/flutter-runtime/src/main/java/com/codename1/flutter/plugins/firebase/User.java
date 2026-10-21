@@ -36,8 +36,13 @@ public class User {
     String idToken;
     String refreshToken;
     long expiresAt;
+    /// The FirebaseAuth that signed this user in or restored it: a secondary app's user
+    /// must refresh, update, reload and delete with that app's key and session, not the
+    /// default instance's.
+    final FirebaseAuth auth;
 
-    User(String uid, String email, boolean anonymous) {
+    User(FirebaseAuth auth, String uid, String email, boolean anonymous) {
+        this.auth = auth;
         this.uid = uid;
         this.email = email;
         this.anonymous = anonymous;
@@ -77,28 +82,28 @@ public class User {
 
     /** The ID token, refreshed first when it has expired or {@code forceRefresh} asks. */
     public Future<String> getIdToken(Boolean forceRefresh) {
-        return FirebaseAuth.instance.idToken(this, forceRefresh != null && forceRefresh.booleanValue());
+        return auth.idToken(this, forceRefresh != null && forceRefresh.booleanValue());
     }
 
     public Future<Object> updateDisplayName(String name) {
-        return FirebaseAuth.instance.updateProfile(this, name, photoURL);
+        return auth.updateProfile(this, name, photoURL);
     }
 
     public Future<Object> updatePhotoURL(String url) {
-        return FirebaseAuth.instance.updateProfile(this, displayName, url);
+        return auth.updateProfile(this, displayName, url);
     }
 
     /** Re-reads the account (accounts:lookup), so a verified email shows as verified. */
     public Future<Object> reload() {
-        return FirebaseAuth.instance.reloadUser(this);
+        return auth.reloadUser(this);
     }
 
     public Future<Object> delete() {
-        return FirebaseAuth.instance.deleteUser(this);
+        return auth.deleteUser(this);
     }
 
     public Future<Object> sendEmailVerification(Object actionCodeSettings) {
-        return FirebaseAuth.instance.sendOob(this, "VERIFY_EMAIL", null);
+        return auth.sendOob(this, "VERIFY_EMAIL", null);
     }
 
     @Override
