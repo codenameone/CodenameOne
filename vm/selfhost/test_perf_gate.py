@@ -226,9 +226,16 @@ class TightenTest(unittest.TestCase):
         self.assertEqual(r['time'], 1.0)
 
     def test_a_win_too_small_to_protect_does_not_tighten(self):
-        # 0.92 is well past half the 10% tolerance, but 0.92 * 1.1 = 1.012: the tightened
+        # 0.92 is past half the 15% tolerance, but 0.92 * 1.15 = 1.058: the tightened
         # row would still let the run go all the way back to 1.0 unflagged.
         changes, r = self.run_tighten([0.92, 0.92, 0.92])
+        self.assertEqual(changes, [])
+        self.assertEqual(r['time'], 1.0)
+
+    def test_the_rounded_value_must_still_protect_the_win(self):
+        # 0.8695 * 1.15 < 1.0, but it would be recorded as 0.870, and 0.870 * 1.15 > 1.0:
+        # the recorded row would let the run go back to 1.0 unflagged.
+        changes, r = self.run_tighten([0.8695, 0.8695, 0.8695])
         self.assertEqual(changes, [])
         self.assertEqual(r['time'], 1.0)
 

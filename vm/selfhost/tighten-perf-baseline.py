@@ -89,9 +89,12 @@ def plan(seen, base, policy, overlay_rows, min_runs):
         tolerance = max(row.get('tolerance', {}).get(metric, 0.0), policy['tolerance'][metric])
         floor = policy.get('floor', {}).get(metric, 0.0)
         worst = max(medians)
+        # Judge the value that is actually recorded: rounding 0.7999 up to 0.800 can put
+        # the old value exactly on the threshold, which verdict()'s strict > lets through.
+        new = round(worst, 3)
         # Only tighten when giving the whole win back would fail the gate afterwards.
-        if worst * (1 + tolerance) < current and current - worst > floor:
-            changes.append((key, bench, cores, metric, current, round(worst, 3), len(medians)))
+        if new * (1 + tolerance) < current and current - new > floor:
+            changes.append((key, bench, cores, metric, current, new, len(medians)))
     return changes
 
 
