@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.gaming.physics.box2d.dynamics;
 
 import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
@@ -122,5 +144,38 @@ class Box2dCollisionScenariosTest {
         assertEquals(0.3f, f.getRestitution(), 1e-3);
         f.setSensor(true);
         assertTrue(f.isSensor());
+    }
+
+    /// A chain has no collision routine against another chain or an edge,
+    /// so the pair makes no contact. It used to throw from the contact
+    /// factory as soon as the two overlapped in the broad phase.
+    @Test
+    void chainAgainstChainMakesNoContactAndDoesNotThrow() {
+        World w = new World(new Vec2(0, -10));
+        BodyDef ground = new BodyDef();
+        ground.type = BodyType.STATIC;
+        Body floor = w.createBody(ground);
+        com.codename1.gaming.physics.box2d.collision.shapes.ChainShape loop =
+                new com.codename1.gaming.physics.box2d.collision.shapes.ChainShape();
+        Vec2[] square = {new Vec2(-5, -1), new Vec2(5, -1), new Vec2(5, 0), new Vec2(-5, 0)};
+        loop.createLoop(square, square.length);
+        floor.createFixture(loop, 0f);
+        EdgeShape ledge = new EdgeShape();
+        ledge.set(new Vec2(-5, 0.2f), new Vec2(5, 0.2f));
+        floor.createFixture(ledge, 0f);
+
+        BodyDef falling = new BodyDef();
+        falling.type = BodyType.DYNAMIC;
+        falling.position.set(0, 0.5f);
+        Body b = w.createBody(falling);
+        com.codename1.gaming.physics.box2d.collision.shapes.ChainShape outline =
+                new com.codename1.gaming.physics.box2d.collision.shapes.ChainShape();
+        Vec2[] box = {new Vec2(-1, -1), new Vec2(1, -1), new Vec2(1, 1), new Vec2(-1, 1)};
+        outline.createLoop(box, box.length);
+        b.createFixture(outline, 1f);
+
+        steps(w, 30);
+        assertEquals(0, w.getContactCount());
+        assertTrue(b.getPosition().y < 0.5f, "nothing holds a chain up against a chain");
     }
 }

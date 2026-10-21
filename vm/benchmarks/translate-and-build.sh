@@ -114,7 +114,7 @@ SRCDIR="$WORK/out/dist/$MAIN-src"
 shopt -s nullglob
 ASM=("$SRCDIR"/*.S)
 shopt -u nullglob
-$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
+$CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off \
     $CN1_BENCH_CFLAGS $EXTRA -I"$SRCDIR" "$SRCDIR"/*.c "${ASM[@]}" -lm -lpthread -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -30 "$WORK/cc.log"; exit 1; }
 echo "built $OUTBIN (workdir $WORK)"

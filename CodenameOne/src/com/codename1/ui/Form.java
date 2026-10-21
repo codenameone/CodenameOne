@@ -125,6 +125,12 @@ public class Form extends Container implements TopLevelContainer {
     }
     private Command sourceCommand;
     private boolean globalAnimationLock;
+    private boolean documentModified;
+    // Whether the application has reported a modified state at all; until it does, commands
+    // that follow the state are left as the application set them.
+    private boolean documentModifiedReported;
+    // Counts the reports, so a command re-added after a later one still takes it.
+    private int documentModifiedRevision;
     private Painter glassPane;
     private Container layeredPane;
     private Container formLayeredPane;
@@ -220,6 +226,7 @@ public class Form extends Container implements TopLevelContainer {
     private boolean cyclicFocus = true;
     private int tactileTouchDuration;
     private EventDispatcher orientationListener;
+    private EventDispatcher pointerCancelledListener;
     private EventDispatcher sizeChangedListener;
     private EventDispatcher pasteListener;
     private UIManager uiManager;
@@ -1034,6 +1041,33 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         orientationListener.removeListener(l);
+    }
+
+    /// Listens for the platform abandoning a gesture in progress (see
+    /// `Display#pointerCancelled(int, int)`). No pointer-released listener hears
+    /// such a gesture end, so whatever a press left held -- a game's pointer, an
+    /// on-screen control -- is let go of here. The event carries the last point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addPointerCancelledListener(ActionListener l) {
+        if (pointerCancelledListener == null) {
+            pointerCancelledListener = new EventDispatcher();
+        }
+        pointerCancelledListener.addListener(l);
+    }
+
+    /// Stops listening for cancelled gestures.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removePointerCancelledListener(ActionListener l) {
+        if (pointerCancelledListener == null) {
+            return;
+        }
+        pointerCancelledListener.removeListener(l);
     }
 
     /// This listener is invoked when device size is changed
@@ -3301,6 +3335,80 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// Marks the document this form shows as having unsaved changes, the way the platform
+    /// shows it in the window's title bar: the dot in the close button on macOS, a leading `*`
+    /// in the title on Windows and Linux. `#getTitle()` keeps answering the title as set, and
+    /// platforms without a desktop window ignore the indicator. Commands that follow the
+    /// modified state (the `Command#DESKTOP_ROLE_SAVE` role by default) are enabled while it is
+    /// set and disabled once it is cleared, see `Command#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modified`: true while the document has unsaved changes
+    public void setDocumentModified(boolean modified) {
+        documentModified = modified;
+        documentModifiedReported = true;
+        documentModifiedRevision++;
+        java.util.Vector published = nativeMenuCommands();
+        if (published == null) {
+            published = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
+        }
+        Command.followDocumentModified(published, modified, this, documentModifiedRevision);
+        Display.impl.documentModifiedChanged(this);
+    }
+
+    /// True while the form's document has unsaved changes, see `#setDocumentModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// the modified state
+    public boolean isDocumentModified() {
+        return documentModified;
+    }
+
+    /// The commands this form puts on the platform's native menu, or null when it puts none
+    /// there. Only a form that owns the surface publishes: an embedded one -- a Dialog hosted in
+    /// a window's layered pane, a form inside an EmbeddedContainer -- would otherwise overwrite
+    /// the real surface's native menu bar with its own.
+    ///
+    /// With native desktop chrome the (hidden) toolbar's commands are bridged to the native
+    /// menu bar. That is checked BEFORE the native command behaviour: the desktop native themes
+    /// declare commandBehavior Native, and with a Toolbar the commands live on the Toolbar
+    /// rather than on this form's MenuBar -- publishing the MenuBar's list there handed the
+    /// native menu bar nothing, so it came up empty while the Toolbar that held the commands
+    /// was hidden. getAllNativeMenuCommands() includes the Toolbar's MenuBar, so nothing the
+    /// other branch would publish is lost.
+    java.util.Vector nativeMenuCommands() {
+        if (getParent() != null) {
+            return null;
+        }
+        java.util.Vector v = null;
+        if (isDesktopNativeChrome() && toolbar != null) {
+            v = toolbar.getAllNativeMenuCommands();
+        } else if (Display.getInstance().isNativeCommands()) {
+            v = menuBar.getCommands();
+        }
+        if (v != null) {
+            Command.settleRadioGroups(v);
+            applyDocumentModified(v);
+        }
+        return v;
+    }
+
+    /// Whether this form still publishes `c` in its native menu or command surface.
+    boolean publishesDocumentCommand(Command c) {
+        java.util.Vector v = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
+        return Command.containsIdentical(v, c);
+    }
+
+    /// Applies the reported modified state to commands as they are published, so a Save
+    /// command added after `#setDocumentModified(boolean)` still follows it.
+    void applyDocumentModified(java.util.List commands) {
+        if (documentModifiedReported) {
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this, documentModifiedRevision);
+        }
+    }
+
     /// {@inheritDoc}
     @Override
     void initComponentImpl() {
@@ -3311,17 +3419,9 @@ public class Form extends Container implements TopLevelContainer {
         // an EmbeddedContainer -- would otherwise overwrite the real surface's native
         // menu bar with its own.
         if (getParent() == null) {
-            if (isDesktopNativeChrome() && toolbar != null) {
-                // bridge the (hidden) toolbar's commands to the native desktop menu bar.
-                // Checked BEFORE the native command behaviour: the desktop native themes declare
-                // commandBehavior Native, and with a Toolbar the commands live on the Toolbar
-                // rather than on this form's MenuBar -- publishing the MenuBar's list there
-                // handed the native menu bar nothing, so it came up empty while the Toolbar
-                // that held the commands was hidden. getAllNativeMenuCommands() includes the
-                // Toolbar's MenuBar, so nothing the other branch would publish is lost.
-                Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
-            } else if (Display.getInstance().isNativeCommands()) {
-                Display.impl.setNativeCommands(menuBar.getCommands());
+            java.util.Vector published = nativeMenuCommands();
+            if (published != null) {
+                Display.impl.setNativeCommands(published);
             }
         }
         if (getParent() != null) {
@@ -5005,6 +5105,9 @@ public class Form extends Container implements TopLevelContainer {
                 indicator.removeAll();
                 indicator.revalidate();
             }
+        }
+        if (pointerCancelledListener != null && pointerCancelledListener.hasListeners()) {
+            pointerCancelledListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Other, x, y));
         }
         repaint();
     }

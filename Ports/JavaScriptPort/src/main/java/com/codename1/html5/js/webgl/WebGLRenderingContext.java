@@ -53,6 +53,7 @@ public interface WebGLRenderingContext extends JSObject {
     void disable(int cap);
     void depthMask(boolean flag);
     void blendFunc(int sfactor, int dfactor);
+    void blendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
     void cullFace(int mode);
 
     WebGLShader createShader(int type);

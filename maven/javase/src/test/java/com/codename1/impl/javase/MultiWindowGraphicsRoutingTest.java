@@ -324,7 +324,7 @@ class MultiWindowGraphicsRoutingTest {
         java.util.List<com.codename1.ui.Command> cmds =
                 new java.util.ArrayList<com.codename1.ui.Command>();
         cmds.add(cmd);
-        javax.swing.JMenuBar bar = port.buildWindowMenuBar(cmds, owner);
+        javax.swing.JMenuBar bar = port.buildWindowMenuBar(port.encodeWindowMenu(cmds), owner);
         assertNotNull(bar);
 
         // The MCP menu carries development-only controls ("Expose This Tool To Agents",

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Two builds of the same sources. netstandard2.1 is the one the CIL translator
+    reads: it is the API profile Unity scripts compile against, and it keeps Roslyn
+    from lowering string interpolation and concatenation onto ref-struct helpers
+    the translator does not model. net10.0 exists only so `dotnet run` can produce
+    the reference output the translated program is compared with.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>netstandard2.1;net10.0</TargetFrameworks>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SpikeConsole</AssemblyName>
+    <RootNamespace>Spike</RootNamespace>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <!--
+    The translator resolves the base library through netstandard.dll, which
+    lives wherever this machine's NuGet cache or SDK keeps it. Copying it next
+    to the output gives every consumer one path that does not depend on that.
+  -->
+  <Target Name="CopyNetStandardReference" AfterTargets="Build" Condition="'$(TargetFramework)' == 'netstandard2.1'">
+    <Copy SourceFiles="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'netstandard.dll'"
+          DestinationFolder="$(OutDir)netstandard-ref" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

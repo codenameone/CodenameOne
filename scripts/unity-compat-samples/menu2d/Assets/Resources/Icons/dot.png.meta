@@ -1,0 +1,11 @@
+fileFormatVersion: 2
+guid: f4000000000000000000000000000003
+TextureImporter:
+  internalIDToNameTable: []
+  serializedVersion: 11
+  textureType: 8
+  spriteMode: 1
+  spritePixelsToUnits: 12
+  spritePivot: {x: 0.5, y: 0.5}
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  alignment: 0

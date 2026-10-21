@@ -129,3 +129,46 @@ ASM is distributed under the BSD 3-Clause license:
   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
   THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+.NET Standard reference assembly
+================================================================================
+
+The "references" artifact of maven/unity-compat (codenameone-unity-compat,
+classifier references) holds the assemblies the C# scripts of a Unity project
+are compiled against. One of them, netstandard.dll, is the .NET Standard 2.1
+reference assembly from the NuGet package NETStandard.Library.Ref 2.1.0
+(https://www.nuget.org/packages/NETStandard.Library.Ref/2.1.0), redistributed
+unmodified. It declares the API of the .NET base library and contains no
+implementation; it is read by the C# compiler and the translator at build time
+and is never part of an application.
+
+The package's LICENSE.TXT and THIRD-PARTY-NOTICES.TXT are kept verbatim in
+maven/unity-compat/third-party/NETStandard.Library.Ref and ship inside the
+artifact under META-INF/licenses/NETStandard.Library.Ref.
+
+NETStandard.Library.Ref is distributed under the MIT license:
+
+  The MIT License (MIT)
+
+  Copyright (c) .NET Foundation and Contributors
+
+  All rights reserved.
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

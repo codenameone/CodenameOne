@@ -837,6 +837,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetTitle___int_java_lang_Str
     });
 }
 
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetDocumentEdited___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN edited) {
+    BOOL value = edited ? YES : NO;
+    cn1OnMain(^{
+        // A negative slot is the main window, which is not in the secondary window table.
+        NSWindow *window = slot < 0 ? [CN1MacHost sharedHost].window : cn1WindowAt(slot).window;
+        window.documentEdited = value;
+    });
+}
+
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetBounds___int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);

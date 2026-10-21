@@ -1318,30 +1318,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macSupersededCommands;
     private static int nextMacCommandId = 1;
 
-    /**
-     * One menu field with the row and column delimiters taken out of it.
-     *
-     * <p>The rows are joined by newlines and the columns by tabs, and both the
-     * command label and the menu hint are user-facing strings a localization can
-     * put anything into. A newline in a label produced an extra native row while
-     * the Java list backing fireMacMenuCommand() still held one entry per
-     * command, so every later item carried a tag pointing at the wrong command
-     * and selecting one ran something else. A tab shifted the label and shortcut
-     * columns of its own row.</p>
-     *
-     * <p>Replaced rather than backslash-escaped: an escape needs the two native
-     * parsers -- the AppKit one and the Catalyst one -- to unescape in step with
-     * this, and neither a newline nor a tab means anything in a menu item, which
-     * renders on one line. Turning them into spaces costs nothing anyone can
-     * see and cannot desynchronize the two sides.</p>
-     */
-    private static String menuField(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
-    }
-
     /// @inheritDoc
     ///
     /// True on the desktop -- the native macOS build's real NSMenu, and Catalyst's
@@ -1359,42 +1335,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         java.util.HashMap<Integer, com.codename1.ui.Command> published =
                 new java.util.HashMap<Integer, com.codename1.ui.Command>();
-        // Encode one row per command as
-        // "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>",
-        // rows separated by '\n'. The native side groups rows into the matching standard macOS menus
+        // The native side groups rows into the matching standard macOS menus
         // (App/File/Edit/View/Window/Help) or a top-level menu named by the hint; an empty hint means
         // the default commands menu. A non-zero shortcutKeyChar produces a UIKeyCommand so the menu
         // item shows (and responds to) the keyboard accelerator.
-        StringBuilder sb = new StringBuilder();
-        if (commands != null) {
-            for (int i = 0; i < commands.size(); i++) {
-                Object o = commands.elementAt(i);
-                if (!(o instanceof com.codename1.ui.Command)) {
-                    continue;
-                }
-                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
-                String name = c.getCommandName();
-                if (name == null || name.length() == 0) {
-                    continue;
-                }
-                String hint = c.getDesktopMenu();
-                if (hint == null) {
-                    hint = "";
-                }
-                if (sb.length() > 0) {
-                    sb.append('\n');
-                }
-                int commandId = nextMacCommandId++;
-                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
-                        .append(c.getDesktopShortcutKeyChar()).append('\t')
-                        .append(c.getDesktopShortcutModifiers()).append('\t')
-                        .append(commandId);
-                published.put(Integer.valueOf(commandId), c);
+        // Submenu paths, separator groups and check state are resolved once, in core; see
+        // NativeMenuEncoder for the row format the native parser reads.
+        com.codename1.impl.NativeMenuEncoder encoded =
+                com.codename1.impl.NativeMenuEncoder.encode(commands, nextMacCommandId);
+        nextMacCommandId += encoded.getIdCount();
+        for (com.codename1.impl.NativeMenuEncoder.Row row : encoded.getRows()) {
+            if (row.getCommand() != null) {
+                published.put(Integer.valueOf(row.getId()), row.getCommand());
             }
         }
+        String sb = encoded.toWireFormat(true);
         macSupersededCommands = macNativeCommands;
         macNativeCommands = published;
-        nativeInstance.setNativeMenuCommands(sb.toString());
+        nativeInstance.setNativeMenuCommands(sb);
     }
 
     /**
