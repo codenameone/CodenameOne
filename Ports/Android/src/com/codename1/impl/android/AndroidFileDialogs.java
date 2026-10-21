@@ -211,6 +211,16 @@ final class AndroidFileDialogs {
             }
         }
         intent.setType(type);
+        // DocumentsUI creates the document under EXTRA_TITLE exactly as given,
+        // so the selected filter's extension is added first, as on desktop.
+        FileTypeFilter[] saveFilters = request.getFilters();
+        int sel = request.getSelectedFilter();
+        if (name != null && sel >= 0 && sel < saveFilters.length) {
+            String[] ext = saveFilters[sel].getExtensions();
+            if (ext.length > 0 && !"*".equals(ext[0]) && !saveFilters[sel].acceptsName(name)) {
+                name = name + "." + ext[0];
+            }
+        }
         if (name != null) {
             intent.putExtra(Intent.EXTRA_TITLE, name);
         }
@@ -224,13 +234,6 @@ final class AndroidFileDialogs {
                     return;
                 }
                 final ContentResolver resolver = AndroidNativeUtil.getContext().getContentResolver();
-                if (persist) {
-                    try {
-                        resolver.takePersistableUriPermission(uri,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                    } catch (SecurityException ignored) {
-                    }
-                }
                 final FileDialogResult result = new FileDialogResult(request, new String[]{uri.toString()}, -1, null);
                 new Thread(new Runnable() {
                     public void run() {
@@ -269,6 +272,14 @@ final class AndroidFileDialogs {
                                 // already gone
                             } catch (RuntimeException ignored) {
                                 // the provider does not support deletion
+                            }
+                        } else if (persist) {
+                            // Persisted only after the write succeeded, so a failed
+                            // save holds no grant against the persisted-URI quota.
+                            try {
+                                resolver.takePersistableUriPermission(uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                            } catch (SecurityException ignored) {
                             }
                         }
                         deliver(callback, result);
