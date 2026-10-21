@@ -345,7 +345,7 @@ class HashnodeAdapter:
          /draft/<id>. (Once a draft is published the slot is freed and
          the next click creates a fresh draft, so weekly runs no
          longer overwrite each other.)
-      2. Fill the title textarea (placeholder "Article Title...") and
+      2. Fill the title textarea (placeholder "Article title...", matched case-insensitively) and
          paste the markdown body into the contenteditable editor. The
          leading header-image markdown line is stripped from the body
          because it lives separately as the "Cover" image (see step 3).
@@ -383,8 +383,22 @@ class HashnodeAdapter:
         "HASHNODE_PUBLICATION_URL", "https://debugagent.com"
     ).rstrip("/")
 
-    TITLE_SELECTOR = "textarea[placeholder='Article Title...']"
-    BODY_SELECTOR = "div[contenteditable='true']"
+    # Hashnode re-cased the placeholder to "Article title..." in 2026-10
+    # and every run timed out here for two days (issue #6070). Match it
+    # case-insensitively (the CSS ``i`` flag) and on any element kind the
+    # field could become, rather than pinning one spelling and tag again.
+    TITLE_SELECTOR = ", ".join(
+        f"{tag}[{attr}^='Article title' i]"
+        for tag in ("textarea", "input", "[contenteditable='true']")
+        for attr in ("placeholder", "data-placeholder")
+    )
+    # The first contenteditable that is not the title, in case the title
+    # itself turns into one.
+    BODY_SELECTOR = (
+        "div[contenteditable='true']"
+        ":not([placeholder^='Article title' i])"
+        ":not([data-placeholder^='Article title' i])"
+    )
     # Cover popover trigger has two captions: "Cover" when no cover is
     # set, "Change cover" once one is uploaded. Both buttons share
     # data-slot='popover-trigger'.
