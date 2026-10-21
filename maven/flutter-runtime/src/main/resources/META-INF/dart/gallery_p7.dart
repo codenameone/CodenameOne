@@ -829,7 +829,9 @@ abstract class AutofillHints {
 // The glue binding the widget layer to the engine — Flutter's `WidgetsBinding`.
 // new_gallery reaches the ambient brightness through
 // `WidgetsBinding.instance.platformDispatcher.platformBrightness`; the dispatcher
-// is left `dynamic` so that chain resolves without pulling in the engine types.
+// is typed (PlatformDispatcher below): left `dynamic`, the chain went through
+// Dyn.get, and the runtime's dispatcher is a plain Java object with no dynamic
+// members -- the native gallery threw NoSuchMethodError before its first frame.
 // `WidgetsFlutterBinding.ensureInitialized()` -- main()'s usual first line; the
 // binding is Codename One's Display, initialized before main() runs.
 @JavaName('com.codename1.flutter.widgets.WidgetsBinding')
@@ -837,10 +839,16 @@ class WidgetsFlutterBinding extends WidgetsBinding {
   external static WidgetsBinding ensureInitialized();
 }
 
+@JavaName('com.codename1.flutter.widgets.WidgetsBinding.PlatformDispatcher')
+class PlatformDispatcher {
+  external Brightness get platformBrightness;
+  external double get devicePixelRatio;
+}
+
 @JavaName('com.codename1.flutter.widgets.WidgetsBinding')
 class WidgetsBinding {
   external static WidgetsBinding get instance;
-  external dynamic get platformDispatcher;
+  external PlatformDispatcher get platformDispatcher;
   external Object get window;
   external void addPostFrameCallback(Object callback);
   external void addObserver(Object observer);
