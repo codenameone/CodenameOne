@@ -31,19 +31,19 @@ import com.codename1.annotations.Id;
 @Entity
 public class CustomerOrder {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String customer = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String restaurantId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String restaurantName = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private OrderState state;
 
     @Column(nullable = false)
@@ -73,10 +73,10 @@ public class CustomerOrder {
     @Column(nullable = false)
     private long commissionCents;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(3)")
     private String currency = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String promoCode = "";
 
     @Column(nullable = false)
@@ -85,22 +85,22 @@ public class CustomerOrder {
     @Column(nullable = false)
     private double dropoffLng;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String dropoffAddress = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String note = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String methodId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String methodLabel = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String authorizationRef = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String paymentStatus = "";
 
     @Column(nullable = false)
@@ -121,10 +121,10 @@ public class CustomerOrder {
     @Column(nullable = false)
     private long updatedAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String reason = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "SMALLINT")
     private int stars;
 
     public CustomerOrder() {

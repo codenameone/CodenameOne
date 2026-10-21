@@ -27,19 +27,19 @@ import com.codename1.annotations.Id;
 @Entity
 public class Restaurant {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String name = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String cuisine = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(500)")
     private String description = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String address = "";
 
     @Column(nullable = false)
@@ -48,7 +48,7 @@ public class Restaurant {
     @Column(nullable = false)
     private double lng;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
     @Column(nullable = false)
@@ -66,7 +66,7 @@ public class Restaurant {
     @Column(nullable = false)
     private long minimumCents;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "SMALLINT")
     private int priceLevel;
 
     @Column(nullable = false)
@@ -75,13 +75,13 @@ public class Restaurant {
     @Column(nullable = false)
     private long ratingCount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String photoId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String applicant = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(255)")
     private String reason = "";
 
     @Column(nullable = false)

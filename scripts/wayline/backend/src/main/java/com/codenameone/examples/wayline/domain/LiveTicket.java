@@ -26,10 +26,10 @@ import com.codename1.annotations.Id;
 @Entity
 public class LiveTicket {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String ticketHash = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
     @Column(nullable = false)
