@@ -66,6 +66,19 @@ function loadBeacon({ hostname = "www.codenameone.com", fetchImpl, subtle = cryp
   assert.equal(new URLSearchParams(calls[0].init.body).get("template"), "");
 }
 
+// A default-package download is identified by the Initializr's random id
+// (GeneratorModel#beaconKey, "id:<64 hex>"): sent as is, not hashed again.
+{
+  const id = "0123456789abcdef".repeat(4);
+  const { beacon, calls } = loadBeacon({ hostname: "codenameone.com" });
+  await beacon.send("id:" + id, "barebones");
+  assert.equal(new URLSearchParams(calls[0].init.body).get("pkg"), id);
+  // Anything else shaped like it is an ordinary package name and is hashed.
+  const other = loadBeacon({ hostname: "codenameone.com" });
+  await other.beacon.send("id:not-a-hex-id", "barebones");
+  assert.equal(new URLSearchParams(other.calls[0].init.body).get("pkg"), sha256Hex("id:not-a-hex-id"));
+}
+
 // Failures are swallowed: a rejecting or throwing fetch never rejects send().
 {
   const rejecting = loadBeacon({ fetchImpl: () => Promise.reject(new TypeError("network")) });
