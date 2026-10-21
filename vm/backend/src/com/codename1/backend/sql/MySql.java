@@ -41,6 +41,8 @@ import com.codename1.backend.Tcp;
 /// therefore through MySQL's BINARY result format. That is more code than sending
 /// COM_QUERY text, and it is the only way to bind a parameter -- a text-protocol
 /// client has to build SQL by concatenation, and this API refuses to offer that.
+/// The exception is a statement the server refuses to prepare, which binds
+/// nothing and goes as text; see [#command].
 ///
 /// Authentication covers what is actually deployed: caching_sha2_password (the
 /// MySQL 8 default) and mysql_native_password (5.7 and MariaDB). The caching_sha2
@@ -374,11 +376,12 @@ public final class MySql {
     /// Runs a statement through COM_QUERY rather than the prepared-statement
     /// protocol, and takes no parameters.
     ///
-    /// This exists for exactly one reason: MySQL refuses to prepare its
-    /// transaction-control statements ("This command is not supported in the
-    /// prepared statement protocol yet"), so BEGIN, COMMIT and ROLLBACK cannot go
-    /// through [#execute]. It is private, and the three callers below pass
-    /// constants -- a text-protocol entry point taking a caller's string is the
+    /// This exists because MySQL refuses to prepare some statements ("This
+    /// command is not supported in the prepared statement protocol yet"):
+    /// BEGIN, COMMIT and ROLLBACK, which the callers below pass as constants, and
+    /// DDL such as ALTER DATABASE, which [#runPrepared] sends here only once the
+    /// server has refused to prepare it and only when it binds no parameter. It
+    /// is private: a text-protocol entry point taking a caller's values is the
     /// concatenation hole this client exists to avoid.
     private void command(String sql) throws IOException {
         checkOpen();
@@ -477,6 +480,18 @@ public final class MySql {
 
         Packet response = readPacket();
         if ((response.body[0] & 0xff) == ERROR_PACKET) {
+            if (rows == null && (params == null || params.length == 0)
+                    && errorCode(response) == UNSUPPORTED_IN_PREPARED_STATEMENT) {
+                // Some statements -- ALTER DATABASE, and the rest of the list
+                // MySQL keeps of what it will not prepare -- run only as text.
+                // A migration script is where they are written, and Flyway,
+                // whose scripts these are, runs them that way. Refused at
+                // PREPARE, so nothing ran, and with no parameters there is
+                // nothing to splice into the text: it goes as the caller wrote
+                // it, which is exactly what the prepared path would have sent.
+                command(sql);
+                return 0;
+            }
             throw errorFrom(response, sql);
         }
         Reader reader = new Reader(response.body);
@@ -1046,6 +1061,18 @@ public final class MySql {
     static boolean isConcurrencyFailure(int code, String state) {
         return code == 1213 || code == 1205 || code == 3572 || code == 1020
                 || (state != null && state.startsWith("40"));
+    }
+
+    /// ER_UNSUPPORTED_PS: "This command is not supported in the prepared
+    /// statement protocol yet".
+    private static final int UNSUPPORTED_IN_PREPARED_STATEMENT = 1295;
+
+    /// The error code of an error packet, or -1 when it is too short to carry one.
+    private static int errorCode(Packet packet) {
+        if (packet.body.length < 3) {
+            return -1;
+        }
+        return (packet.body[1] & 0xff) | (packet.body[2] & 0xff) << 8;
     }
 
     private static IOException errorFrom(Packet packet, String sql) {

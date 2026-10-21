@@ -27,16 +27,16 @@ import com.codename1.annotations.Id;
 @Entity
 public class PaymentMethod {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String username = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private String brand = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(4)")
     private String last4 = "";
 
     @Column(nullable = false)
@@ -45,7 +45,7 @@ public class PaymentMethod {
     @Column(nullable = false)
     private int expYear;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(64)")
     private String token = "";
 
     @Column(nullable = false)

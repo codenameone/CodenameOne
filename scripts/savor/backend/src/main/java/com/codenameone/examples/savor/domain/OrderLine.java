@@ -26,19 +26,19 @@ import com.codename1.annotations.Id;
 @Entity
 public class OrderLine {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String orderId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String dishId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String name = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(500)")
     private String options = "";
 
     @Column(nullable = false)

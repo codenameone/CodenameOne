@@ -28,16 +28,16 @@ import com.codename1.annotations.Id;
 @Entity
 public class OrderEvent {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String orderId = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(24)")
     private OrderState state;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String actor = "";
 
     @Column(nullable = false)

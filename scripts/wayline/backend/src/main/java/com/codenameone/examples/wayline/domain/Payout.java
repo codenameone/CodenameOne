@@ -26,22 +26,22 @@ import com.codename1.annotations.Id;
 @Entity
 public class Payout {
     @Id(autoIncrement = false)
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(32)")
     private String id = "";
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(190)")
     private String driver = "";
 
     @Column(nullable = false)
     private long amountCents;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
     @Column(nullable = false)
     private long createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, type = "VARCHAR(120)")
     private String destination = "";
 
     public Payout() {
