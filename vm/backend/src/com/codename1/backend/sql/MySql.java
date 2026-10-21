@@ -382,8 +382,9 @@ public final class MySql {
     /// DDL such as ALTER DATABASE, which [#runPrepared] sends here only once the
     /// server has refused to prepare it and only when it binds no parameter. It
     /// is private: a text-protocol entry point taking a caller's values is the
-    /// concatenation hole this client exists to avoid.
-    private void command(String sql) throws IOException {
+    /// concatenation hole this client exists to avoid. Returns the affected-row
+    /// count of an OK answer, and 0 for a result set.
+    private long command(String sql) throws IOException {
         checkOpen();
         sequence = 0;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -397,8 +398,13 @@ public final class MySql {
         if (head == ERROR_PACKET) {
             throw errorFrom(packet, sql);
         }
-        if (head == OK_PACKET || head == EOF_PACKET) {
-            return;
+        if (head == OK_PACKET) {
+            Reader reader = new Reader(packet.body);
+            reader.skip(1);
+            return reader.lengthEncoded();
+        }
+        if (head == EOF_PACKET) {
+            return 0;
         }
         // A result set. Nothing here wants the rows, but they have to be drained
         // or the next statement reads them as its own answer.
@@ -415,7 +421,7 @@ public final class MySql {
                 throw errorFrom(row, sql);
             }
             if (marker == EOF_PACKET && row.body.length < 9) {
-                return;
+                return 0;
             }
         }
     }
@@ -489,8 +495,9 @@ public final class MySql {
                 // PREPARE, so nothing ran, and with no parameters there is
                 // nothing to splice into the text: it goes as the caller wrote
                 // it, which is exactly what the prepared path would have sent.
-                command(sql);
-                return 0;
+                // The text answer's affected-row count is returned as the
+                // prepared one would be (LOAD DATA is on that list and writes).
+                return command(sql);
             }
             throw errorFrom(response, sql);
         }

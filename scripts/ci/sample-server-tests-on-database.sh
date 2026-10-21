@@ -50,14 +50,20 @@ reset_schema() {
           -c "DROP SCHEMA IF EXISTS public CASCADE" -c "CREATE SCHEMA public" >/dev/null
       ;;
     mysql://*)
-      # mysql takes no URL: mysql://user:password@host:port/db?options
-      local rest="${URL#mysql://}" auth host db
-      auth="${rest%%@*}"; rest="${rest#*@}"
-      host="${rest%%/*}"; db="${rest#*/}"; db="${db%%\?*}"
-      # The port is optional in the URL, as it is to the server: 3306 when absent.
-      local port=3306
-      case "$host" in *:*) port="${host##*:}" ;; esac
-      MYSQL_PWD="${auth#*:}" mysql --protocol=TCP -u "${auth%%:*}" -h "${host%%:*}" \
+      # mysql takes no URL: mysql://user:password@host:port/db?options. Parsed
+      # as the backend's Database.Url does -- bracketed IPv6 hosts, percent
+      # escapes decoded, 3306 when the port is absent -- so the reset empties
+      # the database the server then connects to.
+      local parts user password host port db
+      parts="$(python3 -c '
+import sys, urllib.parse as u
+p = u.urlsplit(sys.argv[1])
+print("\n".join([u.unquote(p.username or ""), u.unquote(p.password or ""),
+                  p.hostname or "localhost", str(p.port or 3306),
+                  u.unquote(p.path.lstrip("/"))]))' "$URL")"
+      { IFS= read -r user; IFS= read -r password; IFS= read -r host
+        IFS= read -r port; IFS= read -r db; } <<< "$parts"
+      MYSQL_PWD="$password" mysql --protocol=TCP -u "$user" -h "$host" \
           -P "$port" -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`"
       ;;
     *)

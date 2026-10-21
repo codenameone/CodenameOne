@@ -255,10 +255,7 @@ executable comments let one script in the `mysql` directory serve both:
 
 [source,sql]
 ----
-ALTER DATABASE CHARACTER SET utf8mb4
-    COLLATE /*!80000 utf8mb4_0900_bin */ /*M!100400 utf8mb4_nopad_bin */;
-ALTER TABLE account CONVERT TO CHARACTER SET utf8mb4
-    COLLATE /*!80000 utf8mb4_0900_bin */ /*M!100400 utf8mb4_nopad_bin */;
+include::../demos/backend/src/main/snippets/mysql-collation.sql[tag=backend-mysql-collation,indent=0]
 ----
 
 MySQL runs the first comment of each pair and skips the second, which only
