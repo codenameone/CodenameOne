@@ -166,10 +166,9 @@ public final class JsonCodec {
                 sb.append('\n').append(cur);
             }
             sb.append(']');
-        } else if (v instanceof Enum) {
-            // Not encodable in Dart either without toJson; name it in the error.
-            throw new JsonUnsupportedObjectError(v, "Converting object to an encodable object failed");
         } else {
+            // Enums (Java enums here) go this way too: toEncodable or a toJson can
+            // encode one, and only without either is it unsupported, as in Dart.
             Object converted;
             if (toEncodable instanceof Funcs.Func1) {
                 converted = ((Funcs.Func1<Object, Object>) toEncodable).call(v);

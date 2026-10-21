@@ -245,9 +245,22 @@ public class HttpClientRequest {
                 // The status reaches the app through the response, as in dart:io.
             }
 
+            /// Transport failures reach only this (NetworkManager never calls
+            /// postResponse after one), so they settle here, on the EDT. With
+            /// failSilently set they were only logged and the call stayed pending.
             @Override
             protected void handleException(Exception err) {
                 failure = err;
+                if (com.codename1.ui.Display.isInitialized() && !com.codename1.ui.Display.getInstance().isEdt()) {
+                    com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            finish();
+                        }
+                    });
+                } else {
+                    finish();
+                }
             }
 
             @Override
@@ -275,7 +288,7 @@ public class HttpClientRequest {
         req.setHttpMethod(method);
         boolean hasBody = payload.length > 0;
         req.setPost(hasBody);
-        req.setFailSilently(true);
+        // Not failSilently: it keeps transport errors away from handleException.
         req.setReadResponseForErrors(true);
         req.setFollowRedirects(followRedirects);
         req.setDuplicateSupported(true);

@@ -398,13 +398,33 @@ public class Dio {
                 // The status reaches validateStatus through the response, as in dio.
             }
 
+            private boolean settled;
+
+            /// A transport failure (DNS, TLS, a socket timeout) never reaches
+            /// postResponse -- NetworkManager calls only this -- so it settles the call
+            /// here, on the EDT like a response. With failSilently set, NetworkManager
+            /// would only log it and the call would stay pending forever.
             @Override
             protected void handleException(Exception err) {
                 failure = err;
+                if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            postResponse();
+                        }
+                    });
+                } else {
+                    postResponse();
+                }
             }
 
             @Override
             protected void postResponse() {
+                if (settled) {
+                    return;
+                }
+                settled = true;
                 if (token != null) {
                     token.detach(this);
                 }
@@ -440,7 +460,8 @@ public class Dio {
         req.setUrl(ro.url());
         req.setHttpMethod(ro.method);
         req.setPost(payload != null);
-        req.setFailSilently(true);
+        // Not failSilently: that makes NetworkManager swallow transport errors without
+        // calling handleException, which is where this request settles them.
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         if (ro.followRedirects != null) {

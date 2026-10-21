@@ -90,14 +90,34 @@ public final class AsyncStar {
             if (source == null) {
                 return;
             }
+            // yield* forwards the source's errors and keeps delegating until it is done,
+            // as Dart does; a plain (await for) iterator would end the generator at the
+            // first error. Cancelling the generator cancels the source and wakes a body
+            // waiting on it, so the finally below (and the body's own cleanup) runs.
             @SuppressWarnings("unchecked")
-            StreamIterator<T> it = new StreamIterator<T>((Stream<T>) source);
+            final StreamIterator<T> it = new StreamIterator<T>((Stream<T>) source, new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    if (!cancelled) {
+                        addError(e);
+                    }
+                }
+            });
+            onCancel(new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    it.cancel();
+                }
+            });
             try {
                 while (it.next()) {
                     yield$(it.current());
                 }
             } finally {
                 it.cancel();
+            }
+            if (cancelled) {
+                throw new Cancelled();
             }
         }
     }

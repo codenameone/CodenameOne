@@ -82,6 +82,41 @@ public class XFile {
         return mimeType;
     }
 
+    /// A path a platform API can open. A file made with fromData lives only in
+    /// memory (its path is usually empty), so its bytes are written to a file in the
+    /// app's cache directory first, named after the file, and that path is returned.
+    public String materializedPath() {
+        if (bytes == null || !com.codename1.ui.Display.isInitialized()) {
+            return path;
+        }
+        com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+        if (path.length() > 0 && fs.exists(path)) {
+            return path;
+        }
+        String dir = fs.getCachesDir();
+        if (dir == null || dir.length() == 0) {
+            dir = fs.getAppHomePath();
+        }
+        if (!dir.endsWith("/")) {
+            dir += "/";
+        }
+        String n = name();
+        if (n == null || n.length() == 0) {
+            n = "shared-" + System.currentTimeMillis();
+        }
+        String target = dir + n.replace('/', '_').replace('\\', '_');
+        java.io.OutputStream out = null;
+        try {
+            out = fs.openOutputStream(target);
+            out.write(bytes.toBytes());
+        } catch (java.io.IOException e) {
+            return path;
+        } finally {
+            com.codename1.io.Util.cleanup(out);
+        }
+        return target;
+    }
+
     public Future<Uint8List> readAsBytes() {
         return bytes != null ? Future.value(bytes) : new File(path).readAsBytes();
     }

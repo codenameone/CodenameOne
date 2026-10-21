@@ -68,7 +68,7 @@ public class ShareParams {
         }
         for (Object f : files) {
             if (f instanceof XFile) {
-                return ((XFile) f).path();
+                return ((XFile) f).materializedPath();
             }
         }
         return null;

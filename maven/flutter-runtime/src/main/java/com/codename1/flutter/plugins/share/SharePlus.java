@@ -107,7 +107,7 @@ public class SharePlus {
         if (files instanceof List) {
             for (Object f : (List<?>) files) {
                 if (f instanceof XFile) {
-                    path = ((XFile) f).path();
+                    path = ((XFile) f).materializedPath();
                     break;
                 }
             }
