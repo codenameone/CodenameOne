@@ -302,13 +302,9 @@ public final class UtilClassesChecks {
             });
             Bulk.expect("UnsupportedOperationException".equals(Bulk.thrown(UnsupportedOperationException.class,
                     () -> JdkHost.get().randomBytes(new byte[1]))), "no secure source");
-            Set<String> seen = new HashSet<String>();
-            for (int i = 0; i < 200; i++) {
-                UUID u = UUID.randomUUID();
-                Bulk.expect(u.version() == 4, "version 4");
-                Bulk.expect(u.variant() == 2, "variant 2");
-                Bulk.expect(seen.add(u.toString()), "distinct");
-            }
+            // No clock-seeded fallback: a guessable identifier is worse than none.
+            Bulk.expect("UnsupportedOperationException".equals(Bulk.thrown(UnsupportedOperationException.class,
+                    () -> UUID.randomUUID())), "randomUUID refuses");
         });
         Bulk.check("UtilClasses.aNameUuidIsTheJdks", () -> {
             // On ParparVM the MD5 is BulkHost's, the core's own Hash.

@@ -46,9 +46,15 @@ import java.util.stream.StreamSupport;
 /// - Character classes with ranges, negation, nested unions and `&&`
 ///   intersections; `\d \D \w \W \s \S \h \H \v \V`; `\R`.
 /// - The POSIX classes (`\p{Alpha}`, `\p{Punct}`, ...), the `java...`
-///   classes, and the Unicode properties a device can answer: `L`, `Lu`,
-///   `Ll`, `N`/`Nd`, `IsAlphabetic`, `IsLetter`, `IsDigit`, `IsUppercase`,
-///   `IsLowercase`, `IsWhite_Space`.
+///   classes, and the Unicode properties `L`, `Lu`, `Ll`, `N`/`Nd`,
+///   `IsAlphabetic`, `IsLetter`, `IsDigit`, `IsUppercase`, `IsLowercase`,
+///   `IsWhite_Space`.
+/// - Unicode scripts (`\p{IsGreek}`, `\p{script=Latn}`), blocks
+///   (`\p{InGreek}`, `\p{block=Arrows}`) and general categories (`\p{Sc}`,
+///   `\p{IsPd}`, `\p{gc=Mn}`), from the Unicode 15.0 tables of
+///   [UnicodeTables].
+/// - `UNICODE_CHARACTER_CLASS` (`(?U)`): `\d \w \s \b` and the POSIX
+///   classes take their Unicode definitions, as on the JDK.
 /// - Greedy, reluctant and possessive quantifiers.
 /// - Capturing, non-capturing and named groups, back references by number
 ///   and by name, alternation, atomic groups.
@@ -64,18 +70,17 @@ import java.util.stream.StreamSupport;
 /// `UnsupportedOperationException`) naming the construct, when the pattern
 /// is compiled. Nothing is accepted and then matched differently.
 ///
-/// - Unicode scripts, blocks and general categories other than the ones
-///   above (`\p{IsGreek}`, `\p{InArrows}`, `\p{Sc}`, ...).
+/// - Binary properties other than the ones above (`\p{IsEmoji}`, ...).
 /// - `\X`, `\N{name}`, `\b{g}`.
-/// - `CANON_EQ` and `UNICODE_CHARACTER_CLASS` (`(?U)`).
-/// - A code point above U+FFFF inside a character class.
+/// - `CANON_EQ`.
 ///
 /// #### Differences
 ///
-/// Text is matched one UTF-16 `char` at a time: `.` and a character class
-/// take half of a surrogate pair. Which characters are letters is what
-/// `isLetter` in this class answers, the scripts a device font is likely
-/// to have rather than all of Unicode. A group repeated many thousand times
+/// Text is matched one code point at a time, as on the JDK: `.` and a
+/// character class take a whole surrogate pair. Outside
+/// `UNICODE_CHARACTER_CLASS`, which characters `\p{L}` and its kin call
+/// letters is what `isLetter` in this class answers, the scripts a device
+/// font is likely to have rather than all of Unicode. A group repeated many thousand times
 /// over a long text recurses once for each repetition, as the JDK's does,
 /// on a stack that is smaller on a device.
 public final class Pattern {
@@ -111,10 +116,6 @@ public final class Pattern {
         }
         if ((flags & CANON_EQ) != 0) {
             throw new UnsupportedOperationException("Pattern.CANON_EQ is not supported by the Codename One runtime");
-        }
-        if ((flags & UNICODE_CHARACTER_CLASS) != 0) {
-            throw new UnsupportedOperationException(
-                    "Pattern.UNICODE_CHARACTER_CLASS is not supported by the Codename One runtime");
         }
         this.regex = regex;
         Parser parser = new Parser(regex, flags);
@@ -330,14 +331,58 @@ public final class Pattern {
     // Characters
     // ------------------------------------------------------------------
 
-    static boolean lineTerminator(char c, boolean unix) {
+    /// The code point at `i`: a surrogate pair when both halves lie before
+    /// `to`, otherwise the single char.
+    static int codePointAt(CharSequence text, int i, int to) {
+        char c = text.charAt(i);
+        if (c >= 0xd800 && c <= 0xdbff && i + 1 < to) {
+            char d = text.charAt(i + 1);
+            if (d >= 0xdc00 && d <= 0xdfff) {
+                return ((c - 0xd800) << 10) + (d - 0xdc00) + 0x10000;
+            }
+        }
+        return c;
+    }
+
+    /// The code point that ends just before `i`, no further back than `from`.
+    static int codePointBefore(CharSequence text, int i, int from) {
+        char d = text.charAt(i - 1);
+        if (d >= 0xdc00 && d <= 0xdfff && i - 2 >= from) {
+            char c = text.charAt(i - 2);
+            if (c >= 0xd800 && c <= 0xdbff) {
+                return ((c - 0xd800) << 10) + (d - 0xdc00) + 0x10000;
+            }
+        }
+        return d;
+    }
+
+    /// A word character under `UNICODE_CHARACTER_CLASS`, as the JDK defines
+    /// it: alphabetic, a mark, a decimal digit, a connector, or a joiner.
+    static boolean unicodeWordChar(int c) {
+        if (UnicodeTables.alphabetic(c)) {
+            return true;
+        }
+        int type = UnicodeTables.category(c);
+        return type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK
+                || type == Character.COMBINING_SPACING_MARK || type == Character.DECIMAL_DIGIT_NUMBER
+                || type == Character.CONNECTOR_PUNCTUATION || c == 0x200c || c == 0x200d;
+    }
+
+    /// `White_Space` under `UNICODE_CHARACTER_CLASS`.
+    static boolean unicodeWhiteSpace(int c) {
+        int type = UnicodeTables.category(c);
+        return type == Character.SPACE_SEPARATOR || type == Character.LINE_SEPARATOR
+                || type == Character.PARAGRAPH_SEPARATOR || c >= 0x9 && c <= 0xd || c == 0x85;
+    }
+
+    static boolean lineTerminator(int c, boolean unix) {
         if (c == '\n') {
             return true;
         }
         return !unix && (c == '\r' || c == 0x85 || c == 0x2028 || c == 0x2029);
     }
 
-    static boolean asciiLetter(char c) {
+    static boolean asciiLetter(int c) {
         return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
     }
 
@@ -346,18 +391,21 @@ public final class Pattern {
     /// (JDK-8264160); before, it took any Unicode letter or digit, so `\b`
     /// fell inside a word `\w+` could not match. The Unicode reading comes
     /// only with `UNICODE_CHARACTER_CLASS`, which this runtime refuses.
-    static boolean wordChar(char c) {
+    static boolean wordChar(int c) {
         return c == '_' || asciiLetter(c) || c >= '0' && c <= '9';
     }
 
-    static boolean isLetterOrDigit(char c) {
+    static boolean isLetterOrDigit(int c) {
         return isLetter(c) || Character.isDigit(c);
     }
 
     /// Whether `c` is a letter: the scripts a device font is likely to
     /// have rather than all of Unicode. Written out here because
     /// `Character.isLetter` is not available on every device runtime.
-    static boolean isLetter(char c) {
+    static boolean isLetter(int c) {
+        if (c > 0xffff) {
+            return Character.isLetter(c);
+        }
         if (c < 0x80) {
             return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
         }
@@ -381,7 +429,7 @@ public final class Pattern {
 
     /// Whether `a` and `b` are the same character when case is ignored:
     /// for ASCII letters only, or by the device's case tables.
-    static boolean sameIgnoringCase(char a, char b, boolean unicode) {
+    static boolean sameIgnoringCase(int a, int b, boolean unicode) {
         if (a == b) {
             return true;
         }
@@ -391,8 +439,8 @@ public final class Pattern {
         if (!unicode) {
             return false;
         }
-        char ua = Character.toUpperCase(a);
-        char ub = Character.toUpperCase(b);
+        int ua = Character.toUpperCase(a);
+        int ub = Character.toUpperCase(b);
         return ua == ub || Character.toLowerCase(ua) == Character.toLowerCase(ub);
     }
 
@@ -438,40 +486,65 @@ public final class Pattern {
         }
     }
 
-    /// A node that takes exactly one character.
+    /// A node that takes exactly one code point: one char, or both halves of
+    /// a surrogate pair.
     abstract static class Single extends Node {
-        abstract boolean is(char c);
+        abstract boolean is(int c);
+
+        /// The fewest and most chars this can take: 1 and 2 unless it names
+        /// one code point.
+        int minChars() {
+            return 1;
+        }
+
+        int maxChars() {
+            return 2;
+        }
 
         @Override
         boolean match(Matcher m, int i) {
-            return i < m.to && is(m.text.charAt(i)) && next.match(m, i + 1);
+            if (i >= m.to) {
+                return false;
+            }
+            int c = codePointAt(m.text, i, m.to);
+            return is(c) && next.match(m, i + (c > 0xffff ? 2 : 1));
         }
     }
 
     static final class Char extends Single {
-        final char c;
+        final int c;
 
-        Char(char c) {
+        Char(int c) {
             this.c = c;
         }
 
         @Override
-        boolean is(char ch) {
+        int minChars() {
+            return c > 0xffff ? 2 : 1;
+        }
+
+        @Override
+        int maxChars() {
+            return minChars();
+        }
+
+        @Override
+        boolean is(int ch) {
             return ch == c;
         }
     }
 
     static final class CharIgnoringCase extends Single {
-        final char c;
+        final int c;
         final boolean unicode;
 
-        CharIgnoringCase(char c, boolean unicode) {
+        CharIgnoringCase(int c, boolean unicode) {
             this.c = c;
             this.unicode = unicode;
         }
 
         @Override
-        boolean is(char ch) {
+        boolean is(int ch) {
             return sameIgnoringCase(ch, c, unicode);
         }
     }
@@ -486,7 +559,7 @@ public final class Pattern {
         }
 
         @Override
-        boolean is(char c) {
+        boolean is(int c) {
             return all || !lineTerminator(c, unix);
         }
     }
@@ -499,7 +572,7 @@ public final class Pattern {
         }
 
         @Override
-        boolean is(char c) {
+        boolean is(int c) {
             return set.has(c);
         }
     }
@@ -514,8 +587,22 @@ public final class Pattern {
         static final int WHITESPACE = 16;
         static final int LETTER_OR_DIGIT = 32;
         static final int TITLE = 64;
+        // UNICODE_CHARACTER_CLASS, all answered from UnicodeTables.
+        static final int U_ALPHABETIC = 128;
+        static final int U_LOWER = 256;
+        static final int U_UPPER = 512;
+        static final int U_WORD = 1024;
+        static final int U_WHITE_SPACE = 2048;
+        static final int U_HEX_DIGIT = 4096;
+        static final int U_GRAPH = 8192;
+        static final int U_PRINT = 16384;
+        static final int U_BLANK = 32768;
 
-        private char[] ranges = new char[8];
+        private int[] ranges = new int[8];
+        /// General categories, one bit for each `Character.getType` value.
+        int categories;
+        /// A script index into [UnicodeTables], or -1.
+        int script = -1;
         private int count;
         private int kinds;
         private final List<CharSet> united = new ArrayList<CharSet>();
@@ -530,12 +617,12 @@ public final class Pattern {
 
         CharSet add(int lo, int hi) {
             if (count + 2 > ranges.length) {
-                char[] grown = new char[ranges.length * 2];
+                int[] grown = new int[ranges.length * 2];
                 System.arraycopy(ranges, 0, grown, 0, count);
                 ranges = grown;
             }
-            ranges[count++] = (char) lo;
-            ranges[count++] = (char) hi;
+            ranges[count++] = lo;
+            ranges[count++] = hi;
             return this;
         }
 
@@ -561,10 +648,10 @@ public final class Pattern {
         }
 
         boolean isEmpty() {
-            return count == 0 && kinds == 0 && united.isEmpty();
+            return count == 0 && kinds == 0 && categories == 0 && script < 0 && united.isEmpty();
         }
 
-        private boolean inRanges(char c) {
+        private boolean inRanges(int c) {
             for (int k = 0; k < count; k += 2) {
                 if (c >= ranges[k] && c <= ranges[k + 1]) {
                     return true;
@@ -573,9 +660,18 @@ public final class Pattern {
             return false;
         }
 
-        private boolean inKinds(char c) {
+        private boolean inKinds(int c) {
+            if (categories != 0 && (categories & (1 << UnicodeTables.category(c))) != 0) {
+                return true;
+            }
+            if (script >= 0 && UnicodeTables.scriptOf(c) == script) {
+                return true;
+            }
             if (kinds == 0) {
                 return false;
+            }
+            if (kinds >= U_ALPHABETIC && inUnicodeKinds(c)) {
+                return true;
             }
             return (kinds & LETTER) != 0 && isLetter(c)
                     || (kinds & UPPER) != 0 && Character.isUpperCase(c)
@@ -586,7 +682,29 @@ public final class Pattern {
                     || (kinds & TITLE) != 0 && Character.isTitleCase(c);
         }
 
-        boolean has(char c) {
+        /// The `UNICODE_CHARACTER_CLASS` predicates, as the JDK's
+        /// `CharPredicates` define them.
+        private boolean inUnicodeKinds(int c) {
+            int type = UnicodeTables.category(c);
+            boolean digit = type == Character.DECIMAL_DIGIT_NUMBER;
+            boolean graph = type != Character.SPACE_SEPARATOR && type != Character.LINE_SEPARATOR
+                    && type != Character.PARAGRAPH_SEPARATOR && type != Character.CONTROL
+                    && type != Character.SURROGATE && type != Character.UNASSIGNED;
+            boolean blank = type == Character.SPACE_SEPARATOR || c == '\t';
+            return (kinds & U_ALPHABETIC) != 0 && UnicodeTables.alphabetic(c)
+                    || (kinds & U_LOWER) != 0 && UnicodeTables.lowercase(c)
+                    || (kinds & U_UPPER) != 0 && UnicodeTables.uppercase(c)
+                    || (kinds & U_WORD) != 0 && unicodeWordChar(c)
+                    || (kinds & U_WHITE_SPACE) != 0 && unicodeWhiteSpace(c)
+                    || (kinds & U_HEX_DIGIT) != 0 && (digit || c >= '0' && c <= '9' || c >= 'a' && c <= 'f'
+                            || c >= 'A' && c <= 'F' || c >= 0xff10 && c <= 0xff19 || c >= 0xff21 && c <= 0xff26
+                            || c >= 0xff41 && c <= 0xff46)
+                    || (kinds & U_GRAPH) != 0 && graph
+                    || (kinds & U_PRINT) != 0 && (graph || blank) && type != Character.CONTROL
+                    || (kinds & U_BLANK) != 0 && blank;
+        }
+
+        boolean has(int c) {
             boolean in = inRanges(c) || inKinds(c);
             if (!in && ignoreCase != 0 && count > 0) {
                 if (c < 0x80) {
@@ -628,25 +746,31 @@ public final class Pattern {
             int j = i;
             if (mode == Parser.RELUCTANT) {
                 while (n < min) {
-                    if (j >= to || !atom.is(text.charAt(j))) {
+                    int c;
+                    if (j >= to || !atom.is(c = codePointAt(text, j, to))) {
                         return false;
                     }
-                    j++;
+                    j += c > 0xffff ? 2 : 1;
                     n++;
                 }
                 while (true) {
                     if (next.match(m, j)) {
                         return true;
                     }
-                    if (n >= max || j >= to || !atom.is(text.charAt(j))) {
+                    int c;
+                    if (n >= max || j >= to || !atom.is(c = codePointAt(text, j, to))) {
                         return false;
                     }
-                    j++;
+                    j += c > 0xffff ? 2 : 1;
                     n++;
                 }
             }
-            while (n < max && j < to && atom.is(text.charAt(j))) {
-                j++;
+            while (n < max && j < to) {
+                int c = codePointAt(text, j, to);
+                if (!atom.is(c)) {
+                    break;
+                }
+                j += c > 0xffff ? 2 : 1;
                 n++;
             }
             if (n < min) {
@@ -663,7 +787,9 @@ public final class Pattern {
                     return false;
                 }
                 n--;
-                j--;
+                // Back over one code point. Going forward from i paired every
+                // pair it met, so a pair ending here was taken whole.
+                j -= codePointBefore(text, j, i) > 0xffff ? 2 : 1;
             }
         }
     }
@@ -844,10 +970,16 @@ public final class Pattern {
 
         final int kind;
         final boolean unix;
+        /// `\b` and `\B` under `UNICODE_CHARACTER_CLASS`: Unicode words.
+        boolean unicode;
 
         Anchor(int kind, boolean unix) {
             this.kind = kind;
             this.unix = unix;
+        }
+
+        private boolean word(int c) {
+            return unicode ? unicodeWordChar(c) : wordChar(c);
         }
 
         private boolean lineEnd(Matcher m, int i, boolean multiline) {
@@ -921,8 +1053,8 @@ public final class Pattern {
                     here = i == m.oldLast;
                     break;
                 default:
-                    boolean left = i > m.from && wordChar(m.text.charAt(i - 1));
-                    boolean right = i < m.to && wordChar(m.text.charAt(i));
+                    boolean left = i > m.from && word(codePointBefore(m.text, i, m.from));
+                    boolean right = i < m.to && word(codePointAt(m.text, i, m.to));
                     here = (left != right) == (kind == WORD);
                     break;
             }
@@ -1096,7 +1228,16 @@ public final class Pattern {
         }
 
         private boolean has(int flag) {
+            // UNICODE_CHARACTER_CLASS implies UNICODE_CASE, as on the JDK.
+            if (flag == UNICODE_CASE && (flags & UNICODE_CHARACTER_CLASS) != 0) {
+                return true;
+            }
             return (flags & flag) != 0;
+        }
+
+        /// A piece for one code point, as wide in chars as it can be.
+        private static Piece single(Single s) {
+            return new Piece(s, s, s.minChars(), s.maxChars());
         }
 
         /// The flags in force after the whole pattern, which a group's own
@@ -1124,23 +1265,22 @@ public final class Pattern {
         }
 
         private Piece literal(int c) {
-            if (c > 0xffff) {
-                // Two chars in the text, so two nodes here.
-                int v = c - 0x10000;
-                Piece pair = Piece.of(new Char((char) (0xd800 + (v >> 10))), 1);
-                pair.then(Piece.of(new Char((char) (0xdc00 + (v & 0x3ff))), 1));
-                return pair;
-            }
-            char ch = (char) c;
             if (has(CASE_INSENSITIVE)) {
                 boolean unicode = has(UNICODE_CASE);
-                boolean cased = ch < 0x80 ? asciiLetter(ch)
-                        : unicode && (Character.toUpperCase(ch) != ch || Character.toLowerCase(ch) != ch);
+                boolean cased = c < 0x80 ? asciiLetter(c)
+                        : unicode && (Character.toUpperCase(c) != c || Character.toLowerCase(c) != c);
                 if (cased) {
-                    return Piece.of(new CharIgnoringCase(ch, unicode), 1);
+                    return single(new CharIgnoringCase(c, unicode));
                 }
             }
-            return Piece.of(new Char(ch), 1);
+            return single(new Char(c));
+        }
+
+        /// The code point at `at` in the pattern, consuming it.
+        private int patternCodePoint() {
+            int c = codePointAt(p, at, p.length());
+            at += c > 0xffff ? 2 : 1;
+            return c;
         }
 
         private CharSet newSet() {
@@ -1193,7 +1333,7 @@ public final class Pattern {
                 }
             }
             if (mergeable) {
-                return Piece.of(new InClass(merged), 1);
+                return single(new InClass(merged));
             }
             Node[] heads = new Node[all.size()];
             Pass join = new Pass();
@@ -1257,10 +1397,10 @@ public final class Pattern {
                     return group();
                 case '[':
                     at++;
-                    return Piece.of(new InClass(characterClass()), 1);
+                    return single(new InClass(characterClass()));
                 case '.':
                     at++;
-                    return Piece.of(new Any(has(DOTALL), has(UNIX_LINES)), 1);
+                    return single(new Any(has(DOTALL), has(UNIX_LINES)));
                 case '^':
                     at++;
                     return Piece.of(new Anchor(has(MULTILINE) ? Anchor.LINE_START : Anchor.BEGIN, has(UNIX_LINES)), 0);
@@ -1278,16 +1418,9 @@ public final class Pattern {
                 case '{':
                     throw error("Illegal repetition");
                 default:
-                    at++;
-                    if (c >= 0xd800 && c <= 0xdbff && at < p.length() && p.charAt(at) >= 0xdc00
-                            && p.charAt(at) <= 0xdfff) {
-                        // A code point written out is one atom, so a
-                        // quantifier after it repeats both halves.
-                        Piece pair = Piece.of(new Char(c), 1);
-                        pair.then(Piece.of(new Char(p.charAt(at++)), 1));
-                        return pair;
-                    }
-                    return literal(c);
+                    // A code point written out is one atom, so a quantifier
+                    // after it repeats both halves.
+                    return literal(patternCodePoint());
             }
         }
 
@@ -1538,7 +1671,8 @@ public final class Pattern {
                     case 'c':
                         throw unsupported("The inline flag (?c), canonical equivalence,");
                     case 'U':
-                        throw unsupported("The inline flag (?U), Unicode character classes,");
+                        flag = UNICODE_CHARACTER_CLASS;
+                        break;
                     case '-':
                         if (!on) {
                             return;
@@ -1644,6 +1778,24 @@ public final class Pattern {
 
         /// The class an escape names, or null.
         private CharSet escapedClass(char e) {
+            if (has(UNICODE_CHARACTER_CLASS)) {
+                switch (e) {
+                    case 'd':
+                        return categories(1 << Character.DECIMAL_DIGIT_NUMBER);
+                    case 'D':
+                        return categories(1 << Character.DECIMAL_DIGIT_NUMBER).not();
+                    case 'w':
+                        return new CharSet(0).kind(CharSet.U_WORD);
+                    case 'W':
+                        return new CharSet(0).kind(CharSet.U_WORD).not();
+                    case 's':
+                        return new CharSet(0).kind(CharSet.U_WHITE_SPACE);
+                    case 'S':
+                        return new CharSet(0).kind(CharSet.U_WHITE_SPACE).not();
+                    default:
+                        break;
+                }
+            }
             switch (e) {
                 case 'd':
                     return new CharSet(0).add('0', '9');
@@ -1707,6 +1859,10 @@ public final class Pattern {
             // they have on the JDK since 16 (JDK-8214245): the ASCII ones become
             // the ASCII letters, the Unicode ones any cased letter.
             boolean anyCase = has(CASE_INSENSITIVE);
+            CharSet unicode = unicodeProperty(name, anyCase);
+            if (unicode != null) {
+                return unicode;
+            }
             if ("Lower".equals(name)) {
                 return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('a', 'z');
             }
@@ -1768,7 +1924,143 @@ public final class Pattern {
                     || "IsNd".equals(name) || "IsDigit".equals(name)) {
                 return s.kind(CharSet.DIGIT);
             }
+            CharSet table = tableProperty(name);
+            if (table != null) {
+                return table;
+            }
             throw unsupported("The character property {" + name + "}");
+        }
+
+        private static CharSet categories(int mask) {
+            CharSet s = new CharSet(0);
+            s.categories = mask;
+            return s;
+        }
+
+        /// The POSIX classes under `UNICODE_CHARACTER_CLASS`, or null.
+        private CharSet unicodeProperty(String name, boolean anyCase) {
+            if (!has(UNICODE_CHARACTER_CLASS)) {
+                return null;
+            }
+            CharSet s = new CharSet(0);
+            if ("Lower".equals(name)) {
+                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(1 << Character.TITLECASE_LETTER))
+                        : s.kind(CharSet.U_LOWER);
+            }
+            if ("Upper".equals(name)) {
+                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(1 << Character.TITLECASE_LETTER))
+                        : s.kind(CharSet.U_UPPER);
+            }
+            if ("Alpha".equals(name)) {
+                return s.kind(CharSet.U_ALPHABETIC);
+            }
+            if ("Digit".equals(name)) {
+                return categories(1 << Character.DECIMAL_DIGIT_NUMBER);
+            }
+            if ("Alnum".equals(name)) {
+                return s.kind(CharSet.U_ALPHABETIC).unite(categories(1 << Character.DECIMAL_DIGIT_NUMBER));
+            }
+            if ("Punct".equals(name)) {
+                return categories(PUNCTUATION);
+            }
+            if ("Graph".equals(name)) {
+                return s.kind(CharSet.U_GRAPH);
+            }
+            if ("Print".equals(name)) {
+                return s.kind(CharSet.U_PRINT);
+            }
+            if ("Blank".equals(name)) {
+                return s.kind(CharSet.U_BLANK);
+            }
+            if ("Cntrl".equals(name)) {
+                return categories(1 << Character.CONTROL);
+            }
+            if ("XDigit".equals(name)) {
+                return s.kind(CharSet.U_HEX_DIGIT);
+            }
+            if ("Space".equals(name)) {
+                return s.kind(CharSet.U_WHITE_SPACE);
+            }
+            return null;
+        }
+
+        private static final int PUNCTUATION = 1 << Character.CONNECTOR_PUNCTUATION | 1 << Character.DASH_PUNCTUATION
+                | 1 << Character.START_PUNCTUATION | 1 << Character.END_PUNCTUATION
+                | 1 << Character.OTHER_PUNCTUATION | 1 << Character.INITIAL_QUOTE_PUNCTUATION
+                | 1 << Character.FINAL_QUOTE_PUNCTUATION;
+
+        /// The general category masks, by the names the JDK accepts.
+        private static int category(String name) {
+            String[] single = {"Cn", "Lu", "Ll", "Lt", "Lm", "Lo", "Mn", "Me", "Mc", "Nd", "Nl", "No", "Zs", "Zl",
+                "Zp", "Cc", "Cf", null, "Co", "Cs", "Pd", "Ps", "Pe", "Pc", "Po", "Sm", "Sc", "Sk", "So", "Pi", "Pf"};
+            for (int k = 0; k < single.length; k++) {
+                if (name.equals(single[k])) {
+                    return 1 << k;
+                }
+            }
+            if (name.length() == 1) {
+                int mask = 0;
+                for (int k = 0; k < single.length; k++) {
+                    if (single[k] != null && single[k].charAt(0) == name.charAt(0)) {
+                        mask |= 1 << k;
+                    }
+                }
+                return mask;
+            }
+            if ("LC".equals(name)) {
+                return 1 << Character.UPPERCASE_LETTER | 1 << Character.LOWERCASE_LETTER
+                        | 1 << Character.TITLECASE_LETTER;
+            }
+            return 0;
+        }
+
+        /// Scripts, blocks and general categories, from [UnicodeTables];
+        /// null for a name that is none of them.
+        private static CharSet tableProperty(String name) {
+            int eq = name.indexOf('=');
+            if (eq >= 0) {
+                String key = name.substring(0, eq);
+                String value = name.substring(eq + 1);
+                if ("script".equals(key) || "sc".equals(key)) {
+                    return script(value);
+                }
+                if ("block".equals(key) || "blk".equals(key)) {
+                    return block(value);
+                }
+                if ("general_category".equals(key) || "gc".equals(key)) {
+                    int mask = category(value);
+                    return mask == 0 ? null : categories(mask);
+                }
+                return null;
+            }
+            if (name.startsWith("In")) {
+                return block(name.substring(2));
+            }
+            if (name.startsWith("Is")) {
+                String rest = name.substring(2);
+                int mask = category(rest);
+                if (mask != 0) {
+                    return categories(mask);
+                }
+                return script(rest);
+            }
+            int mask = category(name);
+            return mask == 0 ? null : categories(mask);
+        }
+
+        private static CharSet script(String name) {
+            int index = UnicodeTables.script(name);
+            if (index < 0) {
+                return null;
+            }
+            CharSet s = new CharSet(0);
+            s.script = index;
+            return s;
+        }
+
+        private static CharSet block(String name) {
+            int[] range = UnicodeTables.block(name);
+            return range == null ? null : new CharSet(0).add(range[0], range[1]);
         }
 
         private Piece escape() {
@@ -1786,15 +2078,21 @@ public final class Pattern {
                     return Piece.of(new Anchor(Anchor.END_OR_FINAL_TERMINATOR, unix), 0);
                 case 'G':
                     return Piece.of(new Anchor(Anchor.LAST_MATCH, unix), 0);
-                case 'b':
+                case 'b': {
                     // Only \b{g} is a grapheme boundary; \b{2} is a word
                     // boundary under a counted quantifier, as in the JDK.
                     if (at + 1 < p.length() && p.charAt(at) == '{' && p.charAt(at + 1) == 'g') {
                         throw unsupported("The boundary \\b{g}");
                     }
-                    return Piece.of(new Anchor(Anchor.WORD, unix), 0);
-                case 'B':
-                    return Piece.of(new Anchor(Anchor.NOT_WORD, unix), 0);
+                    Anchor word = new Anchor(Anchor.WORD, unix);
+                    word.unicode = has(UNICODE_CHARACTER_CLASS);
+                    return Piece.of(word, 0);
+                }
+                case 'B': {
+                    Anchor word = new Anchor(Anchor.NOT_WORD, unix);
+                    word.unicode = has(UNICODE_CHARACTER_CLASS);
+                    return Piece.of(word, 0);
+                }
                 case 'X':
                     throw unsupported("The grapheme cluster \\X");
                 case 'N':
@@ -1806,7 +2104,7 @@ public final class Pattern {
                     // "\r\n").
                     Piece crlf = Piece.of(new Char('\r'), 1);
                     crlf.then(Piece.of(new Char('\n'), 1));
-                    Piece one = Piece.of(new InClass(vertical()), 1);
+                    Piece one = single(new InClass(vertical()));
                     Pass join = new Pass();
                     crlf.last.next = join;
                     one.last.next = join;
@@ -1844,7 +2142,7 @@ public final class Pattern {
             }
             CharSet set = escapedClass(e);
             if (set != null) {
-                return Piece.of(new InClass(set), 1);
+                return single(new InClass(set));
             }
             int c = escapedChar(e);
             if (c >= 0) {
@@ -1941,14 +2239,13 @@ public final class Pattern {
                         lo = e;
                     }
                 } else {
-                    at++;
-                    lo = c;
+                    lo = patternCodePoint();
                 }
                 int hi = lo;
                 if (at + 1 < p.length() && p.charAt(at) == '-' && p.charAt(at + 1) != ']'
                         && p.charAt(at + 1) != '[') {
                     at++;
-                    char h = p.charAt(at++);
+                    int h = patternCodePoint();
                     if (h == '\\') {
                         if (at >= p.length()) {
                             throw error("Unclosed character class");
@@ -1968,9 +2265,6 @@ public final class Pattern {
                     if (hi < lo) {
                         throw error("Illegal character range");
                     }
-                }
-                if (hi > 0xffff) {
-                    throw unsupported("A character above U+FFFF in a character class");
                 }
                 set.add(lo, hi);
             }

@@ -28,10 +28,10 @@ import com.codename1.impl.JdkHost;
 /// generation and name based (version 3) generation.
 ///
 /// [#randomUUID()] draws its bits from the platform's secure random source
-/// through `JdkHost`. Where the platform installed none it falls back to a
-/// `Random` seeded from the clock, which keeps identifiers unique for every
-/// practical purpose but NOT unpredictable; an application that uses one as
-/// a secret should check that its platform provides secure random bytes.
+/// through `JdkHost`, and throws `UnsupportedOperationException` where the
+/// platform installed none, as `SecureRandom` does: an identifier is often
+/// used as a secret (a session or reset token), and one from a clock-seeded
+/// generator would be guessable without anything saying so.
 ///
 /// [#nameUUIDFromBytes(byte\[\])] needs an MD5 digest from the platform and
 /// throws `UnsupportedOperationException` where there is none. The time based
@@ -41,10 +41,6 @@ public final class UUID implements Comparable<UUID>, java.io.Serializable {
     private static final long serialVersionUID = -4856846361193249489L;
 
     private static final String HEX = "0123456789abcdef";
-
-    /// Made the first time the host has no secure source; see the class
-    /// description.
-    private static Random fallback;
 
     private final long mostSigBits;
     private final long leastSigBits;
@@ -59,25 +55,12 @@ public final class UUID implements Comparable<UUID>, java.io.Serializable {
     /// randomness comes from.
     public static UUID randomUUID() {
         byte[] bits = new byte[16];
-        try {
-            JdkHost.get().randomBytes(bits);
-        } catch (UnsupportedOperationException noSecureSource) {
-            insecureBytes(bits);
-        }
+        JdkHost.get().randomBytes(bits);
         // Version 4 in the high nibble of the seventh byte, the IETF variant
         // in the top two bits of the ninth.
         bits[6] = (byte) ((bits[6] & 0x0f) | 0x40);
         bits[8] = (byte) ((bits[8] & 0x3f) | 0x80);
         return fromBytes(bits);
-    }
-
-    private static synchronized void insecureBytes(byte[] out) {
-        if (fallback == null) {
-            fallback = new Random(System.currentTimeMillis() ^ (System.nanoTime() << 21));
-        }
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) fallback.nextInt(256);
-        }
     }
 
     /// The version 3 identifier of `name`: its MD5 digest, with the version

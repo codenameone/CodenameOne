@@ -160,7 +160,10 @@ public class ChoiceFormat extends NumberFormat {
             // that is closer to a whole number is the one that was written.
             double limit = choiceLimits[i];
             double less = previousDouble(limit);
-            if (distanceToInteger(limit) < distanceToInteger(less)) {
+            // An infinite limit has no distance (the JDK compares two NaNs,
+            // which is false) and is written "<"; say so rather than lean on
+            // how a VM compares NaN.
+            if (!Double.isInfinite(limit) && distanceToInteger(limit) < distanceToInteger(less)) {
                 appendLimit(result, limit);
                 result.append('#');
             } else {
