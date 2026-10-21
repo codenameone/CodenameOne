@@ -35,14 +35,14 @@ log() { echo "[skirmish-server] $*" >&2; }
 
 build_jvm() {
   log "building the server for the JVM"
-  "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl shared,backend \
+  "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl rules,shared,backend \
       -Dmaven.test.skip=true package dependency:copy-dependencies \
       -DincludeScope=runtime -DoutputDirectory="$APP/backend/target/server-lib" >&2
 }
 
 build_native() {
   log "translating the server to a native binary"
-  "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl shared,backend \
+  "$MVN" -B -q -f "$APP/pom.xml" -Dcodename1.platform=backend -pl rules,shared,backend \
       -Dmaven.test.skip=true package cn1:backend-package \
       -Dcn1.backend.output="$APP/backend/target/skirmish-server" >&2
 }

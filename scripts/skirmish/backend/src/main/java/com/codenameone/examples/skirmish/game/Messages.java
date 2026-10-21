@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.game;
 import com.codename1.backend.Json;
 import com.codenameone.examples.skirmish.api.GameProtocol;
 import com.codenameone.examples.skirmish.rules.Command;
+import com.codenameone.examples.skirmish.rules.Match;
 import java.util.List;
 
 /// Builds the game socket's outgoing JSON. Strings go through [Json#write], so a
@@ -60,7 +61,7 @@ final class Messages {
     }
 
     static String hash(int tick, long hash) {
-        return "{\"type\":\"" + GameProtocol.HASH + "\",\"t\":" + tick + ",\"h\":\"" + Long.toHexString(hash) + "\"}";
+        return "{\"type\":\"" + GameProtocol.HASH + "\",\"t\":" + tick + ",\"h\":\"" + Match.hex(hash) + "\"}";
     }
 
     static String emote(int player, String id) {

@@ -282,7 +282,7 @@ public class Rooms {
                 return;
             }
             Long ours = room.hashes.get(Integer.valueOf(tick));
-            if (ours == null || Long.toHexString(ours.longValue()).equals(hash)) {
+            if (ours == null || Match.hex(ours.longValue()).equals(hash)) {
                 return;
             }
             int seat = room.seatOf(username);

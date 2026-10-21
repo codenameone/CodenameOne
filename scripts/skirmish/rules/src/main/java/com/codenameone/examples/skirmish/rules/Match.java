@@ -539,6 +539,24 @@ public final class Match {
 
     // ------------------------------------------------------------------ hashing
 
+    /// A hash as the protocol spells it: unsigned lowercase hex with no leading
+    /// zeros, the same text `Long.toHexString` gives -- which the device
+    /// runtimes do not have, so client and server both use this.
+    public static String hex(long hash) {
+        if (hash == 0) {
+            return "0";
+        }
+        char[] out = new char[16];
+        int at = 16;
+        long v = hash;
+        while (v != 0) {
+            int d = (int) (v & 0xf);
+            out[--at] = (char) (d < 10 ? '0' + d : 'a' + d - 10);
+            v >>>= 4;
+        }
+        return new String(out, at, 16 - at);
+    }
+
     /// FNV-1a over everything that influences the future of the match.
     public long stateHash() {
         long h = 0xcbf29ce484222325L;

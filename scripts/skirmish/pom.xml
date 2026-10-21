@@ -21,6 +21,7 @@
     <module>rules</module>
     <!-- The REST contract between the app and the server. -->
     <module>shared</module>
+    <module>common</module>
   </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>

@@ -1,0 +1,618 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of Skirmish.
+ *
+ * Every screen is built from ordinary Codename One widgets -- Button,
+ * TextField, Label, Tabs, Switch -- and this file is what makes them look like
+ * a game instead of a form: carved wooden buttons, stone panels, a banner for
+ * the player's name, glowing card slots. Change the palette below to re-skin
+ * the game; change a rule to re-shape one widget everywhere it appears.
+ *
+ * The arena itself is not styled here: it is drawn by com.codename1.gaming
+ * from the sprite sheets in battle/Art.java.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    endsWith3PointsBool: true;
+    transitionSpeedInt: "250";
+    /* tag::skirmish-palette[] */
+    --night: #141a2e;
+    --night-alt: #1f2843;
+    --stone: #59627a;
+    --stone-light: #7a849e;
+    --stone-dark: #3a4157;
+    --wood: #c8862f;
+    --wood-light: #f0b04c;
+    --wood-dark: #7a4a12;
+    --gold: #ffd34d;
+    --parchment: #f6e7c1;
+    --ink: #2b1a07;
+    --blue: #2f7bff;
+    --red: #e0453a;
+    --elixir: #d13cf2;
+    --elixir-glow: #f7a8ff;
+    --text: #ffffff;
+    --text-muted: #b9c0d6;
+    --danger: #c5292a;
+    /* end::skirmish-palette[] */
+}
+
+Form, GameForm, BattleForm {
+    background-color: var(--night);
+    color: var(--text);
+}
+
+BattleForm {
+    padding: 0;
+}
+
+GameToolbar {
+    background-color: var(--night-alt);
+    padding: 1mm;
+}
+
+GameTitle {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+
+Container {
+    background-color: transparent;
+}
+
+Label {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+}
+
+Logo {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 10mm;
+    text-align: center;
+    margin: 4mm 0 0 0;
+}
+
+Tagline {
+    color: var(--text-muted);
+    font-size: 3mm;
+    text-align: center;
+    margin: 0 0 4mm 0;
+}
+
+SectionTitle {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    margin: 3mm 2mm 1mm 2mm;
+}
+
+/* tag::skirmish-wood-button[] */
+/* The big carved button: a wooden plank with a darker rim and a lighter top
+   edge, pressed in when touched. */
+WoodButton {
+    background: linear-gradient(to bottom, var(--wood-light), var(--wood));
+    border: 0.6mm solid var(--wood-dark);
+    border-radius: 2mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+    padding: 2.5mm;
+    margin: 1.5mm 3mm;
+}
+
+WoodButton.pressed {
+    background: linear-gradient(to bottom, var(--wood), var(--wood-dark));
+    color: var(--parchment);
+}
+
+WoodButton.disabled {
+    background-color: var(--stone-dark);
+    color: var(--stone-light);
+}
+/* end::skirmish-wood-button[] */
+
+StoneButton, PriceButton, GemButton, ReplayButton, BattleMenu {
+    background: linear-gradient(to bottom, var(--stone-light), var(--stone));
+    border: 0.4mm solid var(--stone-dark);
+    border-radius: 1.5mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.8mm;
+    margin: 1mm 2mm;
+}
+
+StoneButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.pressed, BattleMenu.pressed {
+    background-color: var(--stone-dark);
+}
+
+GemButton {
+    background: linear-gradient(to bottom, #6ee7ff, #1a9ad6);
+    border: 0.4mm solid #0d5a80;
+}
+
+DangerButton {
+    background-color: var(--danger);
+    border-radius: 1.5mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    text-align: center;
+    padding: 1.8mm;
+    margin: 1mm 2mm;
+}
+
+AdminButton {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--gold);
+    border-radius: 1.5mm;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    text-align: center;
+    padding: 1.8mm;
+    margin: 2mm;
+}
+
+LinkButton {
+    background-color: transparent;
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 2.5mm;
+    padding: 1mm;
+}
+
+/* A stone tablet that groups fields and buttons. */
+Panel {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--stone-dark);
+    border-radius: 2.5mm;
+    padding: 2mm;
+    margin: 1.5mm 2mm;
+}
+
+GameField {
+    background-color: var(--parchment);
+    border: 0.4mm solid var(--wood-dark);
+    border-radius: 1.5mm;
+    color: var(--ink);
+    font-size: 3.2mm;
+    padding: 2mm;
+    margin: 1mm 0;
+}
+
+TextHint {
+    color: #9a8a66;
+}
+
+/* tag::skirmish-name-field-css[] */
+/* The battle-name entry is a gold banner: the name is the one thing a
+   player types that everyone else sees. */
+NameField {
+    background: linear-gradient(to bottom, #fff2b0, var(--gold));
+    border: 0.8mm solid var(--wood-dark);
+    border-radius: 3mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    padding: 2.5mm;
+    margin: 1mm 0;
+}
+
+NamePreview, PlayerBanner {
+    background-color: var(--blue);
+    border: 0.5mm solid #ffffff;
+    border-radius: 3mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    text-align: center;
+    padding: 1.5mm 5mm;
+    margin: 2mm;
+}
+/* end::skirmish-name-field-css[] */
+
+WalletBar {
+    background-color: var(--night-alt);
+    padding: 1.5mm;
+}
+
+Trophies, Coins, Gems {
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+Trophies {
+    color: var(--gold);
+}
+
+Coins {
+    color: #ffc94a;
+}
+
+Gems {
+    color: #6ee7ff;
+}
+
+DeckStrip {
+    background-color: var(--night-alt);
+    border-radius: 2mm;
+    padding: 1mm;
+    margin: 1mm 2mm;
+}
+
+DeckStripCard {
+    text-align: center;
+    padding: 0.3mm;
+}
+
+/* tag::skirmish-card-slot[] */
+CardSlot, CardSlotSelected {
+    background: linear-gradient(to bottom, #3b4a78, #26304f);
+    border: 0.5mm solid var(--stone-dark);
+    border-radius: 1.8mm;
+    color: var(--elixir-glow);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1mm;
+    margin: 0.6mm;
+}
+
+CardSlotSelected {
+    border: 0.7mm solid var(--gold);
+    background: linear-gradient(to bottom, #5a6db0, #33406b);
+}
+
+CardSlot.disabled {
+    background-color: #1c2135;
+    color: #5a5f78;
+}
+/* end::skirmish-card-slot[] */
+
+BattleTop, BattleBottom, Hand, ElixirRow, ReplayBar {
+    background-color: var(--night-alt);
+    padding: 0.8mm;
+}
+
+PlayerName, EnemyName {
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+
+PlayerName {
+    color: #8db8ff;
+}
+
+EnemyName {
+    color: #ff9a92;
+}
+
+BattleClock, BattleClockHot {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+
+BattleClockHot {
+    color: var(--elixir-glow);
+}
+
+CrownsBlue, CrownsRed {
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0 1mm;
+}
+
+CrownsBlue {
+    color: var(--blue);
+}
+
+CrownsRed {
+    color: var(--red);
+}
+
+/* tag::skirmish-elixir-css[] */
+ElixirBar {
+    background-color: #2a1036;
+    border: 0.4mm solid #120618;
+    border-radius: 2mm;
+    padding: 0.5mm;
+    margin: 0.5mm 1mm;
+}
+
+ElixirFill {
+    background-color: var(--elixir);
+    color: #7c1f94;
+}
+
+ElixirCount {
+    background-color: var(--elixir);
+    border-radius: 3mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: center;
+    padding: 0.5mm 1.5mm;
+}
+/* end::skirmish-elixir-css[] */
+
+NextLabel {
+    color: var(--text-muted);
+    font-size: 2mm;
+    text-align: center;
+}
+
+NextCard {
+    text-align: center;
+}
+
+EmoteButton {
+    background-color: var(--night);
+    border-radius: 3mm;
+    color: var(--text);
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1mm;
+    margin: 0.5mm;
+}
+
+EmoteMine, EmoteTheirs {
+    background-color: #ffffff;
+    border-radius: 3mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 1.5mm 3mm;
+    margin: 3mm;
+}
+
+Victory, Defeat, Draw {
+    font-family: "native:MainBold";
+    font-size: 11mm;
+    text-align: center;
+}
+
+Victory {
+    color: var(--gold);
+}
+
+Defeat {
+    color: var(--red);
+}
+
+Draw {
+    color: var(--text-muted);
+}
+
+ResultCrowns {
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+}
+
+ResultReward {
+    color: var(--gold);
+    font-size: 3.2mm;
+    text-align: center;
+    margin: 0 0 3mm 0;
+}
+
+ChallengeCode {
+    background-color: var(--parchment);
+    border-radius: 2mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2mm 4mm;
+}
+
+ChallengeUrl, Empty, DeckSummary {
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    text-align: center;
+    margin: 1mm 2mm;
+}
+
+Warning {
+    color: #ffb74d;
+    font-size: 2.8mm;
+    margin: 1mm 2mm;
+}
+
+ShopItem, LeaderRow, LeaderTop, SettingRow {
+    background-color: var(--night-alt);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 1mm 2mm;
+}
+
+LeaderTop {
+    border: 0.4mm solid var(--gold);
+}
+
+ShopItemName, LeaderName, SettingLabel {
+    color: var(--text);
+    font-size: 3mm;
+}
+
+LeaderRank {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    padding: 0 2mm 0 0;
+}
+
+Owned {
+    color: #7be38a;
+    font-family: "native:MainBold";
+}
+
+HistoryRow, AdminRow, FlagReport, FlagAuto {
+    background-color: var(--night-alt);
+    border-radius: 2mm;
+    padding: 1.5mm;
+    margin: 0.8mm 2mm;
+}
+
+FlagReport {
+    border: 0.4mm solid #ffb74d;
+}
+
+FlagAuto {
+    border: 0.4mm solid var(--red);
+}
+
+HistoryWin {
+    color: var(--gold);
+    font-family: "native:MainBold";
+}
+
+HistoryLoss {
+    color: #ff9a92;
+    font-family: "native:MainBold";
+}
+
+HistoryDraw {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+}
+
+MultiLine1 {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+MultiLine2, MultiLine3 {
+    color: var(--text-muted);
+    font-size: 2.5mm;
+}
+
+AdminStat {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--stone-dark);
+    border-radius: 2mm;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 2.5mm;
+    margin: 1mm;
+}
+
+AdminDetail {
+    color: var(--text);
+    font-size: 2.8mm;
+}
+
+AdminTabs {
+    background-color: var(--night);
+}
+
+Tab {
+    background-color: var(--night-alt);
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    padding: 1.5mm;
+}
+
+Tab.selected {
+    color: var(--gold);
+    border-bottom: 0.6mm solid var(--gold);
+}
+
+Dialog {
+    background-color: var(--night-alt);
+    border: 0.5mm solid var(--wood);
+    border-radius: 3mm;
+    padding: 2mm;
+}
+
+DialogBody, DialogTitle {
+    color: var(--text);
+}
+
+DialogTitle {
+    color: var(--gold);
+    font-family: "native:MainBold";
+}
+
+AdDialog {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+Slider {
+    background-color: var(--stone-dark);
+    border-radius: 1mm;
+    padding: 0.8mm;
+}
+
+SliderFull {
+    background-color: var(--gold);
+    border-radius: 1mm;
+}
+
+/* Text sits on the panel or backdrop under it: the native theme gives a
+   label an opaque ground, which a game screen must not have. */
+Label, SpanLabel, SpanLabelText, Logo, Tagline, SectionTitle, Trophies, Coins, Gems, DeckStripCard,
+PlayerName, EnemyName, BattleClock, BattleClockHot, CrownsBlue, CrownsRed, NextLabel, NextCard,
+Victory, Defeat, Draw, ResultCrowns, ResultReward, ChallengeUrl, Empty, DeckSummary, Warning,
+ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw,
+MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, Container {
+    background-color: transparent;
+}
+
+StatusBar, StatusBarSideMenu {
+    background-color: var(--night-alt);
+}
+
+TabsContainer {
+    background-color: var(--night-alt);
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+Tab, Tab.selected, Tab.pressed {
+    background-color: var(--night-alt);
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}
+
+Tab.selected {
+    border-bottom: 0.6mm solid var(--gold);
+}
+
+ContentPane, Toolbar, TitleArea {
+    background-color: transparent;
+}
+
+FlagReport, FlagAuto {
+    color: var(--text);
+}

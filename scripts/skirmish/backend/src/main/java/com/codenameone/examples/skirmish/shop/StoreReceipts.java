@@ -52,10 +52,10 @@ public class StoreReceipts implements ReceiptValidator {
 
     @Override
     public String verify(String store, String sku, String transactionId, String receipt) throws IOException {
-        if ("ios".equals(store)) {
+        if ("itunes".equals(store)) {
             return apple(sku, transactionId, receipt);
         }
-        if ("android".equals(store)) {
+        if ("play".equals(store)) {
             return google(sku, receipt);
         }
         return null;
@@ -84,7 +84,7 @@ public class StoreReceipts implements ReceiptValidator {
                 Map t = (Map) each;
                 if (sku.equals(t.get("product_id")) && transactionId != null
                         && transactionId.equals(t.get("transaction_id"))) {
-                    return "ios:" + transactionId;
+                    return "itunes:" + transactionId;
                 }
             }
         }
@@ -107,7 +107,7 @@ public class StoreReceipts implements ReceiptValidator {
         if (!(state instanceof Number) || ((Number) state).intValue() != 0 || !(order instanceof String)) {
             return null;
         }
-        return "android:" + order;
+        return "play:" + order;
     }
 }
 // end::skirmish-store-receipts[]

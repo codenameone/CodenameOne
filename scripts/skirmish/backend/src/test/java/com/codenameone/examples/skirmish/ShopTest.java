@@ -53,7 +53,7 @@ class ShopTest {
                 "{\"itemId\":\"gems-80\"}"), who)));
         assertEquals(402, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/buy"),
                 "{\"itemId\":\"emotes-taunt\"}"), who)));
-        Api.json(mvc, Api.as(Api.body(post("/api/shop/receipt"), "{\"store\":\"android\",\"sku\":"
+        Api.json(mvc, Api.as(Api.body(post("/api/shop/receipt"), "{\"store\":\"play\",\"sku\":"
                 + "\"skirmish.gems_80\",\"transactionId\":\"tx-shopper\",\"receipt\":\"r\"}"), who));
         Map wallet = Api.json(mvc, Api.as(Api.body(post("/api/shop/buy"),
                 "{\"itemId\":\"emotes-taunt\"}"), who));
@@ -68,7 +68,7 @@ class ShopTest {
     void aReceiptIsRedeemedOnceAndOnlyByItsOwner() throws Exception {
         String who = Api.player(accounts, "buyer");
         String thief = Api.player(accounts, "thief");
-        String receipt = "{\"store\":\"ios\",\"sku\":\"skirmish.gems_80\","
+        String receipt = "{\"store\":\"itunes\",\"sku\":\"skirmish.gems_80\","
                 + "\"transactionId\":\"tx-1001\",\"receipt\":\"opaque\"}";
         Map first = Api.json(mvc, Api.as(Api.body(post("/api/shop/receipt"), receipt), who));
         assertEquals(100L, Api.number(first, "gems"));
@@ -78,7 +78,7 @@ class ShopTest {
         assertEquals(409, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/receipt"),
                 receipt), thief)));
         assertEquals(404, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/receipt"),
-                "{\"store\":\"ios\",\"sku\":\"nope\",\"transactionId\":\"tx-2\",\"receipt\":\"r\"}"),
+                "{\"store\":\"itunes\",\"sku\":\"nope\",\"transactionId\":\"tx-2\",\"receipt\":\"r\"}"),
                 who)));
     }
     // end::skirmish-receipt-test[]

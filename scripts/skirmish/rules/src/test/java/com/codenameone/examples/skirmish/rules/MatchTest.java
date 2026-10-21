@@ -208,4 +208,12 @@ class MatchTest {
         tower[0] = Cards.KING_TOWER;
         assertFalse(Cards.isValidDeck(tower));
     }
+
+    @Test
+    void hexSpellsHashesAsLongToHexStringDoes() {
+        long[] values = {0L, 1L, 15L, 16L, -1L, Long.MIN_VALUE, Long.MAX_VALUE, 0xcbf29ce484222325L};
+        for (long v : values) {
+            assertEquals(Long.toHexString(v), Match.hex(v));
+        }
+    }
 }

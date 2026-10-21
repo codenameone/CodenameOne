@@ -103,7 +103,7 @@ public class Shop {
         if (receipt == null) {
             throw new ResponseStatusException(400, "No receipt");
         }
-        String store = Text.oneOf(receipt.store(), new String[] {"ios", "android", "simulator"}, "",
+        String store = Text.oneOf(receipt.store(), new String[] {"itunes", "play", "simulator"}, "",
                 "the store");
         ShopItemDto item = Catalog.bySku(receipt.sku());
         if (item == null) {
