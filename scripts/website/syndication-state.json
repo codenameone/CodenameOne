@@ -2893,6 +2893,20 @@
         "id": 4891205,
         "url": "https://dev.to/codenameone/pgo-for-faster-apps-and-generationaladaptive-gc-122e",
         "syndicated_at": "2026-10-21T18:01:09+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/pgo-for-faster-apps-and-generational-adaptive-gc-d3e48ddcb43b?postPublishedType=initial",
+        "syndicated_at": "2026-10-21T19:01:51+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/pgo-for-faster-apps-and-generational-adaptive-gc",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad8f40754e3f733c465bd5c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-21T19:03:08+00:00"
       }
     }
   }
