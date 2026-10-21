@@ -578,9 +578,15 @@ public class CSSThemeCompiler {
     /// A constant that is one var() takes its value's token type, a fallback's too: the
     /// build-time compiler stores the string `"hello"` as hello and the number 1.50 as 1.5, as
     /// it would written directly.
-    private static String typedAlias(String key, String original, String resolved) {
+    private String typedAlias(String key, String original, String resolved) {
         String sole = original.trim();
         if (sole.startsWith("var(") && closingParen(sole, "var(".length()) == sole.length() - 1) {
+            if (aliasesQuotedText(sole)) {
+                // The target is a string token whose text resolveVars() already decoded:
+                // `--code: "001"` is copied as 001, not read again as the number 1, and a
+                // quote character inside it is part of the text.
+                return resolved;
+            }
             String text = resolved.trim();
             String unquoted = unquote(text);
             if (!unquoted.equals(text)) {

@@ -1437,6 +1437,18 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testAliasOfQuotedNumberStaysText() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --code: \"001\"; copy: var(--code);"
+                + " --q: '\"x\"'; quoteCopy: var(--q); }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("001", theme.get("@code"));
+        assertEquals("001", theme.get("@copy"));
+        assertEquals("\"x\"", theme.get("@q"));
+        assertEquals("\"x\"", theme.get("@quoteCopy"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
