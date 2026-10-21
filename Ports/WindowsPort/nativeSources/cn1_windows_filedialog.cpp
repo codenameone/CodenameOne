@@ -371,6 +371,14 @@ void cn1FdxRun(Cn1FdxRequest* r) {
         opts |= FOS_FORCESHOWHIDDEN;
     }
     if (r->save) {
+        /* Without this the dialog accepts "report.txt" under a PDF filter and
+         * confirms overwriting report.txt, after which the Java side appends
+         * the filter's extension and writes report.txt.pdf unconfirmed. Strict
+         * types make the dialog itself settle the final name, so its overwrite
+         * prompt is about the file that is really written. */
+        if (r->filterCount > 0) {
+            opts |= FOS_STRICTFILETYPES;
+        }
         if (r->confirmOverwrite) {
             opts |= FOS_OVERWRITEPROMPT;
         } else {

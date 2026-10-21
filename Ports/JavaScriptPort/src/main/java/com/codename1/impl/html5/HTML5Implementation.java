@@ -6603,6 +6603,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         StringBuilder accept = new StringBuilder();
         boolean allFiles = false;
         for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
+            // A filter with no extensions and no MIME types accepts every file
+            // (FileTypeFilter.acceptsName), so it unconstrains the union too.
+            if (f.getExtensions().length == 0 && f.getMimeTypes().length == 0) {
+                allFiles = true;
+            }
             for (String e : f.getExtensions()) {
                 // "*" is the all-files extension, but ".*" in accept names one
                 // literal extension; a filter that takes everything means the

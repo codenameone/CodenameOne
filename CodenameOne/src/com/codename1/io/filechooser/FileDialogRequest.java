@@ -335,6 +335,10 @@ public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
     public String toAcceptString() {
         StringBuilder sb = new StringBuilder();
         for (FileTypeFilter f : filters) {
+            if (f.getExtensions().length == 0 && f.getMimeTypes().length == 0) {
+                // an empty filter accepts every file, so the union does too
+                return null;
+            }
             for (String e : f.getExtensions()) {
                 if ("*".equals(e)) {
                     // One filter takes every file, so the union of them all

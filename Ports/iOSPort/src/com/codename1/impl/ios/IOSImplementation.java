@@ -6886,6 +6886,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean allFiles = false;
         for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
             String[] u = f.getUtTypes();
+            if ((u == null || u.length == 0) && f.getExtensions().length == 0
+                    && f.getMimeTypes().length == 0) {
+                // an unconstrained filter accepts every file, so the union does too
+                allFiles = true;
+            }
             if (u != null && u.length > 0) {
                 for (String s : u) {
                     uts.add(s);
