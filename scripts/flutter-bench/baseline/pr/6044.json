@@ -39,9 +39,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "java.* additions (suppressed-exception printing in Throwable, unmodifiable-collection mutator overrides) add ~4 KB of executable code",
+     "reason": "defaultExecutor routing in CompletableFuture and MessageFormat subformat cloning add 176 bytes of executable code",
      "runs": 1,
-     "value": 14576466
+     "value": 14576642
     },
     "install_bytes": {
      "from": {
@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "java.* additions (Map.of views, unmodifiable mutator overrides) add ~12 KB to the zipped download",
+     "reason": "defaultExecutor routing in CompletableFuture and MessageFormat subformat cloning add 176 bytes of executable code",
      "runs": 1,
-     "value": 84696069
+     "value": 84683790
     }
    }
   }

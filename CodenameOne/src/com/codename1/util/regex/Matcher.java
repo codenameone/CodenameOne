@@ -57,6 +57,9 @@ public final class Matcher implements MatchResult {
 
     private int first = -1;
     private int last;
+    /// Where a zero-width match ended before `usePattern` cleared the match,
+    /// so the next `find()` still steps past it; -1 when there is none.
+    private int emptyAt = -1;
     private int appendPosition;
 
     Matcher(Pattern pattern, CharSequence text) {
@@ -114,12 +117,14 @@ public final class Matcher implements MatchResult {
         }
         use(newPattern);
         clearGroups();
+        emptyAt = first >= 0 && first == last ? last : -1;
         first = -1;
         return this;
     }
 
     public Matcher reset() {
         first = -1;
+        emptyAt = -1;
         last = 0;
         oldLast = -1;
         appendPosition = 0;
@@ -185,6 +190,7 @@ public final class Matcher implements MatchResult {
     }
 
     private boolean search(int start) {
+        emptyAt = -1;
         if (oldLast < 0) {
             oldLast = start;
         }
@@ -209,7 +215,7 @@ public final class Matcher implements MatchResult {
 
     public boolean find() {
         int next = last;
-        if (next == first) {
+        if (next == first || next == emptyAt) {
             next++;
         }
         if (next < from) {

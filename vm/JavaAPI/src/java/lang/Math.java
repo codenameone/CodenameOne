@@ -336,6 +336,10 @@ public final class Math{
     }
 
     /// A pseudo-random double in `[0, 1)`.
+    ///
+    /// The shared generator is not synchronized: Codename One code runs on
+    /// the EDT, and a worker thread that needs random numbers concurrently
+    /// should own its own `java.util.Random`.
     public static double random() {
         return RandomHolder.RANDOM.nextDouble();
     }

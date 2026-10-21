@@ -181,6 +181,9 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         return infinity;
     }
 
+    // setInfinity, setNaN and the currency setters accept null, as the
+    // JDK's do (HotSpot stores it without a check); only
+    // setExponentSeparator is documented to throw.
     public void setInfinity(String infinity) {
         this.infinity = infinity;
     }

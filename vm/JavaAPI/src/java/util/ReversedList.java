@@ -97,7 +97,9 @@ class ReversedList<E> extends AbstractList<E> {
         if (c.isEmpty()) {
             return base.addAll(c);
         }
-        return super.addAll(c);
+        // Snapshot first: c may be this view or the list behind it, which
+        // every add grows, so iterating it live never ends.
+        return super.addAll(new ArrayList<E>(c));
     }
 
     @Override
@@ -109,7 +111,7 @@ class ReversedList<E> extends AbstractList<E> {
         if (c.isEmpty()) {
             return base.addAll(size - index, c);
         }
-        return super.addAll(index, c);
+        return super.addAll(index, new ArrayList<E>(c));
     }
 
     @Override

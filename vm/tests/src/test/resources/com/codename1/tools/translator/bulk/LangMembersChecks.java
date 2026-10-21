@@ -652,6 +652,11 @@ public final class LangMembersChecks {
             Bulk.p("applied", cf.thenApplyAsync(s -> s + "y").join());
             Bulk.p("routed", ran.size() > 0);
         });
+        Bulk.check("Lang.aReversedViewAddsItselfOnce", () -> {
+            java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+            l.reversed().addAll(l.reversed());
+            Bulk.p("list", l);
+        });
         Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
             final boolean[] closed = new boolean[2];
             java.io.OutputStream sink = new java.io.OutputStream() {

@@ -52,6 +52,16 @@ class MatcherExhaustionTest {
     }
 
     @Test
+    void usePatternAfterAnEmptyMatchStillAdvances() {
+        Matcher m = Pattern.compile("").matcher("ab");
+        assertTrue(m.find());
+        assertEquals(0, m.start());
+        m.usePattern(Pattern.compile(""));
+        assertTrue(m.find());
+        assertEquals(1, m.start());
+    }
+
+    @Test
     void resetStartsOver() {
         Matcher m = Pattern.compile("$").matcher("a");
         assertTrue(m.find());
