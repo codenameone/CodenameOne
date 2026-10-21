@@ -107,8 +107,10 @@ public class AppBuilder {
         return this;
     }
 
-    /// Whether to open a generated Xcode or Android Studio project.
-    public AppBuilder open(boolean open) {
+    /// Whether to open a generated Xcode or Android Studio project. `null` (the
+    /// default) decides per build: open, unless the build is being driven by an
+    /// AI coding agent or CI -- see {@link #shouldOpenGeneratedProject()}.
+    public AppBuilder open(Boolean open) {
         this.open = open;
         return this;
     }
@@ -336,9 +338,52 @@ public class AppBuilder {
 
 
     /**
-     * Flag of whether to open the xcode/android studio project.
+     * Flag of whether to open the xcode/android studio project; null means "decide",
+     * see {@link #shouldOpenGeneratedProject()}.
      */
-    protected boolean open = true;
+    protected Boolean open;
+
+    /// Environment variables that say an AI coding agent or a CI runner is driving
+    /// this build. An agent that builds `ios-source` in a loop otherwise leaves a new
+    /// Xcode (or Android Studio) window behind on every iteration, with nobody at
+    /// the screen to close them. Each is exported by the tool itself: Claude Code
+    /// (`CLAUDECODE`), OpenAI Codex (`CODEX_SANDBOX`, `CODEX_THREAD_ID`), Cursor's
+    /// agent (`CURSOR_AGENT`), Gemini CLI (`GEMINI_CLI`), the generic `AGENT` that
+    /// several agent shells set, and `CI` for GitHub Actions and most runners.
+    private static final String[] AUTOMATION_ENV_VARS = {
+            "CLAUDECODE", "CODEX_SANDBOX", "CODEX_THREAD_ID", "CURSOR_AGENT", "GEMINI_CLI", "AGENT", "CI"
+    };
+
+    /// True when a generated Xcode/Android Studio project should be opened. An
+    /// explicit `-Dopen=` / `-Pcodename1.open=` always wins; otherwise the project is
+    /// opened only for an interactive build, never when an agent or CI drives it.
+    protected boolean shouldOpenGeneratedProject() {
+        if (open != null) {
+            return open.booleanValue();
+        }
+        String detected = detectAutomation();
+        if (detected != null) {
+            getLog().info("Not opening the generated project: " + detected
+                    + " is set, so this looks like an agent or CI build. Pass -Dopen=true"
+                    + " (Gradle: -Pcodename1.open=true) to open it anyway.");
+            return false;
+        }
+        return true;
+    }
+
+    private static String detectAutomation() {
+        for (String name : AUTOMATION_ENV_VARS) {
+            String v = System.getenv(name);
+            if (v == null) {
+                continue;
+            }
+            v = v.trim();
+            if (v.length() > 0 && !"0".equals(v) && !"false".equalsIgnoreCase(v)) {
+                return name;
+            }
+        }
+        return null;
+    }
 
 
     private String cn1MavenPluginVersion = "";
@@ -2340,7 +2385,7 @@ public class AppBuilder {
                     getLog().info("Android gradle project already exists.  Checking to see if it needs updating...");
                     if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
                         getLog().info("Sources have not changed.  Skipping android gradle project generation");
-                        if (open) {
+                        if (shouldOpenGeneratedProject()) {
                             openAndroidStudioProject(generatedProject);
                         }
                         return;
@@ -2488,7 +2533,7 @@ public class AppBuilder {
                 }
 
             }
-            if (open) {
+            if (shouldOpenGeneratedProject()) {
                 openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
             }
 
@@ -2577,7 +2622,7 @@ public class AppBuilder {
                     getLog().info("Xcode project already exists.  Checking to see if it needs updating...");
                     if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
                         getLog().info("Sources have not changed.  Skipping Xcode project generation");
-                        if (open) {
+                        if (shouldOpenGeneratedProject()) {
                             File projectToOpen = getWorkspaceOrProject(props, generatedProject);
                             getLog().info("Opening Xcode project "+projectToOpen);
                             openWorkspace(projectToOpen);
@@ -2680,7 +2725,7 @@ public class AppBuilder {
                 } catch (IOException ex) {
                     throw new BuildExecutionException("Failed to copy xcode project at "+xcodeProject+" to "+output, ex);
                 }
-                if (open) {
+                if (shouldOpenGeneratedProject()) {
 
                     File projectToOpen = getWorkspaceOrProject(props, output);
                     getLog().info("Opening Xcode project "+projectToOpen);
@@ -2805,7 +2850,7 @@ public class AppBuilder {
                 // getWorkspaceOrProject rather than the .xcodeproj directly:
                 // it prefers a workspace when the generated project has one,
                 // which is the thing Xcode should be handed.
-                if (open) {
+                if (shouldOpenGeneratedProject()) {
                     File projectToOpen = getWorkspaceOrProject(props, output);
                     getLog().info("Opening macOS Xcode project " + projectToOpen);
                     openWorkspace(projectToOpen);
