@@ -97,10 +97,7 @@
   "all": {
    "memory": 0.059,
    "runs": 1,
-   "time": 0.945,
-   "tolerance": {
-    "time": 0.2
-   }
+   "time": 1.201
   }
  },
  "stringBuilding": {

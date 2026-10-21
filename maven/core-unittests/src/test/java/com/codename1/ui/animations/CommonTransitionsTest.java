@@ -180,10 +180,17 @@ public class CommonTransitionsTest extends UITestBase {
 
         Method createMotion = CommonTransitions.class.getDeclaredMethod("createMotion", int.class, int.class, int.class);
         createMotion.setAccessible(true);
-        Motion again = (Motion) createMotion.invoke(transition, 0, 10, 10);
-        again.start();
-        assertFalse(again.isFinished(), "the next run starts from the source again");
-        assertEquals(0, again.getValue());
+        // Pin the animation clock: on a wall clock a millisecond can pass between start()
+        // and getValue(), and a 10ms motion then legitimately answers 1 instead of 0.
+        AnimationTime.setTime(1000L);
+        try {
+            Motion again = (Motion) createMotion.invoke(transition, 0, 10, 10);
+            again.start();
+            assertFalse(again.isFinished(), "the next run starts from the source again");
+            assertEquals(0, again.getValue());
+        } finally {
+            AnimationTime.reset();
+        }
     }
 
     @Test
