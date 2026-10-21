@@ -19,6 +19,8 @@
     <!-- The game itself: a deterministic simulation the app, the server and the
          replay viewer all run. Built first; it depends on nothing. -->
     <module>rules</module>
+    <!-- The REST contract between the app and the server. -->
+    <module>shared</module>
   </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
