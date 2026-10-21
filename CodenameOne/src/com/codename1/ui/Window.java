@@ -516,7 +516,7 @@ public class Window extends Container implements TopLevelContainer {
     public void setDocumentModified(final boolean modified) {
         documentModified = modified;
         documentModifiedReported = true;
-        Command.followDocumentModified(commands, modified);
+        Command.followDocumentModified(commands, modified, this);
         onPeer(new Runnable() {
             @Override
             public void run() {
@@ -585,10 +585,15 @@ public class Window extends Container implements TopLevelContainer {
         }
         Command.settleRadioGroups(commands);
         if (documentModifiedReported) {
-            Command.followDocumentModified(commands, documentModified, true);
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this);
         }
         manager().setCommands(nativePeer,
                 commands.toArray(new Command[commands.size()]));
+    }
+
+    /// Whether this window still lists `c` among its commands.
+    boolean publishesDocumentCommand(Command c) {
+        return commands.contains(c);
     }
 
     /// The commands this window shows in its native menu, empty while it has no native peer.

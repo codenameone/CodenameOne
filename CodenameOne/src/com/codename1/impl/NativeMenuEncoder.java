@@ -224,21 +224,34 @@ public final class NativeMenuEncoder {
 
     private static final class Node {
         final String segment;
-        final int group;
+        int group;
+        // True while only separators have named this node: a separator that leads or trails
+        // collapses away when emitted, so its group must not decide where the submenu sits.
+        // The first real item through the node sets the group instead.
+        boolean groupFromSeparator;
         final List<Object> children = new ArrayList<Object>();
 
-        Node(String segment, int group) {
+        Node(String segment, int group, boolean separator) {
             this.segment = segment;
             this.group = group;
+            this.groupFromSeparator = separator;
         }
 
-        Node child(String seg, int group) {
+        void settleGroup(int group, boolean separator) {
+            if (groupFromSeparator && !separator) {
+                this.group = group;
+                groupFromSeparator = false;
+            }
+        }
+
+        Node child(String seg, int group, boolean separator) {
             for (Object o : children) {
                 if (o instanceof Node && ((Node) o).segment.equals(seg)) {
+                    ((Node) o).settleGroup(group, separator);
                     return (Node) o;
                 }
             }
-            Node n = new Node(seg, group);
+            Node n = new Node(seg, group, separator);
             children.add(n);
             return n;
         }
@@ -369,11 +382,13 @@ public final class NativeMenuEncoder {
                 }
             }
             if (node == null) {
-                node = new Node(path[0], group);
+                node = new Node(path[0], group, sep);
                 roots.add(node);
+            } else {
+                node.settleGroup(group, sep);
             }
             for (int p = 1; p < path.length; p++) {
-                node = node.child(path[p], group);
+                node = node.child(path[p], group, sep);
             }
             node.children.add(item);
         }

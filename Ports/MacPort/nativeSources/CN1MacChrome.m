@@ -194,9 +194,11 @@ static NSMenuItem *cn1StockItemAnywhere(NSMenu *mainMenu, NSMenu *target, SEL ac
     return nil;
 }
 
-/// Drops the separators this file added that end up leading, trailing or next to another
-/// separator once hidden stock items are discounted: a role About replacing the stock one
-/// keeps AppKit's own separator below it, and the application's group adds another.
+/// Drops the separators that end up leading, trailing or next to another separator once
+/// hidden stock items are discounted: a role About replacing the stock one keeps AppKit's own
+/// separator below it, and the application's group adds another; a role moved to another
+/// menu leaves the stock separator that framed it. Ours are removed; a stock separator is
+/// hidden like a replaced stock item, so the next pass shows it again.
 static void cn1NormalizeSeparators(NSMenu *menu) {
     NSMutableArray *visible = [NSMutableArray array];
     for (NSMenuItem *item in menu.itemArray) {
@@ -213,8 +215,20 @@ static void cn1NormalizeSeparators(NSMenu *menu) {
         }
         BOOL ours = item.target == [CN1MacMenuTarget sharedTarget];
         BOOL nextSeparator = i + 1 >= visible.count || ((NSMenuItem *)visible[i + 1]).separatorItem;
-        if (ours && (prevSeparator || nextSeparator)) {
-            [menu removeItem:item];
+        // A doubled pair keeps the stock one and drops ours; between two stock separators the
+        // second goes.
+        BOOL nextIsOursOnly = !ours && !prevSeparator && i + 1 < visible.count
+                && ((NSMenuItem *)visible[i + 1]).target == [CN1MacMenuTarget sharedTarget];
+        if (prevSeparator || (nextSeparator && !nextIsOursOnly)) {
+            if (ours) {
+                [menu removeItem:item];
+            } else {
+                item.hidden = YES;
+                if (cn1HiddenStockItems == nil) {
+                    cn1HiddenStockItems = [[NSMutableArray alloc] init];
+                }
+                [cn1HiddenStockItems addObject:item];
+            }
             continue;
         }
         prevSeparator = YES;

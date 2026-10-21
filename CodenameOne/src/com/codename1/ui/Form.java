@@ -3322,7 +3322,7 @@ public class Form extends Container implements TopLevelContainer {
         if (published == null) {
             published = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
         }
-        Command.followDocumentModified(published, modified);
+        Command.followDocumentModified(published, modified, this);
         Display.impl.documentModifiedChanged(this);
     }
 
@@ -3364,11 +3364,17 @@ public class Form extends Container implements TopLevelContainer {
         return v;
     }
 
+    /// Whether this form still publishes `c` in its native menu or command surface.
+    boolean publishesDocumentCommand(Command c) {
+        java.util.Vector v = toolbar != null ? toolbar.getAllNativeMenuCommands() : menuBar.getCommands();
+        return v != null && v.contains(c);
+    }
+
     /// Applies the reported modified state to commands as they are published, so a Save
     /// command added after `#setDocumentModified(boolean)` still follows it.
     void applyDocumentModified(java.util.List commands) {
         if (documentModifiedReported) {
-            Command.followDocumentModified(commands, documentModified, true);
+            Command.applyDocumentModifiedOnPublish(commands, documentModified, this);
         }
     }
 

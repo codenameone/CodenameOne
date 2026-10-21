@@ -224,6 +224,16 @@ class NativeMenuConventionsTest extends UITestBase {
     }
 
     @FormTest
+    void aLeadingSeparatorDoesNotPlaceItsSubmenu() {
+        Command a = new Command("A").setDesktopMenu("File").setDesktopMenuGroup(1);
+        Command sep = Command.createDesktopSeparator("File/Sub");
+        Command b = new Command("B").setDesktopMenu("File/Sub").setDesktopMenuGroup(2);
+        List<NativeMenuEncoder.Row> rows = NativeMenuEncoder.encode(vec(a, sep, b), 0, false,
+                NativeMenuConventions.WINDOWS).getRows();
+        assertEquals("A", rows.get(0).getLabel(), "the submenu sorts by B's group, not the separator's");
+    }
+
+    @FormTest
     void aRoleNameIsLookedUpWhenRead() {
         Command c = Command.createDesktopRole(Command.DESKTOP_ROLE_QUIT, null);
         assertEquals(NativeMenuConventions.labelOf(NativeMenuConventions.current(), Command.DESKTOP_ROLE_QUIT),
