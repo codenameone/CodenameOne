@@ -22,6 +22,7 @@ import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.skirmish.api.AccountApi;
 import com.codenameone.examples.skirmish.api.AdminApi;
 import com.codenameone.examples.skirmish.api.GameApi;
+import com.codenameone.examples.skirmish.api.ProgressApi;
 import com.codenameone.examples.skirmish.api.ShopApi;
 
 /// The generated REST clients, one per contract in the shared module, all
@@ -31,6 +32,7 @@ public final class Api {
     private static GameApi game;
     private static ShopApi shop;
     private static AdminApi admin;
+    private static ProgressApi progress;
 
     private Api() {
     }
@@ -40,6 +42,7 @@ public final class Api {
         game = RestClients.create(GameApi.class, baseUrl);
         shop = RestClients.create(ShopApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
+        progress = RestClients.create(ProgressApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -56,5 +59,9 @@ public final class Api {
 
     public static AdminApi admin() {
         return admin;
+    }
+
+    public static ProgressApi progress() {
+        return progress;
     }
 }

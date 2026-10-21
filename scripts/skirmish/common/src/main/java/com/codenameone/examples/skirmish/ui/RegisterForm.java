@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.ui;
 
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
@@ -52,10 +53,11 @@ public final class RegisterForm {
         final TextField email = SignInForm.field("Email", TextField.EMAILADDR, "email");
         final TextField password = SignInForm.field("Password (8+ characters)", TextField.PASSWORD,
                 "password");
-        f.add(Ui.label("Choose your battle name", "SectionTitle"));
-        f.add(Ui.panel(name, Ui.centered(preview)));
-        f.add(Ui.panel(email, password));
-        f.add(Ui.wood("Enter the arena", "createButton", e -> {
+        Container col = Ui.column();
+        col.add(SignInForm.heroes());
+        col.add(Ui.label("Choose your battle name", "SectionTitle"));
+        col.add(Ui.panel(name, Ui.centered(preview)));
+        col.add(Ui.panel(email, password, Ui.wood("Enter the arena", "createButton", e -> {
             final String mail = email.getText().trim();
             final String pass = password.getText();
             Api.account().register(new RegisterDto(mail, pass, name.getText().trim()),
@@ -63,7 +65,8 @@ public final class RegisterForm {
                         Telemetry.registered();
                         Session.signIn(mail, pass, () -> Ui.later(Nav::signedIn), Ui::failed);
                     }, Ui::failed));
-        }));
+        })));
+        f.add(Ui.centeredColumn(col));
         f.show();
     }
 }

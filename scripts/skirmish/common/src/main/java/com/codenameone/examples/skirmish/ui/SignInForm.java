@@ -18,9 +18,14 @@
  */
 package com.codenameone.examples.skirmish.ui;
 
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.skirmish.AppConfig;
 import com.codenameone.examples.skirmish.net.Session;
 
@@ -32,23 +37,43 @@ public final class SignInForm {
     public static void show() {
         Form f = Ui.form("", "signin");
         f.setLayout(BoxLayout.yCenter());
-        f.add(Ui.label("SKIRMISH", "Logo"));
-        f.add(Ui.label("Deploy. Defend. Destroy.", "Tagline"));
+        f.getToolbar().hideToolbar();
+        Container col = Ui.column();
+        col.add(heroes());
+        col.add(Ui.label("SKIRMISH", "Logo"));
+        col.add(Ui.label("Deploy. Defend. Destroy.", "Tagline"));
         final TextField email = field("Email", TextField.EMAILADDR, "email");
         final TextField password = field("Password", TextField.PASSWORD, "password");
-        f.add(Ui.panel(email, password,
+        // Fields and both buttons share one panel, so they share one width.
+        col.add(Ui.panel(email, password,
                 Ui.wood("Sign in", "signInButton", e -> {
                     Session.signIn(email.getText().trim(), password.getText(),
                             () -> Ui.later(Nav::signedIn), Ui::failed);
                 }),
                 Ui.stone("Create an account", "registerButton", e -> RegisterForm.show())));
-        f.add(Ui.stone("Practice without an account", "practiceButton",
+        col.add(Ui.button("Practice without an account", "LinkButton", "practiceButton",
                 e -> BattleForm.practice()));
         if (AppConfig.serverSwitchable()) {
-            f.add(Ui.button("Server: " + AppConfig.serverUrl(), "LinkButton", "serverButton",
+            col.add(Ui.button("Server: " + AppConfig.serverUrl(), "LinkButton", "serverButton",
                     e -> SettingsForm.chooseServer()));
         }
+        Container safe = Ui.centeredColumn(col);
+        safe.setSafeArea(true);
+        f.add(safe);
         f.show();
+    }
+
+    /// Three of the game's heroes, the middle one in front: the first thing a
+    /// new player sees is who they will fight with.
+    static Container heroes() {
+        int h = CN.convertToPixels(26);
+        Label left = new Label(CardArt.hero("barbarian", h * 4 / 5), "SignInHero");
+        Label mid = new Label(CardArt.hero("knight", h), "SignInHero");
+        Label right = new Label(CardArt.hero("mage", h * 4 / 5), "SignInHero");
+        Container c = new Container(new FlowLayout(Component.CENTER, Component.BOTTOM));
+        c.add(left).add(mid).add(right);
+        c.setName("heroes");
+        return c;
     }
 
     static TextField field(String hint, int constraint, String name) {

@@ -56,7 +56,7 @@
 }
 
 Form, GameForm, BattleForm {
-    background-color: var(--night);
+    background: linear-gradient(to bottom, #22305e, var(--night));
     color: var(--text);
 }
 
@@ -120,7 +120,7 @@ WoodButton {
     font-size: 4mm;
     text-align: center;
     padding: 2.5mm;
-    margin: 1.5mm 3mm;
+    margin: 1.2mm 0;
 }
 
 WoodButton.pressed {
@@ -143,7 +143,7 @@ StoneButton, PriceButton, GemButton, ReplayButton, BattleMenu {
     font-size: 3mm;
     text-align: center;
     padding: 1.8mm;
-    margin: 1mm 2mm;
+    margin: 1mm 0;
 }
 
 StoneButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.pressed, BattleMenu.pressed {
@@ -616,3 +616,280 @@ ContentPane, Toolbar, TitleArea {
 FlagReport, FlagAuto {
     color: var(--text);
 }
+
+/* tag::skirmish-progress-css[] */
+/* Home, progress and celebrations. Every piece of chrome around the art is
+   one of these; the art itself (cards, heroes) comes from ui/CardArt.java. */
+HomeHeader {
+    background: linear-gradient(to bottom, #2c3a6e, #1f2843);
+    padding: 1.5mm 2mm;
+}
+
+PlayerNameBig {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 0 1.5mm;
+}
+
+LevelBadge, LevelBadgeBig {
+    background-color: var(--blue);
+    border: 0.4mm solid #ffffff;
+    border-radius: 1.5mm;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 1.5mm;
+    margin: 0 1.5mm;
+}
+
+LevelBadgeBig {
+    background: linear-gradient(to bottom, #fff2b0, var(--gold));
+    color: var(--ink);
+    border: 0.5mm solid var(--wood-dark);
+    font-size: 4.5mm;
+    padding: 1mm 4mm;
+    margin: 1mm;
+}
+
+XpText, Muted {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-size: 2.4mm;
+    padding: 0 1.5mm;
+}
+
+Muted {
+    background-color: transparent;
+    text-align: center;
+}
+
+HeroStage {
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+}
+
+ArenaName {
+    background-color: transparent;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+BattleButton {
+    background: linear-gradient(to bottom, #ffe27a, #f0a020);
+    border: 0.8mm solid var(--wood-dark);
+    border-radius: 3mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 6mm;
+    text-align: center;
+    padding: 3mm;
+    margin: 1.5mm 0;
+}
+
+BattleButton.pressed {
+    background: linear-gradient(to bottom, #f0a020, #b06a10);
+    color: var(--parchment);
+}
+
+ChestSlot, ChestSlotEmpty {
+    background: linear-gradient(to bottom, #8a5a24, #5a3a14);
+    border: 0.5mm solid var(--gold);
+    border-radius: 2mm;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 1.2mm 0.5mm;
+    margin: 0.8mm;
+}
+
+ChestSlot.pressed {
+    background-color: #b07a34;
+}
+
+ChestSlotEmpty {
+    background: none;
+    background-color: #1a2140;
+    border: 0.4mm solid var(--stone);
+    color: var(--stone-light);
+}
+
+QuestCard {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--stone-dark);
+    border-radius: 2mm;
+    padding: 1.5mm 2mm;
+    margin: 0.8mm 0;
+}
+
+QuestTitle {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+QuestReward {
+    background-color: transparent;
+    color: #ffc94a;
+    font-size: 2.5mm;
+}
+
+ClaimButton {
+    background: linear-gradient(to bottom, #7be07b, #2f9e3f);
+    border: 0.5mm solid #1c5a24;
+    border-radius: 1.5mm;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 1.2mm 2.5mm;
+    margin: 0 0 0 1.5mm;
+}
+
+ClaimButton.pressed {
+    background-color: #1c5a24;
+}
+
+Claimed {
+    background-color: transparent;
+    color: #7be07b;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0 0 0 1.5mm;
+}
+
+NavTile {
+    background: linear-gradient(to bottom, var(--stone-light), var(--stone));
+    border: 0.4mm solid var(--stone-dark);
+    border-radius: 2mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1.5mm 0.5mm;
+    margin: 0.8mm;
+}
+
+NavTile.pressed {
+    background-color: var(--stone-dark);
+}
+
+RewardDialog {
+    background: linear-gradient(to bottom, #2c3a6e, #141a2e);
+    border: 0.8mm solid var(--gold);
+    border-radius: 4mm;
+    padding: 2mm 3mm;
+}
+
+RewardBody {
+    background-color: transparent;
+    padding: 0;
+}
+
+RewardTitle, LevelUpTitle {
+    background-color: transparent;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+}
+
+LevelUpTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 5.5mm;
+}
+
+RewardHero {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+RewardCoins, RewardGems, RewardXp, RewardChest {
+    background-color: #0e1224;
+    border-radius: 2mm;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 1mm 2mm;
+    margin: 0.8mm;
+}
+
+RewardCoins { color: #ffc94a; }
+RewardGems { color: #6ee7ff; }
+RewardXp { color: #b6ff7a; }
+RewardChest { color: var(--gold); }
+
+RewardAchievement {
+    background-color: transparent;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+AchievementRow, AchievementLocked {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--gold);
+    border-radius: 2mm;
+    padding: 1.5mm;
+    margin: 0.8mm 0;
+}
+
+AchievementLocked {
+    border: 0.4mm solid var(--stone-dark);
+}
+
+CoachBubble {
+    background-color: #fdf6e3;
+    border: 0.6mm solid var(--wood-dark);
+    border-radius: 3mm;
+    padding: 2mm;
+    margin: 2mm;
+}
+
+CoachName {
+    background-color: transparent;
+    color: var(--wood-dark);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+
+CoachText {
+    background-color: transparent;
+    color: var(--ink);
+    font-size: 3.2mm;
+}
+
+CoachHint {
+    background-color: transparent;
+    color: #8a6a3a;
+    font-size: 2.4mm;
+}
+
+TutorialSkip {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 2.6mm;
+    padding: 1mm 2mm;
+}
+
+SignInHero {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+
+CardTile {
+    background-color: transparent;
+    padding: 0.4mm;
+    margin: 0;
+    text-align: center;
+}
+/* end::skirmish-progress-css[] */

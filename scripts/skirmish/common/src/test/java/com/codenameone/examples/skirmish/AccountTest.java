@@ -36,6 +36,12 @@ public class AccountTest extends E2e {
         shot("register-name");
         click("createButton");
         waitForForm("home");
+        // A new player is taken straight into the training battle.
+        waitForForm("battle");
+        until(() -> has("coachSkip"), 20000, "the mentor");
+        shot("tutorial-first-visit");
+        click("coachSkip");
+        waitForForm("home");
         assertEqual("Ironclad", Session.user().displayName());
         assertEqual(Deck.SIZE, Session.user().deck().size(), "a new player starts with a full deck");
         shot("home");

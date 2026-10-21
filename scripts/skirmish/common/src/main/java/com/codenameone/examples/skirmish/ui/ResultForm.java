@@ -20,6 +20,8 @@ package com.codenameone.examples.skirmish.ui;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.CN;
+import com.codename1.ui.Label;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.skirmish.api.AdRewardDto;
@@ -71,6 +73,10 @@ public final class ResultForm {
         Form f = Ui.form("", "result");
         f.setLayout(BoxLayout.yCenter());
         String title = o.result > 0 ? "VICTORY" : o.result < 0 ? "DEFEAT" : "DRAW";
+        // The player's hero cheers a win; a loss gets the opponent's skeleton.
+        String hero = o.result >= 0
+                ? CardArt.heroOf(Session.user() == null ? null : Session.user().username()) : "skeleton_warrior";
+        f.add(Ui.centered(new Label(CardArt.hero(hero, CN.convertToPixels(o.result > 0 ? 30 : 22)), "RewardHero")));
         f.add(Ui.centered(Ui.label(title, o.result > 0 ? "Victory" : o.result < 0 ? "Defeat" : "Draw")));
         f.add(Ui.centered(Ui.label(o.myCrowns + "  -  " + o.theirCrowns, "ResultCrowns")));
         if (o.trophies != 0 || o.coins != 0) {
@@ -109,7 +115,10 @@ public final class ResultForm {
                 SignInForm.show();
                 return;
             }
-            Session.refreshUser(() -> Ui.later(Nav::home), (s, m) -> Ui.later(Nav::home));
+            // Levels and achievements the battle earned are celebrated on
+            // the way home.
+            Session.refreshUser(() -> Ui.later(() -> Rewards.afterBattle(Nav::home)),
+                    (s, m) -> Ui.later(Nav::home));
         }));
         f.show();
         if (signedIn) {

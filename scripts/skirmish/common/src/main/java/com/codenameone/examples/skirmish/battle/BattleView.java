@@ -514,6 +514,33 @@ public class BattleView extends GameView {
     }
     // end::skirmish-pick[]
 
+    /// Where arena point `(ax, ay)` appears on the screen, in absolute
+    /// coordinates, or null before the first frame. The tutorial points at
+    /// the field with it.
+    public int[] screenPoint(int ax, int ay) {
+        if (getWidth() <= 0 || getHeight() <= 0 || effects == null) {
+            return null;
+        }
+        GameCamera c = getCamera();
+        float aspect = (float) getWidth() / Math.max(1, getHeight());
+        float[] proj = Matrix4.perspective((float) Math.toRadians(c.getFov()), aspect, 1f, 200f);
+        float[] view = Matrix4.lookAt(c.getEyeX(), c.getEyeY(), c.getEyeZ(),
+                c.getTargetX(), c.getTargetY(), c.getTargetZ(), 0f, 1f, 0f);
+        float[] m = new float[16];
+        Matrix4.multiply(proj, view, m);
+        float x = wx(ax, ay);
+        float z = wz(ax, ay);
+        float cx = m[0] * x + m[8] * z + m[12];
+        float cy = m[1] * x + m[9] * z + m[13];
+        float cw = m[3] * x + m[11] * z + m[15];
+        if (cw <= 0f) {
+            return null;
+        }
+        int px = Math.round((cx / cw + 1f) * 0.5f * getWidth());
+        int py = Math.round((1f - cy / cw) * 0.5f * getHeight());
+        return new int[] {getAbsoluteX() + px, getAbsoluteY() + py};
+    }
+
     private float[] unproject(float x, float y, float z) {
         float[] m = inverse;
         float rx = m[0] * x + m[4] * y + m[8] * z + m[12];

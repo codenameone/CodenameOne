@@ -32,11 +32,11 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.UITimer;
-import com.codenameone.examples.skirmish.battle.Art;
 import com.codenameone.examples.skirmish.battle.BattleView;
 import com.codenameone.examples.skirmish.battle.Driver;
 import com.codenameone.examples.skirmish.battle.OnlineDriver;
 import com.codenameone.examples.skirmish.battle.PracticeDriver;
+import com.codenameone.examples.skirmish.battle.TutorialDriver;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.CardDef;
@@ -72,6 +72,7 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
     private final Container overlay = new Container(new BorderLayout());
     private int cardsPlayed;
     private boolean over;
+    private Tutorial coach;
 
     private BattleForm(Driver driver, String mode) {
         this.driver = driver;
@@ -104,6 +105,52 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
             deck = d.toArray(new String[d.size()]);
         }
         new BattleForm(new PracticeDriver(System.currentTimeMillis(), deck), "practice").show();
+    }
+
+    /// The training battle. Not shown yet: the lesson attaches itself first.
+    static BattleForm tutorial(TutorialDriver driver) {
+        return new BattleForm(driver, "tutorial");
+    }
+
+    void setCoach(Tutorial coach) {
+        this.coach = coach;
+    }
+
+    void begin() {
+        show();
+    }
+
+    Form form() {
+        return form;
+    }
+
+    BattleView view() {
+        return view;
+    }
+
+    Component elixirBar() {
+        return elixir;
+    }
+
+    /// The hand slot showing `card`, or null when it is not in the hand.
+    Component slotOf(String card) {
+        for (int i = 0; i < hand.length; i++) {
+            if (hand[i] != null && card.equals(shown[i])) {
+                return hand[i];
+            }
+        }
+        return null;
+    }
+
+    /// Leaves the battle without a result.
+    void abandon() {
+        if (over) {
+            return;
+        }
+        over = true;
+        view.stop();
+        driver.dispose();
+        leaveTo();
     }
 
     public static BattleForm online(OnlineDriver driver, boolean spectator) {
@@ -170,7 +217,7 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
 
     private void choose(int slot) {
         String card = shown[slot];
-        if (card == null || over) {
+        if (card == null || over || (coach != null && !coach.mayChoose(card))) {
             return;
         }
         view.select(card);
@@ -178,22 +225,25 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
             hand[i].setUIID(i == slot ? "CardSlotSelected" : "CardSlot");
         }
         form.revalidate();
+        if (coach != null) {
+            coach.chose(card);
+        }
     }
     // end::skirmish-battle-form[]
 
     @Override
     public void ticked(Match m) {
         PlayerState me = m.player(driver.me());
-        int size = CN.convertToPixels(9);
+        int size = Math.min(CN.convertToPixels(13), CN.getDisplayWidth() / (Deck.HAND + 2));
         boolean changed = false;
         for (int i = 0; i < Deck.HAND && hand[0] != null; i++) {
             String card = me.hand(i);
             if (card != null && !card.equals(shown[i])) {
                 shown[i] = card;
                 CardDef def = Cards.get(card);
-                Image icon = Art.cardIcon(card, size);
+                Image icon = CardArt.card(card, size);
                 hand[i].setIcon(icon);
-                hand[i].setText(String.valueOf(def.cost));
+                hand[i].setText("");
                 hand[i].setUIID(card.equals(view.selected()) ? "CardSlotSelected" : "CardSlot");
                 changed = true;
             }
@@ -206,7 +256,7 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
             }
         }
         if (hand[0] != null && me.next() != null) {
-            next.setIcon(Art.cardIcon(me.next(), CN.convertToPixels(6)));
+            next.setIcon(CardArt.card(me.next(), CN.convertToPixels(7), false));
         }
         elixir.setElixir(me.elixir());
         elixirCount.setText(String.valueOf(me.wholeElixir()));
@@ -231,12 +281,24 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
                 b.setUIID("CardSlot");
             }
         }
+        if (coach != null) {
+            coach.placed(card);
+        }
     }
 
     /// The simulation is over. Practice ends here; online the server's word
     /// on the result is awaited in [#ended(int, int, int, int, int, String)].
     @Override
     public void ended(Match m) {
+        if (coach != null) {
+            over = true;
+            view.stop();
+            Telemetry.battleEnded(mode, m.result() == driver.me() ? 1 : m.result() == Match.DRAW ? 0 : -1,
+                    m.tick() / Match.TICKS_PER_SECOND, cardsPlayed);
+            driver.dispose();
+            coach.finished(m.result() == driver.me() ? 0 : 1);
+            return;
+        }
         if (driver instanceof PracticeDriver) {
             over = true;
             PracticeDriver p = (PracticeDriver) driver;
@@ -288,6 +350,14 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
 
     private void confirmLeave() {
         if (over) {
+            return;
+        }
+        if (coach != null) {
+            if (Dialog.show("Leave training?", "You can replay it any time from \"How to play\".", "Leave",
+                    "Stay")) {
+                coach.stop();
+                abandon();
+            }
             return;
         }
         boolean sure = !(driver instanceof OnlineDriver) || !driver.interactive()

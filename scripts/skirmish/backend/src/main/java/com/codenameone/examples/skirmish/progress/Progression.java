@@ -182,6 +182,38 @@ public class Progression {
         return r.dto(g);
     }
 
+    /// Gives a demo account some history -- a few levels, two chests, a
+    /// finished quest waiting to be claimed -- so the development server's
+    /// home screen shows what a regular player sees, and the tutorial does not
+    /// start on every sign-in.
+    @Transactional(rollbackFor = IOException.class)
+    public void seedDemo(String username) throws IOException {
+        Progress g = load(username);
+        if (g.getMatches() > 0) {
+            return;
+        }
+        g.setTutorialDone(true);
+        g.setXp(420);
+        g.setChests(2);
+        g.setChestsOpened(1);
+        g.setMatches(7);
+        g.setWins(4);
+        g.setCards(62);
+        g.setSpells(9);
+        g.setTowers(6);
+        g.setStreak(2);
+        g.setBestStreak(2);
+        Goals.Goal[] today = Goals.questsFor(username, g.getQuestDay());
+        g.setQuest0(today[0].goal);
+        g.setQuest1(today[1].goal / 2);
+        // Unlocked for what the counters say, without paying for it: the
+        // profile here is a throwaway, never saved.
+        Profile scratch = new Profile();
+        unlock(g, scratch, new Reward(""));
+        g.setXp(420);
+        progress.save(g);
+    }
+
     private Profile profile(String username) throws IOException {
         Profile p = profiles.findById(username);
         if (p == null) {

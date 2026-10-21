@@ -27,12 +27,16 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
 import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Session;
@@ -43,6 +47,9 @@ import com.codenameone.examples.skirmish.net.Session;
 /// editing that file, not this one.
 // tag::skirmish-ui[]
 public final class Ui {
+    /// The widest a column of fields and buttons grows, in millimetres.
+    public static final int MAX_COLUMN_MM = 90;
+
     private Ui() {
     }
 
@@ -105,12 +112,71 @@ public final class Ui {
         return c;
     }
 
+    /// Equal cells side by side, with a gap between them and none at the
+    /// outer edges, so a row lines up with the full-width buttons above it.
     public static Container row(Component... children) {
         Container c = new Container(new GridLayout(1, children.length));
-        for (Component child : children) {
-            c.add(child);
+        for (int i = 0; i < children.length; i++) {
+            Style s = children[i].getAllStyles();
+            s.setMarginUnitLeft(Style.UNIT_TYPE_DIPS);
+            s.setMarginUnitRight(Style.UNIT_TYPE_DIPS);
+            s.setMarginLeft(i == 0 ? 0f : 0.8f);
+            s.setMarginRight(i == children.length - 1 ? 0f : 0.8f);
+            c.add(children[i]);
         }
         return c;
+    }
+
+    /// A column no wider than a phone held upright, centred on wider screens,
+    /// with the same gutter on both sides. Fields and buttons inside it all
+    /// fill its width, so they line up.
+    public static Container column(Component... children) {
+        Container col = new Container(BoxLayout.y()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                Dimension d = super.calcPreferredSize();
+                int gutter = CN.convertToPixels(4) * 2;
+                d.setWidth(Math.min(CN.convertToPixels(MAX_COLUMN_MM), CN.getDisplayWidth() - gutter));
+                return d;
+            }
+        };
+        for (Component child : children) {
+            col.add(child);
+        }
+        return col;
+    }
+
+    /// `column` centred in the space it is given.
+    public static Container centeredColumn(Container column) {
+        return BorderLayout.centerCenter(column);
+    }
+
+    /// A rounded bar filled to `value` of `max`, for experience and quests.
+    public static Component bar(final int value, final int max, final int color) {
+        return new Component() {
+            @Override
+            public void paint(Graphics g) {
+                int h = getHeight();
+                int w = getWidth();
+                g.setAntiAliased(true);
+                g.setColor(0x0e1224);
+                g.fillRoundRect(getX(), getY(), w, h, h, h);
+                int fill = max <= 0 ? 0 : (int) ((long) Math.max(0, Math.min(value, max)) * (w - 2) / max);
+                if (fill > 0) {
+                    g.setColor(color);
+                    g.fillRoundRect(getX() + 1, getY() + 1, Math.max(h - 2, fill), h - 2, h - 2, h - 2);
+                    g.setColor(0xffffff);
+                    g.setAlpha(70);
+                    g.fillRoundRect(getX() + 2, getY() + 1, Math.max(h - 4, fill - 2), (h - 2) / 2, h / 2, h / 2);
+                    g.setAlpha(255);
+                }
+            }
+
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(CN.convertToPixels(20), CN.convertToPixels(2.2f));
+            }
+        };
     }
 
     public static Container centered(Component... children) {

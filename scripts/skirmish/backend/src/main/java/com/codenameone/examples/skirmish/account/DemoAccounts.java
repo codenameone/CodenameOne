@@ -23,6 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.skirmish.admin.Flags;
+import com.codenameone.examples.skirmish.progress.Progression;
 import java.io.IOException;
 
 /// The accounts a development server starts with: two players to challenge
@@ -39,15 +40,17 @@ public class DemoAccounts {
 
     private final Accounts accounts;
     private final Flags flags;
+    private final Progression progression;
     private final Config config;
     private final String adminEmail;
     private final String adminPassword;
 
-    public DemoAccounts(Accounts accounts, Flags flags, Config config,
+    public DemoAccounts(Accounts accounts, Flags flags, Progression progression, Config config,
             @Value("${skirmish.admin.email:}") String adminEmail,
             @Value("${skirmish.admin.password:}") String adminPassword) {
         this.accounts = accounts;
         this.flags = flags;
+        this.progression = progression;
         this.config = config;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
@@ -74,6 +77,7 @@ public class DemoAccounts {
     private void add(String username, String name, boolean admin) throws IOException {
         if (!accounts.exists(username)) {
             accounts.create(username, PASSWORD, name, admin);
+            progression.seedDemo(username);
         }
     }
 }

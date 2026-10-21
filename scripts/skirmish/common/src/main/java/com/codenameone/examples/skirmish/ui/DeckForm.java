@@ -26,7 +26,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.skirmish.api.DeckDto;
-import com.codenameone.examples.skirmish.battle.Art;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.Net;
@@ -62,11 +61,12 @@ public final class DeckForm {
         Ui.back(f, Nav::home);
         f.add(summary);
         Container grid = new Container(new GridLayout(4));
-        int size = CN.convertToPixels(11);
+        int size = Math.min(CN.convertToPixels(18),
+                (Math.min(CN.convertToPixels(Ui.MAX_COLUMN_MM), CN.getDisplayWidth()) - CN.convertToPixels(12)) / 4);
         List<CardDef> all = Cards.playable();
         for (int i = 0; i < all.size(); i++) {
             final CardDef c = all.get(i);
-            Button b = new Button(c.name + "\n" + c.cost, Art.cardIcon(c.id, size), "CardSlot");
+            Button b = new Button("", CardArt.card(c.id, size), "CardSlot");
             b.setName("deck-" + c.id);
             b.setTextPosition(Component.BOTTOM);
             b.putClientProperty("card", c.id);
