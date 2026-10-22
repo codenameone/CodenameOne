@@ -110,7 +110,7 @@ final class JavaSEFileDialogs {
 
     private static boolean needsSwing(FileDialogRequest<?> request) {
         if (request.getFilters().length > 1 || request.getOptions().length > 0
-                || request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false)) {
+                || request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false)) {
             return true;
         }
         if (request.getAcceptLabel() != null) {
@@ -245,7 +245,7 @@ final class JavaSEFileDialogs {
             chooser.setCurrentDirectory(dir);
         }
         chooser.setFileHidingEnabled(!request.getBooleanHint(
-                com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false));
+                com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false));
         if (request.getAcceptLabel() != null) {
             chooser.setApproveButtonText(request.getAcceptLabel());
         }

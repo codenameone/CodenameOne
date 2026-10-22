@@ -34,6 +34,7 @@ import com.codename1.io.filechooser.SaveFileRequest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
+import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -60,8 +61,12 @@ final class FileDialogSupport {
 
     /// Answers an open request through `CodenameOneImplementation#openFileChooser`,
     /// which every port already implements, natively where it can.
-    static void showOpen(CodenameOneImplementation impl, final OpenFileRequest request,
+    static void showOpen(final CodenameOneImplementation impl, final OpenFileRequest request,
                          final SuccessCallback<FileDialogResult> callback) {
+        if (request.isMultiSelect() && !request.isDirectories()) {
+            showMultiOpen(request, callback);
+            return;
+        }
         impl.openFileChooser(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
@@ -74,6 +79,40 @@ final class FileDialogSupport {
                 }
             }
         }, request.toAcceptString());
+    }
+
+    /// The fallback Open dialog for several files: a file tree whose files toggle
+    /// a check mark, answered by Open with every checked file in the order it was
+    /// checked. Open with nothing checked is a cancellation, as on the native pickers.
+    static void showMultiOpen(final OpenFileRequest request, final SuccessCallback<FileDialogResult> callback) {
+        if (!Display.getInstance().isEdt()) {
+            // The dialog is modal and must be built on the EDT.
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    showMultiOpen(request, callback);
+                }
+            });
+            return;
+        }
+        Dialog d = new Dialog(request.getTitle() == null ? "Select files" : request.getTitle());
+        d.setLayout(new BorderLayout());
+        if (request.getMessage() != null) {
+            d.add(BorderLayout.NORTH, new Label(request.getMessage()));
+        }
+        MultiSelectFileTree tree = new MultiSelectFileTree(
+                CodenameOneImplementation.fileTreeModel(request.toAcceptString()));
+        d.add(BorderLayout.CENTER, tree);
+        Command cancel = new Command("Cancel");
+        Command open = new Command(request.getAcceptLabel() == null ? "Open" : request.getAcceptLabel());
+        d.placeButtonCommands(new Command[]{cancel, open});
+        Command picked = d.showAtPosition(2, 2, 2, 2, true);
+        String[] paths = tree.getSelectedPaths();
+        if (picked == open && paths.length > 0) {
+            deliver(new FileDialogResult(request, paths, -1, null), callback);
+        } else {
+            deliver(FileDialogResult.cancelled(request), callback);
+        }
     }
 
     /// Shows the fallback save form: a name field, the filter list and the

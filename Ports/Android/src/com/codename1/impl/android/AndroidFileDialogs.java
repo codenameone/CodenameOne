@@ -32,7 +32,6 @@ import android.os.Build;
 import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
 import com.codename1.io.filechooser.FileDialogFeatures;
-import com.codename1.io.filechooser.FileDialogHints;
 import com.codename1.io.filechooser.FileDialogRequest;
 import com.codename1.io.filechooser.FileDialogResult;
 import com.codename1.io.filechooser.FileTypeFilter;
@@ -73,7 +72,7 @@ final class AndroidFileDialogs {
             case FileDialogFeatures.INITIAL_DIRECTORY:
                 // The portable initialDirectory(path) is ignored: SAF starts from a
                 // document URI and a file path has no general mapping to one. The
-                // FileDialogHints.ANDROID_INITIAL_URI hint (API 26+) is the Android
+                // FileDialogRequest.HINT_ANDROID_INITIAL_URI hint (API 26+) is the Android
                 // equivalent, and a hint is not what this feature reports.
                 return false;
             default:
@@ -104,7 +103,7 @@ final class AndroidFileDialogs {
             }
         }
         applyInitialUri(request, intent);
-        final boolean persist = request.getBooleanHint(FileDialogHints.ANDROID_PERSIST_PERMISSION, false);
+        final boolean persist = request.getBooleanHint(FileDialogRequest.HINT_ANDROID_PERSIST_PERMISSION, false);
         start(request, callback, intent, new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode, Intent data) {
                 if (resultCode != Activity.RESULT_OK || data == null) {
@@ -227,7 +226,7 @@ final class AndroidFileDialogs {
             intent.putExtra(Intent.EXTRA_TITLE, name);
         }
         applyInitialUri(request, intent);
-        final boolean persist = request.getBooleanHint(FileDialogHints.ANDROID_PERSIST_PERMISSION, false);
+        final boolean persist = request.getBooleanHint(FileDialogRequest.HINT_ANDROID_PERSIST_PERMISSION, false);
         start(request, callback, intent, new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode, Intent data) {
                 final Uri uri = data == null ? null : data.getData();
@@ -362,7 +361,7 @@ final class AndroidFileDialogs {
     }
 
     private static void applyInitialUri(FileDialogRequest<?> request, Intent intent) {
-        String initial = request.getStringHint(FileDialogHints.ANDROID_INITIAL_URI);
+        String initial = request.getStringHint(FileDialogRequest.HINT_ANDROID_INITIAL_URI);
         if (initial != null && initial.length() > 0 && Build.VERSION.SDK_INT >= 26) {
             intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(initial));
         }

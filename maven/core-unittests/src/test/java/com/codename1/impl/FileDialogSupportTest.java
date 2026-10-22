@@ -22,18 +22,21 @@
  */
 package com.codename1.impl;
 
+import com.codename1.components.FileTreeModel;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.filechooser.FileDialogResult;
 import com.codename1.io.filechooser.FileTypeFilter;
 import com.codename1.io.filechooser.SaveFileRequest;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Button;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -93,6 +96,26 @@ class FileDialogSupportTest extends UITestBase {
         for (String f : fs.listFiles(home)) {
             assertFalse(f.contains("cn1-backup") || f.contains("cn1-save"), f);
         }
+    }
+
+    @FormTest
+    void theMultiSelectTreeReturnsCheckedFilesInTheOrderTheyWereChecked() throws IOException {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String a = fs.getAppHomePath() + "a.txt";
+        String b = fs.getAppHomePath() + "b.txt";
+        String c = fs.getAppHomePath() + "c.txt";
+        write(fs, a, "a");
+        write(fs, b, "b");
+        write(fs, c, "c");
+        MultiSelectFileTree tree = new MultiSelectFileTree(new FileTreeModel(true));
+        Button na = tree.createNodeComponent(a, 0);
+        Button nb = tree.createNodeComponent(b, 0);
+        Button nc = tree.createNodeComponent(c, 0);
+        nc.released();
+        na.released();
+        nb.released();
+        nb.released();
+        assertArrayEquals(new String[]{c, a}, tree.getSelectedPaths());
     }
 
     private static void write(FileSystemStorage fs, String path, String text) throws IOException {

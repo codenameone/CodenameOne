@@ -91,8 +91,8 @@ class IoJava178Snippet {
                         .extensions("txt").mimeTypes("text/plain"))
                 .addOption(FileDialogOption.choice("pages", "Pages", "All", "Current"))
                 .accessory(formatPanel)
-                .hint(FileDialogHints.MAC_SHOWS_TAG_FIELD, true)
-                .hint(FileDialogHints.WIN_CLIENT_GUID, "6f1c2c7e-9a1b-4c55-8f2a-3e5d1b0a7c11")
+                .hint(FileDialogRequest.HINT_MAC_SHOWS_TAG_FIELD, true)
+                .hint(FileDialogRequest.HINT_WIN_CLIENT_GUID, "6f1c2c7e-9a1b-4c55-8f2a-3e5d1b0a7c11")
                 .content((result, out) -> {
                     boolean pdf = result.getSelectedFilterIndex() == 0;
                     boolean all = "All".equals(result.getOptionValue("pages"));

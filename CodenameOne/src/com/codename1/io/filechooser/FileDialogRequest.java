@@ -41,6 +41,38 @@ import java.util.Map;
 ///
 /// - `<T>`: the concrete request type, so chained setters keep it
 public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
+    // Platform specific hints for #hint(String, Object). A platform that does
+    // not know a hint ignores it, so an application can set every hint it cares
+    // about unconditionally. The prefix after HINT_ names the platform that reads it.
+
+    /// `Boolean`: show the Finder tag field in a macOS save panel.
+    public static final String HINT_MAC_SHOWS_TAG_FIELD = "mac.showsTagField";
+    /// `Boolean`: allow creating folders from a macOS panel. Defaults to true.
+    public static final String HINT_MAC_CAN_CREATE_DIRECTORIES = "mac.canCreateDirectories";
+    /// `Boolean`: show hidden files in a macOS panel.
+    public static final String HINT_MAC_SHOWS_HIDDEN_FILES = "mac.showsHiddenFiles";
+    /// `Boolean`: let the user hide the extension in a macOS save panel.
+    public static final String HINT_MAC_CAN_SELECT_HIDDEN_EXTENSION = "mac.canSelectHiddenExtension";
+    /// `Boolean`: treat packages (`.app`, `.bundle`) as folders in a macOS open panel.
+    public static final String HINT_MAC_TREATS_PACKAGES_AS_DIRECTORIES = "mac.treatsFilePackagesAsDirectories";
+    /// `Boolean`: show file extensions in the iOS document picker.
+    public static final String HINT_IOS_SHOWS_FILE_EXTENSIONS = "ios.showsFileExtensions";
+    /// `Boolean`: move rather than copy the exported file on iOS. Defaults to copy.
+    public static final String HINT_IOS_EXPORT_AS_MOVE = "ios.exportAsMove";
+    /// `String`: a `content://` URI the Android picker starts in.
+    public static final String HINT_ANDROID_INITIAL_URI = "android.initialUri";
+    /// `Boolean`: keep persistable read/write permission to the picked
+    /// Android document across restarts.
+    public static final String HINT_ANDROID_PERSIST_PERMISSION = "android.persistPermission";
+    /// `String`: a GUID string; Windows remembers the last folder and size
+    /// separately per GUID, so different dialogs of one app do not share state.
+    public static final String HINT_WIN_CLIENT_GUID = "win.clientGuid";
+    /// `String`: the folder Windows shows when the user has no recent folder,
+    /// as opposed to `FileDialogRequest#initialDirectory`, which always wins.
+    public static final String HINT_WIN_DEFAULT_FOLDER = "win.defaultFolder";
+    /// `Boolean`: show hidden files in the GTK chooser and the simulator.
+    public static final String HINT_DESKTOP_SHOW_HIDDEN = "desktop.showHidden";
+
     private String title;
     private String message;
     private String acceptLabel;
@@ -145,7 +177,7 @@ public abstract class FileDialogRequest<T extends FileDialogRequest<T>> {
         return self();
     }
 
-    /// Sets a platform specific hint; see `FileDialogHints`. Unknown hints are
+    /// Sets a platform specific hint; see the `HINT_` constants. Unknown hints are
     /// ignored.
     ///
     /// #### Parameters

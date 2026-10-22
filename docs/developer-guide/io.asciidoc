@@ -157,7 +157,7 @@ Every platform can open and save a single file. Some features apply only where t
 * **Filters** (`FileTypeFilter`) carry extensions, MIME types and Apple type identifiers, and each platform reads the form it understands. Extensions alone work everywhere.
 * **Options** (`FileDialogOption`) are declarative checkboxes, choice lists and text fields. Each desktop maps them to its own controls. Where a platform shows none, `FileDialogResult.getOptionValue()` returns the default value.
 * **Accessory** components are Codename One components embedded in the dialog. Today only the Codename One fallback save form shows one, so prefer options.
-* **Hints** (`FileDialogHints`) are platform specific settings, such as the macOS tag field, a Windows client GUID or the folder the browser starts in. A platform that doesn't recognize a hint ignores it.
+* **Hints** (`FileDialogRequest.hint()` with a `FileDialogRequest.HINT_` constant) are platform specific settings, such as the macOS tag field, a Windows client GUID or the folder Android starts in. A platform that doesn't recognize a hint ignores it.
 
 Call `Display.isFileDialogFeatureSupported()` with a `FileDialogFeatures` constant to check a feature at runtime:
 
@@ -205,6 +205,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 |The browser file picker, several files
 |A download with the suggested name and extension
 |None
+
+|Other ports
+|A Codename One file tree. With `multiSelect(true)` each file toggles a check mark and *Open* returns every checked file.
+|A Codename One form with a name field, saved into the starting folder or the app home
+|Filter list, options and accessory on the save form only
 |===
 
 A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:

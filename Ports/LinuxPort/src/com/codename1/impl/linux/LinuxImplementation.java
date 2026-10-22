@@ -2621,7 +2621,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), null,
                 com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
                 request.isMultiSelect(), request.isDirectories(), false,
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
                 com.codename1.impl.NativeFileDialogCodec.encodeOptions(request));
         com.codename1.impl.NativeFileDialogCodec.deliver(callback, com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
     }
@@ -2637,7 +2637,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 request.getSuggestedName(),
                 com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
                 false, false, request.isConfirmOverwrite(),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.DESKTOP_SHOW_HIDDEN, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
                 com.codename1.impl.NativeFileDialogCodec.encodeOptions(request));
         com.codename1.io.filechooser.FileDialogResult result =
                 com.codename1.impl.NativeFileDialogCodec.decode(request, answer);

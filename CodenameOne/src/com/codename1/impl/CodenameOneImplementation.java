@@ -8896,6 +8896,19 @@ public abstract class CodenameOneImplementation {
     public void openFileChooser(final ActionListener response, String accept) {
         final Dialog d = new Dialog("Select a file");
         d.setLayout(new BorderLayout());
+        FileTree t = new OpenGalleryFileTree(fileTreeModel(accept), response, d);
+        d.addComponent(BorderLayout.CENTER, t);
+        d.placeButtonCommands(new Command[]{new Command("Cancel")});
+        Command c = d.showAtPosition(2, 2, 2, 2, true);
+        if (c != null) {
+            response.actionPerformed(null);
+        }
+    }
+
+    /// The file system model behind the fallback open dialogs, narrowed to the
+    /// extensions in an `openFileChooser` accept string. MIME types and the `*`
+    /// wildcard do not narrow it.
+    static FileTreeModel fileTreeModel(String accept) {
         FileTreeModel model = new FileTreeModel(true);
         if (accept != null) {
             Vector tokens = StringUtil.tokenizeString(accept, ',');
@@ -8910,19 +8923,14 @@ public abstract class CodenameOneImplementation {
                 }
             }
         }
-
-        FileTree t = new OpenGalleryFileTree(model, response, d);
-        d.addComponent(BorderLayout.CENTER, t);
-        d.placeButtonCommands(new Command[]{new Command("Cancel")});
-        Command c = d.showAtPosition(2, 2, 2, 2, true);
-        if (c != null) {
-            response.actionPerformed(null);
-        }
+        return model;
     }
 
-    /// Shows an Open dialog. The default answers through `#openFileChooser`, so
-    /// a port with a native single-file picker already gets a native dialog;
-    /// ports override this to support the rest of the request.
+    /// Shows an Open dialog. The default answers a single-file request through
+    /// `#openFileChooser`, so a port with a native single-file picker already gets
+    /// a native dialog, and a multi-select request with a Codename One file tree
+    /// whose files toggle a check mark. Ports override this to support the rest
+    /// of the request.
     ///
     /// #### Parameters
     ///
@@ -8972,7 +8980,8 @@ public abstract class CodenameOneImplementation {
         // The fallback save form (FileDialogSupport.showSave) renders the filter
         // list, every portable option and the accessory, so those are reported;
         // FileDialogFeatures documents that the fallback open dialog does not.
-        return feature == FileDialogFeatures.SAVE_NAME_EDITING
+        return feature == FileDialogFeatures.MULTI_SELECT
+                || feature == FileDialogFeatures.SAVE_NAME_EDITING
                 || feature == FileDialogFeatures.FILTER_LIST
                 || feature == FileDialogFeatures.OPTIONS
                 || feature == FileDialogFeatures.ACCESSORY_COMPONENT;

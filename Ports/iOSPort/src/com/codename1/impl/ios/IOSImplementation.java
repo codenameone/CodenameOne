@@ -6904,7 +6904,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.showOpenFileDialog(joinLines(uts), joinLines(exts),
                 request.isMultiSelect(), request.isDirectories(),
                 stripFileScheme(request.getInitialDirectory()),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.IOS_SHOWS_FILE_EXTENSIONS, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_IOS_SHOWS_FILE_EXTENSIONS, false),
                 id);
     }
 
@@ -6985,7 +6985,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 int id = registerFileDialog(new PendingFileDialog(request, callback, temp));
                 nativeInstance.showSaveFileDialog(temp,
-                        !request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.IOS_EXPORT_AS_MOVE, false),
+                        !request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_IOS_EXPORT_AS_MOVE, false),
                         stripFileScheme(request.getInitialDirectory()), id);
             }
 
@@ -7033,11 +7033,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 request.getSelectedFilter(),
                 joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeOptions(request)),
                 multi, dirs,
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_SHOWS_TAG_FIELD, false),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_CAN_CREATE_DIRECTORIES, true),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_SHOWS_HIDDEN_FILES, false),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_CAN_SELECT_HIDDEN_EXTENSION, false),
-                request.getBooleanHint(com.codename1.io.filechooser.FileDialogHints.MAC_TREATS_PACKAGES_AS_DIRECTORIES, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_SHOWS_TAG_FIELD, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_CAN_CREATE_DIRECTORIES, true),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_SHOWS_HIDDEN_FILES, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_CAN_SELECT_HIDDEN_EXTENSION, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_TREATS_PACKAGES_AS_DIRECTORIES, false),
                 id);
     }
 
