@@ -152,10 +152,22 @@ int cn1_crypto_generate_rsa_keypair(int bits,
                                     uint8_t* outPub,  int pubCap,  int* pubLen,
                                     uint8_t* outPriv, int privCap, int* privLen);
 
-/// Generates an EC P-256 key pair: X.509 SubjectPublicKeyInfo (91 bytes) into
-/// `outPub` and PKCS#8 (138 bytes, ECPrivateKey with its public point) into
-/// `outPriv`. Returns 0 on success, negative on error.
-int cn1_crypto_generate_ec_keypair(uint8_t* outPub,  int pubCap,  int* pubLen,
-                                   uint8_t* outPriv, int privCap, int* privLen);
+/* --- P-256 (ECDSA / ECDH) -------------------------------------------- */
+
+/// Generates a P-256 key pair into `out97`: 04||X||Y||D (ANSI X9.63).
+/// Returns 97 on success, negative on error.
+int cn1_crypto_ec_generate(uint8_t* out97);
+
+/// ECDH: x coordinate of D * peer. `priv97` is X9.63, `point65` an
+/// uncompressed point. Returns bytes written (32) or negative.
+int cn1_crypto_ecdh(const uint8_t* priv97, const uint8_t* point65, uint8_t* out, int outCap);
+
+/// ECDSA sign (DER output). Algorithm codes 3..5 as for cn1_crypto_sign.
+int cn1_crypto_ec_sign(int algorithm, const uint8_t* priv97,
+                       const uint8_t* data, int dataLen, uint8_t* out, int outCap);
+
+/// ECDSA verify of a DER signature. 1 valid, 0 invalid, negative on error.
+int cn1_crypto_ec_verify(int algorithm, const uint8_t* point65,
+                         const uint8_t* data, int dataLen, const uint8_t* sig, int sigLen);
 
 #endif /* CN1Crypto_h */

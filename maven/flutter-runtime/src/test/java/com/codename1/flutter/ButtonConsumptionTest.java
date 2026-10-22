@@ -68,10 +68,10 @@ class ButtonConsumptionTest {
     @Test
     void iconChildBecomesTheMaterialGlyph() {
         TextButton b = new TextButton();
-        b.child(new Icon(Icons.add));
+        b.child(new Icon(Icons.add()));
         ButtonRenderElement el = mount(b);
         assertNull(el.consumedLabel());
-        assertEquals(Icons.add.codePoint(), el.consumedIconChar());
+        assertEquals(Icons.add().codePoint(), el.consumedIconChar());
     }
 
     @Test
@@ -85,11 +85,11 @@ class ButtonConsumptionTest {
     @Test
     void iconButtonConsumesItsIconParameter() {
         IconButton b = new IconButton();
-        b.icon(new Icon(Icons.settings));
+        b.icon(new Icon(Icons.settings()));
         b.iconSize(32.0);
         ButtonRenderElement el = mount(b);
         assertNull(el.consumedLabel());
-        assertEquals(Icons.settings.codePoint(), el.consumedIconChar());
+        assertEquals(Icons.settings().codePoint(), el.consumedIconChar());
     }
 
     /**

@@ -404,7 +404,7 @@ abstract class Navigator {
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')
-external Future<dynamic> showDialog({BuildContext context, WidgetBuilder builder});
+external Future<T?> showDialog<T>({BuildContext context, WidgetBuilder builder});
 
 @JavaName('com.codename1.flutter.material.AlertDialog')
 class AlertDialog extends Widget {

@@ -4293,4 +4293,63 @@ public class Arrays {
         return copyOfRange(original, 0, len);
     }
    
+
+    /// A sequential stream of the elements of `array`.
+    public static <T> java.util.stream.Stream<T> stream(T[] array) {
+        return java.util.stream.Stream.of(array);
+    }
+
+    /// A sequential stream of the elements of `array` from `startInclusive` up
+    /// to, not including, `endExclusive`.
+    public static <T> java.util.stream.Stream<T> stream(T[] array, int startInclusive, int endExclusive) {
+        checkStreamRange(array.length, startInclusive, endExclusive);
+        return java.util.stream.Stream.of(array).skip(startInclusive).limit(endExclusive - startInclusive);
+    }
+
+    /// A sequential stream of the elements of `array`.
+    public static java.util.stream.IntStream stream(int[] array) {
+        return java.util.stream.IntStream.of(array);
+    }
+
+    /// A sequential stream of the elements of `array` from `startInclusive` up
+    /// to, not including, `endExclusive`.
+    public static java.util.stream.IntStream stream(int[] array, int startInclusive, int endExclusive) {
+        checkStreamRange(array.length, startInclusive, endExclusive);
+        return java.util.stream.IntStream.of(array).skip(startInclusive).limit(endExclusive - startInclusive);
+    }
+
+    /// A sequential stream of the elements of `array`.
+    public static java.util.stream.LongStream stream(long[] array) {
+        return java.util.stream.LongStream.of(array);
+    }
+
+    /// A sequential stream of the elements of `array` from `startInclusive` up
+    /// to, not including, `endExclusive`.
+    public static java.util.stream.LongStream stream(long[] array, int startInclusive, int endExclusive) {
+        checkStreamRange(array.length, startInclusive, endExclusive);
+        return java.util.stream.LongStream.of(array).skip(startInclusive).limit(endExclusive - startInclusive);
+    }
+
+    /// A sequential stream of the elements of `array`.
+    public static java.util.stream.DoubleStream stream(double[] array) {
+        return java.util.stream.DoubleStream.of(array);
+    }
+
+    /// A sequential stream of the elements of `array` from `startInclusive` up
+    /// to, not including, `endExclusive`.
+    public static java.util.stream.DoubleStream stream(double[] array, int startInclusive, int endExclusive) {
+        checkStreamRange(array.length, startInclusive, endExclusive);
+        return java.util.stream.DoubleStream.of(array).skip(startInclusive).limit(endExclusive - startInclusive);
+    }
+
+    // A reversed range is an ArrayIndexOutOfBoundsException, not an
+    // IllegalArgumentException: that is what the JDK's Arrays.stream
+    // documents and throws (Spliterators.checkFromToBounds), and HotSpot
+    // answers the same in the bulk conformance run.
+    private static void checkStreamRange(int length, int startInclusive, int endExclusive) {
+        if (startInclusive < 0 || endExclusive > length || startInclusive > endExclusive) {
+            throw new ArrayIndexOutOfBoundsException("origin(" + startInclusive + ") > fence(" + endExclusive + ")");
+        }
+    }
+
 }

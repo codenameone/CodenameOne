@@ -14,10 +14,13 @@ on:
       # sample itself is compiled and tested by wayline.yml, so the demo build
       # and the figure render have nothing to add for it.
       - 'scripts/wayline/**'
-      # The Savor chapters, the same way; savor.yml compiles and tests the sample.
+      # The Savor and Parley chapters, the same way; savor.yml and parley.yml
+      # compile and test the samples.
       - 'scripts/savor/**'
       # The Bastion chapters, the same way; bastion.yml compiles and tests it.
       - 'scripts/bastion/**'
+      - 'scripts/skirmish/**'
+      - 'scripts/parley/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one
@@ -129,10 +132,12 @@ jobs:
               - 'Ports/JavaSE/**'
               - 'maven/core/**'
               - 'maven/javase/**'
-              # The Wayline, Savor and Bastion chapters include these trees by tag, so a
+              # The Wayline, Savor, Parley and Bastion chapters include these trees by tag, so a
               # renamed or deleted tag there has to reach the snippet check.
               - 'scripts/wayline/**'
               - 'scripts/savor/**'
+              - 'scripts/skirmish/**'
+              - 'scripts/parley/**'
               - 'scripts/bastion/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'

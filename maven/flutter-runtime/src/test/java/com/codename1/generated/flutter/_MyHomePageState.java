@@ -57,7 +57,7 @@ public class _MyHomePageState extends State<MyHomePage> {
         var $t6 = new FloatingActionButton();
         $t6.onPressed(this::_incrementCounter);
         $t6.tooltip("Increment");
-        $t6.child(new Icon(Icons.add));
+        $t6.child(new Icon(Icons.add()));
         $t0.floatingActionButton($t6);
         return $t0;
     }

@@ -24,7 +24,7 @@
 package java.lang;
 /// The Boolean class wraps a value of the primitive type boolean in an object. An object of type Boolean contains a single field whose type is boolean.
 /// Since: JDK1.0, CLDC 1.0
-public final class Boolean{
+public final class Boolean implements Comparable<Boolean> {
     /// The Boolean object corresponding to the primitive value false.
     public static final java.lang.Boolean FALSE=null;
 
@@ -80,5 +80,47 @@ public final class Boolean{
 
     public int compareTo(final Boolean b2) {
             return 0;
+    }
+
+    public static final Class<Boolean> TYPE = null;
+
+    /// A Boolean of `parseBoolean(s)`.
+    @Deprecated
+    public Boolean(String s) {
+    }
+
+    /// `"true"` or `"false"`.
+    public static String toString(boolean b) {
+        return null;
+    }
+
+    /// 1231 for true, 1237 for false, as the JDK hashes them.
+    public static int hashCode(boolean value) {
+        return 0;
+    }
+
+    /// 0 when equal, otherwise positive when `x` is true.
+    public static int compare(boolean x, boolean y) {
+        return 0;
+    }
+
+    /// `a && b`.
+    public static boolean logicalAnd(boolean a, boolean b) {
+        return false;
+    }
+
+    /// `a || b`.
+    public static boolean logicalOr(boolean a, boolean b) {
+        return false;
+    }
+
+    /// `a ^ b`.
+    public static boolean logicalXor(boolean a, boolean b) {
+        return false;
+    }
+
+    /// Whether the system property `name` is `"true"`, ignoring case.
+    public static boolean getBoolean(String name) {
+        return false;
     }
 }

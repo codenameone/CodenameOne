@@ -374,6 +374,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
+        boolean game = template == Template.SKIRMISH;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -387,12 +388,24 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // The README describes the app this template really is: a food-delivery
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
-        assertContains(readme, rides ? "ride-hailing app" : bank ? "working bank" : "food-delivery app",
+        boolean chat = template == Template.PARLEY;
+        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : "food-delivery app",
                 label + "README names the app");
-        assertContains(readme, (rides ? "`rider@" : bank ? "`customer2@" : "`customer@") + artifact + ".example`",
-                label + "README lists the template's own demo accounts");
-        assertFalse(readme.indexOf(rides || bank ? "courier@" : "rider@") >= 0,
-                label + "README carries no other template's accounts");
+        if (!game) {
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : "`customer@") + artifact + ".example`",
+                    label + "README lists the template's own demo accounts");
+            assertFalse(readme.indexOf(rides || chat || bank ? "courier@" : "rider@") >= 0,
+                    label + "README carries no other template's accounts");
+            assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
+        }
+        if (game) {
+            assertContains(rootPom, "<module>rules</module><module>shared</module>",
+                    label + "the rules module is built ahead of the contract");
+            assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
+                    label + "the app depends on the rules");
+            assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
+                    label + "the server depends on the rules");
+        }
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
@@ -402,18 +415,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (rides ? "/api/RiderApi.java" : bank ? "/api/BankingApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
-        assertNotNull(entries.get("backend/src/main/resources/db/migration/"
-                        + (bank ? "V4__accounts.sql" : "V1__accounts.sql")),
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (rides ? "/RideFlowTest.java" : bank ? "/LedgerTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (rides ? "/rider/RiderForm.java" : bank ? "/ui/HomeForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
-        assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
+        if (!game) {
+            assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
+        }
         // The generic server every other project gets, which this one replaces.
         assertNull(entries.get("backend/src/main/java/" + packagePath + "/Greeter.java"),
                 label + "the generic server's sources were left beside the template's");
@@ -429,18 +443,22 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(settings, "codename1.arg.android.playIntegrity=true", label + "the template's Android hint");
         } else {
             assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
-            assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
-                    label + "the template's iOS location prompt");
+            if (!game) {
+                assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
+                        label + "the template's iOS location prompt");
+            }
+            assertContains(settings, "codename1.arg.ios.includePush=", label + "the template's iOS push hint");
         }
         assertContains(settings, "codename1.arg.java.version=17", label + "a full-stack project is Java 17");
-        assertContains(getText(entries, "README.md"), "## The app and its server",
+        assertContains(getText(entries, "README.md"), game ? "## The game and its server" : "## The app and its server",
                 label + "README should explain the app and its server");
 
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String path = entry.getKey();
             assertFalse(path.indexOf(lower) >= 0 || path.indexOf(name) >= 0,
                     label + "the template's name is still in the path " + path);
-            if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")) {
+            if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")
+                    || path.endsWith(".glb")) {
                 continue;
             }
             String text = StringUtil.newString(entry.getValue());

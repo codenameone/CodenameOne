@@ -165,6 +165,53 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        Set<Ast.ClassDecl> done = new HashSet<Ast.ClassDecl>();
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                forwardSuperCtors(c, done);
+            }
+        }
+    }
+
+    /**
+     * Gives a mixin application class ({@code class C = S with M;}) one constructor per
+     * generative constructor of S, each taking S's parameters as {@code super.x} parameters
+     * and calling the same-named S constructor. S is completed first when it is itself a
+     * mixin application, so a chain forwards all the way down.
+     */
+    private void forwardSuperCtors(Ast.ClassDecl c, Set<Ast.ClassDecl> done) {
+        if (!c.forwardSuperCtors || !done.add(c) || c.superclass == null) {
+            return;
+        }
+        Ast.ClassDecl sup = resolveClass(c.superclass.name, c.ownerLibrary);
+        if (sup == null) {
+            return;   // a stub or JDK superclass: only its default constructor is reachable
+        }
+        forwardSuperCtors(sup, done);
+        for (Ast.CtorDecl sc : sup.ctors) {
+            if (sc.isFactory || (sc.name != null && sc.name.startsWith("_")
+                    && sup.ownerLibrary != c.ownerLibrary)) {
+                continue;
+            }
+            Ast.CtorDecl fc = new Ast.CtorDecl().at(c.file, c.line, c.col);
+            fc.name = sc.name;
+            fc.isConst = sc.isConst;
+            for (Ast.Param sp : sc.params) {
+                Ast.Param p = new Ast.Param().at(c.file, c.line, c.col);
+                p.type = sp.type;
+                p.name = sp.name;
+                p.named = sp.named;
+                p.required = sp.required;
+                p.optional = sp.optional;
+                p.isSuper = true;
+                p.defaultValue = sp.defaultValue;
+                fc.params.add(p);
+            }
+            Ast.SuperInit si = new Ast.SuperInit();
+            si.namedCtor = sc.name;
+            fc.superInit = si;
+            c.ctors.add(fc);
+        }
     }
 
     private boolean ownsPart(Ast.Library owner, Ast.Library part) {
@@ -400,7 +447,18 @@ public final class Program {
             // package:<own>/x.dart is this project's lib/x.dart; any other package is
             // external (a stub or unsupported) and never a user library.
             int slash = uri.indexOf('/');
-            if (slash < 0 || !ownPackages.contains(uri.substring("package:".length(), slash))) {
+            if (slash < 0) {
+                return null;
+            }
+            if (!ownPackages.contains(uri.substring("package:".length(), slash))) {
+                // A pub package transpiled with the app: cn1:import-flutter-project copies
+                // the files the app reaches to packages/<name>/, beside the app's own.
+                String inPackage = normalizePath("packages/" + uri.substring("package:".length()));
+                for (Ast.Library lib : libraries) {
+                    if (normalizePath(lib.fileName.replace('\\', '/')).equals(inPackage)) {
+                        return lib;
+                    }
+                }
                 return null;
             }
             String rest = normalizePath(uri.substring(slash + 1));

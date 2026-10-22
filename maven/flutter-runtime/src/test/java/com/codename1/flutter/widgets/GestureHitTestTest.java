@@ -80,7 +80,7 @@ class GestureHitTestTest {
     void anInnerButtonKeepsItsHandler() {
         final int[] pressed = {0};
         IconButton inner = new IconButton();
-        inner.icon(new Icon(com.codename1.flutter.Icons.search));
+        inner.icon(new Icon(com.codename1.flutter.Icons.search()));
         inner.onPressed(new Funcs.VoidFunc0() {
             @Override
             public void call() {

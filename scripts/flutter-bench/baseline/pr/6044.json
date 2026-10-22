@@ -1,0 +1,23 @@
+{
+ "pr": 6044,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "install_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 108835838
+     },
+     "reason": "java.* additions, re-measured after master's baseline fold and the Unity merge",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 108855936
+    }
+   }
+  }
+ }
+}

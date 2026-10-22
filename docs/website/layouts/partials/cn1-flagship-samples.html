@@ -13,6 +13,14 @@
     "guide" "/developer-guide/savor-users-guide/"
     "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/savor")
   (dict
+    "name" "Parley"
+    "kind" "Private messaging"
+    "url" "/parley/"
+    "summary" "A messenger with a Java backend: end-to-end encrypted chats and groups, voice notes, voice and video calls, linked devices and an admin console."
+    "images" (slice "/developer-guide/img/parley-chats.png" "/developer-guide/img/parley-bot-chat.png" "/developer-guide/img/parley-call-connected.png")
+    "guide" "/developer-guide/parley-users-guide/"
+    "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/parley")
+  (dict
     "name" "Wayline"
     "kind" "Ride hailing"
     "url" "/wayline/"
@@ -20,6 +28,14 @@
     "images" (slice "/developer-guide/img/wayline-rider-home.png" "/developer-guide/img/wayline-ride-driver-on-the-way.png" "/developer-guide/img/wayline-driver-offer.png")
     "guide" "/developer-guide/wayline-users-guide/"
     "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/wayline")
+  (dict
+    "name" "Skirmish"
+    "kind" "Real-time card battler"
+    "url" "/skirmish/"
+    "summary" "A 3D card-battle game with a Java backend: online matches, replays, a training battle, progression, in-app purchases, ads and a moderation console."
+    "images" (slice "/developer-guide/img/skirmish-home.png" "/developer-guide/img/skirmish-battle.png" "/developer-guide/img/skirmish-finale.png")
+    "guide" "/developer-guide/skirmish-implementors-guide/"
+    "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/skirmish")
   (dict
     "name" "Bastion"
     "kind" "Banking and crypto exchange"
@@ -42,11 +58,12 @@
   </div>
   <div class="cn1-flagship__grid">
     {{- range $samples }}
+    {{- $name := .name }}
     <article class="cn1-flagship-card">
       <a class="cn1-flagship-card__shots" href="{{ .url }}">
         {{- range $i, $img := .images }}
         {{- if or (not $compact) (eq $i 0) }}
-        <img src="{{ $img }}" alt="{{ $.name }} screen" loading="lazy">
+        <img src="{{ $img }}" alt="{{ $name }} screen" loading="lazy">
         {{- end }}
         {{- end }}
       </a>

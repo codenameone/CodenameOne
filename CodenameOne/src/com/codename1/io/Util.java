@@ -1884,10 +1884,17 @@ public final class Util {
         return cryptoImpl().generateRsaKeyPair(bits);
     }
 
-    /// Generates an EC key pair on the named curve (only "P-256" is
-    /// defined). Returns `{publicKeyX509, privateKeyPkcs8}`.
-    public static byte[][] generateEcKeyPair(String curve) {
-        return cryptoImpl().generateEcKeyPair(curve);
+    /// Generates a P-256 key pair through the platform's crypto provider.
+    /// Returns `{publicKeyX509, privateKeyPkcs8}`. Use
+    /// `com.codename1.security.KeyGenerator.ec` instead.
+    public static byte[][] generateEcKeyPair(int bits) {
+        return cryptoImpl().generateEcKeyPair(bits);
+    }
+
+    /// Computes a P-256 ECDH shared secret through the platform's crypto
+    /// provider. Use `com.codename1.security.KeyAgreement.ecdh` instead.
+    public static byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        return cryptoImpl().ecdhAgree(privateKeyPkcs8, publicKeyX509);
     }
 
     /// Generates `bytes` of fresh symmetric key material.

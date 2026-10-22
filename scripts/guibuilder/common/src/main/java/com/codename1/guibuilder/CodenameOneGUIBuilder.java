@@ -5269,13 +5269,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private boolean applyProjectCss(String css, CodeEditor editor) {
         try {
-            MutableResource resources = new MutableResource();
+            MutableResource resources = new ProjectImageResource(binding == null ? null : binding.cssFile());
             new CSSThemeCompiler().compile(css, resources, "ProjectTheme");
             projectTheme = resources.getTheme("ProjectTheme");
             normalizeCompiledTheme(projectTheme);
             // Declarations this compiler does not implement are reported rather than passed over.
             // The canvas runs the Codename One CSS compiler that ships in core, while the project
-            // is built by the Maven one, which understands more -- font-size and font-style among
+            // is built by the Maven one, which understands more -- font-style and font-weight among
             // them. Silently dropping those and announcing success let the canvas differ from the
             // built application with nothing to say so.
             List<CodeDiagnostic> ignored = unsupportedDeclarations(css);
@@ -5330,11 +5330,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String property = css.substring(nameStart, nameEnd).trim();
             String value = css.substring(at + 1, valueEnd).trim();
             if (property.length() == 0 || value.length() == 0 || property.startsWith("@")) continue;
-            Boolean supported = judged.get(property);
+            // A #Constants entry is a theme constant, not a style property a probe rule could show.
+            if (isInConstantsBlock(masked, at)) continue;
+            // Keyed by the value too: whether a declaration applies can depend on it, as a
+            // cn1-image-id naming a project image that exists or not does.
+            String judgedKey = property + ":" + value;
+            Boolean supported = judged.get(judgedKey);
             if (supported == null) {
                 Set<String> withProperty = compiledKeys(property + ": " + value + ";");
                 supported = Boolean.valueOf(withProperty == null || !withProperty.equals(baseline));
-                judged.put(property, supported);
+                judged.put(judgedKey, supported);
             }
             if (!supported.booleanValue()) {
                 out.add(new CodeDiagnostic(line, nameStart - lineStartBefore(masked, nameStart) + 1,
@@ -5343,6 +5348,46 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         }
         return out;
+    }
+
+    /**
+     * True when {@code at} sits inside a {@code #Constants} or {@code @constants} block. Braces
+     * inside a quoted value are text, so the scan tracks quotes and escapes.
+     */
+    private static boolean isInConstantsBlock(String masked, int at) {
+        List<String> open = new ArrayList<>();
+        int selectorStart = 0;
+        char quote = 0;
+        for (int i = 0; i < at && i < masked.length(); i++) {
+            char c = masked.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') i++;
+                else if (c == quote) quote = 0;
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '{') {
+                open.add(masked.substring(selectorStart, i).trim());
+                selectorStart = i + 1;
+            } else if (c == '}') {
+                if (!open.isEmpty()) open.remove(open.size() - 1);
+                selectorStart = i + 1;
+            } else if (c == ';') {
+                selectorStart = i + 1;
+            }
+        }
+        if (open.isEmpty()) return false;
+        String selector = open.get(open.size() - 1);
+        if ("@constants".equalsIgnoreCase(selector)) return true;
+        // `#Constants, Other { ... }` exports its constants too, but also styles `Other`, whose
+        // declarations still need the probe: only a list of nothing but #Constants is skipped.
+        int start = 0;
+        for (int i = 0; i <= selector.length(); i++) {
+            if (i == selector.length() || selector.charAt(i) == ',') {
+                if (!"#Constants".equalsIgnoreCase(selector.substring(start, i).trim())) return false;
+                start = i + 1;
+            }
+        }
+        return true;
     }
 
     /** True for the characters a CSS property name is made of. */
@@ -5363,7 +5408,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private Set<String> compiledKeys(String declaration) {
         try {
-            MutableResource probe = new MutableResource();
+            // Project-aware, as the real compile is: a cn1-image-id naming an image under
+            // res/Theme/<id>/ applies there, so the probe must find it too.
+            MutableResource probe = new ProjectImageResource(binding == null ? null : binding.cssFile());
             new CSSThemeCompiler().compile("CanvasCssProbe { color: #010203; " + declaration + " }",
                     probe, "Probe");
             Set<String> keys = new LinkedHashSet<>();
@@ -5432,13 +5479,178 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private void loadProjectTheme() {
         if (binding == null || binding.cssFile() == null) return;
         try {
-            MutableResource resources = new MutableResource();
+            MutableResource resources = new ProjectImageResource(binding.cssFile());
             new CSSThemeCompiler().compile(ProjectIO.read(binding.cssFile()), resources, "ProjectTheme");
             projectTheme = resources.getTheme("ProjectTheme");
             normalizeCompiledTheme(projectTheme);
         } catch (Exception ex) {
             projectTheme = null;
             setStatus("Project CSS has errors: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * The canvas compiles into an empty resource, so an image constant such as
+     * {@code #Constants{mediaPlayImage:play.png}} found nothing and the stylesheet was rejected,
+     * although the project build resolves it. This looks an image up where the build-time
+     * compiler does: {@code res/<theme>/<name>/<density>.png} beside the stylesheet. Images added to the project's own resource file in the designer are not
+     * visible here.
+     */
+    static final class ProjectImageResource extends MutableResource {
+        private final String cssDir;
+
+        ProjectImageResource(String cssFile) {
+            String path = cssFile == null ? null : cssFile.replace('\\', '/');
+            int slash = path == null ? -1 : path.lastIndexOf('/');
+            cssDir = slash < 0 ? null : path.substring(0, slash);
+        }
+
+        @Override
+        public com.codename1.ui.Image getImage(String id) {
+            com.codename1.ui.Image image = super.getImage(id);
+            if (image != null || cssDir == null || id == null) return image;
+            // No file of that name beside the stylesheet: the build-time compiler only reads the
+            // multi-image folder, so the canvas must not accept what the build would reject. It
+            // looks in the res folder beside the stylesheet, then the one a level up (a Maven
+            // project's src/main/res, an Ant project's own res).
+            // The theme.res the build writes is deliberately not consulted. The CSS CLI loads it
+            // only for an incremental rebuild (its selector cache present and no asset newer);
+            // a clean build -- CI, `mvn clean`, a fresh checkout -- starts without it, so an
+            // image found only there is one the next clean build rejects. Matching that build
+            // means rejecting it here too; the image belongs in a res/<Theme>/ folder.
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            int slash = cssDir.lastIndexOf('/');
+            String[] roots = slash < 0 ? new String[]{cssDir + "/res"}
+                    : new String[]{cssDir + "/res", cssDir.substring(0, slash) + "/res"};
+            try {
+                for (int r = 0; r < roots.length && image == null; r++) {
+                    String res = ProjectIO.fsUrl(roots[r]);
+                    if (!fs.isDirectory(res)) continue;
+                    // res/Theme first, as CSSTheme.getResourceImage() does, then the others.
+                    java.util.List<String> themes = new java.util.ArrayList<String>();
+                    themes.add("Theme");
+                    for (String listed : fs.listFiles(res)) {
+                        if (!"Theme".equals(stripSlash(listed))) themes.add(listed);
+                    }
+                    for (String theme : themes) {
+                        String folder = res + "/" + stripSlash(theme) + "/" + id;
+                        if (!fs.isDirectory(folder)) continue;
+                        image = bestVariant(folder, fs.listFiles(folder));
+                        if (image != null) break;
+                    }
+                }
+            } catch (IOException ignored) {
+                // An unreadable folder is an image that is not there.
+            }
+            if (image != null) setImage(id, image);
+            return image;
+        }
+
+        /**
+         * Classifies every PNG of a multi-image folder the way the build-time compiler does --
+         * a density by its exact lower-case name, any other name (HIGH.PNG included, which the
+         * build's case-sensitive switch reads as medium) as medium -- and loads the one the
+         * display density gets. A named medium file wins over another medium-classified one.
+         */
+        private static boolean isDirectory(String path) {
+            return com.codename1.io.FileSystemStorage.getInstance().isDirectory(path);
+        }
+
+        private static com.codename1.ui.Image bestVariant(String folder, String[] files) {
+            // The build stores each variant's bytes with EncodedImage.create(), which does not
+            // decode them, so a corrupt variant fails nothing there. The canvas only has to
+            // show one: a selected variant that does not decode falls through to the next.
+            for (String density : densityOrder(com.codename1.ui.Display.getInstance().getDeviceDensity())) {
+                String match = null;
+                for (String listed : files) {
+                    String file = stripSlash(listed);
+                    if (!file.regionMatches(true, file.length() - 4, ".png", 0, 4)
+                            || isDirectory(folder + "/" + file)) continue;
+                    // Several files classified medium (medium.png and any unrecognised name):
+                    // EditableResources.MultiImage.getBest() replaces its pick on every equal
+                    // DPI, so the build keeps the LAST one in its File.listFiles() order, and
+                    // the canvas keeps the last in its own listing.
+                    if (density.equals(file) && !"medium.png".equals(density)) {
+                        match = file;
+                        break;
+                    }
+                    if ("medium.png".equals(density) && (density.equals(file) || !isDensityName(file))) {
+                        match = file;
+                    }
+                }
+                if (match != null) {
+                    com.codename1.ui.Image image = load(folder + "/" + match);
+                    if (decodes(image)) return image;
+                }
+            }
+            return null;
+        }
+
+        private static boolean isDensityName(String file) {
+            for (String name : DENSITY_FILES) {
+                if (name.equals(file)) return true;
+            }
+            return false;
+        }
+
+        private static final int[] DENSITIES = {
+            com.codename1.ui.Display.DENSITY_VERY_LOW, com.codename1.ui.Display.DENSITY_LOW,
+            com.codename1.ui.Display.DENSITY_MEDIUM, com.codename1.ui.Display.DENSITY_HIGH,
+            com.codename1.ui.Display.DENSITY_VERY_HIGH, com.codename1.ui.Display.DENSITY_HD,
+            com.codename1.ui.Display.DENSITY_560, com.codename1.ui.Display.DENSITY_2HD,
+            com.codename1.ui.Display.DENSITY_4K};
+        private static final String[] DENSITY_FILES = {
+            "verylow.png", "low.png", "medium.png", "high.png", "veryhigh.png", "hd.png", "560.png", "2hd.png", "4k.png"};
+
+        /**
+         * The variant files of a multi-image, best first for a display of {@code density}: the
+         * project build stores every variant and the device picks its own, so the canvas shows
+         * the one the running density would get. That is the rule of
+         * {@code EditableResources.MultiImage.getBest()}: the largest variant not above the
+         * density. When every variant is denser, getBest() takes whichever file
+         * {@code File.listFiles()} happened to return first, an order the file system does not
+         * define; that is not reproducible, so the canvas takes the nearest larger one.
+         */
+        static String[] densityOrder(int density) {
+            int at = 0;
+            while (at < DENSITIES.length - 1 && DENSITIES[at] < density) at++;
+            java.util.List<String> out = new java.util.ArrayList<String>();
+            if (DENSITIES[at] > density && at > 0) at--;
+            for (int i = at; i >= 0; i--) out.add(DENSITY_FILES[i]);
+            for (int i = at + 1; i < DENSITIES.length; i++) out.add(DENSITY_FILES[i]);
+            return out.toArray(new String[out.size()]);
+        }
+
+        private static String stripSlash(String name) {
+            return name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+        }
+
+        /** An image can decode lazily; reading its pixels is what proves the bytes are a PNG. */
+        private static boolean decodes(com.codename1.ui.Image image) {
+            if (image == null) return false;
+            try {
+                return image.getWidth() > 0 && image.getRGB() != null;
+            } catch (RuntimeException ex) {
+                return false;
+            }
+        }
+
+        private static com.codename1.ui.Image load(String path) {
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            String url = ProjectIO.fsUrl(path);
+            if (!fs.exists(url) || fs.isDirectory(url)) return null;
+            java.io.InputStream in = null;
+            try {
+                in = fs.openInputStream(url);
+                return com.codename1.ui.Image.createImage(in);
+            } catch (IOException ex) {
+                return null;
+            } catch (RuntimeException ex) {
+                // A PNG the decoder cannot read.
+                return null;
+            } finally {
+                com.codename1.io.Util.cleanup(in);
+            }
         }
     }
 
@@ -5783,6 +5995,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             boolean padding = key.endsWith("." + Style.PADDING);
             boolean margin = key.endsWith("." + Style.MARGIN);
             if ((!padding && !margin) || !(raw instanceof String)) continue;
+            String unitKey = key.substring(0, key.length() - (padding ? Style.PADDING : Style.MARGIN).length())
+                    + (padding ? Style.PADDING_UNIT : Style.MARGIN_UNIT);
+            // CSSThemeCompiler already stores plain numbers with their units beside them, per
+            // state; re-deriving the units from the now suffix-free text would reset them to px.
+            if (theme.get(unitKey) instanceof byte[]) continue;
             String[] values = ((String) raw).split(",");
             if (values.length != 4) continue;
             byte[] units = new byte[4];
@@ -5798,7 +6015,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 normalized.append(item.length() == 0 ? "0" : item);
             }
             theme.put(keyObject, normalized.toString());
-            String unitKey = key.substring(0, key.lastIndexOf('.') + 1) + (padding ? Style.PADDING_UNIT : Style.MARGIN_UNIT);
             theme.put(unitKey, units);
         }
     }

@@ -44,6 +44,10 @@ import com.codename1.io.NetworkTypePlatform;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.filechooser.FileDialogFeatures;
+import com.codename1.io.filechooser.FileDialogResult;
+import com.codename1.io.filechooser.OpenFileRequest;
+import com.codename1.io.filechooser.SaveFileRequest;
 import com.codename1.io.bonjour.BonjourPlatform;
 import com.codename1.io.usb.UsbPlatform;
 import com.codename1.io.wifi.WifiDirectPlatform;
@@ -7075,6 +7079,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.webrtc` API: the native WebRTC
+    /// stack, or the simulator's loopback. The default answers `null`, which is the capability
+    /// query -- `WebRtc.isSupported()` reads it.
+    ///
+    /// #### Returns
+    ///
+    /// the WebRTC bridge, or null when unsupported
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.vpn` API to install and control VPN
     /// configurations. Ports supporting VPN management override this; the default answers `null`.
     ///
@@ -8899,6 +8914,19 @@ public abstract class CodenameOneImplementation {
     public void openFileChooser(final ActionListener response, String accept) {
         final Dialog d = new Dialog("Select a file");
         d.setLayout(new BorderLayout());
+        FileTree t = new OpenGalleryFileTree(fileTreeModel(accept), response, d);
+        d.addComponent(BorderLayout.CENTER, t);
+        d.placeButtonCommands(new Command[]{new Command("Cancel")});
+        Command c = d.showAtPosition(2, 2, 2, 2, true);
+        if (c != null) {
+            response.actionPerformed(null);
+        }
+    }
+
+    /// The file system model behind the fallback open dialogs, narrowed to the
+    /// extensions in an `openFileChooser` accept string. MIME types and the `*`
+    /// wildcard do not narrow it.
+    static FileTreeModel fileTreeModel(String accept) {
         FileTreeModel model = new FileTreeModel(true);
         if (accept != null) {
             Vector tokens = StringUtil.tokenizeString(accept, ',');
@@ -8913,14 +8941,68 @@ public abstract class CodenameOneImplementation {
                 }
             }
         }
+        return model;
+    }
 
-        FileTree t = new OpenGalleryFileTree(model, response, d);
-        d.addComponent(BorderLayout.CENTER, t);
-        d.placeButtonCommands(new Command[]{new Command("Cancel")});
-        Command c = d.showAtPosition(2, 2, 2, 2, true);
-        if (c != null) {
-            response.actionPerformed(null);
-        }
+    /// Shows an Open dialog. The default answers a single-file request through
+    /// `#openFileChooser`, so a port with a native single-file picker already gets
+    /// a native dialog, and a multi-select request with a Codename One file tree
+    /// whose files toggle a check mark. Ports override this to support the rest
+    /// of the request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description
+    /// - `callback`: receives the result on the EDT
+    public void showOpenDialog(OpenFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.showOpen(this, request, callback);
+    }
+
+    /// Shows a Save dialog. The default renders a Codename One form that saves
+    /// into the request's initial directory, or the app home.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description
+    /// - `callback`: receives the result on the EDT
+    public void showSaveDialog(SaveFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.showSave(this, request, callback);
+    }
+
+    /// Writes a save request's content to the `FileSystemStorage` path in the
+    /// result off the EDT, then calls back on the EDT. Ports call this once the
+    /// native dialog has returned a writable path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request
+    /// - `result`: the user's choice; its path is the destination
+    /// - `callback`: receives the result, with `FileDialogResult#getError()` set on failure
+    protected void completeSaveDialog(SaveFileRequest request, FileDialogResult result,
+                                      SuccessCallback<FileDialogResult> callback) {
+        FileDialogSupport.completeSave(request, result, callback);
+    }
+
+    /// Checks a `FileDialogFeatures` capability of this port's file dialogs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `feature`: a `FileDialogFeatures` constant
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isFileDialogFeatureSupported(int feature) {
+        // The default open dialog goes through openFileChooser(), which takes no
+        // starting folder, so INITIAL_DIRECTORY is left to ports that honour it.
+        // The fallback save form (FileDialogSupport.showSave) renders the filter
+        // list, every portable option and the accessory, so those are reported;
+        // FileDialogFeatures documents that the fallback open dialog does not.
+        return feature == FileDialogFeatures.MULTI_SELECT
+                || feature == FileDialogFeatures.SAVE_NAME_EDITING
+                || feature == FileDialogFeatures.FILTER_LIST
+                || feature == FileDialogFeatures.OPTIONS
+                || feature == FileDialogFeatures.ACCESSORY_COMPONENT;
     }
 
     /// Opens the device image gallery
@@ -13552,13 +13634,18 @@ public abstract class CodenameOneImplementation {
         throw cryptoUnsupported("generateRsaKeyPair");
     }
 
-    /// Generates a fresh elliptic-curve key pair. `curve` is "P-256"
-    /// (secp256r1), the only curve defined. Returns `{publicKeyX509,
-    /// privateKeyPkcs8}`. The iOS port can only load a PKCS#8 EC key whose
-    /// ECPrivateKey carries the optional `publicKey` field, so a port should
-    /// emit it.
-    public byte[][] generateEcKeyPair(String curve) {
+    /// Generates a fresh P-256 key pair. Returns
+    /// `{publicKeyX509, privateKeyPkcs8}`; the PKCS#8 encoding must carry the
+    /// public point, as [EcP256Codec#pkcs8FromScalar(byte[], byte[])] writes it,
+    /// because some providers will not import the private key without it.
+    public byte[][] generateEcKeyPair(int bits) {
         throw cryptoUnsupported("generateEcKeyPair");
+    }
+
+    /// Computes the P-256 ECDH shared secret (the 32-byte x coordinate) of a
+    /// PKCS#8 private key and an X.509 public key.
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        throw cryptoUnsupported("ecdhAgree");
     }
 
     /// Generates `bytes` of fresh symmetric key material. The default just

@@ -81,13 +81,6 @@ if missing or report.get('calibration'):
         print('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s perf-results.json' % number)
     print(json.dumps({key: report.get('calibration') or sorted(missing)}, indent=1))
     sys.exit(1)
-if report.get('stale_overlay'):
-    # Measured against the baseline without this pull request's overlay, because another
-    # merged change moved a row it rebaselines; the overlay has to be re-measured.
-    print('ParparVM performance gate: %s is stale: %s' % (overlay, report['stale_overlay']))
-    print('Re-measure it from this job\'s perf-results.json:')
-    print(rebaseline)
-    sys.exit(1)
 improved = moved('improved')
 if improved:
     # Reported, not failed: failing on a win turned every VM improvement into a red

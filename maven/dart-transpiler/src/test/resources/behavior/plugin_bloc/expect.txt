@@ -1,0 +1,16 @@
+cubit 2 seen [1, 2]
+bloc 2
+after reset 10
+closed true
+emit after close: Cannot emit new states after calling close
+CounterCubit 0->1
+CounterCubit 1->2
+transition Incremented
+CounterBloc 0->1
+transition Incremented
+CounterBloc 1->2
+transition Reset
+CounterBloc 2->10
+feed 0 listening false
+add returned after a throwing handler
+after close listening false

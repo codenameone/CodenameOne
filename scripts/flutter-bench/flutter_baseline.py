@@ -29,10 +29,11 @@ layout below rather than copied.
 
 THE METRICS
   code_bytes, install_bytes, wire_bytes
-      Codename One's own sizes, ABSOLUTE. They are deterministic for a source tree and
-      toolchain, so the global tolerance is 0 and any move -- either way -- fails until the
-      pull request that caused it rebaselines the row in its own overlay, saying why.
-      Keyed by platform alone: a size does not depend on the runner's CPU.
+      Codename One's own sizes, deterministic for a source tree and toolchain. The nightly
+      fold sets each row to what master's last nightly run measured (`follow`), so a pull
+      request is judged against last night's master, and the policy's 2% tolerance is
+      what one change may add before it has to say why in its own overlay. Growth fails;
+      a shrink is reported. Keyed by platform alone: a size does not depend on the CPU.
   cold_start_ratio, idle_memory_ratio
       Codename One OVER Flutter, from the same run: the median of the per-round ratios of
       the interleaved launches (benchlib.paired_rounds), lower is better. The pinned
@@ -444,6 +445,55 @@ def import_legacy(root, number, legacy, original=None, reason=None):
     return perf_baseline.write_overlay(root, number, calibrate_, rebaseline, reason, FLUTTER)
 
 
+def follow(root, candidates):
+    """Set every SIZE row in base/ to what master's nightly run measured. Returns one line
+    per row that moved.
+
+    Sizes are deterministic for a tree and toolchain, so master's own measurement is the
+    truth about master, and a pull request is judged against last night's master plus the
+    policy's tolerance. Without this every row was an absolute number frozen at its last
+    rebaseline: core edits that never run this benchmark (its paths filter) added a few
+    bytes each, and the next pull request that did run it inherited the sum and had to
+    rebaseline a size it never touched -- the bulk of the overlays, and every overlay
+    conflict, this gate ever saw. A growth past the tolerance still fails the nightly run
+    that measured it (that run is the signal); following it the next night is what keeps
+    one regression from failing every later pull request too. Ratios are never followed:
+    they are noisy, and a slow drift in them is exactly what the gate is for.
+
+    Runs after the fold, on base/ alone: an overlay still pending would be judged against
+    a row this rewrites."""
+    root = Path(root)
+    if perf_baseline.load_overlays(root, FLUTTER):
+        raise BaselineError('follow runs after the fold; pr/ still has overlays')
+    base = perf_baseline.load_base(root, FLUTTER)
+    policy = perf_baseline.load_policy(root, FLUTTER)['tolerance']
+    moved = []
+    # A size row narrower than the policy dates from the absolute rows, where a tolerance
+    # of 0.1-0.5% was each platform's packaging jitter; against last night's master the
+    # policy's band is the point, so the narrower one goes.
+    for key, bench, metric, row in perf_baseline._rows('base', base, FLUTTER):
+        own = row.get('tolerance', {}).get('value')
+        if metric in SIZE_METRICS and own is not None and own <= policy[metric]:
+            del row['tolerance']
+            moved.append('%s %s: tolerance %g -> the policy\'s %g' % (key, metric, own, policy[metric]))
+    for path in candidates:
+        report = json.loads(Path(path).read_text())
+        platform = report.get('platform')
+        values = measurements(report)
+        for metric in SIZE_METRICS:
+            row = base.get(platform, {}).get(APP, {}).get(metric)
+            value = values.get(metric)
+            if row is None or value is None or int(value) == row['value']:
+                continue
+            moved.append('followed %s %s: %d -> %d (%+.2f%%)' % (
+                platform, metric, row['value'], int(value),
+                (int(value) / float(row['value']) - 1.0) * 100.0))
+            row['value'] = int(value)
+    if moved:
+        perf_baseline.write_base(root, base)
+    return moved
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--root', default=str(ROOT))
@@ -452,6 +502,8 @@ def main(argv=None):
     p.add_argument('--base')
     p.add_argument('--pr', type=int)
     sub.add_parser('fold', help='fold every overlay into base/ (nightly, on master)')
+    p = sub.add_parser('follow', help="set base/'s size rows to master's nightly measurement")
+    p.add_argument('results', nargs='*')
     p = sub.add_parser('calibrate', help="write a pull request's overlay from runs")
     p.add_argument('--pr', type=int)
     p.add_argument('--reason')
@@ -481,6 +533,9 @@ def main(argv=None):
             folded = perf_baseline.fold(root, FLUTTER)
             print('flutter-baseline: folded %s' % (', '.join('pr/%d.json' % n for n in folded)
                                                     if folded else 'nothing'))
+        elif args.command == 'follow':
+            for line in follow(root, args.results):
+                print(line)
         elif args.command == 'calibrate':
             number = args.pr or perf_baseline.pr_number()
             if number is None:

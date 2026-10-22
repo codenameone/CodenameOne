@@ -40,7 +40,7 @@ import com.codenameone.examples.bastion.ui.Lang;
 /// This device's signing key: the second thing, after the session, that the
 /// server asks for before money leaves an account.
 ///
-/// The key is an EC P-256 pair from [KeyGenerator#ecP256()], made by the
+/// The key is an EC P-256 pair from [KeyGenerator#ec(int)], made by the
 /// platform's own crypto provider; the server gets its X.509 public half and
 /// the PKCS#8 private half never leaves the device. It is kept sealed: an
 /// AES-256-GCM [SecureEnvelope] whose associated data names the account and
@@ -132,7 +132,7 @@ public final class DeviceKey {
     /// otherwise. The sign-in must be a few minutes old.
     public static void register(final String owner, final String password,
             final Net.Ok<DeviceDto> done, final Net.Failed failed) {
-        KeyPair pair = KeyGenerator.ecP256();
+        KeyPair pair = KeyGenerator.ec(256);
         final PrivateKey key = pair.getPrivateKey();
         final String publicKey = Base64.encodeUrlSafe(pair.getPublicKey().getEncoded());
         final boolean rooted = DeviceIntegrity.isDeviceCompromised();

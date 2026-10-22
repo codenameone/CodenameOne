@@ -37,7 +37,7 @@ import dart.runtime.Funcs;
 public class BackButton extends IconButton {
 
     public BackButton() {
-        icon(new Icon(Icons.arrow_back));
+        icon(new Icon(Icons.arrow_back()));
     }
 
     public BackButton(com.codename1.flutter.Key key, Color color, Funcs.VoidFunc0 onPressed) {

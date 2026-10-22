@@ -46,9 +46,12 @@ public final class Signature {
 
     /// `SHA256withECDSA` -- ECDSA with SHA-256 (P-256 curve).
     public static final String SHA256_WITH_ECDSA = "SHA256withECDSA";
-    /// `SHA384withECDSA` -- ECDSA with SHA-384 (P-384 curve).
+    /// `SHA384withECDSA` -- ECDSA with SHA-384 (P-384 curve). Not on iOS,
+    /// whose Security framework is given P-256 keys only: there a P-384 key
+    /// fails with a `CryptoException`.
     public static final String SHA384_WITH_ECDSA = "SHA384withECDSA";
-    /// `SHA512withECDSA` -- ECDSA with SHA-512 (P-521 curve).
+    /// `SHA512withECDSA` -- ECDSA with SHA-512 (P-521 curve). Not on iOS,
+    /// for the same reason as [#SHA384_WITH_ECDSA].
     public static final String SHA512_WITH_ECDSA = "SHA512withECDSA";
 
     private Signature() {}

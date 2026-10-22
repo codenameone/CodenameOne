@@ -65,6 +65,89 @@ public final class DateTime {
                 millisecond, true)), microsecond), true);
     }
 
+    /// Dart's own grammar for DateTime.parse: an ISO 8601 date, an optional time
+    /// after `T` or a space, an optional fraction, and an optional `Z` or offset.
+    private static final java.util.regex.Pattern ISO = java.util.regex.Pattern.compile(
+            "^([+-]?\\d{4,6})-?(\\d\\d)-?(\\d\\d)(?:[ T](\\d\\d)(?::?(\\d\\d)(?::?(\\d\\d)(?:[.,](\\d+))?)?)?"
+            + "( ?[zZ]| ?([-+])(\\d\\d)(?::?(\\d\\d))?)?)?$");
+
+    /// `DateTime.parse`: a value with a `Z` or an offset is UTC, anything else local.
+    public static DateTime parse(String formattedString) {
+        DateTime d = tryParse(formattedString);
+        if (d == null) {
+            throw new FormatException("Invalid date format\n" + formattedString);
+        }
+        return d;
+    }
+
+    public static DateTime tryParse(String formattedString) {
+        if (formattedString == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = ISO.matcher(formattedString);
+        if (!m.matches()) {
+            return null;
+        }
+        long year = Long.parseLong(m.group(1).startsWith("+") ? m.group(1).substring(1) : m.group(1));
+        long month = Long.parseLong(m.group(2));
+        long day = Long.parseLong(m.group(3));
+        long hour = num(m.group(4));
+        long minute = num(m.group(5));
+        long second = num(m.group(6));
+        long milli = 0;
+        long micro = 0;
+        String frac = m.group(7);
+        if (frac != null) {
+            String six = (frac + "000000").substring(0, 6);
+            long all = Long.parseLong(six);
+            // Digits past the sixth are dropped, not rounded, as the Dart VM does:
+            // .9999999 stays in the same second.
+            milli = all / 1000;
+            micro = all % 1000;
+        }
+        // A well-formed date outside DateTime's range is still unparseable: tryParse
+        // answers null (and parse a FormatException), never the constructor's error.
+        try {
+            if (m.group(8) == null) {
+                return new DateTime(year, month, day, hour, minute, second, milli, micro);
+            }
+            DateTime u = utc(year, month, day, hour, minute, second, milli, micro);
+            if (m.group(9) != null) {
+                long offset = num(m.group(10)) * 60 + num(m.group(11));
+                long sign = m.group(9).equals("-") ? -1 : 1;
+                long at = u.epochMicros - sign * offset * 60000000L;
+                checkMicrosRange(at);
+                return new DateTime(at, true);
+            }
+            return u;
+        } catch (ArgumentError outOfRange) {
+            return null;
+        }
+    }
+
+    private static long num(String s) {
+        return s == null ? 0 : Long.parseLong(s);
+    }
+
+    /// `toIso8601String`: `2024-01-15T10:30:00.000`, `Z` added for a UTC value.
+    public String toIso8601String() {
+        long y = year();
+        String ys = y >= -9999 && y <= 9999 ? fourDigits(y) : (y < 0 ? "-" : "+") + sixDigits(Math.abs(y));
+        long micros = microsecond();
+        String text = ys + "-" + twoDigits(month()) + "-" + twoDigits(day())
+                + "T" + twoDigits(hour()) + ":" + twoDigits(minute()) + ":" + twoDigits(second())
+                + "." + threeDigits(millisecond()) + (micros == 0 ? "" : threeDigits(micros));
+        return utc ? text + "Z" : text;
+    }
+
+    private static String sixDigits(long n) {
+        String s = Long.toString(n);
+        while (s.length() < 6) {
+            s = "0" + s;
+        }
+        return s;
+    }
+
     public static DateTime fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
         return new DateTime(millisToMicros(millisecondsSinceEpoch), isUtc);
     }

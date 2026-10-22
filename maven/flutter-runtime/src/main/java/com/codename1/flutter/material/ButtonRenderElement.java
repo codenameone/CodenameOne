@@ -486,11 +486,18 @@ public class ButtonRenderElement extends RenderElement {
                 ButtonStyle st = ((ButtonBase) w).getStyle();
                 int[] elevatedPad = resolvedPadding(st, vpad, hpad);
                 all.setPadding(elevatedPad[0], elevatedPad[1], elevatedPad[2], elevatedPad[3]);
-                all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
+                // FilledButton shares this shape with its own colours and no resting shadow.
+                boolean filled = w instanceof FilledButton;
+                boolean tonal = filled && ((FilledButton) w).isTonal();
+                com.codename1.flutter.Color fgRole = tonal ? cs.onSecondaryContainer()
+                        : filled ? cs.onPrimary() : cs.primary();
+                com.codename1.flutter.Color bgRole = tonal ? cs.secondaryContainer()
+                        : filled ? cs.primary() : cs.surfaceContainerLow();
+                all.setFgColor(styled(st == null ? null : st.getForegroundColor(), fgRole).rgb());
                 RoundBorder border = RoundBorder.create()
                         .rectangle(true)
-                        .color(styled(st == null ? null : st.getBackgroundColor(), cs.surfaceContainerLow()).rgb());
-                if (!isElevationZero(st)) {
+                        .color(styled(st == null ? null : st.getBackgroundColor(), bgRole).rgb());
+                if (!filled && !isElevationZero(st)) {
                     // Scaled by elevation, the same ElevationShadow mapping every other
                     // elevated surface in this runtime uses (Card, the shaped branch
                     // below) -- a flat shadowOpacity(40) regardless of elevation used to

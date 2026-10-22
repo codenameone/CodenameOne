@@ -567,4 +567,16 @@
         <Method name="dismissKeyguard" />
         <Bug pattern="DE_MIGHT_IGNORE" />
     </Match>
+
+    <!--
+    JdkHost is the class library's narrow platform hook, copied byte for byte
+    from vm/JavaAPI so the core's CoreJdkHost always has its superclass.
+    install stores the object it is handed by design: that object IS the
+    installed host. The copy may not diverge to defend against it.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.JdkHost" />
+        <Method name="install" />
+        <Bug pattern="EI_EXPOSE_STATIC_REP2" />
+    </Match>
 </FindBugsFilter>

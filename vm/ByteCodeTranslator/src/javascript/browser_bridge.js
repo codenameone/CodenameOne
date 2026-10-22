@@ -325,63 +325,87 @@
     return { name: 'RSA-OAEP', hash: cn1CryptoHash(normalized) };
   }
 
-  function cn1RsaSignatureAlgorithm(algorithm, keyAlgorithm) {
-    var kind = String(keyAlgorithm || '').toUpperCase();
-    if (kind === 'EC') {
-      // P-256 is the one curve CodenameOneImplementation.generateEcKeyPair defines.
-      return { name: 'ECDSA', namedCurve: 'P-256', hash: cn1CryptoHash(algorithm) };
+  // The named curve of an encoded EC key, read from its OID, and the byte
+  // length of one coordinate: an imported P-384 or P-521 key signs on the
+  // curve it names, as it does on the JCA ports.
+  var CN1_EC_CURVES = [
+    { name: 'P-256', size: 32, oid: [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07] },
+    { name: 'P-384', size: 48, oid: [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22] },
+    { name: 'P-521', size: 66, oid: [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x23] }
+  ];
+
+  function cn1EcCurve(key) {
+    for (var c = 0; c < CN1_EC_CURVES.length; c++) {
+      var oid = CN1_EC_CURVES[c].oid;
+      for (var i = 0; i + oid.length <= key.length; i++) {
+        var j = 0;
+        while (j < oid.length && key[i + j] === oid[j]) j++;
+        if (j === oid.length) return CN1_EC_CURVES[c];
+      }
     }
-    if (kind !== 'RSA') {
-      throw new Error('Web Crypto bridge supports RSA and EC signatures; requested ' + keyAlgorithm);
-    }
-    return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+    throw new Error('EC key names no supported curve');
   }
 
-  // Web Crypto's ECDSA signature is r || s, each the curve's size; Java's
-  // SHA256withECDSA -- what every other port answers -- is the DER SEQUENCE of
-  // two INTEGERs. These convert between the two.
-  function cn1EcdsaDerInteger(bytes) {
-    var start = 0;
-    while (start < bytes.length - 1 && bytes[start] === 0) {
-      start++;
+  function cn1SignatureAlgorithm(algorithm, keyAlgorithm, key) {
+    var family = String(keyAlgorithm || '').toUpperCase();
+    var wantsEc = String(algorithm || '').toUpperCase().indexOf('ECDSA') >= 0;
+    if (family === 'EC' && wantsEc) {
+      var curve = cn1EcCurve(key);
+      return { name: 'ECDSA', namedCurve: curve.name, hash: cn1CryptoHash(algorithm), cn1Size: curve.size };
     }
-    var body = Array.prototype.slice.call(bytes, start);
-    if (body[0] & 0x80) {
-      body.unshift(0);
+    if (family === 'RSA' && !wantsEc) {
+      return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
     }
-    return [0x02, body.length].concat(body);
+    throw new Error(algorithm + ' cannot be used with a ' + keyAlgorithm + ' key');
   }
 
-  function cn1EcdsaRawToDer(raw) {
-    var bytes = new Uint8Array(raw);
-    var half = bytes.length / 2;
-    var r = cn1EcdsaDerInteger(bytes.subarray(0, half));
-    var sPart = cn1EcdsaDerInteger(bytes.subarray(half));
-    var body = r.concat(sPart);
-    return [0x30, body.length].concat(body);
+  // P-256 key encodings, byte for byte what com.codename1.impl.EcP256Codec
+  // writes, so a key generated in the browser is the same bytes a device
+  // would hand out. Web Crypto's own PKCS#8 export differs between engines.
+  var CN1_EC_SPKI_PREFIX = [0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00];
+  var CN1_EC_PKCS8_HEAD = [0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x04, 0x6d,
+    0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20];
+  var CN1_EC_PKCS8_MID = [0xa1, 0x44, 0x03, 0x42, 0x00];
+
+  function cn1Base64UrlBytes(text) {
+    var b64 = String(text).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var bin = global.atob(b64);
+    var out = [];
+    for (var i = 0; i < bin.length; i++) out.push(bin.charCodeAt(i));
+    return out;
   }
 
-  function cn1EcdsaDerToRaw(der, size) {
-    var bytes = cn1CryptoBytes(der);
-    var out = new Uint8Array(size * 2);
-    var at = 2;
-    if (bytes[1] & 0x80) {
-      at = 2 + (bytes[1] & 0x7f);
+  // ECDSA signatures: Web Crypto speaks the fixed r||s form, the portable API
+  // (and every other port) DER.
+  function cn1EcdsaRawToDer(raw, n) {
+    function integer(offset) {
+      var start = offset;
+      while (start < offset + n - 1 && raw[start] === 0) start++;
+      var bytes = Array.prototype.slice.call(raw, start, offset + n);
+      if (bytes[0] & 0x80) bytes.unshift(0);
+      return [0x02, bytes.length].concat(bytes);
     }
-    for (var part = 0; part < 2; part++) {
-      if (bytes[at] !== 0x02) {
-        throw new Error('Malformed ECDSA signature');
-      }
-      var length = bytes[at + 1];
-      var value = bytes.subarray(at + 2, at + 2 + length);
-      while (value.length > size && value[0] === 0) {
-        value = value.subarray(1);
-      }
-      if (value.length > size) {
-        throw new Error('Malformed ECDSA signature');
-      }
-      out.set(value, part * size + (size - value.length));
-      at += 2 + length;
+    var body = integer(0).concat(integer(n));
+    // A P-521 signature runs past 127 bytes and takes the long length form.
+    return (body.length > 127 ? [0x30, 0x81, body.length] : [0x30, body.length]).concat(body);
+  }
+
+  function cn1EcdsaDerToRaw(der, n) {
+    var out = new Uint8Array(2 * n);
+    var p = 2;
+    if (der[0] !== 0x30) throw new Error('ECDSA signature is not DER');
+    if (der[1] & 0x80) p = 2 + (der[1] & 0x7f);
+    for (var k = 0; k < 2; k++) {
+      if (der[p] !== 0x02) throw new Error('ECDSA signature is not DER');
+      var len = der[p + 1];
+      var start = p + 2;
+      while (len > n && der[start] === 0) { start++; len--; }
+      if (len > n) throw new Error('ECDSA signature component too long');
+      out.set(der.slice(start, start + len), k * n + n - len);
+      p = p + 2 + der[p + 1];
     }
     return out;
   }
@@ -424,26 +448,51 @@
         .then(cn1CryptoResult);
     }
     if (op === 'sign' || op === 'verify') {
-      var signatureAlgorithm = cn1RsaSignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var signatureAlgorithm = cn1SignatureAlgorithm(request.algorithm, request.keyAlgorithm,
+          cn1CryptoBytes(request.key));
+      var isEcdsa = signatureAlgorithm.name === 'ECDSA';
       var signatureUsage = op === 'sign' ? 'sign' : 'verify';
       var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
       return subtle.importKey(signatureKeyFormat, cn1CryptoBytes(request.key), signatureAlgorithm, false, [signatureUsage])
         .then(function(key) {
-          var ec = signatureAlgorithm.name === 'ECDSA';
           if (op === 'sign') {
-            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(function(raw) {
-              return ec ? cn1EcdsaRawToDer(raw) : cn1CryptoResult(raw);
+            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(function(sig) {
+              return isEcdsa ? cn1EcdsaRawToDer(new Uint8Array(sig), signatureAlgorithm.cn1Size)
+                : cn1CryptoResult(sig);
             });
           }
-          var signature;
-          try {
-            signature = ec ? cn1EcdsaDerToRaw(request.signature, 32) : cn1CryptoBytes(request.signature);
-          } catch (malformed) {
-            // A signature that is not even well formed does not verify.
-            return false;
+          var signature = cn1CryptoBytes(request.signature);
+          if (isEcdsa) {
+            try {
+              signature = cn1EcdsaDerToRaw(signature, signatureAlgorithm.cn1Size);
+            } catch (malformed) {
+              return false;
+            }
           }
           return subtle.verify(signatureAlgorithm, key, signature, cn1CryptoBytes(request.data));
         });
+    }
+    if (op === 'generateEcKeyPair') {
+      return subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])
+        .then(function(pair) {
+          return Promise.all([subtle.exportKey('raw', pair.publicKey), subtle.exportKey('jwk', pair.privateKey)]);
+        })
+        .then(function(exported) {
+          var point = cn1CryptoResult(exported[0]);
+          var scalar = cn1Base64UrlBytes(exported[1].d);
+          while (scalar.length < 32) scalar.unshift(0);
+          return [CN1_EC_SPKI_PREFIX.concat(point),
+                  CN1_EC_PKCS8_HEAD.concat(scalar, CN1_EC_PKCS8_MID, point)];
+        });
+    }
+    if (op === 'ecdh') {
+      var ecdhAlgorithm = { name: 'ECDH', namedCurve: 'P-256' };
+      return Promise.all([
+        subtle.importKey('pkcs8', cn1CryptoBytes(request.key), ecdhAlgorithm, false, ['deriveBits']),
+        subtle.importKey('spki', cn1CryptoBytes(request.peer), ecdhAlgorithm, false, [])
+      ]).then(function(keys) {
+        return subtle.deriveBits({ name: 'ECDH', public: keys[1] }, keys[0], 256);
+      }).then(cn1CryptoResult);
     }
     if (op === 'pbkdf2') {
       // RFC 8018 PBKDF2, the one password KDF a browser has. The iteration
@@ -471,23 +520,6 @@
         hash: 'SHA-256'
       };
       return subtle.generateKey(generationAlgorithm, true, ['encrypt', 'decrypt'])
-        .then(function(pair) {
-          return Promise.all([
-            subtle.exportKey('spki', pair.publicKey),
-            subtle.exportKey('pkcs8', pair.privateKey)
-          ]);
-        })
-        .then(function(encoded) {
-          return [cn1CryptoResult(encoded[0]), cn1CryptoResult(encoded[1])];
-        });
-    }
-    if (op === 'generateEcKeyPair') {
-      if (String(request.curve || '') !== 'P-256') {
-        throw new Error('Web Crypto bridge supports the P-256 curve; requested ' + request.curve);
-      }
-      // Chromium, Firefox and Safari all export the PKCS#8 ECPrivateKey with
-      // its optional publicKey member, which the iOS port needs to load it.
-      return subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
         .then(function(pair) {
           return Promise.all([
             subtle.exportKey('spki', pair.publicKey),
@@ -5340,6 +5372,138 @@
     try { if (v.parentNode) { v.parentNode.removeChild(v); } } catch (e) {}
     try { v.srcObject = null; } catch (e) {}
     return 1;
+  });
+
+  // WebRTC (com.codename1.webrtc). RTCPeerConnection, getUserMedia and the
+  // <video> views exist only on the main thread, and neither a MediaStream nor
+  // a peer connection can cross into the worker, so every peer and track lives
+  // in these host tables keyed by the integer handles the Java API speaks in.
+  // Asynchronous outcomes (descriptions, ICE, state, remote tracks) stream back
+  // through the worker-callback channel to HTML5WebRtc.dispatch; a view comes
+  // back as an opaque <video> host-ref the worker hands to PeerComponent.
+  var rtcCallbackId = null;
+  var rtc = { peers: {}, tracks: {}, next: 1 };
+  function rtcFire(k, a, b, s1, s2, s3) {
+    var target = global.__parparWorker;
+    if (rtcCallbackId == null || !target || typeof target.postMessage !== 'function') { return; }
+    try {
+      target.postMessage({ type: 'worker-callback', callbackId: rtcCallbackId, args: [{
+        kind: k, a: a | 0, b: b | 0,
+        s1: s1 == null ? null : '' + s1, s2: s2 == null ? null : '' + s2, s3: s3 == null ? null : '' + s3 }] });
+    } catch (e) { console.log('cn1WebRtc', e); }
+  }
+  function rtcErr(e) { return '' + ((e && (e.message || e.name)) || e); }
+  function rtcTrack(t) { var id = rtc.next++; rtc.tracks[id] = t; return id; }
+  // The far side's audio is heard through an element of its own: the video
+  // views are muted, and an audio-only call has no view at all.
+  function rtcPlay(p, track) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) { return; }
+    var a = doc.createElement('audio');
+    a.autoplay = true; a.style.display = 'none';
+    a.srcObject = new global.MediaStream([track]);
+    doc.body.appendChild(a); (p.audio = p.audio || []).push(a);
+    var play = a.play(); if (play && play.catch) { play.catch(function() {}); }
+  }
+  function rtcAvailable() {
+    return typeof global.RTCPeerConnection !== 'undefined' && typeof navigator !== 'undefined'
+      && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+  var rtcOps = {
+    available: function() { return rtcAvailable() ? 1 : 0; },
+    init: function(r) {
+      var cb = r.callback || r;
+      if (cb && typeof cb.__cn1WorkerCallback === 'number') { rtcCallbackId = cb.__cn1WorkerCallback; }
+      else if (typeof cb === 'function' && typeof cb.__cn1WorkerCallbackId === 'number') { rtcCallbackId = cb.__cn1WorkerCallbackId; }
+      else { return 0; }
+      return 1;
+    },
+    create: function(r) {
+      var servers = [];
+      String(r.wire || '').split('\n').forEach(function(line) { if (!line) { return; }
+        var f = line.split('\t'); var s = { urls: f[0].split(',') };
+        if (f[1]) { s.username = f[1]; } if (f[2]) { s.credential = f[2]; } servers.push(s); });
+      var id = rtc.next++;
+      var pc = new global.RTCPeerConnection({ iceServers: servers, iceTransportPolicy: r.relay ? 'relay' : 'all' });
+      var p = { pc: pc, early: [], remoteSet: false };
+      rtc.peers[id] = p;
+      pc.onicecandidate = function(e) { if (e.candidate) { rtcFire('ice', id,
+        e.candidate.sdpMLineIndex || 0, e.candidate.sdpMid || '', e.candidate.candidate, null); } };
+      pc.onconnectionstatechange = function() { rtcFire('state', id, 0, pc.connectionState, null, null); };
+      pc.ontrack = function(e) { var t = rtcTrack(e.track); (p.remote = p.remote || []).push(t);
+        if (e.track.kind === 'audio') { rtcPlay(p, e.track); }
+        rtcFire('track', id, t, e.track.kind, null, null); };
+      return id;
+    },
+    media: function(r) {
+      var req = r.req, front = !!r.front;
+      navigator.mediaDevices.getUserMedia({ audio: !!r.audio,
+        video: r.video ? { facingMode: front ? 'user' : 'environment' } : false })
+      .then(function(stream) { var a = 0, v = 0;
+        stream.getAudioTracks().forEach(function(t) { if (!a) { a = rtcTrack(t); } });
+        stream.getVideoTracks().forEach(function(t) { if (!v) { v = rtcTrack(t); rtc.tracks[v].cn1Front = front; } });
+        rtcFire('tracks', req, a, '' + v, null, null); })
+      .catch(function(e) { rtcFire('tracks', req, 0, '0', rtcErr(e), null); });
+      return 1;
+    },
+    add: function(r) { var p = rtc.peers[r.peer], t = rtc.tracks[r.track];
+      if (p && t) { p.pc.addTrack(t, new global.MediaStream([t])); } return 1; },
+    describe: function(r) { var p = rtc.peers[r.peer], req = r.req;
+      if (!p) { rtcFire('desc', req, 0, null, null, 'closed'); return 1; }
+      (r.answer ? p.pc.createAnswer() : p.pc.createOffer())
+      .then(function(d) { rtcFire('desc', req, 0, d.type, d.sdp, null); })
+      .catch(function(e) { rtcFire('desc', req, 0, null, null, rtcErr(e)); });
+      return 1; },
+    set: function(r) { var p = rtc.peers[r.peer], req = r.req, remote = !!r.remote;
+      if (!p) { rtcFire('result', req, 0, 'closed', null, null); return 1; }
+      var d = { type: r.type, sdp: r.sdp };
+      (remote ? p.pc.setRemoteDescription(d) : p.pc.setLocalDescription(d))
+      .then(function() { if (remote) { p.remoteSet = true;
+          p.early.forEach(function(c) { p.pc.addIceCandidate(c).catch(function() {}); }); p.early = []; }
+        rtcFire('result', req, 0, null, null, null); })
+      .catch(function(e) { rtcFire('result', req, 0, rtcErr(e), null, null); });
+      return 1; },
+    ice: function(r) { var p = rtc.peers[r.peer]; if (!p) { return 0; }
+      var c = { sdpMid: r.mid, sdpMLineIndex: r.index, candidate: r.cand };
+      if (p.remoteSet) { p.pc.addIceCandidate(c).catch(function() {}); } else { p.early.push(c); }
+      return 1; },
+    close: function(r) { var p = rtc.peers[r.peer]; if (p) { delete rtc.peers[r.peer]; p.pc.close();
+        // Remote tracks belong to their peer (release() leaves them alone),
+        // so they and the elements showing them go with it.
+        (p.remote || []).forEach(function(t) { var track = rtc.tracks[t]; delete rtc.tracks[t];
+          if (track) { (track.cn1Views || []).forEach(function(v) { v.srcObject = null; }); track.cn1Views = null; } });
+        (p.audio || []).forEach(function(a) { a.srcObject = null; if (a.parentNode) { a.parentNode.removeChild(a); } }); }
+      return 1; },
+    enable: function(r) { var t = rtc.tracks[r.track]; if (t) { t.enabled = !!r.on; } return 1; },
+    release: function(r) { var t = rtc.tracks[r.track]; if (t) { delete rtc.tracks[r.track]; t.stop(); } return 1; },
+    switchCamera: function(r) { var track = r.track, t = rtc.tracks[track]; if (!t) { return 0; }
+      var front = !t.cn1Front;
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: front ? 'user' : 'environment' } })
+      .then(function(s) { var n = s.getVideoTracks()[0]; if (!n) { return; } n.cn1Front = front;
+        n.enabled = t.enabled;
+        Object.keys(rtc.peers).forEach(function(k) { rtc.peers[k].pc.getSenders().forEach(function(snd) {
+          if (snd.track === t) { snd.replaceTrack(n); } }); });
+        (t.cn1Views || []).forEach(function(v) { v.srcObject = new global.MediaStream([n]); });
+        n.cn1Views = t.cn1Views; t.stop(); rtc.tracks[track] = n; })
+      .catch(function(e) { console.log('cn1WebRtc switchCamera', e); });
+      return 1; },
+    view: function(r) { var t = rtc.tracks[r.track]; if (!t) { return null; }
+      var doc = global.document || (global.window && global.window.document);
+      if (!doc) { return null; }
+      var v = doc.createElement('video');
+      v.autoplay = true; v.playsInline = true; v.muted = true;
+      v.setAttribute('playsinline', ''); v.style.objectFit = 'cover';
+      if (r.mirror) { v.style.transform = 'scaleX(-1)'; }
+      v.srcObject = new global.MediaStream([t]);
+      (t.cn1Views = t.cn1Views || []).push(v);
+      var play = v.play(); if (play && play.catch) { play.catch(function() {}); }
+      return hostResult(v); }
+  };
+  hostBridge.register('__cn1_webrtc__', function(request) {
+    var op = request && rtcOps[request.op];
+    if (!op) { return null; }
+    if (request.op !== 'available' && request.op !== 'init' && !rtcAvailable()) { return null; }
+    return op(request);
   });
 
   // VideoIO lives entirely on the browser host.  The translated application

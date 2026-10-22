@@ -1,0 +1,14 @@
+-- Makes the database's text case sensitive and NO PAD before any table is
+-- created, so every table the later scripts create inherits it.
+--
+-- The ORM needs that of a text key: "A" and "a" are two keys, and "token "
+-- keeps its trailing space -- what SQLite and PostgreSQL do. MySQL's default,
+-- utf8mb4_0900_ai_ci, folds both away, and the server refuses to start on a
+-- key column that uses it.
+--
+-- MySQL and MariaDB share no name for that collation (utf8mb4_bin, which both
+-- have, pads), and this directory serves both. The two comments are executable
+-- ones, each read by one family only: MySQL runs /*!80000 ...*/ and skips the
+-- MariaDB-only /*M! ...*/; MariaDB runs /*M!100400 ...*/ and skips MySQL's
+-- 8.0 comments.
+ALTER DATABASE CHARACTER SET utf8mb4 COLLATE /*!80000 utf8mb4_0900_bin */ /*M!100400 utf8mb4_nopad_bin */;

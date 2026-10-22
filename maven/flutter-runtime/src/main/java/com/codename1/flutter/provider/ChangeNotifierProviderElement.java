@@ -81,11 +81,19 @@ public class ChangeNotifierProviderElement extends ProviderElement {
     }
 
     private void subscribe() {
-        Object value = widget() instanceof Provider ? ((Provider) widget()).getValue() : null;
-        if (value instanceof Listenable) {
+        // The field: a lazy value not read yet has nothing to listen to, and
+        // subscribing must not create it. onCreated subscribes once it exists.
+        Object value = widget() instanceof Provider ? ((Provider) widget()).value : null;
+        if (value instanceof Listenable && listened != value) {
+            unsubscribe();
             listened = (Listenable) value;
             listened.addListener(handler);
         }
+    }
+
+    @Override
+    protected void onCreated(Object value) {
+        subscribe();
     }
 
     private void unsubscribe() {

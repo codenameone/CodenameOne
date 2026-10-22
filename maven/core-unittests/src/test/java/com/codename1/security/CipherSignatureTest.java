@@ -77,8 +77,8 @@ class CipherSignatureTest extends UITestBase {
     }
 
     @Test
-    void ecP256SignAndVerify() {
-        KeyPair kp = KeyGenerator.ecP256();
+    void ecSignAndVerify() {
+        KeyPair kp = KeyGenerator.ec(256);
         assertEquals(PublicKey.EC, kp.getPublicKey().getAlgorithm());
         assertEquals(PublicKey.EC, kp.getPrivateKey().getAlgorithm());
         // SubjectPublicKeyInfo for P-256 is a fixed 26-byte header plus the
@@ -90,7 +90,7 @@ class CipherSignatureTest extends UITestBase {
         assertTrue(Signature.verify(Signature.SHA256_WITH_ECDSA, kp.getPublicKey(), data, sig));
         data[0] ^= 0x01;
         assertFalse(Signature.verify(Signature.SHA256_WITH_ECDSA, kp.getPublicKey(), data, sig));
-        KeyPair other = KeyGenerator.ecP256();
+        KeyPair other = KeyGenerator.ec(256);
         data[0] ^= 0x01;
         assertFalse(Signature.verify(Signature.SHA256_WITH_ECDSA, other.getPublicKey(), data, sig));
     }
@@ -128,7 +128,7 @@ class CipherSignatureTest extends UITestBase {
 
     @Test
     void jwtEs256RoundTrip() {
-        KeyPair kp = KeyGenerator.ecP256();
+        KeyPair kp = KeyGenerator.ec(256);
         Map<String, Object> claims = new LinkedHashMap<String, Object>();
         claims.put("sub", "alice");
         String token = Jwt.sign(claims, kp.getPrivateKey(), Jwt.ES256);
@@ -137,7 +137,7 @@ class CipherSignatureTest extends UITestBase {
         // JOSE R||S form: 64 bytes, base64url without padding is 86 chars.
         assertEquals(86, token.substring(token.lastIndexOf('.') + 1).length());
         assertTrue(parsed.verify(kp.getPublicKey()));
-        assertFalse(parsed.verify(KeyGenerator.ecP256().getPublicKey()));
+        assertFalse(parsed.verify(KeyGenerator.ec(256).getPublicKey()));
     }
 
     @Test

@@ -10,7 +10,7 @@ let added;
 let failInstall = false;
 let claimed = false;
 const context = {
-    URL, Set, Request, Promise, encodeURIComponent,
+    URL, Set, Request, Response, Promise, encodeURIComponent,
     self: {
         registration: {scope},
         cn1Pwa: {version:'new', startUrl:'./dashboard?installed=1#section', assets:['index.html', 'worker.js', 'translated_app_1.js', 'assets/font%20name.ttf']},
@@ -70,4 +70,26 @@ assert.equal(await cached('https://example.com/outside/dashboard', 'navigate'), 
 context.self.cn1Pwa.startUrl = './worker.js';
 vm.runInNewContext(source, context);
 assert.equal((await cached(scope+'worker.js', 'navigate')).cached, scope+'worker.js', 'existing files keep their own content');
-console.log('PASS: atomic precache, waiting updates, scope isolation, navigation queries and API exclusion');
+// A precached shell that the host served through a redirect must not reach a
+// navigation still marked redirected: Chrome rejects it as a network error.
+const shellResponse = await (async () => {
+    let response;
+    const original = context.caches.open;
+    context.caches.open = async name => {
+        const cache = await original(name);
+        return {...cache, match: async url => {
+            const r = new Response('shell of ' + url, {status:200, statusText:'OK', headers:{'X-Cached':url}});
+            Object.defineProperty(r, 'redirected', {value:true});
+            return r;
+        }};
+    };
+    handlers.get('fetch')({request:{url:scope+'?theme=light', mode:'navigate', method:'GET'}, respondWith:promise => { response = promise; }});
+    const result = await response;
+    context.caches.open = original;
+    return result;
+})();
+assert.equal(shellResponse.redirected, false, 'a redirected cache entry must be copied before answering a navigation');
+assert.equal(shellResponse.status, 200);
+assert.equal(shellResponse.headers.get('X-Cached'), scope+'index.html');
+assert.equal(await shellResponse.text(), 'shell of '+scope+'index.html');
+console.log('PASS: atomic precache, waiting updates, scope isolation, navigation queries, API exclusion and redirected shells');

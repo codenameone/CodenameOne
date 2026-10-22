@@ -40,6 +40,20 @@
             startRoute = null;
         }
     } catch (_) { startRoute = null; }
+    // A host that serves index.html as a redirect (Cloudflare Pages answers
+    // /app/index.html with 301 -> /app/index/) gets that redirect followed by
+    // cache.addAll, and the cached response is marked redirected. A navigation
+    // request has redirect mode "manual", so Chrome rejects such a response as a
+    // network error and the app never loads, while browsers without the worker
+    // installed load it fine. Copying the response drops the redirected flag.
+    function unredirected(response) {
+        if (!response.redirected) return response;
+        return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+        });
+    }
     self.addEventListener('install', function (event) {
         event.waitUntil(caches.open(cacheName).then(function (cache) {
             return cache.addAll(Array.from(assets).map(function (url) {
@@ -70,7 +84,7 @@
         if (!assets.has(url.href)) return;
         event.respondWith(caches.open(cacheName).then(function (cache) {
             return cache.match(url.href).then(function (response) {
-                return response || fetch(event.request);
+                return response ? unredirected(response) : fetch(event.request);
             });
         }));
     });

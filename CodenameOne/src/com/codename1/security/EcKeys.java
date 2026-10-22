@@ -22,6 +22,7 @@
  */
 package com.codename1.security;
 
+import com.codename1.impl.EcP256Codec;
 import com.codename1.util.BigInteger;
 
 /// Completes a P-256 PKCS#8 private key with its public point.
@@ -40,45 +41,30 @@ final class EcKeys {
     private static final BigInteger GY = new BigInteger(
             "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16);
 
-    /// SEQUENCE { OID id-ecPublicKey, OID prime256v1 }
-    private static final byte[] P256_ALG_ID = {
-        0x30, 0x13,
-        0x06, 0x07, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x02, 0x01,
-        0x06, 0x08, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x03, 0x01, 0x07
-    };
-
     private EcKeys() {}
 
     /// Returns `pkcs8` itself when it already carries the point or is not a
-    /// P-256 key this parser understands, otherwise the same key re-encoded
+    /// P-256 key [EcP256Codec] understands, otherwise the same key re-encoded
     /// with the point.
     static byte[] withPublicPoint(byte[] pkcs8) {
-        byte[] d = privateScalarWithoutPoint(pkcs8);
-        if (d == null) {
+        byte[][] parts;
+        try {
+            parts = EcP256Codec.fromPkcs8(pkcs8);
+        } catch (RuntimeException notP256) {
             return pkcs8;
         }
-        BigInteger[] q = multiply(new BigInteger(1, d));
+        if (parts[1] != null) {
+            return pkcs8;
+        }
+        BigInteger[] q = multiply(new BigInteger(1, parts[0]));
         if (q == null) {
             return pkcs8;
         }
-        byte[] out = new byte[138];
-        int p = 0;
-        byte[] head = {0x30, (byte) 0x81, (byte) 0x87, 0x02, 0x01, 0x00};
-        System.arraycopy(head, 0, out, p, head.length);
-        p += head.length;
-        System.arraycopy(P256_ALG_ID, 0, out, p, P256_ALG_ID.length);
-        p += P256_ALG_ID.length;
-        byte[] mid = {0x04, 0x6d, 0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20};
-        System.arraycopy(mid, 0, out, p, mid.length);
-        p += mid.length;
-        System.arraycopy(d, 0, out, p + 32 - d.length, d.length);
-        p += 32;
-        byte[] tail = {(byte) 0xa1, 0x44, 0x03, 0x42, 0x00, 0x04};
-        System.arraycopy(tail, 0, out, p, tail.length);
-        p += tail.length;
-        putFixed(q[0], out, p);
-        putFixed(q[1], out, p + 32);
-        return out;
+        byte[] point = new byte[EcP256Codec.POINT_LENGTH];
+        point[0] = 0x04;
+        putFixed(q[0], point, 1);
+        putFixed(q[1], point, 33);
+        return EcP256Codec.pkcs8FromScalar(parts[0], point);
     }
 
     private static void putFixed(BigInteger v, byte[] out, int off) {
@@ -86,88 +72,6 @@ final class EcKeys {
         int start = b.length > 32 ? b.length - 32 : 0;
         int len = b.length - start;
         System.arraycopy(b, start, out, off + 32 - len, len);
-    }
-
-    /// The private scalar of a P-256 PKCS#8 key that has no public point, or
-    /// null for anything else.
-    private static byte[] privateScalarWithoutPoint(byte[] b) {
-        int[] p = {0};
-        if (enter(b, b.length, p, 0x30) < 0) {
-            return null;
-        }
-        int len = enter(b, b.length, p, 0x02);
-        if (len < 0) {
-            return null;
-        }
-        p[0] += len;
-        if (p[0] + P256_ALG_ID.length > b.length) {
-            return null;
-        }
-        for (int i = 0; i < P256_ALG_ID.length; i++) {
-            if (b[p[0] + i] != P256_ALG_ID[i]) {
-                return null;
-            }
-        }
-        p[0] += P256_ALG_ID.length;
-        if (enter(b, b.length, p, 0x04) < 0) {
-            return null;
-        }
-        len = enter(b, b.length, p, 0x30);
-        if (len < 0) {
-            return null;
-        }
-        int end = p[0] + len;
-        len = enter(b, end, p, 0x02);
-        if (len < 0) {
-            return null;
-        }
-        p[0] += len;
-        int dLen = enter(b, end, p, 0x04);
-        if (dLen < 1 || dLen > 32) {
-            return null;
-        }
-        byte[] d = new byte[dLen];
-        System.arraycopy(b, p[0], d, 0, dLen);
-        p[0] += dLen;
-        if (p[0] < end && (b[p[0]] & 0xff) == 0xa0) {
-            len = enter(b, end, p, 0xa0);
-            if (len < 0) {
-                return null;
-            }
-            p[0] += len;
-        }
-        if (p[0] < end && (b[p[0]] & 0xff) == 0xa1) {
-            return null;
-        }
-        return d;
-    }
-
-    /// Reads a tag and length at `p[0]`, leaving `p[0]` on the content.
-    /// Returns the content length, or -1 when the tag differs or the content
-    /// does not fit before `n`.
-    private static int enter(byte[] b, int n, int[] p, int tag) {
-        if (p[0] + 2 > n || (b[p[0]] & 0xff) != tag) {
-            return -1;
-        }
-        p[0]++;
-        int first = b[p[0]++] & 0xff;
-        int len;
-        if ((first & 0x80) == 0) {
-            len = first;
-        } else {
-            int sl = first & 0x7f;
-            if (sl < 1 || sl > 3 || p[0] + sl > n) {
-                return -1;
-            }
-            len = 0;
-            for (int i = 0; i < sl; i++) {
-                len = (len << 8) | (b[p[0]++] & 0xff);
-            }
-        }
-        if (p[0] + len > n) {
-            return -1;
-        }
-        return len;
     }
 
     /// `k * G` in affine coordinates, or null for the point at infinity.

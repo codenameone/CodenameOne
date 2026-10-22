@@ -77,10 +77,10 @@ public class LibraryStructureTest {
     @Test
     public void aConditionalExportRecordsOnlyTheSelectedUri() {
         Ast.Library lib = new AstBuilder(new Diagnostics()).parse("main.dart",
-                "export 'x_stub.dart' if (dart.library.io) 'x_io.dart' if (dart.library.async) 'x_async.dart';\n"
+                "export 'x_stub.dart' if (dart.library.ffi) 'x_ffi.dart' if (dart.library.async) 'x_async.dart';\n"
               + "import 'y_stub.dart' if (dart.library.html) 'y_web.dart';\n"
               + "void main() {}\n");
-        // dart:io is not provided here, dart:async is: the first true clause wins.
+        // dart:ffi is not provided here, dart:async is: the first true clause wins.
         assertEquals("x_async.dart", lib.exportDirectives.get(0).uri);
         assertEquals("y_stub.dart", lib.imports.get(0));
     }

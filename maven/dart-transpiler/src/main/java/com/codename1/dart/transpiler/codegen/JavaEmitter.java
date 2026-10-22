@@ -96,7 +96,49 @@ public final class JavaEmitter {
                 + (ex.getMessage() != null ? ": " + ex.getMessage() : "") + at);
     }
 
+    /// Marks a case of the $dget/$dset/$dcall switches. The switches are emitted while the
+    /// program's dynamic accesses are still being found, so each case is marked and
+    /// pruneDynamicCases drops, after the whole program is emitted, every case whose
+    /// name no `dynamic` access in the program uses. A case keeps its member alive
+    /// against ParparVM's dead-code removal, and unpruned they were most of a 20%
+    /// native size regression (one case per localized string, for instance).
+    private static final String DYN_CASE = "/*dyn*/";
+
+    /// Every member name a `dynamic` receiver is read, written or called with.
+    private final java.util.Set<String> dynNames = new java.util.HashSet<String>();
+
+    private List<GeneratedFile> pruneDynamicCases(List<GeneratedFile> files) {
+        List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(files.size());
+        for (GeneratedFile g : files) {
+            if (g == null || g.content.indexOf(DYN_CASE) < 0) {
+                pruned.add(g);
+                continue;
+            }
+            StringBuilder sb = new StringBuilder(g.content.length());
+            for (String line : g.content.split("\n", -1)) {
+                int at = line.indexOf(DYN_CASE + "case \"");
+                if (at >= 0) {
+                    int start = at + DYN_CASE.length() + 6;
+                    String name = line.substring(start, line.indexOf('"', start));
+                    // a case spanning lines (a closure default) is kept rather than cut in half
+                    if (!dynNames.contains(name) && line.trim().endsWith(";")) {
+                        continue;
+                    }
+                    line = line.substring(0, at) + line.substring(at + DYN_CASE.length());
+                }
+                sb.append(line).append('\n');
+            }
+            sb.setLength(sb.length() - 1);
+            pruned.add(new GeneratedFile(g.relativePath, sb.toString()));
+        }
+        return pruned;
+    }
+
     public List<GeneratedFile> emit() {
+        return pruneDynamicCases(emitAll());
+    }
+
+    private List<GeneratedFile> emitAll() {
         List<GeneratedFile> out = new ArrayList<GeneratedFile>();
         // Every library with a top-level main(), collected in source order (which is itself
         // sorted by path -- see DartTranspiler.transpile -- not necessarily the order a
@@ -359,6 +401,7 @@ public final class JavaEmitter {
             mm.isAbstract = m.isAbstract;
             mm.isAsync = m.isAsync;
             mm.isSyncStar = m.isSyncStar;
+            mm.isAsyncStar = m.isAsyncStar;
             mm.returnType = m.returnType;
             mm.params = m.params;
             mm.typeParams = m.typeParams;
@@ -695,6 +738,7 @@ public final class JavaEmitter {
             m.isStatic = true;
             m.isAsync = f.isAsync;
             m.isSyncStar = f.isSyncStar;
+            m.isAsyncStar = f.isAsyncStar;
             m.name = f.name.equals("main") ? "main$" : f.name;
             m.returnType = f.returnType;
             m.params = f.params;
@@ -926,6 +970,7 @@ public final class JavaEmitter {
             mm.isAbstract = m.isAbstract;
             mm.isAsync = m.isAsync;
             mm.isSyncStar = m.isSyncStar;
+            mm.isAsyncStar = m.isAsyncStar;
             mm.returnType = m.returnType;
             // Dart lets a value-returning method override a void one; Java forbids it, so pin the
             // override's return to void to keep it a valid override.
@@ -1024,6 +1069,23 @@ public final class JavaEmitter {
             impls.append(javaType(itf, false, ctx));
             emitChangeNotifierState(itf, body);
         }
+        // jsonEncode calls toJson() on what it cannot encode itself; Dart does that
+        // dynamically, the runtime through this interface.
+        MethodDecl toJson = c.method("toJson");
+        if (toJson != null && !toJson.isStatic && toJson.params.isEmpty() && !c.isMixin
+                && (toJson.returnType == null || !(toJson.returnType.is("int") || toJson.returnType.is("double")
+                    || toJson.returnType.is("bool") || toJson.returnType.is("void")))) {
+            if (impls.length() > 0) {
+                impls.append(", ");
+            }
+            impls.append("dart.convert.JsonEncodable");
+        }
+        if (!c.isMixin && emitDynamicMembers(c, body, ctx)) {
+            if (impls.length() > 0) {
+                impls.append(", ");
+            }
+            impls.append("dart.runtime.DynamicObject");
+        }
         body.append(emitStubGetterBridges(c, ctx));
         // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
@@ -1080,6 +1142,246 @@ public final class JavaEmitter {
     }
 
     /**
+     * The {@code $dget}/{@code $dset}/{@code $dcall} members through which dart.runtime.Dyn
+     * reaches this class's fields, getters and methods from a {@code dynamic} receiver.
+     * Each falls back to the superclass's when that is a program class, and answers
+     * {@code Dyn.NO_MEMBER} otherwise. A method is reachable when it is an instance method
+     * with no type parameters; named and optional parameters are filled from the call.
+     *
+     * @return whether this class declares the interface itself (no program superclass)
+     */
+    private boolean emitDynamicMembers(ClassDecl c, StringBuilder body, Ctx ctx) {
+        boolean inherits = c.superclass != null && program.classes.containsKey(c.superclass.name)
+                && !program.classes.get(c.superclass.name).isMixin;
+        // A class extending a framework or runtime class (a widget, a State, a
+        // BoxPainter, a RestorableProperty) is not the model data dynamic code reaches
+        // into, and its overrides of stub methods have no return type of their own to
+        // dispatch with; leave it out. A pure value base -- Equatable -- is the
+        // exception: `dynamic pet; pet.name` on a `Pet extends Equatable` is model data.
+        if (c.superclass != null && !inherits && !MODEL_BASES.contains(c.superclass.name)) {
+            return false;
+        }
+        if (inherits && !hasDynamicMembers(program.classes.get(c.superclass.name))) {
+            return false;
+        }
+        TypeRef self = new TypeRef(c.name);
+        for (String tp : c.typeParams) {
+            self.args.add(new TypeRef(tp));
+        }
+        Out thisOut = new Out("this", self);
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        StringBuilder get = new StringBuilder();
+        StringBuilder set = new StringBuilder();
+        StringBuilder call = new StringBuilder();
+        for (FieldDecl f : c.fields) {
+            if (f.isStatic || !seen.add(f.name)) {
+                continue;
+            }
+            get.append("            ").append(DYN_CASE).append("case \"").append(f.name).append("\": return this.get$").append(f.name)
+                    .append("();\n");
+            if (!f.isFinal && !f.isConst) {
+                TypeRef ft = fieldType(f, ctx);
+                set.append("            ").append(DYN_CASE).append("case \"").append(f.name).append("\": this.set$").append(f.name).append('(')
+                        .append(dynCast("v", ft, ctx)).append("); return true;\n");
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (m.isStatic || m.name.startsWith("$")) {
+                continue;
+            }
+            if (m.isSetter) {
+                // `dynamic a = A(); a.value = 3` reaches an explicit setter as it would a field.
+                if (m.params.size() == 1 && seen.add("set " + m.name)) {
+                    TypeRef pt = m.params.get(0).type == null || m.params.get(0).type.is("var")
+                            ? TypeRef.DYNAMIC : m.params.get(0).type;
+                    set.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": this.")
+                            .append(javaMethodName(m.name)).append('(').append(dynCast("v", pt, ctx))
+                            .append("); return true;\n");
+                }
+                continue;
+            }
+            // A generic method called dynamically gets no type arguments (Dart infers
+            // dynamic), so an argument typed by one of its type parameters is passed erased:
+            // T as Object, List<T> as a raw list -- the parameters are not in scope here.
+            java.util.Set<String> methodTypeParams = new java.util.HashSet<String>(m.typeParams);
+            if (m.isGetter) {
+                if (seen.add(m.name)) {
+                    get.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": return this.")
+                            .append(javaMethodName(m.name)).append("();\n");
+                }
+                continue;
+            }
+            if (!seen.add("()" + m.name)) {
+                continue;
+            }
+            StringBuilder args = new StringBuilder();
+            int positional = 0;
+            for (Param p : m.params) {
+                if (!p.named) {
+                    positional++;
+                }
+            }
+            int pi = 0;
+            for (Param p : m.params) {
+                if (args.length() > 0) {
+                    args.append(", ");
+                }
+                TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
+                String raw = p.named ? "(n == null ? null : n.idx(\"" + p.name + "\"))"
+                        : "(a.length > " + pi + " ? a[" + pi + "] : null)";
+                String cast;
+                if (mentionsAny(pt, methodTypeParams)) {
+                    cast = pt.args.isEmpty() && methodTypeParams.contains(pt.name) ? raw
+                            : "(" + erasedJavaType(pt, ctx) + ") dart.runtime.DartRuntime.as(" + raw + ", "
+                                    + erasedJavaType(pt, ctx) + ".class, " + pt.nullable + ", "
+                                    + quote(pt.toString()) + ")";
+                } else {
+                    cast = dynCast(raw, pt, ctx);
+                }
+                if (p.defaultValue != null && !mentionsAny(pt, methodTypeParams)) {
+                    // An omitted argument takes the declared default, as a static call
+                    // would: null would be the wrong value, and fails unboxing an int.
+                    String present = p.named ? "(n != null && n.containsKey(\"" + p.name + "\"))"
+                            : "(a.length > " + pi + ")";
+                    cast = "(" + present + " ? " + cast + " : "
+                            + coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx) + ")";
+                }
+                if (!p.named) {
+                    pi++;
+                }
+                args.append(cast);
+            }
+            TypeRef rt = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
+            String invoke = "this." + javaMethodName(m.name) + "(" + args + ")";
+            call.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": ");
+            // Dart checks a dynamic call's shape before running the method: a missing
+            // required argument, an extra positional one or an unknown name is a
+            // NoSuchMethodError, never a silent null or a later unboxing failure.
+            int minPos = 0;
+            StringBuilder named = new StringBuilder();
+            StringBuilder requiredNamed = new StringBuilder();
+            for (Param p : m.params) {
+                if (p.named) {
+                    named.append(named.length() > 0 ? ", " : "").append('"').append(p.name).append('"');
+                    if (p.required) {
+                        requiredNamed.append(requiredNamed.length() > 0 ? ", " : "").append('"').append(p.name).append('"');
+                    }
+                } else if (!p.optional && p.defaultValue == null) {
+                    minPos++;
+                }
+            }
+            call.append("dart.runtime.Dyn.checkArgs(this, \"").append(m.name).append("\", a, n, ").append(minPos).append(", ")
+                    .append(positional).append(", ")
+                    .append(named.length() == 0 ? "null" : "new String[] {" + named + "}").append(", ")
+                    .append(requiredNamed.length() == 0 ? "null" : "new String[] {" + requiredNamed + "}").append("); ");
+            if (rt.is("void") || overridesVoid(c, m.name)) {
+                call.append(invoke).append("; return null;\n");
+            } else {
+                call.append("return ").append(invoke).append(";\n");
+            }
+        }
+        String noMember = inherits ? null : "dart.runtime.Dyn.NO_MEMBER";
+        body.append("    @Override\n    @SuppressWarnings(\"unchecked\")\n    public Object $dget(String name) {\n        switch (name) {\n").append(get)
+                .append("            default: return ").append(noMember == null ? "super.$dget(name)" : noMember)
+                .append(";\n        }\n    }\n\n");
+        body.append("    @Override\n    @SuppressWarnings(\"unchecked\")\n    public boolean $dset(String name, Object v) {\n        switch (name) {\n")
+                .append(set).append("            default: return ").append(inherits ? "super.$dset(name, v)" : "false")
+                .append(";\n        }\n    }\n\n");
+        body.append("    @Override\n    @SuppressWarnings(\"unchecked\")\n    public Object $dcall(String name, Object[] a, dart.core.DartMap<String, Object> n) {\n"
+                + "        switch (name) {\n").append(call).append("            default: return ")
+                .append(noMember == null ? "super.$dcall(name, a, n)" : noMember).append(";\n        }\n    }\n\n");
+        return !inherits;
+    }
+
+    /** Whether {@code t} names any of {@code vars}, at any depth of its type arguments. */
+    private static boolean mentionsAny(TypeRef t, java.util.Set<String> vars) {
+        if (t == null || vars.isEmpty()) {
+            return false;
+        }
+        if (t.name != null && vars.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsAny(a, vars)) {
+                return true;
+            }
+        }
+        if (mentionsAny(t.funcReturn, vars)) {
+            return true;
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsAny(a, vars)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether {@link #emitDynamicMembers} gives this program class its dynamic members. */
+    private boolean hasDynamicMembers(ClassDecl c) {
+        java.util.Set<String> guard = new java.util.HashSet<String>();
+        while (c != null && guard.add(c.name)) {
+            if (c.isMixin) {
+                return false;
+            }
+            if (c.superclass == null) {
+                return true;
+            }
+            c = program.classes.get(c.superclass.name);
+        }
+        return false;
+    }
+
+    /// A dynamic value converted to the Java form of a parameter or field type, unboxing
+    /// primitives. Checked through DartRuntime.as (an instanceof test that throws Dart's
+    /// TypeError): a bare Java cast is unchecked on ParparVM, so `d.setCount("3")`
+    /// against an int parameter called longValue() on a String -- a native crash no
+    /// Dart catch could see. A type variable stays an unchecked cast, as `as T` does.
+    private String dynCast(String raw, TypeRef t, Ctx ctx) {
+        if (t == null || isDynamicType(t)) {
+            return raw;
+        }
+        if (isTypeVariable(t, ctx)) {
+            return "(" + javaType(boxType(t), true, ctx) + ") " + raw;
+        }
+        String checked;
+        if (t.is("int") || t.is("double") || t.is("num")) {
+            checked = "dart.runtime.DartRuntime.as(" + raw + ", Number.class, " + t.nullable + ", "
+                    + quote(t.toString()) + ")";
+            if (t.nullable || t.is("num")) {
+                return t.is("num") ? checked
+                        : "(" + javaType(boxType(t), true, ctx) + ") dart.runtime.Dyn.numAs(" + checked + ", "
+                                + t.is("int") + ")";
+            }
+            return checked + "." + (t.is("int") ? "longValue()" : "doubleValue()");
+        }
+        String erased = erasedJavaType(t, ctx);
+        checked = "dart.runtime.DartRuntime.as(" + raw + ", " + erased + ".class, " + t.nullable + ", "
+                + quote(t.toString()) + ")";
+        if (t.is("bool") && !t.nullable) {
+            return checked + ".booleanValue()";
+        }
+        String jt = javaType(boxType(t), true, ctx);
+        return jt.equals(erased) ? checked : "((" + jt + ") " + checked + ")";
+    }
+
+    /** Whether a program superclass declares {@code name} void, which a Java override keeps. */
+    private boolean overridesVoid(ClassDecl c, String name) {
+        java.util.Set<String> guard = new java.util.HashSet<String>();
+        ClassDecl k = c.superclass == null ? null : program.classes.get(c.superclass.name);
+        while (k != null && guard.add(k.name)) {
+            MethodDecl sm = k.method(name);
+            if (sm != null && sm.returnType != null && sm.returnType.is("void")) {
+                return true;
+            }
+            k = k.superclass == null ? null : program.classes.get(k.superclass.name);
+        }
+        return false;
+    }
+
+    /**
      * A program class Java can stand in for an interface by extending it: abstract, with
      * no superclass or mixins of its own, no instance fields, no member with a body and
      * no constructor that takes or does anything.
@@ -1105,8 +1407,14 @@ public final class JavaEmitter {
             }
         }
         for (CtorDecl ct : c.ctors) {
-            if (ct.isFactory || !ct.params.isEmpty() || !ct.fieldInits.isEmpty()
-                    || ct.superInit != null || ct.body != null) {
+            // A factory is a static method, so extending the class inherits nothing from
+            // it: `abstract class Shape { factory Shape.circle(..) = Circle; }` stays an
+            // interface, which is the shape every freezed model has.
+            if (ct.isFactory) {
+                continue;
+            }
+            if (!ct.params.isEmpty() || !ct.fieldInits.isEmpty()
+                    || ct.superInit != null || ct.redirect != null || ct.body != null) {
                 return false;
             }
         }
@@ -1229,6 +1537,28 @@ public final class JavaEmitter {
             }
         } else if (ct.superInit != null && ct.superInit.args != null
                 && stubClassOf(c.superclass) != null) {
+            // Positional arguments go to the stub superclass's Java constructor --
+            // `class C extends Cubit<int> { C() : super(0); }` -- which a stub declares when
+            // its runtime class has no no-arg constructor. Named ones stay setters.
+            // Only when the stub declares an unnamed constructor taking positionals: one
+            // that declares none (the gallery's BoxPainter) has just Java's no-arg one,
+            // and the Dart super arguments have nowhere to go.
+            if (!ct.superInit.args.positional.isEmpty() && ct.superInit.namedCtor == null
+                    && stubTakesPositionals(stubClassOf(c.superclass))) {
+                StringBuilder sa = new StringBuilder();
+                for (Expr e : ct.superInit.args.positional) {
+                    if (sa.length() > 0) {
+                        sa.append(", ");
+                    }
+                    sa.append(emitExpr(e, null, ctx).code);
+                }
+                inSuperInitializer = true;
+                try {
+                    w.line("super(" + sa + ");");
+                } finally {
+                    inSuperInitializer = false;
+                }
+            }
             for (NamedArg na : ct.superInit.args.named) {
                 Out v = emitExpr(na.value, null, ctx);
                 w.line("this." + na.name + "(" + v.code + ");");
@@ -1270,11 +1600,30 @@ public final class JavaEmitter {
      * the class; unnamed factories become {@code $create} and call sites
      * route through it.
      */
+    /**
+     * A generic class's static constructor method cannot see the class's type variables, so
+     * it declares its own of the same names: {@code public static <T> Box<T> of(T v)}.
+     */
+    private static String staticTypeParams(ClassDecl c) {
+        if (c.typeParams.isEmpty()) {
+            return "";
+        }
+        return "<" + String.join(", ", c.typeParams) + "> ";
+    }
+
+    private static String staticTypeArgs(ClassDecl c) {
+        if (c.typeParams.isEmpty()) {
+            return "";
+        }
+        return "<" + String.join(", ", c.typeParams) + ">";
+    }
+
     private String emitFactoryCtor(ClassDecl c, CtorDecl ct, Ctx ctx) {
         StringBuilder sb = new StringBuilder();
         String name = ct.name == null ? "$create" : javaIdent(ct.name);
         ctx.pushScope();
-        sb.append("    public static ").append(javaClassName(c)).append(' ').append(name).append('(');
+        sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
+                .append(staticTypeArgs(c)).append(' ').append(name).append('(');
         appendParams(sb, c, ct.params, ctx);
         sb.append(") {\n");
         ctx.pushWriter(2);
@@ -1311,7 +1660,8 @@ public final class JavaEmitter {
             paramSig.append(javaType(pt, false, ctx)).append(' ').append(jn);
             argList.append(jn);
         }
-        sb.append("    public static ").append(javaClassName(c)).append(' ').append(javaIdent(ct.name))
+        sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
+                .append(staticTypeArgs(c)).append(' ').append(javaIdent(ct.name))
                 .append('(').append(paramSig).append(") {\n");
         sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
         sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
@@ -1368,6 +1718,15 @@ public final class JavaEmitter {
      */
     private void emitInitBody(ClassDecl c, CtorDecl ct, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
+        if (ct.redirect != null) {
+            // `C.a(x) : this.b(x, 0);` runs b's initialization in place of its own: b stores the
+            // fields and calls the superclass, so this one does nothing else.
+            String target = ct.redirect.namedCtor;
+            CtorDecl targetCtor = target != null ? c.namedCtor(target) : c.defaultCtor();
+            w.line("this.$init$" + (target != null ? target : "") + "("
+                    + canonicalArgs(targetCtor, ct.redirect.args, ctx) + ");");
+            return;
+        }
         ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
         for (Param p : ct.params) {
             if (p.isThis) {
@@ -1495,6 +1854,7 @@ public final class JavaEmitter {
         boolean isAbstract;
         boolean isAsync;
         boolean isSyncStar;
+        boolean isAsyncStar;
         TypeRef returnType;
         List<String> typeParams = new ArrayList<String>();
         List<Param> params = new ArrayList<Param>();
@@ -1898,6 +2258,59 @@ public final class JavaEmitter {
                 ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
         ctx.valueCalledLocals.clear();
         ctx.valueCalledLocals.addAll(CaptureScan.valueCalledNames(m.body, m.exprBody));
+        if (m.isAsyncStar && !m.isSetter) {
+            // async* generator. As for sync*, the body moves into a helper, here taking the
+            // generator's AsyncStar.Sink: `yield x` -> sink.yield$(x), `yield* s` ->
+            // sink.yieldAll(s). AsyncStar.asyncStar starts it when the stream is listened to,
+            // on the event loop, where its awaits park like any async body's.
+            ctx.importClass("dart.async.AsyncStar");
+            TypeRef elem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            String sink = ctx.newTemp();
+            String helper = m.name + "$asyncStar";
+            ctx.writer().line("return AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + sink
+                    + ") -> " + helper + "(" + sink + paramNames + "));");
+            sb.append(ctx.popWriter());
+            sb.append("    }\n\n");
+            StringBuilder hb = new StringBuilder("    private ");
+            if (m.isStatic) {
+                hb.append("static ");
+            }
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                hb.append('<');
+                for (int i = 0; i < m.typeParams.size(); i++) {
+                    if (i > 0) {
+                        hb.append(", ");
+                    }
+                    hb.append(m.typeParams.get(i));
+                }
+                hb.append("> ");
+            }
+            hb.append("void ").append(helper).append("(AsyncStar.Sink<").append(ej).append("> ").append(sink)
+                    .append(paramDecls).append(") {\n");
+            ctx.pushWriter(2);
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.inAsyncBody = true;
+            String savedList = ctx.syncStarList;
+            String savedSink = ctx.asyncStarSink;
+            TypeRef savedElem = ctx.syncStarElem;
+            ctx.syncStarList = null;
+            ctx.asyncStarSink = sink;
+            ctx.syncStarElem = elem;
+            if (m.body != null) {
+                emitStatements(m.body, ctx);
+            }
+            ctx.syncStarList = savedList;
+            ctx.asyncStarSink = savedSink;
+            ctx.syncStarElem = savedElem;
+            hb.append(ctx.popWriter());
+            hb.append("    }\n\n");
+            sb.append(hb);
+            ctx.popScope();
+            ctx.methodReturnType = null;
+            ctx.inAsyncBody = false;
+            return sb.toString();
+        }
         if (m.isSyncStar && !rt.is("List") && !m.isSetter) {
             // sync* generator. The body moves into a private helper that yields into the list
             // it is given (`yield x` -> out.add(x), `yield* xs` -> out.addAllIterable(xs), and a
@@ -2045,16 +2458,52 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
-    /** Shallow check: does the block's last statement definitely leave the method? */
+    /** Does the block's last statement definitely leave the method? */
     private boolean endsWithJump(Block b) {
         if (b.statements.isEmpty()) {
             return false;
         }
-        Stmt last = b.statements.get(b.statements.size() - 1);
+        return leavesMethod(b.statements.get(b.statements.size() - 1));
+    }
+
+    /**
+     * Whether a statement always returns or throws, by the rules javac applies to the
+     * statement after it: an if/else when both branches do, a try when its finally does
+     * or its body and every catch do. An `async` body that ends in such a try had a
+     * trailing `return Future.value(null);` appended, which javac rejected as unreachable.
+     */
+    private boolean leavesMethod(Stmt last) {
         if (last instanceof ReturnStmt) {
             return true;
         }
-        return last instanceof ExprStmt && ((ExprStmt) last).expr instanceof ThrowExpr;
+        if (last instanceof ExprStmt) {
+            return ((ExprStmt) last).expr instanceof ThrowExpr;
+        }
+        if (last instanceof Block) {
+            List<Stmt> ss = ((Block) last).statements;
+            return !ss.isEmpty() && leavesMethod(ss.get(ss.size() - 1));
+        }
+        if (last instanceof IfStmt) {
+            IfStmt is = (IfStmt) last;
+            return is.casePattern == null && is.elseStmt != null
+                    && leavesMethod(is.thenStmt) && leavesMethod(is.elseStmt);
+        }
+        if (last instanceof TryStmt) {
+            TryStmt ts = (TryStmt) last;
+            if (ts.finallyBlock != null && leavesMethod(ts.finallyBlock)) {
+                return true;
+            }
+            if (!leavesMethod(ts.tryBlock)) {
+                return false;
+            }
+            for (CatchClause cc : ts.catches) {
+                if (!leavesMethod(cc.body)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     // ==================================================================
@@ -2342,8 +2791,16 @@ public final class JavaEmitter {
             }
         } else if (s instanceof YieldStmt) {
             YieldStmt y = (YieldStmt) s;
-            if (ctx.syncStarList == null) {
-                diags.error(y, "E0304", "yield outside a sync* generator body");
+            if (ctx.asyncStarSink != null) {
+                if (y.star) {
+                    Out o = emitExpr(y.value, null, ctx);
+                    w.line(ctx.asyncStarSink + ".yieldAll(" + o.code + ");");
+                } else {
+                    Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
+                    w.line(ctx.asyncStarSink + ".yield$(" + coerce(o, ctx.syncStarElem, ctx) + ");");
+                }
+            } else if (ctx.syncStarList == null) {
+                diags.error(y, "E0304", "yield outside a generator body");
             } else if (y.star) {
                 Out o = emitExpr(y.value, null, ctx);
                 w.line(ctx.syncStarList + ".addAllIterable(" + o.code + ");");
@@ -2368,7 +2825,7 @@ public final class JavaEmitter {
                 return;
             }
             if (r.value == null) {
-                w.line("return;");
+                w.line(ctx.bareReturnIsNull ? "return null;" : "return;");
             } else if (rt != null && rt.is("void")) {
                 // Dart allows `return expr;` from a method Java-typed void (it overrides a void
                 // base). The value is discarded but the expression still runs: `return n++;`
@@ -2496,6 +2953,54 @@ public final class JavaEmitter {
                 }
             });
             ctx.popScope();
+        } else if (s instanceof ForInStmt && ((ForInStmt) s).isAwait) {
+            // `await for (x in stream) body`: a StreamIterator whose next() parks like an
+            // await until the next event, and is cancelled however the loop is left.
+            ForInStmt f = (ForInStmt) s;
+            ctx.importClass("dart.async.StreamIterator");
+            Out iter = emitExpr(f.iterable, null, ctx);
+            TypeRef elem = f.varType != null && !f.varType.is("var")
+                    ? f.varType
+                    : (iter.type != null && iter.type.is("Stream") && !iter.type.args.isEmpty()
+                        ? iter.type.arg(0) : TypeRef.DYNAMIC);
+            String ej = javaType(elem, true, ctx);
+            String it = ctx.newTemp();
+            String src = iter.code;
+            if (isDynamic(elem)) {
+                // The element type is unknown here (a call through a local function, say)
+                // while the Java value may be a Stream<String>; read it as Stream<Object>.
+                ctx.importClass("dart.async.Stream");
+                src = "(Stream<Object>) (Stream<?>) " + paren(src);
+            }
+            w.line("StreamIterator<" + ej + "> " + it + " = new StreamIterator<" + ej + ">(" + src + ");");
+            w.line("try {");
+            ctx.indent(1);
+            ctx.pushScope();
+            ctx.pushBreakTarget(null);
+            w.line(loopLabel(s) + "while (" + it + ".next()) {");
+            ctx.indent(1);
+            if (f.pattern != null) {
+                String loopVar = ctx.newTemp();
+                w.line(ej + " " + loopVar + " = " + it + ".current();");
+                ctx.declare(loopVar, elem);
+                List<String> binds = new ArrayList<String>();
+                patternMatch(f.pattern, loopVar, elem, ctx, binds);
+                for (String bind : binds) {
+                    w.line(bind);
+                }
+            } else {
+                String loopVar = ctx.declareShadowSafe(f.varName, elem);
+                w.line(ej + " " + loopVar + " = " + it + ".current();");
+            }
+            emitStatement(unwrapBlock(f.body), ctx);
+            ctx.indent(-1);
+            w.line("}");
+            ctx.popBreakTarget();
+            ctx.popScope();
+            ctx.indent(-1);
+            w.line("} finally {");
+            w.line("    " + it + ".cancel();");
+            w.line("}");
         } else if (s instanceof ForInStmt
                 && isIndexedRecordFor(((ForInStmt) s).pattern, ((ForInStmt) s).iterable)) {
             // `for (final (int i, E e) in xs.indexed)` — Dart's Iterable.indexed pairs each
@@ -2578,12 +3083,24 @@ public final class JavaEmitter {
         l.line = lf.line;
         l.col = lf.col;
         l.isAsync = lf.isAsync;
+        l.isSyncStar = lf.isSyncStar;
+        l.isAsyncStar = lf.isAsyncStar;
         l.params = lf.params;
         l.body = lf.body;
         l.exprBody = lf.exprBody;
         // Declare the local first so a recursive body can reference the name.
         String jn = ctx.declareShadowSafe(lf.name, new TypeRef("Function"));
-        Out init = emitExpr(l, funcTypeRef(lf.returnType, lf.params), ctx);
+        TypeRef expected = funcTypeRef(lf.returnType, lf.params);
+        if (lf.isSyncStar || lf.isAsyncStar) {
+            // A generator's element type comes from its declared Iterable<T>/Stream<T>,
+            // which the generator lowering reads from the target's return type.
+            expected.funcParams = new ArrayList<TypeRef>();
+            for (Param p : lf.params) {
+                expected.funcParams.add(paramValueType(p));
+            }
+            expected.funcReturn = lf.returnType;
+        }
+        Out init = emitExpr(l, expected, ctx);
         ctx.writer().line(samType + " " + jn + " = " + init.code + ";");
     }
 
@@ -2999,6 +3516,30 @@ public final class JavaEmitter {
         if (last instanceof Block) {
             List<Stmt> ss = ((Block) last).statements;
             return !ss.isEmpty() && stmtTerminates(ss.get(ss.size() - 1));
+        }
+        // Java's own rules, which decide whether a statement after these is unreachable:
+        // an if/else ends when both branches do, and a try when its finally does, or when
+        // its body and every catch do. A Dart `on T` clause with no catch-all still ends:
+        // what it does not match is rethrown.
+        if (last instanceof IfStmt) {
+            IfStmt is = (IfStmt) last;
+            return is.casePattern == null && is.elseStmt != null
+                    && stmtTerminates(is.thenStmt) && stmtTerminates(is.elseStmt);
+        }
+        if (last instanceof TryStmt) {
+            TryStmt ts = (TryStmt) last;
+            if (ts.finallyBlock != null && stmtTerminates(ts.finallyBlock)) {
+                return true;
+            }
+            if (!stmtTerminates(ts.tryBlock)) {
+                return false;
+            }
+            for (CatchClause cc : ts.catches) {
+                if (!stmtTerminates(cc.body)) {
+                    return false;
+                }
+            }
+            return true;
         }
         return false;
     }
@@ -3745,7 +4286,17 @@ public final class JavaEmitter {
             return ((ListLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof MapLit) {
-            Out o = emitMapLit((MapLit) e, expected, ctx);
+            MapLit ml = (MapLit) e;
+            if (ml.keys.isEmpty() && ml.elements.isEmpty() && ml.keyType == null
+                    && expected != null && expected.is("Set")) {
+                // An empty `{}` is a map unless its context type is a Set, which is
+                // how Dart reads `this.favorites = const {}` for a Set<int> field.
+                SetLit sl = new SetLit();
+                sl.isConst = ml.isConst;
+                Out o = emitSetLit(sl, expected, ctx);
+                return sl.isConst ? constCollection(o, ctx) : o;
+            }
+            Out o = emitMapLit(ml, expected, ctx);
             return ((MapLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof SetLit) {
@@ -3800,8 +4351,16 @@ public final class JavaEmitter {
             return new Out(tmp, target.type);
         }
         if (e instanceof ThrowExpr) {
-            diags.error(e, "E0205", "throw is only supported in statement position in M2");
-            return new Out("null", TypeRef.DYNAMIC);
+            // Expression position: a generic helper that never returns, typed as whatever the
+            // context expects (Dart's Never), so it fits a ternary arm, `??` or an arrow body.
+            ctx.importClass("dart.runtime.DartRuntime");
+            Out v = emitExpr(((ThrowExpr) e).value, null, ctx);
+            if (expected != null && !expected.is("void") && !expected.is("dynamic")
+                    && !expected.is("var")) {
+                return new Out("DartRuntime.<" + javaType(expected, true, ctx) + ">throwValue("
+                        + v.code + ")", expected);
+            }
+            return new Out("DartRuntime.throwValue(" + v.code + ")", TypeRef.DYNAMIC);
         }
         if (e instanceof AwaitExpr) {
             Out o = emitExpr(((AwaitExpr) e).operand, null, ctx);
@@ -3928,6 +4487,20 @@ public final class JavaEmitter {
                 // Duration's unary minus, under the mangled name (see emitBinary).
                 return new Out(paren(o.code) + ".$minus()", o.type);
             }
+            if ((u.op.equals("-") || u.op.equals("~")) && o.type != null && !isNumeric(o.type)
+                    && !o.type.is("bool")) {
+                // A class's own `operator -()` / `operator ~()`: declared under the mangled
+                // binary name with no parameter (see AstBuilder.mangleOperator).
+                String mangled = u.op.equals("-") ? "$minus" : "$bitNot";
+                ClassDecl cls = program.classes.get(o.type.name);
+                MethodDecl m = cls != null ? findMethodInHierarchy(cls, mangled) : null;
+                boolean declares = cls != null ? m != null
+                        : stubs.isStubClass(o.type.name) && stubs.findMethod(o.type.name, mangled, false) != null;
+                if (declares) {
+                    TypeRef rt = m != null && m.returnType != null && !m.returnType.is("var") ? m.returnType : o.type;
+                    return new Out(paren(o.code) + "." + mangled + "()", rt);
+                }
+            }
             return new Out(u.op + paren(o.code), o.type);
         }
         if (e instanceof IncDec) {
@@ -3948,6 +4521,9 @@ public final class JavaEmitter {
             }
             try {
                 if (needsShort(inc)
+                        // `a[i]++`: the read is `a.get(i)`, a call `++` cannot apply to; the
+                        // index assignment writes through `[]=` (the old value for a postfix).
+                        || id.operand instanceof IndexGet
                         || (id.operand instanceof Ident && isTopLevelSetter(((Ident) id.operand).name, ctx))) {
                     // `a?.b++` is shorted like every assignment behind a `?.`; `top++` on a
                     // library-level getter/setter pair writes through the setter.
@@ -4352,15 +4928,20 @@ public final class JavaEmitter {
         StringBuilder sb = new StringBuilder();
         List<String> codes = new ArrayList<String>();
         TypeRef inferred = null;
+        boolean mixed = false;
         for (Expr e : l.elements) {
             Out o = emitExpr(e, elem, ctx);
             codes.add(elementCode(o, elem, ctx));
             if (inferred == null) {
                 inferred = o.type;
+            } else if (o.type == null || inferred.name == null || !inferred.name.equals(o.type.name)) {
+                // `[1, 2.5, 'x', null]`: elements that disagree make a List<dynamic>
+                // (Dart would say List<Object?>), never a list of the first one's type.
+                mixed = true;
             }
         }
         if (elem == null) {
-            elem = inferred != null ? inferred : TypeRef.DYNAMIC;
+            elem = mixed || inferred == null ? TypeRef.DYNAMIC : inferred;
         }
         String pk = primitiveListKind(TypeRef.of("List", elem));
         if (pk != null) {
@@ -4961,6 +5542,12 @@ public final class JavaEmitter {
                 }
             }
         }
+        if (cc != null) {
+            Out onSelf = mixinOnSelf(cc, n, true, ctx);
+            if (onSelf != null) {
+                return emitMemberGet(onSelf, n, id, ctx);
+            }
+        }
         Out top = resolveTopLevel(n, ctx);
         if (top != null) {
             return top;
@@ -5073,6 +5660,16 @@ public final class JavaEmitter {
     }
 
     private Out emitPropertyGet(PropertyGet pg, Ctx ctx) {
+        // `ids.map(int.parse)`: a tear-off of the numeric parsers, as the method reference
+        // the call form already lowers to (see emitPrimitiveStaticCall).
+        if (pg.target instanceof Ident && (pg.name.equals("parse") || pg.name.equals("tryParse"))) {
+            String tn = ((Ident) pg.target).name;
+            if ((tn.equals("int") || tn.equals("double")) && ctx.lookup(tn) == null) {
+                ctx.importClass("dart.core.DString");
+                return new Out("DString::" + pg.name + (tn.equals("int") ? "Int" : "Double"),
+                        new TypeRef("Function"));
+            }
+        }
         // `prefix.member` where prefix is an `import '...' as prefix` name: the member
         // is a top-level const/var/class/enum/function of another user (or stub) library.
         // In the whole-program single-package model that is just a global top-level lookup.
@@ -5151,6 +5748,47 @@ public final class JavaEmitter {
     }
 
     /** Property access driven by the target's static type. */
+    /**
+     * Inside {@code mixin M on S}, a bare member that M does not declare is S's: the mixin is
+     * a Java interface, so it is reached through {@code ((S) this)}. Null when {@code cc} is
+     * not such a mixin or no {@code on} type has the member.
+     */
+    private Out mixinOnSelf(ClassDecl cc, String n, boolean getter, Ctx ctx) {
+        if (!cc.isMixin || cc.mixinOn.isEmpty()) {
+            return null;
+        }
+        for (TypeRef on : cc.mixinOn) {
+            if (hasMember(on.name, n, getter, ctx)) {
+                return new Out("((" + javaType(on, false, ctx) + ") this)", on);
+            }
+        }
+        return null;
+    }
+
+    /** Whether the named program or stub class, or one of its superclasses, has member n. */
+    private boolean hasMember(String cls, String n, boolean getter, Ctx ctx) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String cur = cls;
+        while (cur != null && seen.add(cur)) {
+            ClassDecl pc = program.resolveClass(cur, ctx.library());
+            if (pc == null) {
+                return stubs.isStubClass(cur) && (stubs.findMethod(cur, n, getter) != null
+                        || (getter && stubs.findMethod(cur, n, false) != null));
+            }
+            if (pc.method(n) != null || pc.field(n) != null || (getter && pc.getter(n) != null)) {
+                return true;
+            }
+            for (TypeRef m : pc.mixins) {
+                ClassDecl mx = program.resolveClass(m.name, ctx.library());
+                if (mx != null && (mx.method(n) != null || mx.field(n) != null || mx.getter(n) != null)) {
+                    return true;
+                }
+            }
+            cur = pc.superclass != null ? pc.superclass.name : null;
+        }
+        return false;
+    }
+
     private Out emitMemberGet(Out target, String name, Node posNode, Ctx ctx) {
         TypeRef tt = target.type;
         // A field/param typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
@@ -5168,7 +5806,9 @@ public final class JavaEmitter {
         // resolved at runtime) — e.g. `(dynamic demo) => demo.slug` or a dynamic-typed
         // `platformDispatcher.platformBrightness`. Emit the access with a dynamic result.
         if (tt != null && tt.is("dynamic")) {
-            return new Out(target.code + "." + name, TypeRef.DYNAMIC);
+            ctx.importClass("dart.runtime.Dyn");
+            dynNames.add(name);
+            return new Out("Dyn.get(" + target.code + ", \"" + name + "\")", TypeRef.DYNAMIC);
         }
         // record component accessor: `r.$1`, `r.$2`, or `r.namedField`
         if (tt != null && tt.name.startsWith("Rec$")) {
@@ -5208,7 +5848,30 @@ public final class JavaEmitter {
             if (stubs.isStubClass(cls)) {
                 Ast.MethodDecl g = stubs.findMethod(cls, name, true);
                 if (g != null && g.isStatic) {
-                    return new Out(stubSimpleName(cls, ctx) + "." + name, g.returnType);
+                    // Icons are methods in the runtime (see Icons.java: a field per icon
+                    // kept all 2,176 alive), so an icon read is a call.
+                    return new Out(stubSimpleName(cls, ctx) + "." + name
+                            + (cls.equals("Icons") ? "()" : ""), g.returnType);
+                }
+                // Material's style variants (`Icons.home_outlined`, `_rounded`, `_sharp`) are
+                // separate glyphs in Flutter's font; the icon font here has one glyph per
+                // icon, so a variant shows its base icon (an `_outlined` one the hollow
+                // `_outline` glyph where the font has it) rather than failing the build.
+                if (cls.equals("Icons")) {
+                    for (String suffix : new String[] {"_outlined", "_rounded", "_sharp"}) {
+                        if (!name.endsWith(suffix)) {
+                            continue;
+                        }
+                        String base = name.substring(0, name.length() - suffix.length());
+                        String[] cands = suffix.equals("_outlined")
+                                ? new String[] {base + "_outline", base} : new String[] {base};
+                        for (String cand : cands) {
+                            Ast.MethodDecl bg = stubs.findMethod(cls, cand, true);
+                            if (bg != null && bg.isStatic) {
+                                return new Out(stubSimpleName(cls, ctx) + "." + cand + "()", bg.returnType);
+                            }
+                        }
+                    }
                 }
                 Ast.MethodDecl m = stubs.findMethod(cls, name, false);
                 if (m != null && m.isStatic) {
@@ -5290,6 +5953,12 @@ public final class JavaEmitter {
             if (name.equals("isOdd")) {
                 return new Out("(" + target.code + " % 2 != 0)", TypeRef.BOOL);
             }
+        }
+        // The same implicit members on a stub enum, which is a plain Java enum.
+        if (!program.enums.containsKey(tt.name) && stubs.isStubEnum(tt.name)
+                && (name.equals("index") || name.equals("name"))) {
+            return name.equals("index") ? new Out("(long) " + paren(target.code) + ".ordinal()", TypeRef.INT)
+                    : new Out(target.code + ".name()", TypeRef.STRING);
         }
         // implicit instance members on a program enum value: .index (int), .name (String)
         if (program.enums.containsKey(tt.name)) {
@@ -5427,15 +6096,40 @@ public final class JavaEmitter {
                     ? TypeRef.DYNAMIC : eg.returnType;
             return new Out(extSimple + "." + name + "(" + target.code + ")", rt);
         }
+        // `e.message` on dart:core's errors that declare one. Each maps to a Java exception
+        // built from its message, so getMessage() is that field.
+        if (name.equals("message") && CORE_ERRORS.containsKey(tt.name) && !tt.is("Exception")
+                && !tt.is("TypeError") && !tt.is("ConcurrentModificationError")) {
+            TypeRef str = new TypeRef("String");
+            str.nullable = true;
+            return new Out(target.code + ".getMessage()", str);
+        }
         if (tt.is("Stopwatch")) {
             TypeRef rt = name.equals("isRunning") ? TypeRef.BOOL
                     : name.equals("elapsed") ? new TypeRef("Duration") : TypeRef.INT;
             return new Out(target.code + "." + name + "()", rt);
         }
+        // Every Dart object has hashCode; a class whose superclass is a stub (Equatable)
+        // reaches here with nothing declaring it.
+        if (name.equals("hashCode") && tt != null && !isClassRef(tt)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            return new Out("DartRuntime.hashCodeOf(" + target.code + ")", TypeRef.INT);
+        }
+        // A collection method torn off as a callback -- `stream.listen(seen.add)`,
+        // `ids.where(allowed.contains)`. The runtime collections declare these under the
+        // same names, so a method reference has the shape the target interface wants.
+        if ((tt.is("List") || tt.is("Set")) && COLLECTION_TEAR_OFFS.contains(name)
+                || tt.is("Map") && (name.equals("containsKey") || name.equals("containsValue")
+                        || name.equals("remove"))) {
+            return new Out("(" + target.code + ")::" + name, new TypeRef("Function"));
+        }
         diags.error(posNode, "E0132", "Cannot resolve member '" + name + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`.");
         return new Out(target.code + "." + name, TypeRef.DYNAMIC, true);
     }
+
+    private static final Set<String> COLLECTION_TEAR_OFFS = new HashSet<String>(
+            java.util.Arrays.asList("add", "addAll", "remove", "contains"));
 
     /**
      * For a Dart {@code List<int>}/{@code List<double>} with a non-nullable primitive element, the
@@ -5514,6 +6208,11 @@ public final class JavaEmitter {
                 return new Out(target.code + ".$index(" + idx.code + ")",
                         om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
             }
+        }
+        if (tt.is("dynamic") && !target.fromError) {
+            ctx.importClass("dart.runtime.Dyn");
+            dynNames.add("[]");
+            return new Out("Dyn.index(" + target.code + ", " + boxIfPrimitive(idx, ctx) + ")", TypeRef.DYNAMIC);
         }
         if (tt.is("String")) {
             ctx.importClass("dart.core.DString");
@@ -5762,6 +6461,96 @@ public final class JavaEmitter {
         return new Out("(" + chain + " && " + cur + " != null ? " + cur + " : (" + write.code + "))", rt);
     }
 
+    /**
+     * {@code d.x = v}, {@code d[k] = v} and their compound forms on a {@code dynamic}
+     * receiver, through dart.runtime.Dyn; null when the receiver is statically typed.
+     * A compound write pins the receiver and key in temps so each is evaluated once.
+     */
+    private Out emitDynamicMemberAssign(Assign a, Ctx ctx) {
+        return emitDynamicMemberAssign(a, null, ctx);
+    }
+
+    /**
+     * As above; {@code pre} is the receiver when the caller has already emitted it (a
+     * receiver whose type only emission reveals as dynamic, such as a call).
+     */
+    private Out emitDynamicMemberAssign(Assign a, Out pre, Ctx ctx) {
+        Expr recv = a.lhs instanceof PropertyGet ? ((PropertyGet) a.lhs).target
+                : a.lhs instanceof IndexGet ? ((IndexGet) a.lhs).target : null;
+        if (recv == null || a.op.equals("??=")) {
+            return null;
+        }
+        Out t = pre;
+        if (t == null) {
+            TypeRef rt = inferExprTypeQuiet(recv, ctx);
+            if (rt == null || !rt.is("dynamic")) {
+                return null;
+            }
+            t = emitExpr(recv, null, ctx);
+        }
+        if (!t.type.is("dynamic") || t.fromError) {
+            return null;
+        }
+        ctx.importClass("dart.runtime.Dyn");
+        String key = a.lhs instanceof PropertyGet ? "\"" + ((PropertyGet) a.lhs).name + "\""
+                : boxIfPrimitive(emitExpr(((IndexGet) a.lhs).index, null, ctx), ctx);
+        boolean prop = a.lhs instanceof PropertyGet;
+        String recvCode = t.code;
+        if (!a.op.equals("=")) {
+            // `d[i++] += 1` / `f().x += 1`: the receiver and the key are read and then
+            // written, so each is pinned in a temp and evaluated once, ahead of the value.
+            recvCode = ctx.newTemp();
+            ctx.writer().line("Object " + recvCode + " = " + t.code + ";");
+            if (!prop) {
+                String kTmp = ctx.newTemp();
+                ctx.writer().line("Object " + kTmp + " = " + key + ";");
+                key = kTmp;
+            }
+        }
+        String value = boxIfPrimitive(emitExpr(a.rhs, null, ctx), ctx);
+        if (prop) {
+            dynNames.add(((PropertyGet) a.lhs).name);
+        } else {
+            dynNames.add("[]=");
+            dynNames.add("[]");
+        }
+        if (!a.op.equals("=")) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            String cur = prop ? "Dyn.get(" + recvCode + ", " + key + ")" : "Dyn.index(" + recvCode + ", " + key + ")";
+            if (postfixValue(a, ctx)) {
+                // `d[i]++` as a value: the old value.
+                String oldTmp = ctx.newTemp();
+                ctx.writer().line("Object " + oldTmp + " = " + cur + ";");
+                cur = oldTmp;
+                value = "DartRuntime.dynBinary(\"" + a.op.substring(0, a.op.length() - 1) + "\", " + cur + ", " + value + ")";
+                ctx.writer().line((prop ? "Dyn.set(" : "Dyn.indexSet(") + recvCode + ", " + key + ", " + value + ");");
+                return new Out(oldTmp, TypeRef.DYNAMIC);
+            }
+            value = "DartRuntime.dynBinary(\"" + a.op.substring(0, a.op.length() - 1) + "\", " + cur + ", " + value + ")";
+        }
+        return new Out((prop ? "Dyn.set(" : "Dyn.indexSet(") + recvCode + ", " + key + ", " + value + ")",
+                TypeRef.DYNAMIC);
+    }
+
+    /** {@code a[i]++} used as a value: it yields the element read before the write. */
+    private static boolean postfixValue(Assign a, Ctx ctx) {
+        return ctx.postfixAssign == a && ctx.statementExpr != a;
+    }
+
+    /**
+     * The value form of a postfix {@code a[i]++}: the old element is read once into a
+     * temp, the incremented value written through {@code write}, and the temp returned.
+     * The receiver and index are already temps (the compound path pins them).
+     */
+    private Out postfixIndex(String read, TypeRef t, Assign a, Ctx ctx,
+            java.util.function.Function<String, String> write) {
+        String jt = declarableType(t, false, ctx);
+        String old = ctx.newTemp();
+        ctx.writer().line((jt != null ? jt : "var") + " " + old + " = " + read + ";");
+        ctx.writer().line(write.apply(compoundValue(old, t, a, ctx)) + ";");
+        return new Out(old, t);
+    }
+
     private Out emitAssign(Assign a, Ctx ctx) {
         Out shorted = emitShortedAssign(a, ctx);
         if (shorted != null) {
@@ -5773,6 +6562,10 @@ public final class JavaEmitter {
                 return new Out("", TypeRef.VOID);
             }
             return emitNullAwareAssignValue(a, ctx);
+        }
+        Out dynWrite = emitDynamicMemberAssign(a, ctx);
+        if (dynWrite != null) {
+            return dynWrite;
         }
         // ??= on a variable: a local or field is a valid Java assignment target.
         if (a.op.equals("??=")) {
@@ -5814,6 +6607,14 @@ public final class JavaEmitter {
         if (a.lhs instanceof IndexGet) {
             IndexGet ig = (IndexGet) a.lhs;
             Out target = emitExpr(ig.target, null, ctx);
+            if (target.type.is("dynamic") && !target.fromError) {
+                // `f()[k] += 1` where f returns dynamic: inference did not see it, the
+                // emitted receiver does. Index through Dyn, not a typed `.idx`.
+                Out dyn = emitDynamicMemberAssign(a, target, ctx);
+                if (dyn != null) {
+                    return dyn;
+                }
+            }
             Out idx = emitExpr(ig.index, null, ctx);
             boolean compound = !a.op.equals("=");
             ClassDecl idxOpClass = program.classes.get(target.type.name);
@@ -5837,6 +6638,11 @@ public final class JavaEmitter {
                     // carries no type argument to take it from, and `grid[i] += 1` became
                     // dynamic arithmetic passed to an int parameter.
                     ivt = readOp.returnType;
+                }
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code, ic = idx.code;
+                    return postfixIndex(tc + ".$index(" + ic + ")", ivt, a, ctx,
+                            v -> tc + ".$indexSet(" + ic + ", " + v + ")");
                 }
                 Out rhsOut = compound ? null : emitExpr(a.rhs, null, ctx);
                 String rhsCode = compound
@@ -5863,6 +6669,11 @@ public final class JavaEmitter {
             TypeRef vt = target.type.is("Map") ? target.type.arg(1) : target.type.arg(0);
             String pk = primitiveListKind(target.type);
             if (pk != null) {
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code, ic = idx.code;
+                    return postfixIndex(tc + ".get" + pk + "(" + ic + ")", vt, a, ctx,
+                            v -> tc + ".set" + pk + "(" + ic + ", " + v + ")");
+                }
                 String rhsCode = compound
                         ? compoundValue(target.code + ".get" + pk + "(" + idx.code + ")", vt, a, ctx)
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
@@ -5873,12 +6684,22 @@ public final class JavaEmitter {
                 // The key is coerced like the value: a dynamic one (an untyped forEach
                 // parameter, say) did not compile against putLong(long, long).
                 String key = coerce(idx, TypeRef.INT, ctx);
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code;
+                    return postfixIndex(tc + ".idxLong(" + key + ")", vt, a, ctx,
+                            v -> tc + ".putLong(" + key + ", " + v + ")");
+                }
                 String rhsCode = compound
                         ? compoundValue(target.code + ".idxLong(" + key + ")", vt, a, ctx)
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
                 return new Out(target.code + ".putLong(" + key + ", " + rhsCode + ")", vt);
             }
             String key = target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
+            if (postfixValue(a, ctx)) {
+                final String tc = target.code;
+                return postfixIndex(tc + ".idx(" + key + ")", vt, a, ctx,
+                        v -> tc + ".idxSet(" + key + ", " + v + ")");
+            }
             String rhsCode = compound
                     ? compoundValue(target.code + ".idx(" + key + ")", vt, a, ctx)
                     : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
@@ -6651,7 +7472,20 @@ public final class JavaEmitter {
             return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r.out, ctx), TypeRef.BOOL);
         }
         Out l = emitExpr(b.left, null, ctx);
+        ctx.pushWriter(ctx.currentIndent());
         Out r = emitExpr(b.right, null, ctx);
+        String rLifted = ctx.popWriter();
+        if (!rLifted.isEmpty() && !(b.left instanceof IntLit || b.left instanceof StringLit
+                || b.left instanceof BoolLit || b.left instanceof NullLit)) {
+            // `f() + await g()`: the right operand lifted statements, which would run
+            // before the left operand's expression. Dart evaluates left first, so the
+            // left value is pinned in a temp ahead of them.
+            String jt = declarableType(l.type, false, ctx);
+            String lt = ctx.newTemp();
+            ctx.writer().line((jt != null ? jt : "var") + " " + lt + " = " + l.code + ";");
+            l = new Out(lt, l.type);
+        }
+        ctx.writer().raw(rLifted);
         boolean numeric = isNumeric(l.type) && isNumeric(r.type);
         // user-defined operators on program classes
         ClassDecl opClass = program.classes.get(l.type.name);
@@ -6976,6 +7810,7 @@ public final class JavaEmitter {
         CORE_ERRORS.put("RangeError", "dart.core.RangeError");
         CORE_ERRORS.put("ConcurrentModificationError", "dart.core.ConcurrentModificationError");
         CORE_ERRORS.put("TypeError", "dart.core.TypeError");
+        CORE_ERRORS.put("NoSuchMethodError", "dart.core.NoSuchMethodError");
     }
 
     /**
@@ -7145,6 +7980,10 @@ public final class JavaEmitter {
 
     /** Whether the most recently emitted lambda had a {@code void}-typed expression body. */
     private boolean lastLambdaVoid;
+    /// The last block lambda was emitted with a `return null;` tail (see emitLambda), so
+    /// it is value-shaped in Java whatever its Dart body returns; a caller choosing the
+    /// lambda's SAM by its body shape must pick the value form.
+    private boolean lastLambdaNullTail;
     /**
      * What the most recently emitted lambda yields: its arrow body's type, or the value
      * types of its block body's returns (empty when it returns nothing).
@@ -7171,6 +8010,7 @@ public final class JavaEmitter {
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         lastLambdaVoid = false;
+        lastLambdaNullTail = false;
         lastLambdaExprIsStatementShaped = false;
         // typedef-typed target position gives untyped lambda params real types
         TypeRef[] sigTypes = expected != null ? typedefSig(expected.name) : null;
@@ -7186,6 +8026,8 @@ public final class JavaEmitter {
                     expected.funcReturn != null ? expected.funcReturn : TypeRef.DYNAMIC;
         }
         boolean outerAsync = ctx.inAsyncBody;
+        boolean outerBareNull = ctx.bareReturnIsNull;
+        ctx.bareReturnIsNull = false;   // a nested lambda's `return;` is its own
         boolean outerAsyncLambda = ctx.asyncLambda;
         TypeRef outerReturn = ctx.methodReturnType;
         boolean outerNarrowInt = ctx.narrowReturnToInt;
@@ -7241,15 +8083,70 @@ public final class JavaEmitter {
         List<TypeRef> outerReturns = ctx.lambdaReturns;
         List<TypeRef> returns = new ArrayList<TypeRef>();
         TypeRef exprType = null;
-        if (asyncValue) {
-            code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
-                    + indentStr(ctx.currentIndent()) + "}";
-        } else if (l.body != null) {
-            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
+        if ((l.isAsyncStar || l.isSyncStar) && l.body != null) {
+            // A generator closure: the lambda returns the generator, whose body is a nested
+            // lambda fed the AsyncStar.Sink (async*) or the result list (sync*), as a
+            // generator method's helper is.
+            boolean async = l.isAsyncStar;
+            TypeRef gen = lambdaReturn;
+            TypeRef elem = gen != null && (gen.is(async ? "Stream" : "Iterable")) && !gen.args.isEmpty()
+                    ? gen.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            String target = ctx.newTemp();
+            String savedSink = ctx.asyncStarSink;
+            String savedList = ctx.syncStarList;
+            TypeRef savedElem = ctx.syncStarElem;
+            ctx.asyncStarSink = async ? target : null;
+            ctx.syncStarList = async ? null : target;
+            ctx.syncStarElem = elem;
+            ctx.inAsyncBody = async;
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.pushWriter(ctx.currentIndent() + 2);
             ctx.lambdaReturns = returns;
             emitStatements(l.body, ctx);
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
+            ctx.asyncStarSink = savedSink;
+            ctx.syncStarList = savedList;
+            ctx.syncStarElem = savedElem;
+            String ind = indentStr(ctx.currentIndent());
+            // What an untyped closure local infers its SAM from: the generator's type.
+            exprType = TypeRef.of(async ? "Stream" : "Iterable", elem);
+            if (async) {
+                ctx.importClass("dart.async.AsyncStar");
+                code = head + " -> AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + target
+                        + ") -> {\n" + body + ind + "    })";
+            } else {
+                ctx.importClass("dart.core.DartList");
+                ctx.importClass("dart.core.DartIterable");
+                code = head + " -> DartIterable.syncStar((DartList<" + ej + "> " + target + ") -> {\n"
+                        + body + ind + "    })";
+            }
+        } else if (asyncValue) {
+            code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
+                    + indentStr(ctx.currentIndent()) + "}";
+        } else if (l.body != null) {
+            // `on<E>((event, emit) { emit(s); })`: a block that returns nothing, passed where
+            // the function type returns dynamic -- a value-returning Funcs.FuncN in Java.
+            // Its `return;` and its end both answer null. The body sits under `if (true)`,
+            // which javac treats as able to complete normally, so the trailing return is
+            // never "unreachable" after a body that always returns or throws.
+            boolean nullTail = sigTypes != null && sigTypes.length > 0
+                    && sigTypes[sigTypes.length - 1] != null && sigTypes[sigTypes.length - 1].is("dynamic")
+                    && !returnsValue(l.body);
+            boolean outerNullReturn = ctx.bareReturnIsNull;
+            ctx.bareReturnIsNull = nullTail;
+            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail ? 2 : 1));
+            ctx.lambdaReturns = returns;
+            emitStatements(l.body, ctx);
+            ctx.lambdaReturns = outerReturns;
+            String body = ctx.popWriter();
+            ctx.bareReturnIsNull = outerNullReturn;
+            lastLambdaNullTail = nullTail;
+            if (nullTail) {
+                String in = indentStr(ctx.currentIndent() + 1);
+                body = in + "if (true) {\n" + body + in + "}\n" + in + "return null;\n";
+            }
             code = head + " -> {\n" + body + indentStr(ctx.currentIndent()) + "}";
         } else {
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
@@ -7288,6 +8185,7 @@ public final class JavaEmitter {
         ctx.breakTargets.clear();
         ctx.breakTargets.addAll(savedBreaks);
         ctx.inAsyncBody = outerAsync;
+        ctx.bareReturnIsNull = outerBareNull;
         ctx.asyncLambda = outerAsyncLambda;
         ctx.methodReturnType = outerReturn;
         ctx.narrowReturnToInt = outerNarrowInt;
@@ -7652,6 +8550,9 @@ public final class JavaEmitter {
             String stubSuper = nearestStubSuper(cc);
             if (stubSuper != null) {
                 Ast.MethodDecl sm = stubs.findMethod(stubSuper, n, false);
+                if (sm != null && hasWitnessParam(sm)) {
+                    return new Out("this." + n + "(" + witnessArgs(sm, c, ctx) + ")", sm.returnType);
+                }
                 if (sm != null) {
                     return new Out("this." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
                 }
@@ -7677,6 +8578,12 @@ public final class JavaEmitter {
                         new TypeRef(cc.name)), n, c, ctx);
                 return new Out(fieldRead.code + ".call(" + plainArgs(c.args, ctx) + ")",
                         funcResultType(ff.type));
+            }
+        }
+        if (cc != null) {
+            Out onSelf = mixinOnSelf(cc, n, false, ctx);
+            if (onSelf != null) {
+                return emitMethodCallOn(onSelf, c, ctx);
             }
         }
         // top-level function (user code)
@@ -7715,8 +8622,24 @@ public final class JavaEmitter {
             }
             ctx.importClass(cls);
             String simple = cls.substring(cls.lastIndexOf('.') + 1);
-            return new Out(simple + "." + method + "(" + methodArgs(sf.params, c.args, ctx) + ")",
-                    sf.returnType);
+            String call = simple + "." + method + "(" + methodArgs(sf.params, c.args, ctx) + ")";
+            if (!sf.typeParams.isEmpty() && sf.returnType != null) {
+                // showDialog<bool>(...): bind the function's own type parameters -- to the
+                // call's type arguments, else dynamic -- and cast the erased Java result to
+                // match, as a generic stub method's call is.
+                List<TypeRef> bound = new ArrayList<TypeRef>();
+                for (int i = 0; i < sf.typeParams.size(); i++) {
+                    bound.add(i < c.typeArgs.size() && !isTypeVariable(c.typeArgs.get(i), ctx)
+                            ? c.typeArgs.get(i) : TypeRef.DYNAMIC);
+                }
+                TypeRef rt = substituteTypeParam(sf.returnType, sf.typeParams, bound);
+                String jt = javaType(rt, true, ctx);
+                if (jt != null && !jt.equals("Object")) {
+                    return new Out("((" + jt + ") (Object) " + call + ")", rt);
+                }
+                return new Out(call, rt);
+            }
+            return new Out(call, sf.returnType);
         }
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
@@ -7738,6 +8661,13 @@ public final class JavaEmitter {
         if (target.fromError && tt.is("dynamic")) {
             return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")",
                     TypeRef.DYNAMIC, true);
+        }
+        // Genuine `dynamic` receiver: dispatch at runtime through dart.runtime.Dyn.
+        if (tt != null && tt.is("dynamic")) {
+            ctx.importClass("dart.runtime.Dyn");
+            dynNames.add(n);
+            return new Out("Dyn.call(" + target.code + ", \"" + n + "\", " + dynArgs(c.args, ctx) + ")",
+                    TypeRef.DYNAMIC);
         }
         // static method on a class reference
         if (isClassRef(tt)) {
@@ -7830,15 +8760,23 @@ public final class JavaEmitter {
             }
             ClassDecl pc = program.classes.get(cls);
             if (pc != null) {
+                // The Java name, which is library-prefixed when the class shares its name
+                // with a stub (an app's own User beside firebase_auth's): the raw Dart name
+                // then named the stub, or nothing at all.
+                ClassDecl visible = program.resolveClass(cls, ctx.library());
+                if (visible != null) {
+                    pc = visible;
+                }
+                String jcls = javaClassName(pc);
                 MethodDecl m = pc.method(n);
                 if (m != null && m.isStatic) {
-                    return new Out(cls + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
+                    return new Out(jcls + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
                             m.returnType == null ? TypeRef.DYNAMIC : m.returnType);
                 }
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
                     // named (or named factory) constructor -> static factory
-                    return new Out(cls + "." + n + "(" + canonicalArgs(named, c.args, ctx) + ")",
+                    return new Out(jcls + "." + javaIdent(n) + "(" + canonicalArgs(named, c.args, ctx) + ")",
                             new TypeRef(cls));
                 }
                 diags.error(c, "E0136", "Cannot resolve static member or constructor '" + cls + "." + n + "'");
@@ -7958,7 +8896,7 @@ public final class JavaEmitter {
                 // Narrow a generic method result (declared `T evaluate(...)`) to the
                 // concrete type argument the receiver instantiates.
                 TypeRef sub = stubMemberReturnType(tt, n, false);
-                return stubCallOut(m, c, target.code + "." + n, ctx, sub);
+                return stubCallOut(withReceiverCallbackTypes(m, tt), c, target.code + "." + n, ctx, sub);
             }
         }
         // State<T> lifecycle overrides not present on the minimal State stub surface
@@ -7974,6 +8912,24 @@ public final class JavaEmitter {
             return new Out(extCls.name + "." + n + "(" + target.code
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
                     em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
+        }
+        // extension method contributed by a stub (go_router's `extension GoRouterHelper on
+        // BuildContext { void go(String location, {Object? extra}); }`): a static method of
+        // the extension's @JavaName class taking the receiver first, then the call's
+        // arguments laid out as for any stub method.
+        Ast.ClassDecl stubExtM = stubs.findExtension(tt.name, n, false);
+        if (stubExtM != null) {
+            Ast.MethodDecl em = extensionMember(stubExtM, n, false);
+            if (em != null) {
+                String callee = stubExtensionSimpleName(stubExtM, ctx) + "." + n;
+                Out o = stubCallOut(em, c, callee, ctx);
+                String prefix = callee + "(";
+                if (o.code.startsWith(prefix)) {
+                    String rest = o.code.substring(prefix.length());
+                    return new Out(prefix + target.code + (rest.startsWith(")") ? "" : ", ") + rest,
+                            o.type, o.fromError);
+                }
+            }
         }
         if (tt.is("Stopwatch")) {
             // start / stop / reset are void no-arg controls
@@ -8007,6 +8963,22 @@ public final class JavaEmitter {
         TypeRef tt = target.type;
         String n = c.name;
         List<Expr> pos = c.args.positional;
+        if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
+            // Stream.cast<R>() checks each event, so the runtime takes R as a witness the
+            // way whereType does; an erased type variable has none and stays unchecked.
+            TypeRef sub = c.typeArgs.get(0);
+            // Generic code (a library's cast<T>()) is common, so a type variable is not
+            // diagnosed as whereType's is: it keeps the old unchecked behaviour.
+            boolean dyn = sub.is("dynamic") || sub.is("var") || sub.is("Object") || isTypeVariable(sub, ctx);
+            String jt = dyn ? null : javaType(sub, true, ctx);
+            if (jt == null) {
+                return new Out(target.code + ".cast()", TypeRef.of("Stream", sub));
+            }
+            // A class literal names the raw type: List<int> is checked as a List.
+            String raw = jt.indexOf('<') >= 0 ? jt.substring(0, jt.indexOf('<')) : jt;
+            return new Out(target.code + ".<" + jt + ">cast(" + raw + ".class, " + sub.nullable + ")",
+                    TypeRef.of("Stream", sub));
+        }
         if (tt.is("String")) {
             ctx.importClass("dart.core.DString");
             if (n.equals("substring")) {
@@ -8140,6 +9112,17 @@ public final class JavaEmitter {
                 String lo = emitExpr(pos.get(0), TypeRef.INT, ctx).code;
                 String hi = emitExpr(pos.get(1), TypeRef.INT, ctx).code;
                 return new Out("DartRuntime.clamp(" + target.code + ", " + lo + ", " + hi + ")", TypeRef.INT);
+            }
+        }
+        if (tt.is("num") && pos.isEmpty()) {
+            // A value typed only `num` -- `(json['id'] as num).toInt()`, the shape
+            // json_serializable generates -- is a boxed Long or Double here.
+            ctx.importClass("dart.runtime.DartRuntime");
+            if (n.equals("toInt") || n.equals("truncate")) {
+                return new Out("DartRuntime.numToInt(" + target.code + ")", TypeRef.INT);
+            }
+            if (n.equals("toDouble")) {
+                return new Out("DartRuntime.numToDouble(" + target.code + ")", TypeRef.DOUBLE);
             }
         }
         if (tt.is("double")) {
@@ -8532,11 +9515,24 @@ public final class JavaEmitter {
         if (tt.is("Future")) {
             ctx.importClass("dart.async.Future");
             if (n.equals("then")) {
-                Out cb = emitExpr(pos.get(0), null, ctx);
+                // `getUrl(u).then((r) => r.close())`: an untyped callback parameter takes
+                // the future's value type, as Dart infers it, so members of a runtime class
+                // resolve statically -- through dynamic dispatch they could not resolve.
+                TypeRef valueType = tt.args.size() == 1 ? tt.arg(0) : null;
+                Expr cbExpr = pos.get(0);
+                boolean typedCb = valueType != null && !isDynamicType(valueType) && isFullyConcrete(valueType)
+                        && !valueType.is("int") && !valueType.is("double") && !valueType.is("bool")
+                        && !valueType.is("num") && !valueType.is("void") && !valueType.is("Null")
+                        && cbExpr instanceof Lambda && ((Lambda) cbExpr).params.size() == 1
+                        && ((Lambda) cbExpr).typeParams.isEmpty()
+                        && (((Lambda) cbExpr).params.get(0).type == null || ((Lambda) cbExpr).params.get(0).type.is("var"));
+                Out cb = emitExpr(cbExpr, typedCb ? inlineFuncType(valueType, TypeRef.DYNAMIC) : null, ctx);
+                String vj = typedCb ? javaType(boxType(valueType), true, ctx) : null;
                 // A lambda fits BOTH then overloads (Func1 / VoidFunc1) when it is void- or
                 // throw-bodied, which javac reports as ambiguous; pin those to VoidFunc1.
-                String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
-                        "dart.runtime.Funcs.VoidFunc1");
+                String cbCode = pinnedHandler(cbExpr, cb, typedCb,
+                        typedCb ? "dart.runtime.Funcs.Func1<" + vj + ", Object>" : "dart.runtime.Funcs.Func1",
+                        typedCb ? "dart.runtime.Funcs.VoidFunc1<" + vj + ">" : "dart.runtime.Funcs.VoidFunc1");
                 // then(onValue, onError: handler): the handler was dropped, so a failure
                 // skipped it and the chain stayed failed.
                 for (NamedArg na : c.args.named) {
@@ -8554,7 +9550,7 @@ public final class JavaEmitter {
                 String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
                         "dart.runtime.Funcs.VoidFunc1");
                 boolean valueHandler = pos.get(0) instanceof Lambda
-                        && (((Lambda) pos.get(0)).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(pos.get(0)));
+                        && (((Lambda) pos.get(0)).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(pos.get(0)));
                 // `test` is a NAMED parameter in Dart; reading it positionally meant it was
                 // always null, so the handler caught failures its predicate rejected. The
                 // runtime takes it as an Object, so a lambda is given its predicate type.
@@ -8582,7 +9578,7 @@ public final class JavaEmitter {
                 Out cb = emitExpr(action, null, ctx);
                 boolean value;
                 if (action instanceof Lambda) {
-                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(action);
+                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(action);
                 } else {
                     // A tear-off is typed a bare Function, so its declared return is read
                     // from the method or function it names; unresolved stays on the void form.
@@ -8847,7 +9843,10 @@ public final class JavaEmitter {
      * matched nothing and the page came up blank.</p>
      */
     private static boolean readsProvidedValueByType(String className) {
-        return className.equals("Selector") || className.equals("Consumer");
+        return className.equals("Selector") || className.equals("Consumer")
+                // flutter_bloc's widgets look their bloc up by B the same way.
+                || className.equals("BlocBuilder") || className.equals("BlocListener")
+                || className.equals("BlocConsumer") || className.equals("BlocSelector");
     }
 
     /**
@@ -8873,7 +9872,8 @@ public final class JavaEmitter {
      * arrives; without it the lookup went past the provider as if it were not there.
      */
     private static boolean publishesValueByType(String className) {
-        return className.equals("Provider") || className.equals("ChangeNotifierProvider");
+        return className.equals("Provider") || className.equals("ChangeNotifierProvider")
+                || className.equals("BlocProvider") || className.equals("RepositoryProvider");
     }
 
     /** {@code A.class} for the first type argument when it is a plain class, else null. */
@@ -9680,6 +10680,46 @@ public final class JavaEmitter {
     }
 
     /** Stub method calls: canonical positional per stub declaration order. */
+    /**
+     * A stub method whose LAST parameter is {@code Type? witness} wants the call's first
+     * explicit type argument as a class literal there -- bloc's {@code on<E>(handler)},
+     * which returns void and so cannot use the return-type witness above. The Dart caller
+     * never passes it; a missing or type-variable {@code <E>} passes null (match anything).
+     */
+    private static boolean hasWitnessParam(Ast.MethodDecl m) {
+        if (m.params.isEmpty()) {
+            return false;
+        }
+        Param last = m.params.get(m.params.size() - 1);
+        return "witness".equals(last.name) && last.type != null && last.type.is("Type");
+    }
+
+    private String witnessArgs(Ast.MethodDecl m, Call c, Ctx ctx) {
+        CtorDecl fake = new CtorDecl();
+        fake.params = new ArrayList<Param>(m.params.subList(0, m.params.size() - 1));
+        String args = canonicalArgs(fake, c.args, ctx);
+        String token = "null";
+        TypeRef witness = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
+        if (witness == null && !c.args.positional.isEmpty()
+                && c.args.positional.get(0) instanceof Ast.Lambda) {
+            // `context.select((PetsCubit c) => c.state.pets)`: <T> is inferred from the
+            // selector's declared parameter type, so take the witness from there.
+            Ast.Lambda l = (Ast.Lambda) c.args.positional.get(0);
+            if (!l.params.isEmpty() && l.params.get(0).type != null
+                    && !l.params.get(0).type.is("var") && !l.params.get(0).type.is("dynamic")) {
+                witness = l.params.get(0).type;
+            }
+        }
+        if (witness != null && !isTypeVariable(witness, ctx)) {
+            String javaName = javaType(witness, true, ctx);
+            if (javaName != null) {
+                int lt = javaName.indexOf('<');
+                token = (lt >= 0 ? javaName.substring(0, lt) : javaName) + ".class";
+            }
+        }
+        return args.isEmpty() ? token : args + ", " + token;
+    }
+
     private String stubMethodArgs(Ast.MethodDecl m, Args args, Ctx ctx) {
         CtorDecl fake = new CtorDecl();
         fake.params = m.params;
@@ -9771,6 +10811,10 @@ public final class JavaEmitter {
      * explicit-{@code <T>}-witness path still keys off the raw declared return type.
      */
     private Out stubCallOut(Ast.MethodDecl m, Call c, String callee, Ctx ctx, TypeRef substReturn) {
+        if (hasWitnessParam(m)) {
+            return new Out(callee + "(" + witnessArgs(m, c, ctx) + ")",
+                    bindMethodTypeParams(substReturn != null ? substReturn : m.returnType, m, c, ctx));
+        }
         String args = stubMethodArgs(m, c.args, ctx);
         TypeRef rt = m.returnType;
         if (rt != null && !isConcreteType(rt)) {
@@ -9817,7 +10861,46 @@ public final class JavaEmitter {
         // declares (javac then rejects the local it types). Resolve any of the method's
         // own generics that still appear anywhere in the result.
         result = bindMethodTypeParams(result, m, c, ctx);
-        return new Out(callee + "(" + args + ")", result);
+        String typed = explicitTypeArgs(callee, m, c, result, ctx);
+        if (!typed.equals(callee)) {
+            // javac ignores type arguments on a method that is not generic in Java --
+            // Navigator's push<T> answers Future<Object> -- so the result is also cast
+            // through Object to what the Dart signature promises. An erased cast: the
+            // Java runtime checks only the raw class, which the method already returns.
+            String jt = javaType(result, true, ctx);
+            if (jt != null && !jt.equals("Object")) {
+                return new Out("((" + jt + ") (Object) " + typed + "(" + args + "))", result);
+            }
+        }
+        return new Out(typed + "(" + args + ")", result);
+    }
+
+    /**
+     * {@code dio.get<List<dynamic>>(path)}: the call's explicit type arguments, handed
+     * to the Java method as {@code dio.<DartList<Object>>get(path)}. Without them javac
+     * infers Object for a type parameter that only appears in the result, and the
+     * {@code var} the result lands in loses the type the Dart code relies on. Only when
+     * the arguments line up one to one with the method's own and the result mentions
+     * one of them; a non-generic Java method ignores explicit type arguments.
+     */
+    private String explicitTypeArgs(String callee, Ast.MethodDecl m, Call c, TypeRef result, Ctx ctx) {
+        int dot = callee.lastIndexOf('.');
+        if (dot <= 0 || c.typeArgs.isEmpty() || c.typeArgs.size() != m.typeParams.size()
+                || m.returnType == null || !mentionsAnyTypeParam(m.returnType, m.typeParams)) {
+            return callee;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (TypeRef t : c.typeArgs) {
+            if (isTypeVariable(t, ctx)) {
+                return callee;
+            }
+            String jt = javaType(t, true, ctx);
+            if (jt == null) {
+                return callee;
+            }
+            sb.append(sb.length() == 0 ? "" : ", ").append(jt);
+        }
+        return callee.substring(0, dot + 1) + "<" + sb + ">" + callee.substring(dot + 1);
     }
 
     /**
@@ -9985,6 +11068,10 @@ public final class JavaEmitter {
      * Whether {@code sub} is (transitively) a subtype of {@code sup} across the program and stub
      * class hierarchies. Used to decide when a generic cross-type assignment needs an erasing cast.
      */
+    /** Runtime superclasses whose subclasses are plain model data (see emitDynamicMembers). */
+    private static final java.util.Set<String> MODEL_BASES =
+            new java.util.HashSet<String>(java.util.Arrays.asList("Equatable"));
+
     private boolean isSubtypeName(String sub, String sup) {
         if (sub == null || sup == null) {
             return false;
@@ -10230,7 +11317,7 @@ public final class JavaEmitter {
         if (!(src instanceof Lambda)) {
             return o.code;
         }
-        boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(src);
+        boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(src);
         boolean ambiguous = ((Lambda) src).exprBody != null && lastLambdaExprIsStatementShaped;
         if (value && !forceCast && !ambiguous) {
             return o.code;
@@ -10258,6 +11345,48 @@ public final class JavaEmitter {
             }
         }
         return true;
+    }
+
+    /**
+     * Arguments of a call through a dynamic receiver: positional ones as an Object[], named
+     * ones as a DartMap. A function literal has no target type there, so it is typed as a
+     * function of its own arity over dynamic.
+     */
+    private String dynArgs(Args args, Ctx ctx) {
+        StringBuilder sb = new StringBuilder("new Object[] {");
+        for (int i = 0; i < args.positional.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            Expr a = args.positional.get(i);
+            TypeRef expect = null;
+            if (a instanceof Lambda) {
+                expect = new TypeRef("Function");
+                expect.funcParams = new ArrayList<TypeRef>();
+                for (int k = 0; k < ((Lambda) a).params.size(); k++) {
+                    expect.funcParams.add(TypeRef.DYNAMIC);
+                }
+                expect.funcReturn = TypeRef.DYNAMIC;
+            }
+            Out o = emitExpr(a, expect, ctx);
+            sb.append(expect != null ? funcCast(o, expect, ctx) : boxIfPrimitive(o, ctx));
+        }
+        sb.append("}");
+        if (!args.named.isEmpty()) {
+            ctx.importClass("dart.core.DartMap");
+            sb.append(", DartMap.<String, Object>of(");
+            boolean first = true;
+            for (NamedArg na : args.named) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                first = false;
+                sb.append("\"").append(na.name).append("\", ")
+                        .append(boxIfPrimitive(emitExpr(na.value, null, ctx), ctx));
+            }
+            sb.append(")");
+        }
+        return sb.toString();
     }
 
     private String plainArgs(Args args, Ctx ctx) {
@@ -10691,6 +11820,10 @@ public final class JavaEmitter {
             }
             return simple;
         }
+        Ast.EnumDecl own = visibleProgramEnum(t.name, ctx);
+        if (own != null) {
+            return javaEnumName(own);
+        }
         Ast.EnumDecl se = stubs.enums.get(t.name);
         if (se != null && se.javaName != null) {
             ctx.importClass(se.javaName);
@@ -10807,6 +11940,9 @@ public final class JavaEmitter {
     }
 
     private void importEnum(String dartName, Ctx ctx) {
+        if (visibleProgramEnum(dartName, ctx) != null) {
+            return;
+        }
         Ast.EnumDecl se = stubs.enums.get(dartName);
         if (se != null && se.javaName != null) {
             ctx.importClass(se.javaName);
@@ -10814,12 +11950,42 @@ public final class JavaEmitter {
     }
 
     private String simpleEnumName(String dartName, Ctx ctx) {
+        Ast.EnumDecl own = visibleProgramEnum(dartName, ctx);
+        if (own != null) {
+            return javaEnumName(own);
+        }
         Ast.EnumDecl se = stubs.enums.get(dartName);
         if (se != null && se.javaName != null) {
             return se.javaName.substring(se.javaName.lastIndexOf('.') + 1);
         }
         Ast.EnumDecl pe = programEnum(dartName, ctx);
         return pe != null ? javaEnumName(pe) : dartName;
+    }
+
+    /**
+     * A user enum the emitting library declares or imports directly, which wins over a stub
+     * enum of the same name: stubs are global, so an app's own {@code Priority} or
+     * {@code ResponseType} used to be replaced by flutter_local_notifications' or dio's,
+     * whatever it imported. Null when no such enum is in scope.
+     */
+    private Ast.EnumDecl visibleProgramEnum(String name, Ctx ctx) {
+        Library from = ctx != null ? ctx.library() : null;
+        if (from == null || !stubs.isStubEnum(name)) {
+            return null;
+        }
+        Ast.EnumDecl pe = program.resolveEnum(name, from);
+        if (pe == null || pe.ownerLibrary == null) {
+            return null;
+        }
+        if (pe.ownerLibrary == from) {
+            return pe;
+        }
+        for (String uri : from.imports) {
+            if (program.resolveImportedLibrary(from, uri) == pe.ownerLibrary) {
+                return pe;
+            }
+        }
+        return null;
     }
 
     /** A user enum by simple name, preferring the one the code being emitted can see. */
@@ -11063,6 +12229,13 @@ public final class JavaEmitter {
             // Java's own inference and must not be pinned by a cast.
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
         }
+        // A dynamic value (a Dyn.get member read) landing in a concrete slot -- a typed
+        // local, a switch expression's result temp -- is Dart's implicit downcast. Only for
+        // a fully concrete target: a type variable is left to Java's own inference.
+        if (o.type != null && isDynamicType(o.type) && !isDynamicType(target) && isFullyConcrete(target)
+                && !target.is("void") && o.code.startsWith("Dyn.")) {
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
+        }
         return o.code;
     }
 
@@ -11212,6 +12385,19 @@ public final class JavaEmitter {
         return null;
     }
 
+    private static boolean stubTakesPositionals(Ast.ClassDecl stub) {
+        for (Ast.CtorDecl k : stub.ctors) {
+            if (k.name == null) {
+                for (Param p : k.params) {
+                    if (!p.named) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private Ast.ClassDecl stubClassOf(TypeRef t) {
         return t == null ? null : stubs.classes.get(t.name);
     }
@@ -11278,6 +12464,88 @@ public final class JavaEmitter {
      * / {@code Animatable<T>}) to {@code Color}. Returns {@code null} when the member
      * is not found on the stub chain (leaving the caller's default type in place).
      */
+    /**
+     * {@code m} with its callback parameters' class type variables replaced by the
+     * receiver's type arguments: {@code Stream<List<int>>.listen} expects a
+     * {@code void Function(List<int>)}, so the closure passed to it types its
+     * parameter and {@code xs.contains(1)} is a typed call. Without it the parameter
+     * was dynamic and every member read went through {@code Dyn}, whose untyped
+     * result javac then rejected. Unbound variables (a raw receiver) become dynamic.
+     * Only callbacks change; value parameters keep their declared types.
+     */
+    private Ast.MethodDecl withReceiverCallbackTypes(Ast.MethodDecl m, TypeRef receiver) {
+        Ast.ClassDecl c = receiver == null ? null : stubs.classes.get(receiver.name);
+        if (c == null || c.typeParams.isEmpty() || !c.methods.contains(m)) {
+            return m;
+        }
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            // A raw receiver comes back as the stub's own `Stream<T>`; that T, like any
+            // type variable, is no type the closure can declare, so it stays dynamic.
+            TypeRef a = i < receiver.args.size() ? receiver.args.get(i) : null;
+            subst.put(c.typeParams.get(i), a != null && isConcreteType(a) ? a : TypeRef.DYNAMIC);
+        }
+        List<Param> params = new ArrayList<Param>();
+        boolean changed = false;
+        for (Param p : m.params) {
+            TypeRef nt = p.type != null && p.type.funcParams != null ? substFunctionType(p.type, subst) : p.type;
+            if (nt != p.type) {
+                Param q = new Param();
+                q.type = nt;
+                q.name = p.name;
+                q.named = p.named;
+                q.required = p.required;
+                q.optional = p.optional;
+                q.isThis = p.isThis;
+                q.isSuper = p.isSuper;
+                q.defaultValue = p.defaultValue;
+                params.add(q);
+                changed = true;
+            } else {
+                params.add(p);
+            }
+        }
+        if (!changed) {
+            return m;
+        }
+        Ast.MethodDecl copy = new Ast.MethodDecl();
+        copy.returnType = m.returnType;
+        copy.name = m.name;
+        copy.typeParams = m.typeParams;
+        copy.params = params;
+        copy.isStatic = m.isStatic;
+        copy.isGetter = m.isGetter;
+        copy.isSetter = m.isSetter;
+        copy.isAbstract = m.isAbstract;
+        copy.isAsync = m.isAsync;
+        return copy;
+    }
+
+    /** {@link #substTypeVars}, reaching into an inline function type's signature too. */
+    private TypeRef substFunctionType(TypeRef t, java.util.Map<String, TypeRef> subst) {
+        if (t == null || t.funcParams == null) {
+            return substTypeVars(t, subst);
+        }
+        boolean changed = false;
+        List<TypeRef> fps = new ArrayList<TypeRef>();
+        for (TypeRef fp : t.funcParams) {
+            TypeRef nfp = substFunctionType(fp, subst);
+            changed |= nfp != fp;
+            fps.add(nfp);
+        }
+        TypeRef ret = substFunctionType(t.funcReturn, subst);
+        changed |= ret != t.funcReturn;
+        if (!changed) {
+            return t;
+        }
+        TypeRef nt = new TypeRef(t.name);
+        nt.args.addAll(t.args);
+        nt.nullable = t.nullable;
+        nt.funcParams = fps;
+        nt.funcReturn = ret;
+        return nt;
+    }
+
     private TypeRef stubMemberReturnType(TypeRef receiver, String member, boolean getter) {
         if (receiver == null) {
             return null;
@@ -11405,7 +12673,11 @@ public final class JavaEmitter {
         String nullCheckedTemp;
         /** Inside a hashCode/compareTo body: narrow each `return` value to Java int. */
         boolean narrowReturnToInt;
+        /// A bare `return;` answers null: the enclosing block lambda targets a
+        /// dynamic-returning (value) SAM but returns no value of its own.
+        boolean bareReturnIsNull;
         String syncStarList;                  // non-null inside a sync* body: the result-list temp
+        String asyncStarSink;                 // non-null inside an async* body: the AsyncStar.Sink temp
         /**
          * The expression being emitted as a statement, whose value nobody reads (see
          * {@link #emitStatementExpr}); an assignment through a void setter only needs a

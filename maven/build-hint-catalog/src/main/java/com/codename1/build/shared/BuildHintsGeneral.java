@@ -58,7 +58,7 @@ final class BuildHintsGeneral {
                 .def("cloud.codenameone.com")
                 .platform("general")
                 .doc("The host that serves Codename One invite links "
-                        + "(`https://<host>/i/<slug>/<code>`). Changing it points the generated "
+                        + "(`+https://<host>/i/<slug>/<code>+`). Changing it points the generated "
                         + "Android App Link intent filter and the iOS associated domain at a "
                         + "different link service; the matching `apple-app-site-association` and "
                         + "`assetlinks.json` must be served from that host."));
@@ -68,7 +68,7 @@ final class BuildHintsGeneral {
                 .type(HintType.STRING)
                 .platform("general")
                 .doc("This app's path segment in its invite links "
-                        + "(`https://<host>/i/<slug>/<code>`), shown in the invite settings of "
+                        + "(`+https://<host>/i/<slug>/<code>+`), shown in the invite settings of "
                         + "the build console. Set it so the generated Android App Link filter "
                         + "matches only this app's own links. The link domain is shared by every "
                         + "invite-enabled app, so when this is unset the filter matches every "

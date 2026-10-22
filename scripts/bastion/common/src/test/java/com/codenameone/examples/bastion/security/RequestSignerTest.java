@@ -72,7 +72,7 @@ class RequestSignerTest {
         // The JavaSE port's crypto (the JDK's provider) without a Display,
         // which would need a window: the tests run headless.
         Util.setImplementation(new JavaSEPort());
-        KeyPair pair = KeyGenerator.ecP256();
+        KeyPair pair = KeyGenerator.ec(256);
         String header = RequestSigner.header("dev1", pair.getPrivateKey(), "POST",
                 "/api/accounts/a1/withdraw", KEY, BODY.getBytes("UTF-8"), NONCE, TS);
         assertTrue(header.startsWith("v1;device=dev1;ts=" + TS + ";nonce=" + NONCE + ";sig="),
@@ -99,7 +99,7 @@ class RequestSignerTest {
         Keys.startOver();
         try {
             Session.useUser(user("alice@bastion.example"));
-            KeyPair pair = KeyGenerator.ecP256();
+            KeyPair pair = KeyGenerator.ec(256);
             DeviceKey.keep("alice@bastion.example", pair.getPrivateKey(),
                     new DeviceDto("dev-a", "test", false, true, true, 0L), device -> { },
                     (status, message) -> { throw new AssertionError(message); });

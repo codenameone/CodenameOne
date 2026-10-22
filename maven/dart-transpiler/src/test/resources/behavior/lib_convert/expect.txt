@@ -1,0 +1,17 @@
+Ada 36 2
+9.5
+true
+null
+{"name":"Ada","age":36,"tags":["math","code"]}
+[1,2.5,"a\"b",null,{"k":false}]
+{
+  "a": [
+    1
+  ]
+}
+3
+hé
+aGVsbG8=
+hello
+3
+format error

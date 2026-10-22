@@ -28,6 +28,7 @@ import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 import dart.runtime.DartRuntime;
+import dart.runtime.Dyn;
 
 /**
  * Element for a {@link Provider}: when a rebuild hands it a different value, the widgets
@@ -43,16 +44,81 @@ public class ProviderElement extends StatelessElement {
         super(widget);
     }
 
+    /// The value this element made by calling the provider's `create`, kept across
+    /// rebuilds: the parent hands down a new Provider widget every build, and Flutter
+    /// creates once per element, not once per widget.
+    private Object created;
+    private boolean hasCreated;
+
+    @Override
+    protected void firstBuild() {
+        // After Element.mount linked the parent, so create(context) can read the
+        // providers above it -- `create: (c) => Cubit(c.read<Repo>())`.
+        supplyCreated(widget());
+        super.firstBuild();
+    }
+
+    private void supplyCreated(Widget w) {
+        if (!(w instanceof Provider)) {
+            return;
+        }
+        Provider p = (Provider) w;
+        if (p.getValue() != null || p.create == null) {
+            return;
+        }
+        if (hasCreated) {
+            p.value(created);
+        } else if (p.lazy) {
+            p.pendingCreator = this;
+        } else {
+            createNow(p);
+        }
+    }
+
+    /// Runs `create` for {@code p}: during the first build when `lazy: false`, else
+    /// on the first lookup (see {@link Provider#getValue()}).
+    void createNow(Provider p) {
+        if (!hasCreated) {
+            created = Dyn.invoke(p.create, this);
+            hasCreated = true;
+        }
+        p.value(created);
+        onCreated(created);
+    }
+
+    /// The value now exists; a subclass that listens to it subscribes here.
+    protected void onCreated(Object value) {
+    }
+
+    @Override
+    public void unmount() {
+        forgetPending(widget());
+        if (hasCreated && widget() instanceof Provider) {
+            ((Provider) widget()).disposeCreated(this, created);
+        }
+        super.unmount();
+    }
+
     @Override
     public void update(Widget newWidget) {
         Object before = valueOf(widget());
+        forgetPending(widget());
+        supplyCreated(newWidget);
         super.update(newWidget);
         if (!DartRuntime.eq(before, valueOf(widget()))) {
             rebuildProviderDependents();
         }
     }
 
+    /// An old or unmounted widget must not create through this element any more.
+    private void forgetPending(Widget w) {
+        if (w instanceof Provider && ((Provider) w).pendingCreator == this) {
+            ((Provider) w).pendingCreator = null;
+        }
+    }
+
     private static Object valueOf(Widget w) {
-        return w instanceof Provider ? ((Provider) w).getValue() : null;
+        // The field, not getValue(): comparing must not create a lazy value.
+        return w instanceof Provider ? ((Provider) w).value : null;
     }
 }

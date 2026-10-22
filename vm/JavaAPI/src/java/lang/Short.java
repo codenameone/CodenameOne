@@ -102,14 +102,18 @@ public final class Short extends Number implements Comparable<Short> {
      * Assuming the specified String represents a short, returns that short's value. Throws an exception if the String cannot be parsed as a short. The radix is assumed to be 10.
      */
     public static short parseShort(java.lang.String s) throws java.lang.NumberFormatException{
-        return (short)Integer.parseInt(s);
+        return parseShort(s, 10);
     }
 
     /**
      * Assuming the specified String represents a short, returns that short's value in the radix specified by the second argument. Throws an exception if the String cannot be parsed as a short.
      */
     public static short parseShort(java.lang.String s, int radix) throws java.lang.NumberFormatException{
-        return (short)Integer.parseInt(s, radix);
+        int i = Integer.parseInt(s, radix);
+        if (i < MIN_VALUE || i > MAX_VALUE) {
+            throw new NumberFormatException("Value out of range. Value:\"" + s + "\" Radix:" + radix);
+        }
+        return (short) i;
     }
 
     /**
@@ -183,5 +187,70 @@ public final class Short extends Number implements Comparable<Short> {
         // do return -1/0/1. This returned the sign, so it disagreed with the JDK and with
         // this class's own compare(short, short) directly above.
         return cn1Value() - another.cn1Value();
+    }
+
+    // ---------------------------------------------------------------------
+    // Members of the JDK's class this one did not have, in plain Java.
+    // ---------------------------------------------------------------------
+
+    /// The size of a short in bytes.
+    public static final int BYTES = 2;
+
+    /// The size of a short in bits.
+    public static final int SIZE = 16;
+
+    /// A Short of `parseShort(s)`.
+    @Deprecated
+    public Short(String s) throws NumberFormatException {
+        this(parseShort(s, 10));
+    }
+
+    /// The decimal string of `s`.
+    public static String toString(short s) {
+        return Integer.toString(s);
+    }
+
+    /// A Short of `parseShort(s)`.
+    public static Short valueOf(String s) throws NumberFormatException {
+        return valueOf(parseShort(s, 10));
+    }
+
+    /// A Short of `parseShort(s, radix)`.
+    public static Short valueOf(String s, int radix) throws NumberFormatException {
+        return valueOf(parseShort(s, radix));
+    }
+
+    /// Decodes a decimal, hexadecimal or octal short, as `Integer.decode`.
+    public static Short decode(String nm) throws NumberFormatException {
+        int value = Integer.decode(nm).intValue();
+        if (value < MIN_VALUE || value > MAX_VALUE) {
+            throw new NumberFormatException("Value " + value + " out of range from input " + nm);
+        }
+        return valueOf((short) value);
+    }
+
+    /// The value itself.
+    public static int hashCode(short value) {
+        return value;
+    }
+
+    /// Compares the two as unsigned values.
+    public static int compareUnsigned(short x, short y) {
+        return toUnsignedInt(x) - toUnsignedInt(y);
+    }
+
+    /// The value as an unsigned int.
+    public static int toUnsignedInt(short x) {
+        return x & 0xffff;
+    }
+
+    /// The value as an unsigned long.
+    public static long toUnsignedLong(short x) {
+        return x & 0xffffL;
+    }
+
+    /// The bytes in reverse order.
+    public static short reverseBytes(short i) {
+        return (short) (((i & 0xff00) >> 8) | (i << 8));
     }
 }

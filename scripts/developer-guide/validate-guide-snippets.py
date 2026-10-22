@@ -15,7 +15,7 @@ TAG_RE = re.compile(r"(?:^|,)tag=([^,\]]+)")
 LISTING_DELIMITER_RE = re.compile(r"^-{4,}\s*$")
 TAG_BLOCK_RE = re.compile(r"// tag::([^\[]+)\[\]\n(.*?)\n// end::\1\[\]", re.S)
 JAVA_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.java$")
-INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/")
+INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/", "../../scripts/skirmish/", "../../scripts/parley/")
 
 
 def parse_args():
@@ -135,8 +135,8 @@ def validate_includes(includes):
     cache = {}
     java_snippets = []
     for item in includes:
-        # The Wayline and Savor chapters show the sample applications themselves,
-        # which are built and tested by wayline.yml and savor.yml, so they include its sources directly
+        # The Wayline, Savor, Skirmish and Parley chapters show the sample applications themselves,
+        # which are built and tested by wayline.yml, savor.yml, skirmish.yml and parley.yml, so they include its sources directly
         # rather than through copies under docs/demos that could drift from it.
         if not item["target"].startswith(INCLUDE_ROOTS):
             errors.append(
@@ -173,11 +173,16 @@ def validate_includes(includes):
                 f"must live under a compiled source root, not src/main/snippets: {item['target']}"
             )
         if item["language"].strip().lower() == "css":
-            css_root = (Path("docs/demos/common/src/main/css")).resolve()
-            try:
-                relative_css_path = target_path.relative_to(css_root)
-            except ValueError:
-                relative_css_path = None
+            # The demo's theme, or a sample application's own theme: each is
+            # compiled by its project's CSS goal, and the sample's workflow
+            # builds the sample.
+            relative_css_path = None
+            for css_dir in ("docs/demos/common/src/main/css", "scripts/skirmish/common/src/main/css"):
+                try:
+                    relative_css_path = target_path.relative_to(Path(css_dir).resolve())
+                    break
+                except ValueError:
+                    pass
             if relative_css_path is None or relative_css_path.parent != Path(".") or not target_path.name.endswith("theme.css"):
                 errors.append(
                     f"{item['sourceFile']}:{item['line']}: CSS guide snippets in the common demo "

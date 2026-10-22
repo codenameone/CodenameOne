@@ -155,6 +155,13 @@ include::Savor-Users-Guide.asciidoc[]
 
 include::Savor-Implementors-Guide.asciidoc[]
 
+
+include::Skirmish-Implementors-Guide.asciidoc[]
+
+include::Parley-Users-Guide.asciidoc[]
+
+include::Parley-Implementors-Guide.asciidoc[]
+
 include::Bastion-Users-Guide.asciidoc[]
 
 include::Bastion-Implementors-Guide.asciidoc[]
@@ -182,6 +189,8 @@ include::Bluetooth.asciidoc[]
 include::Nearby-Devices.asciidoc[]
 
 include::Call-Management.asciidoc[]
+
+include::WebRTC.asciidoc[]
 
 include::VPN.asciidoc[]
 

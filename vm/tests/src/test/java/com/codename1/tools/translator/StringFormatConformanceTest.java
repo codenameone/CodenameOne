@@ -82,7 +82,7 @@ class StringFormatConformanceTest {
 
     /**
      * {@code %a} and {@code %t} are unimplemented by design and raise
-     * UnknownFormatConversionException; they are covered by StringFormatIntegrationTest
+     * UnknownFormatConversionException; they are covered by BulkConformanceIntegrationTest (StringFormatChecks)
      * and deliberately absent from CONVERSIONS.
      */
     @Test

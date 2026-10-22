@@ -24,7 +24,7 @@
 package java.lang;
 
 /** Mutable UTF-16 sequence with compact storage for Latin-1 code units. */
-public final class StringBuilder implements CharSequence, Appendable {
+public final class StringBuilder implements CharSequence, Appendable, Comparable<StringBuilder> {
     static final int INITIAL_CAPACITY = 16;
     // Private native buffer lock. Explicit initialization also covers no-zero allocation.
     private long cn1AccessOwner = 0;
@@ -199,11 +199,98 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
 
     public CharSequence subSequence(int start, int end) { return substring(start, end); }
-    // Preserve the API's existing return type.
-    public StringBuilder substring(int start, int end) {
+
+    /// The characters from `start` to the end, as a String.
+    public String substring(int start) { return substring(start, count); }
+
+    /// The characters from `start` to `end`, as a String.
+    public String substring(int start, int end) {
         checkRange(start, end);
-        StringBuilder result = new StringBuilder(end - start);
-        for (int i = start; i < end; i++) result.append(unit(i));
-        return result;
+        char[] chars = new char[end - start];
+        getChars(start, end, chars, 0);
+        return new String(chars);
     }
+
+    /// Appends the code point, as one char or as a surrogate pair.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if it is not a valid code point
+    public StringBuilder appendCodePoint(int codePoint) {
+        if (codePoint >= 0 && codePoint < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+            return append((char) codePoint);
+        }
+        Character.checkCodePoint(codePoint);
+        append(Character.highSurrogate(codePoint));
+        return append(Character.lowSurrogate(codePoint));
+    }
+
+    /// The code point at `index`.
+    public int codePointAt(int index) {
+        checkIndex(index);
+        return Character.codePointAt(this, index);
+    }
+
+    /// The code point that ends just before `index`.
+    public int codePointBefore(int index) {
+        if (index < 1 || index > count) throw new StringIndexOutOfBoundsException(index);
+        return Character.codePointBefore(this, index);
+    }
+
+    /// The number of code points between `beginIndex` and `endIndex`.
+    public int codePointCount(int beginIndex, int endIndex) {
+        if (beginIndex < 0 || endIndex > count || beginIndex > endIndex) throw new IndexOutOfBoundsException();
+        return Character.codePointCount(this, beginIndex, endIndex);
+    }
+
+    /// The index `codePointOffset` code points away from `index`.
+    public int offsetByCodePoints(int index, int codePointOffset) {
+        if (index < 0 || index > count) throw new IndexOutOfBoundsException();
+        return Character.offsetByCodePoints(this, index, codePointOffset);
+    }
+
+    /// The first index of `str`, or -1.
+    public int indexOf(String str) { return indexOf(str, 0); }
+
+    /// The first index of `str` at or after `fromIndex`, or -1.
+    public int indexOf(String str, int fromIndex) { return toString().indexOf(str, fromIndex); }
+
+    /// The last index of `str`, or -1.
+    public int lastIndexOf(String str) { return lastIndexOf(str, count); }
+
+    /// The last index of `str` at or before `fromIndex`, or -1.
+    public int lastIndexOf(String str, int fromIndex) { return toString().lastIndexOf(str, fromIndex); }
+
+    /// Replaces the characters from `start` to `end` (clamped to the length)
+    /// with `str`.
+    public StringBuilder replace(int start, int end, String str) {
+        if (str == null) throw new NullPointerException();
+        if (end > count) end = count;
+        if (start < 0 || start > end) {
+            throw new StringIndexOutOfBoundsException("Range [" + start + ", " + end + ") out of bounds for length " + count);
+        }
+        delete(start, end);
+        return insert(start, str);
+    }
+
+    /// Appends the code point `count` times.
+    public StringBuilder repeat(int codePoint, int count) {
+        if (count < 0) throw new IllegalArgumentException("count is negative: " + count);
+        if (count == 0) return this;
+        Character.checkCodePoint(codePoint);
+        for (int i = 0; i < count; i++) appendCodePoint(codePoint);
+        return this;
+    }
+
+    /// Appends `cs` (or `"null"`) `count` times.
+    public StringBuilder repeat(CharSequence cs, int count) {
+        if (count < 0) throw new IllegalArgumentException("count is negative: " + count);
+        if (count == 0) return this;
+        String text = String.valueOf(cs);
+        for (int i = 0; i < count; i++) append(text);
+        return this;
+    }
+
+    /// Compares the contents lexicographically.
+    public int compareTo(StringBuilder another) { return CharSequence.compare(this, another); }
 }

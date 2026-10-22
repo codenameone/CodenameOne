@@ -306,15 +306,46 @@ class CalibrateTest(unittest.TestCase):
 class OverlayRulesTest(unittest.TestCase):
     """The shared rules, through this layout."""
 
-    def test_two_pull_requests_moving_one_size_conflict_by_name(self):
+    def test_two_pull_requests_moving_one_size_resolve_to_the_later(self):
         base = rows(android={"code_bytes": row(1000)})
         def moved(number, value):
             return {"pr": number, "rebaseline": {"android": {fb.APP: {"code_bytes": dict(
                 row(value), **{"from": {"value": 1000}, "reason": "r"})}}}}
         tree = Tree(base, {11: moved(11, 1100), 12: moved(12, 1200)})
         try:
-            with self.assertRaisesRegex(fb.BaselineError, "pr/11.json, pr/12.json"):
-                fb.load(tree.root)
+            data = fb.load(tree.root)
+            self.assertEqual(1200, data["platforms"]["android"][fb.APP]["code_bytes"]["value"])
+            self.assertTrue(any("pr/12.json" in n for n in data["notes"]), data["notes"])
+        finally:
+            tree.close()
+
+    def test_follow_sets_sizes_to_masters_measurement_and_leaves_ratios(self):
+        base = rows(linux={"code_bytes": row(1000), "wire_bytes": row(500),
+                           "idle_memory_ratio": row(0.4)},
+                    android={"code_bytes": row(7, tolerance=0.005)})
+        policy = dict(POLICY, tolerance=dict(POLICY["tolerance"], code_bytes=0.02))
+        tree = Tree(base, policy=policy)
+        try:
+            night = tree.run_file("baseline-linux.json", {"platform": "linux", "values": {
+                "code_bytes": 1010, "wire_bytes": 500, "idle_memory_ratio": 0.9}})
+            moved = fb.follow(tree.root, [night])
+            self.assertEqual(2, len(moved), moved)
+            self.assertIn("android code_bytes: tolerance 0.005", moved[0])
+            self.assertIn("linux code_bytes: 1000 -> 1010", moved[1])
+            self.assertNotIn("tolerance", pb.load_base(tree.root, fb.FLUTTER)["android"][fb.APP]["code_bytes"])
+            gallery = pb.load_base(tree.root, fb.FLUTTER)["linux"][fb.APP]
+            self.assertEqual(1010, gallery["code_bytes"]["value"])
+            self.assertEqual(0.4, gallery["idle_memory_ratio"]["value"])
+            self.assertEqual([], fb.follow(tree.root, []))
+        finally:
+            tree.close()
+
+    def test_follow_refuses_to_run_before_the_fold(self):
+        overlay = {"pr": 3, "calibrate": {"linux": {fb.APP: {"idle_memory_ratio": row(0.4)}}}}
+        tree = Tree(rows(linux={"code_bytes": row(9)}), {3: overlay})
+        try:
+            with self.assertRaises(fb.BaselineError):
+                fb.follow(tree.root, [])
         finally:
             tree.close()
 
@@ -346,10 +377,16 @@ class CheckTest(unittest.TestCase):
         pb.exists_at = lambda ref, path, root=None: (
             not migrating if path == "policy.json" else False)
         pb.legacy_touched = touched
+        # A copy of the policy and base/ without pr/: these tests are about which paths a
+        # pull request may change, and the overlays open on master at the time must not
+        # decide their outcome (they once failed every build of master this way).
+        tree = Tree(pb.load_base(fb.ROOT, fb.FLUTTER),
+                    policy=json.loads((fb.ROOT / "policy.json").read_text()))
         try:
-            return fb.check(fb.ROOT, "base-sha", number), seen
+            return fb.check(tree.root, "base-sha", number), seen
         finally:
             pb.changed_files, pb.exists_at, pb.legacy_touched = saved
+            tree.close()
 
     def test_base_is_the_folds_alone(self):
         problems, _ = self.check(["base/android.json"])

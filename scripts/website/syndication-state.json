@@ -2876,6 +2876,54 @@
       "medium": {
         "url": "https://medium.com/@Codename_One/try-real-java-in-your-browser-compiler-errors-included-53ac036945c1?postPublishedType=initial",
         "syndicated_at": "2026-10-20T19:01:41+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/try-real-java-in-your-browser-compiler-errors-included",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad6af4d1d327dfc15627464",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-21T17:15:04+00:00"
+      }
+    },
+    "gc-memory-budget-performance": {
+      "devto": {
+        "id": 4891205,
+        "url": "https://dev.to/codenameone/pgo-for-faster-apps-and-generationaladaptive-gc-122e",
+        "syndicated_at": "2026-10-21T18:01:09+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/pgo-for-faster-apps-and-generational-adaptive-gc-d3e48ddcb43b?postPublishedType=initial",
+        "syndicated_at": "2026-10-21T19:01:51+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/pgo-for-faster-apps-and-generational-adaptive-gc",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad8f40754e3f733c465bd5c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-21T19:03:08+00:00"
+      }
+    },
+    "maven-projects-with-less-scaffolding": {
+      "hashnode": {
+        "url": "https://debugagent.com/smaller-simpler-maven-projects",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad9520ed1fd0e9ce7658baf",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-22T00:01:09+00:00"
+      },
+      "devto": {
+        "id": 4898963,
+        "url": "https://dev.to/codenameone/smaller-simpler-maven-projects-4ca5",
+        "syndicated_at": "2026-10-22T17:57:55+00:00"
       }
     }
   }

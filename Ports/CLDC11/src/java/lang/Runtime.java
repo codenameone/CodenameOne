@@ -26,6 +26,34 @@ package java.lang;
 /// An application cannot create its own instance of this class.
 /// Since: JDK1.0, CLDC 1.0 See Also:getRuntime()
 public class Runtime{
+    private Runtime() {
+    }
+
+    /// Ends the process at once, without running the shutdown hooks.
+    public void halt(int status) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Registers a hook that `exit` runs before the application closes.
+    public void addShutdownHook(Thread hook) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// Unregisters a hook; whether it was registered.
+    public boolean removeShutdownHook(Thread hook) {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// The number of processors available to the program.
+    public int availableProcessors() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
+    /// The most memory the program may use.
+    public long maxMemory() {
+        throw new RuntimeException("Compile-time stub");
+    }
+
     /// Terminates the currently running Java application. This method never returns normally.
     /// The argument serves as a status code; by convention, a nonzero status code indicates abnormal termination.
     public void exit(int status){

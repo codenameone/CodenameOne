@@ -75,7 +75,9 @@ class IteratorEscape {
 
     /// Callees invoked ON the tracked reference during the last walk, as
     /// owner.name+desc. Valid only immediately after a walk, exactly like lastReason.
-    /// A site is only retirable if none of these leaks `this`.
+    /// A site is only retirable if none of these leaks `this`. An entry that starts
+    /// with EXACT_CALL was an INVOKESPECIAL, whose target is the named method itself
+    /// rather than whatever the receiver's class overrides it with.
     static final java.util.List<String> receiverCalls = new java.util.ArrayList<String>();
 
     /// Prefix of a receiverCalls entry made by INVOKESPECIAL. Such a call is not

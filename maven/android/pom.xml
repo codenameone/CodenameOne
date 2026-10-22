@@ -124,6 +124,11 @@
                                      the builder deletes whichever halves the
                                      app did not ask for. -->
                                 <exclude>com/codename1/impl/android/nearby/**</exclude>
+                                <!-- The WebRTC implementation names org.webrtc,
+                                     which PlatformFeatureCatalog adds only for an
+                                     app that referenced com.codename1.webrtc; the
+                                     builder deletes the package for everyone else. -->
+                                <exclude>com/codename1/impl/android/webrtc/**</exclude>
                                 <!-- The Play Install Referrer implementation
                                      names com.android.installreferrer, which
                                      PlatformFeatureCatalog adds only for an app

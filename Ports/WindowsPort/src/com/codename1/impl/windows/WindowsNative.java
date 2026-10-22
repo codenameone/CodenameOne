@@ -577,6 +577,18 @@ public final class WindowsNative {
      */
     public static native byte[] generateRsaKeyPair(int bits);
 
+    /**
+     * A fresh P-256 pair as 96 raw bytes, X || Y || D, the coordinates and
+     * scalar of BCrypt's ECC private blob. The DER encodings are built in Java.
+     */
+    public static native byte[] generateEcRaw();
+
+    /**
+     * P-256 ECDH of a raw private key (X || Y || D, 96 bytes) and a raw peer
+     * point (X || Y, 64 bytes). Returns the 32-byte big-endian x coordinate.
+     */
+    public static native byte[] ecdhRaw(byte[] privateXyd, byte[] peerXy);
+
     /** Why the most recent crypto call failed, for the CryptoException message. */
     public static native String lastCryptoError();
 
@@ -874,6 +886,19 @@ public final class WindowsNative {
      * blocks until the user chooses.
      */
     public static native String fileDialog(boolean save, int type, String title);
+
+    /**
+     * Shows the rich open/save dialog behind Display.showOpenDialog and
+     * showSaveDialog (IFileOpenDialog / IFileSaveDialog). Filters and options
+     * are encoded by {@link com.codename1.impl.NativeFileDialogCodec}, which
+     * also decodes the answer; {@code null} means cancelled or headless.
+     * {@code clientGuid} and {@code defaultFolder} carry the Windows-only hints.
+     * Runs on the pump thread; the caller blocks until the user chooses.
+     */
+    public static native String[] fileDialogEx(boolean save, String title, String acceptLabel,
+            String initialDir, String suggestedName, String[] filters, int selectedFilter,
+            boolean multi, boolean dirs, boolean confirmOverwrite, boolean showHidden, String[] options,
+            String clientGuid, String defaultFolder);
 
     /* ----------------------------------------------------------- media */
 

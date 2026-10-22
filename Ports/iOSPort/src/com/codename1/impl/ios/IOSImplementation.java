@@ -256,6 +256,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches the EDT, the log, secure
+        // random bytes, digests and locale symbols through Codename One.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         instance = this;
         // Set the metalRendering static gate as early as possible -- before
         // any NativeImage / NativeGraphics is constructed -- so mutable-image
@@ -448,6 +451,28 @@ public class IOSImplementation extends CodenameOneImplementation {
     private IOSCallBridge callBridge;
 
     private IOSVpnBridge vpnBridge;
+
+    private IOSWebRtc webRtc;
+
+    /// The WebRTC bridge, on the WebRTC framework.
+    ///
+    /// Unlike [#getCallBridge()] this answers null when the build did not
+    /// compile the natives in (`CN1_INCLUDE_WEBRTC`, flipped by the builder
+    /// when the app references `com.codename1.webrtc`): null IS the
+    /// capability query `WebRtc.isSupported()` reads, and the stub natives
+    /// cannot answer a request, because in such a build the
+    /// `com.codename1.webrtc.WebRtc` callbacks were never translated.
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (webRtc == null) {
+            if (!nativeInstance.isWebRtcSupported()) {
+                return null;
+            }
+            webRtc = new IOSWebRtc(this, nativeInstance);
+        }
+        return webRtc;
+    }
+
 
     /// The call bridge, on CallKit and PushKit.
     ///
@@ -6723,6 +6748,385 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             dropEvents = true;
             nativeInstance.openFileChooser(accept);
+        }
+    }
+
+    /// Pending native file dialogs, keyed by the id handed to the native side.
+    /// Reached from the EDT, the save writer task and the native completion
+    /// (UIKit main thread), so it follows the macFileChooserRequests discipline.
+    private static final java.util.HashMap<Integer, PendingFileDialog> fileDialogRequests =
+            new java.util.HashMap<Integer, PendingFileDialog>();
+    private static int fileDialogSequence;
+
+    private static final class PendingFileDialog {
+        final com.codename1.io.filechooser.FileDialogRequest<?> request;
+        final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback;
+        final String tempFile;
+
+        PendingFileDialog(com.codename1.io.filechooser.FileDialogRequest<?> request,
+                          SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback,
+                          String tempFile) {
+            this.request = request;
+            this.callback = callback;
+            this.tempFile = tempFile;
+        }
+    }
+
+    private static int registerFileDialog(PendingFileDialog pending) {
+        synchronized (fileDialogRequests) {
+            int id = ++fileDialogSequence;
+            fileDialogRequests.put(id, pending);
+            return id;
+        }
+    }
+
+    private static String joinLines(java.util.List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (String v : values) {
+            if (v == null || v.length() == 0) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(v);
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    private static String stripFileScheme(String path) {
+        if (path != null && path.startsWith("file://")) {
+            return path.substring(7);
+        }
+        return path;
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        if (isWatch() || isTV()) {
+            // No document picker on either; the Codename One fallback is used
+            return super.isFileDialogFeatureSupported(feature);
+        }
+        if (isMacPlatform()) {
+            // No accessory Component or preview: there is no way to host a
+            // Codename One peer inside the panel's accessory NSView yet.
+            return feature != com.codename1.io.filechooser.FileDialogFeatures.ACCESSORY_COMPONENT
+                    && feature != com.codename1.io.filechooser.FileDialogFeatures.PREVIEW;
+        }
+        return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
+                // allowsMultipleSelection is iOS 11+; IOSNative.m sets it only there.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT
+                    && iosMajorVersion() >= 11)
+                // Picking a folder through UIDocumentPickerViewController is iOS 13+.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.DIRECTORIES
+                    && iosMajorVersion() >= 13)
+                // UIDocumentPickerViewController.directoryURL is iOS 13+; the
+                // native side sets it only there, so older systems ignore it.
+                || (feature == com.codename1.io.filechooser.FileDialogFeatures.INITIAL_DIRECTORY
+                    && iosMajorVersion() >= 13);
+    }
+
+    private int iosMajorVersion() {
+        String ver = nativeInstance.getOSVersion();
+        if (ver == null) {
+            return 0;
+        }
+        int dot = ver.indexOf('.');
+        try {
+            return Integer.parseInt(dot < 0 ? ver : ver.substring(0, dot));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /// Deletes an export's staged file and the per-request folder holding it.
+    private static void deleteExportStaging(String temp) {
+        com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+        fs.delete(temp);
+        int slash = temp.lastIndexOf('/');
+        if (slash > 0) {
+            String folder = temp.substring(0, slash + 1);
+            if (fs.exists(folder)) {
+                fs.delete(folder);
+            }
+        }
+    }
+
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isWatch() || isTV()) {
+            // The document picker natives are compiled out of both targets
+            super.showOpenDialog(request, callback);
+            return;
+        }
+        if (isMacPlatform()) {
+            showMacDialog(request, false, request.isMultiSelect(), request.isDirectories(), callback);
+            return;
+        }
+        java.util.ArrayList<String> uts = new java.util.ArrayList<String>();
+        java.util.ArrayList<String> exts = new java.util.ArrayList<String>();
+        boolean allFiles = false;
+        for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
+            String[] u = f.getUtTypes();
+            if ((u == null || u.length == 0) && f.getExtensions().length == 0
+                    && f.getMimeTypes().length == 0) {
+                // an unconstrained filter accepts every file, so the union does too
+                allFiles = true;
+            }
+            if (u != null && u.length > 0) {
+                for (String s : u) {
+                    uts.add(s);
+                }
+                continue;
+            }
+            String[] e = f.getExtensions();
+            if (e != null) {
+                for (String s : e) {
+                    if (s != null && s.startsWith(".")) {
+                        s = s.substring(1);
+                    }
+                    if ("*".equals(s)) {
+                        allFiles = true;
+                        continue;
+                    }
+                    // Not case folded: UTType resolves extensions case
+                    // insensitively, and toLowerCase is locale sensitive.
+                    exts.add(s);
+                }
+            }
+        }
+        if (allFiles) {
+            // "*" is the all-files extension; sent as a name it would become a
+            // dynamic UTI nothing conforms to. An empty type list makes the
+            // native picker fall back to public.item, i.e. every document.
+            uts.clear();
+            exts.clear();
+        }
+        int id = registerFileDialog(new PendingFileDialog(request, callback, null));
+        nativeInstance.showOpenFileDialog(joinLines(uts), joinLines(exts),
+                request.isMultiSelect(), request.isDirectories(),
+                stripFileScheme(request.getInitialDirectory()),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_IOS_SHOWS_FILE_EXTENSIONS, false),
+                id);
+    }
+
+    @Override
+    public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
+                               final SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (isWatch() || isTV()) {
+            super.showSaveDialog(request, callback);
+            return;
+        }
+        if (isMacPlatform()) {
+            // NSSavePanel always confirms an overwrite itself; AppKit has no
+            // public switch for it, so isConfirmOverwrite(false) is not honoured.
+            showMacDialog(request, true, false, false, callback);
+            return;
+        }
+        String name = request.getSuggestedName();
+        if (name == null || name.length() == 0) {
+            name = "Untitled";
+        }
+        // A separator in the suggested name would escape the staging folder,
+        // and "." or ".." would name the folder itself or its parent.
+        name = name.replace('/', '_');
+        if (".".equals(name) || "..".equals(name)) {
+            name = "Untitled";
+        }
+        // The picker exports the staged file under exactly this name, and no
+        // later step adds the selected filter's extension, so it is added here
+        // with the same rule the desktop ports apply.
+        com.codename1.io.filechooser.FileTypeFilter[] filters = request.getFilters();
+        int selected = request.getSelectedFilter();
+        if (selected >= 0 && selected < filters.length) {
+            com.codename1.io.filechooser.FileTypeFilter f = filters[selected];
+            String[] ext = f.getExtensions();
+            if (ext.length > 0 && !"*".equals(ext[0]) && !f.acceptsName(name)) {
+                name = name + "." + ext[0];
+            }
+        }
+        String caches = nativeInstance.getCachesDir();
+        if (!caches.endsWith("/")) {
+            caches = caches + "/";
+        }
+        final String base = caches + "cn1-export-";
+        final String fileName = name;
+        // The document picker exports a file that already exists, so the
+        // content is staged first, off the EDT.
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+                // Each request gets a folder no other request has. Background
+                // tasks run one at a time, so choosing an unused name here and
+                // creating it cannot race another save; a timestamp chosen on
+                // the caller's thread could repeat within one millisecond.
+                long stamp = System.currentTimeMillis();
+                String folder = base + stamp + "/";
+                for (int n = 1; fs.exists(folder); n++) {
+                    folder = base + stamp + "-" + n + "/";
+                }
+                final String temp = folder + fileName;
+                try {
+                    fs.mkdir(folder);
+                    java.io.OutputStream out = fs.openOutputStream(temp);
+                    try {
+                        request.writeContent(new com.codename1.io.filechooser.FileDialogResult(
+                                request, new String[]{temp}, -1, null), out);
+                    } finally {
+                        out.close();
+                    }
+                } catch (IOException err) {
+                    failStaging(temp, err);
+                    return;
+                } catch (RuntimeException err) {
+                    // An unchecked failure in the application's writer: the
+                    // staging still goes and the callback is still owed.
+                    failStaging(temp, err);
+                    return;
+                }
+                int id = registerFileDialog(new PendingFileDialog(request, callback, temp));
+                nativeInstance.showSaveFileDialog(temp,
+                        !request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_IOS_EXPORT_AS_MOVE, false),
+                        stripFileScheme(request.getInitialDirectory()), id);
+            }
+
+            private void failStaging(String temp, final Throwable err) {
+                deleteExportStaging(temp);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        com.codename1.io.filechooser.FileDialogResult r =
+                                com.codename1.io.filechooser.FileDialogResult.cancelled(request);
+                        r.setError(err);
+                        callback.onSucess(r);
+                    }
+                });
+            }
+        });
+    }
+
+    /// Record separator between the codec's strings on the Mac native boundary
+    /// (ASCII RS); the codec's own records use newlines internally.
+    private static final char MAC_DIALOG_RS = (char) 30;
+
+    private static String joinRecords(String[] values) {
+        if (values.length == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                sb.append(MAC_DIALOG_RS);
+            }
+            sb.append(values[i].replace(MAC_DIALOG_RS, ' '));
+        }
+        return sb.toString();
+    }
+
+    private void showMacDialog(com.codename1.io.filechooser.FileDialogRequest<?> request, boolean save,
+                               boolean multi, boolean dirs,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        int id = registerFileDialog(new PendingFileDialog(request, callback, null));
+        String name = save ? ((com.codename1.io.filechooser.SaveFileRequest) request).getSuggestedName() : null;
+        nativeInstance.showMacFileDialog(save, request.getTitle(), request.getMessage(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), name,
+                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeFilters(request, true)),
+                request.getSelectedFilter(),
+                joinRecords(com.codename1.impl.NativeFileDialogCodec.encodeOptions(request)),
+                multi, dirs,
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_SHOWS_TAG_FIELD, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_CAN_CREATE_DIRECTORIES, true),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_SHOWS_HIDDEN_FILES, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_CAN_SELECT_HIDDEN_EXTENSION, false),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_MAC_TREATS_PACKAGES_AS_DIRECTORIES, false),
+                id);
+    }
+
+    /// Native completion of showMacFileDialog: the codec's answer joined with
+    /// RS, or null when cancelled. Called on the AppKit main thread.
+    public static void macFileDialogResult(final String answer, final int requestId) {
+        final PendingFileDialog pending;
+        synchronized (fileDialogRequests) {
+            pending = fileDialogRequests.remove(requestId);
+        }
+        if (pending == null) {
+            return; // Duplicate or unknown completion.
+        }
+        Runnable delivery = new Runnable() {
+            @Override
+            public void run() {
+                String[] parts = null;
+                if (answer != null) {
+                    // Split by hand: an empty text option is a real, positional value.
+                    java.util.ArrayList<String> list = new java.util.ArrayList<String>();
+                    int start = 0;
+                    for (int i = 0; i <= answer.length(); i++) {
+                        if (i == answer.length() || answer.charAt(i) == MAC_DIALOG_RS) {
+                            // The native escapes '%' and the separator in each field
+                            list.add(StringUtil.replaceAll(StringUtil.replaceAll(
+                                    answer.substring(start, i), "%1e", "\u001e"), "%25", "%"));
+                            start = i + 1;
+                        }
+                    }
+                    parts = list.toArray(new String[list.size()]);
+                }
+                com.codename1.io.filechooser.FileDialogResult r =
+                        com.codename1.impl.NativeFileDialogCodec.decode(pending.request, parts);
+                if (!r.isCancelled() && pending.request instanceof com.codename1.io.filechooser.SaveFileRequest) {
+                    instance.completeSaveDialog(
+                            (com.codename1.io.filechooser.SaveFileRequest) pending.request, r, pending.callback);
+                    return;
+                }
+                pending.callback.onSucess(r);
+            }
+        };
+        if (!deliverPickerResultOnEdt(delivery)) {
+            delivery.run();
+        }
+    }
+
+    /// Native completion of showOpenFileDialog and showSaveFileDialog. `paths`
+    /// is newline separated, null when cancelled. Called on the UIKit main
+    /// thread; the callback is delivered on the EDT.
+    public static void fileDialogResult(final String paths, final int requestId) {
+        final PendingFileDialog pending;
+        synchronized (fileDialogRequests) {
+            pending = fileDialogRequests.remove(requestId);
+        }
+        if (pending == null) {
+            return; // Duplicate or unknown completion.
+        }
+        Runnable delivery = new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.io.filechooser.FileDialogResult r;
+                if (paths == null || paths.length() == 0) {
+                    r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
+                } else if (paths.charAt(0) == '!') {
+                    // The native could not import a picked item (never a path: paths are absolute)
+                    r = com.codename1.io.filechooser.FileDialogResult.cancelled(pending.request);
+                    r.setError(new IOException(paths.substring(1)));
+                } else {
+                    // The native escapes '%' and newline in each path (cn1FileDialogJoin)
+                    java.util.List<String> list = StringUtil.tokenize(paths, '\n');
+                    String[] arr = new String[list.size()];
+                    for (int i = 0; i < arr.length; i++) {
+                        arr[i] = StringUtil.replaceAll(StringUtil.replaceAll(list.get(i), "%0a", "\n"), "%25", "%");
+                    }
+                    r = new com.codename1.io.filechooser.FileDialogResult(pending.request, arr, -1, null);
+                }
+                if (pending.tempFile != null) {
+                    // Exported as a copy or moved away; either way the staging
+                    // file is no longer needed.
+                    deleteExportStaging(pending.tempFile);
+                }
+                pending.callback.onSucess(r);
+            }
+        };
+        if (!deliverPickerResultOnEdt(delivery)) {
+            delivery.run();
         }
     }
     
@@ -16321,6 +16725,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
         int alg = signatureAlgorithmKind(algorithm);
+        checkSignatureKeyFamily(alg, keyAlgorithm);
+        if (alg >= 3) {
+            byte[] sig = new byte[160];
+            int n = nativeInstance.ecSign(alg, ecPrivateX963(privateKeyPkcs8), data, sig);
+            if (n < 0) throw new RuntimeException("sign failed: code " + n);
+            return cryptoTrim(sig, n);
+        }
         byte[] outBuf = new byte[2048];
         int written = nativeInstance.sign(alg, privateKeyPkcs8, data, outBuf);
         return cryptoTrim(outBuf, written);
@@ -16329,9 +16740,64 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
         int alg = signatureAlgorithmKind(algorithm);
-        int rc = nativeInstance.verify(alg, publicKeyX509, data, signature);
+        checkSignatureKeyFamily(alg, keyAlgorithm);
+        int rc = alg >= 3
+                ? nativeInstance.ecVerify(alg, com.codename1.impl.EcP256Codec.pointFromSpki(publicKeyX509), data, signature)
+                : nativeInstance.verify(alg, publicKeyX509, data, signature);
         if (rc < 0) throw new RuntimeException("verify failed: code " + rc);
         return rc == 1;
+    }
+
+    /// An ECDSA algorithm needs an EC key and RSA an RSA one; the natives
+    /// load the key by the family the algorithm implies, so a mismatch would
+    /// otherwise fail as an unreadable key rather than say what is wrong.
+    /// ECDSA here is P-256 only, the curve [com.codename1.security.KeyGenerator#ec(int)]
+    /// makes.
+    private static void checkSignatureKeyFamily(int alg, String keyAlgorithm) {
+        boolean ec = "EC".equals(keyAlgorithm);
+        if ((alg >= 3) != ec) {
+            throw new RuntimeException("signature algorithm cannot be used with a " + keyAlgorithm + " key");
+        }
+    }
+
+    /// Security.framework imports an EC private key as X9.63: the public point
+    /// followed by the scalar. A PKCS#8 key that omits the point cannot be
+    /// converted without computing it; every key KeyGenerator.ec hands out
+    /// carries it.
+    private static byte[] ecPrivateX963(byte[] pkcs8) {
+        byte[][] parts = com.codename1.impl.EcP256Codec.fromPkcs8(pkcs8);
+        if (parts[1] == null) {
+            throw new RuntimeException("EC private key must include its public point on iOS");
+        }
+        byte[] x963 = new byte[97];
+        System.arraycopy(parts[1], 0, x963, 0, 65);
+        System.arraycopy(parts[0], 0, x963, 65, 32);
+        return x963;
+    }
+
+    @Override
+    public byte[][] generateEcKeyPair(int bits) {
+        if (bits != 256) throw new RuntimeException("only P-256 is supported");
+        byte[] x963 = new byte[97];
+        int rc = nativeInstance.ecGenerate(x963);
+        if (rc != 97) throw new RuntimeException("EC keypair generation failed: code " + rc);
+        byte[] point = new byte[65];
+        byte[] scalar = new byte[32];
+        System.arraycopy(x963, 0, point, 0, 65);
+        System.arraycopy(x963, 65, scalar, 0, 32);
+        return new byte[][]{
+            com.codename1.impl.EcP256Codec.spkiFromPoint(point),
+            com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar, point)
+        };
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        byte[] out = new byte[32];
+        int rc = nativeInstance.ecdh(ecPrivateX963(privateKeyPkcs8),
+                com.codename1.impl.EcP256Codec.pointFromSpki(publicKeyX509), out);
+        if (rc != 32) throw new RuntimeException("ECDH failed: code " + rc);
+        return out;
     }
 
     private static int signatureAlgorithmKind(String algorithm) {
@@ -16353,20 +16819,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] lens = new int[2];
         int rc = nativeInstance.generateRsaKeyPair(bits, pubBuf, privBuf, lens);
         if (rc < 0) throw new RuntimeException("RSA keypair generation failed: code " + rc);
-        return new byte[][]{ cryptoTrim(pubBuf, lens[0]), cryptoTrim(privBuf, lens[1]) };
-    }
-
-    @Override
-    public byte[][] generateEcKeyPair(String curve) {
-        if (!"P-256".equals(curve)) {
-            throw new RuntimeException("unsupported EC curve: " + curve);
-        }
-        // P-256 encodes to exactly 91 (X.509) and 138 (PKCS#8) bytes.
-        byte[] pubBuf = new byte[128];
-        byte[] privBuf = new byte[192];
-        int[] lens = new int[2];
-        int rc = nativeInstance.generateEcKeyPair(pubBuf, privBuf, lens);
-        if (rc < 0) throw new RuntimeException("EC keypair generation failed: code " + rc);
         return new byte[][]{ cryptoTrim(pubBuf, lens[0]), cryptoTrim(privBuf, lens[1]) };
     }
 }

@@ -208,8 +208,8 @@ public class PaginatedDataTable extends StatelessWidget {
             parts.add(label);
             com.codename1.flutter.widgets.Icon arrow = new com.codename1.flutter.widgets.Icon(
                     isSortAscending()
-                            ? com.codename1.flutter.Icons.keyboard_arrow_up
-                            : com.codename1.flutter.Icons.keyboard_arrow_down);
+                            ? com.codename1.flutter.Icons.keyboard_arrow_up()
+                            : com.codename1.flutter.Icons.keyboard_arrow_down());
             arrow.size(16);
             parts.add(arrow);
             Row withArrow = new Row();
@@ -248,9 +248,9 @@ public class PaginatedDataTable extends StatelessWidget {
         com.codename1.flutter.widgets.Text range = new com.codename1.flutter.widgets.Text(
                 (total == 0 ? 0 : first + 1) + "-" + last + " of " + total);
         parts.add(range);
-        parts.add(pageButton(com.codename1.flutter.Icons.chevron_left,
+        parts.add(pageButton(com.codename1.flutter.Icons.chevron_left(),
                 first > 0, Math.max(0, first - rowsPerPage)));
-        parts.add(pageButton(com.codename1.flutter.Icons.chevron_right,
+        parts.add(pageButton(com.codename1.flutter.Icons.chevron_right(),
                 last < total, first + rowsPerPage));
 
         Row row = new Row();

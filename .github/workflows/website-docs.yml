@@ -65,6 +65,8 @@ on:
       - 'scripts/wayline/**'
       - 'scripts/savor/**'
       - 'scripts/bastion/**'
+      - 'scripts/skirmish/**'
+      - 'scripts/parley/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'

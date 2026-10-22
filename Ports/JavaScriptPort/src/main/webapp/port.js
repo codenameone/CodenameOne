@@ -1316,13 +1316,27 @@ bindNative([
 });
 
 bindNative([
-  "cn1_com_codename1_impl_CodenameOneImplementation_generateEcKeyPair_java_lang_String_R_byte_2ARRAY"
-], function*(_impl, curve) {
-  const result = yield* cn1CryptoHost({ op: "generateEcKeyPair", curve: jvm.toNativeString(curve) });
+  "cn1_com_codename1_impl_CodenameOneImplementation_generateEcKeyPair_int_R_byte_2ARRAY"
+], function*(_impl, bits) {
+  if ((bits | 0) !== 256) {
+    throw new Error("Web Crypto bridge supports P-256 only");
+  }
+  const result = yield* cn1CryptoHost({ op: "generateEcKeyPair" });
   const pair = jvm.newArray(2, "JAVA_BYTE", 2);
   pair[0] = cn1CryptoJavaBytes(result[0]);
   pair[1] = cn1CryptoJavaBytes(result[1]);
   return pair;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_ecdhAgree_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(_impl, key, peer) {
+  const result = yield* cn1CryptoHost({
+    op: "ecdh",
+    key: cn1CryptoByteValues(key),
+    peer: cn1CryptoByteValues(peer)
+  });
+  return cn1CryptoJavaBytes(result);
 });
 
 // --------------------------------------------------------------------------
@@ -2838,6 +2852,121 @@ bindNative([
   }
   const ref = jvm.unwrapJsValue(video);
   yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
+});
+
+// WebRTC (com.codename1.webrtc via HTML5WebRtc). RTCPeerConnection,
+// getUserMedia and <video> are main-thread only, so each nativeRtc* native is a
+// round-trip to the __cn1_webrtc__ host native in browser_bridge.js. Events the
+// host raises later (descriptions, ICE, state, tracks) come back through the
+// worker-callback channel and are dispatched into HTML5WebRtc.dispatch.
+function cn1RtcNames(method, sig, ret) {
+  const base = "cn1_com_codename1_impl_html5_HTML5WebRtc_" + method;
+  const r = ret ? "_R_" + ret : "";
+  if (!sig) {
+    return [base + r, base + "_" + r, base + "__" + r];
+  }
+  return [base + "_" + sig + r, base + "___" + sig + r];
+}
+
+function* cn1RtcHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  return yield jvm.invokeHostNative("__cn1_webrtc__", [request]);
+}
+
+function cn1RtcStr(v) {
+  return v == null ? null : jvm.toNativeString(v);
+}
+
+const cn1RtcDispatchCandidates = cn1RtcNames("dispatch",
+  "java_lang_String_int_int_java_lang_String_java_lang_String_java_lang_String", null);
+
+function cn1RtcDeliver(e) {
+  let fn = null;
+  for (let i = 0; i < cn1RtcDispatchCandidates.length && !fn; i++) {
+    const n = cn1RtcDispatchCandidates[i];
+    if (typeof global[n] === "function") {
+      fn = global[n];
+    } else if (jvm.translatedMethods && typeof jvm.translatedMethods[n] === "function") {
+      fn = jvm.translatedMethods[n];
+    }
+  }
+  if (!fn || !e) {
+    return;
+  }
+  const s = function(v) { return v == null ? null : jvm.createStringLiteral(String(v)); };
+  try {
+    jvm.spawn(null, (function*() {
+      yield* cn1_ivAdapt(fn(s(e.kind), e.a | 0, e.b | 0, s(e.s1), s(e.s2), s(e.s3)));
+    })());
+  } catch (err) {
+    if (global.console && typeof global.console.error === "function") {
+      global.console.error("PARPAR:webrtc-event-error:" + (err && err.message ? err.message : String(err)));
+    }
+  }
+}
+
+bindNative(cn1RtcNames("nativeRtcAvailable", null, "boolean"), function*() {
+  return (yield* cn1RtcHost({ op: "available" })) ? 1 : 0;
+});
+
+bindNative(cn1RtcNames("nativeRtcInit", null, "boolean"), function*() {
+  if (!jvm.workerCallbacks || typeof jvm.nextWorkerCallbackId !== "number") {
+    return 0;
+  }
+  const id = jvm.nextWorkerCallbackId++;
+  jvm.workerCallbacks[id] = cn1RtcDeliver;
+  return (yield* cn1RtcHost({ op: "init", __cn1WorkerCallback: id })) ? 1 : 0;
+});
+
+bindNative(cn1RtcNames("nativeRtcCreate", "java_lang_String_boolean", "int"), function*(wire, relay) {
+  return (yield* cn1RtcHost({ op: "create", wire: cn1RtcStr(wire) || "", relay: !!relay })) | 0;
+});
+
+bindNative(cn1RtcNames("nativeRtcMedia", "int_boolean_boolean_boolean", null), function*(req, audio, video, front) {
+  yield* cn1RtcHost({ op: "media", req: req | 0, audio: !!audio, video: !!video, front: !!front });
+});
+
+bindNative(cn1RtcNames("nativeRtcAdd", "int_int", null), function*(peer, track) {
+  yield* cn1RtcHost({ op: "add", peer: peer | 0, track: track | 0 });
+});
+
+bindNative(cn1RtcNames("nativeRtcDescribe", "int_int_boolean", null), function*(peer, req, answer) {
+  yield* cn1RtcHost({ op: "describe", peer: peer | 0, req: req | 0, answer: !!answer });
+});
+
+bindNative(cn1RtcNames("nativeRtcSet", "int_int_boolean_java_lang_String_java_lang_String", null),
+    function*(peer, req, remote, type, sdp) {
+  yield* cn1RtcHost({ op: "set", peer: peer | 0, req: req | 0, remote: !!remote,
+    type: cn1RtcStr(type), sdp: cn1RtcStr(sdp) });
+});
+
+bindNative(cn1RtcNames("nativeRtcIce", "int_java_lang_String_int_java_lang_String", null),
+    function*(peer, mid, index, cand) {
+  yield* cn1RtcHost({ op: "ice", peer: peer | 0, mid: cn1RtcStr(mid), index: index | 0, cand: cn1RtcStr(cand) });
+});
+
+bindNative(cn1RtcNames("nativeRtcClose", "int", null), function*(peer) {
+  yield* cn1RtcHost({ op: "close", peer: peer | 0 });
+});
+
+bindNative(cn1RtcNames("nativeRtcEnable", "int_boolean", null), function*(track, on) {
+  yield* cn1RtcHost({ op: "enable", track: track | 0, on: !!on });
+});
+
+bindNative(cn1RtcNames("nativeRtcSwitch", "int", null), function*(track) {
+  yield* cn1RtcHost({ op: "switchCamera", track: track | 0 });
+});
+
+bindNative(cn1RtcNames("nativeRtcRelease", "int", null), function*(track) {
+  yield* cn1RtcHost({ op: "release", track: track | 0 });
+});
+
+bindNative(cn1RtcNames("nativeRtcView", "int_boolean", "com_codename1_html5_js_dom_HTMLElement"),
+    function*(track, mirror) {
+  const ref = yield* cn1RtcHost({ op: "view", track: track | 0, mirror: !!mirror });
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLElement");
 });
 
 // HTML5VideoIO uses Window-only APIs (document, HTMLVideoElement, WebCodecs,

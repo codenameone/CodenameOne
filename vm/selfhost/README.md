@@ -193,7 +193,8 @@ python3 vm/selfhost/calibrate-perf-baseline.py --pr 5931 --reason "why" perf-res
 No pull request edits `perf-baseline/base/`. The nightly `fold` job in
 `.github/workflows/perf-baseline.yml` moves merged overlays there. The one-file layout
 this replaced made unrelated branches conflict on every merge; `perf_baseline.py`
-explains how overlays combine and when two of them are a real conflict. A branch still
+explains how overlays combine: rebaselines of one row apply in merge order and the latest
+merged wins, so two pull requests that moved the same row never fail master. A branch still
 carrying edits to the old `perf-baseline.json` converts them, from a checkout of this
 layout, with `perf_baseline.py import-legacy --pr N --reason "..." --ref origin/<branch>`.
 It reads the branch's copy and the copy at its merge base, so only the branch's own edits

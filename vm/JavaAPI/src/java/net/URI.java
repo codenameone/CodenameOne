@@ -300,6 +300,9 @@ public class URI {
             authority = authority.substring(AUTHORITY_MARKER.length());
             newAuthority = authority;
         }
+        if (!encode) {
+            checkLegal(newAuthority, AUTHORITY_LEGAL, "authority");
+        }
         int index = newAuthority.indexOf(USERINFO_SEPARATOR);
         if (index != -1) {
             this.userInfo = newAuthority.substring(0, index);
@@ -345,6 +348,7 @@ public class URI {
                 this.query = URIHelper.encodeString(this.query);
             } else {
                 // validate
+                checkLegal(this.query, URIC_LEGAL, "query");
                 URIHelper.decodeString(this.query);
             }
         }
@@ -367,6 +371,7 @@ public class URI {
                 this.path = URIHelper.encodeString(this.path);
             } else {
                 // validate
+                checkLegal(this.path, PATH_LEGAL, "path");
                 URIHelper.decodeString(this.path);
             }
         }
@@ -492,6 +497,9 @@ public class URI {
         String s = uriString;
         int index = s.indexOf(FRAGMENT_SEPARATOR);
         if (index != -1) {
+            // setFragment cannot declare the exception, so the fragment is
+            // checked here, where the single-string constructor reads it.
+            checkLegal(s.substring(index + 1), URIC_LEGAL, "fragment");
             setFragment(s.substring(index + 1), false);
             s = s.substring(0, index);
         }
@@ -523,7 +531,14 @@ public class URI {
         if (ssp == null) {
             throw new URISyntaxException(ssp, "Invalid scheme specific part");
         }
+        if (scheme != null && ssp.length() == 0) {
+            // "http:" -- the JDK reports this rather than reading past the end.
+            throw new URISyntaxException(scheme + SCHEME_SEPARATOR, "Expected scheme-specific part");
+        }
         if (scheme != null && ssp.charAt(0) != PATH_SEPARATOR) {
+            if (!encode) {
+                checkLegal(ssp, URIC_LEGAL, "opaque part");
+            }
             this.opaque = true;
             this.schemeSpecificPart = ssp;
             return;
@@ -531,7 +546,7 @@ public class URI {
         int index;
         String s = ssp;
 
-        if ((index = s.lastIndexOf(QUERY_MARKER)) != -1) {
+        if ((index = s.indexOf(QUERY_MARKER)) != -1) {
             setQuery(s.substring(index + 1), encode);
             s = s.substring(0, index);
         } else if (getQuerySeparator() == SOCKET_QUERY_SEPARATOR && (index = s.indexOf(SOCKET_QUERY_SEPARATOR)) != -1) {
@@ -539,13 +554,80 @@ public class URI {
             s = s.substring(0, index);
         }
 
-        index = (s.startsWith(AUTHORITY_MARKER)) ? 2 : 0;
-        index = s.indexOf(PATH_SEPARATOR, index);
+        // Only a "//" opens an authority. Without one the remainder is all
+        // path: "file:/tmp/x" has no authority at all (not an empty one, which
+        // would print back as "file:///tmp/x"), and a relative "a/b" is a
+        // path, not host "a" with path "/b". An empty remainder ("#f", "?q",
+        // "http://h") is an empty path, which getPath() answers as "".
+        if (!s.startsWith(AUTHORITY_MARKER)) {
+            if (scheme == null && !encode) {
+                // A relative path may not have a colon in its first segment:
+                // "@:" or "1a:b" is a scheme that is not a legal one, and the
+                // JDK rejects it rather than reading it as a path.
+                int slash = s.indexOf(PATH_SEPARATOR);
+                int colon = s.indexOf(SCHEME_SEPARATOR);
+                if (colon != -1 && (slash == -1 || colon < slash)) {
+                    throw new URISyntaxException(s, "Expected scheme name", 0);
+                }
+            }
+            setPath(s, encode);
+            return;
+        }
+        index = s.indexOf(PATH_SEPARATOR, AUTHORITY_MARKER.length());
         if (index != -1) {
             setPath(s.substring(index), encode);
             s = s.substring(0, index);
+        } else {
+            setPath("", encode);
         }
         setAuthority(s, encode);
+    }
+
+    /// Characters, beyond the unreserved ones, that may appear unescaped in a
+    /// path: `pchar` plus the segment separator, from the RFC 2396 grammar
+    /// `java.net.URI` parses. `?` and `#` never reach a path, they split it.
+    private static final String PATH_LEGAL = ",;:$&+=/@";
+
+    /// The same for an authority, server or registry based; the brackets are
+    /// RFC 2732's IPv6 literal.
+    private static final String AUTHORITY_LEGAL = ",;:$&+=@[]";
+
+    /// The same for a query, a fragment and an opaque part (`uric`, with the
+    /// RFC 2732 brackets the JDK also accepts there).
+    private static final String URIC_LEGAL = ",;:$&+=/@?[]";
+
+    /// Throws `URISyntaxException` for the first character of `component` the
+    /// JDK's parser would reject: anything that is not unreserved, listed in
+    /// `legal`, a `%` followed by two hex digits, or a non-ASCII character
+    /// other than a control or space character. A space is the common case --
+    /// `new URI("http://h/a b")` must fail, as it does on the JVM, rather than
+    /// build a URI no server would accept.
+    ///
+    /// The checks only run on text the caller claimed was already encoded:
+    /// the single-string constructor. The multi-argument constructors encode
+    /// their arguments instead.
+    private static void checkLegal(String component, String legal, String name) throws URISyntaxException {
+        int len = component.length();
+        for (int i = 0; i < len; i++) {
+            char ch = component.charAt(i);
+            if (ch < 128) {
+                if (URIHelper.isAlphaNum(ch) || UNRESERVED_EXTRAS.indexOf(ch) != -1 || legal.indexOf(ch) != -1) {
+                    continue;
+                }
+                if (ch == QUOTE_MARKER && i + 2 < len && isHexDigit(component.charAt(i + 1))
+                        && isHexDigit(component.charAt(i + 2))) {
+                    i += 2;
+                    continue;
+                }
+            } else if (!Character.isISOControl(ch) && !Character.isSpaceChar(ch)) {
+                continue;
+            }
+            throw new URISyntaxException(component, "Illegal character in " + name, i);
+        }
+    }
+
+    private static boolean isHexDigit(char ch) {
+        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
     }
 
     /**
@@ -585,9 +667,14 @@ public class URI {
      * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
      */
     boolean isValidScheme(String scheme) {
-        for (int i = 0; i < scheme.length(); i++) {
+        // RFC 2396: alpha *( alpha | digit | "+" | "-" | "." ), as the JDK
+        // checks it -- so "1a" is no scheme, and "svn+ssh" is one.
+        if (scheme.length() == 0 || !URIHelper.isAlpha(scheme.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < scheme.length(); i++) {
             char ch = scheme.charAt(i);
-            if (URIHelper.isAlpha(ch) || URIHelper.isNumeric(ch) || ch == '-') {
+            if (URIHelper.isAlpha(ch) || URIHelper.isNumeric(ch) || ch == '-' || ch == '+' || ch == '.') {
                 continue;
             }
             return false;
@@ -741,7 +828,9 @@ public class URI {
      * @return true if the URI is not a relative URI.
      */
     public boolean isAbsolute() {
-        return absolute;
+        // From the scheme itself: a reference parsed without one ("?q", "c")
+        // never cleared the flag init() sets, so resolve() handed it back.
+        return absolute && scheme != null;
     }
 
     /**
@@ -819,32 +908,36 @@ public class URI {
         if (isOpaque() || uri.isAbsolute()) {
             return uri;
         }
-        String thatPath = uri.getPath();
+        String thatPath = uri.getPath() == null ? "" : uri.getPath();
         String thatQuery = uri.getQuery();
         String thatAuthority = uri.getAuthority();
         String thatFragment = uri.getFragment();
         try {
             // if standalone fragment was passed.
             if (thatFragment != null
-                    && (uri.getScheme() == null && thatPath == null && thatQuery == null && thatAuthority == null)) {
+                    && (uri.getScheme() == null && thatPath.length() == 0 && thatQuery == null && thatAuthority == null)) {
                 return new URI(getScheme(), getAuthority(), getPath(), getQuery(), thatFragment);
             }
             if (thatAuthority != null) {
                 return new URI(getScheme(), thatAuthority, thatPath, thatQuery, thatFragment);
             }
             // an absolute path was passed
-            if (thatPath != null && thatPath.charAt(0) == PATH_SEPARATOR) {
+            if (thatPath.length() > 0 && thatPath.charAt(0) == PATH_SEPARATOR) {
                 return new URI(getScheme(), getAuthority(), thatPath, thatQuery, thatFragment);
             }
-            // a relative path was passed
-            String thisPath = getPath();
-            if (thisPath != null) {
-                int index = thisPath.lastIndexOf(PATH_SEPARATOR);
-                if (index != -1) {
-                    thisPath = thisPath.substring(index);
-                }
+            // a relative (or empty, "?q") path replaces the last segment of
+            // this one, as RFC 2396 section 5.2 step 6 and the JDK merge it
+            String thisPath = getPath() == null ? "" : getPath();
+            int index = thisPath.lastIndexOf(PATH_SEPARATOR);
+            if (index != -1) {
+                thisPath = thisPath.substring(0, index + 1) + thatPath;
+            } else if (getAuthority() != null) {
+                // An authority with an empty path: the merged path needs its
+                // root slash, or "a" against http://h would read as host "ha".
+                thisPath = "/" + thatPath;
+            } else {
+                thisPath = thatPath;
             }
-            thisPath += PATH_SEPARATOR + thatPath;
             return new URI(getScheme(), getAuthority(), thisPath, thatQuery, thatFragment).normalize();
         } catch (URISyntaxException use) {
             // since both uri's are already validated, should never get here
@@ -860,7 +953,15 @@ public class URI {
      * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29</a>
      */
     public URI normalize() {
+        if (isOpaque()) {
+            return this;
+        }
         String thisPath = getPath();
+        // The slashes come from the path itself: a leading one when it is
+        // absolute, a trailing one when it names a directory ("a/", "a/.",
+        // "a/b/.."). An unmatched ".." stays as written, with no slash added.
+        boolean leading = thisPath.startsWith("/");
+        boolean trailing = thisPath.endsWith("/") || thisPath.endsWith("/.") || thisPath.equals(".");
         StringTokenizer st = new StringTokenizer(thisPath, String.valueOf(PATH_SEPARATOR));
         List<String> segments = new ArrayList<String>();
         while (st.hasMoreTokens()) {
@@ -880,6 +981,10 @@ public class URI {
                 }
             }
         }
+        int last = segments.size() - 1;
+        if (last >= 0 && segments.get(last).equals("..") && removals.contains(Integer.valueOf(last))) {
+            trailing = true;
+        }
         Iterator<Integer> iter = removals.iterator();
         while (iter.hasNext()) {
             segments.remove(iter.next().intValue());
@@ -888,7 +993,7 @@ public class URI {
         for (int i = 0; i < segments.size(); i++) {
             String segment = segments.get(i);
             if (i == 0) {
-                if (isAbsolute()) {
+                if (leading) {
                     buffer.append(PATH_SEPARATOR);
                 } else if (segment.indexOf(SCHEME_SEPARATOR) != -1) {
                     buffer.append('.');
@@ -899,6 +1004,11 @@ public class URI {
             }
             buffer.append(PATH_SEPARATOR);
             buffer.append(segment);
+        }
+        if (segments.isEmpty() && leading) {
+            buffer.append(PATH_SEPARATOR);
+        } else if (trailing && buffer.length() > 0 && buffer.charAt(buffer.length() - 1) != PATH_SEPARATOR) {
+            buffer.append(PATH_SEPARATOR);
         }
         try {
             return new URI(getScheme(), getUserInfo(), getHost(), getPort(), buffer.toString(), getQuery(),

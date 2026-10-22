@@ -909,6 +909,13 @@ public class Collections {
             c = collection;
         }
 
+        // The inherited default only calls remove() on a match, so an empty
+        // collection or a predicate matching nothing would return normally.
+        @Override
+        public boolean removeIf(java.util.function.Predicate<? super E> filter) {
+            throw new UnsupportedOperationException();
+        }
+
         public boolean add(E object) {
             throw new UnsupportedOperationException();
         }
@@ -1015,6 +1022,16 @@ public class Collections {
         UnmodifiableList(List<E> l) {
             super(l);
             list = l;
+        }
+
+        @Override
+        public void replaceAll(java.util.function.UnaryOperator<E> operator) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void sort(Comparator<? super E> comparator) {
+            throw new UnsupportedOperationException();
         }
 
         public void add(int location, E object) {

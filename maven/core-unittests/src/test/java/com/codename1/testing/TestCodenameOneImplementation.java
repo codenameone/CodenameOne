@@ -169,6 +169,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean inCall;
     private LocationManager locationManager;
     private com.codename1.bluetooth.Bluetooth bluetooth;
+    private com.codename1.webrtc.spi.WebRtcBridge webRtcBridge;
     private com.codename1.health.Health health;
     private L10NManager localizationManager;
     private ImageIO imageIO;
@@ -1630,6 +1631,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mediaRecorderBuilderHandler = null;
         locationManager = null;
         bluetooth = null;
+        webRtcBridge = null;
         health = null;
         localizationManager = null;
         imageIO = null;
@@ -1807,6 +1809,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setLocationManager(LocationManager locationManager) {
         this.locationManager = locationManager;
+    }
+
+    /**
+     * Returns the WebRTC bridge installed via {@link #setWebRtcBridge}; {@code null}
+     * by default, as on a port without WebRTC.
+     */
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return webRtcBridge;
+    }
+
+    /** Scripts the bridge {@link #getWebRtcBridge()} returns; cleared by {@link #reset()}. */
+    public void setWebRtcBridge(com.codename1.webrtc.spi.WebRtcBridge bridge) {
+        this.webRtcBridge = bridge;
     }
 
     /**
@@ -3243,7 +3259,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public Object createFont(int face, int style, int size) {
-        return new TestFont(defaultFont.charWidth, defaultFont.height);
+        TestFont font = new TestFont(defaultFont.charWidth, defaultFont.height);
+        font.face = face;
+        font.style = style;
+        font.size = size;
+        return font;
+    }
+
+    @Override
+    public int getStyle(Object nativeFont) {
+        return nativeFont instanceof TestFont ? ((TestFont) nativeFont).style : 0;
+    }
+
+    @Override
+    public int getFace(Object nativeFont) {
+        return nativeFont instanceof TestFont ? ((TestFont) nativeFont).face : 0;
+    }
+
+    @Override
+    public int getSize(Object nativeFont) {
+        return nativeFont instanceof TestFont ? ((TestFont) nativeFont).size : 0;
     }
 
     @Override
@@ -4838,17 +4873,35 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public byte[][] generateEcKeyPair(String curve) {
-        if (!"P-256".equals(curve)) {
-            throw new RuntimeException("unsupported EC curve: " + curve);
-        }
+    public byte[][] generateEcKeyPair(int bits) {
         try {
             java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
             kpg.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
             java.security.KeyPair kp = kpg.generateKeyPair();
-            return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
+            byte[] spki = kp.getPublic().getEncoded();
+            // The JDK's PKCS#8 omits the public point; re-encode so every port
+            // hands out the same bytes and providers that need the point get it.
+            byte[] scalar = com.codename1.impl.EcP256Codec.fromPkcs8(kp.getPrivate().getEncoded())[0];
+            byte[] pkcs8 = com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar,
+                    com.codename1.impl.EcP256Codec.pointFromSpki(spki));
+            return new byte[][]{ spki, pkcs8 };
         } catch (java.security.GeneralSecurityException e) {
             throw new RuntimeException("EC keypair generation failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("EC");
+            java.security.PrivateKey priv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            java.security.PublicKey pub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            javax.crypto.KeyAgreement ka = javax.crypto.KeyAgreement.getInstance("ECDH");
+            ka.init(priv);
+            ka.doPhase(pub, true);
+            return ka.generateSecret();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("ECDH failed: " + e.getMessage());
         }
     }
 
@@ -5652,6 +5705,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public static final class TestFont {
         final int charWidth;
         final int height;
+        /// What a system font was created with; a real port reports these from its native font.
+        int face;
+        int style;
+        int size = com.codename1.ui.Font.SIZE_MEDIUM;
 
         TestFont(int charWidth, int height) {
             this.charWidth = charWidth;

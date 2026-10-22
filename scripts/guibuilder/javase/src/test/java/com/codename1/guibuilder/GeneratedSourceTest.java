@@ -1773,22 +1773,181 @@ class GeneratedSourceTest {
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> reported = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label {\n  color: #ff0000;\n  font-size: 3mm;\n}\n");
+                "Label {\n  color: #ff0000;\n  font-style: italic;\n}\n");
         assertEquals(1, reported.size(), "one declaration the canvas drops: " + reported);
-        assertTrue(reported.get(0).toString().contains("font-size")
-                        || describe(reported.get(0)).contains("font-size"),
+        assertTrue(reported.get(0).toString().contains("font-style")
+                        || describe(reported.get(0)).contains("font-style"),
                 "and it names the property: " + describe(reported.get(0)));
 
         @SuppressWarnings("unchecked")
         java.util.List<Object> clean = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label { color: #ff0000; background-color: #00ff00; padding: 2mm; margin: 1mm; }\n");
+                "Label { color: #ff0000; background-color: #00ff00; padding: 2mm; margin: 1mm; font-size: 3mm; }\n");
         assertTrue(clean.isEmpty(), "everything here reaches the canvas: " + clean);
 
         // A comment is not a declaration.
         @SuppressWarnings("unchecked")
         java.util.List<Object> commented = (java.util.List<Object>) unsupported.invoke(builder,
-                "Label {\n  /* font-size: 3mm; */\n  color: #ff0000;\n}\n");
+                "Label {\n  /* font-style: italic; */\n  color: #ff0000;\n}\n");
         assertTrue(commented.isEmpty(), "a commented-out declaration is not reported: " + commented);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> constants = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants {\n  message: \"a}b\";\n  includeNativeBool: true;\n}\nLabel { color: #ff0000; }\n");
+        assertTrue(constants.isEmpty(), "a #Constants entry is not a dropped declaration: " + constants);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> listed = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants, #Constants {\n  accentColor: #ff0000;\n}\n");
+        assertTrue(listed.isEmpty(), "a list of only #Constants exports its constants: " + listed);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> mixed = (java.util.List<Object>) unsupported.invoke(builder,
+                "#Constants, Label {\n  font-style: italic;\n}\n");
+        assertEquals(1, mixed.size(), "Label still gets the probe in a mixed list: " + mixed);
+    }
+
+    @Test
+    void anImageConstantResolvesFromTheProjectsResFolder() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        java.awt.image.BufferedImage png = new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        javax.imageio.ImageIO.write(png, "png", folder.resolve("medium.png").toFile());
+        String css = dir.resolve("theme.css").toString();
+        com.codename1.ui.util.MutableResource resources =
+                new CodenameOneGUIBuilder.ProjectImageResource(css);
+        new com.codename1.ui.css.CSSThemeCompiler().compile("#Constants{mediaPlayImage:play.png;}",
+                resources, "ProjectTheme");
+        assertTrue(resources.getTheme("ProjectTheme").get("@mediaPlayImage") instanceof com.codename1.ui.Image,
+                "the image comes from res/<theme>/play.png/medium.png");
+    }
+
+    @Test
+    void theThemeFolderNamedThemeIsSearchedFirst() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        for (String theme : new String[]{"Aaa", "Theme"}) {
+            java.nio.file.Path folder = dir.resolve("res").resolve(theme).resolve("play.png");
+            java.nio.file.Files.createDirectories(folder);
+            int size = "Theme".equals(theme) ? 3 : 2;
+            javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(size, size,
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        }
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(3, image.getWidth());
+    }
+
+    @Test
+    void anUpperCaseVariantNameIsAccepted() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("custom.PNG").toFile());
+        assertNotNull(new CodenameOneGUIBuilder.ProjectImageResource(dir.resolve("theme.css").toString())
+                .getImage("play.png"));
+    }
+
+    @Test
+    void anUpperCaseDensityNameIsReadAsMediumLikeTheBuild() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("high.PNG").toFile());
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("low.png").toFile());
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        int expected = com.codename1.ui.Display.getInstance().getDeviceDensity()
+                >= com.codename1.ui.Display.DENSITY_MEDIUM ? 3 : 2;
+        assertEquals(expected, image.getWidth(), "the build's case-sensitive switch reads high.PNG as medium");
+    }
+
+    @Test
+    void severalMediumVariantsKeepTheLastListedLikeTheBuild() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(5, 5,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("custom.png").toFile());
+        // EditableResources.MultiImage.getBest() replaces its pick on each equal DPI.
+        String[] listed = folder.toFile().list();
+        int expected = "custom.png".equals(listed[listed.length - 1]) ? 5 : 3;
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(expected, image.getWidth());
+    }
+
+    @Test
+    void aDirectoryNamedLikeAPngIsSkippedLikeTheBuild() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder.resolve("high.png"));
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertEquals(3, image.getWidth());
+    }
+
+    @Test
+    void aCorruptVariantDoesNotFailTheFolderLikeTheBuild() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("medium.png").toFile());
+        java.nio.file.Files.write(folder.resolve("high.png"), new byte[]{1, 2, 3, 4});
+        // The build stores the variants undecoded, so the folder is an image; the canvas
+        // shows the variant that decodes.
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                dir.resolve("theme.css").toString()).getImage("play.png");
+        assertNotNull(image);
+        assertEquals(3, image.getWidth());
+    }
+
+    @Test
+    void anUnnamedVariantCountsAsMediumAndTheParentResIsSearched() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        java.nio.file.Path folder = dir.resolve("res").resolve("Theme").resolve("play.png");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3, 3,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("custom.png").toFile());
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("verylow.png").toFile());
+        java.nio.file.Path css = dir.resolve("css");
+        java.nio.file.Files.createDirectories(css);
+        com.codename1.ui.Image image = new CodenameOneGUIBuilder.ProjectImageResource(
+                css.resolve("theme.css").toString()).getImage("play.png");
+        assertNotNull(image, "src/main/res beside src/main/css is searched");
+        int expected = com.codename1.ui.Display.getInstance().getDeviceDensity()
+                >= com.codename1.ui.Display.DENSITY_MEDIUM ? 3 : 2;
+        assertEquals(expected, image.getWidth());
+    }
+
+    @Test
+    void anImageBesideTheStylesheetIsNotAccepted() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cn1-gb-css");
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", dir.resolve("play.png").toFile());
+        assertNull(new CodenameOneGUIBuilder.ProjectImageResource(dir.resolve("theme.css").toString())
+                .getImage("play.png"), "the build-time compiler reads only res/<theme>/<name>/");
+    }
+
+    @Test
+    void anImageVariantIsChosenForTheDisplayDensity() {
+        String[] high = CodenameOneGUIBuilder.ProjectImageResource.densityOrder(com.codename1.ui.Display.DENSITY_HIGH);
+        assertEquals("high.png", high[0]);
+        assertEquals("medium.png", high[1]);
+        assertEquals("verylow.png", high[3]);
+        assertEquals("veryhigh.png", high[4]);
+        assertEquals("4k.png", high[high.length - 1]);
+        assertEquals("verylow.png", CodenameOneGUIBuilder.ProjectImageResource.densityOrder(0)[0]);
+        assertEquals("4k.png", CodenameOneGUIBuilder.ProjectImageResource.densityOrder(1000)[0]);
     }
 
     private static String describe(Object diagnostic) throws Exception {

@@ -236,8 +236,8 @@ public class TextFieldRenderElement extends RenderElement {
      * <p>{@code decorated()} only runs once, on mount ({@code createComponent()}),
      * and {@code updateComponent} used to call only {@link #apply} -- never
      * touching the row it built. So a rebuild that swapped the decoration's icon
-     * -- the demo's password field toggling between {@code Icons.visibility} and
-     * {@code Icons.visibility_off} -- kept drawing whichever glyph happened to be
+     * -- the demo's password field toggling between {@code Icons.visibility()} and
+     * {@code Icons.visibility_off()} -- kept drawing whichever glyph happened to be
      * current the one time the row was built, and an {@code IconButton} that
      * appears or disappears across rebuilds did nothing either way.</p>
      *

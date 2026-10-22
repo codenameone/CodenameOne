@@ -73,6 +73,10 @@ public class LocalContinuityTest extends UITestBase {
     @BeforeEach
     public void installBridge() {
         Continuity.reset();
+        // Navigation's dispatcher is static and outlives reset(); a dispatcher another test
+        // class left installed answers a Form for any path, unknown routes included.
+        Navigation.setDispatcher(null);
+        Navigation.clearStack();
         Storage.getInstance().clearStorage();
         // The route dispatcher and stack are static, and other classes in this JVM (Intents,
         // Navigation) install dispatchers that answer a form for ANY path without always

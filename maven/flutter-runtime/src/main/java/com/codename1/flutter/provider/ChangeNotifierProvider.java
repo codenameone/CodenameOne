@@ -34,6 +34,18 @@ import com.codename1.flutter.Widget;
  */
 public class ChangeNotifierProvider extends Provider {
 
+    /// The notifier `create` made belongs to this provider, so it is disposed with it
+    /// (overridden disposers stop their timers and streams), as provider does. A
+    /// `.value` notifier is not created here and so never reaches this.
+    @Override
+    protected void disposeCreated(com.codename1.flutter.BuildContext context, Object created) {
+        super.disposeCreated(context, created);
+        if (created instanceof com.codename1.flutter.foundation.ChangeNotifier) {
+            ((com.codename1.flutter.foundation.ChangeNotifier) created).dispose();
+        }
+    }
+
+
     /**
      * Subscribes to the model and rebuilds this subtree when it notifies.
      *

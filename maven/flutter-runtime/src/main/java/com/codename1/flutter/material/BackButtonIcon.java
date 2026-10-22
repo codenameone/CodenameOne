@@ -54,7 +54,7 @@ public class BackButtonIcon extends StatelessWidget
      */
     @Override
     public com.codename1.flutter.IconData iconData() {
-        return isApplePlatform() ? Icons.arrow_back_ios : Icons.arrow_back;
+        return isApplePlatform() ? Icons.arrow_back_ios() : Icons.arrow_back();
     }
 
     /** Whether the platform the app is running on uses the chevron. */
@@ -71,7 +71,7 @@ public class BackButtonIcon extends StatelessWidget
 
     @Override
     public Widget build(BuildContext context) {
-        return new Icon(isApplePlatform(context) ? Icons.arrow_back_ios : Icons.arrow_back);
+        return new Icon(isApplePlatform(context) ? Icons.arrow_back_ios() : Icons.arrow_back());
     }
 
     /** Whether the ambient theme targets a platform that uses the chevron. */

@@ -40,7 +40,7 @@ public class FutureBuilder<T> extends StatelessWidget {
 
     private Object future;
     private T initialData;
-    private Funcs.Func2<BuildContext, AsyncSnapshot, Widget> builder;
+    private Funcs.Func2<BuildContext, AsyncSnapshot<T>, Widget> builder;
 
     public void future(Object v) {
         this.future = v;
@@ -50,7 +50,7 @@ public class FutureBuilder<T> extends StatelessWidget {
         this.initialData = v;
     }
 
-    public void builder(Funcs.Func2<BuildContext, AsyncSnapshot, Widget> v) {
+    public void builder(Funcs.Func2<BuildContext, AsyncSnapshot<T>, Widget> v) {
         this.builder = v;
     }
 
@@ -73,6 +73,7 @@ public class FutureBuilder<T> extends StatelessWidget {
                 ? new AsyncSnapshot(ConnectionState.none, initialData, null, null) : new AsyncSnapshot());
     }
 
+    @SuppressWarnings("unchecked")
     Widget buildWith(BuildContext context, AsyncSnapshot snapshot) {
         return builder == null ? null : builder.call(context, snapshot);
     }

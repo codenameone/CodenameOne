@@ -842,7 +842,7 @@ public final class DartUri {
 
     /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a
     /// literal plus.
-    private static String decodeComponent(String s) {
+    public static String decodeComponent(String s) {
         return percentDecode(s, false);
     }
 

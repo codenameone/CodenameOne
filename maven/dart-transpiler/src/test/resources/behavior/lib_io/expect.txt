@@ -1,0 +1,21 @@
+true
+line one
+line two
+3
+28
+3
+b.bin,notes.txt
+false
+fs error
+true
+true
+content-type
+404
+application/json
+utf-8
+[2, 4]
+a-b
+[hello, world]
+6
+5
+offline

@@ -1,0 +1,1864 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of the app.
+ *
+ * COLOURS AND SHAPE -- change these and nothing else to re-skin the app. Every
+ * rule below takes its colours from here; none names a colour of its own. Each
+ * colour has a second value for dark mode, used by the block at the end of the
+ * file.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    /* ONE TYPE SCALE, in millimetres as a phone draws them: 2.1 caption,
+       2.5 secondary, 2.75 body, 2.9 control, 3.5 heading, 4.4 title, 7 display.
+       A desktop draws a millimetre in far fewer pixels and is read from
+       further away, so every size is a quarter larger there. */
+    device-desktop-font-scale: "1.25";
+    /* A line too long for its place ends in an ellipsis, not mid-word. */
+    endsWith3PointsBool: true;
+    /* Lists scroll by touch; a painted scrollbar is a desktop artefact. */
+    scrollVisibleBool: false;
+    /* The title sits beside the back arrow, as in every messenger. */
+    centeredTitleBool: false;
+    /* Screens change quickly: nothing waits for an animation. */
+    transitionSpeedInt: "200";
+    /* The switch, sized from the Switch style's font. */
+    switchThumbScaleY: "1.5";
+    switchTrackScaleY: "1.8";
+    switchTrackScaleX: "3.1";
+    switchThumbInsetMM: "0.35";
+    switchTrackOffOutlineWidthMM: "0";
+    switchTrackOnOutlineWidthMM: "0";
+    switchThumbWidthScale: "1.0";
+    --brand: #0a7d6b;
+    --brand-pressed: #086656;
+    /* White on the teal reads at 5:1. */
+    --brand-contrast: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #eff0f0;
+    --surface-press: #e2e4e4;
+    --text: #1b1c1d;
+    --text-muted: #6b6e70;
+    --line: #dbdfdf;
+    --line-strong: #c4c9c9;
+    --success: #12805c;
+    --warning: #b25e09;
+    --danger: #c5292a;
+    /* The pale ground a selected card and a badge sit on. */
+    --brand-tint: #e3f4f0;
+    --success-tint: #e4f4ed;
+    --warning-tint: #fcf0df;
+    --danger-tint: #fcebeb;
+
+    --brand-dark: #34c3a5;
+    --brand-pressed-dark: #2aa78d;
+    --brand-contrast-dark: #062b24;
+    --surface-dark: #18191a;
+    --surface-alt-dark: #242526;
+    --surface-press-dark: #3a3b3c;
+    --text-dark: #e4e6eb;
+    --text-muted-dark: #b0b3b8;
+    --line-dark: #3a3b3c;
+    --line-strong-dark: #4e4f50;
+    --success-dark: #47c79a;
+    --warning-dark: #f0a24b;
+    --danger-dark: #ff7a7a;
+    --brand-tint-dark: #12302a;
+    --success-tint-dark: #15302a;
+    --warning-tint-dark: #33270f;
+    --danger-tint-dark: #3a1f22;
+
+    /* ONE RADIUS for anything card- or button-shaped, a smaller one for what
+       sits inside a card, and the sheet's. */
+    --radius: 2mm;
+    --radius-small: 1.5mm;
+
+    /* What floats over the map: the shadow under it, the dimming behind an
+       open menu, and the corners of the sheet. */
+    --shadow: #101828;
+    /* Under a card with square-ish corners. Black, and without a blur where it
+       is used: that is the one shadow a rounded rectangle draws for itself.
+       Any other is rendered to pictures of the card when the theme is
+       compiled, and a build that cannot render them has no card at all. */
+    --shadow-card: rgba(0, 0, 0, 0.14);
+    --scrim: #000000;
+    --radius-sheet: 4mm;
+    /* The chat: the wallpaper behind the bubbles, and the two bubbles. */
+    --wall: #ece5dd;
+    --wall-dark: #0f1416;
+    --bubble-in: #ffffff;
+    --bubble-in-dark: #22292c;
+    --bubble-out: #d4f1e9;
+    --bubble-out-dark: #0e4a40;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+PlForm {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+PlPage {
+    background-color: var(--surface);
+    padding: 3mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* The coloured top of the welcome screen. */
+PlHero {
+    background-color: var(--brand);
+    padding: 14mm 4.4mm 8mm 4.4mm;
+    margin: 0;
+}
+
+PlHeroTitle {
+    color: var(--brand-contrast);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2.4mm 0 0.8mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlHeroText {
+    color: var(--brand-contrast);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlHeroIcon {
+    color: var(--brand-contrast);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The panel that rises over the map. */
+PlCard {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 3.6mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* A panel that floats over the map with a gap around it. */
+PlFloat {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 2.4mm 3.2mm 2.4mm 3.2mm;
+    margin: 2.4mm;
+}
+
+PlPanel {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.8mm 3mm 2.8mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+
+PlDivider {
+    background-color: var(--line);
+    padding: 0;
+    margin: 2mm 0 2mm 0;
+}
+
+/* -------------------------------------------------------------------- text */
+
+PlTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0.6mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlHeading {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlLabel {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+PlError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlNotice {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2mm 0 1mm 0;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+PlPrimary {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+PlPrimary.pressed {
+    background-color: var(--brand-pressed);
+}
+
+PlPrimary.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-press);
+}
+
+PlSecondary {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+PlSecondary.pressed {
+    background-color: var(--surface-press);
+}
+
+PlDanger {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+PlDanger.pressed {
+    background-color: var(--surface-press);
+}
+
+PlLink {
+    color: var(--brand);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: center;
+    padding: 2.4mm 2mm 2.4mm 2mm;
+    margin: 0;
+}
+
+PlSecondary.disabled, PlDanger.disabled, PlLink.disabled {
+    color: var(--line-strong);
+}
+
+PlLink.pressed {
+    color: var(--brand-pressed);
+    background-color: var(--brand-tint);
+}
+
+/* The same button on a bar: flat, because nothing on a bar floats. */
+PlBarButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    padding: 2.4mm;
+    margin: 0.6mm 0.6mm 0.6mm 1.2mm;
+}
+
+PlBarButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* "Where to?" -- looks like a field, behaves like a button. */
+PlSearchBar {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 2.9mm 3.2mm 2.9mm 3.2mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+
+PlSearchBar.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ------------------------------------------------------------------ fields */
+
+PlField {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+}
+
+/* The field being typed in says so. */
+PlField.selected {
+    background-color: var(--brand-tint);
+}
+
+PlField.disabled {
+    color: var(--text-muted);
+    background-color: transparent;
+}
+
+PlFieldHint {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------- lists */
+
+PlRow {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 2.6mm 0 2.6mm 0;
+    margin: 0;
+}
+
+PlRow.pressed {
+    background-color: var(--surface-alt);
+}
+
+PlRowIcon {
+    color: var(--text-muted);
+    padding: 0 3mm 0 0.4mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlRowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlRowDetail {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlRowValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: right;
+    padding: 0 0 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+PlBadge {
+    color: var(--text-muted);
+    background: cn1-pill-border;
+    background-color: var(--surface-alt);
+    font-family: "native:MainBold";
+    font-size: 2.05mm;
+    padding: 0.7mm 2mm 0.7mm 2mm;
+    margin: 0 0 0 2mm;
+}
+
+PlBadgeGood {
+    cn1-derive: PlBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+PlBadgeWarn {
+    cn1-derive: PlBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+PlBadgeBad {
+    cn1-derive: PlBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------------------- admin */
+
+PlStat {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 2.6mm 2.6mm 2.6mm;
+    margin: 0.8mm;
+}
+
+PlStatValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlStatLabel {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* --------------------------------------------------------------- title bar */
+
+/* The strip the clock and the battery are drawn over. */
+StatusBar {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+Toolbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 0 0.6mm 0;
+    margin: 0;
+}
+
+Title {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    text-align: left;
+    padding: 0 0 0 3mm;
+    background-color: transparent;
+}
+
+TitleCommand {
+    color: var(--text);
+    background-color: transparent;
+    padding: 1.6mm 1.8mm 1.6mm 1.8mm;
+    margin: 0;
+}
+
+BackCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+/* The switch: the thumb is the colour, the track the background. */
+Switch {
+    color: #ffffff;
+    background-color: var(--line-strong);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 2mm;
+    margin: 0;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--brand);
+}
+
+Switch.disabled {
+    color: var(--surface-alt);
+    background-color: var(--line);
+}
+
+/* One short fact, in a pill under the bar. */
+PlChip {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.4mm;
+    cn1-box-shadow-blur: 1.4mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.4mm 3mm 1.4mm 2.6mm;
+    margin: 1.2mm 2mm 1mm 2mm;
+}
+
+PlSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 0.4mm 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+
+/* The handle of the sheet: the colour is the bar's. */
+PlGrip {
+    color: var(--line-strong);
+    background-color: transparent;
+    padding: 1.6mm 0 1.8mm 0;
+    margin: 0;
+}
+
+/* The countdown: the colour is the time left, the background the time gone. */
+PlRingTrack {
+    color: var(--line);
+    background-color: transparent;
+}
+
+PlRing {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0.8mm;
+    margin: 0 0 0 2.4mm;
+}
+
+PlPulse {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+PlAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.3mm;
+    margin: 0 3mm 0 0;
+}
+/* Call, message, share: an icon with a word under it. */
+PlAction {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.8mm 0 1.8mm 0;
+    margin: 0;
+}
+
+PlAction.pressed {
+    color: var(--brand);
+    background-color: var(--surface-alt);
+}
+/* ------------------------------------------------------ records and charts */
+
+/* A list that fills a screen: rows from edge to edge, each with the page's
+   margin inside it. */
+PlList {
+    background-color: var(--surface);
+    padding: 0 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+/* One line of a receipt: what, and how much. */
+PlFact {
+    background-color: transparent;
+    padding: 1.1mm 0 1.1mm 0;
+    margin: 0;
+}
+PlFactLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+PlFactValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: right;
+    padding: 0 0 0 3mm;
+    margin: 0;
+}
+/* The line the others add up to. */
+PlFactTotal {
+    cn1-derive: PlFactValue;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    background-color: transparent;
+}
+/* The one thing a screen is about, said large at its top. */
+/* A note to read in the flow of a page: see Ui.callout. */
+PlCallout {
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 2.4mm;
+    margin: 2.4mm 0 1mm 0;
+}
+PlCalloutIcon {
+    color: var(--warning);
+    background-color: transparent;
+    padding: 0.3mm 2.2mm 0 0;
+    margin: 0;
+}
+PlCalloutTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+PlCalloutText {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+}
+
+PlBanner {
+    background-color: transparent;
+    padding: 5mm 3mm 3mm 3mm;
+    margin: 0;
+}
+PlBannerIcon {
+    color: var(--brand);
+    background: cn1-round-border;
+    background-color: var(--brand-tint);
+    padding: 3.4mm;
+    margin: 0 0 2.4mm 0;
+}
+PlBannerIconGood {
+    cn1-derive: PlBannerIcon;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+PlBannerIconWarn {
+    cn1-derive: PlBannerIcon;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+PlBannerIconBad {
+    cn1-derive: PlBannerIcon;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+PlBannerTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: center;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+}
+PlBannerText {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+    margin: 0;
+}
+/* The amount a receipt is for. */
+PlAmount {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+    padding: 1mm 0 0.4mm 0;
+    margin: 0;
+}
+/* A group of rows under one heading. */
+PlGroup {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0.8mm 0;
+}
+/* A chart or a breakdown, boxed with its title. */
+PlTile {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3mm 3mm 3mm 3mm;
+    margin: 0.8mm 0.8mm 1.6mm 0.8mm;
+}
+/* A bar chart: the colour is the bars'. */
+PlChart {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 1.6mm 0 0 0;
+    margin: 0;
+}
+PlChartPeak {
+    color: var(--brand-pressed);
+    background-color: transparent;
+}
+PlChartGrid {
+    color: var(--line);
+    background-color: transparent;
+}
+PlChartAxis {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2mm;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+}
+/* The number a chart adds up to, over the chart. */
+PlChartValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4.2mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+/* A share along a track: the colour is the share, the background the track. */
+PlMeter {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+/* Something waiting for the admin, at the top of the dashboard. */
+PlAlert {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 0.8mm;
+}
+PlAlert.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ----------------------------------------------------------------- choosing */
+
+/* One of several things to pick from, of which one is picked: a kind of car,
+   a way to pay. */
+PlOption {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+PlOption.pressed {
+    background-color: var(--surface-alt);
+}
+PlOptionPicked {
+    cn1-derive: PlOption;
+    background-color: var(--brand-tint);
+    border: 2px solid var(--brand);
+}
+PlOptionIcon {
+    color: var(--text);
+    background-color: transparent;
+    padding: 0 2.4mm 0 0;
+    margin: 0;
+}/* Two fields side by side: the space between them is theirs. */
+PlPairLeft {
+    background-color: transparent;
+    padding: 0 1.2mm 0 0;
+    margin: 0;
+}
+PlPairRight {
+    background-color: transparent;
+    padding: 0 0 0 1.2mm;
+    margin: 0;
+}
+/* A picture of a document, small, beside what it is. */
+PlThumb {
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius-small);
+    padding: 2mm;
+    margin: 0 3mm 0 0;
+}
+/* The same picture, filling the screen. */
+PlPicture {
+    background-color: var(--scrim);
+    padding: 0;
+    margin: 0;
+}/* What is fixed to the foot of a form of several steps. */
+PlFooter {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 1mm 3.6mm 1.6mm 3.6mm;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- the menu */
+
+/* Dimmed by the colour's own alpha. `opacity` would not do it: a style's
+   opacity fades what a component draws over its background, and the
+   background itself is filled at the background's transparency -- so an opaque
+   black with an opacity is still a black screen. */
+PlScrim {
+    background-color: rgba(0, 0, 0, 0.45);
+    padding: 0;
+    margin: 0;
+}
+
+PlMenu {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+PlMenuTop {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 5mm 4mm 3.6mm 4mm;
+    margin: 0;
+}
+
+PlMenuName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+
+PlMenuDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: left;
+    padding: 0.2mm 0 0 0;
+    margin: 0;
+}
+
+/* Which of the three apps this is. */
+PlModeBadge {
+    color: var(--brand);
+    background: cn1-pill-border;
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: center;
+    padding: 0.8mm 2.4mm 0.8mm 2.4mm;
+    margin: 2.4mm 0 0 0;
+}
+
+PlMenuLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: left;
+    padding: 3.6mm 4mm 1mm 4mm;
+    margin: 0;
+}
+
+PlMenuItem {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    text-align: left;
+    padding: 2.6mm 4mm 2.6mm 4mm;
+    margin: 0;
+}
+
+PlMenuItem.pressed {
+    background-color: var(--surface-alt);
+}
+
+PlMenuBottom {
+    background-color: transparent;
+    border-top: 1px solid var(--line);
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The top of a home screen that has no map: the menu, and what this is. */
+PlHomeBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 3.6mm 0.6mm 0;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+PlSection {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 5mm 0 0.8mm 0;
+    margin: 0;
+}
+
+/* A few options side by side, one of them chosen. */
+PlSegments {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 0.5mm;
+    margin: 0.8mm 0 1.6mm 0;
+}
+
+PlSegment {
+    color: var(--text-muted);
+    background-color: transparent;
+    border-radius: 1.9mm;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 2mm 1.2mm 2mm 1.2mm;
+    margin: 0.3mm;
+}
+
+/* ".selected" is the FOCUSED state in a Codename One theme, not the chosen
+   one: a chosen toggle wears ".pressed". Styled like the chosen option, the
+   focused one looked chosen too, so two options of one row seemed picked. */
+PlSegment.selected {
+    color: var(--text-muted);
+    background-color: transparent;
+}
+
+/* A toggle that is on wears the pressed style, so the two say the same. */
+PlSegment.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+}
+
+PlSegment.disabled {
+    color: var(--line-strong);
+    background-color: transparent;
+}
+
+/* The outline of rows that are on their way: the colour is the bars'. */
+PlSkeleton {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+/* "Pull to refresh", over a list being pulled. */
+PullToRefresh {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 1.6mm;
+    margin: 0;
+}
+
+/* What the app says in passing, over the foot of the screen. */
+ToastBar {
+    background-color: var(--text);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2.4mm 3.6mm 3.2mm 3.6mm;
+}
+
+ToastBarMessage {
+    color: var(--surface);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* ------------------------------------------------- the admin console, wide */
+
+/* On a tablet on its side, a desktop or a browser the console is three
+   columns: where to go, a list, and what was picked from it. */
+PlSide {
+    background-color: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    padding: 2.4mm 1.6mm 2.4mm 1.6mm;
+    margin: 0;
+}
+
+PlSideName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    padding: 0.8mm 2.4mm 0 2.4mm;
+    margin: 0;
+}
+
+PlSideDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0 2.4mm 2.4mm 2.4mm;
+    margin: 0;
+}
+
+PlSideLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.15mm;
+    padding: 3.2mm 2.4mm 0.8mm 2.4mm;
+    margin: 0;
+}
+
+PlSideItem {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius-small);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 1.9mm 2.4mm 1.9mm 2.4mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+PlSideItem.pressed {
+    background-color: var(--line);
+}
+
+PlSidePicked {
+    cn1-derive: PlSideItem;
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+}
+
+PlMaster {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+PlPaneBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 4mm 1.2mm 4mm;
+    margin: 0;
+}
+
+PlPaneTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 1.6mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The row of a list whose detail is open beside it. */
+PlRowPicked {
+    cn1-derive: PlRow;
+    background-color: var(--surface-alt);
+}
+
+/*
+ * THE DESKTOP'S OWN LOOK. On macOS, Windows and Linux, and in a desktop
+ * browser, the platform's theme is under this one (the nativeTheme=native build
+ * hint), and the admin console wears it: Layouts.dress() gives each component
+ * the PlDesk twin of its style. A twin derives from the platform's control
+ * where there is one -- a button, a field, a segmented control, a group box --
+ * and takes its colours from the palette every desktop theme declares, so the
+ * same rules are Aqua on a Mac, Fluent on Windows and Adwaita on Linux. Nothing
+ * here names the brand; the accent is the platform's.
+ *
+ * The values in PlDeskPalette are only what the compiler needs to resolve
+ * var(): each use is bound to the name, and the installed theme's own value
+ * replaces it when the app runs. They are declared outside #Constants so that
+ * they are not exported over the theme's.
+ */
+PlDeskPalette {
+    --window-bg-color: #ececec;
+    --window-bg-color-dark: #1e1e1e;
+    --view-bg-color: #ffffff;
+    --view-bg-color-dark: #1e1e1e;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2c2c2c;
+    --headerbar-bg-color: #e8e8e8;
+    --headerbar-bg-color-dark: #2a2a2a;
+    --text-color: #1a1a1a;
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #5d5d5d;
+    --text-secondary-color-dark: #c0c0c0;
+    --separator-color: #d8d8d8;
+    --separator-color-dark: #3a3a3a;
+    --accent-color: #007aff;
+    --accent-color-dark: #0a84ff;
+    --accent-fg-color: #ffffff;
+    --accent-fg-color-dark: #ffffff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+PlDeskForm { background-color: var(--window-bg-color); padding: 0; margin: 0; }
+PlDeskPage { background-color: var(--window-bg-color); padding: 3mm 5mm 4mm 5mm; margin: 0; }
+PlDeskList { background-color: var(--view-bg-color); padding: 0 3mm 2mm 3mm; margin: 0; }
+PlDeskMaster { background-color: var(--view-bg-color); border-right: 1px solid #c6c6c8; padding: 0; margin: 0; }
+PlDeskHomeBar { background-color: var(--headerbar-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 4mm 1mm 0; margin: 0; }
+PlDeskPaneBar { background-color: var(--window-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 5mm 1mm 5mm; margin: 0; }
+PlDeskPaneTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+PlDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0;
+    background-color: transparent;
+}
+
+PlDeskSide { background-color: var(--headerbar-bg-color); border-right: 1px solid #c6c6c8; padding: 2.5mm 2mm 2.5mm 2mm; margin: 0; }
+PlDeskSideName { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; padding: 1mm 2.6mm 0 2.6mm; margin: 0; }
+PlDeskSideDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.25mm; padding: 0 2.6mm 2mm 2.6mm; margin: 0; }
+PlDeskSideLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.15mm; padding: 3mm 2.6mm 1mm 2.6mm; margin: 0; }
+PlDeskSideItem { color: var(--text-color); background-color: transparent; border-radius: 1.4mm; font-family: "native:MainRegular"; font-size: 2.65mm; text-align: left; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0.2mm 0 0.2mm 0; }
+PlDeskSideItem.pressed { background-color: var(--separator-color); }
+PlDeskSidePicked { cn1-derive: PlDeskSideItem; color: var(--accent-fg-color); background-color: var(--accent-color); }
+
+PlDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0;
+    background-color: transparent;
+}
+PlDeskField { cn1-derive: TextField; margin: 0;
+    background-color: transparent;
+}
+PlDeskFieldHint { cn1-derive: TextHint;
+    background-color: transparent;
+}
+PlDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0;
+    background-color: transparent;
+}
+/* Four of these share the master pane of the console, which is narrow: the
+   platform's own tab padding leaves "Cancelled" no room and it was drawn cut
+   off at both ends. */
+PlDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0;
+    background-color: transparent;
+}
+/* Something waiting is the one thing on the console that is not the
+   platform's grey: it wears the warning tint the phone's does. */
+PlDeskAlert { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+PlDeskAlert.pressed { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+
+PlDeskRow { background-color: transparent; border-bottom: 1px solid #d8d8d8; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+PlDeskRow.pressed { background-color: var(--separator-color); }
+PlDeskRowPicked { background-color: var(--separator-color); border-bottom: 1px solid #d8d8d8; border-radius: 1.4mm; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+PlDeskRowIcon { color: var(--text-secondary-color); background-color: transparent; padding: 0 2.6mm 0 0; margin: 0; }
+PlDeskRowTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.7mm; padding: 0; margin: 0; }
+PlDeskRowDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+PlDeskRowValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.65mm; text-align: right; padding: 0; margin: 0; }
+
+PlDeskSection { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; text-align: left; padding: 4mm 0 1.2mm 0; margin: 0; }
+PlDeskTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0 0 2mm 0; margin: 0; }
+PlDeskHeading { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+PlDeskText { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.65mm; padding: 1mm 0 1mm 0; margin: 0; }
+PlDeskMuted { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 0 0.5mm 0; margin: 0; }
+PlDeskLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 2.4mm 0 0.8mm 0; margin: 0; }
+PlDeskError { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; }
+PlDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0;
+    background-color: transparent;
+}
+PlDeskFact { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+PlDeskFactLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; padding: 0; margin: 0; }
+PlDeskFactValue { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; text-align: right; padding: 0; margin: 0; }
+PlDeskFactTotal { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; text-align: right; padding: 0; margin: 0; }
+PlDeskAmount { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 6.4mm; text-align: center; padding: 2mm 0 1mm 0; margin: 0; }
+PlDeskBannerIcon { color: var(--text-secondary-color); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
+PlDeskBannerTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.05mm; text-align: center; padding: 0; margin: 0; }
+PlDeskBannerText { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1mm 0 0 0; margin: 0; }
+
+/* The numbers and the charts have no control on any desktop: they keep their
+   shape, in a group box, in the platform's colours. */
+PlDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm;
+    background-color: transparent;
+}
+PlDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm;
+    background-color: transparent;
+}
+PlDeskStatValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0; margin: 0; }
+PlDeskStatLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+PlDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+PlDeskChartAxis { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }PlMutedSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0.3mm 0; margin: 0; background-color: transparent; }PlSearchField { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm 3mm 2mm 3mm; margin: 0; }PlSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
+/* ------------------------------------------------------------------ chats */
+
+/* A row of the chat list: avatar, title over the last message, time and the
+   unread count on the right. */
+PlChatRow {
+    background-color: var(--surface);
+    padding: 2.4mm 3.6mm 2.4mm 3.6mm;
+    margin: 0;
+}
+
+PlChatRow.pressed {
+    background-color: var(--surface-alt);
+}
+
+PlChatTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.85mm;
+    padding: 0 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlChatPreview {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlChatTime {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: right;
+    padding: 0 0 0.6mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlUnread {
+    color: var(--brand-contrast);
+    background: cn1-pill-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 0.4mm 1.4mm 0.4mm 1.4mm;
+    margin: 0;
+}
+
+/* The chat itself: wallpaper, bubbles, the day between them. */
+PlWall {
+    background-color: var(--wall);
+    padding: 1.6mm 2.4mm 1.6mm 2.4mm;
+    margin: 0;
+}
+
+/* The chat's content pane: the wallpaper edge to edge, so the composer spans
+   the full width under it. */
+PlWallPane {
+    background-color: var(--wall);
+    padding: 0;
+    margin: 0;
+}
+
+PlBubbleIn {
+    background-color: var(--bubble-in);
+    border-radius: 3mm;
+    padding: 1.6mm 2.4mm 1.2mm 2.4mm;
+    margin: 0.5mm 14mm 0.5mm 0;
+}
+
+PlBubbleOut {
+    background-color: var(--bubble-out);
+    border-radius: 3mm;
+    padding: 1.6mm 2.4mm 1.2mm 2.4mm;
+    margin: 0.5mm 0 0.5mm 14mm;
+}
+
+PlBubbleText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlBubbleDeleted {
+    color: var(--text-muted);
+    font-family: "native:ItalicRegular";
+    font-size: 2.8mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlBubbleAuthor {
+    color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlBubbleMeta {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.1mm;
+    text-align: right;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlTickRead {
+    color: var(--brand);
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0.6mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlTick {
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0.6mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlTickFailed {
+    color: var(--danger);
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0.6mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The message a reply quotes, inside the bubble and over the composer. */
+PlQuote {
+    background-color: var(--surface-alt);
+    border-left: 0.8mm solid var(--brand);
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 1.6mm 1mm 1.6mm;
+    margin: 0 0 1mm 0;
+}
+
+PlReactions {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 2.6mm;
+    padding: 0.3mm 1.2mm 0.3mm 1.2mm;
+    margin: 0.4mm 0 0 0;
+}
+
+PlMediaThumb {
+    padding: 0;
+    margin: 0 0 1mm 0;
+    background-color: transparent;
+}
+
+PlDay {
+    color: var(--text-muted);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 0.6mm 2.4mm 0.6mm 2.4mm;
+    margin: 1.6mm 0 1.6mm 0;
+}
+
+PlSystem {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 0.6mm 4mm 0.6mm 4mm;
+    margin: 0.8mm 0 0.8mm 0;
+    background-color: transparent;
+}
+
+PlTyping {
+    color: var(--brand);
+    font-family: "native:ItalicRegular";
+    font-size: 2.5mm;
+    padding: 0.6mm 1mm 0.6mm 1mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* Under the chat: the field and the round send button. */
+PlComposer {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 1.4mm 2mm 1.4mm 2mm;
+    margin: 0;
+}
+
+PlComposerDock {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+PlComposerField {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface-alt);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1.8mm 3mm 1.8mm 3mm;
+    margin: 0 1.4mm 0 1.4mm;
+}
+
+PlSend {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-size: 4mm;
+    padding: 2mm;
+    margin: 0;
+}
+
+PlSend.pressed {
+    background-color: var(--brand-pressed);
+}
+
+PlComposerTool {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 4.4mm;
+    padding: 1.6mm;
+    margin: 0;
+}
+
+/* Over a chat that is not end to end encrypted: a bridge or the bot. */
+PlPlainBanner {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 1mm 3mm 1mm 3mm;
+    margin: 0;
+}
+
+/* Safety numbers: big, monospaced-looking groups of five. */
+PlSafety {
+    color: var(--text);
+    font-family: "native:MainLight";
+    font-size: 5mm;
+    text-align: center;
+    padding: 2mm 0 2mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* Over the whole screen while the app is locked or in the app switcher. */
+PlLock {
+    background-color: var(--brand);
+    padding: 0;
+    margin: 0;
+}
+
+PlLockTitle {
+    color: var(--brand-contrast);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The call screen. */
+PlCall {
+    background-color: #0d1b1e;
+    padding: 0;
+    margin: 0;
+}
+
+PlCallName {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 5.2mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlCallState {
+    color: #b6c5c8;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PlCallButton {
+    color: #ffffff;
+    background: cn1-round-border;
+    background-color: #2c3d41;
+    font-size: 5.5mm;
+    padding: 3.4mm;
+    margin: 2mm;
+}
+
+PlCallButtonOn {
+    color: #0d1b1e;
+    background: cn1-round-border;
+    background-color: #ffffff;
+    font-size: 5.5mm;
+    padding: 3.4mm;
+    margin: 2mm;
+}
+
+PlCallHangUp {
+    color: #ffffff;
+    background: cn1-round-border;
+    background-color: #d93a3a;
+    font-size: 5.5mm;
+    padding: 3.4mm;
+    margin: 2mm;
+}
+
+PlCallAnswer {
+    color: #ffffff;
+    background: cn1-round-border;
+    background-color: #1fa463;
+    font-size: 5.5mm;
+    padding: 3.4mm;
+    margin: 2mm;
+}
+
+PlLocalVideo {
+    border: 1px solid #ffffff;
+    border-radius: 2mm;
+    padding: 0;
+    margin: 3mm;
+    background-color: transparent;
+}
+
+
+/* The new-chat button: the brand colour, like every other primary action. */
+FloatingActionButton {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-size: 3.8mm;
+    padding: 3.6mm;
+    margin: 0;
+}
+
+FloatingActionButton.pressed {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand-pressed);
+}
+
+/* The caller, large in the middle of the dark call screen. */
+PlCallAvatar {
+    color: #ffffff;
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 9mm;
+    text-align: center;
+    padding: 7mm;
+    margin: 0 0 3mm 0;
+}
+
+/* The person in a conversation's title bar, beside their name. */
+PlTitleAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.7mm;
+    margin: 0 2mm 0 0;
+}
+@media (prefers-color-scheme: dark) {
+    PlChatRow { background-color: var(--surface-dark); }
+    PlChatRow.pressed { background-color: var(--surface-alt-dark); }
+    PlChatTitle { color: var(--text-dark); }
+    PlChatPreview { color: var(--text-muted-dark); }
+    PlChatTime { color: var(--text-muted-dark); }
+    PlUnread { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PlWall { background-color: var(--wall-dark); }
+    PlWallPane { background-color: var(--wall-dark); }
+    PlBubbleIn { background-color: var(--bubble-in-dark); }
+    PlBubbleOut { background-color: var(--bubble-out-dark); }
+    PlBubbleText { color: var(--text-dark); }
+    PlBubbleDeleted { color: var(--text-muted-dark); }
+    PlBubbleAuthor { color: var(--brand-dark); }
+    PlBubbleMeta { color: var(--text-muted-dark); }
+    PlTickRead { color: var(--brand-dark); }
+    PlTick { color: var(--text-muted-dark); }
+    PlTickFailed { color: var(--danger-dark); }
+    PlQuote { background-color: var(--surface-alt-dark); color: var(--text-muted-dark); border-left: 0.8mm solid var(--brand-dark); }
+    PlReactions { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PlDay { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    PlSystem { color: var(--text-muted-dark); }
+    PlTyping { color: var(--brand-dark); }
+    PlComposer { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    PlComposerField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlSend { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PlSend.pressed { background-color: var(--brand-pressed-dark); }
+    PlComposerTool { color: var(--text-muted-dark); }
+    PlPlainBanner { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlSafety { color: var(--text-dark); }
+    PlLock { background-color: var(--brand-dark); }
+    PlLockTitle { color: var(--brand-contrast-dark); }
+    PlForm { background-color: var(--surface-dark); }
+    PlPage { background-color: var(--surface-dark); }
+    PlHero { background-color: var(--brand-dark); }
+    PlHeroTitle { color: var(--brand-contrast-dark); }
+    PlHeroText { color: var(--brand-contrast-dark); }
+    PlHeroIcon { color: var(--brand-contrast-dark); }
+    PlCard { background-color: var(--surface-dark); }
+    PlFloat { background-color: var(--surface-dark); }
+    PlPanel { background-color: var(--surface-alt-dark); }
+    PlDivider { background-color: var(--line-dark); }
+    PlTitle { color: var(--text-dark); }
+    PlHeading { color: var(--text-dark); }
+    PlText { color: var(--text-dark); }
+    PlMuted { color: var(--text-muted-dark); }
+    PlLabel { color: var(--text-muted-dark); }    PlError { color: var(--danger-dark); }
+    PlNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PlPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    PlPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    PlSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlSecondary.pressed { background-color: var(--surface-press-dark); }
+    PlDanger { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    PlDanger.pressed { background-color: var(--surface-press-dark); }
+    PlLink { color: var(--brand-dark); }
+    PlLink.pressed { color: var(--brand-pressed-dark); background-color: var(--brand-tint-dark); }
+    PlBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    PlBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    PlSearchBar { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlSearchBar.pressed { background-color: var(--surface-press-dark); }
+    PlField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlFieldHint { color: var(--text-muted-dark); }
+    PlRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    PlRow.pressed { background-color: var(--surface-alt-dark); }
+    PlRowIcon { color: var(--text-muted-dark); }
+    PlRowTitle { color: var(--text-dark); }
+    PlRowDetail { color: var(--text-muted-dark); }
+    PlRowValue { color: var(--text-dark); }
+    PlBadge { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    PlBadgeGood { background: cn1-pill-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    PlBadgeWarn { background: cn1-pill-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlBadgeBad { background: cn1-pill-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    PlStat { background-color: var(--surface-alt-dark); }
+    PlStatValue { color: var(--text-dark); }
+    PlStatLabel { color: var(--text-muted-dark); }
+    StatusBar { background-color: var(--surface-dark); }
+    Toolbar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    Title { color: var(--text-dark); }
+    TitleCommand { color: var(--text-dark); }
+    BackCommand { color: var(--text-dark); }    PlChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PlSheet { background-color: var(--surface-dark); }
+    PlGrip { color: var(--line-strong-dark); }
+    PlRing { color: var(--brand-dark); }
+    PlRingTrack { color: var(--line-dark); }
+    PlPulse { color: var(--brand-dark); }    PlAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }    PlAction { color: var(--text-dark); }
+    PlAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }    PlMenu { background-color: var(--surface-dark); }
+    PlMenuTop { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    PlMenuName { color: var(--text-dark); }
+    PlMenuDetail { color: var(--text-muted-dark); }
+    PlModeBadge { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    PlMenuLabel { color: var(--text-muted-dark); }
+    PlMenuItem { color: var(--text-dark); }
+    PlMenuItem.pressed { background-color: var(--surface-alt-dark); }
+    PlMenuBottom { border-top: 1px solid var(--line-dark); }
+    PlHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    PlSection { color: var(--text-dark); }
+    PlSegments { background-color: var(--surface-alt-dark); }
+    PlSegment { color: var(--text-muted-dark); }
+    PlSegment.selected { color: var(--text-muted-dark); background-color: transparent; }
+    PlSegment.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    PlList { background-color: var(--surface-dark); }
+    PlFactLabel { color: var(--text-muted-dark); }
+    PlFactValue { color: var(--text-dark); }
+    PlFactTotal { color: var(--text-dark); }
+    PlCallout { background-color: var(--warning-tint-dark); }
+    PlCalloutIcon { color: var(--warning-dark); }
+    PlCalloutTitle { color: var(--text-dark); }
+    PlCalloutText { color: var(--text-dark); }
+    PlBannerIcon { background: cn1-round-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    PlBannerIconGood { background: cn1-round-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    PlBannerIconWarn { background: cn1-round-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlBannerIconBad { background: cn1-round-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    PlBannerTitle { color: var(--text-dark); }
+    PlBannerText { color: var(--text-muted-dark); }
+    PlAmount { color: var(--text-dark); }
+    PlTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PlChart { color: var(--brand-dark); }
+    PlChartPeak { color: var(--brand-pressed-dark); }
+    PlChartGrid { color: var(--line-dark); }
+    PlChartAxis { color: var(--text-muted-dark); }
+    PlChartValue { color: var(--text-dark); }
+    PlMeter { color: var(--brand-dark); }
+    PlAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlAlert.pressed { background-color: var(--surface-press-dark); }
+    PlOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PlOption.pressed { background-color: var(--surface-alt-dark); }
+    PlOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    PlOptionIcon { color: var(--text-dark); }    PlThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }    PlFooter { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }    PlSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    PlSideName { color: var(--text-dark); }
+    PlSideDetail { color: var(--text-muted-dark); }
+    PlSideLabel { color: var(--text-muted-dark); }
+    PlSideItem { color: var(--text-dark); }
+    PlSideItem.pressed { background-color: var(--line-dark); }
+    PlSidePicked { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PlMaster { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    PlPaneBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    PlPaneTitle { color: var(--text-dark); }
+    PlRowPicked { background-color: var(--surface-alt-dark); }
+    PlSecondary.disabled, PlDanger.disabled, PlLink.disabled { color: var(--line-strong-dark); }
+    PlField.selected { background-color: var(--brand-tint-dark); }
+    PlField.disabled { color: var(--text-muted-dark); }    Switch { color: #ffffff; background-color: var(--line-strong-dark); }
+    Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
+    Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
+    PlSegment.disabled { color: var(--line-strong-dark); }
+    PlSkeleton { color: var(--surface-alt-dark); }
+    PullToRefresh { color: var(--text-muted-dark); }
+    ToastBar { background-color: var(--text-dark); }
+    ToastBarMessage { color: var(--surface-dark); }
+    PlDeskForm { background-color: var(--window-bg-color-dark); }
+    PlDeskPage { background-color: var(--window-bg-color-dark); }
+    PlDeskList { background-color: var(--view-bg-color-dark); }
+    PlDeskMaster { background-color: var(--view-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    PlDeskHomeBar { background-color: var(--headerbar-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    PlDeskPaneBar { background-color: var(--window-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    PlDeskPaneTitle { color: var(--text-color-dark); }
+    PlDeskSide { background-color: var(--headerbar-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    PlDeskSideName { color: var(--text-color-dark); }
+    PlDeskSideDetail { color: var(--text-secondary-color-dark); }
+    PlDeskSideLabel { color: var(--text-secondary-color-dark); }
+    PlDeskSideItem { color: var(--text-color-dark); }
+    PlDeskSideItem.pressed { background-color: var(--separator-color-dark); }
+    PlDeskSidePicked { color: var(--accent-fg-color-dark); background-color: var(--accent-color-dark); }
+    PlDeskDanger { color: var(--danger-dark); }
+    PlDeskRow { border-bottom: 1px solid #3a3a3a; }
+    PlDeskRow.pressed { background-color: var(--separator-color-dark); }
+    PlDeskRowPicked { background-color: var(--separator-color-dark); border-bottom: 1px solid #3a3a3a; }
+    PlDeskAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlDeskAlert.pressed { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PlDeskRowIcon { color: var(--text-secondary-color-dark); }
+    PlDeskRowTitle { color: var(--text-color-dark); }
+    PlDeskRowDetail { color: var(--text-secondary-color-dark); }
+    PlDeskRowValue { color: var(--text-color-dark); }
+    PlDeskSection { color: var(--text-color-dark); }
+    PlDeskTitle { color: var(--text-color-dark); }
+    PlDeskHeading { color: var(--text-color-dark); }
+    PlDeskText { color: var(--text-color-dark); }
+    PlDeskMuted { color: var(--text-secondary-color-dark); }
+    PlDeskLabel { color: var(--text-secondary-color-dark); }
+    PlDeskError { color: var(--danger-dark); }
+    PlDeskNotice { color: var(--text-color-dark); }
+    PlDeskFactLabel { color: var(--text-secondary-color-dark); }
+    PlDeskFactValue { color: var(--text-color-dark); }
+    PlDeskFactTotal { color: var(--text-color-dark); }
+    PlDeskAmount { color: var(--text-color-dark); }
+    PlDeskBannerIcon { color: var(--text-secondary-color-dark); }
+    PlDeskBannerTitle { color: var(--text-color-dark); }
+    PlDeskBannerText { color: var(--text-secondary-color-dark); }
+    PlDeskStatValue { color: var(--text-color-dark); }
+    PlDeskStatLabel { color: var(--text-secondary-color-dark); }
+    PlDeskChartValue { color: var(--text-color-dark); }
+    PlDeskChartAxis { color: var(--text-secondary-color-dark); }    PlMutedSmall { color: var(--text-muted-dark); }    PlSearchField { color: var(--text-dark); background-color: var(--surface-alt-dark); }    PlSheetTitle { color: var(--text-dark); }}

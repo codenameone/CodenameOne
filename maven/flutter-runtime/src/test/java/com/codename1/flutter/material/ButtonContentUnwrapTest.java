@@ -54,7 +54,7 @@ class ButtonContentUnwrapTest {
     static class ComposedIcon extends StatelessWidget {
         @Override
         public Widget build(BuildContext context) {
-            return new Icon(Icons.arrow_back);
+            return new Icon(Icons.arrow_back());
         }
     }
 
@@ -86,8 +86,8 @@ class ButtonContentUnwrapTest {
     @Test
     @DisplayName("a plain Icon still yields its glyph")
     void aPlainIconIsFound() {
-        assertEquals(Icons.arrow_back.codePoint(),
-                mount(new Icon(Icons.arrow_back)).consumedIconChar());
+        assertEquals(Icons.arrow_back().codePoint(),
+                mount(new Icon(Icons.arrow_back())).consumedIconChar());
     }
 
     @Test
@@ -95,7 +95,7 @@ class ButtonContentUnwrapTest {
     void aComposedIconIsResolved() {
         ButtonRenderElement e = mount(new ComposedIcon());
 
-        assertEquals(Icons.arrow_back.codePoint(), e.consumedIconChar(),
+        assertEquals(Icons.arrow_back().codePoint(), e.consumedIconChar(),
                 "BackButtonIcon-shaped content must resolve to its glyph");
         assertEquals(null, e.consumedLabel(),
                 "and must NOT fall back to a toString() label");
@@ -104,9 +104,9 @@ class ButtonContentUnwrapTest {
     @Test
     @DisplayName("a wrapped icon is found through the wrapper")
     void aWrappedIconIsResolved() {
-        ButtonRenderElement e = mount(new Wrapper(new Icon(Icons.search)));
+        ButtonRenderElement e = mount(new Wrapper(new Icon(Icons.search())));
 
-        assertEquals(Icons.search.codePoint(), e.consumedIconChar());
+        assertEquals(Icons.search().codePoint(), e.consumedIconChar());
         assertEquals(null, e.consumedLabel());
     }
 
@@ -115,7 +115,7 @@ class ButtonContentUnwrapTest {
     void nestingIsWalked() {
         ButtonRenderElement e = mount(new Wrapper(new ComposedIcon()));
 
-        assertEquals(Icons.arrow_back.codePoint(), e.consumedIconChar());
+        assertEquals(Icons.arrow_back().codePoint(), e.consumedIconChar());
     }
 
     @Test
@@ -133,7 +133,7 @@ class ButtonContentUnwrapTest {
             return new com.codename1.flutter.State<StatefulIcon>() {
                 @Override
                 public Widget build(BuildContext context) {
-                    return new Icon(Icons.tune);
+                    return new Icon(Icons.tune());
                 }
             };
         }
@@ -144,7 +144,7 @@ class ButtonContentUnwrapTest {
     void aStatefulIconIsResolved() {
         ButtonRenderElement e = mount(new StatefulIcon());
 
-        assertEquals(Icons.tune.codePoint(), e.consumedIconChar(),
+        assertEquals(Icons.tune().codePoint(), e.consumedIconChar(),
                 "FeatureDiscovery-shaped content must resolve to its glyph");
         assertEquals(null, e.consumedLabel());
     }

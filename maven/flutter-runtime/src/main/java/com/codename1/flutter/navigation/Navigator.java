@@ -187,7 +187,8 @@ public class Navigator extends StatelessWidget {
                 tb.setBackCommand("", new ActionListener<ActionEvent>() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
-                        pop(null);
+                        // a request, as Flutter's back button is: PopScope may veto it
+                        maybePop(null, null);
                     }
                 });
             }
@@ -212,6 +213,11 @@ public class Navigator extends StatelessWidget {
      * so with a dialog over the base route maybePop answered false without closing it
      * and a system-back handler could not dismiss the dialog.
      */
+    /** Whether a pop would remove anything: a pushed page or an open dialog. */
+    public static boolean canPopAnything() {
+        return poppable();
+    }
+
     static boolean poppable() {
         return com.codename1.flutter.material.Dialogs.openDialogCount() > 0 || !stack.isEmpty();
     }
@@ -229,11 +235,22 @@ public class Navigator extends StatelessWidget {
      * does and completes the popped route's future with {@code result}.
      */
     public static void pop(BuildContext context, Object result) {
-        if (Dialogs.popTopDialog(result)) {
-            return;
+        // An explicit pop skips canPop, but its PopScopes still hear that it happened
+        // (onPopInvokedWithResult(true, result)). Collected first: the pop unmounts them.
+        List<Widget> scopes;
+        if (Dialogs.openDialogCount() > 0) {
+            scopes = PopGuards.collect(Dialogs.topDialogRoot());
+            if (Dialogs.popTopDialog(result)) {
+                PopGuards.notifyPopScopes(scopes, true, result);
+                return;
+            }
         }
+        scopes = stack.isEmpty() ? null : PopGuards.collect(stack.get(stack.size() - 1).rootElement);
         RouteEntry e = popPage();
         if (e != null) {
+            if (scopes != null) {
+                PopGuards.notifyPopScopes(scopes, true, result);
+            }
             e.popped.complete(result);
         }
     }
@@ -286,6 +303,12 @@ public class Navigator extends StatelessWidget {
     /// Test hooks: the form of stack entry {@code i}, and the form the top entry returns to.
     static Form formAt(int i) {
         return stack.get(i).form;
+    }
+
+    /// Test hook: headless, a page never mounts, so a test mounts one itself and hands
+    /// its root here for maybePop's PopScope/WillPopScope lookup.
+    static void attachTopRootForTest(Element root) {
+        stack.get(stack.size() - 1).rootElement = root;
     }
 
     static String routeNameAt(int i) {
@@ -651,8 +674,7 @@ public class Navigator extends StatelessWidget {
             if (!poppable()) {
                 return dart.async.Future.value(Boolean.FALSE);
             }
-            Navigator.pop(null, result);
-            return dart.async.Future.value(Boolean.TRUE);
+            return Navigator.maybePop(null, result);
         }
 
         @Override
@@ -856,8 +878,7 @@ public class Navigator extends StatelessWidget {
             if (!poppable()) {
                 return dart.async.Future.value(Boolean.FALSE);
             }
-            Navigator.pop(context, result);
-            return dart.async.Future.value(Boolean.TRUE);
+            return Navigator.maybePop(context, result);
         }
 
         @Override
@@ -931,12 +952,47 @@ public class Navigator extends StatelessWidget {
      * {@link #maybePop(BuildContext)} with the value the popped route's future completes
      * with, when something was popped -- Flutter's optional {@code result} parameter.
      */
-    public static dart.async.Future<Boolean> maybePop(BuildContext context, Object result) {
+    public static dart.async.Future<Boolean> maybePop(final BuildContext context, final Object result) {
         if (!poppable()) {
             return dart.async.Future.value(Boolean.FALSE);
         }
-        pop(context, result);
-        return dart.async.Future.value(Boolean.TRUE);
+        final boolean dialog = Dialogs.openDialogCount() > 0;
+        if (!dialog && stack.isEmpty()) {
+            pop(context, result);
+            return dart.async.Future.value(Boolean.TRUE);
+        }
+        // The route's PopScope/WillPopScope widgets decide first -- a back press and
+        // maybePop are requests, unlike pop. A dialog is itself the top route, so its
+        // own guards are the ones asked (PopScope(canPop: false) in a dialog blocks it).
+        final RouteEntry top = dialog ? null : stack.get(stack.size() - 1);
+        final Element dialogRoot = dialog ? Dialogs.topDialogRoot() : null;
+        final List<Widget> scopes = PopGuards.collect(dialog ? dialogRoot : top.rootElement);
+        if (scopes.isEmpty()) {
+            pop(context, result);
+            return dart.async.Future.value(Boolean.TRUE);
+        }
+        final dart.async.Completer<Boolean> done = new dart.async.Completer<Boolean>();
+        PopGuards.mayPop(scopes, result).then(new dart.runtime.Funcs.VoidFunc1<Boolean>() {
+            @Override
+            public void call(Boolean ok) {
+                // still the top route: a guard that awaited a dialog must not pop the page beneath
+                boolean pop = Boolean.TRUE.equals(ok) && (dialog
+                        ? Dialogs.openDialogCount() > 0 && Dialogs.topDialogRoot() == dialogRoot
+                        : !stack.isEmpty() && stack.get(stack.size() - 1) == top);
+                if (pop) {
+                    pop(context, result);
+                }
+                // one onPopInvoked per request: a pop reports itself (didPop true) from
+                // pop(); a refusal, a WillPopScope's included, reports didPop false here
+                if (!pop) {
+                    PopGuards.notifyPopScopes(scopes, false, result);
+                }
+                // true either way: a route that declines to pop has handled the request
+                // (Flutter's doNotPop); false is reserved for "nothing here, bubble up".
+                done.complete(Boolean.TRUE);
+            }
+        }, null);
+        return done.future();
     }
 
     private static final class RouteEntry {

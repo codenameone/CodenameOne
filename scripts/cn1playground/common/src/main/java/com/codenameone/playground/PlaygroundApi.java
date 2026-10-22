@@ -116,12 +116,14 @@ final class PlaygroundApi {
     private static Map<String, String> uniqueBySimpleName;
 
     /// The one public top-level class with this simple name, as a dotted name, or
-    /// null when there is none or more than one. Drives the auto-import of names
+    /// null when there is none or more than one (one Codename One class wins
+    /// over a JDK class of the same name). Drives the auto-import of names
     /// a snippet uses without importing them (``PlaygroundRunner.compile``).
     static synchronized String uniqueClassForSimpleName(String simpleName) {
         if (uniqueBySimpleName == null) {
             StubLibrary lib = libraryOrNull();
             Map<String, String> unique = new HashMap<String, String>();
+            Map<String, String> codenameOne = new HashMap<String, String>();
             if (lib != null) {
                 for (String n : lib.classNames()) {
                     if (n.indexOf('$') >= 0 || !isListed(lib, n)) {
@@ -131,6 +133,18 @@ final class PlaygroundApi {
                     String dotted = n.replace('/', '.');
                     // An empty value marks a name two packages share.
                     unique.put(simple, unique.containsKey(simple) ? "" : dotted);
+                    if (n.startsWith("com/codename1/")) {
+                        codenameOne.put(simple, codenameOne.containsKey(simple) ? "" : dotted);
+                    }
+                }
+            }
+            // A name the device's class library shares with one Codename One
+            // class (SecureRandom, Temporal) means the Codename One one: the
+            // snippets are written against the framework, and the java.* twin
+            // only exists so ported JDK code compiles.
+            for (Map.Entry<String, String> e : codenameOne.entrySet()) {
+                if (!e.getValue().isEmpty()) {
+                    unique.put(e.getKey(), e.getValue());
                 }
             }
             uniqueBySimpleName = unique;

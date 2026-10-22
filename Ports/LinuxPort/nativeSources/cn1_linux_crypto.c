@@ -46,6 +46,8 @@
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 #include <openssl/rsa.h>
+#include <openssl/ec.h>
+#include <openssl/obj_mac.h>
 #include <openssl/err.h>
 #include <openssl/pkcs12.h>
 
@@ -549,6 +551,105 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_
 }
 
 /* ------------------------------------------------------------ key pairs */
+
+/* Same layout as generateRsaKeyPair below. Keygen straight from an EC context
+ * with the curve set works on OpenSSL 1.1 and 3 alike. */
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_generateEcKeyPair___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, 0);
+    EVP_PKEY* key = 0;
+    PKCS8_PRIV_KEY_INFO* info = 0;
+    unsigned char* publicDer = 0;
+    unsigned char* privateDer = 0;
+    unsigned char* blob = 0;
+    int publicLength = 0, privateLength = 0;
+    JAVA_OBJECT result = JAVA_NULL;
+
+    if (ctx == 0) {
+        cn1CryptoFail("EC keygen context");
+        return JAVA_NULL;
+    }
+    if (EVP_PKEY_keygen_init(ctx) <= 0 ||
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_X9_62_prime256v1) <= 0 ||
+        EVP_PKEY_keygen(ctx, &key) <= 0) {
+        cn1CryptoFail("EC keygen");
+        goto done;
+    }
+    publicLength = i2d_PUBKEY(key, &publicDer);
+    info = EVP_PKEY2PKCS8(key);
+    if (info != 0) {
+        privateLength = i2d_PKCS8_PRIV_KEY_INFO(info, &privateDer);
+    }
+    if (publicLength <= 0 || privateLength <= 0) {
+        cn1CryptoFail("EC key encoding");
+        goto done;
+    }
+    blob = (unsigned char*) malloc((size_t) publicLength + (size_t) privateLength + 4);
+    if (blob == 0) {
+        cn1CryptoFail("out of memory");
+        goto done;
+    }
+    blob[0] = (unsigned char) ((publicLength >> 24) & 0xff);
+    blob[1] = (unsigned char) ((publicLength >> 16) & 0xff);
+    blob[2] = (unsigned char) ((publicLength >> 8) & 0xff);
+    blob[3] = (unsigned char) (publicLength & 0xff);
+    memcpy(blob + 4, publicDer, (size_t) publicLength);
+    memcpy(blob + 4 + publicLength, privateDer, (size_t) privateLength);
+    result = cn1LinuxNewByteArray(threadStateData, blob, publicLength + privateLength + 4);
+
+done:
+    free(blob);
+    OPENSSL_free(publicDer);
+    OPENSSL_free(privateDer);
+    if (info != 0) {
+        PKCS8_PRIV_KEY_INFO_free(info);
+    }
+    if (key != 0) {
+        EVP_PKEY_free(key);
+    }
+    EVP_PKEY_CTX_free(ctx);
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_ecdh___byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT privateArray, JAVA_OBJECT publicArray) {
+    int privateLength = 0, publicLength = 0;
+    const unsigned char* privateDer = cn1Bytes(privateArray, &privateLength);
+    const unsigned char* publicDer = cn1Bytes(publicArray, &publicLength);
+    EVP_PKEY* mine = cn1PrivateKey(privateDer, privateLength);
+    EVP_PKEY* theirs = 0;
+    EVP_PKEY_CTX* ctx = 0;
+    unsigned char secret[66];
+    size_t secretLength = sizeof(secret);
+    JAVA_OBJECT result = JAVA_NULL;
+
+    if (mine == 0) {
+        return JAVA_NULL;
+    }
+    theirs = cn1PublicKey(publicDer, publicLength);
+    if (theirs == 0) {
+        EVP_PKEY_free(mine);
+        return JAVA_NULL;
+    }
+    if (EVP_PKEY_id(mine) != EVP_PKEY_EC || EVP_PKEY_id(theirs) != EVP_PKEY_EC) {
+        cn1CryptoFail("ECDH needs EC keys");
+        goto done;
+    }
+    ctx = EVP_PKEY_CTX_new(mine, 0);
+    if (ctx == 0 || EVP_PKEY_derive_init(ctx) <= 0 ||
+        EVP_PKEY_derive_set_peer(ctx, theirs) <= 0 ||
+        EVP_PKEY_derive(ctx, secret, &secretLength) <= 0) {
+        cn1CryptoFail("ECDH");
+        goto done;
+    }
+    result = cn1LinuxNewByteArray(threadStateData, secret, (int) secretLength);
+
+done:
+    OPENSSL_cleanse(secret, sizeof(secret));
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(theirs);
+    EVP_PKEY_free(mine);
+    return result;
+}
 
 /* Returns the pair as one array: a four-byte big-endian public-key length,
  * the X.509 public key, then the PKCS#8 private key. A pair has to come from

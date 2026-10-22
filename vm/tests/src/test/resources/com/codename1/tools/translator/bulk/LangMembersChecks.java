@@ -1,0 +1,780 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/// LangMembersApp, which used to be translated and built by a test of its own,
+/// run as one check of the bulk program. Its `fixtureMain` (the translator
+/// allows one `main` per program) prints what its `main` always
+/// printed (case lines and a RESULT line); a difference names the line.
+public final class LangMembersChecks {
+    private LangMembersChecks() {
+    }
+
+    /// Runs the group.
+    public static void run() {
+        // scalb by a huge negative factor underflows to a signed zero;
+        // cbrt of a subnormal keeps the JDK's one-ulp accuracy.
+        Bulk.check("Lang.scalbUnderflowsAndCbrtOfSubnormals", () -> {
+            Bulk.p("scalb.max.minInt", Double.doubleToRawLongBits(Math.scalb(Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.-max.minInt", Double.doubleToRawLongBits(Math.scalb(-Double.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalbf.max.minInt", Float.floatToRawIntBits(Math.scalb(Float.MAX_VALUE, Integer.MIN_VALUE)));
+            Bulk.p("scalb.min.2098", Double.doubleToRawLongBits(Math.scalb(Double.MIN_VALUE, 2098)));
+            double[] tiny = {Double.MIN_VALUE, -Double.MIN_VALUE, 3 * Double.MIN_VALUE, 0x1.0p-1030, Double.MIN_NORMAL / 3};
+            for (double t : tiny) {
+                long got = Double.doubleToRawLongBits(Math.cbrt(t));
+                long want = Double.doubleToRawLongBits(StrictMath.cbrt(t));
+                Bulk.p("cbrt " + t, Math.abs(got - want) <= 1);
+            }
+        });
+        Bulk.check("Lang.tanhSmallInputsAreAccurate", () -> {
+            double[] xs = {-0.25444256546893085, 0.9900105052487167, -0.5414934855402953, 0.5, 1e-3, 1e-9, 0.999999};
+            for (double x : xs) {
+                Bulk.p("tanh " + x, Math.abs(Math.tanh(x) - StrictMath.tanh(x)) <= 2 * Math.ulp(StrictMath.tanh(x)));
+            }
+        });
+        Bulk.check("Lang.unassignedCjkExtensionGapsAreNotLetters", () -> {
+            int[] cps = {0x2a6f0, 0x2b73f, 0x2b81e, 0x2cea2, 0x2ee5e, 0x2f7ff, 0x2fa1e, 0x2ffff, 0x2f800, 0x2b740};
+            for (int cp : cps) {
+                Bulk.p(Integer.toHexString(cp), Character.isLetter(cp));
+            }
+        });
+        Bulk.check("Lang.aStringDecodedOutOfRangeThrows", () -> {
+            int[][] ranges = {{1, 1}, {-1, 1}, {0, -1}, {2, 0}};
+            for (int[] r : ranges) {
+                String got;
+                try {
+                    got = new String(new byte[1], r[0], r[1], java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IndexOutOfBoundsException e) {
+                    got = "IOOBE";
+                }
+                Bulk.p(r[0] + "," + r[1], got);
+            }
+        });
+        Bulk.check("Lang.hypotIsWithinAnUlp", () -> {
+            double[][] xy = {{-0x1.30ad286c08edp745, 0x1.be3f115b1361dp769}, {2.5917508825783748e48, 1.5152149925235254e41},
+                    {3, 4}, {1e-310, 3e-311}, {Double.MIN_VALUE, Double.MIN_VALUE}, {1e300, 1e300}, {Double.MAX_VALUE, 1},
+                    {0.1, 0.2}, {1, 1e-20}, {-0.0, 0.0}};
+            for (double[] v : xy) {
+                long got = Double.doubleToLongBits(Math.hypot(v[0], v[1]));
+                long want = Double.doubleToLongBits(StrictMath.hypot(v[0], v[1]));
+                Bulk.p("hypot " + v[0] + "," + v[1], Math.abs(got - want) <= 1);
+            }
+        });
+        Bulk.check("Lang.stringBufferComparesBothWays", () -> {
+            StringBuffer a = new StringBuffer("abc");
+            StringBuffer b = new StringBuffer("abd");
+            Bulk.p("ab", Integer.signum(a.compareTo(b)));
+            Bulk.p("ba", Integer.signum(b.compareTo(a)));
+            Bulk.p("aa", a.compareTo(a));
+        });
+        Bulk.check("Lang.underscoreIsNotATagSeparator", () -> {
+            Bulk.p("en_US", java.util.Locale.forLanguageTag("en_US").toLanguageTag());
+            Bulk.p("en-US", java.util.Locale.forLanguageTag("en-US").toLanguageTag());
+        });
+        Bulk.check("Lang.illFormedLocalePartsLeaveTheTag", () -> {
+            Bulk.p("a-US", new java.util.Locale("a", "US").toLanguageTag());
+            Bulk.p("en-USA", new java.util.Locale("en", "USA").toLanguageTag());
+            Bulk.p("en-419", new java.util.Locale("en", "419").toLanguageTag());
+        });
+        Bulk.check("Lang.aQueryKeepsItsLaterQuestionMarks", () -> {
+            try {
+                java.net.URI u = new java.net.URI("http://h/p?a?b");
+                Bulk.p("path", u.getPath());
+                Bulk.p("query", u.getQuery());
+            } catch (java.net.URISyntaxException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.nullArgumentsAreRefused", () -> {
+            try {
+                new String(new byte[] {65}, (String) null);
+                Bulk.p("newString", "accepted");
+            } catch (Exception e) {
+                Bulk.p("newString", e.getClass().getName());
+            }
+            try {
+                "A".getBytes((String) null);
+                Bulk.p("getBytes", "accepted");
+            } catch (Exception e) {
+                Bulk.p("getBytes", e.getClass().getName());
+            }
+            try {
+                java.time.Clock.fixed(null, java.time.ZoneOffset.UTC);
+                Bulk.p("clockInstant", "accepted");
+            } catch (Exception e) {
+                Bulk.p("clockInstant", e.getClass().getName());
+            }
+            try {
+                java.time.Clock.fixed(java.time.Instant.EPOCH, null);
+                Bulk.p("clockZone", "accepted");
+            } catch (Exception e) {
+                Bulk.p("clockZone", e.getClass().getName());
+            }
+            try {
+                new java.security.SecureRandom((byte[]) null);
+                Bulk.p("seedCtor", "accepted");
+            } catch (Exception e) {
+                Bulk.p("seedCtor", e.getClass().getName());
+            }
+            try {
+                new java.security.SecureRandom().setSeed((byte[]) null);
+                Bulk.p("setSeed", "accepted");
+            } catch (Exception e) {
+                Bulk.p("setSeed", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.aSplitCodePointIsOutsideTheRange", () -> {
+            String smile = new String(Character.toChars(0x1F600));
+            Bulk.p("cut", smile.indexOf(0x1F600, 0, 1));
+            Bulk.p("whole", smile.indexOf(0x1F600, 0, 2));
+        });
+        Bulk.check("Lang.anOversizedUuidPartIsRefused", () -> {
+            try {
+                Bulk.p("parsed", java.util.UUID.fromString("ffffffffffffffff-0-0-0-0"));
+            } catch (IllegalArgumentException e) {
+                Bulk.p("threw", e instanceof NumberFormatException);
+            }
+            Bulk.p("max", java.util.UUID.fromString("7fffffff-0-0-0-0"));
+        });
+        Bulk.check("Lang.aNullPrintWriterTargetIsRefused", () -> {
+            try {
+                new java.io.PrintWriter((java.io.Writer) null);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
+        Bulk.check("Lang.anEmptyChoiceRepeatsTheLastLimit", () -> {
+            java.text.ChoiceFormat f = new java.text.ChoiceFormat("0#a||1#b");
+            Bulk.p("zero", f.format(0));
+            Bulk.p("one", f.format(1));
+        });
+        Bulk.check("Lang.sharpSHasNoSingleUpperCase", () -> {
+            Bulk.p("char", (int) Character.toUpperCase((char) 0xdf));
+            Bulk.p("codePoint", Character.toUpperCase(0xdf));
+        });
+        Bulk.check("Lang.anUnwritableVariantLeavesTheTag", () -> {
+            Bulk.p("space", new java.util.Locale("en", "", "a b").toLanguageTag());
+            Bulk.p("short", new java.util.Locale("en", "", "ab").toLanguageTag());
+        });
+        Bulk.check("Lang.bufferedWrappersRefuseNull", () -> {
+            try {
+                new java.io.BufferedReader((java.io.Reader) null);
+                Bulk.p("reader", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("reader", "npe");
+            }
+            try {
+                new java.io.BufferedWriter((java.io.Writer) null);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
+        Bulk.check("Lang.spliteratorsReportOrderAndDistinctness", () -> {
+            java.util.List<String> list = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+            java.util.Set<String> set = new java.util.HashSet<String>(list);
+            Bulk.p("listOrdered", list.spliterator().hasCharacteristics(java.util.Spliterator.ORDERED));
+            Bulk.p("setDistinct", set.spliterator().hasCharacteristics(java.util.Spliterator.DISTINCT));
+            Bulk.p("linkedOrdered", new java.util.LinkedList<String>(list).spliterator()
+                    .hasCharacteristics(java.util.Spliterator.ORDERED));
+        });
+        Bulk.check("Lang.aLargeStringWriteGoesThroughTheBuffer", () -> {
+            try {
+                java.io.StringWriter sink = new java.io.StringWriter();
+                java.io.BufferedWriter w = new java.io.BufferedWriter(sink, 3);
+                w.write("abcdefghij", 1, 8);
+                w.write("xy");
+                w.flush();
+                Bulk.p("out", sink.toString());
+            } catch (java.io.IOException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.adaptersKeepTheirDownstreamCharacteristics", () -> {
+            java.util.stream.Collector<String, ?, java.util.Set<String>> set = java.util.stream.Collectors.toSet();
+            Bulk.p("mapping", new java.util.TreeSet<Object>(java.util.stream.Collectors.mapping(
+                    java.util.function.Function.<String>identity(), set).characteristics()));
+            Bulk.p("filtering", new java.util.TreeSet<Object>(java.util.stream.Collectors.filtering(
+                    (String x) -> true, set).characteristics()));
+            Bulk.p("andThen", new java.util.TreeSet<Object>(java.util.stream.Collectors.collectingAndThen(
+                    set, java.util.Set::size).characteristics()));
+        });
+        Bulk.check("Lang.comparableCharSequencesUseTheirOwnOrder", () -> {
+            Bulk.p("builders", Integer.signum(CharSequence.compare(new StringBuilder("b"), new StringBuilder("a"))));
+            Bulk.p("mixed", Integer.signum(CharSequence.compare("b", new StringBuilder("a"))));
+        });
+        Bulk.check("Lang.charsetReadersRefuseANullStream", () -> {
+            try {
+                new java.io.InputStreamReader((java.io.InputStream) null, java.nio.charset.StandardCharsets.UTF_8);
+                Bulk.p("reader", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("reader", "npe");
+            }
+            try {
+                new java.io.OutputStreamWriter((java.io.OutputStream) null, java.nio.charset.StandardCharsets.UTF_8);
+                Bulk.p("writer", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("writer", "npe");
+            }
+        });
+        Bulk.check("Lang.aContinuedKeyStillTakesItsSeparator", () -> {
+            try {
+                java.util.Properties p = new java.util.Properties();
+                p.load(new java.io.StringReader("key \\\n=value\nk2 \\\n  :v2\nk3=a=b\nk4 x=y\n"));
+                Bulk.p("props", new java.util.TreeMap<Object, Object>(p));
+            } catch (java.io.IOException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.anEmptyReferenceKeepsAnEmptyPath", () -> {
+            try {
+                java.net.URI base = new java.net.URI("http://h/a/b?x#y");
+                String[] refs = {"?q", "#f", "", "c", "../c", "/d", "//g/p"};
+                for (String r : refs) {
+                    Bulk.p("path[" + r + "]", new java.net.URI(r).getPath());
+                    Bulk.p("resolve[" + r + "]", base.resolve(new java.net.URI(r)).toString());
+                }
+                Bulk.p("hostOnly", new java.net.URI("http://h").getPath());
+                String[] paths = {"/a/b/../c/", "/a/./b/.", "/a/b/..", "/", "a/../b", "..", "/..", "a/..", "./", "a/./"};
+                for (String n : paths) {
+                    Bulk.p("normalize[" + n + "]", new java.net.URI(n).normalize().toString());
+                }
+            } catch (java.net.URISyntaxException e) {
+                Bulk.p("threw", e.getClass().getName());
+            }
+        });
+        Bulk.check("Lang.aSortedIteratorSpliteratorHasNaturalOrder", () -> {
+            java.util.Spliterator<String> sp = java.util.Spliterators.spliterator(
+                    java.util.Arrays.asList("a", "b").iterator(), 2, java.util.Spliterator.SORTED);
+            Bulk.p("comparator", String.valueOf(sp.getComparator()));
+        });
+        Bulk.check("Lang.aNullAffixLeavesTheFormatAlone", () -> {
+            java.text.DecimalFormat f = new java.text.DecimalFormat("#0");
+            f.setPositivePrefix("+");
+            try {
+                f.setPositivePrefix(null);
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+            Bulk.p("prefix", f.getPositivePrefix());
+            Bulk.p("suffix", f.getPositiveSuffix());
+        });
+        Bulk.check("Lang.onlyTwentyThreeFiftyNineHasALeapSecond", () -> {
+            String[] in = {"2020-12-31T23:59:60Z", "2020-01-01T12:30:60Z"};
+            for (String t : in) {
+                try {
+                    Bulk.p(t, java.time.Instant.parse(t).toString());
+                } catch (java.time.DateTimeException e) {
+                    Bulk.p(t, "rejected");
+                }
+            }
+        });
+        Bulk.check("Lang.aRefusedConcatLeavesTheStreamUsable", () -> {
+            java.util.stream.IntStream a = java.util.stream.IntStream.of(1, 2);
+            try {
+                java.util.stream.IntStream.concat(a, null);
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+            Bulk.p("sum", a.sum());
+        });
+        Bulk.check("Lang.aNullStreamIsRefusedByPrintWriter", () -> {
+            try {
+                new java.io.PrintWriter((java.io.OutputStream) null);
+                Bulk.p("built", "yes");
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+        });
+        Bulk.check("Lang.aZeroPeriodRefusesANullTemporal", () -> {
+            try {
+                java.time.Period.ZERO.addTo(null);
+                Bulk.p("added", "yes");
+            } catch (NullPointerException e) {
+                Bulk.p("npe", "yes");
+            }
+        });
+        Bulk.check("Lang.aFailureSkipsARejectingExecutor", () -> {
+            java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newSingleThreadExecutor();
+            ex.shutdown();
+            java.util.concurrent.CompletableFuture<Integer> failed = new java.util.concurrent.CompletableFuture<Integer>();
+            failed.completeExceptionally(new IllegalStateException("upstream"));
+            java.util.concurrent.CompletableFuture<Integer> next = failed.thenApplyAsync(v -> v + 1, ex);
+            try {
+                next.join();
+            } catch (java.util.concurrent.CompletionException e) {
+                Bulk.p("cause", e.getCause().getClass().getName() + ":" + e.getCause().getMessage());
+            }
+        });
+        Bulk.check("Lang.aVariantKeepsItsWellFormedPrefix", () -> {
+            Bulk.p("ab", new java.util.Locale("en", "", "POSIX_AB").toLanguageTag());
+            Bulk.p("long", new java.util.Locale("en", "", "POSIX_AB_abcdefghij").toLanguageTag());
+            Bulk.p("plain", new java.util.Locale("en", "US", "POSIX").toLanguageTag());
+        });
+        Bulk.check("Lang.aDateArgumentChecksItsLiterals", () -> {
+            try {
+                Object[] r = new java.text.MessageFormat("{0,date,yyyy-MM-dd}").parse("2020/01/02");
+                Bulk.p("parsed", String.valueOf(r.length));
+            } catch (java.text.ParseException e) {
+                Bulk.p("rejected", "yes");
+            }
+        });
+        Bulk.check("Lang.aUsedStreamNeverCallsTheSupplier", () -> {
+            java.util.stream.Stream<String> st = java.util.stream.Stream.of("a");
+            st.count();
+            final int[] calls = new int[1];
+            try {
+                st.collect(() -> { calls[0]++; return new StringBuilder(); }, StringBuilder::append, StringBuilder::append);
+            } catch (IllegalStateException e) {
+                Bulk.p("ise", "yes");
+            }
+            Bulk.p("calls", String.valueOf(calls[0]));
+        });
+        Bulk.check("Lang.groupingByKeepsIdentityFinish", () -> {
+            Bulk.p("grouping", String.valueOf(java.util.stream.Collectors.groupingBy((String x) -> x)
+                    .characteristics().contains(java.util.stream.Collector.Characteristics.IDENTITY_FINISH)));
+        });
+        Bulk.check("Lang.sharpSAndInvalidCodePoints", () -> {
+            Bulk.p("upper", Integer.toHexString(Character.toUpperCase(0xdf)));
+            Bulk.p("upperChar", Integer.toHexString(Character.toUpperCase((char) 0xdf)));
+            Bulk.p("indexOf", String.valueOf("A".indexOf(0x10041)));
+        });
+        Bulk.check("Lang.aUsedIntStreamNeverCallsTheSupplier", () -> {
+            java.util.stream.IntStream st = java.util.stream.IntStream.of(1);
+            st.sum();
+            final int[] calls = new int[1];
+            try {
+                st.collect(() -> { calls[0]++; return new StringBuilder(); }, StringBuilder::append, StringBuilder::append);
+            } catch (IllegalStateException e) {
+                Bulk.p("ise", "yes");
+            }
+            Bulk.p("calls", String.valueOf(calls[0]));
+        });
+        Bulk.check("Lang.prefixedZoneIdsKeepRegionSyntax", () -> {
+            StringBuilder out = new StringBuilder();
+            String[] ids = {"UTC?", "GMT0", "UT!", "GMT+x"};
+            for (String id : ids) {
+                try {
+                    out.append(java.time.ZoneId.of(id).getId());
+                } catch (java.time.DateTimeException e) {
+                    out.append("DTE");
+                }
+                out.append(',');
+            }
+            Bulk.p("ids", out.toString());
+        });
+        Bulk.check("Lang.yieldKeepsTheInterruptStatus", () -> {
+            Thread.currentThread().interrupt();
+            Thread.yield();
+            Bulk.p("interrupted", String.valueOf(Thread.interrupted()));
+        });
+        Bulk.check("Lang.resolveAgainstAnAuthorityOnlyBase", () -> {
+            Bulk.p("a", java.net.URI.create("http://h").resolve(java.net.URI.create("a")).toString());
+            Bulk.p("q", java.net.URI.create("http://h").resolve(java.net.URI.create("b?x=1")).toString());
+        });
+        Bulk.check("Lang.chmViewsRejectNullAndAdds", () -> {
+            java.util.concurrent.ConcurrentHashMap<String, String> m =
+                    new java.util.concurrent.ConcurrentHashMap<String, String>();
+            m.put("k", "v");
+            try {
+                Bulk.p("contains", String.valueOf(m.values().contains(null)));
+            } catch (NullPointerException e) {
+                Bulk.p("contains", "NPE");
+            }
+            try {
+                Bulk.p("addAll", String.valueOf(m.keySet().addAll(java.util.Collections.<String>emptyList())));
+            } catch (UnsupportedOperationException e) {
+                Bulk.p("addAll", "UOE");
+            }
+        });
+        Bulk.check("Lang.aColonInTheFirstRelativeSegment", () -> {
+            String[] inputs = {"@:", "1a:b", "./x:y", "a/b:c", "svn+ssh://h/p", "a.b:c"};
+            for (String s : inputs) {
+                try {
+                    Bulk.p(s, new java.net.URI(s).getPath());
+                } catch (java.net.URISyntaxException e) {
+                    Bulk.p(s, "USE");
+                }
+            }
+        });
+        Bulk.check("Lang.aLoneTrailingBackslashProperty", () -> {
+            java.util.Properties props = new java.util.Properties();
+            try {
+                props.load(new java.io.StringReader("a=1\n\\"));
+            } catch (java.io.IOException e) {
+                Bulk.p("io", e.toString());
+            }
+            Bulk.p("size", String.valueOf(props.size()));
+            Bulk.p("empty", String.valueOf(props.getProperty("")));
+        });
+        Bulk.check("Lang.fourZsRoundTrip", () -> {
+            java.time.format.DateTimeFormatter f =
+                    java.time.format.DateTimeFormatter.ofPattern("ZZZZ yyyy-MM-dd HH:mm");
+            int[] offsets = {0, 5400, -3600};
+            for (int off : offsets) {
+                String text = f.format(java.time.OffsetDateTime.of(2020, 1, 2, 3, 4, 0, 0,
+                        java.time.ZoneOffset.ofTotalSeconds(off)));
+                Bulk.p(text, java.time.OffsetDateTime.parse(text, f).toString());
+            }
+        });
+        Bulk.check("Lang.fullLocalizedOffsetNeedsMinutes", () -> {
+            String[] inputs = {"GMT+8 2020-01-01", "GMT+08 2020-01-01", "GMT+08:00 2020-01-01", "GMT 2020-01-01"};
+            String[] patterns = {"OOOO uuuu-MM-dd", "ZZZZ uuuu-MM-dd", "O uuuu-MM-dd"};
+            for (String pattern : patterns) {
+                java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter.ofPattern(pattern);
+                StringBuilder out = new StringBuilder();
+                for (String s : inputs) {
+                    try {
+                        f.parse(s);
+                        out.append("ok,");
+                    } catch (java.time.format.DateTimeParseException e) {
+                        out.append("DTPE,");
+                    }
+                }
+                Bulk.p(pattern, out.toString());
+            }
+        });
+        Bulk.check("Lang.summaryStatisticsToString", () -> {
+            java.util.IntSummaryStatistics i = new java.util.IntSummaryStatistics();
+            i.accept(3);
+            i.accept(4);
+            java.util.LongSummaryStatistics l = new java.util.LongSummaryStatistics();
+            java.util.DoubleSummaryStatistics d = new java.util.DoubleSummaryStatistics();
+            d.accept(1.5);
+            Bulk.p("int", i.toString());
+            Bulk.p("long", l.toString());
+            Bulk.p("double", d.toString());
+        });
+        Bulk.check("Lang.aCompletedDependentSkipsItsAction", () -> {
+            final int[] ran = {0};
+            java.util.concurrent.CompletableFuture<Integer> src = new java.util.concurrent.CompletableFuture<Integer>();
+            java.util.concurrent.CompletableFuture<Integer> dep = src.thenApply(x -> {
+                ran[0]++;
+                return x;
+            });
+            dep.complete(5);
+            src.complete(1);
+            Bulk.p("ran", String.valueOf(ran[0]));
+            Bulk.p("dep", String.valueOf(dep.join()));
+        });
+        Bulk.check("Lang.extremeInstantsRoundTrip", () -> {
+            Bulk.p("min", java.time.Instant.parse(java.time.Instant.MIN.toString()).equals(java.time.Instant.MIN));
+            Bulk.p("max", java.time.Instant.parse(java.time.Instant.MAX.toString()).equals(java.time.Instant.MAX));
+            Bulk.p("far", java.time.Instant.parse("+12345-06-07T08:09:10Z").getEpochSecond());
+            Bulk.p("farBack", java.time.Instant.parse("-12345-06-07T08:09:10Z").getEpochSecond());
+        });
+        Bulk.check("Lang.aggregateTimeFieldsConflictWithComponents", () -> {
+            for (String[] c : new String[][]{{"H N", "1 0"}, {"H N", "1 3600000000000"},
+                    {"H:m A", "1:30 5400000"}, {"m A", "31 5400000"}, {"N", "5400000000123"}}) {
+                try {
+                    Bulk.p(c[0] + "|" + c[1], java.time.LocalTime.parse(c[1],
+                            java.time.format.DateTimeFormatter.ofPattern(c[0])).toString());
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(c[0] + "|" + c[1], "rejected");
+                }
+            }
+        });
+        Bulk.check("Lang.aMonthFormatsAlone", () -> {
+            Bulk.p("MMM", java.time.format.DateTimeFormatter.ofPattern("MMM").format(java.time.Month.MARCH));
+            Bulk.p("MM", java.time.format.DateTimeFormatter.ofPattern("MM").format(java.time.Month.MARCH));
+        });
+        Bulk.check("Lang.aCompletedCombineSkipsItsAction", () -> {
+            java.util.concurrent.CompletableFuture<String> a = new java.util.concurrent.CompletableFuture<>();
+            java.util.concurrent.CompletableFuture<String> b = new java.util.concurrent.CompletableFuture<>();
+            final int[] runs = new int[1];
+            java.util.concurrent.CompletableFuture<String> both = a.thenCombine(b, (x, y) -> { runs[0]++; return x + y; });
+            java.util.concurrent.CompletableFuture<String> either = a.applyToEither(b, x -> { runs[0] += 10; return x; });
+            both.complete("hand");
+            either.cancel(false);
+            a.complete("a");
+            b.complete("b");
+            Bulk.p("runs", runs[0]);
+            Bulk.p("both", both.join());
+        });
+        Bulk.check("Lang.aDayOfYearConflictsWithTheDate", () -> {
+            for (String[] c : new String[][]{{"uuuu-MM-dd-DDD", "2020-01-01-002"}, {"uuuu-MM-dd-DDD", "2020-01-02-002"},
+                    {"uuuu-MM-DDD", "2020-02-002"}, {"uuuu-MM-dd", "2021-02-31"}}) {
+                try {
+                    Bulk.p(c[1], java.time.LocalDate.parse(c[1], java.time.format.DateTimeFormatter.ofPattern(c[0])).toString());
+                } catch (java.time.format.DateTimeParseException e) {
+                    Bulk.p(c[1], "rejected");
+                }
+            }
+        });
+        Bulk.check("Lang.theFirstEstimateBindsASpliterator", () -> {
+            java.util.List<String> list = new java.util.ArrayList<>(java.util.Arrays.asList("a", "b"));
+            java.util.Spliterator<String> s = java.util.Spliterators.spliterator(list, 0);
+            Bulk.p("first", s.estimateSize());
+            list.add("c");
+            Bulk.p("second", s.estimateSize());
+            try {
+                final int[] n = new int[1];
+                s.forEachRemaining(x -> n[0]++);
+                Bulk.p("seen", n[0]);
+            } catch (java.util.ConcurrentModificationException e) {
+                Bulk.p("seen", "CME");
+            }
+        });
+        Bulk.check("Lang.addAllAbsentIsAtomic", () -> {
+            java.util.concurrent.CopyOnWriteArrayList<Object> l = new java.util.concurrent.CopyOnWriteArrayList<>();
+            l.add("x");
+            Object bad = new Object() {
+                @Override
+                public boolean equals(Object o) {
+                    throw new IllegalStateException();
+                }
+
+                @Override
+                public int hashCode() {
+                    return 1;
+                }
+            };
+            try {
+                l.addAllAbsent(java.util.Arrays.asList("a", bad));
+                Bulk.p("threw", false);
+            } catch (IllegalStateException e) {
+                Bulk.p("threw", true);
+            }
+            Bulk.p("size", l.size());
+            Bulk.p("added", l.addAllAbsent(java.util.Arrays.asList("a", "x", "a", "b")));
+            Bulk.p("list", l.toString());
+        });
+        Bulk.check("Lang.scriptLettersAreLetters", () -> {
+            for (int c : new int[]{0xe32, 0xe33, 0xe40, 0x6d5, 0x6e5, 0x93d, 0x950, 0x30fc, 0x309b, 0x5f0, 0x10fd}) {
+                Bulk.p(Integer.toHexString(c), Character.isLetter(c) + "/" + Character.isJavaIdentifierStart(c));
+            }
+        });
+        Bulk.check("Lang.extendedLanguageSubtags", () -> {
+            for (String t : new String[]{"zh-cmn-Hans-CN", "zh-yue-HK", "ar-aao-EG", "zh-cmn-abc-def-CN", "en-abc", "zh-Hans-CN"}) {
+                java.util.Locale l = java.util.Locale.forLanguageTag(t);
+                Bulk.p(t, l.getLanguage() + "|" + l.getCountry() + "|" + l.getVariant());
+            }
+        });
+        Bulk.check("Lang.concurrentEntrySetAddsWriteThrough", () -> {
+            java.util.concurrent.ConcurrentHashMap<String, Integer> m = new java.util.concurrent.ConcurrentHashMap<>();
+            Bulk.p("first", m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("a", 1)));
+            Bulk.p("again", m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("a", 2)));
+            Bulk.p("all", m.entrySet().addAll(java.util.Arrays.asList(new java.util.AbstractMap.SimpleEntry<>("b", 3))));
+            Bulk.p("map", new java.util.TreeMap<>(m).toString());
+            try {
+                m.entrySet().add(new java.util.AbstractMap.SimpleEntry<>("c", null));
+                Bulk.p("null", "accepted");
+            } catch (NullPointerException e) {
+                Bulk.p("null", "NPE");
+            }
+        });
+        Bulk.check("Lang.aParsePositionPastTheEndFails", () -> {
+            java.text.ParsePosition pos = new java.text.ParsePosition(5);
+            Bulk.p("result", new java.text.SimpleDateFormat("yyyy").parse("2020", pos) == null);
+            Bulk.p("index", pos.getIndex());
+            Bulk.p("error", pos.getErrorIndex());
+        });
+        Bulk.check("Lang.aCustomUnitProbesByAdding", () -> {
+            java.time.temporal.TemporalUnit unit = new java.time.temporal.TemporalUnit() {
+                public java.time.Duration getDuration() { return java.time.Duration.ofDays(2); }
+                public boolean isDurationEstimated() { return false; }
+                public boolean isDateBased() { return true; }
+                public boolean isTimeBased() { return false; }
+                @SuppressWarnings("unchecked")
+                public <R extends java.time.temporal.Temporal> R addTo(R t, long n) {
+                    return (R) t.plus(n * 2, java.time.temporal.ChronoUnit.DAYS);
+                }
+                public long between(java.time.temporal.Temporal a, java.time.temporal.Temporal b) {
+                    return a.until(b, java.time.temporal.ChronoUnit.DAYS) / 2;
+                }
+            };
+            Bulk.p("date", java.time.LocalDate.of(2020, 1, 1).isSupported(unit));
+            Bulk.p("time", java.time.LocalTime.NOON.isSupported(unit));
+            Bulk.p("dateTime", java.time.LocalDateTime.of(2020, 1, 1, 0, 0).isSupported(unit));
+        });
+        Bulk.check("Lang.anEmptyToListRejectsEveryMutation", () -> {
+            java.util.List<String> l = java.util.stream.Stream.<String>empty().toList();
+            try { l.removeIf(x -> true); Bulk.p("removeIf", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("removeIf", "uoe"); }
+            try { l.replaceAll(x -> x); Bulk.p("replaceAll", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("replaceAll", "uoe"); }
+            try { l.sort(null); Bulk.p("sort", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("sort", "uoe"); }
+        });
+        Bulk.check("Lang.aReversedStreamRangeIsOutOfBounds", () -> {
+            try { java.util.Arrays.stream(new int[2], 1, 0); Bulk.p("reversed", "ok"); } catch (ArrayIndexOutOfBoundsException e) { Bulk.p("reversed", "aioobe"); }
+            try { java.util.Arrays.stream(new int[2], 0, 3); Bulk.p("past", "ok"); } catch (ArrayIndexOutOfBoundsException e) { Bulk.p("past", "aioobe"); }
+        });
+        Bulk.check("Lang.aSuppressedThrowableIsPrinted", () -> {
+            Exception main = new Exception("main");
+            main.addSuppressed(new Exception("closing"));
+            java.io.StringWriter w = new java.io.StringWriter();
+            main.printStackTrace(new java.io.PrintWriter(w, true));
+            Bulk.p("suppressed", w.toString().indexOf("\tSuppressed: java.lang.Exception: closing") >= 0);
+            StringBuffer sb = new StringBuffer("x");
+            Bulk.p("self", sb.compareTo(sb));
+        });
+        Bulk.check("Lang.anEmptyMapOfRejectsClearingItsViews", () -> {
+            try { java.util.Map.of().keySet().clear(); Bulk.p("keySet", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("keySet", "uoe"); }
+            try { java.util.Map.of().values().clear(); Bulk.p("values", "ok"); } catch (UnsupportedOperationException e) { Bulk.p("values", "uoe"); }
+            java.util.List<String> cow = new java.util.concurrent.CopyOnWriteArrayList<String>(java.util.Arrays.asList("a", "b"));
+            try { cow.subList(1, 0); Bulk.p("reversed", "ok"); } catch (IllegalArgumentException e) { Bulk.p("reversed", "iae"); } catch (IndexOutOfBoundsException e) { Bulk.p("reversed", "ioobe"); }
+        });
+        Bulk.check("Lang.anOffsetOnlyPatternParsesToAnOffset", () -> {
+            Bulk.p("offset", java.time.format.DateTimeFormatter.ofPattern("XXX").parse("+01:00", java.time.ZoneOffset::from));
+            java.text.MessageFormat mf = new java.text.MessageFormat("{0}");
+            java.text.DecimalFormat df = new java.text.DecimalFormat("0.##");
+            df.setParseIntegerOnly(true);
+            mf.setFormat(0, df);
+            java.text.MessageFormat copy = (java.text.MessageFormat) mf.clone();
+            Bulk.p("integerOnly", ((java.text.DecimalFormat) copy.getFormats()[0]).isParseIntegerOnly());
+            Bulk.p("distinct", copy.getFormats()[0] != df);
+            final java.util.List<String> ran = new java.util.ArrayList<String>();
+            java.util.concurrent.CompletableFuture<String> cf = new java.util.concurrent.CompletableFuture<String>() {
+                @Override
+                public java.util.concurrent.Executor defaultExecutor() {
+                    return r -> { ran.add("custom"); r.run(); };
+                }
+            };
+            cf.complete("x");
+            Bulk.p("applied", cf.thenApplyAsync(s -> s + "y").join());
+            Bulk.p("routed", ran.size() > 0);
+        });
+        Bulk.check("Lang.aReversedViewAddsItselfOnce", () -> {
+            java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+            l.reversed().addAll(l.reversed());
+            Bulk.p("list", l);
+        });
+        Bulk.check("Lang.aSubMinuteOffsetPrintsAsZero", () -> {
+            java.time.OffsetDateTime t = java.time.OffsetDateTime.of(2020, 1, 1, 0, 0, 0, 0, java.time.ZoneOffset.ofTotalSeconds(-30));
+            Bulk.p("X", java.time.format.DateTimeFormatter.ofPattern("X").format(t));
+            Bulk.p("Z", java.time.format.DateTimeFormatter.ofPattern("Z").format(t));
+            Bulk.p("XXXXX", java.time.format.DateTimeFormatter.ofPattern("XXXXX").format(t));
+            try { Bulk.p("hourOnly", java.time.Instant.parse("2020-02-29T12:34:56+12")); } catch (java.time.format.DateTimeParseException e) { Bulk.p("hourOnly", "refused"); }
+            Bulk.p("withMinutes", java.time.Instant.parse("2020-02-29T12:34:56+12:00"));
+            Bulk.p("mvs", Character.isWhitespace((char) 0x180E));
+            Bulk.p("blank", String.valueOf((char) 0x180E).isBlank());
+        });
+        Bulk.check("Lang.aContinuationCanJoinANestedDependent", () -> {
+            final java.util.concurrent.CompletableFuture<Integer> nested = new java.util.concurrent.CompletableFuture<Integer>();
+            final java.util.concurrent.CompletableFuture<Integer> dependent = nested.thenApply(x -> x + 1);
+            final int[] seen = new int[1];
+            java.util.concurrent.CompletableFuture<Void> outer = new java.util.concurrent.CompletableFuture<Void>();
+            outer.thenRun(() -> {
+                nested.complete(41);
+                seen[0] = dependent.join();
+            });
+            outer.complete(null);
+            Bulk.p("joined", seen[0]);
+            java.util.concurrent.ConcurrentHashMap<String, Integer> map = new java.util.concurrent.ConcurrentHashMap<String, Integer>();
+            map.put("key", 1);
+            map.values().removeIf(v -> { map.put("key", 2); return v == 1; });
+            Bulk.p("values", map);
+            map.put("key", 1);
+            map.entrySet().removeIf(e -> { map.put("key", 3); return e.getValue() == 1; });
+            Bulk.p("entries", map);
+        });
+        Bulk.check("Lang.aCloseClosesTheDelegateAfterAnError", () -> {
+            final boolean[] closed = new boolean[2];
+            java.io.OutputStream sink = new java.io.OutputStream() {
+                @Override
+                public void write(int b) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void close() {
+                    closed[0] = true;
+                }
+            };
+            java.io.Writer wsink = new java.io.Writer() {
+                @Override
+                public void write(char[] c, int off, int len) {
+                    throw new AssertionError("write");
+                }
+
+                @Override
+                public void flush() {
+                }
+
+                @Override
+                public void close() {
+                    closed[1] = true;
+                }
+            };
+            try {
+                java.io.BufferedOutputStream out = new java.io.BufferedOutputStream(sink);
+                out.write(1);
+                out.close();
+            } catch (Throwable t) {
+                Bulk.p("stream", t.getClass().getName());
+            }
+            try {
+                java.io.BufferedWriter out = new java.io.BufferedWriter(wsink);
+                out.write('x');
+                out.close();
+            } catch (Throwable t) {
+                Bulk.p("writer", t.getClass().getName());
+            }
+            Bulk.p("streamClosed", closed[0]);
+            Bulk.p("writerClosed", closed[1]);
+        });
+        Bulk.check("Lang.aCustomMessageFormatSurvivesCloneAndEquals", () -> {
+            java.text.Format shout = new java.text.Format() {
+                @Override
+                public StringBuffer format(Object o, StringBuffer to, java.text.FieldPosition pos) {
+                    return to.append(String.valueOf(o).toUpperCase());
+                }
+
+                @Override
+                public Object parseObject(String s, java.text.ParsePosition pos) {
+                    return null;
+                }
+            };
+            java.text.MessageFormat a = new java.text.MessageFormat("hi {0}");
+            java.text.MessageFormat plain = new java.text.MessageFormat("hi {0}");
+            a.setFormat(0, shout);
+            java.text.MessageFormat copy = (java.text.MessageFormat) a.clone();
+            Bulk.p("copy", copy.format(new Object[] {"bob"}));
+            Bulk.p("equalsPlain", a.equals(plain));
+        });
+        Bulk.check("Lang.flatMappingKeepsTheConsumingFailure", () -> {
+            String got;
+            try {
+                java.util.stream.Stream.of(1).collect(java.util.stream.Collectors.flatMapping(
+                        i -> java.util.stream.Stream.of(i).onClose(() -> { throw new IllegalStateException("close"); }),
+                        java.util.stream.Collectors.reducing(0, v -> { throw new IllegalArgumentException("consume"); }, Integer::sum)));
+                got = "none";
+            } catch (RuntimeException e) {
+                got = e.getMessage() + " suppressed=" + e.getSuppressed().length;
+            }
+            Bulk.p("got", got);
+        });
+        Bulk.check("Lang.collectorsReportTheirCharacteristics", () -> {
+            java.util.Set<java.util.stream.Collector.Characteristics> set = java.util.stream.Collectors.toSet().characteristics();
+            Bulk.p("toList", java.util.stream.Collectors.toList().characteristics());
+            Bulk.p("toSet", set.contains(java.util.stream.Collector.Characteristics.UNORDERED) + ","
+                    + set.contains(java.util.stream.Collector.Characteristics.IDENTITY_FINISH) + "," + set.size());
+            Bulk.p("toCollection", java.util.stream.Collectors.toCollection(java.util.ArrayList::new).characteristics());
+            Bulk.p("joining", java.util.stream.Collectors.joining().characteristics());
+        });
+        Bulk.check("LangMembersApp", () -> LangMembersApp.fixtureMain(new String[0]));
+    }
+}
