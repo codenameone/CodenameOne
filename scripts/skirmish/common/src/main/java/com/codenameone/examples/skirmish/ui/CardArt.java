@@ -24,6 +24,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codenameone.examples.skirmish.rules.CardDef;
+import com.codenameone.examples.skirmish.rules.CardSet;
 import com.codenameone.examples.skirmish.rules.Cards;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -45,7 +46,22 @@ public final class CardArt {
     private static final Map<String, Image> CACHE = new HashMap<String, Image>();
     private static final Map<String, Image> SOURCES = new HashMap<String, Image>();
 
+    /// The cards being drawn: the game's own, or a Forge pack's with its
+    /// custom cards added.
+    private static CardSet cards = CardSet.BUILTIN;
+
     private CardArt() {
+    }
+
+    /// Draws `set`'s cards from now on; a battle on a Forge pack sets it, and
+    /// leaving sets the game's own again.
+    public static void use(CardSet set) {
+        cards = set == null ? CardSet.BUILTIN : set;
+    }
+
+    static CardDef def(String cardId) {
+        CardDef d = cards.get(cardId);
+        return d != null ? d : Cards.get(cardId);
     }
 
     /// A card `w` pixels wide (and 1.3 times as tall): portrait, frame in
@@ -56,12 +72,17 @@ public final class CardArt {
 
     /// The same card, without the name ribbon when it is too small to read.
     public static Image card(String cardId, int w, boolean named) {
-        String key = "card/" + cardId + "/" + w + "/" + named;
+        CardDef def = def(cardId);
+        if (def == null) {
+            return Image.createImage(w, w * 13 / 10, 0);
+        }
+        // A custom card's id is only unique inside its pack: the key carries
+        // what is drawn, so two packs' "golem" never share a picture.
+        String key = "card/" + cardId + "/" + w + "/" + named + "/" + def.name + "/" + def.cost + "/" + def.model();
         Image img = CACHE.get(key);
         if (img != null) {
             return img;
         }
-        CardDef def = Cards.get(cardId);
         int h = w * 13 / 10;
         img = Image.createImage(w, h, 0);
         Graphics g = img.getGraphics();
@@ -81,7 +102,7 @@ public final class CardArt {
         g.setAlpha(70);
         g.fillRoundRect(in, in, w - 2 * in, h / 7, r / 2, r / 2);
         g.setAlpha(255);
-        portrait(g, cardId, in, in, w - 2 * in, h - 2 * in - 2);
+        portrait(g, def, in, in, w - 2 * in, h - 2 * in - 2);
         if (named) {
             int ribbon = Math.max(10, h / 6);
             int ry = h - 2 - in - ribbon;
@@ -219,7 +240,8 @@ public final class CardArt {
         g.drawString(s, x + (size - f.stringWidth(s)) / 2, y + (size - f.getHeight()) / 2);
     }
 
-    private static void portrait(Graphics g, String cardId, int x, int y, int w, int h) {
+    private static void portrait(Graphics g, CardDef def, int x, int y, int w, int h) {
+        String cardId = def.id;
         if ("fire-orb".equals(cardId)) {
             fireOrb(g, x, y, w, h);
             return;
@@ -229,7 +251,12 @@ public final class CardArt {
             return;
         }
         Image src = source("card_" + cardId);
+        if (src == null && def.model() != null && !def.model().startsWith("asset:")) {
+            // A Forge card on a bundled character wears that hero's picture.
+            src = source("hero_" + def.model());
+        }
         if (src == null) {
+            initial(g, def, x, y, w, h);
             return;
         }
         int[] clip = g.getClip();
@@ -238,6 +265,17 @@ public final class CardArt {
         int dh = w * src.getHeight() / src.getWidth();
         g.drawImage(src.scaled(dw, dh), x, y + h - dh);
         g.setClip(clip);
+    }
+
+    /// A card with no picture of its own: its initial, large, on the frame.
+    private static void initial(Graphics g, CardDef def, int x, int y, int w, int h) {
+        String letter = def.name.length() == 0 ? "?" : def.name.substring(0, 1);
+        Font f = font(Math.max(10, h / 2), true);
+        g.setFont(f);
+        g.setColor(0xffffff);
+        g.setAlpha(200);
+        g.drawString(letter, x + (w - f.stringWidth(letter)) / 2, y + (h - f.getHeight()) / 2);
+        g.setAlpha(255);
     }
 
     private static void fireOrb(Graphics g, int x, int y, int w, int h) {

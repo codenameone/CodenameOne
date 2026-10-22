@@ -148,17 +148,25 @@ public class BattleView extends GameView {
         Model outside = flat(new Material(Material.Type.LAMBERT).setTexture(meadow), 120f, 120f);
         outside.setPosition(0f, -0.05f, 0f);
         addModel(outside);
-        Texture fieldTexture = d.createTexture(Art.field());
+        float fw = arena().width() / (float) Arena.TILE;
+        float fh = arena().height() / (float) Arena.TILE;
+        Texture fieldTexture = d.createTexture(Art.field(arena()));
         fieldTexture.setFilter(Texture.Filter.LINEAR);
-        Model field = flat(new Material(Material.Type.LAMBERT).setTexture(fieldTexture), 18f, 32f);
+        Model field = flat(new Material(Material.Type.LAMBERT).setTexture(fieldTexture), fw, fh);
         field.setRotation(-90f, sign > 0 ? 0f : 180f, 0f);
         addModel(field);
+        if (fh > 32f || fw > 18f) {
+            // A bigger Forge arena: step back until all of it is in view.
+            float k = Math.max(fh / 32f, fw / 18f);
+            cam.setPosition(0f, 33f * k, 30f * k);
+        }
 
-        scenery();
+        scenery(fw, fh);
+        obstacles();
 
         zone = flat(new Material(Material.Type.UNLIT).setColor(0x50e0302a)
-                .setRenderState(RenderState.transparent()), 18f, Arena.CLASSIC.riverTop() / (float) Arena.TILE);
-        zone.setPosition(0f, 0.04f, -16f + Arena.CLASSIC.riverTop() / (float) Arena.TILE / 2f);
+                .setRenderState(RenderState.transparent()), fw, arena().riverTop() / (float) Arena.TILE);
+        zone.setPosition(0f, 0.04f, -fh / 2f + arena().riverTop() / (float) Arena.TILE / 2f);
         zone.setVisible(false);
         addModel(zone);
         ghost = Actor.ringModel(d, quad, ringTexture, true, 1f);
@@ -187,31 +195,49 @@ public class BattleView extends GameView {
     }
 
     /// Trees, hills and rocks around the field, the same every match.
-    private void scenery() {
+    private void scenery(float fw, float fh) {
         Random r = new Random(42);
         String[] kinds = {"trees", "tree", "rock", "hill", "trees", "tree"};
         for (int i = 0; i < 26; i++) {
             float side = i % 2 == 0 ? -1f : 1f;
-            float x = side * (10.5f + r.nextFloat() * 6f);
-            float z = -18f + r.nextFloat() * 36f;
+            float x = side * (fw / 2f + 1.5f + r.nextFloat() * 6f);
+            float z = -fh / 2f - 2f + r.nextFloat() * (fh + 4f);
             String kind = kinds[i % kinds.length];
             float size = "hill".equals(kind) ? 5f : "rock".equals(kind) ? 1.4f : 2.6f + r.nextFloat();
             AnimatedModel m = prop(kind, x, 0f, z, size);
             m.setRotation(0f, r.nextFloat() * 360f, 0f);
         }
-        for (int i = 0; i < 10; i++) {
-            float x = -9f + i * 2f;
-            prop(i % 3 == 0 ? "trees" : "tree", x, 0f, -19.5f - (i % 2), 2.8f);
+        int across = (int) (fw / 2f) + 1;
+        for (int i = 0; i < across; i++) {
+            float x = -fw / 2f + i * 2f;
+            prop(i % 3 == 0 ? "trees" : "tree", x, 0f, -fh / 2f - 3.5f - (i % 2), 2.8f);
         }
+    }
+
+    /// A Forge arena's rocks and trees. The rules make them solid; these are
+    /// only what a player sees of them.
+    private void obstacles() {
+        List<Arena.Obstacle> list = arena().obstacles();
+        for (int i = 0; i < list.size(); i++) {
+            Arena.Obstacle o = list.get(i);
+            String kind = "tree".equals(o.kind) ? "tree" : "rock";
+            AnimatedModel m = prop(kind, wx(o.x, o.y), 0f, wz(o.x, o.y), 2.2f * o.radius / (float) Arena.TILE);
+            m.setRotation(0f, (o.x * 7 + o.y * 13) % 360, 0f);
+        }
+    }
+
+    /// The field this match is played on: the classic one, or a Forge arena.
+    private Arena arena() {
+        return driver.match().arena();
     }
 
     /// Rules coordinates to world: the player's own side is toward the camera.
     private float wx(int ax, int ay) {
-        return sign * (ax - Arena.CLASSIC.width() / 2) / (float) Arena.TILE;
+        return sign * (ax - arena().width() / 2) / (float) Arena.TILE;
     }
 
     private float wz(int ax, int ay) {
-        return sign * (ay - Arena.CLASSIC.height() / 2) / (float) Arena.TILE;
+        return sign * (ay - arena().height() / 2) / (float) Arena.TILE;
     }
 
     @Override
@@ -276,13 +302,13 @@ public class BattleView extends GameView {
     private Actor create(Unit u) {
         CardDef card = u.card();
         boolean mine = u.owner() == driver.me();
-        Models.Look look = Models.of(card.id);
+        Models.Look look = Models.of(card);
         String name;
         float footprint = 2f;
-        if (Cards.KING_TOWER.equals(card.id)) {
+        if (u.isKing() || Cards.KING_TOWER.equals(card.id)) {
             name = mine ? "castle_blue" : "castle_red";
             footprint = 3.6f;
-        } else if (Cards.PRINCESS_TOWER.equals(card.id)) {
+        } else if (card.kind == CardDef.TOWER) {
             name = mine ? "tower_blue" : "tower_red";
             footprint = 2.5f;
         } else {
@@ -426,9 +452,9 @@ public class BattleView extends GameView {
             finaleX = 0f;
             finaleZ = 0f;
         } else {
-            int ky = loser == 0 ? Arena.CLASSIC.king(0).y : Arena.CLASSIC.mirrorY(Arena.CLASSIC.king(0).y);
-            finaleX = wx(Arena.CLASSIC.king(0).x, ky);
-            finaleZ = wz(Arena.CLASSIC.king(0).x, ky);
+            Arena.Tower king = arena().king(loser);
+            finaleX = wx(king.x, king.y);
+            finaleZ = wz(king.x, king.y);
         }
         finale = 0f;
     }
@@ -506,7 +532,7 @@ public class BattleView extends GameView {
         boolean inside = px >= 0 && py >= 0 && px < getWidth() && py < getHeight();
         float[] ground = holding && inside ? pick(px, py) : null;
         if (holding && in.isPointerDown() && ground != null) {
-            CardDef def = Cards.get(card);
+            CardDef def = driver.match().cards().get(card);
             int ax = ax(ground[0], ground[1]);
             int ay = ay(ground[0], ground[1]);
             boolean ok = driver.match().canPlay(driver.me(), card, ax, ay);
@@ -538,11 +564,11 @@ public class BattleView extends GameView {
     // end::skirmish-touch[]
 
     private int ax(float x, float z) {
-        return Math.round(x * sign * Arena.TILE) + Arena.CLASSIC.width() / 2;
+        return Math.round(x * sign * Arena.TILE) + arena().width() / 2;
     }
 
     private int ay(float x, float z) {
-        return Math.round(z * sign * Arena.TILE) + Arena.CLASSIC.height() / 2;
+        return Math.round(z * sign * Arena.TILE) + arena().height() / 2;
     }
 
     /// Where the ray from the camera through screen point `(px, py)` meets

@@ -288,10 +288,65 @@ rewards, visits the deck and plays a battle, which is how the promotional video 
 recorded. Any Codename One app can be driven the same way without code of its own,
 through its built-in MCP server; see <<_mcp_headless_api,the MCP headless API>>.
 
+=== Content packs and the Forge
+
+Everything the Forge edits is data in `rules`: a `ContentPack` holds cards
+(`CardDef`), arenas (`Arena`), missions (`MissionDef`) and campaigns
+(`CampaignDef`), and `PackCodec` reads and writes it as JSON. The classic game is
+the same model: `Arena.CLASSIC` and the built-in cards describe the field and
+the cards the battle always had, so the golden replays still pass. A mission is
+played by `MissionRun`, which builds a `Match` from the pack's arena and cards,
+plays the scripted waves and the bot, and decides the stars.
+
+==== Limits
+
+A pack comes from a stranger, so `Validator` checks every number in it before
+the server publishes it and before the app loads it. The limits keep a pack from
+stalling a phone, a server or the economy, not from being odd:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/skirmish/rules/forge/Validator.java[tag=skirmish-forge-limits,indent=0]
+----
+
+An uploaded model is checked by `GlbInspector` on the server: the size, the
+`.glb` header, and caps on its nodes, meshes, joints, and animations. It's stored
+by its SHA-256 and waits in the console's *Forge* tab until a moderator approves
+it.
+
+==== Results are played again
+
+The app plays a mission locally and sends its replay. The replay names the pack,
+its content hash and the mission, so the server finds the exact version that was
+played, plays the player's commands again with `MissionRun.verify` and pays only
+for stars it saw won, and only once:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/forge/Forge.java[tag=skirmish-forge-result,indent=0]
+----
+
+The app's side starts the battle, fetches the pack's files first, and posts the
+result when it ends; a test play from the editor posts nothing:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/forge/MissionPlay.java[tag=skirmish-forge-play,indent=0]
+----
+
+==== Shipping official content
+
+The official pack is seeded from `Samples.official()` when the server starts.
+A designer can instead build a campaign in the Forge, publish it, and mark it
+official in the console; an official pack is listed first and pays the rewards
+its missions set, while a community pack's rewards are capped per star and per
+day. The amounts are constants at the top of the server's `Forge` class.
+
 === Tests
 
 `rules` has the determinism tests and the golden replays; `backend` plays whole
-online matches over its sockets and checks receipts, progression and moderation;
+online matches over its sockets and checks receipts, progression, moderation and
+the Forge's publishing and mission results;
 `run-e2e.sh` drives the app through its screens in the simulator against a running
 server and takes the screenshots in this guide:
 

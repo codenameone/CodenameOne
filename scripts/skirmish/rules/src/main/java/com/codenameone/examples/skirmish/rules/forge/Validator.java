@@ -36,6 +36,7 @@ import java.util.List;
 /// phone, hanging a server's match room or breaking the economy, not from being
 /// strange -- a 1-elixir card with 9000 hit points is allowed.
 public final class Validator {
+    // tag::skirmish-forge-limits[]
     public static final int MAX_CARDS = 40;
     public static final int MAX_ARENAS = 10;
     public static final int MAX_MISSIONS = 60;
@@ -52,6 +53,7 @@ public final class Validator {
     /// are not official.
     public static final int MAX_REWARD_COINS = 500;
     public static final int MAX_REWARD_XP = 200;
+    // end::skirmish-forge-limits[]
 
     private final List<String> problems = new ArrayList<String>();
     private final ContentPack pack;

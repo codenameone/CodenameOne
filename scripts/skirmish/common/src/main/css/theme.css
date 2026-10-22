@@ -934,3 +934,109 @@ DialogWood.pressed {
     background-color: var(--wood-dark);
     color: var(--parchment);
 }
+
+/* The Forge: the pack browser and the editors. Rows are stone panels, labels
+   sit left and values right, and the small steppers are carved like the big
+   buttons so the editor feels like part of the game. */
+ForgeRow {
+    background-color: var(--stone-dark);
+    border-radius: 1.5mm;
+    padding: 1.5mm 2mm;
+    margin: 0.8mm 2mm;
+}
+
+ForgeLabel {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: left;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+ForgeValue {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 0.5mm 1.5mm;
+    margin: 0;
+}
+
+ForgeField {
+    background-color: var(--parchment);
+    border: 0.3mm solid var(--wood-dark);
+    border-radius: 1mm;
+    color: var(--ink);
+    font-size: 3mm;
+    text-align: left;
+    padding: 1.2mm;
+    margin: 0.5mm 0;
+}
+
+ForgeStep {
+    background: linear-gradient(to bottom, var(--wood-light), var(--wood));
+    border: 0.4mm solid var(--wood-dark);
+    border-radius: 1mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1mm 2mm;
+    margin: 0 0.5mm;
+}
+
+ForgeStep.pressed {
+    background-color: var(--wood-dark);
+    color: var(--parchment);
+}
+
+ForgeCheck {
+    color: var(--text);
+    font-size: 3mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0.5mm 2mm;
+}
+
+ForgeHelp, ForgeHelpText, ForgeByline {
+    color: var(--stone-light);
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0.5mm 2mm;
+    margin: 0;
+}
+
+ForgeProblem {
+    color: var(--red);
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 0.5mm 2mm;
+    margin: 0;
+}
+
+ForgeOfficial {
+    background-color: var(--gold);
+    border-radius: 1mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 0.3mm 1.2mm;
+    margin: 0 1mm;
+}
+
+ForgeTab, ForgeTabOn {
+    background-color: var(--stone-dark);
+    border-radius: 1.5mm;
+    color: var(--stone-light);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.5mm;
+    margin: 0.5mm;
+}
+
+ForgeTabOn {
+    background: linear-gradient(to bottom, var(--wood-light), var(--wood));
+    color: var(--ink);
+}

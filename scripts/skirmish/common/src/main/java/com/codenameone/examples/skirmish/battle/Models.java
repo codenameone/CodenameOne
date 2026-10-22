@@ -22,6 +22,8 @@ import com.codename1.gpu.GltfLoader;
 import com.codename1.gpu.GltfScene;
 import com.codename1.io.Log;
 import com.codename1.ui.CN;
+import com.codenameone.examples.skirmish.rules.CardDef;
+import com.codenameone.examples.skirmish.rules.forge.GlbInspector;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,13 +47,24 @@ public final class Models {
         public final String attack;
         public final float hover;
         public final int tint;
+        public final String idle;
+        public final String run;
+        public final String death;
 
         Look(String model, float size, String attack, float hover, int tint) {
+            this(model, size, attack, hover, tint, "Idle", "Running_A", "Death_A");
+        }
+
+        Look(String model, float size, String attack, float hover, int tint, String idle, String run,
+                String death) {
             this.model = model;
             this.size = size;
             this.attack = attack;
             this.hover = hover;
             this.tint = tint;
+            this.idle = idle;
+            this.run = run;
+            this.death = death;
         }
     }
 
@@ -82,11 +95,46 @@ public final class Models {
         return LOOKS.get(card);
     }
 
-    /// The parsed model `name`, loaded once from `/model_<name>.glb`.
+    /// The look of a card from a Forge pack: its own model, bundled or
+    /// uploaded, its size and tint, and the clips its author mapped. A card
+    /// with no model of its own falls back to a bundled one by kind.
+    public static Look of(CardDef card) {
+        Look builtin = LOOKS.get(card.id);
+        if (builtin != null || card.kind == CardDef.SPELL || card.kind == CardDef.TOWER) {
+            return builtin;
+        }
+        String model = card.model();
+        if (model == null || model.length() == 0) {
+            model = card.kind == CardDef.BUILDING ? "crypt" : card.isFlying() ? "skeleton_rogue" : "knight";
+        }
+        float size = (card.kind == CardDef.BUILDING ? 3.5f : 1.9f) * Math.max(25, card.scalePercent()) / 100f;
+        int tint = card.tint() < 0 ? 0xffffffff : 0xff000000 | card.tint();
+        String clips = card.clips();
+        String attack = GlbInspector.clip(clips, "attack");
+        if (attack == null && card.kind != CardDef.BUILDING) {
+            attack = card.range() > 1500 ? "1H_Ranged_Shoot" : "1H_Melee_Attack_Chop";
+        }
+        return new Look(model, size, attack, card.isFlying() ? 1.6f : 0f, tint,
+                orElse(GlbInspector.clip(clips, "idle"), "Idle"), orElse(GlbInspector.clip(clips, "run"), "Running_A"),
+                orElse(GlbInspector.clip(clips, "death"), "Death_A"));
+    }
+
+    private static String orElse(String v, String fallback) {
+        return v == null ? fallback : v;
+    }
+
+    /// Whether `name` is one of the models that ship with the game.
+    public static boolean isBundled(String name) {
+        return CN.getResourceAsStream("/model_" + name + ".glb") != null;
+    }
+
+    /// The parsed model `name`, loaded once: `/model_<name>.glb` for a bundled
+    /// one, or an uploaded file, `asset:<sha256>`, from [ForgeFiles].
     public static synchronized GltfScene scene(String name) {
         GltfScene s = SCENES.get(name);
         if (s == null) {
-            InputStream in = CN.getResourceAsStream("/model_" + name + ".glb");
+            InputStream in = name.startsWith("asset:") ? ForgeFiles.open(name.substring(6))
+                    : CN.getResourceAsStream("/model_" + name + ".glb");
             if (in == null) {
                 throw new IllegalStateException("missing model " + name);
             }

@@ -48,50 +48,60 @@ public final class Art {
     /// The field's ground texture, `TILE_PX` pixels per tile, laid out in rules
     /// coordinates (row 0 is player 1's back line). Checkered turf, worn lanes,
     /// sandy banks and the river; the bridges are 3D models on top of it.
-    public static Image field() {
+    public static Image field(Arena a) {
         int t = TILE_PX;
-        int w = 18 * t;
-        int h = 32 * t;
-        Image img = Image.createImage(w, h, 0xff5a9644);
+        int cols = a.width() / Arena.TILE;
+        int rows = a.height() / Arena.TILE;
+        int w = cols * t;
+        int h = rows * t;
+        boolean snow = "frost".equals(a.theme());
+        boolean sand = "desert".equals(a.theme());
+        int turf0 = snow ? 0xdfe8ee : sand ? 0xd9b878 : 0x5f9e47;
+        int turf1 = snow ? 0xd2dde5 : sand ? 0xcfac6c : 0x578f41;
+        Image img = Image.createImage(w, h, 0xff000000 | turf0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
-        for (int ty = 0; ty < 32; ty++) {
-            for (int tx = 0; tx < 18; tx++) {
-                g.setColor((tx + ty) % 2 == 0 ? 0x5f9e47 : 0x578f41);
+        for (int ty = 0; ty < rows; ty++) {
+            for (int tx = 0; tx < cols; tx++) {
+                g.setColor((tx + ty) % 2 == 0 ? turf0 : turf1);
                 g.fillRect(tx * t, ty * t, t, t);
             }
         }
-        // Worn lanes, wider near the towers.
-        g.setColor(0xc9b27a);
+        // Worn lanes, and the cross paths behind the towers.
+        g.setColor(snow ? 0xb9c6cf : 0xc9b27a);
         g.setAlpha(150);
-        for (int lane = 0; lane < 2; lane++) {
-            int lx = Arena.CLASSIC.laneX(lane) * t / Arena.TILE;
+        int lanes = a.laneCount();
+        for (int lane = 0; lane < lanes; lane++) {
+            int lx = a.laneX(lane) * t / Arena.TILE;
             g.fillRoundRect(lx - t * 3 / 4, t * 5, t * 3 / 2, h - t * 10, t, t);
         }
-        // the cross path between the king towers and the lanes
-        g.fillRoundRect(Arena.CLASSIC.laneX(0) * t / Arena.TILE, t * 5 / 2, (Arena.CLASSIC.laneX(1) - Arena.CLASSIC.laneX(0))
-                * t / Arena.TILE, t, t, t);
-        g.fillRoundRect(Arena.CLASSIC.laneX(0) * t / Arena.TILE, h - t * 7 / 2, (Arena.CLASSIC.laneX(1) - Arena.CLASSIC.laneX(0))
-                * t / Arena.TILE, t, t, t);
-        g.setAlpha(255);
-        // Banks, then the water with a lighter centre.
-        int r1 = Arena.CLASSIC.riverTop() * t / Arena.TILE;
-        int r2 = Arena.CLASSIC.riverBottom() * t / Arena.TILE;
-        g.setColor(0xd8c48e);
-        g.fillRect(0, r1 - t / 4, w, r2 - r1 + t / 2);
-        g.fillLinearGradient(0x2f7fc8, 0x46a6e8, 0, r1, w, (r2 - r1) / 2, false);
-        g.fillLinearGradient(0x46a6e8, 0x2f7fc8, 0, r1 + (r2 - r1) / 2, w, (r2 - r1) / 2, false);
-        g.setColor(0xffffff);
-        g.setAlpha(60);
-        for (int i = 0; i < 18; i++) {
-            int wx = (i * 37) % w;
-            g.fillRoundRect(wx, r1 + ((i * 13) % (r2 - r1 - 6)), t, 3, 3, 3);
+        int left = a.laneX(0) * t / Arena.TILE;
+        int span = (a.laneX(lanes - 1) - a.laneX(0)) * t / Arena.TILE;
+        if (span > 0) {
+            g.fillRoundRect(left, t * 5 / 2, span, t, t, t);
+            g.fillRoundRect(left, h - t * 7 / 2, span, t, t, t);
         }
         g.setAlpha(255);
-        // Plank bridges over the river.
-        for (int lane = 0; lane < 2; lane++) {
-            int bx = (Arena.CLASSIC.laneX(lane) - Arena.CLASSIC.bridgeHalfWidth()) * t / Arena.TILE;
-            int bw = 2 * Arena.CLASSIC.bridgeHalfWidth() * t / Arena.TILE;
+        // Banks, then the water with a lighter centre.
+        int r1 = a.riverTop() * t / Arena.TILE;
+        int r2 = a.riverBottom() * t / Arena.TILE;
+        g.setColor(0xd8c48e);
+        g.fillRect(0, r1 - t / 4, w, r2 - r1 + t / 2);
+        int deep = snow ? 0x7fb6d8 : 0x2f7fc8;
+        int light = snow ? 0xb8dcf0 : 0x46a6e8;
+        g.fillLinearGradient(deep, light, 0, r1, w, (r2 - r1) / 2, false);
+        g.fillLinearGradient(light, deep, 0, r1 + (r2 - r1) / 2, w, (r2 - r1) / 2, false);
+        g.setColor(0xffffff);
+        g.setAlpha(60);
+        for (int i = 0; i < cols; i++) {
+            int wx = (i * 37) % w;
+            g.fillRoundRect(wx, r1 + ((i * 13) % Math.max(1, r2 - r1 - 6)), t, 3, 3, 3);
+        }
+        g.setAlpha(255);
+        // Plank bridges over the river, one per lane.
+        for (int lane = 0; lane < lanes; lane++) {
+            int bx = (a.laneX(lane) - a.bridgeHalfWidth()) * t / Arena.TILE;
+            int bw = 2 * a.bridgeHalfWidth() * t / Arena.TILE;
             g.setColor(0x5a3a1c);
             g.fillRect(bx - 3, r1 - t / 3, bw + 6, r2 - r1 + t * 2 / 3);
             for (int py = r1 - t / 3; py < r2 + t / 3; py += 8) {

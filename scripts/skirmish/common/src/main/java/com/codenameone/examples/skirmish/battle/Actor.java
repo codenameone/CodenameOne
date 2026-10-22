@@ -31,9 +31,6 @@ import com.codenameone.examples.skirmish.rules.Unit;
 /// and what happened to it (an attack, a hit, a death), and chooses the clip
 /// to play from that -- it never decides anything about the match.
 final class Actor {
-    private static final String IDLE = "Idle";
-    private static final String RUN = "Running_A";
-    private static final String DEATH = "Death_A";
     private static final String CHEER = "Cheer";
 
     final int id;
@@ -81,9 +78,10 @@ final class Actor {
         if (look != null && look.tint != 0xffffffff) {
             model.setTint(look.tint);
         }
-        if (!structure) {
-            model.play(u.isDeploying() && model.getScene().findAnimation("Skeletons_Awaken_Floor") != null
-                    ? "Skeletons_Awaken_Floor" : IDLE, !u.isDeploying());
+        String first = u.isDeploying() && clip("Skeletons_Awaken_Floor") != null
+                ? "Skeletons_Awaken_Floor" : clip(idle());
+        if (!structure && first != null) {
+            model.play(first, !u.isDeploying());
         }
         barBack = new Sprite(Art.pixel());
         barBack.setColor(0xe0101418);
@@ -136,7 +134,7 @@ final class Actor {
     /// The rules say this unit just struck toward `(tx, tz)`.
     void attacked(float tx, float tz) {
         face(tx - toX, tz - toZ);
-        if (look != null && look.attack != null && !structure) {
+        if (look != null && clip(look.attack) != null && !structure) {
             model.crossFade(look.attack, 0.06f, false);
             attackLeft = model.getScene().findAnimation(look.attack).getDuration() * 0.9f;
         }
@@ -152,16 +150,26 @@ final class Actor {
         barBack.setVisible(false);
         bar.setVisible(false);
         ring.setVisible(false);
-        if (!structure) {
-            model.crossFade(DEATH, 0.08f, false);
+        if (!structure && clip(look == null ? "Death_A" : look.death) != null) {
+            model.crossFade(clip(look == null ? "Death_A" : look.death), 0.08f, false);
         }
     }
 
     void cheer() {
-        if (!structure && dying < 0f) {
+        if (!structure && dying < 0f && clip(CHEER) != null) {
             model.crossFade(CHEER, 0.2f, true);
             attackLeft = 1e6f;
         }
+    }
+
+    private String idle() {
+        return look == null ? "Idle" : look.idle;
+    }
+
+    /// `name` when the model has that clip, else null: an uploaded model has
+    /// only the clips its author mapped, and may lack a cheer or a death.
+    private String clip(String name) {
+        return name != null && model.getScene().findAnimation(name) != null ? name : null;
     }
 
     private void face(float dx, float dz) {
@@ -185,7 +193,10 @@ final class Actor {
                 if (attackLeft > 0f) {
                     attackLeft -= dt;
                 } else {
-                    model.crossFade(moving ? RUN : IDLE, 0.15f, true);
+                    String c = clip(moving ? (look == null ? "Running_A" : look.run) : idle());
+                    if (c != null) {
+                        model.crossFade(c, 0.15f, true);
+                    }
                     model.setSpeed(moving ? 0.6f + u.card().speed() / 60f : 1f);
                 }
             }

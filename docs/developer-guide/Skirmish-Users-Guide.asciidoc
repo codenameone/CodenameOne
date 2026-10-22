@@ -178,6 +178,57 @@ changed here too, which is how the app reaches a server on another machine.
 
 image::img/skirmish-settings.png["The settings screen with the battle name, sound, notification and privacy switches, and the server address",scaledwidth=40%]
 
+=== The Forge
+
+The Forge is the game's own level editor, in the same app on every platform.
+Players build packs of new cards, arenas, missions and campaigns, share them
+with a link, and play what others made. The game's designers use the same
+editor: a pack an operator marks official appears first, for everyone.
+
+*Forge* on the home screen lists the packs. *Official* comes with the game,
+*Popular* and *New* are what players published, and *Yours* holds a player's own
+drafts and packs.
+
+==== Playing a pack
+
+A pack shows its campaigns, each a list of missions that open one after another,
+and the stars won in each. A mission can be anything the author wrote: hold the
+castle for two minutes, win three crowns against waves of enemies, or beat a bot
+with a fixed deck. Its story is told during the battle, and a line that stops
+the clock waits for *Next*, the way the training battle does.
+
+A mission pays up to three stars. The first is for winning; the second and the
+third for what the author asked, such as keeping towers standing or winning
+before a set second. Rewards come once per star, and the server plays every mission again
+before it believes the stars, so they can't be claimed without being won.
+Missions in packs players made pay a small amount, up to a daily limit.
+
+*Share* sends a link that opens the pack in the app, *Remix* copies a pack into
+a new one of the player's own to change, and a pack can be rated or reported.
+
+==== Making a pack
+
+*Create a pack* starts one with a single mission against the bot, ready to play.
+The pack editor lists its cards, arenas, missions and campaigns, shows any
+problem that would stop it from being published, and saves a draft that only
+its author sees until *Publish*.
+
+* *Cards* start from any card in the game and change its cost, hit points,
+  damage, speed, range, targets and what it spawns. A card can look like any
+  of the game's characters, or like a rigged glTF model imported from a
+  `.glb` file, with its animations matched to walking, attacking and dying on a
+  turntable preview. An imported model is visible to the author and to anyone
+  they share the pack with straight away, and to everyone once a moderator has
+  approved it.
+* *Arenas* are drawn on a grid: castles, towers, rocks and trees placed with a
+  tap, mirrored to the enemy's half as they're placed, on a field of any size
+  with one to three lanes and a frost or desert theme.
+* *Missions* pick an arena, the goal, the length of the battle, each side's
+  elixir and deck, the waves of enemies that arrive at set seconds, the lines
+  of the story, the stars and the reward. *Test play* plays the mission at once.
+* *Campaigns* put missions in order, with a story before the first and after the
+  last.
+
 === The admin console
 
 The admin account sees *Admin console* on the home screen: the operator's view of
@@ -193,6 +244,9 @@ image::img/skirmish-admin-overview.png["The admin console's overview: players on
   server's, or who floods it with invalid plays.
 * *Players* finds an account by name or e-mail and shows its matches, purchases
   and moderation history.
+* *Forge* lists reported and hidden packs, and the models and images players
+  uploaded. An operator looks at a model on the turntable before approving or
+  rejecting it, hides or restores a pack, and makes a pack official.
 
 image::img/skirmish-admin-flags.png["The flags tab: a report and an automatic flag, each with the reason and the match it came from",scaledwidth=40%]
 

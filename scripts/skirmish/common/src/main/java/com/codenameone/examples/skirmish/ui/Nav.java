@@ -24,6 +24,7 @@ import com.codenameone.examples.skirmish.admin.AdminConsole;
 import com.codenameone.examples.skirmish.engage.Notifications;
 import com.codenameone.examples.skirmish.engage.Store;
 import com.codenameone.examples.skirmish.engage.Telemetry;
+import com.codenameone.examples.skirmish.forge.PackScreen;
 import com.codenameone.examples.skirmish.net.Session;
 
 /// Where the app goes. Every screen change that is not a plain "back" comes
@@ -31,6 +32,7 @@ import com.codenameone.examples.skirmish.net.Session;
 /// land on the same screen the same way.
 public final class Nav {
     private static String pendingChallenge;
+    private static String pendingPack;
 
     private Nav() {
     }
@@ -38,6 +40,7 @@ public final class Nav {
     /// The first screen: the stored session decides between home and sign-in.
     public static void launch() {
         pendingChallenge = AppConfig.challengeCode();
+        pendingPack = AppConfig.packId();
         Session.onSignedOut(() -> CN.callSerially(SignInForm::show));
         Session.restore(() -> CN.callSerially(Nav::enter),
                 () -> CN.callSerially(SignInForm::show),
@@ -47,7 +50,7 @@ public final class Nav {
                 }));
     }
 
-    /// Signed in: a challenge link opened the app wins, then the admin
+    /// Signed in: a challenge or pack link opened the app wins, then the admin
     /// console for an administrator who was last there, then home.
     public static void enter() {
         Notifications.signedIn();
@@ -56,6 +59,12 @@ public final class Nav {
             String code = pendingChallenge;
             pendingChallenge = null;
             challenge(code);
+            return;
+        }
+        if (pendingPack != null) {
+            String id = pendingPack;
+            pendingPack = null;
+            PackScreen.show(id);
             return;
         }
         if (Session.user() != null && Session.user().admin()

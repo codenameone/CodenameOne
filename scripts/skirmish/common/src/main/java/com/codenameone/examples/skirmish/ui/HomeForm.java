@@ -35,6 +35,7 @@ import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.api.ProgressDto;
 import com.codenameone.examples.skirmish.api.QuestDto;
 import com.codenameone.examples.skirmish.engage.Ads;
+import com.codenameone.examples.skirmish.forge.ForgeHome;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.Net;
 import com.codenameone.examples.skirmish.net.Session;
@@ -152,6 +153,7 @@ public final class HomeForm {
         }
         col.add(Ui.label("Your deck", "SectionTitle"));
         col.add(deck(p.deck()));
+        col.add(Ui.wood("Forge", "forgeButton", e -> ForgeHome.show()));
         Container nav = new Container(new GridLayout(2, 3));
         nav.add(tile("Deck", FontImage.MATERIAL_STYLE, "deckButton", e -> DeckForm.show()));
         nav.add(tile("Shop", FontImage.MATERIAL_STOREFRONT, "shopButton", e -> ShopForm.show()));

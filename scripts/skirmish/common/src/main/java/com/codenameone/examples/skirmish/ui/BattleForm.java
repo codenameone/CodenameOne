@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -34,16 +35,17 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.skirmish.battle.BattleView;
 import com.codenameone.examples.skirmish.battle.Driver;
+import com.codenameone.examples.skirmish.battle.MissionDriver;
 import com.codenameone.examples.skirmish.battle.OnlineDriver;
 import com.codenameone.examples.skirmish.battle.PracticeDriver;
 import com.codenameone.examples.skirmish.battle.TutorialDriver;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.CardDef;
-import com.codenameone.examples.skirmish.rules.Cards;
 import com.codenameone.examples.skirmish.rules.Deck;
 import com.codenameone.examples.skirmish.rules.Match;
 import com.codenameone.examples.skirmish.rules.PlayerState;
+import com.codenameone.examples.skirmish.rules.forge.DialogStep;
 import java.util.List;
 
 /// A battle: the arena ([BattleView], `com.codename1.gaming`) with ordinary
@@ -73,6 +75,15 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
     private int cardsPlayed;
     private boolean over;
     private Tutorial coach;
+    private MissionEnd missionEnd;
+
+    /// What happens when a Forge mission is over or left: the caller scores it
+    /// and decides where the player goes next.
+    public interface MissionEnd {
+        void finished(MissionDriver driver);
+
+        void left(MissionDriver driver);
+    }
 
     private BattleForm(Driver driver, String mode) {
         this.driver = driver;
@@ -151,6 +162,45 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
         view.stop();
         driver.dispose();
         leaveTo();
+    }
+
+    /// A Forge mission, its story told over the battle.
+    public static BattleForm mission(final MissionDriver driver, MissionEnd end) {
+        final BattleForm f = new BattleForm(driver, "mission");
+        f.missionEnd = end;
+        driver.setListener(f::say);
+        f.show();
+        return f;
+    }
+
+    /// One line of a mission's story, in the mentor's bubble at the top of
+    /// the field. A line that stops the clock waits for "Next".
+    private void say(final DialogStep step) {
+        overlay.removeAll();
+        Container bubble = new Container(new BorderLayout());
+        bubble.setUIID("CoachBubble");
+        String speaker = step.speaker == null || "elda".equals(step.speaker) ? CardArt.MENTOR : step.speaker;
+        bubble.add(BorderLayout.WEST, new Label(CardArt.face(speaker, CN.convertToPixels(11)), "Container"));
+        SpanLabel text = new SpanLabel(step.text);
+        text.setTextUIID("CoachText");
+        bubble.add(BorderLayout.CENTER, text);
+        if (step.freeze) {
+            Button next = Ui.button("Next", "StoneButton", "mission-next", e -> {
+                overlay.removeAll();
+                overlay.revalidate();
+                ((MissionDriver) driver).resume();
+            });
+            bubble.add(BorderLayout.SOUTH, FlowLayout.encloseRight(next));
+        } else {
+            UITimer.timer(4000, false, form, () -> {
+                if (overlay.contains(bubble)) {
+                    overlay.removeAll();
+                    overlay.revalidate();
+                }
+            });
+        }
+        overlay.add(BorderLayout.NORTH, bubble);
+        overlay.revalidate();
     }
 
     public static BattleForm online(OnlineDriver driver, boolean spectator) {
@@ -240,7 +290,7 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
             String card = me.hand(i);
             if (card != null && !card.equals(shown[i])) {
                 shown[i] = card;
-                CardDef def = Cards.get(card);
+                CardDef def = driver.match().cards().get(card);
                 Image icon = CardArt.card(card, size);
                 hand[i].setIcon(icon);
                 hand[i].setText("");
@@ -248,7 +298,7 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
                 changed = true;
             }
             if (card != null) {
-                boolean affordable = me.wholeElixir() >= Cards.get(card).cost;
+                boolean affordable = me.wholeElixir() >= driver.match().cards().get(card).cost;
                 if (hand[i].isEnabled() != affordable) {
                     hand[i].setEnabled(affordable);
                     changed = true;
@@ -297,6 +347,21 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
                     m.tick() / Match.TICKS_PER_SECOND, cardsPlayed);
             driver.dispose();
             coach.finished(m.result() == driver.me() ? 0 : 1);
+            return;
+        }
+        if (driver instanceof MissionDriver) {
+            over = true;
+            Telemetry.battleEnded(mode, m.result() == driver.me() ? 1 : m.result() == Match.DRAW ? 0 : -1,
+                    m.tick() / Match.TICKS_PER_SECOND, cardsPlayed);
+            if (view.finaleRunning()) {
+                UITimer.timer(1800, false, form, () -> {
+                    view.stop();
+                    missionEnd.finished((MissionDriver) driver);
+                });
+            } else {
+                view.stop();
+                missionEnd.finished((MissionDriver) driver);
+            }
             return;
         }
         if (driver instanceof PracticeDriver) {
@@ -364,6 +429,15 @@ public final class BattleForm implements BattleView.Hud, OnlineDriver.Listener {
                     "Stay")) {
                 coach.stop();
                 abandon();
+            }
+            return;
+        }
+        if (missionEnd != null) {
+            if (Dialog.show("Leave the mission?", "You can try it again any time.", "Leave", "Stay")) {
+                over = true;
+                view.stop();
+                driver.dispose();
+                missionEnd.left((MissionDriver) driver);
             }
             return;
         }

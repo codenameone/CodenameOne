@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.skirmish.api.AccountApi;
 import com.codenameone.examples.skirmish.api.AdminApi;
+import com.codenameone.examples.skirmish.api.ForgeApi;
 import com.codenameone.examples.skirmish.api.GameApi;
 import com.codenameone.examples.skirmish.api.ProgressApi;
 import com.codenameone.examples.skirmish.api.ShopApi;
@@ -33,6 +34,7 @@ public final class Api {
     private static ShopApi shop;
     private static AdminApi admin;
     private static ProgressApi progress;
+    private static ForgeApi forge;
 
     private Api() {
     }
@@ -43,6 +45,7 @@ public final class Api {
         shop = RestClients.create(ShopApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
         progress = RestClients.create(ProgressApi.class, baseUrl);
+        forge = RestClients.create(ForgeApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -63,5 +66,9 @@ public final class Api {
 
     public static ProgressApi progress() {
         return progress;
+    }
+
+    public static ForgeApi forge() {
+        return forge;
     }
 }

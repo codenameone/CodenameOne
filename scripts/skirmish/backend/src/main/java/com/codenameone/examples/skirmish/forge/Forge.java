@@ -425,6 +425,7 @@ public class Forge {
         if (mission == null) {
             throw new ResponseStatusException(404, "No such mission");
         }
+        // tag::skirmish-forge-result[]
         Match played;
         try {
             played = MissionRun.verify(pack, ref.mission, replay);
@@ -463,6 +464,7 @@ public class Forge {
             xp = Math.min(xp, COMMUNITY_MISSION_XP * newStars / 3);
             coins = spendDailyAllowance(username, coins);
         }
+        // end::skirmish-forge-result[]
         RewardDto reward = progression.missionReward(username, mission.name, coins, xp);
         return new MissionOutcomeDto(p.getId(), ref.mission, won, row.getStars(), reward);
     }

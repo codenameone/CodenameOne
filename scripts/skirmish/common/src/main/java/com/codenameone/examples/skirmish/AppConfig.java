@@ -198,22 +198,38 @@ public final class AppConfig {
     /// The challenge code the app was opened with -- a challenge link opened in
     /// a browser, or handed to the installed app -- or null.
     public static String challengeCode() {
+        return linkParameter("challenge");
+    }
+
+    /// The Forge pack a shared link opened the app with, or null.
+    public static String packId() {
+        return linkParameter("pack");
+    }
+
+    /// The link that opens a Forge pack, for a player to send a friend.
+    public static String packLink(String id) {
+        String origin = pageOrigin();
+        return (origin == null ? serverUrl() : origin) + "/?pack=" + id;
+    }
+
+    private static String linkParameter(String name) {
+        String key = name + "=";
         String link = CN.getProperty("browser.window.location.href", null);
-        if (link == null || link.indexOf("challenge=") < 0) {
+        if (link == null || link.indexOf(key) < 0) {
             link = CN.getProperty("AppArg", null);
         }
         if (link == null) {
             return null;
         }
-        int at = link.indexOf("challenge=");
+        int at = link.indexOf(key);
         if (at < 0) {
             return null;
         }
-        int end = at + 10;
+        int end = at + key.length();
         while (end < link.length() && link.charAt(end) != '&' && link.charAt(end) != '#') {
             end++;
         }
-        String code = link.substring(at + 10, end);
+        String code = link.substring(at + key.length(), end);
         return code.length() == 0 ? null : code;
     }
 

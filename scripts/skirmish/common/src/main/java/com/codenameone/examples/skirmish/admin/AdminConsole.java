@@ -31,14 +31,21 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.skirmish.api.AdminActionDto;
 import com.codenameone.examples.skirmish.api.AdminStatsDto;
+import com.codenameone.examples.skirmish.api.AssetDto;
 import com.codenameone.examples.skirmish.api.AuditDto;
 import com.codenameone.examples.skirmish.api.FlagDto;
+import com.codenameone.examples.skirmish.api.ForgeActionDto;
 import com.codenameone.examples.skirmish.api.LiveMatchDto;
 import com.codenameone.examples.skirmish.api.MatchSummaryDto;
+import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.api.PlayerDetailDto;
 import com.codenameone.examples.skirmish.api.PlayerDto;
+import com.codenameone.examples.skirmish.battle.ForgeFiles;
+import com.codenameone.examples.skirmish.battle.ModelPreview;
+import com.codenameone.examples.skirmish.forge.PackScreen;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.Net;
+import com.codenameone.examples.skirmish.rules.forge.AssetRef;
 import com.codenameone.examples.skirmish.ui.MatchmakingForm;
 import com.codenameone.examples.skirmish.ui.Nav;
 import com.codenameone.examples.skirmish.ui.ReplayForm;
@@ -69,6 +76,7 @@ public final class AdminConsole {
     private final Container players = column();
     private final Container live = column();
     private final Container audit = column();
+    private final Container forge = column();
 
     private AdminConsole() {
     }
@@ -90,6 +98,7 @@ public final class AdminConsole {
         tabs.addTab("Players", playersTab());
         tabs.addTab("Live", scroll(live));
         tabs.addTab("Audit", scroll(audit));
+        tabs.addTab("Forge", scroll(forge));
         tabs.addSelectionListener((was, now) -> refresh(now));
         form.add(BorderLayout.CENTER, tabs);
         refresh(0);
@@ -108,9 +117,81 @@ public final class AdminConsole {
             search("");
         } else if (tab == 3) {
             Api.admin().liveMatches(Net.to(list -> Ui.later(() -> showLive(list)), Ui::failed));
-        } else {
+        } else if (tab == 4) {
             Api.admin().audit(Net.to(list -> Ui.later(() -> showAudit(list)), Ui::failed));
+        } else {
+            Api.admin().forgeQueue(Net.to(packs -> Api.admin().forgeAssets(Net.to(
+                    files -> Ui.later(() -> showForge(packs, files)), Ui::failed)), Ui::failed));
         }
+    }
+
+    /// Player content waiting for a moderator: packs players reported or a
+    /// moderator hid, and uploaded models and images nobody has seen yet. A
+    /// file stays usable by its owner and anyone they share it with, and is
+    /// public once approved; promoting a pack to official is how the game's
+    /// own designers ship a campaign made with the same editor.
+    private void showForge(List<PackSummaryDto> packs, List<AssetDto> files) {
+        forge.removeAll();
+        forge.add(Ui.label("Packs (" + packs.size() + ")", "SectionTitle"));
+        for (final PackSummaryDto p : packs) {
+            Container row = Ui.panel(Ui.label(p.name() + " by " + p.author(), "ForgeLabel"),
+                    Ui.label(p.status() + (p.official() ? ", official" : "") + ", " + p.plays() + " plays", "ForgeHelp"));
+            row.add(Ui.row(
+                    Ui.stone("Open", "forge-open-" + p.id(), e -> PackScreen.show(p.id())),
+                    Ui.stone("hidden".equals(p.status()) ? "Restore" : "Hide", "forge-hide-" + p.id(),
+                            e -> packAction(p, "hidden".equals(p.status()) ? "restore" : "hide")),
+                    Ui.stone(p.official() ? "Unofficial" : "Official", "forge-official-" + p.id(),
+                            e -> packAction(p, p.official() ? "unofficial" : "official"))));
+            forge.add(row);
+        }
+        forge.add(Ui.label("Uploaded files (" + files.size() + ")", "SectionTitle"));
+        for (final AssetDto a : files) {
+            Container row = Ui.panel(Ui.label(a.name() + " (" + a.kind() + ", " + a.bytes() / 1024 + " KB)",
+                    "ForgeLabel"));
+            if (a.animations() != null && !a.animations().isEmpty()) {
+                StringBuilder names = new StringBuilder("Animations:");
+                for (String n : a.animations()) {
+                    names.append(' ').append(n);
+                }
+                row.add(Ui.text(names.toString(), "ForgeHelp"));
+            }
+            row.add(Ui.row(
+                    Ui.stone("Look", "asset-look-" + a.sha256(), e -> look(a)),
+                    Ui.stone("Approve", "asset-approve-" + a.sha256(), e -> assetAction(a, "approve")),
+                    Ui.stone("Reject", "asset-reject-" + a.sha256(), e -> assetAction(a, "reject"))));
+            forge.add(row);
+        }
+        forge.revalidate();
+    }
+
+    private void packAction(PackSummaryDto p, String action) {
+        Api.admin().forgePackAction(new ForgeActionDto(p.id(), action, ""),
+                Net.to(x -> Ui.later(() -> refresh(5)), Ui::failed));
+    }
+
+    private void assetAction(AssetDto a, String action) {
+        Api.admin().forgeAssetAction(new ForgeActionDto(a.sha256(), action, ""),
+                Net.to(x -> Ui.later(() -> refresh(5)), Ui::failed));
+    }
+
+    /// A model on the turntable, or an image as it is, before deciding.
+    private void look(final AssetDto a) {
+        ForgeFiles.fetch(java.util.Collections.singletonList(a.sha256()), () -> {
+            Form f = Ui.form(a.name(), "assetLook");
+            f.setLayout(new BorderLayout());
+            Ui.back(f, () -> form.showBack());
+            if (AssetRef.MODEL.equals(a.kind())) {
+                f.add(BorderLayout.CENTER, new ModelPreview("asset:" + a.sha256(), 0, null));
+            } else {
+                try {
+                    f.add(BorderLayout.CENTER, new Label(com.codename1.ui.EncodedImage.create(
+                            ForgeFiles.bytes(a.sha256())), "Container"));
+                } catch (RuntimeException err) {
+                    f.add(BorderLayout.CENTER, Ui.label("This file is not an image", "ForgeProblem"));
+                }
+            }
+            f.show();
+        }, Ui::failed);
     }
 
     private void pollFlags() {
