@@ -1599,7 +1599,7 @@ public class CSSThemeCompiler {
         String style = null;
         String color = null;
         for (String part : parts) {
-            String token = part.trim().toLowerCase();
+            String token = asciiLower(part.trim());
             if (token.length() == 0) {
                 continue;
             }
@@ -1850,7 +1850,7 @@ public class CSSThemeCompiler {
     }
 
     private String normalizeHexColor(String cssColor) {
-        String value = cssColor == null ? "" : cssColor.trim().toLowerCase();
+        String value = cssColor == null ? "" : asciiLower(cssColor.trim());
         if (value.length() == 0) {
             throw new CSSSyntaxException("Color value cannot be empty");
         }
@@ -1892,7 +1892,7 @@ public class CSSThemeCompiler {
     }
 
     private Integer normalizeAlignment(String value) {
-        String v = value == null ? "" : value.trim().toLowerCase();
+        String v = value == null ? "" : asciiLower(value.trim());
         if ("left".equals(v) || "start".equals(v)) {
             return Integer.valueOf(Component.LEFT);
         }
@@ -2141,7 +2141,7 @@ public class CSSThemeCompiler {
     }
 
     private boolean isDarkModeMediaQuery(String mediaQuery) {
-        String normalized = mediaQuery == null ? "" : mediaQuery.toLowerCase();
+        String normalized = mediaQuery == null ? "" : asciiLower(mediaQuery);
         return normalized.indexOf("prefers-color-scheme") > -1 && normalized.indexOf("dark") > -1;
     }
 
@@ -2324,7 +2324,7 @@ public class CSSThemeCompiler {
             }
             Declaration dec = new Declaration();
             dec.name = trimmed.substring(0, colon).trim();
-            dec.property = dec.name.toLowerCase();
+            dec.property = asciiLower(dec.name);
             dec.value = tightenVarCalls(stripPriority(trimmed.substring(colon + 1).trim()));
             if (dec.property.length() == 0 || dec.value.length() == 0) {
                 throw new CSSSyntaxException("Malformed declaration: " + trimmed);
@@ -2399,6 +2399,23 @@ public class CSSThemeCompiler {
             }
         }
         return out.toArray(new String[out.size()]);
+    }
+
+    /// Lower-cases ASCII letters only. CSS keywords, property names and colors are ASCII by
+    /// specification, and String.toLowerCase() follows the device locale: on a Turkish device
+    /// `I` would fold to a dotless i and `PADDING-LEFT`-style names would never match.
+    private static String asciiLower(String s) {
+        StringBuilder out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) {
+                    out = new StringBuilder(s);
+                }
+                out.setCharAt(i, (char) (c + 32));
+            }
+        }
+        return out == null ? s : out.toString();
     }
 
     /// The value of an ASCII hex digit, or -1. CSS escapes take only `0-9a-fA-F`;
