@@ -189,9 +189,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return WindowsNative.storageDir() + getFileSystemSeparator() + name;
     }
 
+    /// The native path of a `file://` URL. This port writes `file://C:/x`,
+    /// but the standard form of the same URL is `file:///C:/x` -- which is
+    /// what `java.io.File` hands over for an absolute path -- and its leading
+    /// slash makes `/C:/x`, a name Windows refuses (error 123).
     private static String stripFileUrl(String path) {
         if (path.startsWith("file://")) {
-            return path.substring("file://".length());
+            String p = path.substring("file://".length());
+            if (p.length() > 2 && p.charAt(0) == '/' && p.charAt(2) == ':'
+                    && Character.isLetter(p.charAt(1))) {
+                return p.substring(1);
+            }
+            return p;
         }
         return path;
     }

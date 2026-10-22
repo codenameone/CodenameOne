@@ -241,6 +241,15 @@ public final class LinuxNative {
 
     public static native boolean mainWindowGetBounds(int[] out);
 
+    /// Resizes the application's MAIN window to an outer size, frame included.
+    /// A no-op when headless, where the surface is the size of the screenshot.
+    public static native void mainWindowSetSize(int width, int height);
+
+    /// Fills `out` with the main window's outer rectangle, the one
+    /// `#mainWindowSetSize(int, int)` sets; `#mainWindowGetBounds(int[])` answers
+    /// the client area. False when there is no window.
+    public static native boolean mainWindowGetFrame(int[] out);
+
     public static native int desktopWindowGetWidth(int slot);
 
     public static native int desktopWindowGetHeight(int slot);
@@ -488,6 +497,18 @@ public final class LinuxNative {
 
     public static native long getImageGraphics(long image);
 
+    /// Queues an image for disposal. Safe from any thread: this is what an image
+    /// handle's finalizer calls, on the collector's thread. Nothing is freed here.
+    public static native void releaseImage(long image);
+
+    /// The next queued image, or 0 when the queue is empty.
+    public static native long nextReleasedImage();
+
+    /// Destroys an image's surface and the graphics context cached for it, and
+    /// returns that context's pointer (0 if it never had one) so the caller can
+    /// forget what it kept under it. Drawing thread only.
+    public static native long disposeImage(long image);
+
     /* ------------------------------------------------------- filesystem */
 
     /**
@@ -517,6 +538,9 @@ public final class LinuxNative {
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);
 
+    /** How Tab ended the native edit: 1 forwards, 2 backwards, 0 when it did not. */
+    public static native int editTabbed(long peer);
+
     /** The native EDIT control's current text. */
     public static native String editGetText(long peer);
 
@@ -529,6 +553,13 @@ public final class LinuxNative {
 
     /** Why the most recent open failed, for the exception the port raises. */
     public static native String lastIoError();
+
+    /**
+     * A moment as the user's locale writes a date ({@code what == 0}) or a time
+     * of day ({@code what == 1}), in the local time zone; empty when it cannot
+     * be written.
+     */
+    public static native String formatLocalTime(long millis, int what);
 
     /* ---------------------------------------------------------- crypto */
 

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for this module. The report is a
+     zero-findings gate, so every entry is scoped and explained. -->
+<FindBugsFilter>
+
+    <!-- java.io.File's list() and listFiles() answer null, not an empty
+         array, for a path that is not a readable directory, and applications
+         test for exactly that. The shim and the host helper behind it keep
+         the JDK's contract. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.desktopcompat.shared.jdk.java.io.File"/>
+            <Class name="com.codename1.desktopcompat.shared.jdk.java.io.Host"/>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- File has toURI() and Path has toUri(): both spellings are the JDK's,
+         and an application calls each by its own name. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.shared.jdk.java.io.File"/>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+
+    <!-- java.nio.file.Path is an interface extending Comparable<Path>, as in
+         the JDK; the signature is not ours to change. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.shared.jdk.java.nio.file.Path"/>
+        <Bug pattern="CO_ABSTRACT_SELF"/>
+    </Match>
+
+    <!-- DirectoryIteratorException wraps THE IOException that stopped the
+         iteration and getCause() hands that same exception back, as the
+         JDK's does. A copy would be a different exception. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.shared.jdk.java.nio.file.DirectoryIteratorException"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- The generated registry makes itself the one installed registry
+         from its install path; there is one per application, and Codename
+         One runs it on the EDT. -->
+    <Match>
+        <Class name="com.codename1.desktopcompat.shared.CompatRegistryBase"/>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+
+    <!-- com.codename1.impl is the JavaSE port's JdkHost, copied in only so
+         the module compiles against core; it is left out of the jar and
+         analysed with the port it belongs to. -->
+    <Match>
+        <Package name="com.codename1.impl"/>
+    </Match>
+
+</FindBugsFilter>
