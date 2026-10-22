@@ -3,6 +3,7 @@ title: "Build an End-to-End Encrypted Messenger in Java with Parley"
 description: "Parley is a full-stack messaging application: end-to-end encrypted chats and groups, voice notes, voice and video calls, linked devices, privacy controls and an admin console, with a Java backend. Free MIT-0 source."
 url: "/parley/"
 summary: "A complete full-stack end-to-end encrypted messenger you can brand and extend."
+images: ["/developer-guide/img/parley-chats.png"]
 ShowToc: true
 ---
 
@@ -28,6 +29,11 @@ In the Initializr, choose the **Parley** messaging template, set your applicatio
 | Shared code | API contracts and data classes shared between the client and server |
 
 The same client project targets iOS, Android, desktop and the web, and the server runs on SQLite, PostgreSQL, MySQL and MariaDB.
+
+![Parley chat list](/developer-guide/img/parley-chats.png)
+![Parley conversation with the bot](/developer-guide/img/parley-bot-chat.png)
+![Parley video call](/developer-guide/img/parley-call-connected.png)
+![Parley admin console](/developer-guide/img/parley-admin-dashboard.png)
 
 ## From first run to customization
 
