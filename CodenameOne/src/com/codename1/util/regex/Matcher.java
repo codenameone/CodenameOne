@@ -197,6 +197,11 @@ public final class Matcher implements MatchResult {
         requireEnd = false;
         endAt = -1;
         for (int i = start; i <= to; i++) {
+            // A match never starts inside a surrogate pair, as on the JDK.
+            if (pattern.supplementary && i > from && i < to && Character.isLowSurrogate(text.charAt(i))
+                    && Character.isHighSurrogate(text.charAt(i - 1))) {
+                continue;
+            }
             clearGroups();
             if (pattern.root.match(this, i)) {
                 first = i;

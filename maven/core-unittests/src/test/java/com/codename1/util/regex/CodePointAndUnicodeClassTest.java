@@ -88,4 +88,42 @@ class CodePointAndUnicodeClassTest {
         assertTrue(Pattern.compile("(?U)\\b\u00e9").matcher(" \u00e9").find());
         assertTrue(matches("(?U)\\p{Alpha}", "\u03b1"));
     }
+
+    @Test
+    void aMatchNeverStartsInsideAPair() {
+        assertFalse(Pattern.compile("[^\\x{1F600}-\\x{1F64F}]").matcher(FACE).find());
+        assertFalse(Pattern.compile("[^\\x{10400}]", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                .matcher("\ud801\udc28").find());
+        assertFalse(Pattern.compile("\\uDE00").matcher(FACE).find());
+    }
+
+    @Test
+    void escapedAndQuotedPairsAreOneCodePoint() {
+        assertTrue(matches("\\uD83D\\uDE00", FACE));
+        assertTrue(matches("\\uD83D\\uDE00+", FACE + FACE));
+        assertTrue(matches("[\\uD83D\\uDE00]", FACE));
+        assertTrue(matches("\\Q" + FACE + "\\E", FACE));
+        assertTrue(matches("\\Q" + FACE + "\\E+", FACE + FACE));
+        assertTrue(matches(Pattern.quote("a" + FACE), "a" + FACE));
+        assertTrue(matches("[\\Q" + FACE + "\\E]", FACE));
+        assertFalse(Pattern.compile("[^\\Q" + FACE + "\\E]").matcher(FACE).find());
+    }
+
+    @Test
+    void anEmptyMatchBetweenTheHalvesUnlessThePatternNamesAPair() {
+        assertEquals("-\ud83d-\ude00-", Pattern.compile("x*").matcher(FACE).replaceAll("-"));
+    }
+
+    @Test
+    void binaryPropertiesAndCategoriesAnswerForAllOfUnicode() {
+        assertTrue(matches("\\p{IsPunctuation}", "!"));
+        assertTrue(matches("\\p{IsTITLECASE}", "\u01c5"));
+        assertTrue(Pattern.compile("\\p{IsTitlecase}", Pattern.CASE_INSENSITIVE).matcher("a").matches());
+        assertTrue(matches("\\p{IsJoin_Control}", "\u200d"));
+        assertTrue(matches("\\p{IsNoncharacter_Code_Point}", "\ufffe"));
+        assertFalse(matches("\\p{IsWhite_Space}", "\u001c"));
+        assertTrue(matches("\\p{L}", "\u0250"));
+        assertTrue(Pattern.compile("\\p{gc=Lu}", Pattern.CASE_INSENSITIVE).matcher("a").matches());
+        assertFalse(matches("\\p{Lu}", "\u2160"));
+    }
 }

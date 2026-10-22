@@ -53,6 +53,10 @@ import java.util.stream.StreamSupport;
 ///   (`\p{InGreek}`, `\p{block=Arrows}`) and general categories (`\p{Sc}`,
 ///   `\p{IsPd}`, `\p{gc=Mn}`), from the Unicode 15.0 tables of
 ///   [UnicodeTables].
+/// - The binary properties `IsDigit`, `IsPunctuation`, `IsTitlecase`, `IsControl`,
+///   `IsAssigned`, `IsHex_Digit`, `IsJoin_Control`,
+///   `IsNoncharacter_Code_Point`, `IsWord`, `IsAlnum`, `IsBlank`, `IsGraph`
+///   and `IsPrint`, in any case.
 /// - `UNICODE_CHARACTER_CLASS` (`(?U)`): `\d \w \s \b` and the POSIX
 ///   classes take their Unicode definitions, as on the JDK.
 /// - Greedy, reluctant and possessive quantifiers.
@@ -70,17 +74,17 @@ import java.util.stream.StreamSupport;
 /// `UnsupportedOperationException`) naming the construct, when the pattern
 /// is compiled. Nothing is accepted and then matched differently.
 ///
-/// - Binary properties other than the ones above (`\p{IsEmoji}`, ...).
+/// - Other binary properties (`\p{IsEmoji}`, `\p{IsIdeographic}`, ...).
 /// - `\X`, `\N{name}`, `\b{g}`.
 /// - `CANON_EQ`.
 ///
 /// #### Differences
 ///
 /// Text is matched one code point at a time, as on the JDK: `.` and a
-/// character class take a whole surrogate pair. Outside
-/// `UNICODE_CHARACTER_CLASS`, which characters `\p{L}` and its kin call
-/// letters is what `isLetter` in this class answers, the scripts a device
-/// font is likely to have rather than all of Unicode. A group repeated many thousand times
+/// character class take a whole surrogate pair. The Unicode properties and
+/// categories answer from the tables, for all of Unicode; `javaLetter` and
+/// its kin answer this class's own letter test, the scripts a device font is
+/// likely to have. A group repeated many thousand times
 /// over a long text recurses once for each repetition, as the JDK's does,
 /// on a stack that is smaller on a device.
 public final class Pattern {
@@ -104,6 +108,11 @@ public final class Pattern {
     final int groupCount;
     final int loopCount;
     final Map<String, Integer> names;
+    /// Whether the pattern names a supplementary code point or a surrogate.
+    /// Only then does a search skip the positions inside a surrogate pair,
+    /// as the JDK's does: otherwise `x*` finds an empty match between the
+    /// halves there too.
+    final boolean supplementary;
 
     private Pattern(String regex, int flags) {
         if (regex == null) {
@@ -120,6 +129,7 @@ public final class Pattern {
         this.regex = regex;
         Parser parser = new Parser(regex, flags);
         this.root = parser.compile();
+        this.supplementary = parser.supplementary;
         // As in the JDK, flags() reports the top-level state the parse ended
         // in: (?i) outside every group counts, (?i) inside one does not.
         this.flags = parser.topLevelFlags();
@@ -1219,10 +1229,23 @@ public final class Pattern {
         int groups;
         int loops;
         final Map<String, Integer> names = new HashMap<String, Integer>();
+        boolean supplementary;
 
         Parser(String pattern, int flags) {
             this.p = pattern;
             this.flags = flags;
+            for (int k = 0; k < pattern.length() && !supplementary; k++) {
+                char c = pattern.charAt(k);
+                supplementary = c >= 0xd800 && c <= 0xdfff;
+            }
+        }
+
+        /// Records a code point the pattern names, and returns it.
+        private int note(int c) {
+            if (c > 0xffff || c >= 0xd800 && c <= 0xdfff) {
+                supplementary = true;
+            }
+            return c;
         }
 
         private PatternSyntaxException error(String description) {
@@ -1271,6 +1294,7 @@ public final class Pattern {
         }
 
         private Piece literal(int c) {
+            note(c);
             if (has(CASE_INSENSITIVE)) {
                 boolean unicode = has(UNICODE_CASE);
                 boolean cased = c < 0x80 ? asciiLetter(c)
@@ -1375,16 +1399,21 @@ public final class Pattern {
                         end = p.length();
                     }
                     // A quantifier after the quotation applies to its last
-                    // character, so that one goes through the usual path.
-                    for (; at < end - 1; at++) {
-                        out.then(literal(p.charAt(at)));
+                    // code point, so that one goes through the usual path.
+                    if (at >= end) {
+                        at = Math.min(end + 2, p.length());
                     }
-                    if (at < end) {
-                        Piece last = literal(p.charAt(at));
-                        at = Math.min(end + 2, p.length());
-                        out.then(quantified(last));
-                    } else {
-                        at = Math.min(end + 2, p.length());
+                    while (at < end) {
+                        int cp = codePointAt(p, at, end);
+                        at += cp > 0xffff ? 2 : 1;
+                        if (at < end) {
+                            out.then(literal(cp));
+                        } else {
+                            Piece last = literal(cp);
+                            at = Math.min(end + 2, p.length());
+                            out.then(quantified(last));
+                            break;
+                        }
                     }
                     continue;
                 }
@@ -1771,7 +1800,22 @@ public final class Pattern {
                             throw error("Illegal Unicode escape sequence");
                         }
                     }
-                    return hex(4);
+                    int unit = hex(4);
+                    // Two escapes that spell a surrogate pair are one code
+                    // point, as on the JDK.
+                    if (unit >= 0xd800 && unit <= 0xdbff && at + 6 <= p.length() && p.charAt(at) == '\\'
+                            && p.charAt(at + 1) == 'u') {
+                        int low = 0;
+                        for (int k = 2; k < 6 && low >= 0; k++) {
+                            int d = Character.digit(p.charAt(at + k), 16);
+                            low = d < 0 ? -1 : low * 16 + d;
+                        }
+                        if (low >= 0xdc00 && low <= 0xdfff) {
+                            at += 6;
+                            return ((unit - 0xd800) << 10) + (low - 0xdc00) + 0x10000;
+                        }
+                    }
+                    return unit;
                 case 'c':
                     if (at >= p.length()) {
                         throw error("Illegal control escape sequence");
@@ -1868,6 +1912,17 @@ public final class Pattern {
             CharSet unicode = unicodeProperty(name, anyCase);
             if (unicode != null) {
                 return unicode;
+            }
+            // The Unicode binary properties come from the tables, so they
+            // answer exactly what the JDK does for every code point.
+            if (name.startsWith("Is")) {
+                CharSet binary = binaryProperty(name.substring(2));
+                if (binary != null) {
+                    return binary;
+                }
+            }
+            if (category(name.startsWith("Is") ? name.substring(2) : name) != 0) {
+                return tableProperty(name);
             }
             if ("Lower".equals(name)) {
                 return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('a', 'z');
@@ -2022,7 +2077,7 @@ public final class Pattern {
 
         /// Scripts, blocks and general categories, from [UnicodeTables];
         /// null for a name that is none of them.
-        private static CharSet tableProperty(String name) {
+        private CharSet tableProperty(String name) {
             int eq = name.indexOf('=');
             if (eq >= 0) {
                 String key = name.substring(0, eq);
@@ -2035,7 +2090,7 @@ public final class Pattern {
                 }
                 if ("general_category".equals(key) || "gc".equals(key)) {
                     int mask = category(value);
-                    return mask == 0 ? null : categories(mask);
+                    return mask == 0 ? null : caseless(mask);
                 }
                 return null;
             }
@@ -2044,14 +2099,100 @@ public final class Pattern {
             }
             if (name.startsWith("Is")) {
                 String rest = name.substring(2);
+                CharSet binary = binaryProperty(rest);
+                if (binary != null) {
+                    return binary;
+                }
                 int mask = category(rest);
                 if (mask != 0) {
-                    return categories(mask);
+                    return caseless(mask);
                 }
                 return script(rest);
             }
             int mask = category(name);
-            return mask == 0 ? null : categories(mask);
+            return mask == 0 ? null : caseless(mask);
+        }
+
+        /// The set a general category names. Under `CASE_INSENSITIVE` a case
+        /// category matches every cased character, as the JDK's does.
+        private CharSet caseless(int mask) {
+            int cased = 1 << Character.UPPERCASE_LETTER | 1 << Character.LOWERCASE_LETTER
+                    | 1 << Character.TITLECASE_LETTER;
+            return categories(has(CASE_INSENSITIVE) && (mask & cased) != 0 ? mask | cased : mask);
+        }
+
+        /// The JDK's binary properties that these tables can answer, named
+        /// without regard to case as the JDK reads them; null for any other.
+        private CharSet binaryProperty(String name) {
+            StringBuilder folded = new StringBuilder(name.length());
+            for (int k = 0; k < name.length(); k++) {
+                char c = name.charAt(k);
+                folded.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+            }
+            String key = folded.toString();
+            CharSet s = new CharSet(0);
+            if ("ALPHABETIC".equals(key)) {
+                return s.kind(CharSet.U_ALPHABETIC);
+            }
+            if ("DIGIT".equals(key)) {
+                return categories(1 << Character.DECIMAL_DIGIT_NUMBER);
+            }
+            if ("PUNCTUATION".equals(key)) {
+                return categories(PUNCTUATION);
+            }
+            if ("CONTROL".equals(key)) {
+                return categories(1 << Character.CONTROL);
+            }
+            if ("ASSIGNED".equals(key)) {
+                return categories(1 << Character.UNASSIGNED).not();
+            }
+            if ("HEXDIGIT".equals(key) || "HEX_DIGIT".equals(key)) {
+                return s.kind(CharSet.U_HEX_DIGIT);
+            }
+            if ("JOINCONTROL".equals(key) || "JOIN_CONTROL".equals(key)) {
+                return s.add(0x200c, 0x200d);
+            }
+            if ("NONCHARACTERCODEPOINT".equals(key) || "NONCHARACTER_CODE_POINT".equals(key)) {
+                s.add(0xfdd0, 0xfdef);
+                for (int plane = 0; plane <= 0x10; plane++) {
+                    s.add(plane * 0x10000 + 0xfffe, plane * 0x10000 + 0xffff);
+                }
+                return s;
+            }
+            if ("WHITESPACE".equals(key) || "WHITE_SPACE".equals(key)) {
+                return s.kind(CharSet.U_WHITE_SPACE);
+            }
+            if ("WORD".equals(key)) {
+                return s.kind(CharSet.U_WORD);
+            }
+            if ("ALNUM".equals(key)) {
+                return s.kind(CharSet.U_ALPHABETIC).unite(categories(1 << Character.DECIMAL_DIGIT_NUMBER));
+            }
+            if ("BLANK".equals(key)) {
+                return s.kind(CharSet.U_BLANK);
+            }
+            if ("GRAPH".equals(key)) {
+                return s.kind(CharSet.U_GRAPH);
+            }
+            if ("PRINT".equals(key)) {
+                return s.kind(CharSet.U_PRINT);
+            }
+            boolean anyCase = has(CASE_INSENSITIVE);
+            int cased = 1 << Character.TITLECASE_LETTER;
+            if ("LOWERCASE".equals(key)) {
+                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : s.kind(CharSet.U_LOWER);
+            }
+            if ("UPPERCASE".equals(key)) {
+                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : s.kind(CharSet.U_UPPER);
+            }
+            if ("TITLECASE".equals(key)) {
+                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : categories(cased);
+            }
+            if ("LETTER".equals(key)) {
+                return categories(1 << Character.UPPERCASE_LETTER | 1 << Character.LOWERCASE_LETTER
+                        | cased | 1 << Character.MODIFIER_LETTER | 1 << Character.OTHER_LETTER);
+            }
+            return null;
         }
 
         private static CharSet script(String name) {
@@ -2222,8 +2363,10 @@ public final class Pattern {
                         if (end < 0) {
                             throw error("Unclosed character class");
                         }
-                        for (; at < end; at++) {
-                            set.add(p.charAt(at));
+                        while (at < end) {
+                            int cp = codePointAt(p, at, end);
+                            set.add(note(cp));
+                            at += cp > 0xffff ? 2 : 1;
                         }
                         at = end + 2;
                         continue;
@@ -2271,6 +2414,11 @@ public final class Pattern {
                     if (hi < lo) {
                         throw error("Illegal character range");
                     }
+                }
+                note(lo);
+                note(hi);
+                if (lo < 0xd800 && hi > 0xdfff) {
+                    supplementary = true;
                 }
                 set.add(lo, hi);
             }
