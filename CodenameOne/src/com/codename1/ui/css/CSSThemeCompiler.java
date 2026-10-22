@@ -128,10 +128,11 @@ public class CSSThemeCompiler {
 
     /// The UIIDs (`$Dark` ones included) a rule of this compile styled, in first-seen order.
     private ArrayList<String> styledUiids = new ArrayList<String>();
-    /// For a base key an `A.unselected {}` rule overwrote: the value a bare `A {}` rule had set,
-    /// or NO_BARE_VALUE. Only that value is carried into the other states.
-    private Hashtable<String, Object> bareValues = new Hashtable<String, Object>();
-    private static final Object NO_BARE_VALUE = new Object();
+    /// The state prefix an `A.unselected {}` rule compiles into until mergeUnselected().
+    /// The build-time compiler keeps such a rule apart from a bare `A {}` rule: it wins over the
+    /// bare rule whatever the source order, yet only the bare rule's values reach the
+    /// selected, pressed and disabled states, and per-side insets start from the bare box.
+    private static final String UNSELECTED = "uns#";
 
     /// The style keys the build-time compiler carries from a UIID's unselected style into its
     /// selected, pressed and disabled ones. The font has its own pass in compileFonts.
@@ -200,7 +201,6 @@ public class CSSThemeCompiler {
         ownerDerives = new Hashtable<String, String>();
         styledUiids = new ArrayList<String>();
         boxSides = new Hashtable<String, Length[]>();
-        bareValues = new Hashtable<String, Object>();
         for (Rule rule : rules) {
             if (rule.legacyConstants) {
                 continue;
@@ -209,31 +209,7 @@ public class CSSThemeCompiler {
                 compileConstants(rule.declarations, theme, deferred, false);
                 continue;
             }
-            if (rule.universal || ":root".equals(rule.selector) || selector(rule.selector)[1].length() > 0) {
-                applyRule(theme, resources, rule, fonts, deferred);
-                continue;
-            }
-            // A base-state rule: remember, per key, what a bare `A {}` rule set before an
-            // `A.unselected {}` rule overwrote it, since only the bare value reaches the states.
-            String uiid = selector(rule.selector)[0];
-            boolean unselected = isUnselectedSelector(rule.selector);
-            Object[] before = new Object[STATE_INHERITED_KEYS.length];
-            for (int i = 0; i < before.length; i++) {
-                before[i] = theme.get(uiid + "." + STATE_INHERITED_KEYS[i]);
-            }
             applyRule(theme, resources, rule, fonts, deferred);
-            for (int i = 0; i < before.length; i++) {
-                String key = uiid + "." + STATE_INHERITED_KEYS[i];
-                Object after = theme.get(key);
-                if (after == null ? before[i] == null : after.equals(before[i])) {
-                    continue;
-                }
-                if (!unselected) {
-                    bareValues.remove(key);
-                } else if (!bareValues.containsKey(key)) {
-                    bareValues.put(key, before[i] == null ? NO_BARE_VALUE : before[i]);
-                }
-            }
         }
         markLiteralAliases(theme, deferred);
         compileFonts(theme, fonts);
@@ -255,6 +231,7 @@ public class CSSThemeCompiler {
                 theme.put(key, constantColor(resolved));
             }
         }
+        mergeUnselected(theme);
         // The build-time compiler also stores every `Default.*` property unprefixed: the
         // theme's root keys, which UIManager's default style reads.
         ArrayList<String> defaults = new ArrayList<String>();
@@ -917,8 +894,8 @@ public class CSSThemeCompiler {
         String uiid = selectorParts[0];
         String statePrefix = selectorParts[1];
         // Only a bare `A {}` rule reaches the other states in the build; `A.unselected {}`
-        // styles the unselected state alone.
-        if (!universal && !isUnselectedSelector(rule.selector)) {
+        // styles the unselected state alone (see UNSELECTED).
+        if (!universal && statePrefix.length() == 0) {
             styledUiids.add(uiid);
         }
         StringBuilder borderCss = new StringBuilder();
@@ -1187,9 +1164,8 @@ public class CSSThemeCompiler {
         }
         for (String uiid : styledUiids) {
             for (String key : STATE_INHERITED_KEYS) {
-                Object bare = bareValues.get(uiid + "." + key);
-                Object value = bare == null ? theme.get(uiid + "." + key) : bare;
-                if (value == null || value == NO_BARE_VALUE) {
+                Object value = theme.get(uiid + "." + key);
+                if (value == null) {
                     continue;
                 }
                 for (String state : states) {
@@ -1199,7 +1175,7 @@ public class CSSThemeCompiler {
                         continue;
                     }
                     theme.put(uiid + "." + state + key, value);
-                    Object binding = bare != null ? null : theme.get("@cn1-bind:" + uiid + "." + key);
+                    Object binding = theme.get("@cn1-bind:" + uiid + "." + key);
                     if (binding != null) {
                         theme.put("@cn1-bind:" + uiid + "." + state + key, binding);
                     }
@@ -2045,7 +2021,18 @@ public class CSSThemeCompiler {
         for (int i = 0; i < selector.length(); i++) {
             char c = selector.charAt(i);
             if (c == '\\') {
-                i++;
+                // `\41 B` is the UIID `AB`: up to six hex digits, then one whitespace
+                // character that belongs to the escape.
+                int digits = 0;
+                while (digits < 6 && i + 1 < selector.length() && hexDigit(selector.charAt(i + 1)) > -1) {
+                    i++;
+                    digits++;
+                }
+                if (digits == 0) {
+                    i++;
+                } else if (i + 1 < selector.length() && selector.charAt(i + 1) <= ' ') {
+                    i++;
+                }
             } else if (c <= ' ' || c == '>' || c == '+' || c == '~') {
                 return true;
             }
@@ -2053,17 +2040,9 @@ public class CSSThemeCompiler {
         return false;
     }
 
-    private static boolean isUnselectedSelector(String selector) {
-        String s = selector.trim();
-        int dot = s.indexOf('.');
-        int colon = s.indexOf(':');
-        int pos = dot < 0 ? colon : colon < 0 ? dot : Math.min(dot, colon);
-        return pos > -1 && "unselected".equals(s.substring(pos + 1).trim());
-    }
-
     private String statePrefix(String pseudo) {
         if ("unselected".equals(pseudo)) {
-            return "";
+            return UNSELECTED;
         }
         if ("selected".equals(pseudo)) {
             return "sel#";
@@ -2355,6 +2334,28 @@ public class CSSThemeCompiler {
     /// declared, else (for a state) the UIID's unselected box, which the build-time compiler's
     /// state style starts from, else zero. Unselected keys go first so a state can start from
     /// a box that itself had sides applied.
+    /// Lays every `A.uns#key` over `A.key`, with the binding that goes with it.
+    private static void mergeUnselected(Hashtable theme) {
+        ArrayList<String> keys = new ArrayList<String>();
+        for (Object k : theme.keySet()) {
+            if (k instanceof String && ((String) k).indexOf("." + UNSELECTED) > -1
+                    && !((String) k).startsWith("@")) {
+                keys.add((String) k);
+            }
+        }
+        for (String key : keys) {
+            int at = key.indexOf("." + UNSELECTED);
+            String base = key.substring(0, at + 1) + key.substring(at + 1 + UNSELECTED.length());
+            theme.put(base, theme.remove(key));
+            Object binding = theme.remove("@cn1-bind:" + key);
+            if (binding != null) {
+                theme.put("@cn1-bind:" + base, binding);
+            } else {
+                theme.remove("@cn1-bind:" + base);
+            }
+        }
+    }
+
     private void applyBoxSides(Hashtable theme) {
         for (int pass = 0; pass < 2; pass++) {
             for (Map.Entry<String, Length[]> entry : boxSides.entrySet()) {

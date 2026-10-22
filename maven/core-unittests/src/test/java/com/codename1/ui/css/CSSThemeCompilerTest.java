@@ -1735,4 +1735,30 @@ public class CSSThemeCompilerTest extends UITestBase {
         }
         return n;
     }
+
+    @Test
+    void testUnselectedIsALayerOverTheBareRule() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--c:#ff0000;}"
+                + " A{padding:1px} A.unselected{padding-top:5px}"
+                + " B{padding-top:2px} B.unselected{padding:5px} B{padding-left:3px}"
+                + " C{color:var(--c)} C.unselected{color:#00ff00}"
+                + " D.unselected{color:#222222} D{color:#333333}"
+                + " \\41 E{color:#123456}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("5,1,1,1", theme.get("A.padding"));
+        assertEquals("1,1,1,1", theme.get("A.sel#padding"));
+        assertEquals("5,5,5,5", theme.get("B.padding"));
+        assertEquals("2,0,3,0", theme.get("B.press#padding"));
+        assertEquals("00ff00", theme.get("C.fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("@cn1-bind:C.fgColor"));
+        assertEquals("c", theme.get("@cn1-bind:C.sel#fgColor"));
+        assertEquals("ff0000", theme.get("C.dis#fgColor"));
+        assertEquals("222222", theme.get("D.fgColor"));
+        assertEquals("333333", theme.get("D.sel#fgColor"));
+        assertEquals("123456", theme.get("AE.fgColor"));
+        for (Object k : theme.keySet()) {
+            org.junit.jupiter.api.Assertions.assertTrue(k.toString().indexOf("uns#") < 0, k.toString());
+        }
+    }
 }
