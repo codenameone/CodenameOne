@@ -30,6 +30,7 @@ import com.codename1.security.vault.VaultError;
 import com.codename1.security.vault.VaultException;
 import com.codename1.security.vault.VaultOptions;
 import com.codename1.util.Base64;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
 /// The app key: 32 random bytes that seal everything Bastion keeps on the
@@ -75,6 +76,10 @@ public final class Keys {
     private static final String BIO_ON = "bastion.keys.biometricOn";
     private static final String PIN_ON = "bastion.keys.pinOn";
     private static final String FAILURES = "bastion.keys.pinFailures";
+    private static final String OWNER = "bastion.keys.owner";
+    /// Set while a PIN vault is known to be on the device but its removal has
+    /// not been confirmed: the next wipe tries again.
+    private static final String VAULT_STALE = "bastion.keys.vaultStale";
     private static final String VAULT = "bastion-pin";
     private static final String SECRET = "app-key";
 
@@ -105,7 +110,15 @@ public final class Keys {
     }
 
     static SecureStorage storage() {
-        return storage != null ? storage : SecureStorage.getInstance();
+        if (storage != null) {
+            return storage;
+        }
+        SecureStorage platform = SecureStorage.getInstance();
+        // The strict binding is opt-in (installed apps keep their keys): on
+        // Android it binds the key on every API level and revokes it when a
+        // biometric is enrolled. Set before the first write creates the key.
+        platform.setStrictBiometricBinding(true);
+        return platform;
     }
 
     /// The key while unlocked, else null. Callers must not keep it.
@@ -155,10 +168,36 @@ public final class Keys {
         if (key != null) {
             return;
         }
+        if (Lock.isLocked()) {
+            // Never while locked: a refresh that failed behind the lock is
+            // not the user choosing to start over. The unlock decides.
+            return;
+        }
         if (exists() && !protectedByUser() && openPlain()) {
             return;
         }
         startOver();
+    }
+
+    /// After a sign-in, once the server has said who `username` is. A key
+    /// made for another account -- or a device key registered for one -- is
+    /// given up: the next user must not have their session sealed under the
+    /// previous user's key, nor sign with the previous user's device id.
+    /// Answers true when the key was replaced, and whatever was sealed under
+    /// the old one (the tokens just stored) has to be sealed again.
+    public static boolean claim(String username) {
+        if (username == null) {
+            return false;
+        }
+        String owner = Preferences.get(OWNER, "");
+        String deviceOwner = DeviceKey.owner();
+        boolean foreign = (owner.length() > 0 && !owner.equals(username))
+                || (deviceOwner != null && !deviceOwner.equals(username));
+        if (foreign) {
+            startOver();
+        }
+        Preferences.set(OWNER, username);
+        return foreign;
     }
 
     /// Opens the plain copy without asking: only when the user set up
@@ -185,23 +224,54 @@ public final class Keys {
         Preferences.set(MADE, true);
     }
 
-    /// Wipes every copy and the key in memory.
-    public static void wipe() {
+    /// Wipes every copy and the key in memory. Signing out calls this too:
+    /// the next account to sign in on this device starts from nothing.
+    ///
+    /// Every copy is removed whether or not the preferences say it was set
+    /// up: a flag that was lost or cleared (a revoked biometric, an
+    /// interrupted setup) must not leave a copy behind. The PIN vault's
+    /// removal is asynchronous; the answer completes when it is done, with
+    /// false when it failed -- the vault is then marked and removed again by
+    /// the next wipe or PIN setup, and is useless meanwhile: its pepper is
+    /// already gone.
+    public static AsyncResource<Boolean> wipe() {
         lock();
         SecureStorage store = storage();
         store.remove(PLAIN_ACCOUNT);
         store.remove(PEPPER_ACCOUNT);
-        if (biometricEnabled()) {
-            store.remove(null, BIO_ACCOUNT);
-        }
-        if (pinEnabled()) {
-            Vault.named(VAULT).destroyLocalData();
-        }
+        store.remove(null, BIO_ACCOUNT);
         Preferences.delete(MADE);
         Preferences.delete(BIO_ON);
         Preferences.delete(PIN_ON);
         Preferences.delete(FAILURES);
+        Preferences.delete(OWNER);
         DeviceKey.forget();
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Vault vault = vault();
+        if (vault == null || (!vault.isEnrolled() && !Preferences.get(VAULT_STALE, false))) {
+            Preferences.delete(VAULT_STALE);
+            out.complete(Boolean.TRUE);
+            return out;
+        }
+        Preferences.set(VAULT_STALE, true);
+        vault.destroyLocalData().ready(gone -> {
+            Preferences.delete(VAULT_STALE);
+            out.complete(Boolean.TRUE);
+        }).except(err -> out.complete(Boolean.FALSE));
+        return out;
+    }
+
+    private static Vault testVault;
+    private static boolean useTestVault;
+
+    /// Keeps the PIN vault somewhere else (the tests); null for none.
+    static void useVault(Vault vault) {
+        testVault = vault;
+        useTestVault = true;
+    }
+
+    private static Vault vault() {
+        return useTestVault ? testVault : Vault.named(VAULT);
     }
 
     // ---------------------------------------------------------- biometric
@@ -261,8 +331,12 @@ public final class Keys {
                     && ((BiometricException) err).getError() == BiometricError.KEY_REVOKED;
             if (gone) {
                 // Revoked by the OS: a biometric was enrolled since. The copy
-                // is dead; say so instead of offering it again.
+                // is dead; say so instead of offering it again, and remove
+                // the entry itself -- biometricEnabled() is false from here,
+                // so nothing else would.
                 Preferences.delete(BIO_ON);
+                storage().remove(null, BIO_ACCOUNT);
+                restorePlainIfUnprotected();
             }
             failed.onSucess(Boolean.valueOf(gone));
         });
@@ -305,7 +379,7 @@ public final class Keys {
             failed.onSucess("Choose 6 to 12 digits that are not a simple run.");
             return;
         }
-        final Vault vault = Vault.named(VAULT);
+        final Vault vault = vault();
         final char[] secret = encode(key).toCharArray();
         Runnable enroll = () -> {
             String pepper = encode(SecureRandom.bytes(32));
@@ -340,7 +414,7 @@ public final class Keys {
             done.run();
             return;
         }
-        Vault.named(VAULT).destroyLocalData().ready(gone -> {
+        vault().destroyLocalData().ready(gone -> {
             storage().remove(PEPPER_ACCOUNT);
             Preferences.delete(PIN_ON);
             Preferences.delete(FAILURES);
@@ -359,11 +433,10 @@ public final class Keys {
         final String pepper = storage().get(PEPPER_ACCOUNT);
         if (pepper == null) {
             // Without the pepper no PIN can be right: the OS store lost it.
-            wipe();
-            result.wiped();
+            wipe().ready(done -> result.wiped());
             return;
         }
-        final Vault vault = Vault.named(VAULT);
+        final Vault vault = vault();
         vault.unlockWithPassword(pinSecret(pin, pepper)).ready(ok -> vault.getSecret(SECRET)
                 .ready(chars -> {
                     vault.lock();
@@ -383,8 +456,7 @@ public final class Keys {
                             && ((VaultException) err).getError() == VaultError.AUTHENTICATION_FAILED) {
                         int failures = pinFailures() + 1;
                         if (failures >= PIN_ATTEMPTS) {
-                            wipe();
-                            result.wiped();
+                            wipe().ready(done -> result.wiped());
                         } else {
                             Preferences.set(FAILURES, failures);
                             result.wrong(PIN_ATTEMPTS - failures);

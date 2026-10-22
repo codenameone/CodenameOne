@@ -46,7 +46,7 @@ image::img/bastion-sign-in.png["The sign-in screen with fields for e-mail and pa
 *Open an account* on the sign-in screen walks through the steps a new customer takes:
 
 . *Name, e-mail and password.* The password has to be at least twelve characters and can't be the e-mail address; the server checks it too, not only the app.
-. *Authenticator app.* The app shows a QR code and the same secret as text. Scanning the code with any authenticator app and typing the six digits it shows turns on the second factor. The secret can be copied instead; the app wipes it from the clipboard after a short while, so that it doesn't stay where other apps can read it. Bastion then shows ten recovery codes, once. Each opens the account once if the phone is lost; keep them somewhere other than the phone.
+. *Authenticator app.* The app shows a QR code and the same secret as text. Scanning the code with any authenticator app and typing the six digits it shows turns on the second factor. The secret can be copied instead; the app wipes it from the clipboard after a minute or as soon as the app goes to the background, so that it doesn't stay where other apps can read it. Bastion then shows ten recovery codes, once, to write down: they aren't offered for copying, because a clipboard is readable by other apps. Each opens the account once if the phone is lost; keep them somewhere other than the phone.
 . *Passkey.* Where the device or browser supports passkeys, one can be added now, so that later sign-ins need no password at all.
 . *Unlock with biometrics.* An option on a phone with a fingerprint or face enrolled: the key that opens the stored sign-in and the payment key is released only by the biometric.
 . *Unlock PIN.* An option: six to twelve digits that open the lock when a biometric isn't available or isn't wanted. Five wrong PINs in a row erase the keys on the device, and the way back is signing in again.
@@ -64,7 +64,7 @@ image::img/bastion-sign-in-code.png["The second step of signing in, asking for t
 
 === The lock
 
-The app locks itself after half a minute in the background and after two minutes without a touch. Locked, it shows nothing of the account and can't sign a payment or read its stored sign-in until it's unlocked again: with biometrics when they're turned on, then with the unlock PIN when one is set, and otherwise by signing in again. Signing in again from the lock sets the device up from the start, so its payment key is registered again the next time a payment needs it.
+The app locks itself after half a minute in the background and after two minutes without a touch. Locked, it shows nothing of the account and can't sign a payment or read its stored sign-in until it's unlocked again: with biometrics when they're turned on, then with the unlock PIN when one is set, and otherwise by signing in again. Signing in again from the lock sets the device up from the start when a biometric or PIN was set up, so its payment key is registered again the next time a payment needs it. Signing out from the menu does the same, so whoever signs in next on the device starts with none of the previous account's keys.
 
 image::img/bastion-lock.png["The lock screen: Bastion is locked, a PIN field, an Unlock with PIN button and a Sign in again button",scaledwidth=40%]
 

@@ -64,21 +64,69 @@ on:
       - 'scripts/tests/GenerateInitializr.java'
       # The generator and the template.
       - 'scripts/initializr/common/src/**'
+      # Everything else this sample needs from the framework and the ports:
+      # the platform crypto and secure storage it signs and seals with, the
+      # browser bridge its passkeys go through, and the builders of the
+      # device projects.
+      - 'CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java'
+      - 'CodenameOne/src/com/codename1/io/Util.java'
+      - 'Ports/Android/**'
+      - 'Ports/iOSPort/**'
+      - 'Ports/JavaSE/src/**'
+      - 'vm/ByteCodeTranslator/src/javascript/browser_bridge.js'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/**'
       - '.github/workflows/bastion.yml'
+  # The same paths as pull_request: a change that a PR run would have
+  # checked is checked again when it lands.
   push:
     branches: [ master ]
     paths:
       - 'scripts/bastion/**'
       - 'vm/backend/src/**'
+      - 'vm/backend/impl/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/rest/**'
+      - 'CodenameOne/src/com/codename1/mapping/**'
+      # The device key, request signing, the vault, the shield and the second
+      # factor are all the core's.
       - 'CodenameOne/src/com/codename1/security/**'
+      # P-256 runs on the core's big numbers.
+      - 'CodenameOne/src/com/codename1/util/BigInteger.java'
+      - 'CodenameOne/src/com/codename1/util/BigDecimal.java'
+      - 'CodenameOne/src/com/codename1/util/TBigInteger.java'
+      - 'CodenameOne/src/com/codename1/util/TBigDecimal.java'
+      - 'CodenameOne/src/com/codename1/util/TBitLevel.java'
+      - 'CodenameOne/src/com/codename1/util/TDivision.java'
+      # The ORM validates every mapping against its migration when the
+      # server starts, and the backend-database job is where that runs
+      # against a real database.
       - 'CodenameOne/src/com/codename1/impl/orm/**'
       - 'CodenameOne/src/com/codename1/orm/**'
       - 'CodenameOne/src/com/codename1/annotations/**'
       - 'scripts/ci/sample-server-tests-on-database.sh'
+      - 'Ports/JavaScriptPort/src/main/**'
+      - 'scripts/build-android-app.sh'
+      - 'scripts/build-ios-app.sh'
       - 'scripts/sync-initializr-template.py'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/tests/GenerateInitializr.java'
+      # The generator and the template.
       - 'scripts/initializr/common/src/**'
+      # Everything else this sample needs from the framework and the ports:
+      # the platform crypto and secure storage it signs and seals with, the
+      # browser bridge its passkeys go through, and the builders of the
+      # device projects.
+      - 'CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java'
+      - 'CodenameOne/src/com/codename1/io/Util.java'
+      - 'Ports/Android/**'
+      - 'Ports/iOSPort/**'
+      - 'Ports/JavaSE/src/**'
+      - 'vm/ByteCodeTranslator/src/javascript/browser_bridge.js'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/**'
       - '.github/workflows/bastion.yml'
   workflow_dispatch:
 

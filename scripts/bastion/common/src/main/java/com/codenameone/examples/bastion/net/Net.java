@@ -58,10 +58,18 @@ public final class Net {
 
     /// The callback to hand a generated method: `ok` gets the result, `failed`
     /// everything else.
+    ///
+    /// Both are dropped when the session epoch moved on while the call was
+    /// out (the app locked, or the user signed out or in again): the answer
+    /// belongs to a session that is no longer on screen.
     public static <T> OnComplete<Response<T>> to(final Ok<T> ok, final Failed failed) {
+        final int epoch = Session.epoch();
         return new OnComplete<Response<T>>() {
             @Override
             public void completed(Response<T> response) {
+                if (epoch != Session.epoch()) {
+                    return;
+                }
                 if (response == null) {
                     lastCode = null;
                     failed.failed(0, Lang.tr("Could not reach the server. Check your connection."));

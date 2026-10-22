@@ -111,9 +111,12 @@ public final class LiveE2e {
                 + payee + "\",\"amount\":2500,\"memo\":\"lunch\"}";
         String key = id();
         alice.expect("POST", "/api/transfers", pay, key, null, 403);
-        String signature = alice.signature("POST", "/api/transfers", pay);
+        String signature = alice.signature("POST", "/api/transfers", pay, key);
         alice.expect("POST", "/api/transfers", pay, key, signature, 200);
-        alice.expect("POST", "/api/transfers", pay, id(), signature, 403);
+        // The Idempotency-Key is signed: the same request under a fresh key
+        // (and a fresh nonce) is refused, not paid twice.
+        alice.expect("POST", "/api/transfers", pay, id(), alice.signature("POST",
+                "/api/transfers", pay, key), 403);
         check(alice.balance(checking) == 500000 - 2500, "the payment left Alice's account");
         check(bob.balance(bob.first("USD", "CHECKING")) == 2500, "and reached Bob's");
 
@@ -133,15 +136,17 @@ public final class LiveE2e {
         step("coins leave only to an allow-listed address, after its cooling-off");
         String withdraw = "/api/accounts/" + aliceWallet + "/crypto-withdraw";
         String nowhere = "{\"addressId\":\"nope\",\"amount\":50000}";
-        alice.expect("POST", withdraw, nowhere, id(), alice.signature("POST", withdraw, nowhere),
-                403);
+        String nowhereKey = id();
+        alice.expect("POST", withdraw, nowhere, nowhereKey,
+                alice.signature("POST", withdraw, nowhere, nowhereKey), 403);
         String address = (String) alice.signed("POST", "/api/crypto/addresses",
                 "{\"asset\":\"BTC\",\"address\":\"bc1qexampleexampleexample0000\",\"label\":\"cold\"}",
                 null, 200).get("id");
         String there = "{\"addressId\":\"" + address + "\",\"amount\":50000}";
         alice.expect("POST", withdraw, there, id(), null, 403);
-        alice.expect("POST", withdraw, there, id(), alice.signature("POST", withdraw, there),
-                409);
+        String thereKey = id();
+        alice.expect("POST", withdraw, there, thereKey,
+                alice.signature("POST", withdraw, there, thereKey), 409);
         check(alice.balance(aliceWallet) == 100000L, "and nothing left the wallet");
     }
 
@@ -228,11 +233,13 @@ public final class LiveE2e {
             device = (String) d.get("id");
         }
 
-        String signature(String method, String target, String body) throws Exception {
+        String signature(String method, String target, String body, String idempotencyKey)
+                throws Exception {
             long ts = System.currentTimeMillis();
             String nonce = id();
             String text = method + "|" + target + "|" + hex(MessageDigest.getInstance("SHA-256")
-                    .digest(body.getBytes(StandardCharsets.UTF_8))) + "|" + nonce + "|" + ts;
+                    .digest(body.getBytes(StandardCharsets.UTF_8))) + "|"
+                    + (idempotencyKey == null ? "" : idempotencyKey) + "|" + nonce + "|" + ts;
             Signature signer = Signature.getInstance("SHA256withECDSA");
             signer.initSign(key.getPrivate());
             signer.update(text.getBytes(StandardCharsets.UTF_8));
@@ -242,7 +249,7 @@ public final class LiveE2e {
 
         Map signed(String method, String path, String body, String key, int status)
                 throws Exception {
-            return json(call(method, path, body, key, signature(method, path, body)), status);
+            return json(call(method, path, body, key, signature(method, path, body, key)), status);
         }
 
         void expect(String method, String path, String body, String key, String signature,

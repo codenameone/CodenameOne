@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.bastion.security;
 
+import com.codenameone.examples.bastion.api.DeviceDto;
 import com.codenameone.examples.bastion.api.SignedRequest;
+import com.codenameone.examples.bastion.api.UserDto;
+import com.codenameone.examples.bastion.net.Session;
 import com.codename1.security.KeyGenerator;
 import com.codename1.security.KeyPair;
 import com.codename1.impl.javase.JavaSEPort;
@@ -34,6 +37,8 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The signature the app sends is the one the server checks.
@@ -45,15 +50,19 @@ class RequestSignerTest {
     static final String BODY = "{\"amount\":1500,\"memo\":\"rent\"}";
     static final String NONCE = "AAECAwQFBgcICQoLDA0ODw";
     static final long TS = 1767225600000L;
+    static final String KEY = "idem-0123456789abcdef";
     static final String CANONICAL = "POST|/api/accounts/a1/withdraw|"
             + "27faf49a231437b9d9308db1799c1ab06d8665c087da17478d59acbefa20a125|"
-            + NONCE + "|" + TS;
+            + KEY + "|" + NONCE + "|" + TS;
 
     @Test
     void canonicalFormMatchesTheServers() throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(BODY.getBytes("UTF-8"));
         assertEquals(CANONICAL, SignedRequest.canonical("POST", "/api/accounts/a1/withdraw",
-                digest, NONCE, TS));
+                digest, KEY, NONCE, TS));
+        // No Idempotency-Key: an empty field, never a missing one.
+        assertTrue(SignedRequest.canonical("GET", "/x", digest, null, NONCE, TS)
+                .contains("||" + NONCE + "|"));
         // 16 bytes in base64url, the length RequestSigner.nonce() makes.
         assertTrue(SignedRequest.nonceShaped(NONCE));
     }
@@ -65,7 +74,7 @@ class RequestSignerTest {
         Util.setImplementation(new JavaSEPort());
         KeyPair pair = KeyGenerator.ecP256();
         String header = RequestSigner.header("dev1", pair.getPrivateKey(), "POST",
-                "/api/accounts/a1/withdraw", BODY.getBytes("UTF-8"), NONCE, TS);
+                "/api/accounts/a1/withdraw", KEY, BODY.getBytes("UTF-8"), NONCE, TS);
         assertTrue(header.startsWith("v1;device=dev1;ts=" + TS + ";nonce=" + NONCE + ";sig="),
                 header);
         byte[] jose = Base64.getUrlDecoder().decode(SignedRequest.field(header, "sig"));
@@ -77,6 +86,37 @@ class RequestSignerTest {
         verifier.initVerify(key);
         verifier.update(CANONICAL.getBytes("UTF-8"));
         assertTrue(verifier.verify(der(jose)));
+    }
+
+    /// A device key registered for one account never signs for another: the
+    /// next user on the device would otherwise sign under the previous user's
+    /// device id.
+    @Test
+    void aKeyRegisteredForAnotherAccountDoesNotSign() throws Exception {
+        Util.setImplementation(new JavaSEPort());
+        Keys.useStorage(new MemoryStorage());
+        Keys.useVault(null);
+        Keys.startOver();
+        try {
+            Session.useUser(user("alice@bastion.example"));
+            KeyPair pair = KeyGenerator.ecP256();
+            DeviceKey.keep("alice@bastion.example", pair.getPrivateKey(),
+                    new DeviceDto("dev-a", "test", false, true, true, 0L), device -> { },
+                    (status, message) -> { throw new AssertionError(message); });
+            assertNotNull(RequestSigner.sign("POST", "/api/transfers", "k", null));
+
+            Session.useUser(user("bob@bastion.example"));
+            assertNull(RequestSigner.sign("POST", "/api/transfers", "k", null));
+            Session.useUser(null);
+            assertNull(RequestSigner.sign("POST", "/api/transfers", "k", null));
+        } finally {
+            Session.useUser(null);
+            Keys.wipe();
+        }
+    }
+
+    static UserDto user(String name) {
+        return new UserDto(name, name, true, false, false, 0, 0L);
     }
 
     @Test

@@ -101,8 +101,21 @@ public final class Lock {
         locked = true;
         DeviceKey.dropFromMemory();
         Keys.lock();
+        // The tokens go too: nothing renews behind the lock (the rotated
+        // refresh token could not be sealed while the key is closed, and
+        // would be lost), every answer still on its way is dropped (the
+        // session epoch moves), and the unlock reads them back from the
+        // sealed store (Session#restore).
+        Session.suspend();
         hidden = CN.getCurrentForm();
         screens.showLocked();
+    }
+
+    /// A form something asked to show while the app is locked -- an answer
+    /// that arrived after the lock. It is not shown; it becomes the form the
+    /// unlock goes back to.
+    public static void defer(Form form) {
+        hidden = form;
     }
 
     /// Locks at start, before the stored session is read: its refresh token
@@ -119,6 +132,7 @@ public final class Lock {
     /// The app went to the background.
     public static void paused() {
         backgroundSince = System.currentTimeMillis();
+        Protect.paused();
     }
 
     /// The app is in front again.

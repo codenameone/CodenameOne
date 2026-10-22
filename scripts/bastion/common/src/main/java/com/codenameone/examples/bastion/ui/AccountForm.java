@@ -138,19 +138,44 @@ public final class AccountForm {
             Dialog.show(Lang.tr("Amount"), Lang.tr("Enter an amount, like 25.00."), Lang.tr("OK"), null);
             return;
         }
-        // One key for this action, kept across the retry after registering.
-        final String key = RequestSigner.idempotencyKey();
         final CashDto cash = new CashDto(units, deposit ? "Deposit" : "Cash withdrawal");
+        // One key for this action, kept across the retry after registering
+        // AND across a second dialog for the same amount after a failure whose
+        // answer was lost -- as TransferForm does -- so trying again cannot
+        // move the money twice. A success forgets it: the next one is new.
+        final String key = keyFor(account.id() + (deposit ? "|in|" : "|out|") + units);
         DeviceSetup.withDevice(failed -> {
-            Net.Ok<ReceiptDto> ok = receipt -> done.run();
+            Net.Ok<ReceiptDto> ok = receipt -> {
+                forgetKey();
+                done.run();
+            };
             if (deposit) {
                 Api.banking().deposit(account.id(), key, cash, Net.to(ok, failed));
             } else {
                 String target = "/api/accounts/" + account.id() + "/withdraw";
-                Api.banking().withdraw(account.id(), key, RequestSigner.sign("POST", target, cash),
+                Api.banking().withdraw(account.id(), key, RequestSigner.sign("POST", target, key,
+                        cash),
                         cash, Net.to(ok, failed));
             }
         }, (status, message) -> Dialog.show(Lang.tr("Not done"), Lang.tr(message),
                 Lang.tr("OK"), null));
+    }
+
+    private static String triedAction;
+    private static String triedKey;
+
+    /// The idempotency key for `action` (account, direction and amount): the
+    /// one the last unfinished try of the same action used, else a new one.
+    static String keyFor(String action) {
+        if (triedKey == null || !action.equals(triedAction)) {
+            triedAction = action;
+            triedKey = RequestSigner.idempotencyKey();
+        }
+        return triedKey;
+    }
+
+    static void forgetKey() {
+        triedAction = null;
+        triedKey = null;
     }
 }

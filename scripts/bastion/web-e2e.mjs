@@ -568,6 +568,15 @@ try {
     }
     await page.screenshot({ path: path.join(out, '5-device.png') });
     say('registered this browser as a device after a passkey sign-in');
+
+    // 7. A reload keeps the session: the stored one opens behind the lock
+    // (there is no PIN or biometric here, so the lock asks for the password)
+    // instead of the app forgetting it and showing the sign-in form.
+    await page.reload({ waitUntil: 'load' });
+    await waitFor('the lock after a reload', startSeconds, async () =>
+        /Bastion is locked/.test(await screenText()));
+    await page.screenshot({ path: path.join(out, '6-reload.png') });
+    say('a reload found the stored session');
   }
 
   if (tour) {

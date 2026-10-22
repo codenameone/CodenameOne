@@ -47,8 +47,9 @@ import java.util.List;
 ///   `v1;device=<id>;ts=<millis>;nonce=<random>;sig=<base64url>`, where `sig`
 ///   is the device key's ES256 signature (r and s, 32 bytes each, as JOSE
 ///   writes them) of
-///   `METHOD|path|hex(sha256(body))|nonce|ts`. The body is the exact bytes
-///   sent, so the client serializes once and signs what it sends. A stolen
+///   `METHOD|path|hex(sha256(body))|idempotency-key|nonce|ts` (the key empty
+///   for a call without one, so a signed request cannot be replayed under a
+///   fresh key). The body is the exact bytes sent, so the client serializes once and signs what it sends. A stolen
 ///   access token alone therefore cannot move money out: it needs the private
 ///   key, which never leaves the device's key store.
 ///

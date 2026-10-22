@@ -25,6 +25,7 @@ import com.codename1.security.SecureRandom;
 import com.codename1.security.Signature;
 import com.codename1.util.Base64;
 import com.codenameone.examples.bastion.api.SignedRequest;
+import com.codenameone.examples.bastion.net.Session;
 
 import java.io.UnsupportedEncodingException;
 
@@ -33,23 +34,33 @@ import java.io.UnsupportedEncodingException;
 ///
 /// The signature covers the exact body bytes, so it is made over the very
 /// text the typed client sends: the generated client writes a `@Body` as
-/// `Mappers.toJson(body)` in UTF-8, and [#sign(String, String, Object)] hashes
+/// `Mappers.toJson(body)` in UTF-8, and [#sign(String, String, String, Object)] hashes
 /// that same string. Sign the object you then pass, unchanged, to the call.
 public final class RequestSigner {
     private RequestSigner() {
     }
 
     /// The `Bastion-Signature` header for `method target` carrying `body` (a
-    /// mapped DTO, or null for no body), or null when this device has no
-    /// registered key yet -- the server then answers 403 for anything that
-    /// needs one, and the app offers to register the device.
-    public static String sign(String method, String target, Object body) {
+    /// mapped DTO, or null for no body) under `idempotencyKey` (the request's
+    /// `Idempotency-Key`, or null when it has none), or null when this device
+    /// has no registered key yet -- the server then answers 403 for anything
+    /// that needs one, and the app offers to register the device.
+    ///
+    /// Also null when the key was registered for another account than the one
+    /// signed in: it would sign this user's payment under the previous user's
+    /// device id. [Keys#claim] gives such a key up after a sign-in; this is the
+    /// last line in case anything ever skips it.
+    public static String sign(String method, String target, String idempotencyKey,
+            Object body) {
         String deviceId = DeviceKey.deviceId();
-        PrivateKey key = DeviceKey.privateKey();
-        if (deviceId == null || key == null) {
+        if (deviceId == null || !DeviceKey.ownedBy(Session.username())) {
             return null;
         }
-        return header(deviceId, key, method, target, bodyBytes(body), nonce(),
+        PrivateKey key = DeviceKey.privateKey();
+        if (key == null) {
+            return null;
+        }
+        return header(deviceId, key, method, target, idempotencyKey, bodyBytes(body), nonce(),
                 System.currentTimeMillis());
     }
 
@@ -62,11 +73,12 @@ public final class RequestSigner {
     }
 
     /// The header for the given parts; the deterministic core of
-    /// [#sign(String, String, Object)], which the tests check against the
+    /// [#sign(String, String, String, Object)], which the tests check against the
     /// server's form.
     public static String header(String deviceId, PrivateKey privateKey, String method,
-            String target, byte[] body, String nonce, long ts) {
-        String text = SignedRequest.canonical(method, target, Hash.sha256(body), nonce, ts);
+            String target, String idempotencyKey, byte[] body, String nonce, long ts) {
+        String text = SignedRequest.canonical(method, target, Hash.sha256(body), idempotencyKey,
+                nonce, ts);
         byte[] der = Signature.sign(Signature.SHA256_WITH_ECDSA, privateKey, utf8(text));
         return SignedRequest.header(deviceId, ts, nonce, Base64.encodeUrlSafe(jose(der)));
     }

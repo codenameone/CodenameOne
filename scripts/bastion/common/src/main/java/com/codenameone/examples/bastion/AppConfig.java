@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion;
 
-import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 
 import java.util.Hashtable;
 import java.util.Vector;
@@ -28,10 +28,12 @@ import java.util.Vector;
 /// them security settings, and each one read by the Security Center screen so
 /// the user sees what is in force.
 public final class AppConfig {
-    /// Where the server is when nothing says otherwise: a server started on
-    /// this machine with `cn1:backend`. A release points this at an `https`
-    /// address; see [#isDevelopmentServer].
-    public static final String DEFAULT_SERVER = "http://localhost:8080";
+    /// Where a release talks to when nothing says otherwise. Replace with the
+    /// deployment's API address; its host must be in [#ALLOWED_HOSTS].
+    public static final String RELEASE_SERVER = "https://api.bastion.example";
+    /// Where the simulator talks to: a server started on this machine with
+    /// `cn1:backend`. Only a development run uses it ([#developmentAllowed]).
+    public static final String DEVELOPMENT_SERVER = "http://localhost:8080";
     /// The id the server knows this app by (`SecurityConfig.CLIENT_ID`).
     public static final String CLIENT_ID = "bastion-app";
     /// The redirect the server hands the authorization code back on. The app
@@ -73,27 +75,51 @@ public final class AppConfig {
     /// clipboard.
     public static final long CLIPBOARD_CLEAR_MILLIS = 60 * 1000L;
 
-    private static final String SERVER_KEY = "bastion.server";
-
     private AppConfig() {
     }
 
     /// The server's address with no trailing slash: a `bastion.server.url`
     /// system property (the tests), then -- in a browser -- the address the
     /// page came from, since the server that hosts the app is the server it
-    /// talks to, then the one chosen in the app, then [#DEFAULT_SERVER].
+    /// talks to, then [#DEVELOPMENT_SERVER] in a development run, else
+    /// [#RELEASE_SERVER].
     public static String serverUrl() {
         String url = System.getProperty("bastion.server.url");
         if (url == null || url.length() == 0) {
             String origin = pageOrigin();
-            url = origin != null ? origin : Preferences.get(SERVER_KEY, DEFAULT_SERVER);
+            url = origin != null ? origin
+                    : developmentAllowed() ? DEVELOPMENT_SERVER : RELEASE_SERVER;
         }
         return clean(url);
+    }
+
+    /// Whether this run may use a development server at all: in the
+    /// simulator, under the tests (which name their server), or in a page
+    /// served from this machine -- which is itself cleartext from loopback,
+    /// so talking back to it adds nothing. An installed app on a phone is
+    /// none of these, so a release build never has the exemption, whatever
+    /// address it is handed.
+    public static boolean developmentAllowed() {
+        String testing = System.getProperty("bastion.server.url");
+        if (testing != null && testing.length() > 0) {
+            return true;
+        }
+        if (!Display.isInitialized()) {
+            return false;
+        }
+        if (CN.isSimulator()) {
+            return true;
+        }
+        String origin = pageOrigin();
+        return origin != null && isLoopback(hostOf(origin));
     }
 
     /// The address of the page the app is running in -- `https://host`, with
     /// no path -- or null when it is not running in a browser.
     public static String pageOrigin() {
+        if (!Display.isInitialized()) {
+            return null;
+        }
         String origin = CN.getProperty("browser.window.location.origin", null);
         if (origin == null || !(origin.regionMatches(true, 0, "http://", 0, 7)
                 || origin.regionMatches(true, 0, "https://", 0, 8))) {
@@ -113,39 +139,24 @@ public final class AppConfig {
         return origin == null ? REDIRECT_URI : origin + WEB_REDIRECT_PATH;
     }
 
-    /// Whether the app may be pointed at another server. Not in a browser:
-    /// there the code comes back to the page's own server, which no other
-    /// server has registered as one of its addresses.
-    public static boolean serverSwitchable() {
-        return pageOrigin() == null;
-    }
-
-    /// Points the app at another server. Refused unless the address is
-    /// an `https` address of a host in [#ALLOWED_HOSTS], or the development
-    /// server on this machine: the app is never talked into plain HTTP, or
-    /// into a server nobody listed, from a settings screen.
-    public static boolean setServerUrl(String url) {
-        if (!serverSwitchable()) {
-            return false;
-        }
-        String cleaned = clean(url);
-        if (!isDevelopmentServer(cleaned)
-                && (!isHttps(cleaned) || !isAllowedHost(hostOf(cleaned)))) {
-            return false;
-        }
-        Preferences.set(SERVER_KEY, cleaned);
-        return true;
-    }
-
-    /// Whether `url` is a server on this machine: `localhost` or a loopback
-    /// address. The ONE exemption from "no cleartext": a development server
+    /// Whether `url` is a development server this run may use: one on this
+    /// machine (`localhost` or a loopback address), in a run where
+    /// [#developmentAllowed]. The ONE exemption from "no cleartext": a server
     /// started with `cn1:backend` has no certificate, and traffic to it never
     /// leaves the machine. It is also exempt from the host allow-list and the
     /// pins, and the Security Center says so in red while it is in use.
+    ///
+    /// The Android emulator's alias for the host machine (`10.0.2.2`) is
+    /// deliberately not one: that traffic crosses a virtual network into
+    /// another machine, and an app on an emulator is a release-shaped build.
+    /// Point an emulator at an `https` address instead.
     public static boolean isDevelopmentServer(String url) {
-        String host = hostOf(url);
-        return "localhost".equals(host) || "127.0.0.1".equals(host) || "[::1]".equals(host)
-                || "10.0.2.2".equals(host);
+        return isLoopback(hostOf(url)) && developmentAllowed();
+    }
+
+    /// Whether `host` (lower case) is this machine.
+    static boolean isLoopback(String host) {
+        return "localhost".equals(host) || "127.0.0.1".equals(host) || "[::1]".equals(host);
     }
 
     /// Whether `host` (lower case) is one of [#ALLOWED_HOSTS].
@@ -176,24 +187,37 @@ public final class AppConfig {
         } else {
             return null;
         }
+        // The authority runs to the first '/', '?' or '#'. Inside it the host
+        // follows the LAST '@' (user info may hold ':' and '@' of its own:
+        // `http://localhost:1@evil.example/` is a request to evil.example),
+        // and ends at the port's ':' -- after the ']' of an IPv6 literal.
         int end = start;
-        boolean bracket = end < url.length() && url.charAt(end) == '[';
         while (end < url.length()) {
             char c = url.charAt(end);
-            if (c == '/' || c == '?' || c == '#' || (!bracket && c == ':')) {
-                break;
-            }
-            if (bracket && c == ']') {
-                end++;
+            if (c == '/' || c == '?' || c == '#' || c == '\\') {
                 break;
             }
             end++;
         }
-        int at = url.lastIndexOf('@', end);
-        if (at >= start) {
-            start = at + 1;
+        String authority = url.substring(start, end);
+        int at = authority.lastIndexOf('@');
+        String host = at >= 0 ? authority.substring(at + 1) : authority;
+        if (host.startsWith("[")) {
+            int close = host.indexOf(']');
+            if (close < 0 || (close + 1 < host.length() && host.charAt(close + 1) != ':')) {
+                return null;
+            }
+            host = host.substring(0, close + 1);
+        } else {
+            int colon = host.indexOf(':');
+            if (colon >= 0) {
+                host = host.substring(0, colon);
+            }
         }
-        return asciiLower(url.substring(start, end));
+        if (host.length() == 0) {
+            return null;
+        }
+        return asciiLower(host);
     }
 
     /// [#PINS] as a host-to-`Vector` table, the shape `PinSet` takes.
@@ -228,7 +252,7 @@ public final class AppConfig {
             text = text.substring(0, text.length() - 1);
         }
         if (text.length() == 0) {
-            return DEFAULT_SERVER;
+            return developmentAllowed() ? DEVELOPMENT_SERVER : RELEASE_SERVER;
         }
         if (!text.regionMatches(true, 0, "http://", 0, 7)
                 && !text.regionMatches(true, 0, "https://", 0, 8)) {

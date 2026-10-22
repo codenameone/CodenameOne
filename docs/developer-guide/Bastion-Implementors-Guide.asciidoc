@@ -54,7 +54,7 @@ Every call that sends value away carries a `Bastion-Signature` header made by `s
 Bastion-Signature: v1;device=<id>;ts=<millis>;nonce=<random>;sig=<base64url r||s>
 ----
 
-The signature is ECDSA P-256 with SHA-256 over `METHOD|target|hex(sha256(body))|nonce|ts`, built by `SignedRequest` in `shared` so that both sides compute the same bytes. The app signs the exact JSON it sends. The server (`money/RequestSigning.java`) refuses an unknown device, a bad signature, a timestamp outside the window or a nonce it has seen, and commits the nonce in its own transaction before the money transaction starts, so a replay that races the original still loses.
+The signature is ECDSA P-256 with SHA-256 over `METHOD|target|hex(sha256(body))|idempotency-key|nonce|ts`, built by `SignedRequest` in `shared` so that both sides compute the same bytes. The app signs the exact JSON it sends. The `Idempotency-Key` is signed too (an empty field for a call without one): otherwise a captured request could be sent again under a fresh key and its fresh nonce, and the server would take it for a new payment. The server (`money/RequestSigning.java`) refuses an unknown device, a bad signature, a timestamp outside the window or a nonce it has seen, and commits the nonce in its own transaction before the money transaction starts, so a replay that races the original still loses.
 
 A refusal is answered as `(code|value|value) English text`. The code is one of the `Refusal` constants; the app looks it up as `error.<code>` in its own bundle (`net/Net.java`), so the customer reads it in their language and a reworded English sentence never breaks a translation. `ui/DeviceSetup.java` reacts to the device codes: it offers to register a key and then sends the same request again, with a fresh nonce and the same idempotency key.
 
@@ -99,7 +99,7 @@ The last column says whether the feature needs a build from the Codename One bui
 |Rate limits |Per-address limits on sign-in, registration and transfers. |`SecurityConfig.java` |No
 |Headers |`nosniff`, frame denial, `no-store`, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java` |No
 |Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java` |No
-|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again unless the sign-in had a second factor or a passkey. |`money/Devices.java` |No
+|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again unless the sign-in had a second factor or a passkey. A registration without a platform attestation token is recorded as untrusted, and an untrusted device's signature is refused for any money leaving the customer's accounts. If the app locks while a registration is on its way, the app revokes the server's record of that device after the next unlock. |`money/Devices.java` |No
 |Request signing |Signature, timestamp window and single-use nonce on every call that sends value away. |`money/RequestSigning.java`, `SignedRequest.java` |No
 |Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java` |No
 |Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see <<bastion-before-product>>. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java` |Token: yes
@@ -115,15 +115,15 @@ The last column says whether the feature needs a build from the Codename One bui
 [cols="2,4,3,1",options="header"]
 |===
 |Feature |What it does |Where |Cloud build?
-|Network guard |Installed before the first request: no cleartext except to a development server on this machine, a host allow-list, and certificate pins, through `AppShield`. |`net/Guard.java`, `AppConfig.java` |No
+|Network guard |Installed before the first request: no cleartext, a host allow-list, and certificate pins, through `AppShield`. If the guard can't be installed the app shows a fatal screen and makes no request. A pinned host that presents no certificate chain, as a connection resumed from a TLS cache can, fails like a mismatch. The one exemption from cleartext is a server on this machine, and only in the simulator, under the tests or in a page served from this machine; an installed app never has it. |`net/Guard.java`, `AppConfig.java` |No
 |Over-the-air pins and attestation tokens |`AppShield`'s attestation engine fetches pins and stamps requests with a token. |`net/Guard.java` |Yes
 |Sign-in |Password and second-factor step, then the authorization-code flow with PKCE; passkey sign-in, in a browser too. |`net/Session.java` |No
 |App key |32 random bytes that seal the device key and the stored tokens, held in memory only while unlocked. Copies: one in the biometric tier of `SecureStorage` (an iOS Keychain item with biometric access control, an Android Keystore key that requires user authentication), one in a `Vault` opened by the unlock PIN through its `KdfProfile` with a pepper from the OS store, and a plain copy only while neither exists. Five wrong PINs wipe every copy. |`security/Keys.java`, `security/SealedStorage.java` |No (biometric binding: a device)
 |Token storage |Tokens sealed under the app key in `SecureStorage`: the Keychain on iOS, the Keystore-backed store on Android. |`net/Session.java`, `security/SealedStorage.java` |No
 |Device key |A P-256 pair from `KeyGenerator.ecP256()`, the private half sealed with AES-256-GCM in a `SecureEnvelope` under the app key. |`security/DeviceKey.java` |No
 |Request signer |Signs the exact bytes the request sends, in the canonical form the server checks. |`security/RequestSigner.java` |No
-|App lock |Locks on start with a stored session, after 30 seconds in the background and after two minutes idle; biometric, then PIN, then a fresh sign-in. |`security/Lock.java`, `ui/LockForm.java` |No
-|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself. |`security/Protect.java` |No (a device)
+|App lock |Locks on start with a stored session, after 30 seconds in the background and after two minutes idle; biometric, then PIN, then a fresh sign-in. Locking also drops the session's tokens from memory and ignores every answer still on its way; the unlock reads the tokens back from the sealed store. Signing out erases every key on the device, and a sign-in by another account starts the device over. |`security/Lock.java`, `ui/LockForm.java` |No
+|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself after a minute, when the app goes to the background, and at the next start. Codename One can't mark a clip as sensitive, so recovery codes are shown and never copied. |`security/Protect.java` |No (a device)
 |App switcher cover |A blank card in the iOS app switcher. |`codenameone_settings.properties` |Yes
 |Root and jailbreak |Root signals reported to the server; a jailbroken iPhone refuses to start. |`security/DeviceKey.java`, `codenameone_settings.properties` |Jailbreak exit: yes
 |Code hardening |Class renaming, string encryption, control-flow flattening and tamper checks. |`codenameone_settings.properties` |Yes
@@ -175,7 +175,7 @@ The server reads these at start-up. A system property of the same name wins, the
 |`bastion.market-maker.enabled` |`true` (development only) |The random-walk market maker.
 |===
 
-In the app, `AppConfig.java` holds the server address the app defaults to, `ALLOWED_HOSTS` and the certificate `PINS`. The pins in the sample are placeholders, and the Security Center warns about them until they're the SHA-256 digests of the real server's public keys.
+In the app, `AppConfig.java` holds the address a release talks to, `RELEASE_SERVER`, the development server the simulator talks to, `ALLOWED_HOSTS` and the certificate `PINS`. The pins in the sample are placeholders, and the Security Center warns about them until they're the SHA-256 digests of the real server's public keys.
 
 === The API
 
@@ -257,7 +257,7 @@ The server's tests cover the ledger's invariants under concurrent transfers and 
 === Making it yours
 
 * *Name, icon and colors.* The name and package come from the Initializr, the icon is `common/icon.png`, and the colors are the variables at the top of `common/src/main/css/theme.css`, with a dark set below them.
-* *Server address and pins.* Set `AppConfig.ALLOWED_HOSTS` to your API's host and `AppConfig.PINS` to its key digests before the first release build.
+* *Server address and pins.* Set `AppConfig.RELEASE_SERVER` to your API's `https` address, `AppConfig.ALLOWED_HOSTS` to its host and `AppConfig.PINS` to its key digests before the first release build.
 * *Languages.* The bundles are in `common/src/main/l10n`; `BundleTest` checks that every bundle has every key and every server refusal code.
 * *Markets and assets.* `bastion.markets` lists the markets; the assets are rows in the ledger's migrations (`V2__ledger.sql`), served to the app by `/api/assets`.
 * *Limits.* Every limit and cooling-off period is a setting in the table above.

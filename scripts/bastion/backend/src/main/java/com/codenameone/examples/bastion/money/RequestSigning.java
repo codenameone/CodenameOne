@@ -144,7 +144,8 @@ public class RequestSigning {
         byte[] body = request.getBodyBytes();
         // The form both sides read from shared: the app signs exactly this.
         String signed = SignedRequest.canonical(request.getMethod(), request.getTarget(),
-                Crypto.sha256(body == null ? new byte[0] : body), nonce, at);
+                Crypto.sha256(body == null ? new byte[0] : body),
+                request.getHeader("Idempotency-Key"), nonce, at);
         boolean valid;
         try {
             valid = Crypto.verify("ES256", key, signed.getBytes("UTF-8"),

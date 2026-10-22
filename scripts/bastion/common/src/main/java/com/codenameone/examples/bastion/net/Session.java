@@ -162,6 +162,11 @@ public final class Session {
         return key.toString();
     }
 
+    /// Says who is signed in without asking the server (the tests).
+    public static void useUser(UserDto signedIn) {
+        user = signedIn;
+    }
+
     /// Keeps the tokens somewhere else (the tests keep them in memory).
     public static void useStore(TokenStore tokens) {
         store = tokens;
@@ -177,6 +182,44 @@ public final class Session {
 
     public static UserDto user() {
         return user;
+    }
+
+    /// The session epoch: moves on at every sign-in, sign-out, server change
+    /// and lock. A callback made in one epoch is dropped in another
+    /// ([Net#to]), so an answer that arrives after the lock never paints an
+    /// account screen.
+    public static int epoch() {
+        return session;
+    }
+
+    /// The app locked: the tokens are dropped from memory (not from the
+    /// sealed store), which also abandons a renewal in progress, and the
+    /// epoch moves on. [#restore] picks them up again after the unlock.
+    ///
+    /// A renewal that had already reached the server when the lock came is
+    /// lost with its answer; the unlock then finds the stored refresh token
+    /// spent and asks for a sign-in -- the safe failure, and a narrow one.
+    public static void suspend() {
+        endPasskeySession();
+        user = null;
+        session++;
+        if (authorizer != null) {
+            authorizer.setTokens(null);
+        }
+    }
+
+    /// Seals the tokens in use again: after `Keys.claim` replaced the key
+    /// they were sealed under.
+    public static void resealTokens() {
+        OidcTokens tokens = authorizer == null ? null : authorizer.getTokens();
+        if (tokens != null && base != null) {
+            store.save(storeKey(base), tokens);
+        }
+    }
+
+    /// The signed-in account's name, or null.
+    public static String username() {
+        return user == null ? null : user.username();
     }
 
     /// Whether this device keeps a sealed session for the current server,

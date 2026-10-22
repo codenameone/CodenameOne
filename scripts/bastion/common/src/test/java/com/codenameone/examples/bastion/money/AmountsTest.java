@@ -85,4 +85,36 @@ class AmountsTest {
         // 10 million BTC at $60,000.00 -- q * p would overflow a long.
         assertEquals(6000000L * 10000000L, Amounts.value(1000000000000000L, 8, 6000000));
     }
+
+    /// A comma is a decimal separator in German, French and Spanish: "10,50"
+    /// there is ten fifty, and in English it is refused, never 1,050.
+    @Test
+    void readsAndWritesTheLocalesSeparators() {
+        try {
+            Amounts.useSeparators('.', ',');
+            assertEquals(Amounts.INVALID, Amounts.parse("10,50", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse("1,2,3", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse("1.234,56", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse("1234,567", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse(",500", "EUR"));
+            assertEquals(123456789, Amounts.parse("1,234,567.89", "EUR"));
+
+            Amounts.useSeparators(',', '.');
+            assertEquals(1050, Amounts.parse("10,50", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse("1,2,3", "EUR"));
+            assertEquals(123456, Amounts.parse("1.234,56", "EUR"));
+            assertEquals(Amounts.INVALID, Amounts.parse("10.50", "EUR"));
+            assertEquals("1.234,56 EUR", Amounts.format(123456, "EUR"));
+            assertEquals("1234,56", Amounts.plain(123456, "EUR"));
+            assertEquals(123456, Amounts.parse(Amounts.plain(123456, "EUR"), "EUR"));
+
+            // French groups with a narrow no-break space; any space will do.
+            Amounts.useSeparators(',', '\u202f');
+            assertEquals(123456, Amounts.parse("1 234,56", "EUR"));
+            assertEquals(123456, Amounts.parse("1\u00a0234,56", "EUR"));
+            assertEquals("1\u202f234,56 EUR", Amounts.format(123456, "EUR"));
+        } finally {
+            Amounts.useSeparators('.', ',');
+        }
+    }
 }

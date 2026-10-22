@@ -40,13 +40,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// file is a complete list for a translator to work from. A string added to
 /// the code without its line fails here, named.
 ///
-/// What is checked is the plain case: a single literal handed to `Lang.tr` or
-/// to one of the builders that translate their argument. A sentence built of
+/// What is checked is the plain case: a single literal handed to `Lang.tr`,
+/// to one of the builders that translate their argument, or to a failure
+/// callback (`onSucess`, `failed`) whose text a screen shows translated. A sentence built of
 /// several literals is the writer's to add by hand.
 class BundleTest {
     private static final Pattern CALL = Pattern.compile(
-            "(?:Lang\\.tr|Ui\\.(?:form|title|primary|secondary|section|empty|field|toast)|Nav\\.form)"
-            + "\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*[,)]");
+            "(?:(?:Lang\\.tr|Ui\\.(?:form|title|primary|secondary|section|empty|field|toast)|Nav\\.form)"
+            + "\\(\\s*"
+            // A reason handed to a failure callback, which the screen shows
+            // through Lang.tr: `failed.onSucess("...")`, `result.failed("...")`
+            // and `failed.failed(401, "...")`.
+            + "|onSucess\\(\\s*|\\.failed\\(\\s*(?:-?\\d+\\s*,\\s*)?)"
+            + "\"((?:[^\"\\\\]|\\\\.)*)\"\\s*[,)]");
 
     @Test
     void everyTranslatedLiteralHasAnEnglishLine() throws Exception {

@@ -54,12 +54,45 @@ public final class Ui {
     }
 
     /// Shows `form`. A `sensitive` one -- anything with a balance, a number
-    /// or a code on it -- blocks screenshots while it is up.
+    /// or a code on it -- blocks screenshots while it is up; the form
+    /// remembers it, so going back to it ([#reshow]) blocks them again.
+    ///
+    /// While the app is locked nothing but the lock screen is shown: a form
+    /// an answer builds after the lock is kept for the unlock instead
+    /// (`Lock.defer`), never painted over the lock.
     public static void show(Form form, boolean sensitive) {
+        form.putClientProperty(SENSITIVE, sensitive ? Boolean.TRUE : Boolean.FALSE);
+        if (Lock.isLocked()) {
+            Lock.defer(form);
+            return;
+        }
+        display(form, sensitive);
+    }
+
+    /// Shows a form shown before, with the protection it was shown with.
+    public static void reshow(Form form) {
+        show(form, isSensitive(form));
+    }
+
+    /// Whether `form` was shown as sensitive. A form this class never saw is
+    /// treated as sensitive: the safe answer.
+    public static boolean isSensitive(Form form) {
+        return !Boolean.FALSE.equals(form.getClientProperty(SENSITIVE));
+    }
+
+    /// The lock screen itself: the one form shown while locked.
+    static void showLockScreen(Form form) {
+        form.putClientProperty(SENSITIVE, Boolean.TRUE);
+        display(form, true);
+    }
+
+    private static void display(Form form, boolean sensitive) {
         Protect.screen(sensitive);
         Lock.watch(form);
         form.show();
     }
+
+    private static final String SENSITIVE = "BnSensitive";
 
     public static Label title(String text) {
         return new Label(Lang.tr(text), "BnTitle");

@@ -22,12 +22,15 @@ package com.codenameone.examples.bastion.api;
 /// signs) and the server (which checks): a request is signed over
 ///
 /// ```
-/// METHOD|target|hex(sha256(body bytes))|nonce|ts
+/// METHOD|target|hex(sha256(body bytes))|idempotency-key|nonce|ts
 /// ```
 ///
 /// where `target` is the path with its query string exactly as the request
 /// line carries it, the body is the exact bytes on the wire (an empty array
-/// when there are none), the hex is lower case, `nonce` is 16 to 64 URL-safe
+/// when there are none), the hex is lower case, `idempotency-key` is the
+/// request's `Idempotency-Key` header (empty when it has none) -- so a captured
+/// signature cannot be replayed under a fresh key to move the money again --
+/// `nonce` is 16 to 64 URL-safe
 /// characters used once, and `ts` is the device's clock in milliseconds. The
 /// text is UTF-8, signed with ECDSA P-256 and SHA-256, and the signature sent
 /// as base64url of the 64-byte `r || s` (the JOSE form, as in a JWT) in
@@ -50,10 +53,12 @@ public final class SignedRequest {
     private SignedRequest() {
     }
 
-    /// The text that is signed. `bodySha256` is the SHA-256 of the body bytes.
+    /// The text that is signed. `bodySha256` is the SHA-256 of the body bytes;
+    /// `idempotencyKey` is null or empty when the request carries none.
     public static String canonical(String method, String target, byte[] bodySha256,
-            String nonce, long ts) {
-        return method + "|" + target + "|" + hex(bodySha256) + "|" + nonce + "|" + ts;
+            String idempotencyKey, String nonce, long ts) {
+        return method + "|" + target + "|" + hex(bodySha256) + "|"
+                + (idempotencyKey == null ? "" : idempotencyKey) + "|" + nonce + "|" + ts;
     }
 
     /// The header's value.

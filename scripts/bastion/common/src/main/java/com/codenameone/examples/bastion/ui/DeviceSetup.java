@@ -41,9 +41,10 @@ public final class DeviceSetup {
     private DeviceSetup() {
     }
 
-    /// Whether this phone can sign payments.
+    /// Whether this phone can sign payments for the signed-in account (a
+    /// key registered for another account does not count).
     public static boolean registered() {
-        return DeviceKey.deviceId() != null;
+        return DeviceKey.deviceId() != null && DeviceKey.ownedBy(Session.username());
     }
 
     /// Registers the device, asking for the password first when the account

@@ -222,7 +222,7 @@ public final class TransferForm {
             final String key, final Runnable back) {
         review.setEnabled(false);
         DeviceSetup.withDevice(failed -> Api.banking().transfer(key,
-                RequestSigner.sign("POST", TARGET, transfer), transfer,
+                RequestSigner.sign("POST", TARGET, key, transfer), transfer,
                 Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, back), failed)),
                 (status, message) -> {
                     review.setEnabled(true);

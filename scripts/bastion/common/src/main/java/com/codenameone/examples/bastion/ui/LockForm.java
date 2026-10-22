@@ -52,8 +52,8 @@ public final class LockForm {
             pin.setMaxSize(Keys.MAX_PIN);
             Button withPin = biometric() ? Ui.secondary("Unlock with PIN")
                     : Ui.primary("Unlock with PIN");
-            withPin.addActionListener(evt -> tryPin(pin, error, signInAgain));
-            pin.setDoneListener(evt -> tryPin(pin, error, signInAgain));
+            withPin.addActionListener(evt -> tryPin(pin, withPin, error, signInAgain));
+            pin.setDoneListener(evt -> tryPin(pin, withPin, error, signInAgain));
             form.addAll(pin, withPin);
         }
         if (!Keys.protectedByUser()) {
@@ -73,7 +73,7 @@ public final class LockForm {
         form.add(again);
         // Locked screens are sensitive too: the last frame before the lock
         // must not survive in the recent-apps list.
-        Ui.show(form, true);
+        Ui.showLockScreen(form);
         if (biometric()) {
             ask(signInAgain, error);
         }
@@ -99,8 +99,15 @@ public final class LockForm {
         });
     }
 
-    private static void tryPin(final TextField pin, final Label error,
+    /// One PIN attempt at a time: the field and the button stay disabled
+    /// until the vault answers. Two attempts in flight would read the same
+    /// failure count, and each record one -- so a guesser typing fast got
+    /// more than [Keys#PIN_ATTEMPTS] tries before the wipe.
+    static void tryPin(final TextField pin, final Button withPin, final Label error,
             final Runnable signInAgain) {
+        if (!pin.isEnabled()) {
+            return;
+        }
         String typed = pin.getText();
         pin.setText("");
         if (typed.length() < Keys.MIN_PIN) {
@@ -108,6 +115,12 @@ public final class LockForm {
                     String.valueOf(Keys.MIN_PIN)));
             return;
         }
+        pin.setEnabled(false);
+        withPin.setEnabled(false);
+        final Runnable again = () -> {
+            pin.setEnabled(true);
+            withPin.setEnabled(true);
+        };
         Lock.unlockWithPin(typed, new Keys.PinResult() {
             @Override
             public void unlocked() {
@@ -115,6 +128,7 @@ public final class LockForm {
 
             @Override
             public void wrong(int left) {
+                again.run();
                 Ui.showError(error, left == 1
                         ? Lang.tr("Wrong PIN. One try left before the keys on this device are erased.")
                         : Lang.tr("Wrong PIN. {0} tries left.", String.valueOf(left)));
@@ -128,6 +142,7 @@ public final class LockForm {
 
             @Override
             public void failed(String why) {
+                again.run();
                 Ui.showError(error, Lang.tr(why));
             }
         });

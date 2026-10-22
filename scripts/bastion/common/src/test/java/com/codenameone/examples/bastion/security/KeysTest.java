@@ -18,7 +18,11 @@
  */
 package com.codenameone.examples.bastion.security;
 
-import com.codename1.security.SecureStorage;
+import com.codename1.impl.javase.JavaSEPort;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
+import com.codename1.security.BiometricError;
+import com.codename1.security.BiometricException;
 import com.codenameone.examples.bastion.api.Refusal;
 import org.junit.jupiter.api.Test;
 
@@ -76,5 +80,89 @@ class KeysTest {
         assertNull(Refusal.code("Sign in first"));
         assertNull(Refusal.code("(not a code) at all"));
         assertEquals("Sign in first", Refusal.english("Sign in first"));
+    }
+
+    private static MemoryStorage fresh() {
+        Util.setImplementation(new JavaSEPort());
+        MemoryStorage store = new MemoryStorage();
+        Keys.useStorage(store);
+        Keys.useVault(null);
+        Keys.wipe();
+        return store;
+    }
+
+    /// The next account on the device does not inherit the previous one's
+    /// key, nor its device key.
+    @Test
+    void anotherAccountStartsOver() {
+        fresh();
+        Keys.startOver();
+        assertFalse(Keys.claim("alice@bastion.example"));
+        byte[] alices = Keys.current().clone();
+        assertFalse(Keys.claim("alice@bastion.example"), "the same account keeps its key");
+        assertArrayEquals(alices, Keys.current());
+        assertTrue(Keys.claim("bob@bastion.example"));
+        assertFalse(java.util.Arrays.equals(alices, Keys.current()), "a new key for Bob");
+        Keys.wipe();
+    }
+
+    /// A failed refresh behind the lock must not wipe the keys: only the
+    /// user starts over.
+    @Test
+    void aSignInPromptWhileLockedDoesNotWipe() {
+        fresh();
+        Keys.startOver();
+        Preferences.set("bastion.keys.pinOn", true);
+        Lock.install(new Lock.Screens() {
+            @Override
+            public void showLocked() {
+            }
+
+            @Override
+            public void showUnlocked(com.codename1.ui.Form previous) {
+            }
+        });
+        Keys.lock();
+        Lock.lockAtStart();
+        try {
+            Keys.signedIn();
+            assertTrue(Keys.exists());
+            assertTrue(Keys.pinEnabled(), "the PIN copy is still there");
+        } finally {
+            Lock.reset();
+            Keys.wipe();
+        }
+    }
+
+    /// A biometric copy the OS revoked is removed, not left behind a flag
+    /// that no longer mentions it.
+    @Test
+    void aRevokedBiometricCopyIsRemoved() {
+        MemoryStorage store = fresh();
+        Keys.startOver();
+        store.prompted.put("bastion.keys.biometric", "dead");
+        Preferences.set("bastion.keys.biometricOn", true);
+        Keys.lock();
+        store.promptedReadError = new BiometricException(BiometricError.KEY_REVOKED);
+        final Boolean[] gone = new Boolean[1];
+        Keys.unlockWithBiometric("test", () -> { }, revoked -> gone[0] = revoked);
+        assertEquals(Boolean.TRUE, gone[0]);
+        assertFalse(Keys.biometricEnabled());
+        assertTrue(store.prompted.isEmpty(), "the revoked entry is gone");
+        Keys.wipe();
+    }
+
+    /// Wiping removes the biometric copy whatever the flag says.
+    @Test
+    void aWipeRemovesEveryCopy() {
+        MemoryStorage store = fresh();
+        Keys.startOver();
+        store.prompted.put("bastion.keys.biometric", "orphan");
+        final Boolean[] done = new Boolean[1];
+        Keys.wipe().ready(ok -> done[0] = ok);
+        assertEquals(Boolean.TRUE, done[0]);
+        assertTrue(store.prompted.isEmpty());
+        assertTrue(store.quiet.isEmpty());
+        assertFalse(Keys.exists());
     }
 }

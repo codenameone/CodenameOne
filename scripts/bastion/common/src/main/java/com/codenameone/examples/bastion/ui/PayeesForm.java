@@ -93,7 +93,7 @@ public final class PayeesForm {
         final NewPayeeDto payee = new NewPayeeDto(Session.accountName(email.getText()),
                 nickname.getText().trim());
         DeviceSetup.withDevice(failed -> Api.banking().addPayee(
-                RequestSigner.sign("POST", TARGET, payee), payee,
+                RequestSigner.sign("POST", TARGET, null, payee), payee,
                 Net.to((PayeeDto added) -> {
                     Ui.toast("Payee added. It is limited while it cools off.");
                     load(content);

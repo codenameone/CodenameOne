@@ -76,6 +76,12 @@ class MoneyTest {
     @Autowired
     private Audit audit;
 
+    @Autowired
+    private com.codenameone.examples.bastion.ledger.Ledger ledger;
+
+    @Autowired
+    private com.codenameone.examples.bastion.account.SignInGuard guard;
+
     /// A customer signed in, with a registered device.
     private final class Customer {
         final String name;
@@ -141,7 +147,8 @@ class MoneyTest {
         MockResponse signed(String path, String body, TestKeys pair, long ts, String nonce,
                 String idempotencyKey) throws Exception {
             MockRequestBuilder request = json(path, body)
-                    .header("Bastion-Signature", signature("POST", path, body, pair, ts, nonce));
+                    .header("Bastion-Signature",
+                            signature("POST", path, body, pair, ts, nonce, idempotencyKey));
             if (idempotencyKey != null) {
                 request = request.header("Idempotency-Key", idempotencyKey);
             }
@@ -153,9 +160,10 @@ class MoneyTest {
         }
 
         String signature(String method, String path, String body, TestKeys pair, long ts,
-                String nonce) throws Exception {
+                String nonce, String idempotencyKey) throws Exception {
             String text = method + "|" + path + "|"
                     + Ids.hex(Crypto.sha256(body.getBytes("UTF-8")))
+                    + "|" + (idempotencyKey == null ? "" : idempotencyKey)
                     + "|" + nonce + "|" + ts;
             byte[] jose = pair.sign(text.getBytes("UTF-8"));
             return "v1;device=" + device + ";ts=" + ts + ";nonce=" + nonce + ";sig="
@@ -341,11 +349,19 @@ class MoneyTest {
                 System.currentTimeMillis(), nonce(), key());
         assertEquals(403, forged.getStatus());
         // A signature of one body sent with another.
+        String swapKey = key();
         String sig = a.signature("POST", "/api/transfers", a.payBody(payee, 10),
-                a.key, System.currentTimeMillis(), nonce());
+                a.key, System.currentTimeMillis(), nonce(), swapKey);
         MockResponse swapped = a.send(json("/api/transfers", a.payBody(payee, 9000))
-                .header("Bastion-Signature", sig).header("Idempotency-Key", key()));
+                .header("Bastion-Signature", sig).header("Idempotency-Key", swapKey));
         assertEquals(403, swapped.getStatus());
+        // The same signed request under a fresh Idempotency-Key: the key is
+        // signed, so a captured request cannot be replayed as a new payment.
+        String rekeyed = a.signature("POST", "/api/transfers", a.payBody(payee, 10),
+                a.key, System.currentTimeMillis(), nonce(), key());
+        MockResponse fresh = a.send(json("/api/transfers", a.payBody(payee, 10))
+                .header("Bastion-Signature", rekeyed).header("Idempotency-Key", key()));
+        assertEquals(403, fresh.getStatus());
         // No signature at all, paying someone else.
         MockResponse unsigned = a.send(json("/api/transfers", a.payBody(payee, 10))
                 .header("Idempotency-Key", key()));
@@ -539,5 +555,220 @@ class MoneyTest {
         assertEquals(409, c.signed(path, big, key()).getStatus());
         assertEquals(50000000L - 32100000L, c.balance(wallet));
         assertTrue(audit.verify().isEmpty());
+    }
+
+    private static String totp(String secret, long offsetMillis) {
+        return com.codename1.security.Otp.totp(com.codename1.security.Base32.decode(secret),
+                System.currentTimeMillis() + offsetMillis, 30, 6,
+                com.codename1.security.Hash.SHA1);
+    }
+
+    private static boolean refusedAs(MockResponse answer, String code) throws Exception {
+        return answer.getContentAsString().indexOf("(" + code) >= 0;
+    }
+
+    @Test
+    void clientIdempotencyKeysAreTheOwnersAndNeverSystemKeys() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        a.deposit(a.checking, 50000);
+        b.deposit(b.checking, 50000);
+        String aSavings = a.open("USD", "SAVINGS");
+        String bSavings = b.open("USD", "SAVINGS");
+        // One key, two customers: two payments, not a 422 for the second.
+        String k = key();
+        assertEquals(200, a.send(json("/api/transfers", internal(a.checking, aSavings, 100))
+                .header("Idempotency-Key", k)).getStatus());
+        MockResponse theirs = b.send(json("/api/transfers", internal(b.checking, bSavings, 100))
+                .header("Idempotency-Key", k));
+        assertEquals(200, theirs.getStatus(), theirs.getContentAsString());
+        assertEquals(100, b.balance(bSavings));
+        // A key shaped like the exchange's own is never accepted from a client.
+        MockResponse hijack = a.send(json("/api/transfers", internal(a.checking, aSavings, 100))
+                .header("Idempotency-Key", "hold:" + key()));
+        assertEquals(400, hijack.getStatus(), hijack.getContentAsString());
+        assertEquals(100, a.balance(aSavings));
+    }
+
+    @Test
+    void anAppEnrolledWithAPasswordTokenDoesNotStandInForThePassword() throws Exception {
+        Customer c = new Customer(false);
+        // A token whose sign-in is half an hour old cannot enrol an app.
+        String fresh = c.token;
+        c.token = aged(fresh, 30);
+        assertEquals(403, c.send(post("/api/account/mfa/totp")).getStatus());
+        c.token = fresh;
+        MockResponse started = c.send(post("/api/account/mfa/totp"));
+        assertEquals(200, started.getStatus(), started.getContentAsString());
+        String secret = (String) Json.parseObject(started.getContentAsString()).get("secret");
+        MockResponse confirmed = c.send(json("/api/account/mfa/totp/confirm",
+                "{\"code\":\"" + totp(secret, 0) + "\"}"));
+        assertEquals(200, confirmed.getStatus(), confirmed.getContentAsString());
+        // The token still says "pwd": the app does not make it a second factor.
+        String noPassword = "{\"publicKey\":\"" + Base64Url.encode(newKey().publicKey)
+                + "\",\"platform\":\"and\",\"rooted\":false,\"attested\":true,"
+                + "\"integrityToken\":\"t\"}";
+        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        // A sign-in made with the code does.
+        c.token = aged(fresh, 1, java.util.Arrays.asList("pwd", "otp", "mfa"));
+        assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());
+    }
+
+    @Test
+    void theSimulatedVerifierRunsOnlyOnADevelopmentProfile() {
+        assertTrue(com.codenameone.examples.bastion.money.SimulatedIntegrityVerifier
+                .forProfile(true) != null);
+        boolean refused = false;
+        try {
+            com.codenameone.examples.bastion.money.SimulatedIntegrityVerifier.forProfile(false);
+        } catch (IllegalStateException expected) {
+            refused = true;
+        }
+        assertTrue(refused, "production must declare a real verifier");
+    }
+
+    @Test
+    void wrongPasswordsAtOnceAreAllCounted() throws Exception {
+        final String user = SignIn.register(mvc, "m" + TestKeys.random().substring(0, 12)
+                + "@bastion.example", PASSWORD);
+        Runnable[] calls = new Runnable[5];
+        for (int iter = 0; iter < calls.length; iter++) {
+            calls[iter] = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        guard.failed(user);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+        }
+        Race.together(calls);
+        assertTrue(guard.locked(user), "five failures at once lock the account");
+    }
+
+    @Test
+    void anOrderHoldCannotBeMovedByTheCustomer() throws Exception {
+        Customer c = new Customer(false);
+        c.deposit(c.checking, 50000);
+        String hold = ledger.open(c.name, "USD", "HOLD", "hold").getId();
+        assertEquals(404, c.send(json("/api/transfers", internal(hold, c.checking, 1))
+                .header("Idempotency-Key", key())).getStatus());
+        assertEquals(404, c.send(json("/api/transfers", internal(c.checking, hold, 1))
+                .header("Idempotency-Key", key())).getStatus());
+        assertEquals(404, c.send(json("/api/accounts/" + hold + "/deposit",
+                "{\"amount\":100,\"memo\":\"x\"}").header("Idempotency-Key", key())).getStatus());
+        assertEquals(404, c.signed("/api/accounts/" + hold + "/withdraw", "{\"amount\":1}",
+                key()).getStatus());
+    }
+
+    @Test
+    void theDailyLimitCountsEveryCurrency() throws Exception {
+        Customer a = new Customer(false);
+        a.deposit(a.checking, 2000000);
+        String euros = a.open("EUR", "CHECKING");
+        a.deposit(euros, 2000000);
+        // 4,600.00 EUR is 5,060.00 USD at the test rate: over one payment.
+        assertEquals(409, a.signed("/api/accounts/" + euros + "/withdraw", "{\"amount\":460000}",
+                key()).getStatus());
+        String usd = "/api/accounts/" + a.checking + "/withdraw";
+        assertEquals(200, a.signed(usd, "{\"amount\":500000}", key()).getStatus());
+        assertEquals(200, a.signed(usd, "{\"amount\":500000}", key()).getStatus());
+        // The day's 10,000.00 USD is used up: one euro cent more is refused.
+        assertEquals(409, a.signed("/api/accounts/" + euros + "/withdraw", "{\"amount\":1}",
+                key()).getStatus());
+    }
+
+    @Test
+    void accountsOpenedAtOnceStayUnderTheCap() throws Exception {
+        final Customer c = new Customer(false);
+        for (int iter = c.accounts().size(); iter < 18; iter++) {
+            c.open("USD", "SAVINGS");
+        }
+        Runnable[] calls = new Runnable[6];
+        for (int iter = 0; iter < calls.length; iter++) {
+            calls[iter] = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        c.send(json("/api/accounts",
+                                "{\"asset\":\"USD\",\"kind\":\"SAVINGS\",\"name\":\"r\"}"));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+        }
+        Race.together(calls);
+        assertEquals(20, c.accounts().size());
+    }
+
+    @Test
+    void verifyFindsABalanceItsPostingsDoNotExplain() throws Exception {
+        Customer c = new Customer(false);
+        c.deposit(c.checking, 1234);
+        assertTrue(ledger.verify(java.util.Arrays.asList(c.name)).isEmpty());
+        db.execute("UPDATE ledger_account SET balance = balance + 1 WHERE id = ?",
+                new Object[] {c.checking});
+        List<String> problems = ledger.verify(java.util.Arrays.asList(c.name));
+        assertEquals(1, problems.size(), String.valueOf(problems));
+        db.execute("UPDATE ledger_account SET balance = balance - 1 WHERE id = ?",
+                new Object[] {c.checking});
+    }
+
+    @Test
+    void theAuditChainIsVerifiedAcrossPages() throws Exception {
+        for (int iter = 0; iter < 520; iter++) {
+            audit.append("pager", "PAGE_TEST", "s", "#" + iter);
+        }
+        assertTrue(audit.verify().isEmpty());
+        List rows = db.query("SELECT MAX(seq) AS s FROM audit_event", new Object[0]);
+        long last = ((Number) ((Map) rows.get(0)).get("s")).longValue();
+        db.execute("UPDATE audit_event SET detail = 'changed' WHERE seq = ?",
+                new Object[] {Long.valueOf(last - 1)});
+        List<String> problems = audit.verify();
+        db.execute("UPDATE audit_event SET detail = '#518' WHERE seq = ?",
+                new Object[] {Long.valueOf(last - 1)});
+        assertEquals(1, problems.size(), String.valueOf(problems));
+        assertTrue(audit.verify().isEmpty());
+    }
+
+    @Test
+    void isolationIsReadFromTxIsolationWhereTheNewNameIsUnknown() throws Exception {
+        Object level = com.codenameone.examples.bastion.ledger.IsolationCheck.level(sql -> {
+            if (sql.indexOf("@@transaction_isolation") >= 0) {
+                throw new java.io.IOException("Unknown system variable 'transaction_isolation'");
+            }
+            return "READ-COMMITTED";
+        });
+        assertEquals("READ-COMMITTED", level);
+    }
+
+    @Test
+    void aPayeeAnswersTheSameWhetherOrNotAnyoneBanksThere() throws Exception {
+        Customer a = new Customer(false);
+        a.deposit(a.checking, 50000);
+        MockResponse added = a.signed("/api/payees", "{\"email\":\"nobody-"
+                + TestKeys.random().substring(0, 10) + "@bastion.example\",\"nickname\":\"x\"}",
+                null);
+        assertEquals(200, added.getStatus(), added.getContentAsString());
+        String ghost = (String) Json.parseObject(added.getContentAsString()).get("id");
+        MockResponse paid = a.signed("/api/transfers", a.payBody(ghost, 100), key());
+        assertEquals(409, paid.getStatus());
+        assertTrue(refusedAs(paid, "payee-cannot-receive"), paid.getContentAsString());
+    }
+
+    @Test
+    void payingAFrozenCustomerDoesNotSayFrozen() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        a.deposit(a.checking, 50000);
+        String payee = a.addPayee(b);
+        ledger.freeze(b.checking, true);
+        MockResponse paid = a.signed("/api/transfers", a.payBody(payee, 100), key());
+        assertEquals(409, paid.getStatus());
+        assertTrue(refusedAs(paid, "payee-cannot-receive"), paid.getContentAsString());
+        assertEquals(50000, a.balance(a.checking));
     }
 }

@@ -33,6 +33,7 @@ import com.codenameone.examples.bastion.api.DeviceDto;
 import com.codenameone.examples.bastion.api.DeviceRegistrationDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
+import com.codenameone.examples.bastion.net.Session;
 import com.codenameone.examples.bastion.ui.Lang;
 
 /// This device's signing key: the second thing, after the session, that the
@@ -53,6 +54,10 @@ public final class DeviceKey {
     private static final String SEALED_KEY = "bastion.device.sealed";
     private static final String ID_KEY = "bastion.device.id";
     private static final String OWNER_KEY = "bastion.device.owner";
+    /// A device the server registered whose key this device could not keep:
+    /// the app locked (or the session changed) while the registration was
+    /// on its way. It is revoked at the next chance ([#revokeOrphan]).
+    private static final String ORPHAN_KEY = "bastion.device.orphan";
 
     private static PrivateKey cached;
 
@@ -69,6 +74,13 @@ public final class DeviceKey {
     public static String owner() {
         String owner = Preferences.get(OWNER_KEY, "");
         return owner.length() == 0 ? null : owner;
+    }
+
+    /// Whether the key belongs to `username`: false for a key registered for
+    /// another account, or when nobody is signed in.
+    public static boolean ownedBy(String username) {
+        String owner = owner();
+        return owner != null && owner.equals(username);
     }
 
     /// The private key, unsealed, or null when there is none (or the wrapping
@@ -147,19 +159,71 @@ public final class DeviceKey {
             Net.Failed failed) {
         DeviceRegistrationDto request = new DeviceRegistrationDto(publicKey,
                 CN.getPlatformName(), rooted, token != null, token, password);
-        Api.banking().registerDevice(request, Net.to(device -> {
-            byte[] wrap = Keys.current();
-            if (wrap == null) {
-                failed.failed(0, Lang.tr("Unlock Bastion first."));
+        final int epoch = Session.epoch();
+        // Not Net.to: that drops an answer from an earlier epoch, and this one
+        // must not be dropped -- the server has a device on record either way.
+        Api.banking().registerDevice(request, response -> {
+            DeviceDto device = response != null && response.getResponseCode() == 200
+                    ? response.getResponseData() : null;
+            if (device == null || epoch == Session.epoch()) {
+                Net.to((DeviceDto registered) -> keep(owner, key, registered, done, failed),
+                        failed).completed(response);
                 return;
             }
-            byte[] sealed = SecureEnvelope.seal(wrap, "device-key", 1, aad(owner), key.getEncoded());
-            Preferences.set(SEALED_KEY, Base64.encodeUrlSafe(sealed));
-            Preferences.set(ID_KEY, device.id());
-            Preferences.set(OWNER_KEY, owner);
-            cached = key;
-            done.got(device);
-        }, failed));
+            // Locked (or signed out) mid-registration: the key that goes with
+            // the server's record is gone from memory, and an untrusted
+            // stranger could not sign with it anyway. The record is revoked
+            // once there is a session again, so no device the user never saw
+            // finish stays on their account.
+            Preferences.set(ORPHAN_KEY, device.id());
+        });
+    }
+
+    /// Keeps the key the server just registered as `device`: sealed under
+    /// the app key, for `owner`, who must still be the one signed in.
+    static void keep(String owner, PrivateKey key, DeviceDto device,
+            Net.Ok<DeviceDto> done, Net.Failed failed) {
+        byte[] wrap = Keys.current();
+        if (wrap == null || !owner.equals(Session.username())) {
+            Preferences.set(ORPHAN_KEY, device.id());
+            revokeOrphan();
+            failed.failed(0, Lang.tr("Unlock Bastion first."));
+            return;
+        }
+        byte[] sealed = SecureEnvelope.seal(wrap, "device-key", 1, aad(owner), key.getEncoded());
+        Preferences.set(SEALED_KEY, Base64.encodeUrlSafe(sealed));
+        Preferences.set(ID_KEY, device.id());
+        Preferences.set(OWNER_KEY, owner);
+        cached = key;
+        done.got(device);
+    }
+
+    /// The device left registered on the server by an interrupted
+    /// registration, or null.
+    public static String orphan() {
+        String id = Preferences.get(ORPHAN_KEY, "");
+        return id.length() == 0 ? null : id;
+    }
+
+    /// Revokes [#orphan] if there is one and a session to do it with; kept
+    /// for the next try when the server cannot be reached. Called after every
+    /// sign-in and unlock.
+    public static void revokeOrphan() {
+        final String id = orphan();
+        if (id == null || Session.user() == null) {
+            return;
+        }
+        Api.banking().revokeDevice(id, Net.to((DeviceDto gone) -> {
+            if (id.equals(orphan())) {
+                Preferences.delete(ORPHAN_KEY);
+            }
+        }, (status, message) -> {
+            // 404: already gone (or never this account's). Anything else is
+            // tried again next time.
+            if (status == 404 && id.equals(orphan())) {
+                Preferences.delete(ORPHAN_KEY);
+            }
+        }));
     }
 
     private static AssociatedData aad(String owner) {

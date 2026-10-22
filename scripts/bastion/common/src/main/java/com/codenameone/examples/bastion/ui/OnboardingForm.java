@@ -54,8 +54,8 @@ import java.util.List;
 ///    typed so the server's refusal is never the first the user hears of it.
 /// 2. **Sign in**, at once, keeping the server session for step 4.
 /// 3. **An authenticator app**: the TOTP secret as a QR code and as text,
-///    confirmed by a first code, then the recovery codes -- shown once,
-///    copyable through the clipboard that clears itself.
+///    confirmed by a first code, then the recovery codes -- shown once, to
+///    write down (never copied: see `Protect`).
 /// 4. **A passkey**, through the platform's passkey sheet.
 /// 5. **Biometric unlock**, if the device has one: a choice, not a default.
 /// 6. **This device's signing key**, registered while the sign-in is fresh
@@ -253,20 +253,16 @@ public final class OnboardingForm {
         form.add(Ui.muted(Lang.tr("Each signs you in once if you lose your phone. Keep them "
                 + "somewhere safe and offline. They will not be shown again.")));
         Container grid = new Container(BoxLayout.y(), "BnPanel");
-        final StringBuilder all = new StringBuilder();
         for (String one : codes) {
             grid.add(new Label(one, "BnSecret"));
-            all.append(one).append('\n');
         }
         form.add(grid);
-        Button copy = Ui.secondary("Copy codes");
-        copy.addActionListener(evt -> {
-            Protect.copy(all.toString());
-            Ui.toast("Copied. The clipboard clears itself in a minute.");
-        });
+        // Shown, not copied: a clipboard is readable by other apps and by the
+        // keyboard's history until it is wiped, and these codes outlive the
+        // minute it takes to wipe one. Write them down.
         Button saved = Ui.primary("I have saved them");
         saved.addActionListener(evt -> done.run());
-        form.addAll(copy, saved);
+        form.add(saved);
         Ui.show(form, true);
     }
 

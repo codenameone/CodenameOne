@@ -188,7 +188,7 @@ public final class WithdrawForm {
             send.setEnabled(false);
             final String target2 = "/api/accounts/" + from.id() + "/crypto-withdraw";
             DeviceSetup.withDevice(failed -> Api.exchange().withdrawCrypto(from.id(), key[0],
-                    RequestSigner.sign("POST", target2, withdrawal), withdrawal,
+                    RequestSigner.sign("POST", target2, key[0], withdrawal), withdrawal,
                     Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, back), failed)),
                     (status, message) -> {
                         send.setEnabled(true);
@@ -218,7 +218,7 @@ public final class WithdrawForm {
         final NewCryptoAddressDto added = new NewCryptoAddressDto(Ui.pickedId(coin),
                 address.getText().trim(), label.getText().trim());
         DeviceSetup.withDevice(failed -> Api.exchange().addAddress(
-                RequestSigner.sign("POST", ADDRESSES, added), added,
+                RequestSigner.sign("POST", ADDRESSES, null, added), added,
                 Net.to((CryptoAddressDto saved) -> {
                     Dialog.show(Lang.tr("Address added"), Lang.tr("For your safety it can be used "
                             + "from {0}.", Ui.when(saved.usableAt())), Lang.tr("OK"), null);
