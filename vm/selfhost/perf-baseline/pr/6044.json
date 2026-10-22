@@ -58,7 +58,7 @@
     "all": {
      "from": {
       "memory": 0.519,
-      "time": 0.508,
+      "time": 0.499,
       "tolerance": {
        "time": 0.2
       }

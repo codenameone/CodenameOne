@@ -3,20 +3,6 @@
  "rebaseline": {
   "javascript": {
    "gallery": {
-    "code_bytes": {
-     "from": {
-      "tolerance": {
-       "value": 0.005
-      },
-      "value": 13338532
-     },
-     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
-     "runs": 1,
-     "tolerance": {
-      "value": 0.005
-     },
-     "value": 13449368
-    },
     "install_bytes": {
      "from": {
       "tolerance": {
@@ -30,34 +16,6 @@
       "value": 0.005
      },
      "value": 108855936
-    }
-   }
-  },
-  "linux": {
-   "gallery": {
-    "code_bytes": {
-     "from": {
-      "value": 14523602
-     },
-     "reason": "Regex matching by code point, (?U) and Unicode script/block/category tables add executable code",
-     "runs": 1,
-     "value": 14705602
-    },
-    "install_bytes": {
-     "from": {
-      "value": 116342496
-     },
-     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
-     "runs": 1,
-     "value": 116679264
-    },
-    "wire_bytes": {
-     "from": {
-      "value": 84685068
-     },
-     "reason": "Regex matching by code point, (?U) and Unicode script/block/category tables add executable code",
-     "runs": 1,
-     "value": 84763963
     }
    }
   }
