@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333333"/></marker><marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3c8d5a"/></marker></defs>
+  <rect x="0" y="0" width="880" height="520" fill="#ffffff"/>
+  <text xml:space="preserve" x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">A signed payment, and what the server checks before money moves</text>
+  <text xml:space="preserve" x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Every call that sends money away -- a transfer, a new payee, a withdrawal, a new coin address -- carries the</text>
+  <text xml:space="preserve" x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Bastion-Signature header. The checks run in this order; the first that fails answers with a coded refusal.</text>
+  <rect x="20" y="74" width="400" height="170" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="30" y="92" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">In the app</text>
+  <text xml:space="preserve" x="34" y="114" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">1. Unlock opens the app key; the app key unseals the</text>
+  <text xml:space="preserve" x="48" y="128" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">device's P-256 private key (security/Keys, DeviceKey)</text>
+  <text xml:space="preserve" x="34" y="150" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">2. Canonical form of the exact bytes it will send:</text>
+  <text xml:space="preserve" x="48" y="168" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">POST|/api/transfers|&lt;sha256 hex of body&gt;|&lt;nonce&gt;|&lt;ts&gt;</text>
+  <text xml:space="preserve" x="34" y="190" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">3. SHA256withECDSA over it (security/RequestSigner)</text>
+  <text xml:space="preserve" x="34" y="212" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">4. Header, with an Idempotency-Key for the retry:</text>
+  <text xml:space="preserve" x="48" y="230" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">Bastion-Signature: v1;device=..;ts=..;nonce=..;sig=..</text>
+  <line x1="420" y1="160" x2="470" y2="160" stroke="#333333" stroke-width="1.3" marker-end="url(#a)"/>
+  <rect x="472" y="78" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="97" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">1  Bearer token</text>
+  <text xml:space="preserve" x="484" y="113" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">valid, not expired, not revoked by a password change</text>
+  <line x1="667" y1="124" x2="667" y2="130" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="130" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="149" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">2  Signature</text>
+  <text xml:space="preserve" x="484" y="165" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">device registered to this customer, ECDSA verifies over the canonical form</text>
+  <line x1="667" y1="176" x2="667" y2="182" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="182" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="201" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">3  Freshness</text>
+  <text xml:space="preserve" x="484" y="217" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">timestamp within the window; nonce never seen -- recorded in its own transaction</text>
+  <line x1="667" y1="228" x2="667" y2="234" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="234" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="253" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">4  Device policy</text>
+  <text xml:space="preserve" x="484" y="269" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">money leaving the customer needs a trusted device: not rooted, attested</text>
+  <line x1="667" y1="280" x2="667" y2="286" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="286" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="305" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">5  Step-up</text>
+  <text xml:space="preserve" x="484" y="321" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">own-account moves above bastion.stepup.threshold must be signed too</text>
+  <line x1="667" y1="332" x2="667" y2="338" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="338" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="357" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">6  Limits</text>
+  <text xml:space="preserve" x="484" y="373" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">per transfer, per day; a payee in cooling-off gets only a small amount</text>
+  <line x1="667" y1="384" x2="667" y2="390" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="390" width="390" height="46" rx="4" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="409" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">7  Idempotency</text>
+  <text xml:space="preserve" x="484" y="425" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">same key + same body answers the first entry; different body is refused</text>
+  <line x1="667" y1="436" x2="667" y2="442" stroke="#333333" stroke-width="1.3"/>
+  <rect x="472" y="442" width="390" height="46" rx="4" fill="#eef7f1" stroke="#3c8d5a" stroke-width="1.5"/>
+  <text xml:space="preserve" x="484" y="461" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#3c8d5a">8  Ledger</text>
+  <text xml:space="preserve" x="484" y="477" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">one journal entry, conditional balance updates, accounts locked in id order</text>
+  <rect x="20" y="270" width="400" height="120" rx="4" fill="#ffffff" stroke="#888888" stroke-width="1.5"/>
+  <text xml:space="preserve" x="30" y="288" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#888888">Where each check lives</text>
+  <text xml:space="preserve" x="30" y="304" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">money/RequestSigning.java   signature, nonce, timestamp</text>
+  <text xml:space="preserve" x="30" y="318" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">money/Devices.java          registration, trust</text>
+  <text xml:space="preserve" x="30" y="332" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">money/Money.java            policy, step-up, limits</text>
+  <text xml:space="preserve" x="30" y="346" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">money/Payees.java           cooling-off</text>
+  <text xml:space="preserve" x="30" y="360" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">ledger/Ledger.java          idempotency, the entry</text>
+  <rect x="20" y="404" width="400" height="92" rx="4" fill="#ffffff" stroke="#b5652a" stroke-width="1.5"/>
+  <text xml:space="preserve" x="30" y="422" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#b5652a">A refusal</text>
+  <text xml:space="preserve" x="30" y="438" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">403 (device-not-attested) This device is not attested...</text>
+  <text xml:space="preserve" x="30" y="452" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">The code is stable; the app shows error.&lt;code&gt; from its</text>
+  <text xml:space="preserve" x="30" y="466" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">own bundle in the customer's language (net/Net.localize).</text>
+</svg>

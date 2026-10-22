@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="420" viewBox="0 0 880 420">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333333"/></marker><marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3c8d5a"/></marker></defs>
+  <rect x="0" y="0" width="880" height="420" fill="#ffffff"/>
+  <text xml:space="preserve" x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">One trade is one journal entry</text>
+  <text xml:space="preserve" x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">A buyer's limit order for 0.01 BTC at 60,000.00 USD meets a resting sell. Both holds were set aside when the orders</text>
+  <text xml:space="preserve" x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">were placed; the fill pays out of them, so a customer can never spend what an open order has reserved.</text>
+  <rect x="30" y="67" width="820" height="26" fill="#eef3fa"/>
+  <text xml:space="preserve" x="40" y="84" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">Account</text>
+  <text xml:space="preserve" x="330" y="84" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">Asset</text>
+  <text xml:space="preserve" x="430" y="84" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">Posting</text>
+  <text xml:space="preserve" x="560" y="84" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#4a6fa5">Why</text>
+  <text xml:space="preserve" x="40" y="114" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="start" fill="#333333">buyer  HOLD</text>
+  <text xml:space="preserve" x="330" y="114" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">USD</text>
+  <text xml:space="preserve" x="510" y="114" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="end" fill="#b5652a">-601.20</text>
+  <text xml:space="preserve" x="560" y="114" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">ceil(p x q) once per order, plus the taker's 0.20% fee</text>
+  <line x1="30" y1="123" x2="850" y2="123" stroke="#dddddd"/>
+  <text xml:space="preserve" x="40" y="142" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="start" fill="#333333">seller CHECKING</text>
+  <text xml:space="preserve" x="330" y="142" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">USD</text>
+  <text xml:space="preserve" x="510" y="142" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="end" fill="#3c8d5a">+600.00</text>
+  <text xml:space="preserve" x="560" y="142" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">floor(p x q) once per order; the maker pays no fee</text>
+  <line x1="30" y1="151" x2="850" y2="151" stroke="#dddddd"/>
+  <text xml:space="preserve" x="40" y="170" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="start" fill="#333333">SYS_FEES</text>
+  <text xml:space="preserve" x="330" y="170" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">USD</text>
+  <text xml:space="preserve" x="510" y="170" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="end" fill="#3c8d5a">+1.20</text>
+  <text xml:space="preserve" x="560" y="170" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">the fee, plus whatever rounding left between the sides</text>
+  <line x1="30" y1="179" x2="850" y2="179" stroke="#dddddd"/>
+  <text xml:space="preserve" x="40" y="198" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="start" fill="#333333">seller HOLD</text>
+  <text xml:space="preserve" x="330" y="198" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">BTC</text>
+  <text xml:space="preserve" x="510" y="198" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="end" fill="#b5652a">-0.01000000</text>
+  <text xml:space="preserve" x="560" y="198" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">the coins the sell order set aside</text>
+  <line x1="30" y1="207" x2="850" y2="207" stroke="#dddddd"/>
+  <text xml:space="preserve" x="40" y="226" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="start" fill="#333333">buyer  WALLET</text>
+  <text xml:space="preserve" x="330" y="226" font-family="Arial, sans-serif" font-size="10.5" text-anchor="start" fill="#333333">BTC</text>
+  <text xml:space="preserve" x="510" y="226" font-family="Menlo, Consolas, monospace" font-size="10.5" text-anchor="end" fill="#3c8d5a">+0.01000000</text>
+  <text xml:space="preserve" x="560" y="226" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">the coins bought</text>
+  <line x1="30" y1="235" x2="850" y2="235" stroke="#dddddd"/>
+  <text xml:space="preserve" x="40" y="262" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="start" fill="#222222">Sum per asset: USD -601.20 + 600.00 + 1.20 = 0      BTC -0.01 + 0.01 = 0</text>
+  <rect x="30" y="284" width="400" height="110" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="40" y="302" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">Why it cannot be half done</text>
+  <text xml:space="preserve" x="40" y="318" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">Ledger.post writes every posting in one transaction,</text>
+  <text xml:space="preserve" x="40" y="332.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">each balance with UPDATE ... WHERE balance + delta &gt;= 0,</text>
+  <text xml:space="preserve" x="40" y="347" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">in account-id order, and rolls back on any exception.</text>
+  <text xml:space="preserve" x="40" y="361.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">The market row is locked first: one match at a time.</text>
+  <rect x="450" y="284" width="400" height="110" rx="4" fill="#ffffff" stroke="#888888" stroke-width="1.5"/>
+  <text xml:space="preserve" x="460" y="302" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#888888">Where it lives</text>
+  <text xml:space="preserve" x="460" y="318" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">exchange/Exchange.java    matching, holds, rounding</text>
+  <text xml:space="preserve" x="460" y="332" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">ledger/Ledger.java        the entry and its legs</text>
+  <text xml:space="preserve" x="460" y="346" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">admin/                    verify: every entry sums to</text>
+  <text xml:space="preserve" x="460" y="360" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">                          zero, balances = postings</text>
+</svg>

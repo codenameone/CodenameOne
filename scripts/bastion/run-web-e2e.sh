@@ -4,10 +4,13 @@
 # the app, starts the server with the app staged where it serves it from, and
 # drives the hosted app in a headless browser (web-e2e.mjs).
 #
-#   run-web-e2e.sh [--native] [--prebuilt]
+#   run-web-e2e.sh [--native] [--prebuilt] [--guide]
 #
 # --native runs the compiled server; --prebuilt skips both builds and uses what
-# `backend/server.sh build --web` left.
+# `backend/server.sh build --web` left. --guide runs the server on the
+# development profile instead and, after the checks, signs in with its demo
+# accounts and takes the screenshots in the user's and implementor's guides,
+# into docs/developer-guide/img.
 #
 # What it proves: a person who opens the server's address gets the app, from
 # this server, and it starts without an error at its sign-in form; then that
@@ -31,10 +34,15 @@ OUT="${BASTION_WEB_OUT:-$HERE/target/web-e2e}"
 LOG="$OUT/server.log"
 MODE="--jvm"
 PREBUILT=0
+PROFILE=test
+TOUR=""
 for arg in "$@"; do
   case "$arg" in
     --native) MODE="--native" ;;
     --prebuilt) PREBUILT=1 ;;
+    # A browser cannot attest itself, so on the default policy it may move money
+    # only between its own accounts; the guide shows a payment to a payee.
+    --guide) PROFILE=dev; export BASTION_DEVICE_POLICY_ENFORCE=false; TOUR="$(cd "$HERE/../../docs/developer-guide/img" && pwd)" ;;
     *) echo "[bastion-web] unknown argument $arg" >&2; exit 2 ;;
   esac
 done
@@ -59,7 +67,7 @@ fi
 echo "[bastion-web] starting the server on port $PORT"
 # Passkeys are accepted only from the listed origins: this one.
 BASTION_WEBAUTHN_ORIGINS="http://localhost:$PORT" \
-  CN1_PROFILE=test "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
+  CN1_PROFILE="$PROFILE" "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
 SERVER_PID=$!
 cleanup() {
   kill "$SERVER_PID" >/dev/null 2>&1 || true
@@ -103,7 +111,7 @@ status="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/me"
 [ "$status" = "401" ] || fail "/api/me answered $status without a token, not 401"
 
 set +e
-URL="http://localhost:$PORT/" OUT="$OUT" node "$HERE/web-e2e.mjs"
+URL="http://localhost:$PORT/" OUT="$OUT" BASTION_WEB_TOUR="$TOUR" node "$HERE/web-e2e.mjs"
 STATUS=$?
 set -e
 

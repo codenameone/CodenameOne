@@ -40,6 +40,8 @@ try {
 const url = process.env.URL;
 const out = process.env.OUT || 'target/web-e2e';
 const accounts = process.env.BASTION_WEB_ACCOUNTS !== '0';
+// The guides' screenshots; needs the development profile's demo accounts.
+const tour = process.env.BASTION_WEB_TOUR || '';
 // A new address each run: the server under test may have kept the last one.
 const email = `web-${Date.now()}@bastion.example`;
 const password = 'correct horse battery staple';
@@ -266,6 +268,164 @@ async function noErrorDialog() {
   }
 }
 
+/// Opens the side menu and picks `label` in it.
+async function menu(label) {
+  for (let tries = 0; tries < 6; tries++) {
+    await settled();
+    // The menu button is the right-most of the title bar's left buttons: a
+    // form below the dashboard has its back button before it.
+    const open = (await components()).filter(c => c.role === 'button' && c.y < 70 && c.x < 130)
+        .sort((x, y) => y.x - x.x)[0];
+    if (!open) {
+      // The Security Center has its way back at the end of the page.
+      const back = await button('Back')();
+      if (!back) {
+        throw new Error('no menu button and no Back button on screen');
+      }
+      if (back.y > 800) {
+        await page.mouse.move(210, 430);
+        await page.mouse.wheel(0, 6000);
+        continue;
+      }
+      await click(back);
+      continue;
+    }
+    await click(open);
+    await settled();
+    const item = await button(label)();
+    if (item) {
+      await click(item);
+      await settled();
+      return;
+    }
+  }
+  throw new Error('no ' + label + ' in the side menu');
+}
+
+async function shot(name) {
+  await settled();
+  await noErrorDialog();
+  await page.screenshot({ path: path.join(tour, name + '.png') });
+  say('took ' + name);
+}
+
+const textOnScreen = pattern => async () => pattern.test(await screenText());
+
+/// The screens the guides show, on the development profile's demo accounts:
+/// BASTION_WEB_TOUR names the directory the pictures go to.
+async function guideTour() {
+  fs.mkdirSync(tour, { recursive: true });
+  for (const [from, to] of [['1-sign-in', 'bastion-sign-in'],
+    ['2-authenticator', 'bastion-totp-enrolment'], ['3-code', 'bastion-sign-in-code']]) {
+    if (fs.existsSync(path.join(out, from + '.png'))) {
+      fs.copyFileSync(path.join(out, from + '.png'), path.join(tour, to + '.png'));
+    }
+  }
+  await newPage();
+  await page.goto(url, { waitUntil: 'load' });
+  await waitFor('the sign-in form', startSeconds, button('Sign in'));
+  await typeInto(0, 'customer@bastion.example', 'email');
+  await typeInto(1, 'bastion-demo-password', 'password');
+  await press('Sign in');
+  await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
+  await shot('bastion-dashboard-unregistered');
+  await press('Register this device');
+  await waitFor('the password prompt', stepSeconds, textOnScreen(/Confirm it is you/));
+  await typeInto(0, 'bastion-demo-password', 'password');
+  await press('Continue');
+  await waitFor('the device to be registered', stepSeconds, async () =>
+      requests.includes('200 POST /api/devices'));
+  await settled();
+  await shot('bastion-dashboard');
+
+  const checking = await waitFor('the checking account', stepSeconds, async () =>
+      (await components()).find(c => /Checking/.test(c.label || c.text || '') && c.height < 200));
+  await click(checking);
+  await waitFor('the history', stepSeconds, textOnScreen(/Money in/));
+  await shot('bastion-account-history');
+  await press('Order a card');
+  await waitFor('the card', stepSeconds, async () => requests.some(r => /POST \/api\/accounts\/.*\/card/.test(r)));
+  await waitFor('the cards screen', stepSeconds, textOnScreen(/Daily limit/));
+  await shot('bastion-cards');
+
+  await menu('Payees');
+  await press('Add a payee');
+  await typeInto(0, 'customer2@bastion.example', 'email');
+  await typeInto(1, 'Robin', 'any');
+  await press('Add');
+  await waitFor('the payee', stepSeconds, textOnScreen(/Cooling off/));
+  await shot('bastion-payees');
+
+  await menu('Accounts');
+  await press('Pay someone');
+  await typeInto(0, '20.00', 'any');
+  await page.mouse.click(210, 8);
+  await shot('bastion-transfer');
+  await press('Review');
+  await waitFor('the confirmation', stepSeconds, textOnScreen(/Send .* to /));
+  await shot('bastion-transfer-confirm');
+  await press('Send');
+  await waitFor('the receipt', stepSeconds, textOnScreen(/Sent/));
+  await shot('bastion-receipt');
+
+
+  await menu('Exchange');
+  await waitFor('the markets', stepSeconds, textOnScreen(/BTC/));
+  await shot('bastion-exchange');
+  const btc = await waitFor('the BTC market', stepSeconds, async () =>
+      (await components()).find(c => /BTC/.test(c.label || c.text || '') && c.height < 200));
+  await click(btc);
+  await waitFor('the order book', stepSeconds, textOnScreen(/Last price/));
+  await page.waitForTimeout(3000);
+  await shot('bastion-order-book');
+  // A market buy: the wallet it fills is what Send crypto sends from.
+  await press('Market');
+  await page.mouse.move(210, 430);
+  await page.mouse.wheel(0, 600);
+  await typeInto(0, '100.00', 'any');
+  await press('Place order');
+  await press('Place');
+  await waitFor('the fill', stepSeconds, async () => requests.includes('200 POST /api/exchange/orders'));
+  await page.waitForTimeout(1500);
+  await shot('bastion-order-filled');
+
+  await menu('Send crypto');
+  await press('Add an address');
+  await typeInto(0, 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', 'any');
+  await typeInto(1, 'Hardware wallet', 'any');
+  await press('Add');
+  await press('OK');
+  await shot('bastion-withdraw');
+
+  await menu('Security Center');
+  await shot('bastion-security-center');
+
+  await menu('Settings');
+  await shot('bastion-settings');
+  await click(await waitFor('the Unlock PIN row', stepSeconds, async () =>
+      (await components()).find(c => c.label === 'Unlock PIN')));
+  await typeInto(0, '480261', 'any');
+  await typeInto(1, '480261', 'any');
+  await press('Set PIN');
+  await waitFor('the PIN to be on', stepSeconds, textOnScreen(/Opens the lock/));
+  // Two minutes without a touch lock the app (AppConfig.IDLE_LOCK_MILLIS).
+  await waitFor('the idle lock', 200, textOnScreen(/Bastion is locked/));
+  await page.waitForTimeout(1500);
+  await shot('bastion-lock');
+
+  await newPage();
+  await page.goto(url, { waitUntil: 'load' });
+  await waitFor('the sign-in form', startSeconds, button('Sign in'));
+  await typeInto(0, 'admin@bastion.example', 'email');
+  await typeInto(1, 'bastion-demo-password', 'password');
+  await press('Sign in');
+  // An administrator lands on the administration screen.
+  await press('Verify the audit log');
+  await press('Verify the ledger');
+  await waitFor('the verification', stepSeconds, textOnScreen(/Intact|Problems found/));
+  await shot('bastion-admin-verify');
+}
+
 let failed = null;
 try {
   say('opening ' + url);
@@ -343,6 +503,9 @@ try {
     // The step the code was confirmed in is used up; wait for the next one.
     await waitFor('a new code', 35, async () => step() > confirmedAt);
     await typeInto(0, totp(secret, step()), 'any');
+    await page.mouse.click(210, 8);
+    await settled();
+    await page.screenshot({ path: path.join(out, '3-code.png') });
     await press('Continue');
     await waitFor('the dashboard', stepSeconds, async () =>
         /Total balance/.test(await screenText()));
@@ -405,6 +568,10 @@ try {
     }
     await page.screenshot({ path: path.join(out, '5-device.png') });
     say('registered this browser as a device after a passkey sign-in');
+  }
+
+  if (tour) {
+    await guideTour();
   }
 } catch (err) {
   failed = err;

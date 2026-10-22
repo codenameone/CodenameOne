@@ -250,6 +250,7 @@ BnHeroLabel {
     font-size: 2.6mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnHeroAmount {
@@ -258,6 +259,7 @@ BnHeroAmount {
     font-size: 6.4mm;
     padding: 0.8mm 0 0.8mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnHeroNote {
@@ -266,6 +268,7 @@ BnHeroNote {
     font-size: 2.3mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnRowValue {
@@ -275,6 +278,7 @@ BnRowValue {
     text-align: right;
     padding: 0 0 0 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnRowValueMuted {
@@ -284,6 +288,7 @@ BnRowValueMuted {
     text-align: right;
     padding: 0 0 0 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnRowValueMono {
@@ -293,6 +298,7 @@ BnRowValueMono {
     text-align: right;
     padding: 0 0 0 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnAmountIn {
@@ -302,6 +308,7 @@ BnAmountIn {
     text-align: right;
     padding: 0 0 0 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnAmountOut {
@@ -311,6 +318,7 @@ BnAmountOut {
     text-align: right;
     padding: 0 0 0 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnRowLead {
@@ -326,6 +334,7 @@ BnEmpty {
     text-align: center;
     padding: 3mm 2mm 3mm 2mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnPanel {
@@ -348,6 +357,7 @@ BnBannerTitle {
     font-size: 2.8mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnBannerText {
@@ -356,6 +366,7 @@ BnBannerText {
     font-size: 2.5mm;
     padding: 0.5mm 0 0.5mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 /* ------------------------------------------------------------- segments */
@@ -419,6 +430,7 @@ BnCardBrand {
     font-size: 3mm;
     padding: 0 0 3mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnCardNumber {
@@ -427,6 +439,7 @@ BnCardNumber {
     font-size: 3.6mm;
     padding: 0 0 1mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnCardNote {
@@ -435,6 +448,7 @@ BnCardNote {
     font-size: 2.4mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 /* ------------------------------------------------------------- exchange */
@@ -442,6 +456,7 @@ BnCardNote {
 BnBookRow {
     padding: 0.5mm 1mm 0.5mm 1mm;
     margin: 0;
+    background-color: transparent;
 }
 
 BnAsk {
@@ -450,6 +465,7 @@ BnAsk {
     font-size: 2.6mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnBid {
@@ -458,6 +474,7 @@ BnBid {
     font-size: 2.6mm;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnBookQty {
@@ -467,6 +484,7 @@ BnBookQty {
     text-align: right;
     padding: 0;
     margin: 0;
+    background-color: transparent;
 }
 
 /* ----------------------------------------------------------- onboarding */
@@ -477,6 +495,7 @@ BnRule {
     font-size: 2.4mm;
     padding: 0.3mm 0 0.3mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnRuleMet {
@@ -485,6 +504,7 @@ BnRuleMet {
     font-size: 2.4mm;
     padding: 0.3mm 0 0.3mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 BnSecret {
@@ -494,6 +514,7 @@ BnSecret {
     text-align: center;
     padding: 1mm 0 1mm 0;
     margin: 0;
+    background-color: transparent;
 }
 
 /* Always white: a QR code in dark-mode colours does not scan. */
@@ -509,6 +530,7 @@ BnMenuHeader {
     font-size: 3.2mm;
     padding: 4mm 3mm 3mm 3mm;
     margin: 0;
+    background-color: transparent;
 }
 
 /* --------------------------------------------------------------- dark mode */

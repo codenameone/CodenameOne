@@ -1,7 +1,7 @@
 [[bastion-implementors-guide]]
 == Bastion: Building on the sample
 
-This chapter is for the developer who takes `scripts/bastion` as the start of a real banking or exchange app. It covers how the sample is put together, every security feature and the file it lives in, the threats it's built against, what only a cloud build turns on, and the work that stands between the sample and a product.
+This chapter is for the developer who takes `scripts/bastion` as the start of a real banking or exchange app. It covers how the sample is put together, how sign-in, a signed payment, a trade and the audit chain work, every security feature with the file it lives in, the settings and the endpoints, the threats it's built against, what only a cloud build turns on, and the work that stands between the sample and a product.
 
 === Running it
 
@@ -24,15 +24,39 @@ mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
 
 === The modules
 
+image::img/bastion-architecture.svg["The common module with the app's screens and security classes, the shared module with the contracts, and the backend module with the server's packages over a database",scaledwidth=95%]
+
 [cols="1,3",options="header"]
 |===
 |Module |What it holds
-|`shared` |The transfer objects and the `@RestClient` contracts (`BankingApi`, `ExchangeApi`, `AccountApi`, `AdminApi`), and `SignedRequest`, the canonical form both sides sign and verify.
+|`shared` |The transfer objects and the `@RestClient` contracts (`BankingApi`, `ExchangeApi`, `AccountApi`, `AdminApi`), `SignedRequest`, the canonical form both sides sign and verify, and `Refusal`, the stable codes of the server's refusals.
 |`backend` |The Codename One Backend server: the ledger, accounts and sign-in, money movement, the exchange, the audit chain, and the administrator's checks.
-|`common` |The app: every screen, the network guard, the device key and request signer, the app lock, the screen protections and the Security Center.
+|`common` |The app: every screen, the network guard, the app key, the device key and request signer, the app lock, the screen protections and the Security Center.
 |===
 
-The project has the minimal layout, with no platform modules: `common` builds the simulator, the desktop app, Android, iOS and the browser.
+The project has the minimal layout, with no platform modules: `common` builds the simulator, the desktop app, Android, iOS and the browser. The server's classes live under `backend/src/main/java/com/codenameone/examples/bastion` and the app's under `common/src/main/java/com/codenameone/examples/bastion`; the paths in this chapter are relative to those.
+
+=== Signing in
+
+image::img/bastion-sign-in-flow.svg["A sequence between the app and the server: password, redirect to the code step, the code, the authorization request with a PKCE challenge, the code handed back, the token request with the verifier and the tokens; and the passkey alternative",scaledwidth=95%]
+
+The server is its own OAuth 2 authorization server (`SecurityConfig.java`). The app (`net/Session.java`) posts the password, answers the `/login/mfa` step when the account has an authenticator app, and then runs the authorization-code flow with PKCE. A passkey replaces the first three steps with a WebAuthn assertion. In a browser the app runs the same steps from the page, with the browser's own session cookie, and reads its code from `/signin/code` on the server it came from.
+
+Access tokens last five minutes and refresh tokens twelve hours, rotating on every use. Each access token carries an `amr` claim saying how the sign-in was made: `pwd`, `otp` and `mfa`, or `hwk` for a passkey. `money/Devices.java` reads it: a device key is registered only within ten minutes of a sign-in, and also needs the password when the account has no authenticator app and the sign-in wasn't a passkey.
+
+=== A signed payment
+
+image::img/bastion-signed-request.svg["The app unseals its device key, builds the canonical form of the request and signs it; the server checks the token, the signature, freshness, the device policy, the step-up threshold, the limits and idempotency before the ledger entry",scaledwidth=95%]
+
+Every call that sends value away carries a `Bastion-Signature` header made by `security/RequestSigner.java`:
+
+----
+Bastion-Signature: v1;device=<id>;ts=<millis>;nonce=<random>;sig=<base64url r||s>
+----
+
+The signature is ECDSA P-256 with SHA-256 over `METHOD|target|hex(sha256(body))|nonce|ts`, built by `SignedRequest` in `shared` so that both sides compute the same bytes. The app signs the exact JSON it sends. The server (`money/RequestSigning.java`) refuses an unknown device, a bad signature, a timestamp outside the window or a nonce it has seen, and commits the nonce in its own transaction before the money transaction starts, so a replay that races the original still loses.
+
+A refusal is answered as `(code|value|value) English text`. The code is one of the `Refusal` constants; the app looks it up as `error.<code>` in its own bundle (`net/Net.java`), so the customer reads it in their language and a reworded English sentence never breaks a translation. `ui/DeviceSetup.java` reacts to the device codes: it offers to register a key and then sends the same request again, with a fresh nonce and the same idempotency key.
 
 === The ledger
 
@@ -45,82 +69,167 @@ Every amount is a `long` in the asset's smallest unit: cents for dollars and eur
 * *Idempotency.* Every money request carries an `Idempotency-Key`. The key and a hash of the request are stored with the entry; a retry answers the first entry, and the same key with a different request is refused.
 * *Rollback on any failure.* Every transaction is `@Transactional(rollbackFor = Exception.class)`. A checked exception would otherwise commit what was done before it.
 
+A trade is the richest entry the ledger makes:
+
+image::img/bastion-trade-entry.svg["The five postings of one trade: the buyer's hold pays dollars, the seller's checking account receives them less nothing, the fee account takes the fee, the seller's coin hold gives the coins and the buyer's wallet receives them",scaledwidth=95%]
+
+`exchange/Exchange.java` sets aside what an order could spend in a `HOLD` account when it's placed, and pays fills out of the holds. Each order keeps the exact running sum of price times quantity over its fills and rounds it once: up for what a buyer pays, down for what a seller gets, with the difference and the taker fee going to `SYS_FEES`. The market's row is locked before matching, so one market matches one order at a time.
+
 `ledger/IsolationCheck.java` refuses to start the server on MySQL at its default REPEATABLE READ isolation. The ledger, the audit chain and the order book each serialize their writers on one row and then read what the previous writer committed, and REPEATABLE READ answers those reads from an older snapshot. Run MySQL at READ COMMITTED (`transaction-isolation = READ-COMMITTED` in its configuration). PostgreSQL runs at READ COMMITTED by default, and SQLite serializes every writer.
+
+=== The audit chain
+
+image::img/bastion-audit-chain.svg["Three audit rows, each holding the hash of the row before it, and the audit_head row pointing at the last; the hash covers length-prefixed fields",scaledwidth=95%]
+
+`audit/Audit.java` appends every security and money event as a row whose SHA-256 hash covers its own fields, length-prefixed, and the hash of the row before it. Appending a row locks `audit_head`, links to its hash and advances it, inside the caller's transaction, so a transfer that rolls back leaves no audit row behind. *Verify the audit log* (`/api/admin/audit/verify`) walks the chain from its fixed starting hash and reports the first row whose hash isn't its own, that doesn't link to the row before, or a head that doesn't match the last row.
 
 === Security features and where they live
 
+The last column says whether the feature needs a build from the Codename One build server to be in force. Everything marked *No* works in the simulator, a local build and the browser too.
+
 ==== On the server
 
-[cols="1,2,1",options="header"]
+[cols="2,4,3,1",options="header"]
 |===
-|Feature |What it does |Where
-|Sign-in |The authorization server with the authorization-code flow and PKCE, five-minute access tokens and rotating twelve-hour refresh tokens. The app in a browser asks for its code at `/signin/code` on the server it came from, which hands the code back. Every access token says how its sign-in was made in the `amr` claim: `pwd`, `otp` and `mfa`, or `hwk` for a passkey. |`SecurityConfig.java`, `SignInCodePage.java`
-|Second factor |TOTP enrolment and confirmation, ten single-use recovery codes, and the `/login/mfa` step that holds the session back until the code. |`account/SecondFactor.java`, `SecurityConfig.java`
-|Passkeys |WebAuthn registration and sign-in; listing and removing them. |`SecurityConfig.java`, `account/PasskeyList.java`
-|Lockout |Failed passwords counted per account in `login_failure`, locking it for a period after too many. |`account/SignInGuard.java`
-|Rate limits |Per-address limits on sign-in, registration and transfers. |`SecurityConfig.java`
-|Headers |`nosniff`, frame denial, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java`
-|Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java`
-|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again when the account has no authenticator and the sign-in didn't use a passkey. |`money/Devices.java`
-|Request signing |A payment is signed over the method, path, body hash, a nonce and a timestamp. A replayed nonce, an old timestamp or a wrong key is refused, and the nonce is recorded in its own transaction before any money moves. |`money/RequestSigning.java`, `shared/.../SignedRequest.java`
-|Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java`
-|Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see below. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java`
-|Limits |Per transfer, per day, and per new payee during its cooling-off period; crypto limits counted in dollars at the market's index price. |`money/Money.java`, `money/Payees.java`
-|Allow-list |Coins leave only to a signed-in, signed, cooled-off address. |`exchange/CryptoWallets.java`
-|Audit chain |Every security and money event is a row whose hash covers the row before it, appended under a lock on the chain's head; `/api/admin/audit/verify` walks it. |`audit/Audit.java`
-|Ledger check |`/api/admin/ledger/verify` checks that every entry balances and every balance equals its postings. |`admin/AdminEndpoint.java`
-|Administrators |No request makes one. Outside development, the only administrator comes from `bastion.admin.email` and `bastion.admin.password` in the environment. |`account/DemoAccounts.java`
+|Feature |What it does |Where |Cloud build?
+|Sign-in |The authorization server with the authorization-code flow and PKCE, five-minute access tokens, rotating twelve-hour refresh tokens and the `amr` claim. |`SecurityConfig.java`, `SignInCodePage.java` |No
+|Second factor |TOTP enrolment and confirmation, ten single-use recovery codes, and the `/login/mfa` step that holds the session back until the code. |`account/SecondFactor.java`, `SecurityConfig.java` |No
+|Passkeys |WebAuthn registration and sign-in; listing and removing them. |`SecurityConfig.java`, `account/PasskeyList.java` |No
+|Lockout |Failed passwords counted per account in `login_failure`, locking it for a period after too many. |`account/SignInGuard.java` |No
+|Rate limits |Per-address limits on sign-in, registration and transfers. |`SecurityConfig.java` |No
+|Headers |`nosniff`, frame denial, `no-store`, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java` |No
+|Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java` |No
+|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again unless the sign-in had a second factor or a passkey. |`money/Devices.java` |No
+|Request signing |Signature, timestamp window and single-use nonce on every call that sends value away. |`money/RequestSigning.java`, `SignedRequest.java` |No
+|Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java` |No
+|Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see <<bastion-before-product>>. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java` |Token: yes
+|Limits and step-up |Per transfer, per day, per new payee during its cooling-off; own-account moves above a threshold signed too; crypto counted in dollars at the index price. |`money/Money.java`, `money/Payees.java` |No
+|Allow-list |Coins leave only to a signed, cooled-off address. |`exchange/CryptoWallets.java` |No
+|Audit chain |Hash-chained event rows appended under a lock on the head. |`audit/Audit.java` |No
+|Ledger check |Every entry balances and every balance equals its postings. |`admin/AdminEndpoint.java` |No
+|Administrators |No request makes one. Outside development, the only administrator comes from the environment. |`account/DemoAccounts.java` |No
 |===
 
 ==== In the app
 
-[cols="1,2,1",options="header"]
+[cols="2,4,3,1",options="header"]
 |===
-|Feature |What it does |Where
-|Network guard |Installed before the first request: no cleartext except to a development server on this machine, a host allow-list, and certificate pins, through `AppShield`. |`net/Guard.java`, `AppConfig.java`
-|Sign-in |The password form and the second-factor step, then the authorization-code flow with PKCE; passkey sign-in. In a browser the same steps run from the page, with the browser's own session cookie and the code read from `/signin/code`. |`net/Session.java`
-|Token storage |The tokens are kept in `SecureStorage`, the Keychain on iOS and the Keystore-backed store on Android. |`net/Session.java`
-|Device key |A P-256 pair from `KeyGenerator.ecP256()`. The private half is sealed with AES-256-GCM in a `SecureEnvelope` under the app key; the server gets the public half. |`security/DeviceKey.java`
-|App key |32 random bytes that seal the device key and the stored tokens, held in memory only while unlocked. Its copies: one in the prompting tier of `SecureStorage` (an iOS Keychain item with biometric access control, an Android Keystore key that requires user authentication), one in a `Vault` opened by the unlock PIN through its `KdfProfile` with a pepper from the OS store, and a plain copy only while neither exists. Five wrong PINs wipe every copy. |`security/Keys.java`, `security/SealedStorage.java`
-|Request signer |Signs the exact bytes the request sends, in the canonical form the server checks. |`security/RequestSigner.java`
-|App lock |Locks on start with a stored session, after time in the background and after idle time; a biometric when the customer opts in, then the unlock PIN, and a fresh sign-in otherwise. The app key and the unsealed device key are dropped while locked, and a stored session is read only after the unlock. |`security/Lock.java`, `ui/LockForm.java`
-|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself. |`security/Protect.java`
-|Device integrity |Root and jailbreak signals, and the attestation token the server checks. |`security/DeviceKey.java`, `security/SecurityStatus.java`
-|Security Center |Lists every protection above with its real state on this device and build. |`security/SecurityStatus.java`, `ui/SecurityCenterForm.java`
+|Feature |What it does |Where |Cloud build?
+|Network guard |Installed before the first request: no cleartext except to a development server on this machine, a host allow-list, and certificate pins, through `AppShield`. |`net/Guard.java`, `AppConfig.java` |No
+|Over-the-air pins and attestation tokens |`AppShield`'s attestation engine fetches pins and stamps requests with a token. |`net/Guard.java` |Yes
+|Sign-in |Password and second-factor step, then the authorization-code flow with PKCE; passkey sign-in, in a browser too. |`net/Session.java` |No
+|App key |32 random bytes that seal the device key and the stored tokens, held in memory only while unlocked. Copies: one in the biometric tier of `SecureStorage` (an iOS Keychain item with biometric access control, an Android Keystore key that requires user authentication), one in a `Vault` opened by the unlock PIN through its `KdfProfile` with a pepper from the OS store, and a plain copy only while neither exists. Five wrong PINs wipe every copy. |`security/Keys.java`, `security/SealedStorage.java` |No (biometric binding: a device)
+|Token storage |Tokens sealed under the app key in `SecureStorage`: the Keychain on iOS, the Keystore-backed store on Android. |`net/Session.java`, `security/SealedStorage.java` |No
+|Device key |A P-256 pair from `KeyGenerator.ecP256()`, the private half sealed with AES-256-GCM in a `SecureEnvelope` under the app key. |`security/DeviceKey.java` |No
+|Request signer |Signs the exact bytes the request sends, in the canonical form the server checks. |`security/RequestSigner.java` |No
+|App lock |Locks on start with a stored session, after 30 seconds in the background and after two minutes idle; biometric, then PIN, then a fresh sign-in. |`security/Lock.java`, `ui/LockForm.java` |No
+|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself. |`security/Protect.java` |No (a device)
+|App switcher cover |A blank card in the iOS app switcher. |`codenameone_settings.properties` |Yes
+|Root and jailbreak |Root signals reported to the server; a jailbroken iPhone refuses to start. |`security/DeviceKey.java`, `codenameone_settings.properties` |Jailbreak exit: yes
+|Code hardening |Class renaming, string encryption, control-flow flattening and tamper checks. |`codenameone_settings.properties` |Yes
+|Security Center |Every protection above with its real state on this device and build. |`security/SecurityStatus.java`, `ui/SecurityCenterForm.java` |No
 |===
 
 The app can't read its own build hints when it runs, so `SecurityStatus.DECLARED_HINTS` mirrors the hardening hints in `common/codenameone_settings.properties`, and `SecurityStatusTest` fails when the two disagree.
 
-=== Threat model
-
-Bastion is built against these, in this order of likelihood:
-
-* *Stolen or guessed passwords.* A second factor or a passkey, a lockout per account, rate limits per address, and a password minimum checked on the server.
-* *A stolen session.* Access tokens last five minutes. A password change ends every other sign-in. Money leaving the account needs a signature from a registered device as well, so a token alone moves nothing out.
-* *Account takeover that adds a mule.* A new payee or address cools off for a day with a small limit, and adding one is signed by the device.
-* *A tampered or replayed request.* The signature covers the body and the path, and each nonce is accepted once within a short time window.
-* *An attacker in the network path.* No cleartext, a host allow-list and certificate pins in the app; HSTS on the server.
-* *A lost or stolen phone.* The app lock, the sealed device key, removal of the device from another sign-in, and secure windows that keep balances out of screenshots and the app switcher.
-* *A rooted device or a repackaged app.* Root and jailbreak signals, platform attestation, and code hardening in a cloud build. None of these is proof; the server treats them as signals that decide whether a device is trusted.
-* *A careless or malicious insider.* The audit chain makes changing history detectable, the ledger check makes a wrong balance detectable, and no request creates an administrator.
-* *Races and retries.* Conditional balance updates, ordered locks and idempotency keys keep money exact under concurrent and repeated requests.
-
-Out of scope for the sample: a compromised server or database host, an attacker who can read the device's memory while it's unlocked, and denial of service beyond the rate limits.
-
 === What only a cloud build turns on
 
-Some protections are applied when the app is built, by the Codename One build server, and do nothing in the simulator or in a local build. The Security Center reports each as inactive there rather than claiming it's on.
+Some protections are applied when the app is built, by the Codename One build server, and do nothing in the simulator, a local build or the browser. The Security Center marks each *Cloud build* there rather than claiming it's on.
 
 [cols="1,2",options="header"]
 |===
 |Build hint |What it turns on
-|`cn1.hardenLevel=aggressive` |Code hardening: string encryption, control-flow obfuscation and tamper checks in the built app.
+|`cn1.hardenLevel=aggressive` |Code hardening: class renaming, string encryption, control-flow flattening and tamper checks in the built app.
 |`android.playIntegrity=true` |Play Integrity: the app obtains an attestation token for the server to check.
-|`ios.detectJailbreak=true` |The iOS jailbreak checks.
+|`ios.detectJailbreak=true` |The iOS jailbreak checks; the app exits on a jailbroken iPhone.
 |`ios.blockScreenshotsOnEnterBackground=true` |A cover over the app in the iOS app switcher.
 |===
 
 A hardware-backed keystore, secure windows and biometrics need a real device; the simulator reports them as unavailable.
+
+=== Settings
+
+The server reads these at start-up. A system property of the same name wins, then the environment variable the key maps to (`bastion.payee.cooloff-hours` is read from `BASTION_PAYEE_COOLOFF_HOURS`), then `application-<profile>.properties`, then `application.properties`. Amounts are in cents.
+
+[cols="2,1,3",options="header"]
+|===
+|Key |Default |What it controls
+|`cn1.datasource.url` (`DATABASE_URL`) |none |The database: SQLite, PostgreSQL, MySQL or MariaDB.
+|`cn1.security.authorizationserver.issuer` |none |The server's public `https` address, written into every token.
+|`cn1.security.authorizationserver.jwk.keys` |a key made at start-up |The key tokens are signed with. Without it, every token stops verifying when the process ends.
+|`cn1.security.mfa.encryptionKey` |a fixed development key |The key authenticator secrets are sealed under.
+|`bastion.admin.email`, `bastion.admin.password` |none |The one administrator outside the development profile.
+|`bastion.webauthn.rp-id` |`localhost` |The domain passkeys belong to.
+|`bastion.webauthn.origins` |`http://localhost:8080` |The origins passkeys are accepted from, comma separated.
+|`bastion.lockout.attempts`, `bastion.lockout.window-seconds`, `bastion.lockout.seconds` |5, 900, 900 |Failed passwords before the account locks, the window they're counted in, and how long it stays locked.
+|`bastion.signin.per-minute`, `bastion.register.per-hour`, `bastion.transfer.per-minute` |10, 20, 20 |Rate limits per address.
+|`bastion.device.fresh-minutes` |10 |How recent a sign-in must be to register a device key.
+|`bastion.device.policy.enforce` |`true` |Whether money leaving a customer needs a trusted device. Turn it off only for development and screenshots.
+|`bastion.stepup.threshold` |100000 |Own-account moves above this are signed by the device too.
+|`bastion.limit.per-transfer`, `bastion.limit.daily` |500000, 1000000 |Transfer limits.
+|`bastion.payee.cooloff-hours`, `bastion.payee.cooloff-limit` |24, 10000 |How long a new payee cools off and what it can receive meanwhile.
+|`bastion.address.cooloff-hours` |24 |How long a new coin address waits.
+|`bastion.crypto.limit.per-withdrawal`, `bastion.crypto.limit.daily` |1000000, 2000000 |Coin withdrawal limits, in dollar cents at the index price.
+|`bastion.exchange.taker-fee-bps` |20 |The taker fee in basis points.
+|`bastion.markets` |BTC-USD and ETH-USD |The markets, as `id:base:quote:lot:index` entries.
+|`bastion.market-maker.enabled` |`true` (development only) |The random-walk market maker.
+|===
+
+In the app, `AppConfig.java` holds the server address the app defaults to, `ALLOWED_HOSTS` and the certificate `PINS`. The pins in the sample are placeholders, and the Security Center warns about them until they're the SHA-256 digests of the real server's public keys.
+
+=== The API
+
+Every endpoint but registration and sign-in needs a bearer token. *Signed* marks the calls that also need the `Bastion-Signature` header; *Idempotent* marks those that take an `Idempotency-Key`.
+
+[cols="2,3,2",options="header"]
+|===
+|Endpoint |What it does |Needs
+|`POST /api/account/register` |Opens an account. |Rate limited
+|`GET /api/me` |The signed-in customer. |
+|`POST /api/account/password` |Changes the password and ends every other sign-in. |
+|`POST /api/account/mfa/totp`, `.../totp/confirm` |Starts and confirms the authenticator app. |
+|`POST /api/account/mfa/recovery-codes` |New recovery codes. |
+|`GET`, `DELETE /api/account/passkeys[/{id}]` |Lists and removes passkeys. |
+|`GET /api/assets` |The currencies and coins and their decimals. |
+|`GET`, `POST /api/accounts` |Lists and opens accounts. |
+|`GET /api/accounts/{id}/postings` |An account's history. |
+|`POST /api/transfers` |Moves money. |Signed, idempotent
+|`POST /api/accounts/{id}/deposit` |The demo deposit. |Idempotent
+|`POST /api/accounts/{id}/withdraw` |A withdrawal to the outside. |Signed, idempotent
+|`GET`, `POST`, `PUT`, `DELETE /api/payees[/{id}]` |Lists, adds, renames and removes payees. |Adding: signed
+|`GET /api/cards`, `POST /api/accounts/{id}/card` |Lists and issues cards. |
+|`POST /api/cards/{id}/freeze`, `.../unfreeze`, `PUT .../limit` |Freezes, unfreezes and limits a card. |
+|`POST /api/cards/{id}/spend` |The demo card spend. |Idempotent
+|`GET`, `POST`, `DELETE /api/devices[/{id}]` |Lists, registers and removes device keys. |Recent sign-in
+|`GET /api/exchange/markets`, `.../{id}/book`, `.../{id}/ticker` |Markets, order book and ticker. |
+|`POST`, `GET`, `DELETE /api/exchange/orders[/{id}]` |Places, lists and cancels orders. |
+|`GET /api/exchange/trades` |The customer's trades. |
+|`GET`, `POST`, `DELETE /api/crypto/addresses[/{id}]` |The coin address allow-list. |Adding: signed
+|`POST /api/accounts/{id}/crypto-withdraw` |Sends coins to an allowed address. |Signed, idempotent
+|`GET /api/admin/audit/verify`, `GET /api/admin/ledger/verify` |The administrator's checks. |Administrator
+|===
+
+The contracts are the interfaces in `shared/.../api`; the app calls them through the generated `@RestClient` implementations, so a changed path is a compile error on both sides.
+
+=== Threat model
+
+Bastion is built against these, the likeliest first:
+
+[cols="2,4,3",options="header"]
+|===
+|Threat |What stops it |Where
+|Stolen or guessed passwords |A second factor or a passkey, a lockout per account, rate limits per address, and a password minimum checked on the server. |`SecurityConfig.java`, `account/SignInGuard.java`
+|A stolen session |Five-minute access tokens; a password change ends every other sign-in; money leaving the account also needs a device signature, so a token alone moves nothing out. |`account/Grants.java`, `money/RequestSigning.java`
+|Account takeover that adds a mule |A new payee or address cools off for a day with a small limit, and adding one is signed by the device. |`money/Payees.java`, `exchange/CryptoWallets.java`
+|A tampered or replayed request |The signature covers the body and the path; each nonce is accepted once within a short time window. |`money/RequestSigning.java`
+|An attacker in the network path |No cleartext, a host allow-list and certificate pins in the app; HSTS on the server. |`net/Guard.java`, `SecurityConfig.java`
+|A lost or stolen phone |The app lock, keys sealed under an app key that only a biometric or PIN opens, removal of the device from another sign-in, and secure windows that keep balances out of screenshots and the app switcher. |`security/Lock.java`, `security/Keys.java`, `security/Protect.java`
+|A rooted device or a repackaged app |Root and jailbreak signals, platform attestation, and code hardening in a cloud build. None is proof; the server treats them as signals that decide whether a device is trusted. |`money/Devices.java`, `codenameone_settings.properties`
+|A careless or malicious insider |The audit chain makes changing history detectable, the ledger check makes a wrong balance detectable, and no request creates an administrator. |`audit/Audit.java`, `admin/AdminEndpoint.java`
+|Races and retries |Conditional balance updates, ordered locks and idempotency keys keep money exact under concurrent and repeated requests. |`ledger/Ledger.java`
+|===
+
+Out of scope for the sample: a compromised server or database host, an attacker who can read the device's memory while it's unlocked, and denial of service beyond the rate limits.
 
 === Tests
 
@@ -139,10 +248,21 @@ mvn -Dcodename1.platform=javase -Djava.awt.headless=true package
 ./run-e2e.sh --native
 # The app in a headless browser, served by the server
 ./run-web-e2e.sh
+# The same, then every screen in the user's guide, into docs/developer-guide/img
+./run-web-e2e.sh --guide
 ----
 
-The server's tests cover the ledger's invariants under concurrent transfers and trades, idempotency, sign-in with each factor, the access rules of every endpoint, signing and replay, the device policy, limits and cooling-off, the matching engine and its rounding, and the audit chain's detection of a changed row. `run-e2e.sh` registers two customers, enrols an authenticator and signs in with it, registers device keys, makes a signed payment and checks that the unsigned and replayed copies are refused, fills an order between the two, and checks that a withdrawal is refused until its address is allowed and cooled off. `run-web-e2e.sh` does it in a headless browser, through the app's own screens: it opens an account, turns on the authenticator app, creates a passkey, signs in again with the password and a code, moves money between two accounts, then signs in with the passkey alone and registers the browser as a device without the password.
+The server's tests cover the ledger's invariants under concurrent transfers and trades, idempotency, sign-in with each factor, the access rules of every endpoint, signing and replay, the device policy, limits and cooling-off, the matching engine and its rounding, and the audit chain's detection of a changed row. `run-e2e.sh` registers two customers, enrols an authenticator and signs in with it, registers device keys, makes a signed payment and checks that the unsigned and replayed copies are refused, fills an order between the two, and checks that a withdrawal is refused until its address is allowed and cooled off. `run-web-e2e.sh` does it in a headless browser, through the app's own screens: it opens an account, turns on the authenticator app, creates a passkey, signs in again with the password and a code, moves money between two accounts, then signs in with the passkey alone and registers the browser as a device without the password. With `--guide` it runs the server on the development profile with the device policy off, then signs in as the demo customer and the administrator and photographs each screen; run it after changing a screen so the user's guide stays true.
 
+=== Making it yours
+
+* *Name, icon and colors.* The name and package come from the Initializr, the icon is `common/icon.png`, and the colors are the variables at the top of `common/src/main/css/theme.css`, with a dark set below them.
+* *Server address and pins.* Set `AppConfig.ALLOWED_HOSTS` to your API's host and `AppConfig.PINS` to its key digests before the first release build.
+* *Languages.* The bundles are in `common/src/main/l10n`; `BundleTest` checks that every bundle has every key and every server refusal code.
+* *Markets and assets.* `bastion.markets` lists the markets; the assets are rows in the ledger's migrations (`V2__ledger.sql`), served to the app by `/api/assets`.
+* *Limits.* Every limit and cooling-off period is a setting in the table above.
+
+[[bastion-before-product]]
 === Before it's a product
 
 The sample is complete as a demonstration and stops where a real bank's own systems begin. A product needs at least:
@@ -155,8 +275,8 @@ The sample is complete as a demonstration and stops where a real bank's own syst
 * *A real market.* The market maker is a development-only random walk. A product takes its prices from a market data provider and its liquidity from real counterparties, and runs the exchange's own surveillance.
 * *Regulatory reporting.* Suspicious activity reports, transaction reporting, statements and tax documents, and records kept for as long as the law asks.
 * *Audit anchoring off the database.* The audit chain shows that history was changed, but whoever controls the database can rewrite the whole chain. Publishing the chain's head at intervals to a store the database's administrators can't write, such as write-once storage or a timestamping service, closes that.
-* *Reviewed translations.* The app ships English, Spanish, French, German and Hebrew. The non-English bundles are machine translations; have them reviewed before release. The server's refusals carry a stable code (`api/Refusal.java`) that the app looks up as `error.<code>`, so a reworded English sentence never breaks a translation.
+* *Reviewed translations.* The non-English bundles are machine translations; have them reviewed before release.
 * *A PIN checked off the device.* The attempt counter is in the app's preferences, so it stops a guesser at the screen, not one with root access who resets it; the pepper in the OS store is what keeps a copy of the files from being tried offline. A product that must hold against that checks the PIN on the server or in a secure element.
 * *Biometric-bound keys on the web and desktop.* Only iOS and Android bind a key to a biometric in the OS. In a browser and on the desktop the lock offers the PIN, and the Security Center says so.
-* *Your own origin for passkeys.* A passkey belongs to the domain in `bastion.webauthn.rp-id` and is accepted only from the origins in `bastion.webauthn.origins`. A deployment sets both to its own domain, and adds the Android app's `android:apk-key-hash:` origin and the iOS app's associated domain.
+* *Your own origin for passkeys.* A deployment sets `bastion.webauthn.rp-id` and `bastion.webauthn.origins` to its own domain, and adds the Android app's `android:apk-key-hash:` origin and the iOS app's associated domain.
 * *Operations.* Monitoring and alerting on the audit and ledger checks, fraud scoring on transfers, a support console with its own access controls and audit, backups and disaster recovery, and penetration testing.

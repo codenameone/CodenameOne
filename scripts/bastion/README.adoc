@@ -103,7 +103,9 @@ mvn -Dcodename1.platform=javase -Djava.awt.headless=true package   # <4>
     and a code, moves money between two accounts, then signs in with the
     passkey alone and registers the browser as a signing device. Needs Node with Playwright and its Chromium (`npm ci` and
     `npx playwright install chromium` in `scripts/`). Screenshots and logs go to
-    `target/web-e2e`.
+    `target/web-e2e`. With `--guide` it runs the server on the development
+    profile and then takes every screenshot in the user's guide, into
+    `docs/developer-guide/img`.
 
 `.github/workflows/bastion.yml` runs all of them, and builds the application for
 Android and iOS through `scripts/build-android-app.sh` and

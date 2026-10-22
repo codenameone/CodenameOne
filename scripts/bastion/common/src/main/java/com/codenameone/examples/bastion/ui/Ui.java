@@ -165,6 +165,19 @@ public final class Ui {
     /// Buttons side by side, sharing the width.
     public static Container across(Component... parts) {
         Container row = new Container(new GridLayout(1, parts.length));
+        for (Component part : parts) {
+            if (part instanceof Label) {
+                // Three buttons share a phone's width: they give up most of
+                // their side padding, and a longer label (or a longer
+                // translation) shrinks a little rather than end in "...".
+                Label label = (Label) part;
+                label.getAllStyles().setPaddingLeft(1f);
+                label.getAllStyles().setPaddingRight(1f);
+                label.setAutoSizeMode(true);
+                label.setMaxAutoSize(2.9f);
+                label.setMinAutoSize(2.2f);
+            }
+        }
         row.addAll(parts);
         return row;
     }
