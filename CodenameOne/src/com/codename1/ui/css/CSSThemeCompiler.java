@@ -877,7 +877,9 @@ public class CSSThemeCompiler {
         boolean universal = rule.universal;
         String uiid = selectorParts[0];
         String statePrefix = selectorParts[1];
-        if (!universal) {
+        // Only a bare `A {}` rule reaches the other states in the build; `A.unselected {}`
+        // styles the unselected state alone.
+        if (!universal && !isUnselectedSelector(rule.selector)) {
             styledUiids.add(uiid);
         }
         StringBuilder borderCss = new StringBuilder();
@@ -1933,6 +1935,14 @@ public class CSSThemeCompiler {
         return new String[]{uiid, statePrefix};
     }
 
+    private static boolean isUnselectedSelector(String selector) {
+        String s = selector.trim();
+        int dot = s.indexOf('.');
+        int colon = s.indexOf(':');
+        int pos = dot < 0 ? colon : colon < 0 ? dot : Math.min(dot, colon);
+        return pos > -1 && "unselected".equals(s.substring(pos + 1).trim());
+    }
+
     private String statePrefix(String pseudo) {
         if ("unselected".equals(pseudo)) {
             return "";
@@ -2123,6 +2133,9 @@ public class CSSThemeCompiler {
     /// The alpha a color carries, 0-255, or -1 for an opaque color that states none:
     /// `transparent` is 0 and `rgba(0, 0, 0, .5)` is 127, as the build-time compiler truncates it.
     private int colorAlpha(String cssColor) {
+        // Folded on purpose: CSS keywords are case-insensitive, so `TRANSPARENT` is transparent.
+        // The build-time compiler matches only the lowercase spelling and paints such a value
+        // opaque, which is its bug, not a behaviour this compiler should copy.
         String value = asciiLower(cssColor.trim());
         if ("transparent".equals(value)) {
             return 0;
@@ -2321,11 +2334,11 @@ public class CSSThemeCompiler {
 
     private Rule[] parseRulesWithMedia(String css) {
         ArrayList<Rule> out = new ArrayList<Rule>();
-        parseRulesInto(css, out, false);
+        parseRulesInto(css, out, false, null);
         return out.toArray(new Rule[out.size()]);
     }
 
-    private void parseRulesInto(String css, ArrayList<Rule> out, boolean darkContext) {
+    private void parseRulesInto(String css, ArrayList<Rule> out, boolean darkContext, String[] mediaPrefixes) {
         int pos = 0;
         int len = css.length();
         while (pos < len) {
@@ -2358,8 +2371,18 @@ public class CSSThemeCompiler {
             }
             if (selectors.startsWith("@media")) {
                 String mediaQuery = selectors.substring("@media".length()).trim();
-                boolean nextDarkContext = darkContext || isDarkModeMediaQuery(mediaQuery);
-                parseRulesInto(css.substring(open + 1, close), out, nextDarkContext);
+                boolean dark = isDarkModeMediaQuery(mediaQuery);
+                String[] nextPrefixes = mediaPrefixes;
+                if (!dark) {
+                    if (mediaQuery.indexOf('(') >= 0) {
+                        // The build-time parser rejects a feature query such as (min-width: 400px)
+                        // and drops the whole block; a theme has no viewport to test it against.
+                        pos = close + 1;
+                        continue;
+                    }
+                    nextPrefixes = mediaPrefixes(mediaQuery);
+                }
+                parseRulesInto(css.substring(open + 1, close), out, darkContext || dark, nextPrefixes);
                 pos = close + 1;
                 continue;
             }
@@ -2385,12 +2408,23 @@ public class CSSThemeCompiler {
                     out.add(constants);
                     continue;
                 }
-                Rule rule = new Rule();
-                rule.selector = darkContext ? toDarkSelector(selector) : selector;
                 String base = selector.trim();
-                rule.universal = base.startsWith("*") || base.startsWith(":") && !":root".equals(base);
-                rule.declarations = declarations;
-                out.add(rule);
+                boolean universal = base.startsWith("*") || base.startsWith(":") && !":root".equals(base);
+                String target = darkContext ? toDarkSelector(selector) : selector;
+                if (mediaPrefixes == null || universal) {
+                    Rule rule = new Rule();
+                    rule.selector = target;
+                    rule.universal = universal;
+                    rule.declarations = declarations;
+                    out.add(rule);
+                    continue;
+                }
+                for (String prefix : mediaPrefixes) {
+                    Rule rule = new Rule();
+                    rule.selector = prefix.length() == 0 ? target : prefix + "-" + target;
+                    rule.declarations = declarations;
+                    out.add(rule);
+                }
             }
 
             pos = close + 1;
@@ -2434,6 +2468,52 @@ public class CSSThemeCompiler {
     /// merging), so `background-color` set in `$DarkFoo` silently vanishes from the build. That
     /// is a defect of the build, not a behaviour a stylesheet relies on, so the preview keeps
     /// what the author wrote.
+    /// The UIID prefixes a `@media` list stands for, as the build-time compiler computes them:
+    /// `platform-*` crossed with `density-*`, then `device-*` in front, so
+    /// `@media platform-ios, density-high { A {} }` styles `platform-ios-density-high-A`. A list
+    /// naming none of the three applies to the plain UIIDs (prefix "").
+    private String[] mediaPrefixes(String mediaQuery) {
+        ArrayList<String> platforms = new ArrayList<String>();
+        ArrayList<String> densities = new ArrayList<String>();
+        ArrayList<String> types = new ArrayList<String>();
+        for (String entry : splitOnChar(mediaQuery, ',')) {
+            String key = entry.trim();
+            if (key.startsWith("platform-")) {
+                platforms.add(key);
+            } else if (key.startsWith("density-")) {
+                densities.add(key);
+            } else if (key.startsWith("device-")) {
+                types.add(key);
+            }
+        }
+        ArrayList<String> out = new ArrayList<String>();
+        if (platforms.isEmpty()) {
+            if (densities.isEmpty()) {
+                out.add("");
+            } else {
+                out.addAll(densities);
+            }
+        } else {
+            for (String platform : platforms) {
+                if (densities.isEmpty()) {
+                    out.add(platform);
+                } else {
+                    for (String density : densities) {
+                        out.add(platform + "-" + density);
+                    }
+                }
+            }
+        }
+        int count = out.size();
+        for (String type : types) {
+            for (int i = 0; i < count; i++) {
+                String curr = out.get(i);
+                out.set(i, curr.length() == 0 ? type : type + "-" + curr);
+            }
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
     private boolean isDarkModeMediaQuery(String mediaQuery) {
         String normalized = mediaQuery == null ? "" : asciiLower(mediaQuery);
         return normalized.indexOf("prefers-color-scheme") > -1 && normalized.indexOf("dark") > -1;

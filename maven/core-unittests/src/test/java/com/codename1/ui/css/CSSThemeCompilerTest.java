@@ -1645,4 +1645,26 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("ff0000", theme.get("@placeholderImage"));
         assertEquals("3", theme.get("@countImage"));
     }
+
+    @Test
+    void testPlatformMediaQueryPrefixesTheUiid() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("@media platform-ios { A { color: #111111; } }"
+                + "@media device-tablet, platform-and, density-high { B { color: #222222; } }"
+                + "@media (min-width: 400px) { C { color: #333333; } }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("111111", theme.get("platform-ios-A.fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A.fgColor"));
+        assertEquals("222222", theme.get("device-tablet-platform-and-density-high-B.fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("C.fgColor"));
+    }
+
+    @Test
+    void testUnselectedRuleStaysInTheUnselectedState() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("A.unselected { color: #222222; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("222222", theme.get("A.fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A.sel#fgColor"));
+    }
 }
