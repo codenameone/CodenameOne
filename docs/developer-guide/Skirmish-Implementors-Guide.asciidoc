@@ -335,6 +335,8 @@ only of a player who keeps coming back:
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/Skirmish.java[tag=skirmish-app-review,indent=0]
 ----
 
+image::img/skirmish-desktop-admin-overview.png["The admin console in a desktop window, with its tabs in a sidebar on the left and the overview's numbers beside them",scaledwidth=80%]
+
 On a desktop or a tablet, the console puts its tabs in a sidebar:
 
 [source,java,role=cn1-no-try]
@@ -387,6 +389,8 @@ installed, is the number most games live or die by. Push brings players back,
 but only when it's rare and worth reading.
 
 . Sign in as the administrator, open the console, and choose *Promote*.
++
+image::img/skirmish-desktop-admin-promote.png["The Promote tab on a desktop: the button that opens Codename One analytics, the player numbers, and the top of the push form",scaledwidth=80%]
 . Under *Broadcast a push*, choose who it's for. *Away for a while* with 3 days
   reaches players who stopped recently and still remember the game.
 . Write a title and a message about something new, and choose the screen a tap
@@ -395,6 +399,10 @@ but only when it's rare and worth reading.
   `push_open` event with that name when the notification is tapped, and the
   campaign is how the console tells broadcasts apart.
 . Choose *Count players*, then *Send*, and confirm.
++
+image::img/skirmish-desktop-admin-broadcast.png["The push form filled in: everyone, a title and message about season two, the Home screen to open, and the campaign season-two",scaledwidth=80%]
++
+image::img/skirmish-desktop-admin-broadcast-confirm.png["The confirmation before a push goes out, naming its title and the number of players it reaches",scaledwidth=80%]
 
 image::img/skirmish-admin-promote.png["The Promote tab on a phone: the analytics button, the player numbers and the push form with its audience, days and title",scaledwidth=40%]
 
@@ -443,6 +451,8 @@ spotlight* with a line of text and either a Forge pack, which opens that pack,
 or a screen. Use it for what's new this week; take it down by saving an empty
 banner.
 
+image::img/skirmish-desktop-admin-spotlight.png["The spotlight editor under the push form: the banner text, an optional Forge pack, the screen it opens, and Save spotlight",scaledwidth=80%]
+image::img/skirmish-desktop-home-spotlight.png["The home screen in a desktop window, with the new banner announcing the Frost Arena under the hero",scaledwidth=80%]
 image::img/skirmish-home-spotlight.png["The spotlight banner on a player's home screen, under the hero",scaledwidth=40%]
 
 ==== Step 7: Ratings
