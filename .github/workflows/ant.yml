@@ -22,7 +22,9 @@ jobs:
   build-linux-jdk8:
 
     runs-on: ubuntu-24.04
-    # Includes archetype integration tests and backend packaging after the Ant build.
+    # Includes archetype integration tests and backend packaging after the Ant
+    # build, and the Swing and JavaFX compatibility modules in the reactor it
+    # builds and tests.
     timeout-minutes: 75
 
     steps:

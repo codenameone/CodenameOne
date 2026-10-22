@@ -53,6 +53,19 @@ import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatPh
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatSpritesScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTextMeshProScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTilemapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingControlsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingTablesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingTreesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingPaintingScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingContainersScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingOptionPaneScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingXScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxControlsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxDataScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxShapesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxFxmlScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxPanesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxAlertScreenshotTest;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -630,7 +643,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
             new DeviceInputApiTest(),
-            new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
@@ -673,6 +685,31 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new UnityCompatParticlesScreenshotTest(),
             new UnityCompatTextMeshProScreenshotTest(),
             new UnityCompatCinemachineScreenshotTest(),
+            // The desktop compatibility layers: Swing, SwingX and JavaFX screens that this
+            // app compiles from common/src/main/desktop in library mode (no entry point of
+            // their own) and embeds in forms of its own, plus one modal dialog of each
+            // toolkit captured while open and answered from code. After the Android
+            // screens for the same reason those come late -- a runtime installed here
+            // cannot shift an existing baseline -- and before DesktopMode, which must stay
+            // the last ordinary capture.
+            new DesktopCompatSwingControlsScreenshotTest(),
+            new DesktopCompatSwingTablesScreenshotTest(),
+            new DesktopCompatSwingTreesScreenshotTest(),
+            new DesktopCompatSwingPaintingScreenshotTest(),
+            new DesktopCompatSwingContainersScreenshotTest(),
+            new DesktopCompatSwingOptionPaneScreenshotTest(),
+            new DesktopCompatSwingXScreenshotTest(),
+            new DesktopCompatFxControlsScreenshotTest(),
+            new DesktopCompatFxDataScreenshotTest(),
+            new DesktopCompatFxShapesScreenshotTest(),
+            new DesktopCompatFxFxmlScreenshotTest(),
+            new DesktopCompatFxPanesScreenshotTest(),
+            new DesktopCompatFxAlertScreenshotTest(),
+            // After every test that shows a dialog. It asks for the notification
+            // permission, and on iOS the system alert nobody answers leaves the
+            // application inactive for the rest of the run: Display.isMinimized()
+            // is then true and Dialog refuses to show anything at all.
+            new LocalNotificationOverrideTest(),
             // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
             // and a populated list, which warms the font cache / shifts suite timing, and the
             // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed

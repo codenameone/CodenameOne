@@ -1,0 +1,65 @@
+{
+ "pr": 5980,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13238731
+     },
+     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 13356239
+    },
+    "install_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 108271844
+     },
+     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 108853545
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 14523602
+     },
+     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "runs": 1,
+     "value": 14603714
+    },
+    "install_bytes": {
+     "from": {
+      "value": 116342496
+     },
+     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "runs": 1,
+     "value": 116543968
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 84685068
+     },
+     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "runs": 1,
+     "value": 84697277
+    }
+   }
+  }
+ }
+}
