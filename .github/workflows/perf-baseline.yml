@@ -123,6 +123,30 @@ jobs:
           done
           find "${dest}" -name perf-results.json | wc -l | xargs echo "perf-results.json files:"
 
+      # The Flutter gate's SIZE rows follow master: they are deterministic, so the latest
+      # nightly measurement of master is what a pull request should be judged against
+      # (flutter_baseline.py follow explains why). Ratios are not followed.
+      - name: Collect master's latest nightly Flutter benchmark sizes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/flutter-sizes"
+          mkdir -p "${dest}"
+          run="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow flutter-bench.yml \
+              --branch master --event schedule --status completed --limit 1 \
+              --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -z "${run}" ]; then
+            echo "No completed nightly Flutter benchmark run; sizes stay as they are."
+            exit 0
+          fi
+          for name in $(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}/artifacts" \
+              --jq '.artifacts[] | select(.name | startswith("flutter-bench-")) | select(.expired | not) | .name'); do
+            gh run download "${run}" --repo "${GITHUB_REPOSITORY}" -n "${name}" \
+              -D "${dest}/${name}" || echo "could not download ${name} of run ${run}"
+          done
+          find "${dest}" -name 'baseline-*.json' | wc -l | xargs echo "nightly size files:"
+
       - name: Fold merged overlays into base/ and tighten consistently beaten rows
         id: fold
         run: |
@@ -137,6 +161,9 @@ jobs:
             git reset --quiet --hard origin/master
             python3 vm/selfhost/perf_baseline.py fold
             python3 scripts/flutter-bench/flutter_baseline.py fold
+            find "${RUNNER_TEMP}/flutter-sizes" -name 'baseline-*.json' -print0 \
+              | xargs -0 python3 scripts/flutter-bench/flutter_baseline.py follow \
+              | tee "${RUNNER_TEMP}/followed.txt"
             git add -A vm/selfhost/perf-baseline scripts/flutter-bench/baseline
             folded=true
             git diff --staged --quiet && folded=false
@@ -153,7 +180,8 @@ jobs:
               [ "${folded}" = true ] && subject="ci: fold merged performance baselines and tighten consistently beaten rows"
               git commit --quiet -m "${subject}" -m "$(grep '^tightened ' "${RUNNER_TEMP}/tightened.txt")"
             else
-              git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/"
+              git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/" \
+                -m "$(cat "${RUNNER_TEMP}/followed.txt")"
             fi
             if git push origin HEAD:master; then
               echo "folded=true" >> "$GITHUB_OUTPUT"

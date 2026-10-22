@@ -602,19 +602,13 @@ def render_markdown(report):
                   '`%s`, with the reason, from this job\'s `perf-results.json`. The rebaseline '
                   'is then part of this pull request\'s diff:' % overlay_name(report), '',
                   '```', fix_command(report, True), '```']
-    if report.get('stale_overlay'):
-        lines += ['', '**`%s` is stale, so this gate fails.** %s This run was judged against '
-                  'the baseline without it; re-measure from this job\'s `perf-results.json`, '
-                  'which rewrites the stale rows:' % (overlay_name(report), report['stale_overlay']),
-                  '', '```', fix_command(report, True), '```']
     lines += ['', '**Result: %s**' % (
         'performance regression' if report['regression'] else
         ('gate did not complete' if report.get('error') else
          ('benchmark failed' if report.get('failures') else
           ('no baseline: calibration required' if missing_baselines(report)
-           else ('stale overlay: re-measure required' if report.get('stale_overlay')
-                 else ('no regression (improved past the baseline: consider rebaselining)'
-                       if improvements else 'no regression'))))))]
+           else ('no regression (improved past the baseline: consider rebaselining)'
+                 if improvements else 'no regression')))))]
     return '\n'.join(lines) + '\n'
 
 
@@ -668,28 +662,14 @@ def main(argv):
     try:
         baseline = perf_baseline.load(args.baseline)
     except perf_baseline.BaselineError as error:
-        baseline = None
-        own = report['pr'] and (Path(args.baseline) / 'pr' / ('%d.json' % report['pr'])).is_file()
-        if own:
-            # This pull request's OWN overlay went stale: another merged change moved a row
-            # it rebaselines. The fix is to re-measure on top of that change, which needs a
-            # measurement -- so measure against the baseline without the stale overlay and
-            # fail afterwards, rather than refuse and leave nothing to recalibrate from.
-            try:
-                baseline = perf_baseline.load(args.baseline, exclude=report['pr'])
-                report['stale_overlay'] = str(error)
-                print('perf-gate: this pull request\'s overlay is stale; measuring against '
-                      'the baseline without it: %s' % error, flush=True)
-            except perf_baseline.BaselineError:
-                baseline = None
-        if baseline is None:
-            # Overlays that contradict each other leave nothing to judge against. Say which,
-            # in the comment, rather than measuring for ten minutes first.
-            report['tolerance'] = {'time': 0.0, 'memory': 0.0}
-            report['error'] = 'perf-baseline: %s' % error
-            write()
-            print('perf-gate: REFUSING: %s' % report['error'], flush=True)
-            return 2
+        # A malformed baseline tree leaves nothing to judge against. Say why, in the
+        # comment, rather than measuring for ten minutes first. (Overlays that disagree
+        # are not an error: perf_baseline.resolve applies them in merge order.)
+        report['tolerance'] = {'time': 0.0, 'memory': 0.0}
+        report['error'] = 'perf-baseline: %s' % error
+        write()
+        print('perf-gate: REFUSING: %s' % report['error'], flush=True)
+        return 2
     report['tolerance'] = baseline['tolerance']
     for note in baseline['notes']:
         print('perf-gate: baseline note: %s' % note, flush=True)
@@ -813,13 +793,11 @@ def main(argv):
     failed = bool(report.get('failures'))
     uncalibrated = bool(missing_baselines(report))
     improved = bool(report.get('improved'))
-    stale = bool(report.get('stale_overlay'))
     print('perf-gate: %s' % ('REGRESSION' if report['regression'] else
                              ('FAILED' if failed else
                               ('NO BASELINE' if uncalibrated else
-                               ('STALE OVERLAY' if stale else
-                                ('OK (IMPROVED: consider rebaselining)' if improved else 'OK'))))))
-    return 1 if report['regression'] or failed or uncalibrated or stale else 0
+                               ('OK (IMPROVED: consider rebaselining)' if improved else 'OK')))))
+    return 1 if report['regression'] or failed or uncalibrated else 0
 
 
 if __name__ == '__main__':

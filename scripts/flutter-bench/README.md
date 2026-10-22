@@ -163,23 +163,27 @@ layout), so the rules are the same and are written down once:
   request that edits them fails `flutter_baseline.py check --base`.
 - `baseline/pr/<number>.json`: one pull request's calibrations and rebaselines.
   No other branch writes that file, so two pull requests never conflict on a
-  baseline; two that moved the same row are reported by name.
+  baseline. Two that moved the same row both merge; they apply in merge order
+  and the later one wins, with a note in `check`'s output.
 
 What is judged, per platform:
 
 | Metric | Value | Keyed by | Policy tolerance |
 | --- | --- | --- | --- |
-| `code_bytes`, `install_bytes`, `wire_bytes` | Codename One's own size, absolute | platform | 0 |
+| `code_bytes`, `install_bytes`, `wire_bytes` | Codename One's own size, as master measured it last night | platform | 2% |
 | `cold_start_ratio` | Codename One / Flutter, median of the per-round ratios | platform, or platform@CPU model | 25% |
 | `idle_memory_ratio` | the same, for memory at rest | platform, or platform@CPU model | 15% |
 
-- **Sizes are absolute** because they are deterministic for a source tree, so
-  any move is a real change. A row may carry its own tolerance: Android's code
-  size has 0.5%, because at 0 every change that added bytes failed the leg
-  while Android code stays 4.5x under Flutter's; Android's install and
-  download sizes have 0.1%, because two runs of identical sources differ by 4
-  bytes of APK packaging. Learned size tolerances round up in 0.1% steps, not
-  the timing gate's 5%.
+- **Sizes follow master.** They are deterministic for a source tree, so the
+  nightly fold sets each size row to what master's latest nightly run measured
+  (`flutter_baseline.py follow`), and a pull request is judged against last
+  night's master. The 2% tolerance is what one change may add without saying
+  why. The sizes used to be absolute rows with no tolerance. Core changes that
+  never run this benchmark (its `paths` filter) added bytes the next pull request
+  inherited, so nearly every pull request that ran it had to rebaseline a size it
+  never touched, and those rebaselines were what conflicted. Growth past the
+  tolerance still fails the nightly run that measured it; following it the next
+  night keeps one regression from failing every later pull request too.
 - **Start-up and memory are ratios to Flutter from the same run.** The pinned
   Flutter build is the unit of measure, as JDK 25 is for the ParparVM gate. An
   absolute figure moved with the runner: measured over the branch's seven
