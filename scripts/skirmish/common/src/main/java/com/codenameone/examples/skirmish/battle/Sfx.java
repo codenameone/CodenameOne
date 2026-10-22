@@ -47,12 +47,21 @@ public final class Sfx {
     }
 
     /// Loads the clips; quietly does nothing where audio is unavailable.
-    public static synchronized void load() {
+    ///
+    /// Only a native mixer is used. Without one, a pool falls back to a media
+    /// player per voice -- in the simulator a browser engine per sound -- which
+    /// a battle firing a hit every 60 ms would drown in, so the game stays
+    /// silent instead (a simulator or CI runner with no audio device).
+    public static void load() {
         if (pool != null) {
             return;
         }
         try {
-            pool = SoundPool.create(6);
+            SoundPool created = SoundPool.create(6);
+            if (!created.isNativeAccelerated()) {
+                return;
+            }
+            pool = created;
             deploy = pool.load(new ByteArrayInputStream(tone(660, 990, 90, 0.35)), "audio/wav");
             hit = pool.load(new ByteArrayInputStream(tone(220, 140, 45, 0.25)), "audio/wav");
             boom = pool.load(new ByteArrayInputStream(tone(110, 40, 380, 0.6)), "audio/wav");

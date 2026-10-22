@@ -51,15 +51,44 @@ import com.codename1.gpu.VertexFormat;
 /// uploaded textures are shared; only the posed buffers are per instance.
 ///
 /// ```java
-/// GltfScene knight = GltfLoader.loadScene(glbBytes);
-/// AnimatedModel unit = new AnimatedModel(device, knight);
-/// unit.hideNode("Shield_Spike");          // the file carries every prop
-/// unit.play("Walking_A", true);
-/// unit.addTo(gameView);
-/// // each frame:
-/// unit.update(deltaSeconds);
-/// // later:
-/// unit.crossFade("1H_Melee_Attack_Chop", 0.15f, false);
+/// import com.codename1.gaming.*;
+/// import com.codename1.gpu.*;
+/// import com.codename1.io.Log;
+/// import com.codename1.ui.*;
+/// import com.codename1.ui.layouts.BorderLayout;
+/// import java.io.InputStream;
+///
+/// class Knight extends GameView {
+///     private AnimatedModel unit;
+///
+///     protected void onSetup(GraphicsDevice device) {
+///         try {
+///             InputStream in = Display.getInstance().getResourceAsStream(getClass(), "/knight.glb");
+///             GltfScene knight = GltfLoader.loadScene(in);
+///             in.close();
+///             unit = new AnimatedModel(device, knight);
+///             unit.hideNode("Shield_Spike");          // the file carries every prop
+///             unit.play("Walking_A", true);
+///             unit.addTo(this);
+///         } catch (Exception err) {
+///             Log.e(err);
+///         }
+///     }
+///
+///     protected void update(double deltaSeconds) {
+///         if (unit != null) {
+///             unit.update((float) deltaSeconds);
+///         }
+///     }
+///
+///     void attack() {
+///         unit.crossFade("1H_Melee_Attack_Chop", 0.15f, false);
+///     }
+/// }
+///
+/// Form f = new Form("Knight", new BorderLayout());
+/// f.add(BorderLayout.CENTER, new Knight());
+/// f.show();
 /// ```
 public class AnimatedModel {
     private static final int POSE = 10; // t(3) r(4) s(3)
@@ -72,7 +101,7 @@ public class AnimatedModel {
     private final float[] pose;
     private final float[] fadePose;
     private final float[] world;
-    private final float[] local = new float[16];
+    private final float[] local = new float[16]; //NOPMD SingularField - per-frame scratch, kept to avoid allocating every frame
     private final float[] rot = new float[16];
     private final float[] skinMatrix = new float[16];
     private final float[] jointMatrices;
@@ -169,15 +198,15 @@ public class AnimatedModel {
 
     /// Adds every part to `view`.
     public void addTo(GameView view) {
-        for (int i = 0; i < parts.length; i++) {
-            view.addModel(parts[i]);
+        for (Model part : parts) {
+            view.addModel(part);
         }
     }
 
     /// Removes every part from `view`.
     public void removeFrom(GameView view) {
-        for (int i = 0; i < parts.length; i++) {
-            view.removeModel(parts[i]);
+        for (Model part : parts) {
+            view.removeModel(part);
         }
     }
 
@@ -277,7 +306,7 @@ public class AnimatedModel {
         if (a == null) {
             return false;
         }
-        if (a == clip && this.loop && loop) {
+        if (a == clip && this.loop && loop) { //NOPMD CompareObjectsWithEquals - the same clip instance
             return true;
         }
         if (clip == null || seconds <= 0f) {
@@ -396,8 +425,7 @@ public class AnimatedModel {
             return;
         }
         GltfScene.Channel[] channels = a.getChannels();
-        for (int i = 0; i < channels.length; i++) {
-            GltfScene.Channel c = channels[i];
+        for (GltfScene.Channel c : channels) {
             int node = c.getNode();
             if (node < 0 || node * POSE >= dst.length) {
                 continue;
@@ -442,8 +470,7 @@ public class AnimatedModel {
     }
 
     private void computeWorld() {
-        for (int k = 0; k < order.length; k++) {
-            int n = order[k];
+        for (int n : order) {
             int b = n * POSE;
             key[0] = pose[b + 3];
             key[1] = pose[b + 4];
@@ -625,8 +652,8 @@ public class AnimatedModel {
         this.x = x;
         this.y = y;
         this.z = z;
-        for (int i = 0; i < parts.length; i++) {
-            parts[i].setPosition(x, y, z);
+        for (Model part : parts) {
+            part.setPosition(x, y, z);
         }
         return this;
     }
@@ -636,8 +663,8 @@ public class AnimatedModel {
         rotX = degX;
         rotY = degY;
         rotZ = degZ;
-        for (int i = 0; i < parts.length; i++) {
-            parts[i].setRotation(degX, degY, degZ);
+        for (Model part : parts) {
+            part.setRotation(degX, degY, degZ);
         }
         return this;
     }
@@ -645,8 +672,8 @@ public class AnimatedModel {
     /// Scales the instance uniformly.
     public AnimatedModel setScale(float scale) {
         this.scale = scale;
-        for (int i = 0; i < parts.length; i++) {
-            parts[i].setScale(scale);
+        for (Model part : parts) {
+            part.setScale(scale);
         }
         return this;
     }

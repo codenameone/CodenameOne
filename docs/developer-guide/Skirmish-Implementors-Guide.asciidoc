@@ -72,7 +72,7 @@ Everything that decides a battle is in `Match.step`, and nothing else changes a
 match. It advances the game by one tick, a twentieth of a second, applying the
 cards played on that tick:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/skirmish/rules/Match.java[tag=skirmish-step,indent=0]
 ----
@@ -98,7 +98,7 @@ gone its own way.
 
 A card is a row in `Cards`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/skirmish/rules/Cards.java[tag=skirmish-cards,indent=0]
 ----
@@ -111,7 +111,7 @@ units it spawns and how long a building lasts.
 The look of a card on the field is a row in `Models`, the glTF character it uses,
 its height in tiles and its attack animation:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/Models.java[tag=skirmish-unit-looks,indent=0]
 ----
@@ -135,7 +135,7 @@ An online battle is played in lockstep. Neither phone decides anything: each sen
 the card it wants to play, and the server's `MatchRoom` runs the match, stamps the
 play with the tick it takes effect on and sends it to both players:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/game/MatchRoom.java[tag=skirmish-room,indent=0]
 ----
@@ -144,7 +144,7 @@ The play is scheduled a few ticks ahead, so it reaches both phones before it's
 due, and each phone advances its own copy of the match only as far as the server
 has said. `OnlineDriver` is the client's half:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/OnlineDriver.java[tag=skirmish-lockstep,indent=0]
 ----
@@ -159,7 +159,7 @@ The battle is a `com.codename1.gaming` 3D scene, and only the renderer knows abo
 it. When the match is over, `BattleView` swings the camera around the field and
 down beside the fallen castle before the result screen appears:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/BattleView.java[tag=skirmish-finale,indent=0]
 ----
@@ -173,7 +173,7 @@ Levels, experience, chests, daily quests and achievements are all decided on the
 server, after it has recorded a result. The app only shows what the server says
 was earned:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/progress/Progression.java[tag=skirmish-progression,indent=0]
 ----
@@ -209,14 +209,14 @@ The shop sells gems through the platform's store. The app's `Store` starts the
 purchase, and the server grants nothing until it has checked the receipt with Apple
 or Google:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/shop/ReceiptValidator.java[tag=skirmish-receipt-validator,indent=0]
 ----
 
 The server picks the validator from its configuration:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/Services.java[tag=skirmish-receipt-choice,indent=0]
 ----
@@ -224,7 +224,7 @@ include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/s
 The product identifiers and the ad units are in `AppConfig`, and the server's
 `Catalog` names the same products. Replace both with your own before release:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/AppConfig.java[tag=skirmish-monetization-ids,indent=0]
 ----
@@ -235,7 +235,7 @@ include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/sk
 after one. The units in `AppConfig` are Google's test units, which always fill and
 never pay:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Ads.java[tag=skirmish-ads,indent=0]
 ----
@@ -248,12 +248,12 @@ times a day.
 The server tells a player when a chest is ready or a friend has challenged them.
 It sends through the Codename One push service once the app's push key is set:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/AppConfig.java[tag=skirmish-push-key,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/Services.java[tag=skirmish-push-choice,indent=0]
 ----
@@ -268,7 +268,7 @@ allows it in *Settings*.
 The console is part of the same app, shown only to an account with the admin role.
 The server flags players on its own, as well as on reports:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/admin/Flags.java[tag=skirmish-flags,indent=0]
 ----
@@ -286,7 +286,7 @@ steps.
 The app can also drive itself through its own screens: `Tour` signs in, collects
 rewards, visits the deck and plays a battle, which is how the promotional video is
 recorded. Any Codename One app can be driven the same way without code of its own,
-through its built-in MCP server; see <<mcp-headless-api>>.
+through its built-in MCP server; see <<_mcp_headless_api,the MCP headless API>>.
 
 === Tests
 

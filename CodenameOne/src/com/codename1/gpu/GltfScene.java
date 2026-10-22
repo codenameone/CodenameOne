@@ -115,7 +115,7 @@ public final class GltfScene {
         if (index < 0 || index >= images.length || images[index] == null) {
             return null;
         }
-        if (textures == null || textureDevice != device) {
+        if (textures == null || textureDevice != device) { //NOPMD CompareObjectsWithEquals - a different device instance needs its own textures
             textures = new Texture[images.length];
             textureDevice = device;
         }
@@ -148,9 +148,9 @@ public final class GltfScene {
 
     /// The first clip named `name`, or null.
     public Animation findAnimation(String name) {
-        for (int i = 0; i < animations.length; i++) {
-            if (name.equals(animations[i].name)) {
-                return animations[i];
+        for (Animation a : animations) {
+            if (name.equals(a.name)) {
+                return a;
             }
         }
         return null;
@@ -362,8 +362,8 @@ public final class GltfScene {
             this.name = name;
             this.channels = channels;
             float d = 0f;
-            for (int i = 0; i < channels.length; i++) {
-                float[] t = channels[i].times;
+            for (Channel c : channels) {
+                float[] t = c.times;
                 if (t.length > 0 && t[t.length - 1] > d) {
                     d = t[t.length - 1];
                 }

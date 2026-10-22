@@ -44,14 +44,33 @@ import java.util.Random;
 /// the scene -- an emitter with no live particles draws nothing visible.
 ///
 /// ```java
-/// ParticleEmitter fire = new ParticleEmitter(device, 64)
-///         .setColor(0xffff8a2a).setAdditive(true)
-///         .setSpeed(1.5f, 4f).setLifetime(0.3f, 0.7f).setSize(0.6f, 1.6f)
-///         .setGravity(-2f);
-/// fire.addTo(gameView);
-/// fire.burst(x, 0.5f, z, 40);
-/// // each frame:
-/// fire.update(deltaSeconds, gameView.getCamera());
+/// import com.codename1.gaming.*;
+/// import com.codename1.gpu.*;
+/// import com.codename1.ui.*;
+/// import com.codename1.ui.layouts.BorderLayout;
+///
+/// class Campfire extends GameView {
+///     private ParticleEmitter fire;
+///
+///     protected void onSetup(GraphicsDevice device) {
+///         fire = new ParticleEmitter(device, 64)
+///                 .setColor(0xffff8a2a).setAdditive(true)
+///                 .setSpeed(1.5f, 4f).setLifetime(0.3f, 0.7f).setSize(0.6f, 1.6f)
+///                 .setGravity(-2f);
+///         fire.addTo(this);
+///     }
+///
+///     protected void update(double deltaSeconds) {
+///         if (fire != null) {
+///             fire.burst(0f, 0.5f, 0f, 2);
+///             fire.update((float) deltaSeconds, getCamera());
+///         }
+///     }
+/// }
+///
+/// Form f = new Form("Campfire", new BorderLayout());
+/// f.add(BorderLayout.CENTER, new Campfire());
+/// f.show();
 /// ```
 ///
 /// Additive emitters suit light (fire, sparks, magic); alpha blended ones suit

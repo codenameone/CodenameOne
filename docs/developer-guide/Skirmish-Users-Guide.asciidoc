@@ -186,7 +186,7 @@ the game.
 image::img/skirmish-admin-overview.png["The admin console's overview: players online, matches today, purchases and gems sold",scaledwidth=40%]
 
 * *Overview* counts players online, matches and purchases.
-* *Live matches* lists the battles being played, and any of them can be watched
+* The *Live matches* tab lists the battles being played, and any of them can be watched
   as it happens.
 * *Flags* are reports from players and signals the server raises on its own: a
   player who keeps leaving matches, whose game state keeps diverging from the
