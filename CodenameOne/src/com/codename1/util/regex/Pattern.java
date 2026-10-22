@@ -57,6 +57,7 @@ import java.util.stream.StreamSupport;
 ///   `IsAssigned`, `IsHex_Digit`, `IsJoin_Control`,
 ///   `IsNoncharacter_Code_Point`, `IsWord`, `IsAlnum`, `IsBlank`, `IsGraph`
 ///   and `IsPrint`, in any case.
+/// - `\p{all}`, any code point.
 /// - `UNICODE_CHARACTER_CLASS` (`(?U)`): `\d \w \s \b` and the POSIX
 ///   classes take their Unicode definitions, as on the JDK.
 /// - Greedy, reluctant and possessive quantifiers.
@@ -400,7 +401,7 @@ public final class Pattern {
     /// `\w` matches. The JDK has defined the boundary this way since 19
     /// (JDK-8264160); before, it took any Unicode letter or digit, so `\b`
     /// fell inside a word `\w+` could not match. The Unicode reading comes
-    /// only with `UNICODE_CHARACTER_CLASS`, which this runtime refuses.
+    /// with `UNICODE_CHARACTER_CLASS`.
     static boolean wordChar(int c) {
         return c == '_' || asciiLetter(c) || c >= '0' && c <= '9';
     }
@@ -720,7 +721,12 @@ public final class Pattern {
                 if (c < 0x80) {
                     in = asciiLetter(c) && inRanges((char) (c ^ 0x20));
                 } else if (ignoreCase == 2) {
-                    in = inRanges(Character.toUpperCase(c)) || inRanges(Character.toLowerCase(c));
+                    // As the JDK: the upper and lower forms, and the lower
+                    // form of the upper one, which takes U+0131 and U+017F
+                    // into [a-z].
+                    int upper = Character.toUpperCase(c);
+                    in = inRanges(upper) || inRanges(Character.toLowerCase(c))
+                            || inRanges(Character.toLowerCase(upper));
                 }
             }
             for (int k = 0; !in && k < united.size(); k++) {
@@ -963,12 +969,14 @@ public final class Pattern {
             if (i + length > m.to) {
                 return false;
             }
-            for (int k = 0; k < length; k++) {
-                char a = m.text.charAt(start + k);
-                char b = m.text.charAt(i + k);
+            // By code point, so a supplementary case pair compares whole.
+            for (int k = 0; k < length;) {
+                int a = codePointAt(m.text, start + k, end);
+                int b = codePointAt(m.text, i + k, i + length);
                 if (a != b && !(ignoreCase && sameIgnoringCase(a, b, unicode))) {
                     return false;
                 }
+                k += a > 0xffff ? 2 : 1;
             }
             return next.match(m, i + length);
         }
@@ -996,6 +1004,32 @@ public final class Pattern {
 
         private boolean word(int c) {
             return unicode ? unicodeWordChar(c) : wordChar(c);
+        }
+
+        /// A word character, or a non-spacing mark that follows a letter or
+        /// digit and so belongs to it, as the JDK's boundary reads `i`.
+        private boolean wordAt(Matcher m, int i, int to) {
+            int c = codePointAt(m.text, i, to);
+            return word(c) || UnicodeTables.category(c) == Character.NON_SPACING_MARK && hasBase(m, i);
+        }
+
+        private static boolean hasBase(Matcher m, int i) {
+            for (int x = i; x >= m.from;) {
+                int c = codePointAt(m.text, x, m.to);
+                int type = UnicodeTables.category(c);
+                if (type >= Character.UPPERCASE_LETTER && type <= Character.OTHER_LETTER
+                        || type == Character.DECIMAL_DIGIT_NUMBER) {
+                    return true;
+                }
+                if (type != Character.NON_SPACING_MARK) {
+                    return false;
+                }
+                if (x == m.from) {
+                    break;
+                }
+                x -= codePointBefore(m.text, x, m.from) > 0xffff ? 2 : 1;
+            }
+            return false;
         }
 
         private boolean lineEnd(Matcher m, int i, boolean multiline) {
@@ -1069,8 +1103,18 @@ public final class Pattern {
                     here = i == m.oldLast;
                     break;
                 default:
-                    boolean left = i > m.from && word(codePointBefore(m.text, i, m.from));
-                    boolean right = i < m.to && word(codePointAt(m.text, i, m.to));
+                    // The code point before i ends at i: inside a pair that is
+                    // the lone high half, as the JDK reads it.
+                    boolean left = false;
+                    if (i > m.from) {
+                        int before = i - 1;
+                        if (before > m.from && Character.isLowSurrogate(m.text.charAt(before))
+                                && Character.isHighSurrogate(m.text.charAt(before - 1))) {
+                            before--;
+                        }
+                        left = wordAt(m, before, i);
+                    }
+                    boolean right = i < m.to && wordAt(m, i, m.to);
                     here = (left != right) == (kind == WORD);
                     break;
             }
@@ -1829,6 +1873,7 @@ public final class Pattern {
         /// The class an escape names, or null.
         private CharSet escapedClass(char e) {
             if (has(UNICODE_CHARACTER_CLASS)) {
+                supplementary = true;
                 switch (e) {
                     case 'd':
                         return categories(1 << Character.DECIMAL_DIGIT_NUMBER);
@@ -1891,6 +1936,10 @@ public final class Pattern {
         }
 
         private CharSet property() {
+            // A Unicode property can be negated, and a negated one would take
+            // the low half of a pair a search started on; the JDK's search
+            // skips those positions for a property too.
+            supplementary = true;
             String name;
             if (at < p.length() && p.charAt(at) == '{') {
                 int close = p.indexOf('}', at);
@@ -1909,6 +1958,9 @@ public final class Pattern {
             // they have on the JDK since 16 (JDK-8214245): the ASCII ones become
             // the ASCII letters, the Unicode ones any cased letter.
             boolean anyCase = has(CASE_INSENSITIVE);
+            if ("all".equals(name)) {
+                return new CharSet(0).add(0, 0x10ffff);
+            }
             CharSet unicode = unicodeProperty(name, anyCase);
             if (unicode != null) {
                 return unicode;

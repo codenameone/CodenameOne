@@ -126,4 +126,50 @@ class CodePointAndUnicodeClassTest {
         assertTrue(Pattern.compile("\\p{gc=Lu}", Pattern.CASE_INSENSITIVE).matcher("a").matches());
         assertFalse(matches("\\p{Lu}", "\u2160"));
     }
+
+    private static final String DESERET = "\ud801\udc00\ud801\udc28";
+
+    @Test
+    void aNegatedPropertyNeverTakesHalfAPair() {
+        assertFalse(Pattern.compile("[^\\p{L}]").matcher(DESERET).find());
+        assertFalse(Pattern.compile("\\P{L}").matcher(DESERET).find());
+        assertFalse(Pattern.compile("(?U)\\W").matcher(DESERET).find());
+    }
+
+    @Test
+    void aCaselessBackReferenceComparesCodePoints() {
+        assertTrue(matches("(?iu)(.)\\1", DESERET));
+        assertTrue(matches("(?iu)(\\x{10400})\\1", DESERET));
+    }
+
+    @Test
+    void aCaselessClassTakesTheLowerFormOfTheUpper() {
+        assertTrue(matches("(?iu)[a-z]", "\u0131"));
+        assertTrue(matches("(?iu)[i]", "\u0131"));
+        assertTrue(matches("(?iu)[a-z]", "\u017f"));
+    }
+
+    @Test
+    void aMarkBelongsToTheLetterBeforeIt() {
+        assertEquals("|a\u0301b|", Pattern.compile("\\b").matcher("a\u0301b").replaceAll("|"));
+        assertEquals("a|\u0301|b", Pattern.compile("\\B").matcher("a\u0301b").replaceAll("|"));
+    }
+
+    @Test
+    void usePatternKeepsTheMatchButNotItsGroups() {
+        Matcher m = Pattern.compile("(a)").matcher("aab");
+        assertTrue(m.find());
+        m.usePattern(Pattern.compile("b"));
+        assertEquals(null, m.group(0));
+        assertEquals(0, m.start());
+    }
+
+    @Test
+    void aBoundaryInsideAPairReadsTheLoneHalves() {
+        Matcher m = Pattern.compile("(?U)\\b.").matcher(DESERET);
+        assertTrue(m.find());
+        assertEquals(0, m.start());
+        assertFalse(m.find());
+        assertTrue(matches("\\p{all}+", FACE + "a"));
+    }
 }

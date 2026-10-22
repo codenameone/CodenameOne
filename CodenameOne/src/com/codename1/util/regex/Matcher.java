@@ -118,7 +118,8 @@ public final class Matcher implements MatchResult {
         use(newPattern);
         clearGroups();
         emptyAt = first >= 0 && first == last ? last : -1;
-        first = -1;
+        // The match stays, its groups do not: group(0) answers null, as on
+        // the JDK, rather than throwing.
         return this;
     }
 
