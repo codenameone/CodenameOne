@@ -2286,6 +2286,12 @@ public class BytecodeCompliance {
             for (String[][] table : new String[][][] {Relocation.JDK_SHIMS, CompatLayers.DESKTOP_JDK_SHIMS,
                 AndroidRemapper.ANDROID_JDK_SHIMS}) {
                 for (String[] shim : table) {
+                    // A shim onto another JDK class (Closeable -> AutoCloseable)
+                    // cannot be reversed: the target is a name in its own right,
+                    // and the application may well have named it itself.
+                    if (shim[1].startsWith("java/")) {
+                        continue;
+                    }
                     if (shim[1].equals(original)) {
                         return shim[0];
                     }

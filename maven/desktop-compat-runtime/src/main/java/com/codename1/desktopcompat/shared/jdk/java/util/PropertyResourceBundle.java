@@ -39,25 +39,76 @@ import java.io.Reader;
 /// feed, carriage return, backslash-u followed by four hex digits, and a
 /// backslash before any other character standing for that character.
 ///
-/// A stream is decoded as ISO-8859-1, one byte to one character, which is
-/// what the JDK did for as long as `.properties` files have carried
-/// backslash-u escapes for everything else. Pass a `Reader` to choose another
-/// encoding.
+/// A stream is decoded as the JDK has decoded it since Java 9: as UTF-8 when
+/// the bytes are well-formed UTF-8, and otherwise as ISO-8859-1, one byte to
+/// one character, which is what older files written with backslash-u escapes
+/// for everything else expect. Pass a `Reader` to choose another encoding.
 public class PropertyResourceBundle extends ResourceBundle {
 
     private final Map<String, Object> lookup = new HashMap<String, Object>();
 
     public PropertyResourceBundle(InputStream stream) throws IOException {
-        StringBuilder text = new StringBuilder();
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
         byte[] buffer = new byte[4096];
         int n = stream.read(buffer);
         while (n >= 0) {
-            for (int i = 0; i < n; i++) {
-                text.append((char) (buffer[i] & 0xff));
-            }
+            bytes.write(buffer, 0, n);
             n = stream.read(buffer);
         }
-        parse(text.toString(), lookup);
+        byte[] data = bytes.toByteArray();
+        String text;
+        if (isUtf8(data)) {
+            text = new String(data, "UTF-8");
+        } else {
+            StringBuilder latin1 = new StringBuilder(data.length);
+            for (int i = 0; i < data.length; i++) {
+                latin1.append((char) (data[i] & 0xff));
+            }
+            text = latin1.toString();
+        }
+        parse(text, lookup);
+    }
+
+    /// True when `data` is well-formed UTF-8: no stray continuation byte, no
+    /// truncated or overlong sequence, no surrogate and nothing past U+10FFFF.
+    static boolean isUtf8(byte[] data) {
+        int i = 0;
+        while (i < data.length) {
+            int b = data[i] & 0xff;
+            int extra;
+            int min;
+            if (b < 0x80) {
+                i++;
+                continue;
+            } else if (b >= 0xc2 && b <= 0xdf) {
+                extra = 1;
+                min = 0x80;
+            } else if (b >= 0xe0 && b <= 0xef) {
+                extra = 2;
+                min = 0x800;
+            } else if (b >= 0xf0 && b <= 0xf4) {
+                extra = 3;
+                min = 0x10000;
+            } else {
+                return false;
+            }
+            if (i + extra >= data.length) {
+                return false;
+            }
+            int cp = b & (0x3f >> extra);
+            for (int k = 1; k <= extra; k++) {
+                int c = data[i + k] & 0xff;
+                if ((c & 0xc0) != 0x80) {
+                    return false;
+                }
+                cp = (cp << 6) | (c & 0x3f);
+            }
+            if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
+                return false;
+            }
+            i += extra + 1;
+        }
+        return true;
     }
 
     public PropertyResourceBundle(Reader reader) throws IOException {
