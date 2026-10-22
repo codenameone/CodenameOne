@@ -39,6 +39,7 @@ import dart.core.DartList;
  */
 public class Connectivity {
     private static StreamController<DartList<ConnectivityResult>> changes;
+    private static boolean listening;
 
     public Connectivity() {
     }
@@ -83,14 +84,24 @@ public class Connectivity {
         synchronized (Connectivity.class) {
             if (changes == null) {
                 changes = StreamController.broadcast();
-                if (Display.isInitialized()) {
-                    NetworkManager.getInstance().addNetworkTypeListener(new NetworkTypeListener() {
-                        @Override
-                        public void onNetworkTypeChanged(int oldType, int newType, boolean vpnActive) {
-                            changes.add(results(newType, vpnActive));
-                        }
-                    });
-                }
+            }
+            // Registered on the first call made once Display is up, not only on the very
+            // first call: a stream requested before then would otherwise never fire.
+            if (!listening && Display.isInitialized()) {
+                listening = true;
+                NetworkManager.getInstance().addNetworkTypeListener(new NetworkTypeListener() {
+                    @Override
+                    public void onNetworkTypeChanged(int oldType, int newType, final boolean vpnActive) {
+                        final int type = newType;
+                        // The platform reports from its own thread; listeners call setState.
+                        Display.getInstance().callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                changes.add(results(type, vpnActive));
+                            }
+                        });
+                    }
+                });
             }
             return changes.stream();
         }

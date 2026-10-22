@@ -11,3 +11,6 @@ transition Incremented
 CounterBloc 1->2
 transition Reset
 CounterBloc 2->10
+feed 0 listening false
+add returned after a throwing handler
+after close listening false

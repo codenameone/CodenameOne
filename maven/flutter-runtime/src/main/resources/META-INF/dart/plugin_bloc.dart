@@ -54,7 +54,10 @@ abstract class Bloc<E, S> extends BlocBase<S> {
   external void onEvent(E event);
   external void onTransition(Transition<E, S> transition);
   // `witness` is filled in by the transpiler with the class of the call's <T>.
-  external void on<T>(dynamic handler, [Type? witness]);
+  // Typed, so a handler's parameters are (event, Emitter<S>) rather than dynamic
+  // -- `emit.forEach(...)` then binds statically -- and a block body that returns
+  // nothing still fits the value-returning Java handler type.
+  external void on<T>(dynamic Function(T event, Emitter<S> emit) handler, [Type? witness]);
 }
 
 @JavaName('com.codename1.flutter.plugins.bloc.BlocObserver')

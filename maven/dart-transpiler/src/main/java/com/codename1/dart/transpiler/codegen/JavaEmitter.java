@@ -2825,7 +2825,7 @@ public final class JavaEmitter {
                 return;
             }
             if (r.value == null) {
-                w.line("return;");
+                w.line(ctx.bareReturnIsNull ? "return null;" : "return;");
             } else if (rt != null && rt.is("void")) {
                 // Dart allows `return expr;` from a method Java-typed void (it overrides a void
                 // base). The value is discarded but the expression still runs: `return n++;`
@@ -8002,6 +8002,8 @@ public final class JavaEmitter {
                     expected.funcReturn != null ? expected.funcReturn : TypeRef.DYNAMIC;
         }
         boolean outerAsync = ctx.inAsyncBody;
+        boolean outerBareNull = ctx.bareReturnIsNull;
+        ctx.bareReturnIsNull = false;   // a nested lambda's `return;` is its own
         boolean outerAsyncLambda = ctx.asyncLambda;
         TypeRef outerReturn = ctx.methodReturnType;
         boolean outerNarrowInt = ctx.narrowReturnToInt;
@@ -8100,11 +8102,26 @@ public final class JavaEmitter {
             code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
                     + indentStr(ctx.currentIndent()) + "}";
         } else if (l.body != null) {
-            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
+            // `on<E>((event, emit) { emit(s); })`: a block that returns nothing, passed where
+            // the function type returns dynamic -- a value-returning Funcs.FuncN in Java.
+            // Its `return;` and its end both answer null. The body sits under `if (true)`,
+            // which javac treats as able to complete normally, so the trailing return is
+            // never "unreachable" after a body that always returns or throws.
+            boolean nullTail = sigTypes != null && sigTypes.length > 0
+                    && sigTypes[sigTypes.length - 1] != null && sigTypes[sigTypes.length - 1].is("dynamic")
+                    && !returnsValue(l.body);
+            boolean outerNullReturn = ctx.bareReturnIsNull;
+            ctx.bareReturnIsNull = nullTail;
+            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail ? 2 : 1));
             ctx.lambdaReturns = returns;
             emitStatements(l.body, ctx);
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
+            ctx.bareReturnIsNull = outerNullReturn;
+            if (nullTail) {
+                String in = indentStr(ctx.currentIndent() + 1);
+                body = in + "if (true) {\n" + body + in + "}\n" + in + "return null;\n";
+            }
             code = head + " -> {\n" + body + indentStr(ctx.currentIndent()) + "}";
         } else {
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + 1);
@@ -8143,6 +8160,7 @@ public final class JavaEmitter {
         ctx.breakTargets.clear();
         ctx.breakTargets.addAll(savedBreaks);
         ctx.inAsyncBody = outerAsync;
+        ctx.bareReturnIsNull = outerBareNull;
         ctx.asyncLambda = outerAsyncLambda;
         ctx.methodReturnType = outerReturn;
         ctx.narrowReturnToInt = outerNarrowInt;
@@ -12630,6 +12648,9 @@ public final class JavaEmitter {
         String nullCheckedTemp;
         /** Inside a hashCode/compareTo body: narrow each `return` value to Java int. */
         boolean narrowReturnToInt;
+        /// A bare `return;` answers null: the enclosing block lambda targets a
+        /// dynamic-returning (value) SAM but returns no value of its own.
+        boolean bareReturnIsNull;
         String syncStarList;                  // non-null inside a sync* body: the result-list temp
         String asyncStarSink;                 // non-null inside an async* body: the AsyncStar.Sink temp
         /**

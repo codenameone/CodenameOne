@@ -73,13 +73,19 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
             }
             handled = true;
             final Emitter<S> emitter = new Emitter<S>(this, event);
+            synchronized (emitters) {
+                emitters.add(emitter);
+            }
             Object result;
             try {
                 result = Dyn.invoke(handlers.get(i), event, emitter);
             } catch (RuntimeException err) {
                 emitter.complete();
                 onError(err, null);
-                throw err;
+                // bloc's add only enqueues: a handler's error goes to onError and the
+                // zone, never to the code that called add (a gesture callback, say).
+                reportUncaught(err);
+                continue;
             }
             if (result instanceof Future) {
                 // A handler that fails later reaches onError (and the observer) as a
@@ -127,6 +133,30 @@ public abstract class Bloc<E, S> extends BlocBase<S> {
         } catch (Throwable loggingFailed) {
             // Nothing to log through; nothing more to do.
         }
+    }
+
+    /// The handlers' emitters. Completing one detaches it; [#close] completes the rest,
+    /// which cancels any `emit.forEach`/`onEach` subscription still running, so a
+    /// closed bloc does not keep a periodic source alive.
+    private final List<Emitter<S>> emitters = new ArrayList<Emitter<S>>();
+
+    void emitterDone(Emitter<S> e) {
+        synchronized (emitters) {
+            emitters.remove(e);
+        }
+    }
+
+    @Override
+    public Future<Object> close() {
+        List<Emitter<S>> live;
+        synchronized (emitters) {
+            live = new ArrayList<Emitter<S>>(emitters);
+            emitters.clear();
+        }
+        for (Emitter<S> e : live) {
+            e.complete();
+        }
+        return super.close();
     }
 
     public void onEvent(E event) {

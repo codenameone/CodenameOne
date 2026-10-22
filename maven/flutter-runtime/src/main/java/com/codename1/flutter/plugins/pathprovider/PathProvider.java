@@ -55,12 +55,15 @@ public final class PathProvider {
         return under(Directory.current, "library");
     }
 
+    // Temp and cache are separate subdirectories: apps clear the temp directory
+    // recursively, which must neither take the cache with it nor reach past the
+    // app's own files into the platform temp root.
     public static Future<Directory> getTemporaryDirectory() {
-        return under(Directory.systemTemp, null);
+        return under(Directory.systemTemp, "tmp");
     }
 
     public static Future<Directory> getApplicationCacheDirectory() {
-        return under(Directory.systemTemp, null);
+        return under(Directory.systemTemp, "cache");
     }
 
     public static Future<Directory> getDownloadsDirectory() {

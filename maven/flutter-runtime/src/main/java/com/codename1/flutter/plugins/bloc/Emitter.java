@@ -53,20 +53,40 @@ public class Emitter<S> {
         return done;
     }
 
+    /// Finishes this emitter: later emits are ignored, and a forEach/onEach
+    /// subscription is cancelled and its future completed, as bloc does on close.
     void complete() {
-        done = true;
+        dart.async.StreamSubscription<?> s;
+        dart.async.Completer<Object> r;
+        synchronized (this) {
+            done = true;
+            s = activeSub;
+            r = activeResult;
+            activeSub = null;
+            activeResult = null;
+        }
+        bloc.emitterDone(this);
+        if (s != null) {
+            s.cancel();
+        }
+        if (r != null && !r.isCompleted()) {
+            r.complete(null);
+        }
     }
+
+    private dart.async.StreamSubscription<?> activeSub;
+    private dart.async.Completer<Object> activeResult;
 
     /// `await emit.forEach(stream, onData: (d) => state, onError: (e, st) => state)`:
     /// emits what onData maps each event to, until the stream ends. A source error
     /// goes to onError, whose state is emitted, as Bloc does; with no onError the
     /// error fails the handler.
-    public <T> Future<Object> forEach(Stream<T> stream, final Object onData, final Object onError) {
+    public <T> Future<Object> forEach(Stream<T> stream, final Funcs.Func1<T, S> onData, final Object onError) {
         return drive(stream, onData, onError, true);
     }
 
     /// `await emit.onEach(stream, onData: (d) { ... }, onError: (e, st) { ... })`.
-    public <T> Future<Object> onEach(Stream<T> stream, final Object onData, final Object onError) {
+    public <T> Future<Object> onEach(Stream<T> stream, final Funcs.VoidFunc1<T> onData, final Object onError) {
         return drive(stream, onData, onError, false);
     }
 
@@ -112,6 +132,20 @@ public class Emitter<S> {
                 }
             }
         }, Boolean.FALSE);
+        boolean already;
+        synchronized (this) {
+            already = done;
+            if (!already) {
+                activeSub = sub[0];
+                activeResult = result;
+            }
+        }
+        if (already) {
+            sub[0].cancel();
+            if (!result.isCompleted()) {
+                result.complete(null);
+            }
+        }
         return result.future();
     }
 
