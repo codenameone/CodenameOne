@@ -25,9 +25,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "reason": "Parley's Linux size rows, re-measured on top of master after master moved between calibration runs",
      "runs": 1,
-     "value": 14591794
+     "value": 14592242
     },
     "install_bytes": {
      "from": {
@@ -41,9 +41,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "reason": "Parley's Linux size rows, re-measured on top of master after master moved between calibration runs",
      "runs": 1,
-     "value": 84680126
+     "value": 84680189
     }
    }
   }
