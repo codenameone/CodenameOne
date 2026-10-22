@@ -33,6 +33,7 @@ import com.codenameone.examples.skirmish.rules.Command;
 import com.codenameone.examples.skirmish.rules.Replay;
 import com.codenameone.examples.skirmish.rules.Match;
 import com.codenameone.examples.skirmish.rules.RulesVersion;
+import com.codenameone.examples.skirmish.social.Referrals;
 import java.io.IOException;
 
 /// Records a finished match: the replay, and what it did to each player.
@@ -61,9 +62,11 @@ public class Results {
     private final ProfileRepository profiles;
     private final Flags flags;
     private final Progression progression;
+    private final Referrals referrals;
 
     public Results(MatchRecordRepository matches, ProfileRepository profiles, Flags flags,
-            Progression progression) {
+            Progression progression, Referrals referrals) {
+        this.referrals = referrals;
         this.matches = matches;
         this.profiles = profiles;
         this.flags = flags;
@@ -78,6 +81,13 @@ public class Results {
             Profile p = profiles.findById(quitter.username);
             if (p != null && p.getLeftStreak() == QUITTER_STREAK) {
                 flags.auto(quitter.username, "Left " + QUITTER_STREAK + " matches in a row", room.id);
+            }
+        }
+        // After every profile is saved: paying an inviter writes a profile,
+        // and that inviter may be the other seat of this very match.
+        for (Seat s : room.seats) {
+            if (!s.isBot()) {
+                referrals.played(s.username);
             }
         }
         return out;

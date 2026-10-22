@@ -136,7 +136,7 @@ public class PushDevices {
     }
 
     /// [#targets] for a caller already inside a transaction.
-    List<PushTarget> targetsOf(String username) {
+    public List<PushTarget> targetsOf(String username) {
         List<PushTarget> out = new ArrayList<PushTarget>();
         if (username == null || username.length() == 0) {
             return out;

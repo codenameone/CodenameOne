@@ -45,4 +45,14 @@ public interface ProfileRepository extends CrudRepository<Profile, String> {
 
     @Query("select count(p) from Profile p where p.banned = true or p.suspendedUntil > :now")
     Long suspended(@Param("now") long now);
+
+    /// The players a broadcast reaches, a page at a time. Banned players are
+    /// never sent anything; `seenBefore` and `joinedAfter` narrow it to the
+    /// lapsed and the new (pass 0 and `Long.MAX_VALUE` to leave them out).
+    @Query("select p from Profile p where p.banned = false and p.lastSeen < :seen and p.createdAt > :joined "
+            + "order by p.username asc")
+    List<Profile> audience(@Param("seen") long seenBefore, @Param("joined") long joinedAfter, PageRequest page);
+
+    @Query("select count(p) from Profile p where p.banned = false and p.lastSeen < :seen and p.createdAt > :joined")
+    Long audienceSize(@Param("seen") long seenBefore, @Param("joined") long joinedAfter);
 }

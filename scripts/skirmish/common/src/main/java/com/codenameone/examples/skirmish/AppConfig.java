@@ -44,6 +44,10 @@ public final class AppConfig {
     /// and a phone in a pocket simply hears nothing until it is opened.
     public static final String PUSH_APP_KEY = "";
     // end::skirmish-push-key[]
+    /// Where the game's analytics are read: engagement, retention, the invite
+    /// funnel and revenue per campaign, all from what `Telemetry` and
+    /// `Friends` report. The console's Promote tab opens it.
+    public static final String ANALYTICS_CONSOLE = "https://cloud.codenameone.com/console/analytics";
 
     // tag::skirmish-monetization-ids[]
     /// Google's published test ad units. They always fill, never pay, and are

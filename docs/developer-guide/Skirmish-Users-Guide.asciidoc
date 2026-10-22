@@ -178,6 +178,18 @@ changed here too, which is how the app reaches a server on another machine.
 
 image::img/skirmish-settings.png["The settings screen with the battle name, sound, notification and privacy switches, and the server address",scaledwidth=40%]
 
+=== Friends
+
+*Friends* on the home screen shows the player's invite code and what an invite
+pays. *Invite friends* opens the share sheet with a link. A friend who opens it
+starts with extra coins, even when the link took them through the store to
+install the game first, and once they've played their first battle the player
+who invited them is paid too, for up to ten friends. The screen lists everyone
+who joined through the player's link and whether they've played yet.
+
+The banner at the top of the home screen is the game's news, set by the
+operator. A tap opens what it's about: a Forge pack, the shop or another screen.
+
 === The Forge
 
 The Forge is the game's own level editor, in the same app on every platform.
@@ -244,6 +256,12 @@ image::img/skirmish-admin-overview.png["The admin console's overview: players on
   server's, or who floods it with invalid plays.
 * *Players* finds an account by name or e-mail and shows its matches, purchases
   and moderation history.
+* *Promote* is where the game is marketed. It opens the Codename One analytics
+  console, where engagement, retention and every campaign's results are read;
+  sends a push notification to everyone, to players who've been away, to new
+  players or to those who came through an invite; sets the home screen's
+  banner; and makes campaign links for adverts and posts. On a desktop the
+  console's tabs are a side bar.
 * *Forge* lists reported and hidden packs, and the models and images players
   uploaded. An operator looks at a model on the turntable before approving or
   rejecting it, hides or restores a pack, and makes a pack official.

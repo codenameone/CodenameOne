@@ -48,6 +48,10 @@ public final class ShopForm {
             Session.refreshUser(() -> Ui.later(ShopForm::show), Ui::failed);
         });
         Api.shop().wallet(Net.to(wallet -> Api.shop().items(Net.to(items -> Ui.later(() -> {
+            if (Session.user() == null) {
+                // Signed out while the shop was loading.
+                return;
+            }
             f.add(Ui.wallet(Session.user()));
             fill(f, items, wallet);
             f.revalidate();

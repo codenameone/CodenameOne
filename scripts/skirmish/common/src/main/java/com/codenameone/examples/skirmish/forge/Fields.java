@@ -33,23 +33,23 @@ import com.codename1.ui.spinner.Picker;
 /// The editor's inputs: each one a labelled row that writes its value back
 /// the moment it changes, so a screen never has a "read the form" step to
 /// forget a field in.
-final class Fields {
-    interface IntSink {
+public final class Fields {
+    public interface IntSink {
         void set(int value);
     }
 
-    interface TextSink {
+    public interface TextSink {
         void set(String value);
     }
 
-    interface BoolSink {
+    public interface BoolSink {
         void set(boolean value);
     }
 
     private Fields() {
     }
 
-    static Container row(String label, Component input) {
+    public static Container row(String label, Component input) {
         Container c = new Container(new BorderLayout());
         c.setUIID("ForgeRow");
         Label l = new Label(label, "ForgeLabel");
@@ -57,7 +57,7 @@ final class Fields {
         return c;
     }
 
-    static Container text(String label, String name, String value, int max, final TextSink sink) {
+    public static Container text(String label, String name, String value, int max, final TextSink sink) {
         final TextField t = new TextField(value == null ? "" : value, label, 20, TextArea.ANY);
         t.setName(name);
         t.setMaxSize(max);
@@ -67,7 +67,7 @@ final class Fields {
     }
 
     /// Several lines of text: a briefing, a line of dialog.
-    static Container area(String label, String name, String value, int max, final TextSink sink) {
+    public static Container area(String label, String name, String value, int max, final TextSink sink) {
         final TextArea t = new TextArea(value == null ? "" : value, 3, 20);
         t.setName(name);
         t.setMaxSize(max);
@@ -81,13 +81,13 @@ final class Fields {
 
     /// A whole number with buttons either side: easier on a phone than a
     /// keyboard, and it can never hold a value out of range.
-    static Container stepper(String label, String name, int value, final int min, final int max, final int step,
+    public static Container stepper(String label, String name, int value, final int min, final int max, final int step,
             final String unit, final IntSink sink) {
         return stepper(label, name, value, min, max, step, 1, unit, sink);
     }
 
     /// A stepper over tenths, shown as a decimal: "2.5 tiles".
-    static Container tenths(String label, String name, int value, int min, int max, int step, String unit,
+    public static Container tenths(String label, String name, int value, int min, int max, int step, String unit,
             IntSink sink) {
         return stepper(label, name, value, min, max, step, 10, unit, sink);
     }
@@ -120,7 +120,7 @@ final class Fields {
         return row(label, BoxLayout.encloseX(less, shown, more));
     }
 
-    static Container choice(String label, String name, String[] options, int selected, final IntSink sink) {
+    public static Container choice(String label, String name, String[] options, int selected, final IntSink sink) {
         final Picker p = new Picker();
         p.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
         p.setStrings(options);
@@ -139,7 +139,7 @@ final class Fields {
         return row(label, p);
     }
 
-    static CheckBox check(String label, String name, boolean value, final BoolSink sink) {
+    public static CheckBox check(String label, String name, boolean value, final BoolSink sink) {
         final CheckBox c = new CheckBox(label);
         c.setUIID("ForgeCheck");
         c.setName(name);
@@ -148,14 +148,14 @@ final class Fields {
         return c;
     }
 
-    static SpanLabel help(String text) {
+    public static SpanLabel help(String text) {
         SpanLabel l = new SpanLabel(text);
         l.setTextUIID("ForgeHelp");
         return l;
     }
 
     /// Index of `value` in `options`, or 0.
-    static int indexOf(String[] options, String value) {
+    public static int indexOf(String[] options, String value) {
         for (int i = 0; i < options.length; i++) {
             if (options[i].equals(value)) {
                 return i;
@@ -166,7 +166,7 @@ final class Fields {
 
     /// A slug made from a name: what a new card, arena or mission is called
     /// inside its pack until its author renames it.
-    static String slug(String name, String fallback) {
+    public static String slug(String name, String fallback) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < name.length() && sb.length() < 30; i++) {
             char c = name.charAt(i);

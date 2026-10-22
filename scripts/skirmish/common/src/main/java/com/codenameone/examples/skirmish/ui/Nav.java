@@ -21,9 +21,11 @@ package com.codenameone.examples.skirmish.ui;
 import com.codename1.ui.CN;
 import com.codenameone.examples.skirmish.AppConfig;
 import com.codenameone.examples.skirmish.admin.AdminConsole;
+import com.codenameone.examples.skirmish.engage.Friends;
 import com.codenameone.examples.skirmish.engage.Notifications;
 import com.codenameone.examples.skirmish.engage.Store;
 import com.codenameone.examples.skirmish.engage.Telemetry;
+import com.codenameone.examples.skirmish.forge.ForgeHome;
 import com.codenameone.examples.skirmish.forge.PackScreen;
 import com.codenameone.examples.skirmish.net.Session;
 
@@ -77,6 +79,7 @@ public final class Nav {
 
     public static void signedIn() {
         Telemetry.signedIn();
+        Friends.claimPending();
         enter();
     }
 
@@ -92,6 +95,24 @@ public final class Nav {
     public static void adminConsole() {
         AppConfig.setMode("admin", Session.user().username());
         AdminConsole.show();
+    }
+
+    /// A screen named by a push or the admin's broadcast composer; the names
+    /// are the server's `Promotion.SCREENS`.
+    public static void screen(String name) {
+        if ("shop".equals(name)) {
+            shop();
+        } else if ("friends".equals(name)) {
+            FriendsForm.show();
+        } else if ("forge".equals(name)) {
+            ForgeHome.show();
+        } else if ("deck".equals(name)) {
+            DeckForm.show();
+        } else if ("battle".equals(name)) {
+            MatchmakingForm.queue();
+        } else {
+            home();
+        }
     }
 
     public static void shop() {

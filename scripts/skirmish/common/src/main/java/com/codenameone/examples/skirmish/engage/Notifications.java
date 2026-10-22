@@ -123,14 +123,16 @@ public final class Notifications {
             // The keys are the ones the server's GamePushes puts in `data`.
             Object challenge = message.getData().get("challenge");
             Object screen = message.getData().get("screen");
+            Object campaign = message.getData().get("campaign");
+            if (campaign != null) {
+                Telemetry.pushOpened(String.valueOf(campaign));
+            }
             if (challenge != null) {
                 Nav.challenge(String.valueOf(challenge));
             } else if ("admin".equals(screen) && Session.user().admin()) {
                 Nav.adminConsole();
-            } else if ("shop".equals(screen)) {
-                Nav.shop();
             } else {
-                Nav.home();
+                Nav.screen(screen == null ? "" : String.valueOf(screen));
             }
         }
 

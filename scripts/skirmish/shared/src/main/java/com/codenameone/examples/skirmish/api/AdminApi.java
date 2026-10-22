@@ -71,4 +71,20 @@ public interface AdminApi {
     /// `approve` or `reject` an uploaded file.
     @POST("/api/admin/forge/assets/action")
     void forgeAssetAction(@Body ForgeActionDto action, OnComplete<Response<AssetDto>> callback);
+
+    /// The Promote tab: players, credited invites, top inviters, pushes sent
+    /// and the home banner.
+    @GET("/api/admin/promote")
+    void promote(OnComplete<Response<PromoteDto>> callback);
+
+    /// How many players a broadcast would reach, without sending it.
+    @POST("/api/admin/promote/audience")
+    void audience(@Body BroadcastDto broadcast, OnComplete<Response<BroadcastDto>> callback);
+
+    /// Sends a push to a segment, through Codename One push.
+    @POST("/api/admin/promote/broadcast")
+    void broadcast(@Body BroadcastDto broadcast, OnComplete<Response<BroadcastDto>> callback);
+
+    @POST("/api/admin/promote/spotlight")
+    void spotlight(@Body SpotlightDto spotlight, OnComplete<Response<SpotlightDto>> callback);
 }

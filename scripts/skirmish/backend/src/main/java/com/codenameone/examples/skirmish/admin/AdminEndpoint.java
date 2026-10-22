@@ -30,12 +30,15 @@ import com.codenameone.examples.skirmish.api.AdminApiServer;
 import com.codenameone.examples.skirmish.api.AdminStatsDto;
 import com.codenameone.examples.skirmish.api.AssetDto;
 import com.codenameone.examples.skirmish.api.AuditDto;
+import com.codenameone.examples.skirmish.api.BroadcastDto;
 import com.codenameone.examples.skirmish.api.FlagDto;
 import com.codenameone.examples.skirmish.api.ForgeActionDto;
 import com.codenameone.examples.skirmish.api.LiveMatchDto;
 import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.api.PlayerDetailDto;
 import com.codenameone.examples.skirmish.api.PlayerDto;
+import com.codenameone.examples.skirmish.api.PromoteDto;
+import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.domain.Profile;
 import com.codenameone.examples.skirmish.domain.StorePurchase;
 import com.codenameone.examples.skirmish.forge.Forge;
@@ -45,6 +48,7 @@ import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.StorePurchaseRepository;
 import com.codenameone.examples.skirmish.shop.Shop;
+import com.codenameone.examples.skirmish.social.Promotion;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,11 +66,13 @@ public class AdminEndpoint implements AdminApiServer {
     private final Shop shop;
 
     private final Forge forge;
+    private final Promotion promotion;
 
     public AdminEndpoint(Accounts accounts, ProfileRepository profiles, MatchRecordRepository matches,
             StorePurchaseRepository purchases, Flags flags, Moderation moderation, Rooms rooms, Shop shop,
-            Forge forge) {
+            Forge forge, Promotion promotion) {
         this.forge = forge;
+        this.promotion = promotion;
         this.accounts = accounts;
         this.profiles = profiles;
         this.matches = matches;
@@ -167,5 +173,25 @@ public class AdminEndpoint implements AdminApiServer {
             throw new ResponseStatusException(400, "Nothing to do");
         }
         return forge.assetAction(Caller.name(), body.target(), body.action(), body.reason());
+    }
+
+    @Override
+    public PromoteDto promote() throws Exception {
+        return promotion.overview();
+    }
+
+    @Override
+    public BroadcastDto audience(BroadcastDto body) throws Exception {
+        return promotion.audience(body);
+    }
+
+    @Override
+    public BroadcastDto broadcast(BroadcastDto body) throws Exception {
+        return promotion.broadcast(Caller.name(), body);
+    }
+
+    @Override
+    public SpotlightDto spotlight(SpotlightDto body) throws Exception {
+        return promotion.spotlight(Caller.name(), body);
     }
 }

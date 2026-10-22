@@ -18,10 +18,12 @@
  */
 package com.codenameone.examples.skirmish;
 
+import com.codename1.appreview.AppReview;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.system.Lifecycle;
 import com.codenameone.examples.skirmish.battle.Sfx;
 import com.codenameone.examples.skirmish.engage.Ads;
+import com.codenameone.examples.skirmish.engage.Friends;
 import com.codenameone.examples.skirmish.engage.Notifications;
 import com.codenameone.examples.skirmish.engage.Store;
 import com.codenameone.examples.skirmish.engage.Telemetry;
@@ -55,6 +57,13 @@ public class Skirmish extends Lifecycle implements PurchaseCallback {
         Sfx.load();
         Telemetry.start();
         Ads.start();
+        // tag::skirmish-app-review[]
+        // The store's own rating prompt, asked only of a player who has come
+        // back: five launches over three days, and never twice in a month.
+        // ResultForm asks after a win, the moment a player is happiest.
+        AppReview.getInstance().setMinimumLaunches(5).setMinimumDaysInstalled(3)
+                .setDaysBetweenPrompts(30).registerSession();
+        // end::skirmish-app-review[]
         boolean tour = AppConfig.tourRequested();
         Session.start(AppConfig.serverUrl());
         Nav.launch();
@@ -67,6 +76,7 @@ public class Skirmish extends Lifecycle implements PurchaseCallback {
     public void start() {
         super.start();
         Notifications.start();
+        Friends.start();
     }
 
     @Override

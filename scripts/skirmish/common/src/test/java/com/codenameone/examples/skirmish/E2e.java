@@ -65,13 +65,39 @@ public abstract class E2e extends AbstractTest {
 
     protected abstract boolean run() throws Exception;
 
+    /// Whether this run of the tests is the one in a desktop window.
+    ///
+    /// `run-e2e.sh` runs the tests twice: on the simulator's phone, and then,
+    /// on Linux, with the simulator as a desktop, where the admin console is
+    /// a side bar and a page. A test belongs to one of the two -- see
+    /// [#desktop()] -- and passes without doing anything in the other.
+    static boolean desktopRun() {
+        return "true".equals(System.getProperty("skirmish.e2e.desktop"));
+    }
+
+    /// Whether this test is one for the desktop window. The phone's are not.
+    protected boolean desktop() {
+        return false;
+    }
+
+    private boolean mine() {
+        return desktop() == desktopRun();
+    }
+
     @Override
     public final boolean runTest() throws Exception {
+        if (!mine()) {
+            log("Not a test for " + (desktopRun() ? "the desktop" : "the phone") + "; skipped");
+            return true;
+        }
         return run();
     }
 
     @Override
     public void prepare() {
+        if (!mine()) {
+            return;
+        }
         Session.useStore(new MemoryStore());
         onEdt(() -> {
             Telemetry.allow(false);
@@ -85,6 +111,9 @@ public abstract class E2e extends AbstractTest {
 
     @Override
     public void cleanup() {
+        if (!mine()) {
+            return;
+        }
         onEdt(() -> Session.start(AppConfig.serverUrl()));
     }
 
@@ -92,8 +121,14 @@ public abstract class E2e extends AbstractTest {
         CN.callSeriallyAndWait(work);
     }
 
+    /// Presses a button, or taps anything else by that name -- a list row is
+    /// a `MultiButton`, which is a container holding its button.
     protected void click(final String name) {
-        until(() -> findByName(name) instanceof Button, 20000, "a button called " + name);
+        until(() -> findByName(name) != null, 20000, "a button called " + name);
+        if (!(findByName(name) instanceof Button)) {
+            touch(name);
+            return;
+        }
         onEdt(() -> {
             Button button = (Button) findByName(name);
             button.pressed();

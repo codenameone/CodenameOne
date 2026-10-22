@@ -24,13 +24,16 @@ import com.codenameone.examples.skirmish.api.ClaimDto;
 import com.codenameone.examples.skirmish.api.ProgressApiServer;
 import com.codenameone.examples.skirmish.api.ProgressDto;
 import com.codenameone.examples.skirmish.api.RewardDto;
+import com.codenameone.examples.skirmish.social.Referrals;
 
 @Component
 public class ProgressEndpoint implements ProgressApiServer {
     private final Progression progression;
+    private final Referrals referrals;
 
-    public ProgressEndpoint(Progression progression) {
+    public ProgressEndpoint(Progression progression, Referrals referrals) {
         this.progression = progression;
+        this.referrals = referrals;
     }
 
     @Override
@@ -50,6 +53,10 @@ public class ProgressEndpoint implements ProgressApiServer {
 
     @Override
     public RewardDto tutorialDone() throws Exception {
-        return progression.tutorialDone(Caller.name());
+        RewardDto reward = progression.tutorialDone(Caller.name());
+        // The training battle is a battle: an invited player who finished it
+        // has played, and their inviter is paid.
+        referrals.played(Caller.name());
+        return reward;
     }
 }

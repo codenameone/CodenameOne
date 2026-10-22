@@ -25,6 +25,7 @@ import com.codenameone.examples.skirmish.api.ForgeApi;
 import com.codenameone.examples.skirmish.api.GameApi;
 import com.codenameone.examples.skirmish.api.ProgressApi;
 import com.codenameone.examples.skirmish.api.ShopApi;
+import com.codenameone.examples.skirmish.api.SocialApi;
 
 /// The generated REST clients, one per contract in the shared module, all
 /// pointed at the server [Session] is using.
@@ -35,6 +36,7 @@ public final class Api {
     private static AdminApi admin;
     private static ProgressApi progress;
     private static ForgeApi forge;
+    private static SocialApi social;
 
     private Api() {
     }
@@ -46,6 +48,7 @@ public final class Api {
         admin = RestClients.create(AdminApi.class, baseUrl);
         progress = RestClients.create(ProgressApi.class, baseUrl);
         forge = RestClients.create(ForgeApi.class, baseUrl);
+        social = RestClients.create(SocialApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -70,5 +73,9 @@ public final class Api {
 
     public static ForgeApi forge() {
         return forge;
+    }
+
+    public static SocialApi social() {
+        return social;
     }
 }

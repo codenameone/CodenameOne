@@ -19,6 +19,8 @@
 package com.codenameone.examples.skirmish.admin;
 
 import com.codename1.components.MultiButton;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
@@ -65,6 +67,8 @@ import java.util.List;
 ///   one is written to the audit log with the reason given.
 /// - **Live**: every match being played, each one watchable as it happens.
 /// - **Audit**: who did what to whom.
+/// - **Promote**: push broadcasts, the home spotlight and campaign links, with
+///   the engagement numbers read in the Codename One analytics console.
 // tag::skirmish-admin[]
 public final class AdminConsole {
     private static final int POLL_MILLIS = 15000;
@@ -77,6 +81,7 @@ public final class AdminConsole {
     private final Container live = column();
     private final Container audit = column();
     private final Container forge = column();
+    private final PromoteTab promote = new PromoteTab(column());
 
     private AdminConsole() {
     }
@@ -99,6 +104,14 @@ public final class AdminConsole {
         tabs.addTab("Live", scroll(live));
         tabs.addTab("Audit", scroll(audit));
         tabs.addTab("Forge", scroll(forge));
+        tabs.addTab("Promote", scroll(promote.column()));
+        // tag::skirmish-admin-desktop[]
+        // On a desktop or a tablet the console is a side bar and a page, the
+        // way an operator's tools usually are; on a phone, tabs along the top.
+        if (wide()) {
+            tabs.setTabPlacement(Component.LEFT);
+        }
+        // end::skirmish-admin-desktop[]
         tabs.addSelectionListener((was, now) -> refresh(now));
         form.add(BorderLayout.CENTER, tabs);
         refresh(0);
@@ -119,6 +132,8 @@ public final class AdminConsole {
             Api.admin().liveMatches(Net.to(list -> Ui.later(() -> showLive(list)), Ui::failed));
         } else if (tab == 4) {
             Api.admin().audit(Net.to(list -> Ui.later(() -> showAudit(list)), Ui::failed));
+        } else if (tab == 6) {
+            promote.refresh();
         } else {
             Api.admin().forgeQueue(Net.to(packs -> Api.admin().forgeAssets(Net.to(
                     files -> Ui.later(() -> showForge(packs, files)), Ui::failed)), Ui::failed));
@@ -379,6 +394,12 @@ public final class AdminConsole {
         f.add(Ui.label(title + " (" + count + ")", "SectionTitle"));
     }
 
+    /// Wider than a phone held sideways: a desktop window or a tablet.
+    private static boolean wide() {
+        return CN.isDesktop() || CN.isTablet()
+                || CN.getDisplayWidth() > CN.convertToPixels(160);
+    }
+
     private static Container column() {
         return new Container(BoxLayout.y());
     }
@@ -388,7 +409,7 @@ public final class AdminConsole {
         return c;
     }
 
-    private static Label stat(String name, int value) {
+    static Label stat(String name, int value) {
         Label l = new Label(value + "  " + name, "AdminStat");
         l.setName("stat-" + name);
         return l;

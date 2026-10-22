@@ -34,8 +34,11 @@ import com.codenameone.examples.skirmish.api.ClaimDto;
 import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.api.ProgressDto;
 import com.codenameone.examples.skirmish.api.QuestDto;
+import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.engage.Ads;
+import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.forge.ForgeHome;
+import com.codenameone.examples.skirmish.forge.PackScreen;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.Net;
 import com.codenameone.examples.skirmish.net.Session;
@@ -49,6 +52,10 @@ import java.util.List;
 public final class HomeForm {
     private HomeForm() {
     }
+
+    /// The banner the operator sets from the console's Promote tab, as of the
+    /// last time home was shown.
+    private static SpotlightDto spotlight;
 
     public static void show() {
         final PlayerDto p = Session.user();
@@ -72,11 +79,21 @@ public final class HomeForm {
         }
         fill(f, header, col, p, Rewards.progress());
         f.show();
+        Api.social().spotlight(Net.to(found -> {
+            spotlight = found;
+            if (Session.user() != null && CN.getCurrentForm() == f) {
+                fill(f, header, col, Session.user(), Rewards.progress());
+                f.revalidate();
+            }
+        }, (s, m) -> { }));
         Rewards.refresh(() -> {
             if (Session.user() == null || CN.getCurrentForm() != f) {
                 return;
             }
             ProgressDto now = Rewards.progress();
+            if (now != null) {
+                Telemetry.describe(now.level(), Session.user().trophies());
+            }
             fill(f, header, col, Session.user(), now);
             f.revalidate();
             offerTutorial(now);
@@ -138,6 +155,10 @@ public final class HomeForm {
         Label arena = new Label(arenaName(p.trophies()), "ArenaName");
         stage.add(BorderLayout.SOUTH, arena);
         col.add(stage);
+        Component banner = spotlightBanner();
+        if (banner != null) {
+            col.add(banner);
+        }
         Button battle = Ui.button("BATTLE", "BattleButton", "battleButton", e -> MatchmakingForm.queue());
         battle.setMaterialIcon(FontImage.MATERIAL_SPORTS_ESPORTS);
         col.add(battle);
@@ -154,7 +175,8 @@ public final class HomeForm {
         col.add(Ui.label("Your deck", "SectionTitle"));
         col.add(deck(p.deck()));
         col.add(Ui.wood("Forge", "forgeButton", e -> ForgeHome.show()));
-        Container nav = new Container(new GridLayout(2, 3));
+        Container nav = new Container(new GridLayout(2, 4));
+        nav.add(tile("Friends", FontImage.MATERIAL_GROUP_ADD, "friendsButton", e -> FriendsForm.show()));
         nav.add(tile("Deck", FontImage.MATERIAL_STYLE, "deckButton", e -> DeckForm.show()));
         nav.add(tile("Shop", FontImage.MATERIAL_STOREFRONT, "shopButton", e -> ShopForm.show()));
         nav.add(tile("Trophies", FontImage.MATERIAL_MILITARY_TECH, "achievementsButton",
@@ -162,8 +184,8 @@ public final class HomeForm {
         nav.add(tile("Replays", FontImage.MATERIAL_REPLAY, "replaysButton", e -> HistoryForm.show()));
         nav.add(tile("Leaders", FontImage.MATERIAL_LEADERBOARD, "leadersButton", e -> LeaderboardForm.show()));
         nav.add(tile("How to play", FontImage.MATERIAL_SCHOOL, "tutorialButton", e -> Tutorial.start()));
+        nav.add(tile("Settings", FontImage.MATERIAL_SETTINGS, "settingsButton", e -> SettingsForm.show()));
         col.add(nav);
-        col.add(Ui.stone("Settings", "settingsButton", e -> SettingsForm.show()));
         if (p.admin()) {
             col.add(Ui.button("Admin console", "AdminButton", "adminButton", e -> Nav.adminConsole()));
         }
@@ -237,6 +259,26 @@ public final class HomeForm {
         }
         return c;
     }
+
+    // tag::skirmish-spotlight[]
+    /// The spotlight: one line of news from the operator, and a tap that goes
+    /// where it is about -- a Forge pack, or a screen of the game.
+    private static Component spotlightBanner() {
+        final SpotlightDto s = spotlight;
+        if (s == null || s.text() == null || s.text().length() == 0) {
+            return null;
+        }
+        Button b = Ui.button(s.text(), "Spotlight", "spotlight", e -> {
+            if (s.packId() != null && s.packId().length() > 0) {
+                PackScreen.show(s.packId());
+            } else {
+                Nav.screen(s.screen() == null ? "" : s.screen());
+            }
+        });
+        b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
+        return b;
+    }
+    // end::skirmish-spotlight[]
 
     private static Button tile(String text, char icon, String name,
             com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> go) {

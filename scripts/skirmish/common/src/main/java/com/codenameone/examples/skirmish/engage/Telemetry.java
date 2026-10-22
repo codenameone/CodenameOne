@@ -140,6 +140,30 @@ public final class Telemetry {
         send(ACCOUNT, "share", "content", "challenge");
     }
 
+    public static void inviteSent(String campaign) {
+        send(ACCOUNT, "share", "content", "invite", "campaign", campaign);
+    }
+
+    public static void inviteAccepted() {
+        send(ACCOUNT, "invite_accepted");
+    }
+
+    /// A tap on a push notification. The broadcast's campaign rides in its
+    /// data, so the console reports what each broadcast brought back.
+    public static void pushOpened(String campaign) {
+        send(ACCOUNT, "push_open", "campaign", campaign);
+    }
+
+    /// Who the player is, as segments the console slices every report by:
+    /// how far they got. No names, no ids.
+    public static void describe(int level, int trophies) {
+        if (!allowed()) {
+            return;
+        }
+        Analytics.setUserProperty("level_band", level < 5 ? "1-4" : level < 10 ? "5-9" : "10+");
+        Analytics.setUserProperty("trophy_band", trophies < 100 ? "0-99" : trophies < 500 ? "100-499" : "500+");
+    }
+
     private static void send(String category, String name, Object... pairs) {
         if (!allowed()) {
             return;

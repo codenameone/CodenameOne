@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.ui;
 
+import com.codename1.appreview.AppReview;
 import com.codename1.ui.Button;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.CN;
@@ -27,6 +28,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.skirmish.api.AdRewardDto;
 import com.codenameone.examples.skirmish.api.ReportDto;
 import com.codenameone.examples.skirmish.engage.Ads;
+import com.codenameone.examples.skirmish.engage.Friends;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.Net;
@@ -71,6 +73,7 @@ public final class ResultForm {
 
     public static void show(final Outcome o) {
         Form f = Ui.form("", "result");
+        Friends.battleFinished(o.result);
         f.setLayout(BoxLayout.yCenter());
         String title = o.result > 0 ? "VICTORY" : o.result < 0 ? "DEFEAT" : "DRAW";
         // The player's hero cheers a win; a loss gets the opponent's skeleton.
@@ -121,7 +124,11 @@ public final class ResultForm {
                     (s, m) -> Ui.later(Nav::home));
         }));
         f.show();
-        if (signedIn) {
+        // A win is when to ask for a rating, and an advert then would spoil
+        // it: one or the other, never both.
+        if (signedIn && o.result > 0 && AppReview.getInstance().shouldPrompt()) {
+            AppReview.getInstance().requestReview();
+        } else if (signedIn) {
             Ads.betweenBattles(Ui.adFree());
         }
     }

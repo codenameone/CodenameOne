@@ -445,6 +445,30 @@ ChallengeUrl, Empty, DeckSummary {
     margin: 1mm 2mm;
 }
 
+Spotlight {
+    background-color: var(--night-alt);
+    border: 0.4mm solid var(--gold);
+    border-radius: 1.5mm;
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 1.6mm 2mm;
+    margin: 1mm 2mm;
+}
+
+Spotlight.pressed {
+    background-color: var(--night);
+}
+
+InviteCode {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    margin: 2mm;
+}
+
 Warning {
     color: #ffb74d;
     font-size: 2.8mm;

@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.push;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
+import java.util.ArrayList;
 import java.util.List;
 
 /// The notifications the game sends. Each one brings a player back for a
@@ -65,6 +66,55 @@ public class GamePushes {
                     .data("screen", "admin")
                     .data("player", username));
         }
+    }
+
+    /// Someone joined through the player's invite.
+    public void friendJoined(String inviter, String friend) {
+        send(inviter, PushNotification.builder()
+                .title("Your friend joined")
+                .body(friend + " joined Skirmish through your invite")
+                .collapseKey("friends")
+                .data("screen", "friends"));
+    }
+
+    /// That friend finished a battle, and the inviter was paid for it.
+    public void friendPlayed(String inviter, String friend, int coins) {
+        send(inviter, PushNotification.builder()
+                .title("Invite reward")
+                .body(friend + " played their first battle. " + coins + " coins are yours")
+                .collapseKey("friends")
+                .data("screen", "friends"));
+    }
+
+    /// An operator's message to many players at once, through the same
+    /// Codename One push service as everything else. `screen` and `campaign`
+    /// ride in the data: the app opens that screen and reports the open to
+    /// Codename One analytics under the campaign. Answers how many of the
+    /// players had a device to send to.
+    public int broadcast(List<String> usernames, String id, String title, String body, String screen,
+            String campaign) {
+        List<PushTarget> targets = new ArrayList<PushTarget>();
+        int reached = 0;
+        for (String u : usernames) {
+            List<PushTarget> mine = devices.targetsOf(u);
+            if (!mine.isEmpty()) {
+                reached++;
+                targets.addAll(mine);
+            }
+        }
+        if (!targets.isEmpty()) {
+            sender.send(targets, PushNotification.builder()
+                    .id(id)
+                    .title(title)
+                    .body(body)
+                    .collapseKey("broadcast")
+                    .ttlSeconds(24 * 60 * 60)
+                    .data("screen", screen)
+                    .data("campaign", campaign)
+                    .data("broadcast", id)
+                    .build(), null);
+        }
+        return reached;
     }
 
     private void send(String username, PushNotification.Builder message) {

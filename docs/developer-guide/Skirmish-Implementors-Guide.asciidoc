@@ -276,6 +276,75 @@ include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/s
 Every action an operator takes goes through `Moderation`, which records it with its
 reason and removes a suspended or banned player from any battle they're in.
 
+=== Inviting friends and promoting the game
+
+Growth uses what Codename One already has, and the game counts nothing of its
+own. An invite link comes from `com.codename1.analytics.invite`. The app makes
+it, with a campaign, a channel and the player's code as its payload:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Friends.java[tag=skirmish-invite-share,indent=0]
+----
+
+The friend's app reads it back on its first start, whether the link opened the
+installed app or went through the store first:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Friends.java[tag=skirmish-invites,indent=0]
+----
+
+From then on, everything the friend's app reports through Codename One
+analytics carries the campaign and the referrer, so the invite funnel,
+retention and revenue per campaign are read in the Codename One console.
+`Telemetry` adds the player's level and trophy band as user properties, which
+the console slices every report by.
+
+The server keeps only what's part of the game: the codes, who joined through
+whom, and the rewards. A claim is refused for an account older than a week,
+for a player's own code and for a second code, and the inviter is paid once the
+friend has played a battle, for at most ten friends:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/social/Referrals.java[tag=skirmish-referrals,indent=0]
+----
+
+The console's *Promote* tab is the operator's side. It opens the analytics
+console, and it sends Codename One push notifications to a segment of players:
+everyone, players away for some days, new players, or those who came through an
+invite. A broadcast is counted before it's confirmed, the server sends at most
+five a day, and each one carries a campaign name in its data, which the app
+reports when the notification is tapped:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/social/Promotion.java[tag=skirmish-promotion,indent=0]
+----
+
+The same tab sets the spotlight, a banner at the top of every player's home
+screen, and makes campaign links for adverts and posts: invite links without a
+player's code, which reward nobody and attribute everyone they bring in.
+
+The store's rating prompt is Codename One's `AppReview`, asked after a win and
+only of a player who keeps coming back:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/Skirmish.java[tag=skirmish-app-review,indent=0]
+----
+
+On a desktop or a tablet, the console puts its tabs in a side bar:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/admin/AdminConsole.java[tag=skirmish-admin-desktop,indent=0]
+----
+
+`run-e2e.sh` runs its tests a second time on Linux with the simulator as a
+desktop window, and that pass captures the *Promote* tab.
+
 === The training battle
 
 `Tutorial` is a script of steps run over an ordinary practice battle. Each step
@@ -346,7 +415,8 @@ day. The amounts are constants at the top of the server's `Forge` class.
 
 `rules` has the determinism tests and the golden replays; `backend` plays whole
 online matches over its sockets and checks receipts, progression, moderation and
-the Forge's publishing and mission results;
+the Forge's publishing and mission results, the invite rewards and their
+refusals, and the broadcast limits;
 `run-e2e.sh` drives the app through its screens in the simulator against a running
 server and takes the screenshots in this guide:
 

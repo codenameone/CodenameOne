@@ -66,4 +66,46 @@ fi
 
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx768m -Dskirmish.server.url=http://localhost:$PORT -Dskirmish.shots.dir=$SHOTS"
 
+set +e
 ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
+STATUS=$?
+set -e
+
+# The second pass: the same tests with the simulator as a desktop window and
+# not a phone, which is where the admin console is a side bar and a page and
+# the Promote tab is shown (PromoteTest). Each test knows which pass it is for
+# and passes untouched in the other (E2e.desktop()).
+#
+# The simulator is a desktop when its "desktopSkin" preference says so; there
+# is no switch for it on the command line. Java keeps preferences in files only
+# on Linux, where java.util.prefs.userRoot can point them at a directory of
+# this run's own -- so that is where this pass runs, which covers CI and a
+# container. Elsewhere it would mean rewriting the developer's own simulator
+# preferences, and it is skipped with a word.
+if [ "$STATUS" -eq 0 ] && [ "$(uname -s)" = "Linux" ]; then
+  PREFS="$HERE/target/e2e-desktop-prefs"
+  NODE="$PREFS/.java/.userPrefs/com/codename1/impl/javase"
+  rm -rf "$PREFS"
+  mkdir -p "$NODE"
+  cat >"$NODE/prefs.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">
+<map MAP_XML_VERSION="1.0">
+  <entry key="desktopSkin" value="true"/>
+</map>
+XML
+  echo "[skirmish-e2e] the desktop pass"
+  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dskirmish.e2e.desktop=true -Djava.util.prefs.userRoot=$PREFS -Dcodename1.arg.desktop.titleBar=native"
+  set +e
+  ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
+  STATUS=$?
+  set -e
+elif [ "$STATUS" -eq 0 ]; then
+  echo "[skirmish-e2e] not on Linux: the desktop pass was skipped"
+fi
+
+if [ "$STATUS" -ne 0 ]; then
+  echo "[skirmish-e2e] the tests failed; the end of the server's log:" >&2
+  tail -n 80 "$LOG" >&2 || true
+  exit "$STATUS"
+fi
