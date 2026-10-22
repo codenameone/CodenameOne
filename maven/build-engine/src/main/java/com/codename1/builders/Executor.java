@@ -3719,7 +3719,7 @@ public abstract class Executor {
             }
             zis.close();
             source.close();
-            pruneUnusedFlutterPlugins(classesDir);
+            pruneUnusedFlutterPlugins(classesDir, libsDir);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -3740,6 +3740,10 @@ public abstract class Executor {
     /// Nothing in the runtime outside the plugin tree refers to a pack, and nothing
     /// loads one reflectively, so a pack no one names is unreachable.
     static void pruneUnusedFlutterPlugins(File classesDir) throws IOException {
+        pruneUnusedFlutterPlugins(classesDir, null);
+    }
+
+    static void pruneUnusedFlutterPlugins(File classesDir, File libsDir) throws IOException {
         File root = new File(classesDir, FLUTTER_PLUGINS.replace('/', File.separatorChar));
         String[] names = root.list();
         if (names == null || names.length == 0) {
@@ -3753,6 +3757,7 @@ public abstract class Executor {
         }
         java.util.Set<String> kept = new java.util.TreeSet<String>();
         collectPluginRefs(classesDir, root, packs, kept);
+        collectJarPluginRefs(libsDir, packs, kept);
         java.util.List<String> todo = new java.util.ArrayList<String>(kept);
         while (!todo.isEmpty()) {
             String pack = todo.remove(todo.size() - 1);
@@ -3791,19 +3796,56 @@ public abstract class Executor {
             } else if (f.getName().endsWith(".class")) {
                 // Class names sit in the constant pool as plain modified-UTF-8, which
                 // for these ASCII names is the bytes of the string itself.
-                String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "ISO-8859-1");
-                int at = text.indexOf(FLUTTER_PLUGINS);
-                while (at >= 0) {
-                    int start = at + FLUTTER_PLUGINS.length();
-                    int end = text.indexOf('/', start);
-                    if (end > start) {
-                        String pack = text.substring(start, end);
-                        if (packs.contains(pack)) {
-                            out.add(pack);
-                        }
-                    }
-                    at = text.indexOf(FLUTTER_PLUGINS, start);
+                scanPluginRefs(java.nio.file.Files.readAllBytes(f.toPath()), packs, out);
+            }
+        }
+    }
+
+    private static void scanPluginRefs(byte[] classBytes, java.util.Set<String> packs,
+            java.util.Set<String> out) throws IOException {
+        String text = new String(classBytes, "ISO-8859-1");
+        int at = text.indexOf(FLUTTER_PLUGINS);
+        while (at >= 0) {
+            int start = at + FLUTTER_PLUGINS.length();
+            int end = text.indexOf('/', start);
+            if (end > start) {
+                String pack = text.substring(start, end);
+                if (packs.contains(pack)) {
+                    out.add(pack);
                 }
+            }
+            at = text.indexOf(FLUTTER_PLUGINS, start);
+        }
+    }
+
+    /// Library jars (cn1libs, dependencies routed to libs/) are compiled in with the
+    /// app, so a pack only they call is in use too.
+    private static void collectJarPluginRefs(File libsDir, java.util.Set<String> packs,
+            java.util.Set<String> out) throws IOException {
+        File[] jars = libsDir == null ? null : libsDir.listFiles();
+        if (jars == null) {
+            return;
+        }
+        for (File jar : jars) {
+            if (!jar.isFile() || !jar.getName().endsWith(".jar")) {
+                continue;
+            }
+            ZipInputStream z = new ZipInputStream(new FileInputStream(jar));
+            try {
+                ZipEntry e;
+                while ((e = z.getNextEntry()) != null) {
+                    if (e.getName().endsWith(".class")) {
+                        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+                        byte[] buf = new byte[8192];
+                        int r;
+                        while ((r = z.read(buf)) > 0) {
+                            b.write(buf, 0, r);
+                        }
+                        scanPluginRefs(b.toByteArray(), packs, out);
+                    }
+                }
+            } finally {
+                z.close();
             }
         }
     }

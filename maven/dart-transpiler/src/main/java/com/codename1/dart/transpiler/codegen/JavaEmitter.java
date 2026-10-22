@@ -1186,9 +1186,24 @@ public final class JavaEmitter {
             }
         }
         for (MethodDecl m : c.methods) {
-            if (m.isStatic || m.isSetter || !m.typeParams.isEmpty() || m.name.startsWith("$")) {
+            if (m.isStatic || m.name.startsWith("$")) {
                 continue;
             }
+            if (m.isSetter) {
+                // `dynamic a = A(); a.value = 3` reaches an explicit setter as it would a field.
+                if (m.params.size() == 1 && seen.add("set " + m.name)) {
+                    TypeRef pt = m.params.get(0).type == null || m.params.get(0).type.is("var")
+                            ? TypeRef.DYNAMIC : m.params.get(0).type;
+                    set.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": this.")
+                            .append(javaMethodName(m.name)).append('(').append(dynCast("v", pt, ctx))
+                            .append("); return true;\n");
+                }
+                continue;
+            }
+            // A generic method called dynamically gets no type arguments (Dart infers
+            // dynamic), so an argument typed by one of its type parameters is passed erased:
+            // T as Object, List<T> as a raw list -- the parameters are not in scope here.
+            java.util.Set<String> methodTypeParams = new java.util.HashSet<String>(m.typeParams);
             if (m.isGetter) {
                 if (seen.add(m.name)) {
                     get.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": return this.")
@@ -1214,8 +1229,16 @@ public final class JavaEmitter {
                 TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
                 String raw = p.named ? "(n == null ? null : n.idx(\"" + p.name + "\"))"
                         : "(a.length > " + pi + " ? a[" + pi + "] : null)";
-                String cast = dynCast(raw, pt, ctx);
-                if (p.defaultValue != null) {
+                String cast;
+                if (mentionsAny(pt, methodTypeParams)) {
+                    cast = pt.args.isEmpty() && methodTypeParams.contains(pt.name) ? raw
+                            : "(" + erasedJavaType(pt, ctx) + ") dart.runtime.DartRuntime.as(" + raw + ", "
+                                    + erasedJavaType(pt, ctx) + ".class, " + pt.nullable + ", "
+                                    + quote(pt.toString()) + ")";
+                } else {
+                    cast = dynCast(raw, pt, ctx);
+                }
+                if (p.defaultValue != null && !mentionsAny(pt, methodTypeParams)) {
                     // An omitted argument takes the declared default, as a static call
                     // would: null would be the wrong value, and fails unboxing an int.
                     String present = p.named ? "(n != null && n.containsKey(\"" + p.name + "\"))"
@@ -1270,6 +1293,32 @@ public final class JavaEmitter {
         return !inherits;
     }
 
+    /** Whether {@code t} names any of {@code vars}, at any depth of its type arguments. */
+    private static boolean mentionsAny(TypeRef t, java.util.Set<String> vars) {
+        if (t == null || vars.isEmpty()) {
+            return false;
+        }
+        if (t.name != null && vars.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsAny(a, vars)) {
+                return true;
+            }
+        }
+        if (mentionsAny(t.funcReturn, vars)) {
+            return true;
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsAny(a, vars)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Whether {@link #emitDynamicMembers} gives this program class its dynamic members. */
     private boolean hasDynamicMembers(ClassDecl c) {
         java.util.Set<String> guard = new java.util.HashSet<String>();
@@ -1285,19 +1334,37 @@ public final class JavaEmitter {
         return false;
     }
 
-    /** A dynamic value cast to the Java form of a parameter type, unboxing primitives. */
+    /// A dynamic value converted to the Java form of a parameter or field type, unboxing
+    /// primitives. Checked through DartRuntime.as (an instanceof test that throws Dart's
+    /// TypeError): a bare Java cast is unchecked on ParparVM, so `d.setCount("3")`
+    /// against an int parameter called longValue() on a String -- a native crash no
+    /// Dart catch could see. A type variable stays an unchecked cast, as `as T` does.
     private String dynCast(String raw, TypeRef t, Ctx ctx) {
         if (t == null || isDynamicType(t)) {
             return raw;
         }
-        if (!t.nullable && (t.is("int") || t.is("double") || t.is("bool"))) {
-            return t.is("bool") ? "((Boolean) " + raw + ").booleanValue()"
-                    : "((Number) " + raw + ")." + (t.is("int") ? "longValue()" : "doubleValue()");
+        if (isTypeVariable(t, ctx)) {
+            return "(" + javaType(boxType(t), true, ctx) + ") " + raw;
         }
-        if (t.is("num")) {
-            return "(Number) " + raw;
+        String checked;
+        if (t.is("int") || t.is("double") || t.is("num")) {
+            checked = "dart.runtime.DartRuntime.as(" + raw + ", Number.class, " + t.nullable + ", "
+                    + quote(t.toString()) + ")";
+            if (t.nullable || t.is("num")) {
+                return t.is("num") ? checked
+                        : "(" + javaType(boxType(t), true, ctx) + ") dart.runtime.Dyn.numAs(" + checked + ", "
+                                + t.is("int") + ")";
+            }
+            return checked + "." + (t.is("int") ? "longValue()" : "doubleValue()");
         }
-        return "(" + javaType(boxType(t), true, ctx) + ") " + raw;
+        String erased = erasedJavaType(t, ctx);
+        checked = "dart.runtime.DartRuntime.as(" + raw + ", " + erased + ".class, " + t.nullable + ", "
+                + quote(t.toString()) + ")";
+        if (t.is("bool") && !t.nullable) {
+            return checked + ".booleanValue()";
+        }
+        String jt = javaType(boxType(t), true, ctx);
+        return jt.equals(erased) ? checked : "((" + jt + ") " + checked + ")";
     }
 
     /** Whether a program superclass declares {@code name} void, which a Java override keeps. */

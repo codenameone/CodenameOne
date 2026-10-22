@@ -63,10 +63,17 @@ public final class AsyncStar {
         /// Runs {@code hook} when the listener cancels: a body blocked on an upstream
         /// source releases it then, not at the source's next event.
         public void onCancel(Funcs.VoidFunc0 hook) {
-            if (cancelled) {
+            // One lock with the cancel handler: a cancel between the check and the add
+            // left the hook unrun, and the body blocked on a quiet source forever.
+            boolean now;
+            synchronized (cancelHooks) {
+                now = cancelled;
+                if (!now) {
+                    cancelHooks.add(hook);
+                }
+            }
+            if (now) {
                 hook.call();
-            } else {
-                cancelHooks.add(hook);
             }
         }
 
@@ -126,6 +133,48 @@ public final class AsyncStar {
         return asyncStar(body, null);
     }
 
+    /// A stream transformation: {@code body} reads {@code source} through an iterator
+    /// and yields. The iterator subscribes inside the downstream listen(), so an event
+    /// the source emits right after it is buffered rather than lost to a broadcast
+    /// stream, and source errors are re-emitted in order while the body keeps reading,
+    /// as Dart's transformers (take, LineSplitter, utf8.decoder...) do.
+    public static <T, R> Stream<R> over(final Stream<T> source,
+            final Funcs.VoidFunc2<StreamIterator<T>, Sink<R>> body) {
+        final Object[] sinkRef = new Object[1];
+        final StreamIterator<T> it = new StreamIterator<T>(source, new Funcs.VoidFunc1<Object>() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public void call(Object e) {
+                Object sk = sinkRef[0];
+                if (sk instanceof Sink) {
+                    ((Sink<R>) sk).addError(e);
+                }
+            }
+        });
+        return asyncStar(new Funcs.VoidFunc1<Sink<R>>() {
+            @Override
+            public void call(final Sink<R> s) {
+                sinkRef[0] = s;
+                s.onCancel(new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        it.cancel();
+                    }
+                });
+                try {
+                    body.call(it, s);
+                } finally {
+                    it.cancel();
+                }
+            }
+        }, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                it.start();
+            }
+        });
+    }
+
     /// {@code onListen} runs synchronously inside listen(), before the body's timer: a
     /// derived stream subscribes to its source there, so an event the source emits right
     /// after the downstream listen() is buffered rather than lost to a broadcast stream.
@@ -149,9 +198,12 @@ public final class AsyncStar {
         sink.controller.onCancel(new Funcs.VoidFunc0() {
             @Override
             public void call() {
-                sink.cancelled = true;
-                Funcs.VoidFunc0[] hooks = sink.cancelHooks.toArray(new Funcs.VoidFunc0[sink.cancelHooks.size()]);
-                sink.cancelHooks.clear();
+                Funcs.VoidFunc0[] hooks;
+                synchronized (sink.cancelHooks) {
+                    sink.cancelled = true;
+                    hooks = sink.cancelHooks.toArray(new Funcs.VoidFunc0[sink.cancelHooks.size()]);
+                    sink.cancelHooks.clear();
+                }
                 for (Funcs.VoidFunc0 h : hooks) {
                     h.call();
                 }

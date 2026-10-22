@@ -67,6 +67,27 @@ class ExecutorFlutterPluginPruneTest {
     }
 
     @Test
+    void aPackOnlyALibraryJarUsesIsKept() throws IOException {
+        String p = Executor.FLUTTER_PLUGINS;
+        cls("com/example/Main.class");
+        cls(p + "dio/Dio.class");
+        cls(p + "geolocator/Geolocator.class");
+        File libs = new File(dir.getParentFile(), dir.getName() + "-libs");
+        libs.mkdirs();
+        java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(
+                new java.io.FileOutputStream(new File(libs, "lib.jar")));
+        z.putNextEntry(new java.util.zip.ZipEntry("com/lib/UsesDio.class"));
+        z.write(("CAFEBABE\u0001" + p + "dio/Dio").getBytes(StandardCharsets.ISO_8859_1));
+        z.closeEntry();
+        z.close();
+
+        Executor.pruneUnusedFlutterPlugins(dir, libs);
+
+        assertTrue(new File(dir, p + "dio/Dio.class").isFile());
+        assertFalse(new File(dir, p + "geolocator").exists());
+    }
+
+    @Test
     void anAppWithNoFlutterRuntimeIsUntouched() throws IOException {
         cls("com/example/Main.class");
         Executor.pruneUnusedFlutterPlugins(dir);

@@ -134,6 +134,14 @@ public class GoogleMapRenderElement extends RenderElement {
 
     private com.codename1.ui.util.UITimer moveTimer;
     private com.codename1.maps.CameraPosition lastMove;
+    private int stillTicks;
+
+    @Override
+    public void unmount() {
+        // the poll must not outlive the map, nor call map() on an unmounted element
+        stopMoveTracking();
+        super.unmount();
+    }
 
     private void startMoveTracking() {
         if (moveTimer != null || view == null || map().onCameraMove == null) {
@@ -146,11 +154,20 @@ public class GoogleMapRenderElement extends RenderElement {
         moveTimer = new com.codename1.ui.util.UITimer(new Runnable() {
             @Override
             public void run() {
-                if (view != null) {
-                    reportMove(view.getCameraPosition());
+                if (view == null) {
+                    stopMoveTracking();
+                    return;
+                }
+                // A tap that never moves the camera fires no CameraChangeListener, so
+                // the poll also ends itself once the camera has been still ~500 ms.
+                if (reportMove(view.getCameraPosition())) {
+                    stillTicks = 0;
+                } else if (++stillTicks >= 10) {
+                    stopMoveTracking();
                 }
             }
         });
+        stillTicks = 0;
         moveTimer.schedule(50, true, c.getComponentForm());
     }
 
@@ -161,19 +178,21 @@ public class GoogleMapRenderElement extends RenderElement {
         }
     }
 
-    /// Reports the camera to onCameraMove when it differs from the last report.
-    private void reportMove(com.codename1.maps.CameraPosition p) {
+    /// Reports the camera to onCameraMove when it differs from the last report;
+    /// answers whether it did.
+    private boolean reportMove(com.codename1.maps.CameraPosition p) {
         if (p == null) {
-            return;
+            return false;
         }
         camera = CameraPosition.of(p);
         if (lastMove != null && sameCamera(lastMove, p)) {
-            return;
+            return false;
         }
         lastMove = p;
         if (map().onCameraMove != null) {
             map().onCameraMove.call(camera);
         }
+        return true;
     }
 
     private static boolean sameCamera(com.codename1.maps.CameraPosition a, com.codename1.maps.CameraPosition b) {

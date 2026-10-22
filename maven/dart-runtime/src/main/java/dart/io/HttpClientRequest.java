@@ -298,7 +298,10 @@ public class HttpClientRequest {
                 }
                 HttpClientResponse res = new HttpClientResponse(getResponseCode(), getResponseErrorMessage(),
                         responseHeaders, body);
-                res.uncompressed = inflated;
+                // Content-Length is the compressed size whoever inflated it: iOS hands
+                // over decompressed bytes (no magic left) under the same header.
+                res.uncompressed = inflated || (client.autoUncompress() && "gzip".equalsIgnoreCase(
+                        String.valueOf(responseHeaders.value(HttpHeaders.contentEncodingHeader)).trim()));
                 result.complete(res);
             }
         };

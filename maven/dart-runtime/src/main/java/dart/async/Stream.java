@@ -800,44 +800,7 @@ public class Stream<T> {
 
     /** A derived stream: {@code body} reads this stream through an iterator and yields. */
     private <R> Stream<R> derive(final Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>> body) {
-        final Stream<T> self = this;
-        final Object[] sinkRef = new Object[1];
-        // Source errors are re-emitted and the operator keeps reading, as Dart's
-        // transformations do; a plain StreamIterator would stop at the first one.
-        final StreamIterator<T> it = new StreamIterator<T>(self, new Funcs.VoidFunc1<Object>() {
-            @Override
-            @SuppressWarnings("unchecked")
-            public void call(Object e) {
-                Object sk = sinkRef[0];
-                if (sk instanceof AsyncStar.Sink) {
-                    ((AsyncStar.Sink<R>) sk).addError(e);
-                }
-            }
-        });
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<R>>() {
-            @Override
-            public void call(final AsyncStar.Sink<R> s) {
-                sinkRef[0] = s;
-                s.onCancel(new Funcs.VoidFunc0() {
-                    @Override
-                    public void call() {
-                        it.cancel();
-                    }
-                });
-                try {
-                    body.call(it, s);
-                } finally {
-                    it.cancel();
-                }
-            }
-        }, new Funcs.VoidFunc0() {
-            @Override
-            public void call() {
-                // Subscribed inside the downstream listen(), not when the body's timer
-                // fires: controller.stream.take(1).listen(..); controller.add(v) lost v.
-                it.start();
-            }
-        });
+        return AsyncStar.over(this, body);
     }
 
     /** Dart's {@code expand}. */

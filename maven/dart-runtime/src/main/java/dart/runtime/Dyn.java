@@ -457,7 +457,7 @@ public final class Dyn {
             case "toSet":
                 return it.toSet();
             case "join":
-                return a.length == 0 || a[0] == null ? it.join() : it.join((String) a[0]);
+                return a.length == 0 || a[0] == null ? it.join() : it.join(DartRuntime.as(a[0], String.class, false, "String"));
             case "forEach": {
                 Object f = arg(a, 0);
                 for (Object e : it.toList()) {
@@ -497,6 +497,18 @@ public final class Dyn {
         }
     }
 
+    /// A value already checked to be a Number (or null), boxed as the Java type an
+    /// {@code int?} or {@code double?} parameter takes: Long or Double.
+    public static Object numAs(Number n, boolean isInt) {
+        if (n == null) {
+            return null;
+        }
+        if (isInt) {
+            return n instanceof Long ? n : Long.valueOf(n.longValue());
+        }
+        return n instanceof Double ? n : Double.valueOf(n.doubleValue());
+    }
+
     private static Object stringCall(String s, String name, Object[] a) {
         switch (name) {
             case "toLowerCase":
@@ -530,10 +542,10 @@ public final class Dyn {
             case "codeUnitAt":
                 return Long.valueOf(DString.codeUnitAt(s, num(arg(a, 0)).longValue()));
             case "padLeft":
-                return a.length > 1 && a[1] != null ? DString.padLeft(s, num(a[0]).longValue(), (String) a[1])
+                return a.length > 1 && a[1] != null ? DString.padLeft(s, num(a[0]).longValue(), DartRuntime.as(a[1], String.class, false, "String"))
                         : DString.padLeft(s, num(arg(a, 0)).longValue());
             case "compareTo":
-                return Long.valueOf(DString.compareTo(s, (String) arg(a, 0)));
+                return Long.valueOf(DString.compareTo(s, DartRuntime.as(arg(a, 0), String.class, false, "String")));
             case "toString":
                 return s;
             default:

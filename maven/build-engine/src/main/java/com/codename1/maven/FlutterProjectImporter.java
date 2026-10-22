@@ -464,6 +464,7 @@ public final class FlutterProjectImporter {
         }
         Map<String, File> libDirs = new HashMap<String, File>();
         Map<String, Integer> counts = new TreeMap<String, Integer>();
+        Map<String, Set<String>> importers = new HashMap<String, Set<String>>();
         Map<String, Boolean> pluginCache = new HashMap<String, Boolean>();
         int copied = 0;
         while (!work.isEmpty()) {
@@ -520,6 +521,14 @@ public final class FlutterProjectImporter {
                 }
                 if (nextPkg != null) {
                     lastReachedPackages.add(nextPkg);
+                    if (pkg != null && !pkg.equals(nextPkg)) {
+                        Set<String> by = importers.get(nextPkg);
+                        if (by == null) {
+                            by = new TreeSet<String>();
+                            importers.put(nextPkg, by);
+                        }
+                        by.add(pkg);
+                    }
                     if (SDK_PACKAGES.contains(nextPkg) || COVERED.containsKey(nextPkg)
                             || r.unsupportedPackages.containsKey(nextPkg)) {
                         continue;
@@ -550,6 +559,23 @@ public final class FlutterProjectImporter {
                 }
                 if (seen.add((nextPkg == null ? "\u0000" : nextPkg + "\u0000") + nextRel)) {
                     work.add(new String[] {nextPkg, nextRel});
+                }
+            }
+        }
+        // A package that imports an unsupported one cannot compile either (its symbols
+        // were never imported), so the verdict travels up to every importer -- else the
+        // build failed in the importer's sources while this report blamed only the leaf.
+        java.util.ArrayDeque<String> verdicts = new java.util.ArrayDeque<String>(r.unsupportedPackages.keySet());
+        while (!verdicts.isEmpty()) {
+            String dep = verdicts.poll();
+            Set<String> by = importers.get(dep);
+            if (by == null) {
+                continue;
+            }
+            for (String p : by) {
+                if (!r.unsupportedPackages.containsKey(p)) {
+                    r.unsupportedPackages.put(p, "depends on " + dep + ", which is unsupported");
+                    verdicts.add(p);
                 }
             }
         }

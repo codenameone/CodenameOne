@@ -39,10 +39,12 @@ public final class LineSplitter implements dart.async.StreamTransformer<String, 
     /** {@code stream.transform(const LineSplitter())}: a line split across chunks is joined. */
     @Override
     public dart.async.Stream<String> bind(final dart.async.Stream<String> source) {
-        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<String>>() {
+        // AsyncStar.over: subscribed inside listen() (a broadcast source's next event is
+        // not lost) and source errors forwarded without ending the stream, as Dart's do.
+        return dart.async.AsyncStar.over(source, new dart.runtime.Funcs.VoidFunc2<dart.async.StreamIterator<String>,
+                dart.async.AsyncStar.Sink<String>>() {
             @Override
-            public void call(dart.async.AsyncStar.Sink<String> sink) {
-                dart.async.StreamIterator<String> it = new dart.async.StreamIterator<String>(source);
+            public void call(dart.async.StreamIterator<String> it, dart.async.AsyncStar.Sink<String> sink) {
                 StringBuilder pending = new StringBuilder();
                 try {
                     while (it.next()) {

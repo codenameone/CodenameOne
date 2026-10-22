@@ -78,7 +78,7 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
 
     public Object decode(Object input, Boolean allowMalformed) {
         if (kind == BASE64 || kind == BASE64_URL) {
-            return Uint8List.fromBytes(unbase64((String) input));
+            return Uint8List.fromBytes(unbase64(dart.runtime.DartRuntime.as(input, String.class, false, "String")));
         }
         byte[] b = bytesOf(input);
         if (kind == UTF8 && !Boolean.TRUE.equals(allowMalformed)) {
@@ -136,10 +136,12 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
      */
     @Override
     public dart.async.Stream<Object> bind(final dart.async.Stream<Object> source) {
-        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<Object>>() {
+        // AsyncStar.over: subscribed inside listen() (a broadcast source's next event is
+        // not lost) and source errors forwarded without ending the stream, as Dart's do.
+        return dart.async.AsyncStar.over(source, new dart.runtime.Funcs.VoidFunc2<dart.async.StreamIterator<Object>,
+                dart.async.AsyncStar.Sink<Object>>() {
             @Override
-            public void call(dart.async.AsyncStar.Sink<Object> sink) {
-                dart.async.StreamIterator<Object> it = new dart.async.StreamIterator<Object>(source);
+            public void call(dart.async.StreamIterator<Object> it, dart.async.AsyncStar.Sink<Object> sink) {
                 byte[] carry = new byte[0];
                 // Only the BOM at the very start of the stream is dropped; one opening a
                 // later chunk is a real U+FEFF in the middle of the text.

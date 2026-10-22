@@ -370,6 +370,37 @@ public class FlutterProjectImporterTest {
 
     /// lib/ is copied flat, so lib/assets/x.dart shares assets/ with the bundled
     /// assets; the lib-sources record lists exactly the Dart files that came from lib/.
+    /// A pure-Dart package importing an unsupported one cannot compile either: the
+    /// verdict travels to it, and none of its files reach the build.
+    @Test
+    public void aPackageImportingAnUnsupportedOneIsUnsupportedToo() throws Exception {
+        File root = Files.createTempDirectory("flutter-transitive").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  outer: 1.0.0\n");
+        write(new File(flutterProject, "lib/main.dart"), "import 'package:outer/outer.dart';\nvoid main() {}\n");
+        File outer = new File(root, "cache/outer-1.0.0");
+        write(new File(outer, "lib/outer.dart"), "import 'package:inner/inner.dart';\nint o() => 1;\n");
+        File inner = new File(root, "cache/inner-1.0.0");
+        write(new File(inner, "lib/inner.dart"), "import 'dart:mirrors';\nint i() => 1;\n");
+        write(new File(flutterProject, ".dart_tool/package_config.json"), "{\n  \"configVersion\": 2,\n"
+                + "  \"packages\": [\n"
+                + "    {\n      \"name\": \"outer\",\n      \"rootUri\": \"" + outer.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    },\n"
+                + "    {\n      \"name\": \"inner\",\n      \"rootUri\": \"" + inner.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    }\n"
+                + "  ]\n}\n");
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.containsKey("inner"));
+        assertTrue(r.unsupportedPackages.toString(),
+                String.valueOf(r.unsupportedPackages.get("outer")).startsWith("depends on inner"));
+        assertFalse(new File(common, "src/main/flutter/packages/outer/outer.dart").exists());
+    }
+
     @Test
     public void recordsTheDartSourcesCopiedFromLib() throws Exception {
         File root = Files.createTempDirectory("flutter-lib-sources").toFile();

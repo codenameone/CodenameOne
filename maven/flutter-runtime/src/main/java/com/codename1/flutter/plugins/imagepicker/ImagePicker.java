@@ -79,6 +79,12 @@ public class ImagePicker {
                 }
                 done.complete(out);
             }
+        }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                // a failed single pick fails the list; without this the await never returned
+                done.completeError(e);
+            }
         });
         return done.future();
     }
