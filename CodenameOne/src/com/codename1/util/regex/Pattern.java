@@ -720,7 +720,8 @@ public final class Pattern {
             if (!in && ignoreCase != 0 && count > 0) {
                 if (c < 0x80) {
                     in = asciiLetter(c) && inRanges((char) (c ^ 0x20));
-                } else if (ignoreCase == 2) {
+                }
+                if (!in && ignoreCase == 2) {
                     // As the JDK: the upper and lower forms, and the lower
                     // form of the upper one, which takes U+0131 and U+017F
                     // into [a-z].
@@ -1569,6 +1570,8 @@ public final class Pattern {
                 whole.deterministic = false;
                 piece = whole;
             }
+            // In COMMENTS mode "a* ?" is "a*?", as on the JDK.
+            skipComments();
             int mode = GREEDY;
             if (at < p.length() && p.charAt(at) == '?') {
                 mode = RELUCTANT;
@@ -1583,7 +1586,12 @@ public final class Pattern {
                 highest = 0;
             }
             Piece out;
-            if (min == 0 && max != 1 && piece.max == 0 && piece.deterministic && piece.first instanceof GroupOpen) {
+            // Not possessive: there the JDK takes its round, and "()*+" sets
+            // the group. It also takes the round for "(?:())*" and for the
+            // inner group of "(())*", an accident of how it optimizes a
+            // repeated group, which is not copied here.
+            if (min == 0 && max != 1 && mode != POSSESSIVE && piece.max == 0 && piece.deterministic
+                    && piece.first instanceof GroupOpen) {
                 // A group that can only be empty, repeated from zero times:
                 // the JDK takes no round of it, so the group stays unset. Not
                 // for at most one round (? and {0,1}): there the JDK tries its
@@ -1677,8 +1685,9 @@ public final class Pattern {
                 } else {
                     // (?flags) for the rest of the enclosing group, or
                     // (?flags:X) for X alone.
+                    int flagsStart = at;
                     inlineFlags();
-                    if (at >= p.length()) {
+                    if (at >= p.length() || at == flagsStart && p.charAt(at) == ')') {
                         throw error("Unknown inline modifier");
                     }
                     if (p.charAt(at) == ')') {
@@ -2381,7 +2390,9 @@ public final class Pattern {
                 at--;
                 throw error("Illegal/unsupported escape sequence");
             }
-            return literal(e);
+            // An escaped code point above U+FFFF is one atom, both halves.
+            at--;
+            return literal(patternCodePoint());
         }
 
         /// A class, with `at` after its opening bracket; consumes the
@@ -2419,8 +2430,11 @@ public final class Pattern {
                     continue;
                 }
                 // "[a&&&b]" is an intersection with "&b" here; the JDK reads
-                // the third '&' as a literal of the left operand. Nobody
-                // writes that on purpose, so the plainer reading stands.
+                // the third '&' as a literal of the left operand. Its reading
+                // of several && in one class, or of one with an empty left
+                // side ("[&&[a]b&&[c]]"), does not follow its own grammar
+                // either. Nobody writes those on purpose, so the plainer
+                // reading stands.
                 if (c == '&' && at + 1 < p.length() && p.charAt(at + 1) == '&') {
                     at += 2;
                     if (at < p.length() && p.charAt(at) == ']') {
@@ -2506,6 +2520,14 @@ public final class Pattern {
                     supplementary = true;
                 }
                 set.add(lo, hi);
+                // A single member under UNICODE_CASE also stands for its folded
+                // form, as the JDK compares them: [\u0131] takes "I".
+                if (lo == hi && has(CASE_INSENSITIVE) && has(UNICODE_CASE)) {
+                    int folded = Character.toLowerCase(Character.toUpperCase(lo));
+                    if (folded != lo) {
+                        set.add(folded);
+                    }
+                }
             }
         }
     }

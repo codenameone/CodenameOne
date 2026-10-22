@@ -189,4 +189,21 @@ class CodePointAndUnicodeClassTest {
         assertFalse(matches("\\R?\\n", "\r\n"));
         assertTrue(matches("\\R\\R", "\r\n"));
     }
+
+    @Test
+    void fuzzFindings() {
+        assertTrue(matches("\\" + "\ud801\udc28{2}", "\ud801\udc28\ud801\udc28"));
+        assertTrue(matches("\\" + "\ud801\udc28{0}", ""));
+        assertEquals(3, Pattern.compile("a* ?", Pattern.COMMENTS).matcher("aa").results().count());
+        assertTrue(Pattern.compile("[\u0131]", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher("I").matches());
+        Matcher m = Pattern.compile("()*+").matcher("");
+        assertTrue(m.matches());
+        assertEquals(0, m.start(1));
+        try {
+            Pattern.compile("(?)");
+            assertTrue(false, "(?) compiled");
+        } catch (PatternSyntaxException expected) {
+            // As on the JDK.
+        }
+    }
 }

@@ -198,7 +198,13 @@ public final class Matcher implements MatchResult {
         requireEnd = false;
         endAt = -1;
         for (int i = start; i <= to; i++) {
-            // A match never starts inside a surrogate pair, as on the JDK.
+            // A match never starts inside a surrogate pair when the pattern
+            // names a supplementary code point, a surrogate or a Unicode
+            // property, as on the JDK. Otherwise every char position is
+            // tried, as the JDK's search also does; which of those the JDK
+            // then accepts depends on the node its optimizer picked ("\\B."
+            // matches the low half and "\\B[^b]" does not), and that is not
+            // copied.
             if (pattern.supplementary && i > from && i < to && Character.isLowSurrogate(text.charAt(i))
                     && Character.isHighSurrogate(text.charAt(i - 1))) {
                 continue;
