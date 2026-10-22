@@ -121,6 +121,20 @@ public class CSSThemeCompiler {
     /// compiler adds a custom property to its constants only inside `#Constants`, so a later
     /// `:root { --name: ... }` changes what `var(--name)` reads and leaves `@name` alone.
     private HashSet<String> exportedConstants = new HashSet<String>();
+
+    /// `padding-left` and its kin, per `uiid.state#padding` key, top/right/bottom/left; null is
+    /// a side not declared. Applied once every rule is read, over the box shorthand.
+    private Hashtable<String, Length[]> boxSides = new Hashtable<String, Length[]>();
+
+    /// The UIIDs (`$Dark` ones included) a rule of this compile styled, in first-seen order.
+    private ArrayList<String> styledUiids = new ArrayList<String>();
+
+    /// The style keys the build-time compiler carries from a UIID's unselected style into its
+    /// selected, pressed and disabled ones. The font has its own pass in compileFonts.
+    private static final String[] STATE_INHERITED_KEYS = {
+        "fgColor", "fgAlpha", "bgColor", "transparency", "opacity", "padding", "padUnit", "margin",
+        "marUnit", "align", "border", "bgImage"
+    };
     /// While set, resolveVars does not see a constant this compile declares unless it holds it:
     /// one declared further down is not defined yet. A constant only an earlier compile into the
     /// same theme declared is visible.
@@ -180,6 +194,8 @@ public class CSSThemeCompiler {
         }
         Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
         ownerDerives = new Hashtable<String, String>();
+        styledUiids = new ArrayList<String>();
+        boxSides = new Hashtable<String, Length[]>();
         for (Rule rule : rules) {
             if (rule.legacyConstants) {
                 continue;
@@ -192,6 +208,8 @@ public class CSSThemeCompiler {
         }
         markLiteralAliases(theme, deferred);
         compileFonts(theme, fonts);
+        applyBoxSides(theme);
+        inheritUnselectedIntoStates(theme);
         inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme, deferred);
         for (Map.Entry<String, String> entry : deferred.entrySet()) {
@@ -859,6 +877,9 @@ public class CSSThemeCompiler {
         boolean universal = rule.universal;
         String uiid = selectorParts[0];
         String statePrefix = selectorParts[1];
+        if (!universal) {
+            styledUiids.add(uiid);
+        }
         StringBuilder borderCss = new StringBuilder();
 
         for (int i = 0; i < rule.declarations.length; i++) {
@@ -1085,6 +1106,71 @@ public class CSSThemeCompiler {
             }
             theme.put(keyPrefix + Style.FONT, font);
         }
+    }
+
+    /// The build-time compiler's selected, pressed and disabled styles start from the UIID's
+    /// unselected one, and the built theme holds every state's value. UIManager does not fall
+    /// back from `sel#bgColor` to `bgColor`, so without this a selected `Label{color:#333}`
+    /// would take the default selected color. A state keeps its own value, and one a derive
+    /// target declares for that state: the build lays `Base:selected` over `Child`'s unselected
+    /// style, and UIManager reaches `Base.sel#` through the derive by itself.
+    private void inheritUnselectedIntoStates(Hashtable theme) {
+        String[] states = {"sel#", "press#", "dis#"};
+        String[] baseStates = {"sel", "press", "dis"};
+        // What the stylesheet itself declared; a value this pass copies into a state is not a
+        // declaration a derived UIID's state should stop at.
+        Hashtable declared = new Hashtable(theme);
+        // A derived UIID's states derive from the target's matching states, as the build-time
+        // compiler writes them (`Child.sel#derive=Base.sel`): UIManager reads only the state's
+        // own derive key, so without it a selected Child would start from the default style.
+        for (Map.Entry<String, String> entry : ownerDerives.entrySet()) {
+            String uiid = entry.getKey();
+            for (int i = 0; i < states.length; i++) {
+                if (theme.get(uiid + "." + states[i] + "derive") == null) {
+                    theme.put(uiid + "." + states[i] + "derive", entry.getValue() + "." + baseStates[i]);
+                }
+            }
+        }
+        for (String uiid : styledUiids) {
+            for (String key : STATE_INHERITED_KEYS) {
+                Object value = theme.get(uiid + "." + key);
+                if (value == null) {
+                    continue;
+                }
+                for (String state : states) {
+                    if (theme.get(uiid + "." + state + key) != null
+                            || declared.get(uiid + "." + state + "derive") != null
+                            || derivedStateDeclares(declared, uiid, state, key)) {
+                        continue;
+                    }
+                    theme.put(uiid + "." + state + key, value);
+                }
+            }
+        }
+    }
+
+    /// Whether a UIID `uiid` derives from, at any depth, declares `key` for `state`.
+    private boolean derivedStateDeclares(Hashtable theme, String uiid, String state, String key) {
+        boolean dark = uiid.startsWith("$Dark");
+        ArrayList<String> seen = new ArrayList<String>();
+        String id = uiid;
+        while (!seen.contains(id)) {
+            seen.add(id);
+            String next = ownerDerives.get(id);
+            if (next == null) {
+                Object stored = theme.get(id + ".derive");
+                next = stored instanceof String ? (String) stored : null;
+            }
+            if (next == null) {
+                return false;
+            }
+            id = dark && !next.startsWith("$Dark") && theme.get("$Dark" + next + "." + state + key) != null
+                    ? "$Dark" + next : next;
+            if (theme.get(id + "." + state + key) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The UIIDs a font in `state` inherits from, nearest first. At every hop a state that
@@ -1516,17 +1602,49 @@ public class CSSThemeCompiler {
     private boolean applySimpleThemeProperty(Hashtable theme, String uiid, String statePrefix, String property, String value) {
         if ("color".equals(property)) {
             theme.put(uiid + "." + statePrefix + "fgColor", normalizeHexColor(value));
+            // As the build-time compiler's getThemeFgAlpha(): `transparent` and an rgba() alpha
+            // become fgAlpha, any other color leaves it unset.
+            int alpha = colorAlpha(value);
+            if (alpha >= 0) {
+                theme.put(uiid + "." + statePrefix + "fgAlpha", Integer.valueOf(alpha));
+            }
             return true;
         }
         if ("background-color".equals(property)) {
             theme.put(uiid + "." + statePrefix + "bgColor", normalizeHexColor(value));
-            if (!"transparent".equalsIgnoreCase(value)) {
-                theme.put(uiid + "." + statePrefix + "transparency", "255");
+            // As getThemeTransparency(): `transparent` is 0, an rgba() its alpha, anything else
+            // opaque. A transparent background has to say so: the UIID's default may be opaque.
+            int alpha = colorAlpha(value);
+            theme.put(uiid + "." + statePrefix + "transparency", String.valueOf(alpha >= 0 ? alpha : 255));
+            return true;
+        }
+        if ("opacity".equals(property)) {
+            float opacity;
+            try {
+                opacity = Float.parseFloat(value.trim());
+            } catch (NumberFormatException err) {
+                throw new CSSSyntaxException("Unsupported opacity value: " + value, err);
             }
+            // As getThemeOpacity(): the fraction scaled to 0-255 and truncated.
+            theme.put(uiid + "." + statePrefix + "opacity", String.valueOf((int) (opacity * 255.0)));
             return true;
         }
         if ("padding".equals(property) || "margin".equals(property)) {
             applyBox(theme, uiid + "." + statePrefix, property, value);
+            // A later shorthand replaces the sides declared before it.
+            boxSides.remove(uiid + "." + statePrefix + property);
+            return true;
+        }
+        int side = boxSide(property);
+        if (side >= 0) {
+            String box = property.startsWith("padding") ? "padding" : "margin";
+            String key = uiid + "." + statePrefix + box;
+            Length[] sides = boxSides.get(key);
+            if (sides == null) {
+                sides = new Length[4];
+                boxSides.put(key, sides);
+            }
+            sides[side] = length(value);
             return true;
         }
         if ("cn1-derive".equals(property)) {
@@ -1572,6 +1690,13 @@ public class CSSThemeCompiler {
         if (!isBorderProperty(property)) {
             return false;
         }
+        if ("background-image".equals(property) && "none".equalsIgnoreCase(value.trim())) {
+            // No image, as in the build-time compiler; CSSBorder has no `none` to parse.
+            return true;
+        }
+        // CSSBorder reads only hex and rgb() colors; a keyword such as `red` is written as the
+        // hex the build-time compiler resolves it to.
+        value = namedColorsAsHex(value);
         if ("border".equals(property)) {
             String expanded = expandBorderShorthand(value);
             if (expanded.length() == 0) {
@@ -1858,13 +1983,15 @@ public class CSSThemeCompiler {
             return "000000";
         }
 
-        if (value.startsWith("rgb(")) {
+        if (value.startsWith("rgb(") || value.startsWith("rgba(")) {
+            boolean alpha = value.startsWith("rgba(");
             if (!value.endsWith(")")) {
                 throw new CSSSyntaxException("Malformed rgb() color: " + cssColor);
             }
-            String[] parts = colorArguments(value.substring(4, value.length() - 1), cssColor);
-            if (parts.length != 3) {
-                throw new CSSSyntaxException("rgb() must have exactly 3 components: " + cssColor);
+            String[] parts = colorArguments(value.substring(alpha ? 5 : 4, value.length() - 1), cssColor);
+            if (parts.length != (alpha ? 4 : 3)) {
+                throw new CSSSyntaxException((alpha ? "rgba() must have exactly 4" : "rgb() must have exactly 3")
+                        + " components: " + cssColor);
             }
             int r = parseRgbChannel(parts[0], cssColor);
             int g = parseRgbChannel(parts[1], cssColor);
@@ -1905,38 +2032,116 @@ public class CSSThemeCompiler {
         throw new CSSSyntaxException("Unsupported text-align value: " + value);
     }
 
+    /// The CSS named colors as the build-time compiler's Color table resolves them, name then
+    /// hex. `transparent` is handled by the callers, which give it its alpha.
+    private static final String[] NAMED_COLORS = {
+        "aliceblue", "f0f8ff", "antiquewhite", "faebd7", "aqua", "00ffff",
+        "aquamarine", "7fffd4", "azure", "f0ffff", "beige", "f5f5dc",
+        "bisque", "ffe4c4", "black", "000000", "blanchedalmond", "ffebcd",
+        "blue", "0000ff", "blueviolet", "8a2be2", "brown", "a52a2a",
+        "burlywood", "deb887", "cadetblue", "5f9ea0", "chartreuse", "7fff00",
+        "chocolate", "d2691e", "coral", "ff7f50", "cornflowerblue", "6495ed",
+        "cornsilk", "fff8dc", "crimson", "dc143c", "cyan", "00ffff",
+        "darkblue", "00008b", "darkcyan", "008b8b", "darkgoldenrod", "b8860b",
+        "darkgray", "a9a9a9", "darkgreen", "006400", "darkgrey", "a9a9a9",
+        "darkkhaki", "bdb76b", "darkmagenta", "8b008b", "darkolivegreen", "556b2f",
+        "darkorange", "ff8c00", "darkorchid", "9932cc", "darkred", "8b0000",
+        "darksalmon", "e9967a", "darkseagreen", "8fbc8f", "darkslateblue", "483d8b",
+        "darkslategray", "2f4f4f", "darkslategrey", "2f4f4f", "darkturquoise", "00ced1",
+        "darkviolet", "9400d3", "deeppink", "ff1493", "deepskyblue", "00bfff",
+        "dimgray", "696969", "dimgrey", "696969", "dodgerblue", "1e90ff",
+        "firebrick", "b22222", "floralwhite", "fffaf0", "forestgreen", "228b22",
+        "fuchsia", "ff00ff", "gainsboro", "dcdcdc", "ghostwhite", "f8f8ff",
+        "gold", "ffd700", "goldenrod", "daa520", "gray", "808080",
+        "green", "008000", "greenyellow", "adff2f", "grey", "808080",
+        "honeydew", "f0fff0", "hotpink", "ff69b4", "indianred", "cd5c5c",
+        "indigo", "4b0082", "ivory", "fffff0", "khaki", "f0e68c",
+        "lavender", "e6e6fa", "lavenderblush", "fff0f5", "lawngreen", "7cfc00",
+        "lemonchiffon", "fffacd", "lightblue", "add8e6", "lightcoral", "f08080",
+        "lightcyan", "e0ffff", "lightgoldenrodyellow", "fafad2", "lightgray", "d3d3d3",
+        "lightgreen", "90ee90", "lightgrey", "d3d3d3", "lightpink", "ffb6c1",
+        "lightsalmon", "ffa07a", "lightseagreen", "20b2aa", "lightskyblue", "87cefa",
+        "lightslategray", "778899", "lightslategrey", "778899", "lightsteelblue", "b0c4de",
+        "lightyellow", "ffffe0", "lime", "00ff00", "limegreen", "32cd32",
+        "linen", "faf0e6", "magenta", "ff00ff", "maroon", "800000",
+        "mediumaquamarine", "66cdaa", "mediumblue", "0000cd", "mediumorchid", "ba55d3",
+        "mediumpurple", "9370db", "mediumseagreen", "3cb371", "mediumslateblue", "7b68ee",
+        "mediumspringgreen", "00fa9a", "mediumturquoise", "48d1cc", "mediumvioletred", "c71585",
+        "midnightblue", "191970", "mintcream", "f5fffa", "mistyrose", "ffe4e1",
+        "moccasin", "ffe4b5", "navajowhite", "ffdead", "navy", "000080",
+        "oldlace", "fdf5e6", "olive", "808000", "olivedrab", "6b8e23",
+        "orange", "ffa500", "orangered", "ff4500", "orchid", "da70d6",
+        "palegoldenrod", "eee8aa", "palegreen", "98fb98", "paleturquoise", "afeeee",
+        "palevioletred", "db7093", "papayawhip", "ffefd5", "peachpuff", "ffdab9",
+        "peru", "cd853f", "pink", "ffc0cb", "plum", "dda0dd",
+        "powderblue", "b0e0e6", "purple", "800080", "red", "ff0000",
+        "rosybrown", "bc8f8f", "royalblue", "4169e1", "saddlebrown", "8b4513",
+        "salmon", "fa8072", "sandybrown", "f4a460", "seagreen", "2e8b57",
+        "seashell", "fff5ee", "sienna", "a0522d", "silver", "c0c0c0",
+        "skyblue", "87ceeb", "slateblue", "6a5acd", "slategray", "708090",
+        "slategrey", "708090", "snow", "fffafa", "springgreen", "00ff7f",
+        "steelblue", "4682b4", "tan", "d2b48c", "teal", "008080",
+        "thistle", "d8bfd8", "tomato", "ff6347", "turquoise", "40e0d0",
+        "violet", "ee82ee", "wheat", "f5deb3", "white", "ffffff",
+        "whitesmoke", "f5f5f5", "yellow", "ffff00", "yellowgreen", "9acd32",
+    };
+
     private String cssColorKeyword(String value) {
-        if ("black".equals(value)) {
-            return "000000";
-        }
-        if ("white".equals(value)) {
-            return "ffffff";
-        }
-        if ("red".equals(value)) {
-            return "ff0000";
-        }
-        if ("green".equals(value)) {
-            return "008000";
-        }
-        if ("blue".equals(value)) {
-            return "0000ff";
-        }
-        if ("pink".equals(value)) {
-            return "ffc0cb";
-        }
-        if ("orange".equals(value)) {
-            return "ffa500";
-        }
-        if ("yellow".equals(value)) {
-            return "ffff00";
-        }
-        if ("purple".equals(value)) {
-            return "800080";
-        }
-        if ("gray".equals(value) || "grey".equals(value)) {
-            return "808080";
+        for (int i = 0; i < NAMED_COLORS.length; i += 2) {
+            if (NAMED_COLORS[i].equals(value)) {
+                return NAMED_COLORS[i + 1];
+            }
         }
         return null;
+    }
+
+    /// `1px solid red` as `1px solid #ff0000`: every whitespace-separated CSS color keyword
+    /// replaced by its hex.
+    private String namedColorsAsHex(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        int i = 0;
+        int n = value.length();
+        while (i < n) {
+            char c = value.charAt(i);
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end < n && " \t\n\r\f".indexOf(value.charAt(end)) < 0) {
+                end++;
+            }
+            String token = value.substring(i, end);
+            String hex = "transparent".equalsIgnoreCase(token) ? null : cssColorKeyword(asciiLower(token));
+            out.append(hex != null ? "#" + hex : token);
+            i = end;
+        }
+        return out.toString();
+    }
+
+    /// The alpha a color carries, 0-255, or -1 for an opaque color that states none:
+    /// `transparent` is 0 and `rgba(0, 0, 0, .5)` is 127, as the build-time compiler truncates it.
+    private int colorAlpha(String cssColor) {
+        String value = asciiLower(cssColor.trim());
+        if ("transparent".equals(value)) {
+            return 0;
+        }
+        if (!value.startsWith("rgba(") || !value.endsWith(")")) {
+            return -1;
+        }
+        String[] parts = colorArguments(value.substring(5, value.length() - 1), cssColor);
+        if (parts.length != 4) {
+            throw new CSSSyntaxException("rgba() must have exactly 4 components: " + cssColor);
+        }
+        String a = parts[3].trim();
+        float fraction;
+        try {
+            fraction = a.endsWith("%") ? Float.parseFloat(a.substring(0, a.length() - 1)) / 100f : Float.parseFloat(a);
+        } catch (NumberFormatException err) {
+            throw new CSSSyntaxException("Invalid rgba() alpha in " + cssColor + ": " + a, err);
+        }
+        return Math.max(0, Math.min(255, (int) (fraction * 255.0)));
     }
 
     private int parseRgbChannel(String value, String originalColor) {
@@ -1991,6 +2196,88 @@ public class CSSThemeCompiler {
         theme.put(keyPrefix + property, top.text + "," + bottom.text + "," + left.text + "," + right.text);
         String unitKey = "padding".equals(property) ? Style.PADDING_UNIT : Style.MARGIN_UNIT;
         theme.put(keyPrefix + unitKey, new byte[]{top.unit, left.unit, bottom.unit, right.unit});
+    }
+
+    /// 0-3 for `padding-top`/`-right`/`-bottom`/`-left` (and `margin-`), else -1.
+    private static int boxSide(String property) {
+        String rest;
+        if (property.startsWith("padding-")) {
+            rest = property.substring(8);
+        } else if (property.startsWith("margin-")) {
+            rest = property.substring(7);
+        } else {
+            return -1;
+        }
+        if ("top".equals(rest)) {
+            return 0;
+        }
+        if ("right".equals(rest)) {
+            return 1;
+        }
+        if ("bottom".equals(rest)) {
+            return 2;
+        }
+        return "left".equals(rest) ? 3 : -1;
+    }
+
+    /// Writes the declared sides over the box they belong to: the state's own box when one was
+    /// declared, else (for a state) the UIID's unselected box, which the build-time compiler's
+    /// state style starts from, else zero. Unselected keys go first so a state can start from
+    /// a box that itself had sides applied.
+    private void applyBoxSides(Hashtable theme) {
+        for (int pass = 0; pass < 2; pass++) {
+            for (Map.Entry<String, Length[]> entry : boxSides.entrySet()) {
+                String key = entry.getKey();
+                int dot = key.indexOf('.');
+                int hash = key.indexOf('#', dot);
+                if ((pass == 0) != (hash < 0)) {
+                    continue;
+                }
+                String box = key.endsWith("padding") ? "padding" : "margin";
+                String unitSuffix = "padding".equals(box) ? Style.PADDING_UNIT : Style.MARGIN_UNIT;
+                String prefix = key.substring(0, key.length() - box.length());
+                String source = theme.get(key) != null || hash < 0 ? prefix : key.substring(0, dot + 1);
+                Length[] out = readBox(theme.get(source + box), theme.get(source + unitSuffix));
+                Length[] sides = entry.getValue();
+                for (int i = 0; i < 4; i++) {
+                    if (sides[i] != null) {
+                        out[i] = sides[i];
+                    }
+                }
+                theme.put(key, out[0].text + "," + out[2].text + "," + out[3].text + "," + out[1].text);
+                theme.put(prefix + unitSuffix, new byte[]{out[0].unit, out[3].unit, out[2].unit, out[1].unit});
+            }
+        }
+    }
+
+    /// A stored box (`top,bottom,left,right` with units `[top, left, bottom, right]`) as
+    /// top/right/bottom/left lengths; zero pixels where nothing is stored.
+    private static Length[] readBox(Object values, Object units) {
+        Length[] out = new Length[4];
+        String[] parts = values instanceof String ? splitCommas((String) values) : null;
+        byte[] unit = units instanceof byte[] ? (byte[]) units : null;
+        // Stored order to top/right/bottom/left.
+        int[] textIndex = {0, 3, 1, 2};
+        int[] unitIndex = {0, 3, 2, 1};
+        for (int i = 0; i < 4; i++) {
+            Length l = new Length();
+            l.text = parts != null && parts.length == 4 ? parts[textIndex[i]].trim() : "0";
+            l.unit = unit != null && unit.length == 4 ? unit[unitIndex[i]] : Style.UNIT_TYPE_PIXELS;
+            out[i] = l;
+        }
+        return out;
+    }
+
+    private static String[] splitCommas(String value) {
+        ArrayList<String> out = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i <= value.length(); i++) {
+            if (i == value.length() || value.charAt(i) == ',') {
+                out.add(value.substring(start, i));
+                start = i + 1;
+            }
+        }
+        return out.toArray(new String[out.size()]);
     }
 
     /// One side of a box. `px`, `pt` and a bare number are pixels rounded to a whole number,
@@ -2140,6 +2427,13 @@ public class CSSThemeCompiler {
         return -1;
     }
 
+    /// A dark media block's rules land on the same `$Dark` UIID as a `$DarkFoo` rule and merge
+    /// with it in source order. The build-time compiler differs in one case on purpose left
+    /// unmatched: a `$DarkFoo` rule BEFORE a `@media (prefers-color-scheme: dark) { Foo {...} }`
+    /// block loses its other declarations there (the media rule replaces the element instead of
+    /// merging), so `background-color` set in `$DarkFoo` silently vanishes from the build. That
+    /// is a defect of the build, not a behaviour a stylesheet relies on, so the preview keeps
+    /// what the author wrote.
     private boolean isDarkModeMediaQuery(String mediaQuery) {
         String normalized = mediaQuery == null ? "" : asciiLower(mediaQuery);
         return normalized.indexOf("prefers-color-scheme") > -1 && normalized.indexOf("dark") > -1;

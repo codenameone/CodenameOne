@@ -1449,6 +1449,88 @@ public class CSSThemeCompilerTest extends UITestBase {
     }
 
     @Test
+    void testUnselectedStyleReachesEveryState() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Label{color:#333;background-color:#fff;padding:2px 3mm;margin:1mm}"
+                + " Label.selected{color:#f00}"
+                + " Base.pressed{background-color:#0f0} Child{cn1-derive:Base;background-color:#00f}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        for (String state : new String[]{"sel#", "press#", "dis#"}) {
+            assertEquals("ffffff", theme.get("Label." + state + "bgColor"), state);
+            assertEquals("255", theme.get("Label." + state + "transparency"), state);
+            assertEquals(theme.get("Label.padding"), theme.get("Label." + state + "padding"), state);
+            org.junit.jupiter.api.Assertions.assertNotNull(theme.get("Label." + state + "marUnit"), state);
+        }
+        assertEquals("ff0000", theme.get("Label.sel#fgColor"));
+        assertEquals("333333", theme.get("Label.press#fgColor"));
+        // Base:pressed is laid over Child's unselected style, through the derive.
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("Child.press#bgColor"));
+        assertEquals("0000ff", theme.get("Child.sel#bgColor"));
+    }
+
+    @Test
+    void testRgbaAndTransparentColors() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("T{background-color:rgba(0,0,0,0);color:rgba(255,0,0,.5)}"
+                + " N{background-color:transparent} O{opacity:0.5}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("000000", theme.get("T.bgColor"));
+        assertEquals("0", theme.get("T.transparency"));
+        assertEquals("ff0000", theme.get("T.fgColor"));
+        assertEquals(Integer.valueOf(127), theme.get("T.fgAlpha"));
+        assertEquals("0", theme.get("N.transparency"));
+        assertEquals("127", theme.get("O.opacity"));
+    }
+
+    @Test
+    void testBorderWithNamedColorAndNoBackgroundImage() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Card{border:1px solid red} N{background-image:none;color:#000}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNotNull(theme.get("Card.border"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("N.border"));
+        assertEquals("000000", theme.get("N.fgColor"));
+    }
+
+    @Test
+    void testDerivedUiidStatesDeriveFromTheTargetStates() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("Base{color:#112233;background-color:#fff;padding:2mm}"
+                + " Base.pressed{color:#f00} Child{cn1-derive:Base} Child.selected{color:#0f0}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("Base.sel", theme.get("Child.sel#derive"));
+        assertEquals("Base.press", theme.get("Child.press#derive"));
+        assertEquals("Base.dis", theme.get("Child.dis#derive"));
+        assertEquals("00ff00", theme.get("Child.sel#fgColor"));
+    }
+
+    @Test
+    void testPerSidePaddingAndMargin() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("S{padding-left:1mm;padding-top:2px;margin-right:3mm;margin-bottom:4pt}"
+                + " S.pressed{padding-right:5px} T{padding:1px;padding-left:9px}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("2,0,1,0", theme.get("S.padding"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[]{Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_DIPS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS}, (byte[]) theme.get("S.padUnit"));
+        assertEquals("0,4,0,3", theme.get("S.margin"));
+        assertEquals("2,0,1,5", theme.get("S.press#padding"));
+        assertEquals("1,1,9,1", theme.get("T.padding"));
+    }
+
+    @Test
+    void testEveryCssNamedColor() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("A{color:silver;background-color:navy} B{color:orchid}"
+                + " C{color:lightslategrey}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("c0c0c0", theme.get("A.fgColor"));
+        assertEquals("000080", theme.get("A.bgColor"));
+        assertEquals("da70d6", theme.get("B.fgColor"));
+        assertEquals("778899", theme.get("C.fgColor"));
+    }
+
+    @Test
     void testColorKeywordConstantStaysAnIdentifier() {
         MutableResource res = new MutableResource();
         new CSSThemeCompiler().compile("#Constants { accent: red; clear: transparent; accentColor: red;"
