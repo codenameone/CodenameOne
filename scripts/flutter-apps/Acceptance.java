@@ -74,6 +74,7 @@ public class Acceptance {
         TranspileResult t = new DartTranspiler().transpile(new TranspileRequest()
                 .sourceRoot(new File(common, "src/main/flutter"))
                 .stubClasspathEntry(new File(args[2]))
+                .javaSourceRoot(new File(common, "src/main/java"))
                 .outputDir(out));
         List<Diagnostic> errors = t.errors();
         System.out.println("== transpile: " + t.getGeneratedFiles().size() + " file(s), " + errors.size()
@@ -98,6 +99,15 @@ public class Acceptance {
             try (java.util.stream.Stream<Path> s = Files.walk(out.toPath())) {
                 javac.addAll(s.filter(p -> p.toString().endsWith(".java")).map(Path::toString)
                         .collect(Collectors.toList()));
+            }
+            // The import-generated entry point too: it names the packs whose hooks it
+            // installs, and the transpiler copies only the packs something names.
+            Path own = new File(common, "src/main/java").toPath();
+            if (Files.isDirectory(own)) {
+                try (java.util.stream.Stream<Path> s = Files.walk(own)) {
+                    javac.addAll(s.filter(p -> p.toString().endsWith(".java")).map(Path::toString)
+                            .collect(Collectors.toList()));
+                }
             }
             int rc = ToolProvider.getSystemJavaCompiler().run(null, null, null, javac.toArray(new String[0]));
             System.out.println("== javac: " + (rc == 0 ? "clean" : "FAILED"));

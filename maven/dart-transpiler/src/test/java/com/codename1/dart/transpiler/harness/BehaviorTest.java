@@ -127,8 +127,21 @@ public class BehaviorTest {
             TestSupport.write(out, gf.content);
             javacArgs.add(out.getAbsolutePath());
         }
+        List<CharSequence> packRoots = new ArrayList<CharSequence>();
+        for (GeneratedFile gf : r.files) {
+            packRoots.add(gf.content);
+        }
         for (File javaFile : javaSupportFiles) {
             File out = TestSupport.writeJavaSupportFile(srcRoot, javaFile);
+            javacArgs.add(out.getAbsolutePath());
+            packRoots.add(TestSupport.read(javaFile));
+        }
+        // The runtime jar carries no plugin pack classes: the packs the program names are
+        // compiled with it, exactly as the transpiler copies them into an app.
+        for (java.util.Map.Entry<String, String> e : com.codename1.dart.transpiler.api.DartTranspiler
+                .pluginPackSources(stubEntries, packRoots).entrySet()) {
+            File out = new File(srcRoot, e.getKey());
+            TestSupport.write(out, e.getValue());
             javacArgs.add(out.getAbsolutePath());
         }
         File runner = new File(work, "src/Runner.java");
