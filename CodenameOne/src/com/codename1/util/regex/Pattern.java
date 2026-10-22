@@ -1160,7 +1160,8 @@ public final class Pattern {
             this.behind = behind;
             this.negative = negative;
             this.min = min;
-            this.max = max;
+            // -1 for a lookbehind without bound: tried back to the region start.
+            this.max = max < 0 ? Integer.MAX_VALUE : max;
         }
 
         @Override
@@ -1210,6 +1211,9 @@ public final class Pattern {
         int max;
         /// Whether there is one way only for this to match at a position.
         boolean deterministic = true;
+        /// `\R`, which a quantifier repeats whole: each round takes `\r\n`
+        /// as a pair and never gives the `\n` back, as the JDK's does.
+        boolean lineEnding;
 
         Piece(Node first, Node last, int min, int max) {
             this.first = first;
@@ -1274,6 +1278,8 @@ public final class Pattern {
         int loops;
         final Map<String, Integer> names = new HashMap<String, Integer>();
         boolean supplementary;
+        /// Groups repeated without an upper bound, and back references, so far.
+        int unboundedGroups;
 
         Parser(String pattern, int flags) {
             this.p = pattern;
@@ -1495,6 +1501,9 @@ public final class Pattern {
                 case '?':
                     throw error("Dangling meta character '" + c + "'");
                 case '{':
+                    // The JDK reads a leading "{1}" as an empty match; that is
+                    // an accident of its parser, not syntax anyone writes, and
+                    // refusing it says so at compile time.
                     throw error("Illegal repetition");
                 default:
                     // A code point written out is one atom, so a quantifier
@@ -1553,6 +1562,13 @@ public final class Pattern {
             } else {
                 return piece;
             }
+            if (piece.lineEnding) {
+                piece.last.next = new SubEnd();
+                Node atomic = new Atomic(piece.first);
+                Piece whole = new Piece(atomic, atomic, piece.min, piece.max);
+                whole.deterministic = false;
+                piece = whole;
+            }
             int mode = GREEDY;
             if (at < p.length() && p.charAt(at) == '?') {
                 mode = RELUCTANT;
@@ -1578,6 +1594,9 @@ public final class Pattern {
                 out.first = new SingleLoop((Single) piece.first, min, max, mode);
                 out.last = out.first;
             } else {
+                if (highest < 0) {
+                    unboundedGroups++;
+                }
                 Loop loop = new Loop(loops++, min, max, mode == RELUCTANT);
                 loop.body = piece.first;
                 piece.last.next = new LoopTail(loop);
@@ -1597,6 +1616,9 @@ public final class Pattern {
                     throw error("Dangling meta character '" + after + "'");
                 }
                 if (after == '{') {
+                    // "x{1}{2}" repeats the repetition. The JDK parses the
+                    // second count and then drops it, which reads as a bug
+                    // in it rather than a meaning to copy.
                     return quantified(out);
                 }
             }
@@ -1693,8 +1715,12 @@ public final class Pattern {
         }
 
         private Piece look(boolean behind, boolean negative) {
+            int groupsBefore = unboundedGroups;
             Piece inner = body();
-            if (behind && inner.max < 0) {
+            // As on the JDK: a lookbehind may repeat one character without
+            // bound ("(?<=a+)b"), and is then tried from every earlier
+            // position; a group repeated without bound has no maximum.
+            if (behind && inner.max < 0 && unboundedGroups != groupsBefore) {
                 throw error("Look-behind group does not have an obvious maximum length");
             }
             inner.last.next = new SubEnd();
@@ -2309,6 +2335,7 @@ public final class Pattern {
                     one.last.next = join;
                     Piece lineEnd = new Piece(new Branch(new Node[] {crlf.first, one.first}), join, 1, 2);
                     lineEnd.deterministic = false;
+                    lineEnd.lineEnding = true;
                     return lineEnd;
                 }
                 case 'k': {
@@ -2321,6 +2348,7 @@ public final class Pattern {
                     if (group == null) {
                         throw error("named capturing group <" + name + "> does not exist");
                     }
+                    unboundedGroups++;
                     return Piece.of(new BackReference(group.intValue(), has(CASE_INSENSITIVE), has(UNICODE_CASE)), 0)
                             .unbounded();
                 }
@@ -2337,6 +2365,8 @@ public final class Pattern {
                     group = more;
                     at++;
                 }
+                // A back reference has no maximum length either.
+                unboundedGroups++;
                 return Piece.of(new BackReference(group, has(CASE_INSENSITIVE), has(UNICODE_CASE)), 0).unbounded();
             }
             CharSet set = escapedClass(e);
@@ -2388,6 +2418,9 @@ public final class Pattern {
                     set.unite(characterClass());
                     continue;
                 }
+                // "[a&&&b]" is an intersection with "&b" here; the JDK reads
+                // the third '&' as a literal of the left operand. Nobody
+                // writes that on purpose, so the plainer reading stands.
                 if (c == '&' && at + 1 < p.length() && p.charAt(at + 1) == '&') {
                     at += 2;
                     if (at < p.length() && p.charAt(at) == ']') {

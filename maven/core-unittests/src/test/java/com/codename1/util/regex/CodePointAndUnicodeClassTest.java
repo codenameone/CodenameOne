@@ -172,4 +172,21 @@ class CodePointAndUnicodeClassTest {
         assertFalse(m.find());
         assertTrue(matches("\\p{all}+", FACE + "a"));
     }
+
+    @Test
+    void aLookbehindMayRepeatOneCharacterWithoutBound() {
+        Matcher m = Pattern.compile("(?<=a+)b").matcher("aab");
+        assertTrue(m.find());
+        assertEquals(2, m.start());
+        assertTrue(Pattern.compile("(?<=\\w+)x").matcher("abx").find());
+        assertTrue(Pattern.compile("(?<=a|b+)c").matcher("bbc").find());
+        assertFalse(Pattern.compile("(?<!a*)b").matcher("b").find());
+    }
+
+    @Test
+    void aRepeatedLineEndKeepsItsPair() {
+        assertFalse(Pattern.compile("\\R{2}").matcher("\r\n").find());
+        assertFalse(matches("\\R?\\n", "\r\n"));
+        assertTrue(matches("\\R\\R", "\r\n"));
+    }
 }
