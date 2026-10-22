@@ -64,7 +64,9 @@ if command -v xvfb-run >/dev/null 2>&1; then
   RUNNER=(xvfb-run -a -s "-screen 0 1280x1024x24")
 fi
 
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx768m -Dskirmish.server.url=http://localhost:$PORT -Dskirmish.shots.dir=$SHOTS"
+# Every test runs in one simulator, and the Forge's turntable previews and
+# 3D battles hold enough textures that 768m ran out in the test after them.
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx1536m -Dskirmish.server.url=http://localhost:$PORT -Dskirmish.shots.dir=$SHOTS"
 
 set +e
 ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
