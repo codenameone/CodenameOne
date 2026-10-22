@@ -155,7 +155,6 @@ include::Savor-Users-Guide.asciidoc[]
 
 include::Savor-Implementors-Guide.asciidoc[]
 
-include::Skirmish-Users-Guide.asciidoc[]
 
 include::Skirmish-Implementors-Guide.asciidoc[]
 

@@ -126,7 +126,8 @@ WoodButton {
     font-size: 4mm;
     text-align: center;
     padding: 2.5mm;
-    margin: 1.2mm 0;
+    /* The same 2mm inset as the section titles and panels above it. */
+    margin: 1.2mm 2mm;
 }
 
 WoodButton.pressed {
@@ -149,7 +150,7 @@ StoneButton, PriceButton, GemButton, ReplayButton, BattleMenu {
     font-size: 3mm;
     text-align: center;
     padding: 1.8mm;
-    margin: 1mm 0;
+    margin: 1mm 2mm;
 }
 
 StoneButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.pressed, BattleMenu.pressed {
@@ -988,7 +989,7 @@ ForgeLabel {
     font-family: "native:MainBold";
     font-size: 3mm;
     text-align: left;
-    padding: 0.5mm;
+    padding: 0.5mm 2mm 0.5mm 0.5mm;
     margin: 0;
 }
 
@@ -1077,3 +1078,327 @@ ForgeTabOn {
     background: linear-gradient(to bottom, var(--wood-light), var(--wood));
     color: var(--ink);
 }
+
+/* The arena editor's tools: an icon over a short word, small enough that
+   five of them share a phone's width without "To...". */
+ForgeTool, ForgeToolOn {
+    background-color: var(--stone-dark);
+    border-radius: 1.5mm;
+    color: var(--stone-light);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 1mm 0.5mm;
+    margin: 0.5mm;
+}
+
+ForgeToolOn {
+    background: linear-gradient(to bottom, var(--wood-light), var(--wood));
+    color: var(--ink);
+}
+
+/* tag::skirmish-desk-css[] */
+/* The admin console. It is a tool for the people running the game, not part
+   of the game, so it looks like a desktop application: a light page, a side
+   bar, plain fields in one aligned column, flat buttons and charts. Nothing
+   here is wood or stone. admin/Desk.java builds every widget with these. */
+DeskForm, DeskPage, DeskTabs {
+    background-color: #f4f5f7;
+    padding: 0;
+    margin: 0;
+}
+
+DeskPage {
+    padding: 2mm 3mm;
+}
+
+DeskToolbar {
+    background-color: #1f2633;
+    padding: 1mm 2mm;
+}
+
+DeskTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: left;
+}
+
+DeskSide {
+    background-color: #e8eaee;
+    border-right: 0.2mm solid #d3d7de;
+    padding: 1mm 0;
+}
+
+DeskTab, DeskTab.selected, DeskTab.pressed {
+    background-color: transparent;
+    color: #3c4454;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    text-align: left;
+    border: none;
+    border-radius: 1mm;
+    padding: 1.4mm 2.5mm;
+    margin: 0.3mm 1mm;
+}
+
+DeskTab.selected {
+    background-color: #ffffff;
+    color: #1d4ed8;
+    font-family: "native:MainBold";
+}
+
+DeskSection {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0;
+    margin: 3mm 0 1.2mm 0;
+}
+
+DeskPanel, DeskCard, DeskChartBox {
+    background-color: #ffffff;
+    border: 0.2mm solid #d9dde3;
+    border-radius: 1.2mm;
+    padding: 2mm 2.5mm;
+    margin: 0.8mm;
+}
+
+DeskPanelTitle {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    padding: 0 0 0.6mm 0;
+    margin: 0;
+}
+
+DeskCardValue {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskCardName {
+    background-color: transparent;
+    color: #4a5263;
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskCardDetail, DeskHelp {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskHelpBox {
+    background-color: transparent;
+    padding: 0.8mm 0;
+    margin: 0;
+}
+
+DeskFieldRow {
+    background-color: transparent;
+    padding: 0.6mm 0;
+    margin: 0;
+}
+
+DeskLabel {
+    background-color: transparent;
+    color: #4a5263;
+    font-size: 2.7mm;
+    text-align: right;
+    padding: 1.2mm 2.5mm 1.2mm 0;
+    margin: 0;
+}
+
+DeskValue, DeskValueAlert {
+    background-color: transparent;
+    color: #1d2330;
+    font-size: 2.7mm;
+    padding: 1.2mm 0;
+    margin: 0;
+}
+
+DeskValueAlert {
+    color: #b42318;
+}
+
+DeskInput {
+    background-color: #ffffff;
+    border: 0.2mm solid #c4c9d2;
+    border-radius: 0.8mm;
+    color: #1d2330;
+    font-size: 2.7mm;
+    text-align: left;
+    padding: 1mm 1.4mm;
+    margin: 0 0.6mm 0 0;
+}
+
+DeskConditionRow {
+    background-color: transparent;
+    padding: 0.4mm 0;
+    margin: 0;
+}
+
+DeskActions {
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+DeskButton, DeskPrimary, DeskDanger {
+    background-color: #ffffff;
+    border: 0.2mm solid #c4c9d2;
+    border-radius: 0.8mm;
+    color: #1d2330;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    text-align: center;
+    padding: 1mm 2.5mm;
+    margin: 0 0 0 1mm;
+}
+
+DeskButton.pressed {
+    background-color: #e8eaee;
+}
+
+DeskPrimary {
+    background-color: #2563eb;
+    border: 0.2mm solid #1d4ed8;
+    color: #ffffff;
+    font-family: "native:MainBold";
+}
+
+DeskPrimary.pressed {
+    background-color: #1d4ed8;
+}
+
+DeskDanger {
+    color: #b42318;
+    border: 0.2mm solid #e4a39c;
+}
+
+DeskDanger.pressed {
+    background-color: #fdecea;
+}
+
+DeskLink {
+    background-color: transparent;
+    color: #1d4ed8;
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0;
+}
+
+DeskRow, DeskRowWarn, DeskRowAlert {
+    background-color: #ffffff;
+    border: 0.2mm solid #d9dde3;
+    border-radius: 1mm;
+    padding: 1.4mm 2mm;
+    margin: 0.5mm 0;
+}
+
+DeskRowWarn {
+    border-left: 1mm solid #f59e0b;
+}
+
+DeskRowAlert {
+    border-left: 1mm solid #dc2626;
+}
+
+DeskRowTitle {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+}
+
+DeskRowDetail {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.5mm;
+}
+
+DeskTableHeader, DeskTableRow {
+    background-color: #ffffff;
+    border-bottom: 0.2mm solid #e5e7eb;
+    padding: 0 1mm;
+    margin: 0;
+}
+
+DeskTableHeader {
+    background-color: #eef0f3;
+}
+
+DeskTableHead, DeskCell {
+    background-color: transparent;
+    color: #1d2330;
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0;
+}
+
+DeskTableHead {
+    color: #4a5263;
+    font-family: "native:MainBold";
+}
+
+DeskEmpty {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.7mm;
+    padding: 2mm 0;
+}
+
+DeskBadge, DeskBadgeOn {
+    background-color: #e5e7eb;
+    border-radius: 1mm;
+    color: #4a5263;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 0.4mm 1.5mm;
+    margin: 0;
+}
+
+DeskBadgeOn {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+/* The charts read their colours from these: the page, the grid lines and
+   the three series. */
+DeskChart {
+    background-color: #ffffff;
+    color: #4a5263;
+    padding: 0;
+    margin: 0;
+}
+
+DeskChartGrid {
+    color: #e2e5ea;
+}
+
+DeskChartA {
+    color: #2563eb;
+}
+
+DeskChartB {
+    color: #16a34a;
+}
+
+DeskChartC {
+    color: #f59e0b;
+}
+/* end::skirmish-desk-css[] */

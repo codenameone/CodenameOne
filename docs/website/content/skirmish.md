@@ -9,7 +9,7 @@ ShowToc: true
 
 Skirmish is a complete, full-stack real-time card battler in Java. Two players drop troops, buildings and spells onto a 3D field, and the first to topple the other's towers wins. Around the battle is everything a live game needs: accounts, decks, matchmaking, challenge links, replays, a training battle, levels, quests, chests, a shop and a console for moderating players. Use it to build your own game with Codename One, or to see how a Codename One app and server share one codebase.
 
-**[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/skirmish-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/skirmish)**
+**[Generate your project](/initializr/)** · **[Read the guide](/developer-guide/skirmish-implementors-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/skirmish)**
 
 In the Initializr, choose the **Skirmish** card-battler template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/skirmish/LICENSE): you can modify it, use it commercially and keep your changes private without royalties. The characters and buildings are KayKit models by Kay Lousberg, released under CC0.
 
@@ -35,8 +35,8 @@ The menus are ordinary Codename One components styled through CSS into carved wo
 ## From first run to customization
 
 1. **[Run the project](https://github.com/codenameone/CodenameOne/tree/master/scripts/skirmish#running-it).** The development profile needs nothing installed: an in-memory database, demo accounts and a simulated store, so you can play the bot, or a second simulator, straight away.
-2. **[Play every screen](/developer-guide/skirmish-users-guide/).** The user's guide walks through the training battle, the deck, battles, replays, the shop and the admin console.
-3. **[Make it your own](/developer-guide/skirmish-implementors-guide/).** The implementor's guide covers adding cards and their models, balancing, re-skinning, store products, ads, push and moderation.
+2. **[Tour the game](/developer-guide/skirmish-implementors-guide/).** The guide opens with a screen-by-screen tour of the training battle, the deck, battles, replays, the shop, the Forge and the admin console.
+3. **[Make it your own](/developer-guide/skirmish-implementors-guide/).** The same guide then covers adding cards and their models, balancing, re-skinning, store products, ads, push and moderation.
 
 ## What does a live game still need?
 

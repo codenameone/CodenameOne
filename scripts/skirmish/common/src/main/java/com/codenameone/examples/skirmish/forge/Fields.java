@@ -20,6 +20,7 @@ package com.codenameone.examples.skirmish.forge;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -46,6 +47,8 @@ public final class Fields {
         void set(boolean value);
     }
 
+    private static final float LABEL_MM = 20f;
+
     private Fields() {
     }
 
@@ -53,6 +56,9 @@ public final class Fields {
         Container c = new Container(new BorderLayout());
         c.setUIID("ForgeRow");
         Label l = new Label(label, "ForgeLabel");
+        // One label column: the fields of a form start at the same place
+        // unless a label is longer than the column.
+        l.setPreferredW(Math.max(l.getPreferredW(), CN.convertToPixels(LABEL_MM)));
         c.add(BorderLayout.WEST, l).add(BorderLayout.CENTER, input);
         return c;
     }

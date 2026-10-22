@@ -33,4 +33,7 @@ public interface MatchRecordRepository extends CrudRepository<MatchRecord, Strin
     List<MatchRecord> of(@Param("u") String username, PageRequest page);
 
     long countByEndedAtGreaterThan(long since);
+
+    @Query("select m from MatchRecord m where m.endedAt >= :since")
+    List<MatchRecord> since(@Param("since") long since);
 }

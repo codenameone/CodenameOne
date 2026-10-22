@@ -23,10 +23,14 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.skirmish.admin.Flags;
+import com.codenameone.examples.skirmish.api.ConditionDto;
+import com.codenameone.examples.skirmish.api.PipelineDto;
 import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.progress.Progression;
+import com.codenameone.examples.skirmish.social.Pipelines;
 import com.codenameone.examples.skirmish.social.Promotion;
 import java.io.IOException;
+import java.util.Arrays;
 
 /// The accounts a development server starts with: two players to challenge
 /// each other, one flagged player for the console to find, and an admin.
@@ -45,17 +49,19 @@ public class DemoAccounts {
     private final Progression progression;
     private final Config config;
     private final Promotion promotion;
+    private final Pipelines pipelines;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Flags flags, Progression progression, Config config,
-            Promotion promotion, @Value("${skirmish.admin.email:}") String adminEmail,
+            Promotion promotion, Pipelines pipelines, @Value("${skirmish.admin.email:}") String adminEmail,
             @Value("${skirmish.admin.password:}") String adminPassword) {
         this.accounts = accounts;
         this.flags = flags;
         this.progression = progression;
         this.config = config;
         this.promotion = promotion;
+        this.pipelines = pipelines;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
     }
@@ -82,6 +88,19 @@ public class DemoAccounts {
         if (banner == null || banner.length() == 0) {
             promotion.spotlight(ADMIN, new SpotlightDto("New: build your own levels in the Forge and share them",
                     "", "forge", 0L));
+        }
+        // Two pipelines to start from: one brings lapsed players back, the
+        // other (off until someone turns it on) rewards a keen player who has
+        // never bought anything.
+        if (pipelines.list().isEmpty()) {
+            pipelines.save(ADMIN, new PipelineDto(null, "Win back", true,
+                    Arrays.asList(new ConditionDto("daysAway", ">=", 7), new ConditionDto("battles", ">=", 1)),
+                    Pipelines.PUSH, "Your troops miss you", "A new season has started. Come back for a battle!",
+                    "battle", 0, 14, 0, 0L));
+            pipelines.save(ADMIN, new PipelineDto(null, "Keen, never paid", false,
+                    Arrays.asList(new ConditionDto("battles", ">=", 10), new ConditionDto("purchases", "=", 0)),
+                    Pipelines.GEMS, "A gift for you", "20 gems for your next chest. Thanks for playing!",
+                    "shop", 20, 30, 0, 0L));
         }
     }
 

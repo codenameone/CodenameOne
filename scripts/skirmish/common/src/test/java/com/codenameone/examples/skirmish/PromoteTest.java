@@ -23,9 +23,10 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Tabs;
 
-/// The console's Promote tab, in a desktop window: the numbers, a push
-/// broadcast counted against its audience, and a home spotlight that every
-/// player then sees.
+/// The console in a desktop window: the reports and their charts, a query
+/// over the players, the engagement pipelines and one opened for editing,
+/// then the Promote tab -- a push broadcast counted against its audience,
+/// and a home spotlight that every player then sees.
 public class PromoteTest extends E2e {
     @Override
     protected boolean desktop() {
@@ -38,10 +39,27 @@ public class PromoteTest extends E2e {
         waitForForm("home");
         click("adminButton");
         waitForForm("admin");
-        until(() -> has("stat-Open flags"), 20000, "the numbers");
+        until(() -> has("stat-Open flags") && has("chartPlayers"), 20000, "the numbers and the charts");
+        waitFor(800);
         shot("desktop-admin-overview");
-        onEdt(() -> ((Tabs) findByName("adminTabs")).setSelectedIndex(6));
-        until(() -> has("promoteTitle") && has("openAnalytics"), 20000, "the Promote tab");
+        reveal("chartGems");
+        shot("desktop-admin-reports");
+        tab(6);
+        until(() -> has("queryRun"), 20000, "the query tool");
+        click("queryRun");
+        until(() -> has("queryCount"), 20000, "the players the query found");
+        shot("desktop-admin-query");
+        tab(7);
+        until(() -> has("pipeline-Win back"), 20000, "the pipelines");
+        shot("desktop-admin-pipelines");
+        click("pipelineEdit-Win back");
+        until(() -> has("pipelineSave"), 20000, "the pipeline editor");
+        click("pipelineCountButton");
+        waitFor(1500);
+        shot("desktop-admin-pipeline-edit");
+        click("pipelineCancel");
+        tab(8);
+        until(() -> has("promoteTitle"), 20000, "the Promote tab");
         shot("desktop-admin-promote");
         type("promoteTitle", "Season two is here");
         type("promoteBody", "New arena, new cards. Come and battle!");
@@ -69,6 +87,11 @@ public class PromoteTest extends E2e {
         until(() -> has("spotlight"), 20000, "the spotlight banner");
         shot("desktop-home-spotlight");
         return true;
+    }
+
+    private void tab(final int index) {
+        onEdt(() -> ((Tabs) findByName("adminTabs")).setSelectedIndex(index));
+        waitFor(600);
     }
 
     private void reveal(final String name) {

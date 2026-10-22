@@ -37,7 +37,11 @@ import com.codenameone.examples.skirmish.api.LiveMatchDto;
 import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.api.PlayerDetailDto;
 import com.codenameone.examples.skirmish.api.PlayerDto;
+import com.codenameone.examples.skirmish.api.PipelineDto;
 import com.codenameone.examples.skirmish.api.PromoteDto;
+import com.codenameone.examples.skirmish.api.QueryDto;
+import com.codenameone.examples.skirmish.api.QueryResultDto;
+import com.codenameone.examples.skirmish.api.InsightsDto;
 import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.domain.Profile;
 import com.codenameone.examples.skirmish.domain.StorePurchase;
@@ -48,6 +52,8 @@ import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.StorePurchaseRepository;
 import com.codenameone.examples.skirmish.shop.Shop;
+import com.codenameone.examples.skirmish.social.Insights;
+import com.codenameone.examples.skirmish.social.Pipelines;
 import com.codenameone.examples.skirmish.social.Promotion;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,10 +73,14 @@ public class AdminEndpoint implements AdminApiServer {
 
     private final Forge forge;
     private final Promotion promotion;
+    private final Insights insights;
+    private final Pipelines pipelines;
 
     public AdminEndpoint(Accounts accounts, ProfileRepository profiles, MatchRecordRepository matches,
             StorePurchaseRepository purchases, Flags flags, Moderation moderation, Rooms rooms, Shop shop,
-            Forge forge, Promotion promotion) {
+            Forge forge, Promotion promotion, Insights insights, Pipelines pipelines) {
+        this.insights = insights;
+        this.pipelines = pipelines;
         this.forge = forge;
         this.promotion = promotion;
         this.accounts = accounts;
@@ -193,5 +203,35 @@ public class AdminEndpoint implements AdminApiServer {
     @Override
     public SpotlightDto spotlight(SpotlightDto body) throws Exception {
         return promotion.spotlight(Caller.name(), body);
+    }
+
+    @Override
+    public InsightsDto reports(int days) throws Exception {
+        return insights.report(days);
+    }
+
+    @Override
+    public QueryResultDto query(QueryDto body) throws Exception {
+        return insights.query(body);
+    }
+
+    @Override
+    public List<PipelineDto> pipelines() throws Exception {
+        return pipelines.list();
+    }
+
+    @Override
+    public PipelineDto savePipeline(PipelineDto body) throws Exception {
+        return pipelines.save(Caller.name(), body);
+    }
+
+    @Override
+    public PipelineDto deletePipeline(String id) throws Exception {
+        return pipelines.delete(Caller.name(), id);
+    }
+
+    @Override
+    public PipelineDto runPipeline(String id) throws Exception {
+        return pipelines.run(id);
     }
 }

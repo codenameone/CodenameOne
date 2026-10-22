@@ -17,13 +17,11 @@ Initializr generates when you start from the card-battler template.
 
 == Start here
 
-Two chapters of the developer guide cover this project:
+One chapter of the developer guide covers this project:
 
-* https://www.codenameone.com/developer-guide/#skirmish-users-guide[The user's guide]
-  (link:../../docs/developer-guide/Skirmish-Users-Guide.asciidoc[source]) shows
-  the game screen by screen, with the demo accounts.
-* https://www.codenameone.com/developer-guide/#skirmish-implementors-guide[The implementor's guide]
+* https://www.codenameone.com/developer-guide/#skirmish-implementors-guide[The Skirmish chapter]
   (link:../../docs/developer-guide/Skirmish-Implementors-Guide.asciidoc[source])
+  tours what the game does screen by screen, with the demo accounts, then
   explains how it is built and what to change to make it yours: new cards and
   their models, balance, the look, store products, ads, push and moderation.
 

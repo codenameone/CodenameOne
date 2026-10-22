@@ -19,12 +19,11 @@
 package com.codenameone.examples.skirmish.admin;
 
 import com.codename1.analytics.invite.Invite;
-import com.codename1.ui.CN;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
-import com.codename1.ui.layouts.GridLayout;
-import com.codenameone.examples.skirmish.AppConfig;
+import com.codename1.ui.Label;
 import com.codenameone.examples.skirmish.api.BroadcastDto;
 import com.codenameone.examples.skirmish.api.InviterDto;
 import com.codenameone.examples.skirmish.api.PromoteDto;
@@ -38,11 +37,11 @@ import java.util.Date;
 
 /// The console's Promote tab: how a game developer brings players in and back.
 ///
-/// Nothing here is a home-grown metric. Engagement, retention, the invite
-/// funnel and revenue per campaign are what the app reports through Codename
-/// One analytics, and are read in the Codename One console, which the first
-/// button opens. The server's numbers below are the game's own economy: who
-/// joined through an invite and who was paid for it.
+/// The reports, the query tool and the pipelines have pages of their own;
+/// this one is the hand-sent side. The numbers here are the game's own
+/// economy: who joined through an invite and who was paid for it. Behaviour
+/// inside the app, and what each campaign brought back, is in Codename One
+/// analytics.
 ///
 /// - **Broadcast** sends a Codename One push to a segment of players, with the
 ///   screen a tap opens and a campaign name. The app reports the tap under
@@ -56,10 +55,10 @@ final class PromoteTab {
     private static final String[] SEGMENTS = {"all", "lapsed", "new", "invited"};
     private static final String[] SEGMENT_NAMES = {"Everyone", "Away for a while", "Joined recently",
         "Came through an invite"};
-    private static final String[] SCREENS = {"", "shop", "forge", "friends", "deck", "battle"};
-    private static final String[] SCREEN_NAMES = {"Home", "Shop", "Forge", "Friends", "Deck", "Battle"};
+    static final String[] SCREENS = {"", "shop", "forge", "friends", "deck", "battle"};
+    static final String[] SCREEN_NAMES = {"Home", "Shop", "Forge", "Friends", "Deck", "Battle"};
 
-    private final Container col;
+    private final Container col = Desk.page();
     private String segment = SEGMENTS[0];
     private int days = 7;
     private String title = "";
@@ -71,8 +70,8 @@ final class PromoteTab {
     private String spotScreen = "";
     private String linkCampaign = "launch";
 
-    PromoteTab(Container col) {
-        this.col = col;
+    PromoteTab() {
+        col.setName("promote");
     }
 
     Container column() {
@@ -85,57 +84,53 @@ final class PromoteTab {
 
     private void show(PromoteDto p) {
         col.removeAll();
-        col.add(Ui.label("Engagement", "SectionTitle"));
-        col.add(Fields.help("Daily players, retention, the invite funnel and revenue per campaign are reported by "
-                + "the app through Codename One analytics."));
-        col.add(Ui.wood("Open Codename One analytics", "openAnalytics",
-                e -> CN.execute(AppConfig.ANALYTICS_CONSOLE)));
-        Container numbers = new Container(new GridLayout(2, 2));
-        numbers.add(AdminConsole.stat("Players", p.players()));
-        numbers.add(AdminConsole.stat("New", p.joinedThisWeek()));
-        numbers.add(AdminConsole.stat("Invited", p.invited()));
-        numbers.add(AdminConsole.stat("Played", p.invitedPlayed()));
-        col.add(numbers);
-        col.add(Fields.help("New: joined in the last seven days. Invited: joined through a friend's link. "
-                + "Played: of those, played a battle."));
-        if (!p.inviters().isEmpty()) {
-            col.add(Ui.label("Top inviters", "SectionTitle"));
-            for (InviterDto i : p.inviters()) {
-                col.add(Ui.label(i.displayName() + ": " + i.joined() + " joined, " + i.played() + " played",
-                        "ForgeHelp"));
-            }
-        }
         broadcastComposer();
         if (!p.broadcasts().isEmpty()) {
-            col.add(Ui.label("Sent", "SectionTitle"));
+            col.add(Desk.section("Sent"));
+            col.add(Desk.tableRow(true, "Title", "Campaign", "Players", "Sent"));
+            SimpleDateFormat fmt = new SimpleDateFormat("MMM d, HH:mm");
             for (BroadcastDto b : p.broadcasts()) {
-                col.add(Ui.label(b.title() + " (" + b.campaign() + ")", "ForgeLabel"));
-                col.add(Ui.label(b.targets() + " players, " + b.segment() + ", by " + b.sentBy() + ", "
-                        + new Date(b.sentAt()), "ForgeHelp"));
+                col.add(Desk.tableRow(false, b.title(), b.campaign(), String.valueOf(b.targets()),
+                        fmt.format(new Date(b.sentAt()))));
             }
         }
         spotlightEditor(p.spotlight());
         campaignLink();
+        col.add(Desk.section("Invitations"));
+        col.add(Desk.cards(AdminConsole.wide() ? 4 : 2,
+                Desk.card("Players", String.valueOf(p.players()), null),
+                Desk.card("New this week", String.valueOf(p.joinedThisWeek()), null),
+                Desk.card("Invited", String.valueOf(p.invited()), "joined through a link"),
+                Desk.card("Played", String.valueOf(p.invitedPlayed()), "of those, fought a battle")));
+        if (!p.inviters().isEmpty()) {
+            col.add(Desk.tableRow(true, "Top inviters", "Joined", "Played"));
+            for (InviterDto i : p.inviters()) {
+                col.add(Desk.tableRow(false, i.displayName(), String.valueOf(i.joined()), String.valueOf(i.played())));
+            }
+        }
         col.revalidate();
     }
 
     private void broadcastComposer() {
-        col.add(Ui.label("Broadcast a push", "SectionTitle"));
-        col.add(Fields.choice("To", "promoteSegment", SEGMENT_NAMES, Fields.indexOf(SEGMENTS, segment),
-                i -> segment = SEGMENTS[i]));
-        col.add(Fields.stepper("Days", "promoteDays", days, 1, 365, 1, "",
-                v -> days = v));
-        col.add(Fields.text("Title", "promoteTitle", title, 60, v -> title = v));
-        col.add(Fields.area("Message", "promoteBody", body, 200, v -> body = v));
-        col.add(Fields.choice("Opens", "promoteScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, screen),
-                i -> screen = SCREENS[i]));
-        col.add(Fields.text("Campaign", "promoteCampaign", campaign, 40, v -> campaign = v));
-        col.add(Fields.help("Days counts back from today: how long a lapsed player has been away, or how "
-                + "recently a new one joined. The campaign names this push in analytics."));
-        col.add(Ui.row(
-                Ui.stone("Count players", "promoteCount", e -> Api.admin().audience(draft(), Net.to(
+        col.add(Desk.section("Broadcast a push"));
+        Container form = Desk.panel();
+        form.add(Desk.field("To", Desk.choice("promoteSegment", SEGMENT_NAMES, Fields.indexOf(SEGMENTS, segment),
+                i -> segment = SEGMENTS[i])));
+        form.add(Desk.field("Days", Desk.number("promoteDays", days, v -> days = v)));
+        form.add(Desk.field("Title", Desk.text("promoteTitle", title, "Season two is here", 60, v -> title = v)));
+        form.add(Desk.field("Message", Desk.area("promoteBody", body, 200, v -> body = v)));
+        form.add(Desk.field("Opens", Desk.choice("promoteScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, screen),
+                i -> screen = SCREENS[i])));
+        form.add(Desk.field("Campaign", Desk.text("promoteCampaign", campaign, "season-two", 40,
+                v -> campaign = v)));
+        form.add(Desk.help("Days counts back from today: how long a lapsed player has been away, or how "
+                + "recently a new one joined. The campaign names this push in analytics. For a push that goes "
+                + "out by itself whenever a player qualifies, make a pipeline."));
+        form.add(Desk.actions(
+                Desk.button("Count players", "promoteCount", e -> Api.admin().audience(draft(), Net.to(
                         b -> Ui.later(() -> Ui.toast(b.targets() + " players would get this")), Ui::failed))),
-                Ui.wood("Send", "promoteSend", e -> send())));
+                Desk.primary("Send", "promoteSend", e -> send())));
+        col.add(form);
     }
 
     private BroadcastDto draft() {
@@ -168,25 +163,30 @@ final class PromoteTab {
             spotPack = current.packId() == null ? "" : current.packId();
             spotScreen = current.screen() == null ? "" : current.screen();
         }
-        col.add(Ui.label("Home spotlight", "SectionTitle"));
-        col.add(Fields.text("Banner", "spotlightText", spotText, 140, v -> spotText = v));
-        col.add(Fields.text("Forge pack", "spotlightPack", spotPack, 40, v -> spotPack = v));
-        col.add(Fields.choice("Opens", "spotlightScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, spotScreen),
-                i -> spotScreen = SCREENS[i]));
-        col.add(Fields.help("Shown at the top of every player's home screen. A pack id wins over the "
+        col.add(Desk.section("Home spotlight"));
+        Container form = Desk.panel();
+        form.add(Desk.field("Banner", Desk.text("spotlightText", spotText, "", 140, v -> spotText = v)));
+        form.add(Desk.field("Forge pack", Desk.text("spotlightPack", spotPack, "pack id", 40, v -> spotPack = v)));
+        form.add(Desk.field("Opens", Desk.choice("spotlightScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, spotScreen),
+                i -> spotScreen = SCREENS[i])));
+        form.add(Desk.help("Shown at the top of every player's home screen. A pack id wins over the "
                 + "screen. Save an empty banner to take it down."));
-        col.add(Ui.stone("Save spotlight", "spotlightSave", e -> Api.admin().spotlight(
+        form.add(Desk.actions(Desk.primary("Save spotlight", "spotlightSave", e -> Api.admin().spotlight(
                 new SpotlightDto(spotText.trim(), spotPack.trim(), spotScreen, 0L),
-                Net.to(saved -> Ui.later(() -> Ui.toast("Spotlight saved")), Ui::failed))));
+                Net.to(saved -> Ui.later(() -> Ui.toast("Spotlight saved")), Ui::failed)))));
+        col.add(form);
     }
 
     private void campaignLink() {
-        col.add(Ui.label("Campaign link", "SectionTitle"));
-        col.add(Fields.text("Campaign", "linkCampaign", linkCampaign, 40, v -> linkCampaign = v));
-        col.add(Fields.help("An invite link for an advert, a post or a newsletter. It opens the store for "
+        col.add(Desk.section("Campaign link"));
+        Container form = Desk.panel();
+        form.add(Desk.field("Campaign", Desk.text("linkCampaign", linkCampaign, "launch", 40,
+                v -> linkCampaign = v)));
+        form.add(Desk.help("An invite link for an advert, a post or a newsletter. It opens the store for "
                 + "anyone without the game, and the players it brings in are reported under its campaign."));
         final Container shown = new Container();
-        col.add(Ui.stone("Make link", "linkMake", e -> {
+        form.add(shown);
+        form.add(Desk.actions(Desk.primary("Make link", "linkMake", e -> {
             String name = linkCampaign.trim();
             if (name.length() == 0) {
                 Ui.toast("Name the campaign first");
@@ -195,11 +195,11 @@ final class PromoteTab {
             Invite link = Friends.campaignLink(name);
             Display.getInstance().copyToClipboard(link.getUrl());
             shown.removeAll();
-            shown.add(Ui.text(link.getUrl(), "ChallengeUrl"));
+            shown.add(Desk.field("Link", new Label(link.getUrl(), "DeskValue")));
             Ui.toast("Link copied");
             col.revalidate();
-        }));
-        col.add(shown);
+        })));
+        col.add(form);
     }
 }
 // end::skirmish-promote-tab[]

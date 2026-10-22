@@ -39,6 +39,133 @@ then open it and run it on a simulator or a device from Xcode:
 include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-ios,indent=0]
 ----
 
+The development profile needs nothing installed, and four demo accounts exist, each
+with the password `skirmish-demo`:
+
+[cols="1,3"]
+|===
+| Account | What it's for
+
+| `player@skirmish.example`
+| A player with some history: level 3, two chests waiting and a daily quest
+  ready to claim.
+
+| `rival@skirmish.example`
+| A second player, to battle the first from another simulator or device.
+
+| `trouble@skirmish.example`
+| A player the server has already flagged, so the console has something to
+  review.
+
+| `admin@skirmish.example`
+| The operator. Signs in to the same app and gets the admin console as well.
+|===
+
+[[skirmish-tour]]
+=== What the sample does
+
+This tour follows a player through the app, with a pointer to the section that
+explains how each part is built.
+
+==== Signing in
+
+The first screen offers to sign in, to create an account, or to practice against
+the bot without one. A new account picks a battle name, which is what opponents
+and the leaderboard see.
+
+image::img/skirmish-register-name.png["Creating an account: three heroes above a field for the battle name, its preview, and fields for e-mail and password",scaledwidth=40%]
+
+image::img/skirmish-signin.png["The sign-in screen: three heroes above the name Skirmish, fields for e-mail and password, and buttons to sign in, create an account or practice",scaledwidth=40%]
+
+A new player goes straight into the training battle, described in
+<<skirmish-training>>.
+
+==== The home screen
+
+The home screen shows the player's progress at a glance: level and how close the
+next one is, coins, gems and trophies, the hero of the deck, the *BATTLE* button,
+chests, today's quests and the deck.
+
+image::img/skirmish-home.png["The home screen: avatar, level and experience bar, the hero on stage, the BATTLE button, the chest slots and the daily quests",scaledwidth=40%]
+
+* Chests are earned by winning and by levelling up. A tap opens one.
+* Daily quests change every day. Three are picked for each player, and a
+  finished one is claimed with *Claim*.
+* Achievements are long-term goals with gem rewards, listed in the *Trophies*
+  room.
+
+Every reward is shown in a popup with the player's hero cheering. The server
+decides every part of it, as <<skirmish-progression>> shows.
+
+image::img/skirmish-reward-levelup.png["A reward popup: Training complete, a level-up badge, coins, gems, experience and a chest, and the achievement unlocked",scaledwidth=40%]
+
+==== The deck
+
+A deck is eight cards, and the battle hand is four of them at a time, with the
+next card waiting. *Deck* shows every card with its elixir cost, and the eight in
+use are framed in gold. A tap swaps a card in or out.
+
+image::img/skirmish-deck.png["The deck screen: ten card portraits, eight of them framed in gold, the deck's average elixir cost and a button to save it",scaledwidth=40%]
+
+==== Battle
+
+A battle lasts three minutes. Each side has a king's castle and two archer
+towers. Toppling a tower wins a crown, and toppling the castle wins outright. When
+the clock runs out, the side with more crowns wins. A tie goes to a minute of
+overtime where the next crown wins, and is a draw if nobody scores. Elixir comes
+twice as fast in the last minute of regular time.
+
+image::img/skirmish-battle.png["A battle: the field with the river and two bridges, both sides' towers, troops on the left lane, and the hand of cards under the elixir bar",scaledwidth=40%]
+
+Elixir fills the bar at the bottom, one drop at a time up to ten. A card is played
+by tapping it and then the field, or by dragging it there. Troops and buildings go
+on the player's own side of the river, and spells go anywhere. Troops walk to the
+nearest bridge and attack the first thing in their way.
+
+The result screen follows, with the crowns, trophies and coins won. From there a
+player can watch the replay, report the opponent, or watch a sponsored video for
+extra coins.
+
+image::img/skirmish-result.png["The result screen: Victory, the crown count, and buttons to watch an ad for coins and to continue",scaledwidth=40%]
+
+==== Finding an opponent
+
+*BATTLE* puts the player in a queue that pairs players with similar trophy counts
+and falls back to the bot if nobody is found. During an online battle, the buttons
+under the hand send a quick emote to the opponent. <<skirmish-referee>> explains
+how the two phones stay in step.
+
+image::img/skirmish-online-battle.png["An online battle against the bot, with the emote buttons GG, Wow!, Oops and Thanks under the hand",scaledwidth=40%]
+
+*Practice* plays the bot straight away and earns nothing. *Challenge* makes a code
+and a link to send a friend, and opening the link starts the friend's app straight
+into the battle.
+
+==== Replays
+
+Every online battle is kept, and *Replays* lists them. Any signed-in player can
+watch any battle, with both players' names. A replay isn't a recording. It's the
+starting state and every card played, run again through the same rules. The viewer
+pauses, plays at two or four times speed, and a slider jumps to any moment.
+
+image::img/skirmish-replay.png["The replay viewer showing a battle in progress with play, pause and speed controls",scaledwidth=40%]
+
+==== The shop and settings
+
+The shop sells gems for real money, and cosmetic items for gems: arenas, emote
+sets and a season pass. Purchases go through the platform's store, and the server
+checks every receipt before granting anything, as <<skirmish-purchases>> shows. On
+the development profile the store is simulated, so a purchase completes
+immediately.
+
+image::img/skirmish-shop.png["The shop: gem packs with prices, and cosmetic items with their gem cost",scaledwidth=40%]
+
+*Settings* renames the player, and switches the sound, push notifications and
+sharing anonymous usage statistics on or off. The server address can be changed
+here too, which is how the app reaches a server on another machine.
+
+image::img/skirmish-settings.png["The settings screen with the battle name, sound, notification and privacy switches, and the server address",scaledwidth=40%]
+
 === The modules
 
 [cols="1,3"]
@@ -129,6 +256,7 @@ Changing what any card does changes the outcome of recorded battles. Bump
 `RulesVersion.ID` with it: each replay records the version it was played under, and
 `GoldenReplayTest` fails until the golden replays are recorded again.
 
+[[skirmish-referee]]
 === The server is the referee
 
 An online battle is played in lockstep. Neither phone decides anything: each sends
@@ -159,6 +287,9 @@ The battle is a `com.codename1.gaming` 3D scene, and only the renderer knows abo
 it. When the match is over, `BattleView` swings the camera around the field and
 down beside the fallen castle before the result screen appears:
 
+image::img/skirmish-finale-sweep.png["Halfway through the finishing camera sweep, the field seen from the side",scaledwidth=40%]
+image::img/skirmish-finale.png["The camera's final view, low beside the enemy castle",scaledwidth=40%]
+
 [source,java,role=cn1-no-try]
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/BattleView.java[tag=skirmish-finale,indent=0]
@@ -167,6 +298,7 @@ include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/sk
 Particle effects and the camera are cosmetic: they read the match and never
 change it, so they can be changed without touching a replay.
 
+[[skirmish-progression]]
 === Progression
 
 Levels, experience, chests, daily quests and achievements are all decided on the
@@ -203,6 +335,7 @@ The characters and buildings are glTF files in `common/src/main/resources`. They
 KayKit models, packed from the original downloads by `tools/pack-models.py`; any
 rigged glTF character with the same animation names can replace one.
 
+[[skirmish-purchases]]
 === Purchases
 
 The shop sells gems through the platform's store. The app's `Store` starts the
@@ -276,6 +409,30 @@ include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/s
 Every action an operator takes goes through `Moderation`, which records it with its
 reason and removes a suspended or banned player from any battle they're in.
 
+The admin account sees *Admin console* on the home screen. Its tabs are:
+
+image::img/skirmish-admin-overview.png["The admin console's overview: players online, matches today, purchases and gems sold",scaledwidth=40%]
+
+* *Overview* counts players online, matches and purchases.
+* *Live matches* lists the battles being played, and any of them can be watched
+  as it happens.
+* *Flags* lists reports from players and signals the server raises on its own: a
+  player who keeps leaving matches, whose game state keeps diverging from the
+  server's, or who floods it with invalid plays.
+* *Players* finds an account by name or e-mail and shows its matches, purchases
+  and moderation history.
+* *Promote* is where the game is marketed, as described in the next section.
+* *Forge* lists reported and hidden packs, and the models and images players
+  uploaded.
+
+image::img/skirmish-admin-flags.png["The flags tab: a report and an automatic flag, each with the reason and the match it came from",scaledwidth=40%]
+
+An operator can warn, mute, suspend or ban a player, reset their trophies or
+revoke purchased items, and the history of actions sits beside the player's
+numbers.
+
+image::img/skirmish-admin-player.png["A player in the console, with their numbers, the moderation buttons and the history of actions",scaledwidth=40%]
+
 === Inviting friends and promoting the game
 
 Growth uses what Codename One already has, and the game counts nothing of its
@@ -294,6 +451,11 @@ installed app or went through the store first:
 ----
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Friends.java[tag=skirmish-invites,indent=0]
 ----
+
+The *Friends* screen shows the player's invite code and what an invitation pays,
+and its *Invite friends* button opens the share sheet. A friend who opens the link
+starts with extra coins, and the screen lists everyone who joined through the
+player's link and whether they have played yet.
 
 From then on, everything the friend's app reports through Codename One
 analytics carries the campaign and the referrer, so the invite funnel,
@@ -462,12 +624,32 @@ who've launched the game five times over three days, never more than once a
 month, and only after a win. A low score goes to feedback rather than the
 store. Tune those numbers in `Skirmish.runApp`.
 
+[[skirmish-training]]
 === The training battle
 
 `Tutorial` is a script of steps run over an ordinary practice battle. Each step
 freezes the clock, shows Elda's line and, if it asks for something, the finger and
 the one card that can be played. Changing the lesson means changing the list of
 steps.
+
+The mentor, Elda, explains one idea at a time while the clock is frozen: the red
+towers are the targets, cards cost elixir, and elixir refills by itself. Then she
+asks for something and a finger shows how. It points at the card to pick, then
+slides from the card to the spot to drop it, and only that card can be picked
+while she's teaching it.
+
+image::img/skirmish-tutorial-welcome.png["The training battle with Elda's speech bubble welcoming the player and a Next button",scaledwidth=40%]
+
+image::img/skirmish-tutorial-pick.png["A finger pointing at the Squire card in the hand while Elda asks the player to pick it up",scaledwidth=40%]
+image::img/skirmish-tutorial-drag.png["The finger dragging from the hand to a glowing circle by the left bridge",scaledwidth=40%]
+
+The lesson covers attacking, defending when the enemy sends troops, and throwing
+a spell at a tower. Finishing the battle against a slow opponent pays once: coins,
+experience, a chest and the first achievement. A player can replay the lesson from
+*How to play* on the home screen.
+
+image::img/skirmish-tutorial-defend.png["Elda warning that enemies are coming and asking the player to pick the Twin Archers",scaledwidth=40%]
+image::img/skirmish-tutorial-spell.png["The finger dragging the Fire Orb spell toward the red tower",scaledwidth=40%]
 
 The app can also drive itself through its own screens: `Tour` signs in, collects
 rewards, visits the deck and plays a battle, which is how the promotional video is
@@ -483,6 +665,61 @@ the same model: `Arena.CLASSIC` and the built-in cards describe the field and
 the cards the battle always had, so the golden replays still pass. A mission is
 played by `MissionRun`, which builds a `Match` from the pack's arena and cards,
 plays the scripted waves and the bot, and decides the stars.
+
+The Forge is the game's own level editor, in the same app on every platform.
+Players build packs of new cards, arenas, missions and campaigns, share them with
+a link, and play what others made. The game's designers use the same editor: a
+pack an operator marks official appears first, for everyone. *Forge* on the home
+screen lists the packs. *Official* comes with the game, *Popular* and *New* are
+what players published, and *Yours* holds a player's own drafts and packs.
+
+image::img/skirmish-forge-home.png["The Forge: tabs for official, popular, new and the player's own packs, a Create a pack button and the official campaign",scaledwidth=40%]
+
+==== Playing a pack
+
+A pack shows its campaigns, each a list of missions that open one after another,
+and the stars won in each. A mission can be anything the author wrote: hold the
+castle for two minutes, win three crowns against waves of enemies, or beat a bot
+with a fixed deck. Its story is told during the battle, and a line that stops the
+clock waits for *Next*, the way the training battle does.
+
+A mission pays up to three stars. The first is for winning, and the second and
+third are for what the author asked, such as keeping towers standing or winning
+before a set second. Rewards come once per star, and the server plays every
+mission again before it believes the stars, as <<skirmish-forge-verify>> shows.
+
+image::img/skirmish-forge-pack.png["An official pack: its campaign with the first mission open and the others locked, and buttons to share, copy the link, remix, rate or report",scaledwidth=40%]
+image::img/skirmish-forge-mission-story.png["A mission under way, with Elda telling the story in a bubble and a Next button",scaledwidth=40%]
+
+*Share* sends a link that opens the pack in the app, and *Remix* copies a pack
+into a new one of the player's own to change.
+
+==== Making a pack
+
+*Create a pack* starts one with a single mission against the bot, ready to play.
+The pack editor lists its cards, arenas, missions and campaigns, shows any problem
+that would stop it from being published, and saves a draft that only its author
+sees until *Publish*.
+
+image::img/skirmish-forge-editor.png["The pack editor: the name and description, then sections for cards, arenas, missions and campaigns, each with a button to add one",scaledwidth=40%]
+
+* Cards start from any card in the game and change its cost, hit points, damage,
+  speed, range, targets and what it spawns. A card can look like any of the
+  game's characters, or like a rigged glTF model imported from a `.glb` file,
+  with its animations matched to walking, attacking and dying on a turntable
+  preview. An imported model is visible to the author and to anyone they share
+  the pack with straight away, and to everyone once a moderator has approved it.
+* Arenas are drawn on a grid: castles, towers, rocks and trees placed with a
+  tap, mirrored to the enemy's half as they're placed, on a field of any size
+  with one to three lanes and a frost or desert theme.
+* Missions pick an arena, the goal, the length of the battle, each side's elixir
+  and deck, the waves of enemies that arrive at set seconds, the lines of the
+  story, the stars and the reward. *Test play* plays the mission at once.
+* Campaigns put missions in order, with a story before the first and after the
+  last.
+
+image::img/skirmish-forge-card.png["The card editor: a turntable preview of the character with Walk, Attack and Idle buttons, and fields for the name, kind, elixir and hit points",scaledwidth=40%]
+image::img/skirmish-forge-arena.png["The arena editor: tools for the king, towers, rocks and trees above the field, with both castles and the river drawn on the grid",scaledwidth=40%]
 
 ==== Limits
 
@@ -500,6 +737,7 @@ An uploaded model is checked by `GlbInspector` on the server: the size, the
 by its SHA-256 and waits in the console's *Forge* tab until a moderator approves
 it.
 
+[[skirmish-forge-verify]]
 ==== Results are played again
 
 The app plays a mission locally and sends its replay. The replay names the pack,

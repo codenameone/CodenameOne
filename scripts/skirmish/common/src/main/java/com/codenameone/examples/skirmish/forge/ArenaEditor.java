@@ -25,6 +25,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.skirmish.battle.Art;
 import com.codenameone.examples.skirmish.rules.Arena;
@@ -42,6 +43,9 @@ import java.util.List;
 /// is switched off. The river always crosses the middle.
 public final class ArenaEditor {
     private static final String[] TOOLS = {"King", "Tower", "Rock", "Tree", "Erase"};
+    /// An icon over a short word: five words side by side do not fit a phone.
+    private static final char[] TOOL_ICONS = {FontImage.MATERIAL_CASTLE, FontImage.MATERIAL_FORT,
+        FontImage.MATERIAL_LANDSCAPE, FontImage.MATERIAL_PARK, FontImage.MATERIAL_BACKSPACE};
     private static final String[] THEMES = {"meadow", "frost", "desert"};
     private static final int HALF = Arena.TILE / 2;
 
@@ -154,13 +158,16 @@ public final class ArenaEditor {
         final com.codename1.ui.Button[] buttons = new com.codename1.ui.Button[TOOLS.length];
         for (int i = 0; i < TOOLS.length; i++) {
             final int t = i;
-            buttons[i] = Ui.button(TOOLS[i], i == tool ? "ForgeTabOn" : "ForgeTab", "tool-" + TOOLS[i], e -> {
+            buttons[i] = Ui.button(TOOLS[i], i == tool ? "ForgeToolOn" : "ForgeTool", "tool-" + TOOLS[i], e -> {
                 tool = t;
                 for (int j = 0; j < buttons.length; j++) {
-                    buttons[j].setUIID(j == t ? "ForgeTabOn" : "ForgeTab");
+                    buttons[j].setUIID(j == t ? "ForgeToolOn" : "ForgeTool");
+                    FontImage.setMaterialIcon(buttons[j], TOOL_ICONS[j], 4);
                 }
                 buttons[t].getParent().revalidate();
             });
+            FontImage.setMaterialIcon(buttons[i], TOOL_ICONS[i], 4);
+            buttons[i].setTextPosition(com.codename1.ui.Component.BOTTOM);
             tools.add(buttons[i]);
         }
         f.add(tools);

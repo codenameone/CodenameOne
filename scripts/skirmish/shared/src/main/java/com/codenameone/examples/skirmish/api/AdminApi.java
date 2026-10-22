@@ -87,4 +87,27 @@ public interface AdminApi {
 
     @POST("/api/admin/promote/spotlight")
     void spotlight(@Body SpotlightDto spotlight, OnComplete<Response<SpotlightDto>> callback);
+
+    /// Daily players, new accounts, battles and sales over the last `days`,
+    /// with the funnel, retention and trophy bands.
+    @GET("/api/admin/reports")
+    void reports(@Query("days") int days, OnComplete<Response<InsightsDto>> callback);
+
+    /// The players matching every condition, counted, with the first of them.
+    @POST("/api/admin/query")
+    void query(@Body QueryDto query, OnComplete<Response<QueryResultDto>> callback);
+
+    @GET("/api/admin/pipelines")
+    void pipelines(OnComplete<Response<List<PipelineDto>>> callback);
+
+    /// Creates a pipeline (no id) or replaces one.
+    @POST("/api/admin/pipelines")
+    void savePipeline(@Body PipelineDto pipeline, OnComplete<Response<PipelineDto>> callback);
+
+    @POST("/api/admin/pipelines/{id}/delete")
+    void deletePipeline(@Path("id") String id, OnComplete<Response<PipelineDto>> callback);
+
+    /// Runs a pipeline now instead of waiting for the hour.
+    @POST("/api/admin/pipelines/{id}/run")
+    void runPipeline(@Path("id") String id, OnComplete<Response<PipelineDto>> callback);
 }

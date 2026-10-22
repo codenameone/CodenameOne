@@ -127,4 +127,50 @@ class SocialTest {
         assertEquals("The Border War campaign is here", banner.get("text"));
         assertEquals("border-war", banner.get("packId"));
     }
+
+    @Test
+    void reportsAndTheQueryToolReadTheGamesOwnRecords() throws Exception {
+        Map report = Api.json(mvc, admin(get("/api/admin/reports?days=14")));
+        assertEquals(14, ((List) report.get("joined")).size());
+        assertEquals(14, ((List) report.get("active")).size());
+        List funnel = (List) report.get("funnel");
+        assertEquals("Joined", ((Map) funnel.get(0)).get("name"));
+        assertTrue(Api.number((Map) funnel.get(0), "count") >= 4, "the demo accounts at least");
+        assertEquals(3, ((List) report.get("retention")).size());
+
+        Map all = Api.json(mvc, admin(Api.body(post("/api/admin/query"),
+                "{\"conditions\":[{\"field\":\"trophies\",\"op\":\">=\",\"value\":0}]}")));
+        assertTrue(Api.number(all, "count") >= 4);
+        Map none = Api.json(mvc, admin(Api.body(post("/api/admin/query"),
+                "{\"conditions\":[{\"field\":\"trophies\",\"op\":\">\",\"value\":1000000}]}")));
+        assertEquals(0, Api.number(none, "count"));
+        assertEquals(400, Api.statusOf(mvc, admin(Api.body(post("/api/admin/query"),
+                "{\"conditions\":[{\"field\":\"password\",\"op\":\"=\",\"value\":1}]}"))));
+        assertEquals(403, Api.statusOf(mvc, Api.as(get("/api/admin/reports?days=7"), DemoAccounts.PLAYER)));
+    }
+
+    @Test
+    void aPipelineActsOnceAPlayerPerCoolDown() throws Exception {
+        assertTrue(Api.list(mvc, admin(get("/api/admin/pipelines"))).size() >= 2, "the two the server starts with");
+        assertEquals(400, Api.statusOf(mvc, admin(Api.body(post("/api/admin/pipelines"),
+                "{\"name\":\"Everyone\",\"enabled\":true,\"conditions\":[],\"action\":\"push\","
+                        + "\"title\":\"Hi\",\"body\":\"Hello\",\"screen\":\"\",\"cooldownDays\":1}"))),
+                "a pipeline for everyone is a broadcast");
+        long before = Api.number((Map) Api.json(mvc, admin(get("/api/admin/players/" + DemoAccounts.PLAYER)))
+                .get("player"), "gems");
+        Map saved = Api.json(mvc, admin(Api.body(post("/api/admin/pipelines"),
+                "{\"name\":\"Gift\",\"enabled\":false,\"conditions\":[{\"field\":\"trophies\","
+                        + "\"op\":\">=\",\"value\":0}],\"action\":\"gems\",\"title\":\"A gift\","
+                        + "\"body\":\"Five gems\",\"screen\":\"shop\",\"amount\":5,\"cooldownDays\":30}")));
+        String id = (String) saved.get("id");
+        Map first = Api.json(mvc, admin(post("/api/admin/pipelines/" + id + "/run")));
+        long reached = Api.number(first, "reached");
+        assertTrue(reached >= 4);
+        Map player = (Map) Api.json(mvc, admin(get("/api/admin/players/" + DemoAccounts.PLAYER))).get("player");
+        assertEquals(before + 5, Api.number(player, "gems"));
+        Map again = Api.json(mvc, admin(post("/api/admin/pipelines/" + id + "/run")));
+        assertEquals(reached, Api.number(again, "reached"), "nobody twice within the cool-down");
+        Api.json(mvc, admin(post("/api/admin/pipelines/" + id + "/delete")));
+        assertEquals(404, Api.statusOf(mvc, admin(post("/api/admin/pipelines/" + id + "/run"))));
+    }
 }
