@@ -86,6 +86,7 @@ FULL_STACK = {
     'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
+    'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
 }
 
 

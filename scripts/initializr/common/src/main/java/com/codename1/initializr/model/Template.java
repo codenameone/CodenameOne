@@ -70,7 +70,16 @@ public enum Template {
             "com.codenameone.examples.skirmish", "Skirmish", "/skirmish-preview.jpg",
             "The card-battle template is an app, a server and the modules they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/skirmish-modules.zip", "/skirmish-settings.properties");
+            new String[0], "/skirmish-modules.zip", "/skirmish-settings.properties"),
+    // The same kind of template as WAYLINE: an end-to-end encrypted messaging app
+    // (chats, groups, media, calls) and its server. It is the project in
+    // scripts/parley, and its resources come from
+    // `scripts/sync-initializr-template.py parley`.
+    PARLEY(false, "/parley-src.zip", "/parley-css.zip", "/parley-pom.xml",
+            "com.codenameone.examples.parley", "Parley", "/parley-preview.jpg",
+            "The messaging template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/parley-modules.zip", "/parley-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.

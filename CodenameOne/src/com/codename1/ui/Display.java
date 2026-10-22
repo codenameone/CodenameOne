@@ -6539,6 +6539,17 @@ public final class Display extends CN1Constants {
         return impl.getCallBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.webrtc` API to carry call media,
+    /// or null when unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.webrtc` package rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the WebRTC bridge, or null
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return impl.getWebRtcBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.vpn` API to manage VPN
     /// configurations, or null when unsupported on this port. Internal -- application code uses
     /// the `com.codename1.vpn` packages rather than this bridge directly.

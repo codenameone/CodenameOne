@@ -159,6 +159,10 @@ include::Skirmish-Users-Guide.asciidoc[]
 
 include::Skirmish-Implementors-Guide.asciidoc[]
 
+include::Parley-Users-Guide.asciidoc[]
+
+include::Parley-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]
@@ -182,6 +186,8 @@ include::Bluetooth.asciidoc[]
 include::Nearby-Devices.asciidoc[]
 
 include::Call-Management.asciidoc[]
+
+include::WebRTC.asciidoc[]
 
 include::VPN.asciidoc[]
 

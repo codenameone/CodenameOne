@@ -8672,6 +8672,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
+    private HTML5WebRtc webRtc;
+
+    /// The browser's WebRTC, where the browser has one.
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        synchronized (HTML5Implementation.class) {
+            if (webRtc == null && HTML5WebRtc.nativeRtcAvailable()) {
+                webRtc = new HTML5WebRtc();
+            }
+            return webRtc;
+        }
+    }
+
     /// The nearby bridge for the JavaScript port: a simulated
     /// implementation rather than no implementation, for the same reason
     /// [#getHomeBridge()] carries one.

@@ -811,7 +811,15 @@ Kharrat
 Cinemachine
 # -----------------------------------------------------------------------------
 # The sample application the Wayline chapters walk through.
+Parley
 Savor
 Wayline
 Lousberg
 Elda
+prekey
+prekeys
+rekey
+callee
+signalling
+coturn
+unconfigured

@@ -89,9 +89,15 @@ public class GeneratorModel {
     /// The card-battle template's accent, used for its icon: it has no `--brand`.
     public static final int SKIRMISH_BRAND = 0xc8862f;
 
+    /// The messaging template's `--brand`, held to its theme.css the same way.
+    public static final int PARLEY_BRAND = 0x0a7d6b;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
+        if (template == Template.PARLEY) {
+            return PARLEY_BRAND;
+        }
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
     }
@@ -1523,6 +1529,13 @@ public class GeneratorModel {
         if ("common/pom.xml".equals(targetPath)) {
             content = applyJavaVersionToPom(content);
         }
+        if ("pom.xml".equals(targetPath) && !isBareTemplate()
+                && options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
+            // The server and the shared module inherit the root's level, and a
+            // full-stack template's server may be written in Java 17 (records).
+            content = StringUtil.replaceAll(content, "<maven.compiler.source>1.8<", "<maven.compiler.source>17<");
+            content = StringUtil.replaceAll(content, "<maven.compiler.target>1.8<", "<maven.compiler.target>17<");
+        }
         if (".idea/misc.xml".equals(targetPath)) {
             content = normalizeIntellijMiscXml(content);
         }
@@ -1975,16 +1988,23 @@ public class GeneratorModel {
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
+            boolean chat = template == Template.PARLEY;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(food
+                    .append(chat
+                            ? "This project is a working messaging app: chats, groups, media, calls and an admin "
+                            + "console in one "
+                            : food
                             ? "This project is a working food-delivery app: a customer, a restaurant, a courier "
                             + "and an admin mode in one "
                             : "This project is a working ride-hailing app: a rider, a driver and an admin mode in one ")
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(food
+                    .append(chat
+                            ? "- `backend/` is the server: accounts and devices, contacts, conversations and "
+                            + "messages, media, calls, the live channel and the database migrations.\n"
+                            : food
                             ? "- `backend/` is the server: accounts and roles, phone verification, restaurants and "
                             + "their menus, orders, courier applications, deliveries, payments, the live channel "
                             + "and the database migrations.\n"
@@ -1999,23 +2019,36 @@ public class GeneratorModel {
                     .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(food
+                    .append(chat
+                            ? "`alice@" + lower + ".example`, `bob@" + lower + ".example`, `carol@" + lower
+                            + ".example` and `dan@" + lower + ".example`, who already share chats and a group, "
+                            + "`admin@" + lower + ".example`, who sees the console, and `mallory@" + lower
+                            + ".example`, whom the others have reported "
+                            : food
                             ? "`customer@" + lower + ".example`, `merchant@" + lower + ".example`, who runs the "
                             + "first restaurant's kitchen, `courier@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append("and waits for the admin's decision. ")
+                    .append(chat ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
-                    .append("configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the ")
-                    .append("server is given a Stripe key; `backend/application.properties` says how.\n\n")
+                    .append(chat
+                            ? "configured. Calls use a public STUN server until the server is given a TURN "
+                            + "server; `backend/application.properties` says how.\n\n"
+                            : "configured. Cards are simulated (`4242 4242 4242 4242` is accepted) until the "
+                            + "server is given a Stripe key; `backend/application.properties` says how.\n\n")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n")
                     .append("The server can also host the app, so it runs in a browser with nothing to install: ")
                     .append("`backend/server.sh web` builds the browser version, and a server started after that ")
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append(food
+                    .append(chat
+                            ? "cover the sample this project started as: \"A private messenger from three sides\" "
+                            + "shows it as two people chatting and an admin see it, and \"Building on the sample\" "
+                            + "explains how it is built and what to change: the encryption, calls and TURN, the "
+                            + "bridges to other networks and the database.\n\n"
+                            : food
                             ? "cover the sample this project started as: \"A food-delivery app from four sides\" "
                             + "shows it as a customer, a restaurant, a courier and an admin see it, and "
                             + "\"Building on the sample\" explains how it is built and what to change, including "
