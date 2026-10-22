@@ -5471,6 +5471,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // undefined StatusBar UIID would also paint an opaque strip there).
             tp.put("@paintsTitleBarBool", "false");
 
+            // A browser driven by a mouse gets desktop scrollbars: a thumb that can be grabbed
+            // and dragged, and a track that pages on click. Without this constant the core
+            // treats a press on the scrollbar as a press on the content, so dragging the thumb
+            // became a touch swipe and scrolled the opposite way. The JavaSE port injects the
+            // same constant for desktop builds. ANY fine pointer qualifies, not only the
+            // primary one: a touch laptop still has its mouse, and the scrollbar only claims
+            // presses that land on it, so a finger swipe over the content still scrolls. A
+            // theme that sets the constant itself keeps its own value.
+            if (!tp.containsKey("@interactiveScrollBool") && matchesMediaQuery("(any-pointer: fine)")) {
+                tp.put("@interactiveScrollBool", "true");
+            }
+
             // Before the theme applies: a desktop theme sets commandBehavior Native, and
             // setCommandBehavior normalises that to the default for good when the port reports no
             // native menu bar at that moment -- which it does until the HTML chrome exists. Forms
