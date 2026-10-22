@@ -70,4 +70,83 @@ public class Date implements Comparable<Date> {
         return 0;
     }
 
+    /// This date as an [java.time.Instant].
+    public java.time.Instant toInstant() {
+        return java.time.Instant.ofEpochMilli(getTime());
+    }
+
+    /// The date of `instant`, which must fit in milliseconds since the
+    /// epoch.
+    public static Date from(java.time.Instant instant) {
+        try {
+            return new Date(instant.toEpochMilli());
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException(ex.toString());
+        }
+    }
+
+    /// Whether this date is after `when`.
+    public boolean after(Date when) {
+        return getTime() > when.getTime();
+    }
+
+    /// Whether this date is before `when`.
+    public boolean before(Date when) {
+        return getTime() < when.getTime();
+    }
+
+    private int field(int field) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(this);
+        return calendar.get(field);
+    }
+
+    /// The year less 1900, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.YEAR) - 1900`
+    public int getYear() {
+        return field(Calendar.YEAR) - 1900;
+    }
+
+    /// The month, 0 for January, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.MONTH)`
+    public int getMonth() {
+        return field(Calendar.MONTH);
+    }
+
+    /// The day of the month, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.DAY_OF_MONTH)`
+    public int getDate() {
+        return field(Calendar.DAY_OF_MONTH);
+    }
+
+    /// The day of the week, 0 for Sunday, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.DAY_OF_WEEK)`
+    public int getDay() {
+        return field(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY;
+    }
+
+    /// The hour of the day, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.HOUR_OF_DAY)`
+    public int getHours() {
+        return field(Calendar.HOUR_OF_DAY);
+    }
+
+    /// The minute of the hour, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.MINUTE)`
+    public int getMinutes() {
+        return field(Calendar.MINUTE);
+    }
+
+    /// The second of the minute, in the default time zone.
+    ///
+    /// @deprecated use `Calendar.get(Calendar.SECOND)`
+    public int getSeconds() {
+        return field(Calendar.SECOND);
+    }
 }

@@ -243,6 +243,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public void init(Object m) {
+        // The class library (vm/JavaAPI) reaches the EDT, the log, secure
+        // random bytes, digests and locale symbols through Codename One.
+        com.codename1.impl.CoreJdkHostInstaller.install();
         WindowsNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
         windowGraphicsPeer = WindowsNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);

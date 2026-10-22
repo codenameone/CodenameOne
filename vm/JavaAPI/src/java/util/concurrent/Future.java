@@ -28,7 +28,8 @@ package java.util.concurrent;
 /// @param <V> the type of the result
 public interface Future<V> {
     /// Stops the work if it has not started. Answers whether it was cancelled;
-    /// work already running is not interrupted by the backend's executors.
+    /// whether work already running is interrupted is up to the implementation
+    /// and to `mayInterruptIfRunning`.
     ///
     /// @param mayInterruptIfRunning whether a running task may be interrupted
     /// @return true when this call cancelled it

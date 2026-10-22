@@ -99,39 +99,91 @@ public class Throwable{
      * The format of the backtrace information depends on the implementation.
      */
     public void printStackTrace(){
-        System.out.println(renderedStack());
-        if (cause != null) {
-            System.out.println("Caused by ");
-            cause.printStackTrace();
-        }
+        System.out.println(printedStack());
     }
 
     public void printStackTrace(java.io.PrintStream s) {
-        s.println(renderedStack());
-        if (cause != null) {
-            s.println("Caused by ");
-            cause.printStackTrace(s);
+        s.println(printedStack());
+    }
+
+    /// Prints this throwable and its backtrace to the given writer, in the
+    /// same text `printStackTrace(PrintStream)` writes.
+    public void printStackTrace(java.io.PrintWriter s) {
+        s.println(printedStack());
+    }
+
+    /// The whole text `printStackTrace` prints, in the JDK's shape: the first
+    /// line is `toString()`, then this throwable's frames, then each
+    /// suppressed throwable as a tab-indented `Suppressed: ` block, then each
+    /// cause as `Caused by: ` followed by the cause's own text. A throwable
+    /// already printed is named as a circular reference instead.
+    private String printedStack() {
+        StringBuilder sb = new StringBuilder();
+        appendStack(sb, "", "", new java.util.ArrayList<Throwable>());
+        return sb.toString();
+    }
+
+    private void appendStack(StringBuilder sb, String caption, String prefix, java.util.List<Throwable> seen) {
+        Throwable t = this;
+        String cap = caption;
+        while (t != null) {
+            for (int i = 0; i < seen.size(); i++) {
+                if (seen.get(i) == t) {
+                    sb.append('\n').append(prefix).append(cap)
+                            .append("[CIRCULAR REFERENCE: ").append(t.toString()).append(']');
+                    return;
+                }
+            }
+            seen.add(t);
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            String text = t.headedStack();
+            int start = 0;
+            while (true) {
+                int nl = text.indexOf('\n', start);
+                sb.append(prefix);
+                if (start == 0) {
+                    sb.append(cap);
+                }
+                sb.append(nl < 0 ? text.substring(start) : text.substring(start, nl));
+                if (nl < 0) {
+                    break;
+                }
+                sb.append('\n');
+                start = nl + 1;
+            }
+            if (t.suppressed != null) {
+                for (int i = 0; i < t.suppressed.size(); i++) {
+                    t.suppressed.get(i).appendStack(sb, "Suppressed: ", prefix + "\t", seen);
+                }
+            }
+            Throwable next = t.cause;
+            t = next == t ? null : next;
+            cap = "Caused by: ";
         }
     }
 
-    /*
-     * There is deliberately NO printStackTrace(java.io.PrintWriter) here.
-     *
-     * This VM has no java.io.PrintWriter -- not in vm/JavaAPI and not in
-     * Ports/CLDC11 -- so nothing on a device can construct one to pass, and
-     * CLDC11's Throwable, which is what the CN1 API offers at compile time, never
-     * declared the overload either. It existed here only because this file is
-     * compiled without a -bootclasspath and borrowed the JDK's class; the
-     * translator then emitted "#include java_io_PrintWriter.h" into
-     * java_lang_Throwable.c and every fresh translation died on the missing
-     * header. Nothing in the core or the device ports called it: the one caller in
-     * the tree is Ports/JavaSE, which compiles against the real JDK.
-     *
-     * Restoring it does not make `e.printStackTrace(writer)` translate either --
-     * the app's own PrintWriter reference is just as unresolvable -- so it would
-     * buy back the broken build and nothing else. Add java/io/PrintWriter.java
-     * first if that pattern is ever wanted.
-     */
+    /// [#renderedStack()] with `toString()` as its first line. The native
+    /// trace is filled in when the throwable is THROWN, so one that never
+    /// was has none and prints its `toString()` alone; and the native header
+    /// is the bare class name, without the message the JDK prints there.
+    private String headedStack() {
+        String text = renderedStack();
+        if (text == null) {
+            return toString();
+        }
+        if (stackReplaced) {
+            return text;
+        }
+        int nl = text.indexOf('\n');
+        String first = nl < 0 ? text : text.substring(0, nl);
+        if (!first.equals(getClass().getName())) {
+            // Not the native header (a browser engine's trace): leave it.
+            return text;
+        }
+        return nl < 0 ? toString() : toString() + text.substring(nl);
+    }
 
     /**
      * The text to print for this throwable's own frames. By default this is the native

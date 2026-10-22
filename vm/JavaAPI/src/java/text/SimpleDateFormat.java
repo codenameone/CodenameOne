@@ -419,12 +419,20 @@ public class SimpleDateFormat extends DateFormat {
 	 */
 	@Override
 	public Date parse(String source) throws ParseException {
+		return parseAt(source, 0, null);
+	}
+
+	@Override
+	Date parseAt(String source, int start, int[] end) throws ParseException {
 		if (pattern == null) {
-			return super.parse(source);
+			return super.parseAt(source, start, end);
 		}
-		int startIndex = 0;
+		int startIndex = start;
 		// parse based on GMT timezone for handling offsets
 		Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(GMT));
+		// A field the pattern does not parse takes its value from the epoch,
+		// 1970-01-01 00:00:00.000, as in the JDK -- never from the current time.
+		calendar.setTime(new Date(0L));
 		int tzMinutes = -1;
 		List<String> pattern = getPatternTokens();
 		for (int i = 0; i < pattern.size(); i++) {
@@ -440,6 +448,10 @@ public class SimpleDateFormat extends DateFormat {
 			switch (patternChar) {
 				case LITERAL_LETTER :
 					s = readLiteral(source, startIndex, token);
+					// A literal must be there as written: yyyy-MM-dd refuses 2020/01/02.
+					if (!s.equals(token)) {
+						throwInvalid("literal", startIndex);
+					}
 					break;
 				case AMPM_LETTER :
 					s = readAmPmMarker(source, startIndex);
@@ -516,6 +528,9 @@ public class SimpleDateFormat extends DateFormat {
 			if (s != null) {
 				startIndex += s.length();
 			}
+		}
+		if (end != null) {
+			end[0] = startIndex;
 		}
 		TimeZone localTimezone = Calendar.getInstance().getTimeZone();
 		calendar.setTimeZone(localTimezone);
@@ -653,7 +668,7 @@ public class SimpleDateFormat extends DateFormat {
 			char ch = source.charAt(i);
 			if (isNumeric(ch) == false) {
 				// empty string would be invalid number
-				if (i == 0) {
+				if (i == ofs) {
 					return null;
 				}
 				return source.substring(ofs, i);
@@ -788,7 +803,7 @@ public class SimpleDateFormat extends DateFormat {
 			if (adjacent) {
 				return source.substring(ofs, ofs + token.length());
 			}
-			if (isNumeric(source.charAt(0))) {
+			if (ofs < source.length() && isNumeric(source.charAt(ofs))) {
 				return readNumber(source, ofs, token, adjacent);
 			}
 		}
@@ -823,6 +838,9 @@ public class SimpleDateFormat extends DateFormat {
 	 * @throws ParseException if the source could not be parsed.
 	 */
 	int parseMonth(String month, int offset) throws ParseException {
+		if (month == null) {
+			throwInvalid("month", offset);
+		}
 		if (month.length() < 3) {
 			return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
 		}

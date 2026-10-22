@@ -397,3 +397,25 @@ vm/JavaAPI/src/com/codename1/impl/zip/JZlib.java | JZlib, Copyright ymnk, JCraft
 vm/JavaAPI/src/com/codename1/impl/zip/StaticTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
 vm/JavaAPI/src/com/codename1/impl/zip/Tree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
 vm/JavaAPI/src/com/codename1/impl/zip/ZStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
+Ports/CLDC11/src/java/util/Comparator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/lang/Iterable.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Arrays.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Collection.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Iterator.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/List.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Map.java | Apache Harmony source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Set.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/lang/Iterable.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Arrays.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Iterator.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/List.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Map.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Set.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/text/LegacyDoubleDigits.java | Rewrite of OpenJDK sun.misc.FloatingDecimal.BinaryToASCIIBuffer.dtoa and FDBigInteger (Oracle GPLv2 + Classpath exception), retaining the original Oracle notice; recorded in NOTICE
+Ports/CLDC11/src/java/text/LegacyDoubleDigits.java | Rewrite of OpenJDK sun.misc.FloatingDecimal.BinaryToASCIIBuffer.dtoa and FDBigInteger (Oracle GPLv2 + Classpath exception), retaining the original Oracle notice; recorded in NOTICE
+vm/JavaAPI/src/java/util/Random.java | Apache Harmony source under the Apache License 2.0, retaining its original ASF notice
+Ports/CLDC11/src/java/lang/CharSequence.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/util/Collections.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/io/ByteArrayOutputStream.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/lang/CharSequence.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Objects.java | Apache Harmony class library source retaining its original Apache-2.0 notice

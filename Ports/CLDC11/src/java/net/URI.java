@@ -443,6 +443,9 @@ public class URI {
 		if (ssp == null) {
 			throw new URISyntaxException(ssp, "Invalid scheme specific part");
 		}
+		if (scheme != null && ssp.length() == 0) {
+			throw new URISyntaxException(scheme + SCHEME_SEPARATOR, "Expected scheme-specific part");
+		}
 		if (scheme != null && ssp.charAt(0) != PATH_SEPARATOR) {
 			this.opaque = true;
 			this.schemeSpecificPart = ssp;
@@ -451,7 +454,7 @@ public class URI {
 		int index;
 		String s = ssp;
 
-		if ((index = s.lastIndexOf(QUERY_MARKER)) != -1) {
+		if ((index = s.indexOf(QUERY_MARKER)) != -1) {
 			setQuery(s.substring(index + 1), encode);
 			s = s.substring(0, index);
 		} else if (getQuerySeparator() == SOCKET_QUERY_SEPARATOR && (index = s.indexOf(SOCKET_QUERY_SEPARATOR)) != -1) {
@@ -459,8 +462,15 @@ public class URI {
 			s = s.substring(0, index);
 		}
 
-		index = (s.startsWith(AUTHORITY_MARKER)) ? 2 : 0;
-		index = s.indexOf(PATH_SEPARATOR, index);
+		// Only a "//" opens an authority; without one the remainder is all
+		// path (see vm/JavaAPI's URI, which this mirrors).
+		if (!s.startsWith(AUTHORITY_MARKER)) {
+			if (s.length() > 0) {
+				setPath(s, encode);
+			}
+			return;
+		}
+		index = s.indexOf(PATH_SEPARATOR, AUTHORITY_MARKER.length());
 		if (index != -1) {
 			setPath(s.substring(index), encode);
 			s = s.substring(0, index);

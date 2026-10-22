@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -53,6 +55,7 @@ class NavigationTest extends UITestBase {
     @AfterEach
     void uninstallDispatcher() {
         Navigation.setDispatcher(null);
+        Navigation.clearStack();
     }
 
     /** A {@link RouteDispatcher} test double: returns a fresh titled Form for any

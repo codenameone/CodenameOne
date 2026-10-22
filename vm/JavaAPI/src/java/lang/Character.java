@@ -277,8 +277,43 @@ public final class Character implements Comparable<Character>{
             }
             return result < radix ? result : -1;
         }
-        //return digitImpl(codePoint, radix);
-        return codePoint;
+        // Was "return codePoint", so digit of e-acute in radix 10 answered 233. A
+        // decimal digit of another script, or a fullwidth Latin letter, has
+        // the value the JDK gives it; everything else is not a digit.
+        int result = decimalDigitValue(codePoint);
+        if (result < 0) {
+            if (codePoint >= 0xff21 && codePoint <= 0xff3a) {
+                result = 10 + (codePoint - 0xff21);
+            } else if (codePoint >= 0xff41 && codePoint <= 0xff5a) {
+                result = 10 + (codePoint - 0xff41);
+            }
+        }
+        return result >= 0 && result < radix ? result : -1;
+    }
+
+    /// The zero of every block of ten decimal digits this runtime knows,
+    /// ASCII aside: Arabic-Indic, Extended Arabic-Indic, the Indic scripts,
+    /// Thai, Lao, Tibetan, Myanmar and the fullwidth forms.
+    private static final int[] DECIMAL_ZEROS = {
+        0x0660, 0x06f0, 0x07c0, 0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6,
+        0x0c66, 0x0ce6, 0x0d66, 0x0de6, 0x0e50, 0x0ed0, 0x0f20, 0x1040, 0x1090,
+        0x17e0, 0x1810, 0xff10
+    };
+
+    private static int decimalDigitValue(int codePoint) {
+        if (codePoint >= '0' && codePoint <= '9') {
+            return codePoint - '0';
+        }
+        if (codePoint < 0x0660 || codePoint > 0xff19) {
+            return -1;
+        }
+        for (int i = 0; i < DECIMAL_ZEROS.length; i++) {
+            int zero = DECIMAL_ZEROS[i];
+            if (codePoint >= zero && codePoint <= zero + 9) {
+                return codePoint - zero;
+            }
+        }
+        return -1;
     }
 
 
@@ -440,8 +475,7 @@ public final class Character implements Comparable<Character>{
         if (codePoint < 1632) {
             return false;
         }
-        //return isDigitImpl(codePoint);
-        return false;
+        return decimalDigitValue(codePoint) >= 0;
     }
 
     /**
@@ -572,6 +606,19 @@ public final class Character implements Comparable<Character>{
         // Optimized case for ASCII
         if ('a' <= codePoint && codePoint <= 'z') {
             return (char) (codePoint - ('a' - 'A'));
+        }
+        // The rest of Latin-1, which this class documents as supported. The
+        // sharp s has no single-char upper case and stays; the micro sign and
+        // y with diaeresis map outside the range, as they do in the JDK.
+        // (The sharp s is U+00DF, below this range's start.)
+        if (codePoint >= 0xe0 && codePoint <= 0xfe && codePoint != 0xf7) {
+            return codePoint - 0x20;
+        }
+        if (codePoint == 0xb5) {
+            return 0x39c;
+        }
+        if (codePoint == 0xff) {
+            return 0x178;
         }
         /*if (codePoint < 181) {
             return codePoint;
@@ -1324,8 +1371,20 @@ public final class Character implements Comparable<Character>{
         return isWhitespace((int) c);
     }
 
+    /// Whether the char is a Unicode space separator, line separator or
+    /// paragraph separator. Unlike `isWhitespace` this includes the
+    /// no-break spaces and excludes the ASCII control characters.
     public static boolean isSpaceChar(char c) {
-        return c == ' ';
+        return isSpaceChar((int) c);
+    }
+
+    /// Whether the code point is a Unicode space separator, line separator or
+    /// paragraph separator.
+    public static boolean isSpaceChar(int codePoint) {
+        return codePoint == 0x20 || codePoint == 0xa0 || codePoint == 0x1680
+                || codePoint >= 0x2000 && codePoint <= 0x200a
+                || codePoint == 0x2028 || codePoint == 0x2029 || codePoint == 0x202f
+                || codePoint == 0x205f || codePoint == 0x3000;
     }
 
     public static byte getDirectionality(char ch) {
@@ -1337,7 +1396,8 @@ public final class Character implements Comparable<Character>{
     }
 
     public static boolean isBmpCodePoint(int codePoint) {
-        return codePoint > 0 && codePoint <= MAX_VALUE;
+        // U+0000 is in the Basic Multilingual Plane; this used to say "> 0".
+        return codePoint >= 0 && codePoint <= MAX_VALUE;
     }
     
     public static boolean isSurrogate(char ch) {
@@ -1456,10 +1516,77 @@ public final class Character implements Comparable<Character>{
         if (isDigit(codePoint)) {
             return DECIMAL_DIGIT_NUMBER;
         }
-        if (isWhitespace(codePoint)) {
+        if (isTitleCaseLetter(codePoint)) {
+            return TITLECASE_LETTER;
+        }
+        if (isSpaceChar(codePoint) || isWhitespace(codePoint)) {
             return SPACE_SEPARATOR;
         }
+        if (isScriptLetter(codePoint)) {
+            // Without a case table above Latin-1 the letters of the scripts
+            // below cannot be told apart by case, but they are letters: this
+            // is what makes isLetter, isLetterOrDigit and the identifier tests
+            // answer for Greek, Cyrillic, Hebrew, Arabic, the CJK ideographs,
+            // kana and Hangul.
+            return OTHER_LETTER;
+        }
         return UNASSIGNED;
+    }
+
+    private static boolean isTitleCaseLetter(int c) {
+        return c == 0x1c5 || c == 0x1c8 || c == 0x1cb || c == 0x1f2
+                || c >= 0x1f88 && c <= 0x1f8f || c >= 0x1f98 && c <= 0x1f9f
+                || c >= 0x1fa8 && c <= 0x1faf || c == 0x1fbc || c == 0x1fcc || c == 0x1ffc;
+    }
+
+    // The letters of the scripts above Latin-1, as inclusive [first, last]
+    // pairs in ascending order: the maximal runs that Character.isLetter
+    // answers true for in JDK 21 (Unicode 15), inside the Latin Extended,
+    // Greek, Cyrillic, Armenian, Hebrew, Arabic, Devanagari, Thai, Georgian,
+    // Latin and Greek Extended Additional, kana, CJK, Hangul, fullwidth Latin
+    // and CJK extension B-G blocks. Generated from the JDK's own data rather
+    // than written by hand, so the unassigned holes and the symbols between
+    // the letters are left out exactly; scripts outside those blocks are not
+    // covered at all. Every block is taken whole, so a letter of an
+    // advertised script cannot be missing; regenerate with a loop over those
+    // block ranges calling Character.isLetter on JDK 21.
+    private static final int[] SCRIPT_LETTERS = {
+            0x100, 0x24f, 0x370, 0x374, 0x376, 0x377, 0x37a, 0x37d,
+            0x37f, 0x37f, 0x386, 0x386, 0x388, 0x38a, 0x38c, 0x38c,
+            0x38e, 0x3a1, 0x3a3, 0x3f5, 0x3f7, 0x481, 0x48a, 0x52f,
+            0x531, 0x556, 0x559, 0x559, 0x560, 0x588, 0x5d0, 0x5ea,
+            0x5ef, 0x5f2, 0x620, 0x64a, 0x66e, 0x66f, 0x671, 0x6d3,
+            0x6d5, 0x6d5, 0x6e5, 0x6e6, 0x6ee, 0x6ef, 0x6fa, 0x6fc,
+            0x6ff, 0x6ff, 0x904, 0x939, 0x93d, 0x93d, 0x950, 0x950,
+            0x958, 0x961, 0x971, 0x97f, 0xe01, 0xe30, 0xe32, 0xe33,
+            0xe40, 0xe46, 0x10a0, 0x10c5, 0x10c7, 0x10c7, 0x10cd, 0x10cd,
+            0x10d0, 0x10fa, 0x10fc, 0x10ff, 0x1e00, 0x1f15, 0x1f18, 0x1f1d,
+            0x1f20, 0x1f45, 0x1f48, 0x1f4d, 0x1f50, 0x1f57, 0x1f59, 0x1f59,
+            0x1f5b, 0x1f5b, 0x1f5d, 0x1f5d, 0x1f5f, 0x1f7d, 0x1f80, 0x1fb4,
+            0x1fb6, 0x1fbc, 0x1fbe, 0x1fbe, 0x1fc2, 0x1fc4, 0x1fc6, 0x1fcc,
+            0x1fd0, 0x1fd3, 0x1fd6, 0x1fdb, 0x1fe0, 0x1fec, 0x1ff2, 0x1ff4,
+            0x1ff6, 0x1ffc, 0x3041, 0x3096, 0x309d, 0x309f, 0x30a1, 0x30fa,
+            0x30fc, 0x30ff, 0x3400, 0x4dbf, 0x4e00, 0x9fff, 0xac00, 0xd7a3,
+            0xf900, 0xfa6d, 0xfa70, 0xfad9, 0xff21, 0xff3a, 0xff41, 0xff5a,
+            0xff66, 0xffbe, 0xffc2, 0xffc7, 0xffca, 0xffcf, 0xffd2, 0xffd7,
+            0xffda, 0xffdc, 0x20000, 0x2a6df, 0x2a700, 0x2b739, 0x2b740, 0x2b81d,
+            0x2b820, 0x2cea1, 0x2ceb0, 0x2ebe0, 0x2f800, 0x2fa1d, 0x30000, 0x3134a
+    };
+
+    private static boolean isScriptLetter(int c) {
+        int lo = 0;
+        int hi = SCRIPT_LETTERS.length / 2 - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            if (c < SCRIPT_LETTERS[2 * mid]) {
+                hi = mid - 1;
+            } else if (c > SCRIPT_LETTERS[2 * mid + 1]) {
+                lo = mid + 1;
+            } else {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**
@@ -1478,8 +1605,9 @@ public final class Character implements Comparable<Character>{
         if (codePoint < 0x1000) {
             return false;
         }
-        // OGHAM SPACE MARK or MONGOLIAN VOWEL SEPARATOR?
-        if (codePoint == 0x1680 || codePoint == 0x180e) {
+        // OGHAM SPACE MARK. MONGOLIAN VOWEL SEPARATOR (U+180E) has been a
+        // format character, not a space, since Unicode 6.3.
+        if (codePoint == 0x1680) {
             return true;
         }
         if (codePoint < 0x2000) {
@@ -1525,7 +1653,245 @@ public final class Character implements Comparable<Character>{
     public static char toTitleCase(char c) {
         return String.valueOf(c).toUpperCase().charAt(0);
     }
-    
+
+    // ---------------------------------------------------------------------
+    // The members of the JDK's Character the class did not have, in plain
+    // Java over the classification above.
+    // ---------------------------------------------------------------------
+
+    /// The size of a char in bytes.
+    public static final int BYTES = 2;
+
+    /// Throws the JDK's exception for a value that is not a code point.
+    static void checkCodePoint(int codePoint) {
+        if (!isValidCodePoint(codePoint)) {
+            throw new IllegalArgumentException("Not a valid Unicode code point: 0x" + upperHex(codePoint));
+        }
+    }
+
+    private static String upperHex(int value) {
+        String digits = "0123456789ABCDEF";
+        char[] out = new char[8];
+        int at = 8;
+        do {
+            out[--at] = digits.charAt(value & 0xf);
+            value >>>= 4;
+        } while (value != 0);
+        return new String(out, at, 8 - at);
+    }
+
+    /// A one-char string of `c`.
+    public static String toString(char c) {
+        return String.valueOf(c);
+    }
+
+    /// The string of the code point: one char, or a surrogate pair.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if it is not a valid code point
+    public static String toString(int codePoint) {
+        checkCodePoint(codePoint);
+        if (codePoint < MIN_SUPPLEMENTARY_CODE_POINT) {
+            return String.valueOf((char) codePoint);
+        }
+        return new String(new char[] {highSurrogate(codePoint), lowSurrogate(codePoint)});
+    }
+
+    /// The char itself, as the JDK hashes it.
+    public static int hashCode(char value) {
+        return value;
+    }
+
+    /// `x - y`.
+    public static int compare(char x, char y) {
+        return x - y;
+    }
+
+    /// Whether the char is an ISO control character: U+0000 to U+001F or
+    /// U+007F to U+009F.
+    public static boolean isISOControl(char ch) {
+        return isISOControl((int) ch);
+    }
+
+    /// Whether the code point is an ISO control character.
+    public static boolean isISOControl(int codePoint) {
+        return codePoint >= 0 && codePoint <= 0x1f || codePoint >= 0x7f && codePoint <= 0x9f;
+    }
+
+    /// The char of `digit` in `radix`, a lower case letter from 10 on, or
+    /// U+0000 when either is out of range.
+    public static char forDigit(int digit, int radix) {
+        if (radix < MIN_RADIX || radix > MAX_RADIX || digit < 0 || digit >= radix) {
+            return '\0';
+        }
+        return (char) (digit < 10 ? '0' + digit : 'a' + digit - 10);
+    }
+
+    /// The value of a digit, or of a Latin letter read as a digit of base
+    /// 36, or of a numeric symbol this runtime knows (superscripts,
+    /// subscripts, Roman numerals, circled numbers); -2 for a vulgar fraction,
+    /// which has a value but not an integral one; otherwise -1.
+    public static int getNumericValue(char ch) {
+        return getNumericValue((int) ch);
+    }
+
+    /// The value of a digit, or of a Latin letter read as a digit of base
+    /// 36, or of a numeric symbol this runtime knows (superscripts,
+    /// subscripts, Roman numerals, circled numbers); -2 for a vulgar fraction,
+    /// which has a value but not an integral one; otherwise -1.
+    public static int getNumericValue(int codePoint) {
+        int value = digit(codePoint, MAX_RADIX);
+        return value >= 0 || codePoint < 0xb2 ? value : numericSymbolValue(codePoint);
+    }
+
+    /// Ranges of numeric symbols as {first, last, value of first}; each code
+    /// point after the first is worth one more. A first value of -2 marks a
+    /// range of fractions, all of them -2.
+    private static final int[] NUMERIC_RANGES = {
+        0x00b2, 0x00b3, 2,
+        0x00b9, 0x00b9, 1,
+        0x00bc, 0x00be, -2,
+        0x2070, 0x2070, 0,
+        0x2074, 0x2079, 4,
+        0x2080, 0x2089, 0,
+        0x2150, 0x215e, -2,
+        0x215f, 0x215f, 1,
+        0x2160, 0x216b, 1,
+        0x2170, 0x217b, 1,
+        0x2460, 0x2473, 1,
+        0x2474, 0x2487, 1,
+        0x2488, 0x249b, 1,
+        0x24ea, 0x24ea, 0,
+        0x24eb, 0x24f4, 11,
+        0x24f5, 0x24fe, 1,
+        0x24ff, 0x24ff, 0,
+        0x2776, 0x277f, 1,
+        0x2780, 0x2789, 1,
+        0x278a, 0x2793, 1
+    };
+
+    private static int numericSymbolValue(int codePoint) {
+        for (int i = 0; i < NUMERIC_RANGES.length; i += 3) {
+            if (codePoint >= NUMERIC_RANGES[i] && codePoint <= NUMERIC_RANGES[i + 1]) {
+                int first = NUMERIC_RANGES[i + 2];
+                return first == -2 ? -2 : first + codePoint - NUMERIC_RANGES[i];
+            }
+        }
+        // The Roman numerals past twelve: L, C, D and M, upper and lower case.
+        if (codePoint >= 0x216c && codePoint <= 0x216f || codePoint >= 0x217c && codePoint <= 0x217f) {
+            int k = (codePoint - 0x216c) % 16;
+            return k == 0 ? 50 : k == 1 ? 100 : k == 2 ? 500 : 1000;
+        }
+        return -1;
+    }
+
+    /// Whether the code point is alphabetic. This runtime answers as for
+    /// `isLetter`.
+    public static boolean isAlphabetic(int codePoint) {
+        return isLetter(codePoint);
+    }
+
+    /// Whether the char has a category in this runtime's classification.
+    public static boolean isDefined(char ch) {
+        return isDefined((int) ch);
+    }
+
+    /// Whether the code point has a category in this runtime's
+    /// classification. Above Latin-1 that classification is partial, so an
+    /// assigned symbol it does not know answers false.
+    public static boolean isDefined(int codePoint) {
+        return getType(codePoint) != UNASSIGNED;
+    }
+
+    /// Whether the code point is a CJK ideograph.
+    ///
+    /// The blocks whole, unassigned gaps included: which code points inside
+    /// them are assigned moves with every Unicode release (JDK 8 and JDK 21
+    /// answer differently), and this runtime carries no per-version table.
+    public static boolean isIdeographic(int codePoint) {
+        return codePoint >= 0x3400 && codePoint <= 0x4dbf || codePoint >= 0x4e00 && codePoint <= 0x9fff
+                || codePoint >= 0xf900 && codePoint <= 0xfaff || codePoint >= 0x20000 && codePoint <= 0x3134a
+                || codePoint == 0x3006 || codePoint == 0x3007 || codePoint >= 0x3021 && codePoint <= 0x3029
+                || codePoint >= 0x3038 && codePoint <= 0x303a;
+    }
+
+    /// Whether the char is a title case letter.
+    public static boolean isTitleCase(char ch) {
+        return isTitleCaseLetter(ch);
+    }
+
+    /// Whether the code point is a title case letter.
+    public static boolean isTitleCase(int codePoint) {
+        return isTitleCaseLetter(codePoint);
+    }
+
+    /// Whether the char is mirrored in right-to-left text: the ASCII
+    /// brackets and the guillemets.
+    public static boolean isMirrored(char ch) {
+        return isMirrored((int) ch);
+    }
+
+    /// Whether the code point is mirrored in right-to-left text. This
+    /// runtime knows the ASCII brackets and the guillemets.
+    public static boolean isMirrored(int codePoint) {
+        switch (codePoint) {
+            case '(':
+            case ')':
+            case '<':
+            case '>':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case 0xab:
+            case 0xbb:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// The ISO-LATIN-1 white space of the old JDK: tab, line feed, form feed,
+    /// carriage return and space.
+    @Deprecated
+    public static boolean isSpace(char ch) {
+        return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f' || ch == '\r';
+    }
+
+    /// As `isJavaIdentifierStart(char)`.
+    @Deprecated
+    public static boolean isJavaLetter(char ch) {
+        return isJavaIdentifierStart(ch);
+    }
+
+    /// As `isJavaIdentifierPart(char)`.
+    @Deprecated
+    public static boolean isJavaLetterOrDigit(char ch) {
+        return isJavaIdentifierPart(ch);
+    }
+
+    /// Whether the char may start a Unicode identifier.
+    public static boolean isUnicodeIdentifierStart(char ch) {
+        return isUnicodeIdentifierStart((int) ch);
+    }
+
+    /// Whether the code point may start a Unicode identifier: a letter.
+    public static boolean isUnicodeIdentifierStart(int codePoint) {
+        return isLetter(codePoint);
+    }
+
+    /// Whether the char may continue a Unicode identifier.
+    public static boolean isUnicodeIdentifierPart(char ch) {
+        return isUnicodeIdentifierPart((int) ch);
+    }
+
+    /// Whether the code point may continue a Unicode identifier: a letter, a
+    /// digit, connecting punctuation or an ignorable character.
+    public static boolean isUnicodeIdentifierPart(int codePoint) {
+        return isLetterOrDigit(codePoint) || getType(codePoint) == CONNECTOR_PUNCTUATION
+                || isIdentifierIgnorable(codePoint);
+    }
 }
 
 

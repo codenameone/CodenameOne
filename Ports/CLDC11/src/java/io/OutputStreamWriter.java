@@ -64,4 +64,12 @@ public class OutputStreamWriter extends java.io.Writer{
         return; //TODO codavaj!!
     }
 
+    /// An OutputStreamWriter that encodes with `cs`.
+    public OutputStreamWriter(java.io.OutputStream os, java.nio.charset.Charset cs) {
+    }
+
+    /// The historical name of the encoding: `UTF8`, `ASCII`, `ISO8859_1`.
+    public String getEncoding() {
+        return null;
+    }
 }

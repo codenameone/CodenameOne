@@ -5926,11 +5926,38 @@ final class JavascriptMethodGenerator {
                 return "";
             }
             pendingExpr[sp] = null;
+            // A deferred invoke (pushComposite from the call sites that
+            // canDeferInvokeResult admits) can name slots ABOVE its own as
+            // arguments: ``s0 = call(s0, s1)`` is held as pending s0 and s1 is
+            // free again. A materialised push into that slot would then
+            // overwrite an argument before the call reads it -- as in
+            // ``Long.divideUnsigned(a, b) == 14L``, where the long literal is
+            // not deferrable and became ``s1 = _Llit(14, 0)`` ahead of the
+            // call. Evaluate any such pending first; nothing between the call
+            // and here has side effects, so this is the order the bytecode has.
+            String prelude = flushPendingReading("s" + sp);
             String slot = "s" + sp++;
             if (sp > maxObservedStack) {
                 maxObservedStack = sp;
             }
-            return slot + " = " + expression;
+            return prelude + slot + " = " + expression;
+        }
+
+        /// Materialise every pending below the top whose expression reads
+        /// ``slot``. Returns the statements to emit, each ending in a newline.
+        private String flushPendingReading(String slot) {
+            StringBuilder prelude = null;
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null && containsWord(pendingExpr[i], slot)) {
+                    if (prelude == null) {
+                        prelude = new StringBuilder();
+                    }
+                    prelude.append("s").append(i).append(" = ").append(pendingExpr[i]).append(";\n  ");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude == null ? "" : prelude.toString();
         }
 
         private String pop() {
