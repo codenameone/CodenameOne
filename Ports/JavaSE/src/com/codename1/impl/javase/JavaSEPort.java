@@ -18075,6 +18075,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         com.codename1.continuity.Continuity.refreshBridge();
     }
 
+    private com.codename1.impl.javase.webrtc.LoopbackWebRtc webRtc;
+
+    /// The simulator carries calls through every step but the media: see
+    /// [com.codename1.impl.javase.webrtc.LoopbackWebRtc]. A desktop build has
+    /// no WebRTC, so it answers null and the app sees calls as unsupported
+    /// rather than connecting calls that carry nothing.
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (!isSimulator()) {
+            return null;
+        }
+        if (webRtc == null) {
+            webRtc = new com.codename1.impl.javase.webrtc.LoopbackWebRtc();
+        }
+        return webRtc;
+    }
+
     /// The VPN bridge for the simulator and desktop builds: a simulated
     /// configuration store that tunnels nothing.
     ///
@@ -23960,6 +23977,39 @@ public class JavaSEPort extends CodenameOneImplementation {
             return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
         } catch (java.security.GeneralSecurityException e) {
             throw new RuntimeException("RSA keypair generation failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[][] generateEcKeyPair(int bits) {
+        try {
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
+            kpg.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            byte[] spki = kp.getPublic().getEncoded();
+            // The JDK's PKCS#8 omits the public point; re-encode so every port
+            // hands out the same bytes and providers that need the point get it.
+            byte[] scalar = com.codename1.impl.EcP256Codec.fromPkcs8(kp.getPrivate().getEncoded())[0];
+            byte[] pkcs8 = com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar,
+                    com.codename1.impl.EcP256Codec.pointFromSpki(spki));
+            return new byte[][]{ spki, pkcs8 };
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("EC keypair generation failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("EC");
+            java.security.PrivateKey priv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            java.security.PublicKey pub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            javax.crypto.KeyAgreement ka = javax.crypto.KeyAgreement.getInstance("ECDH");
+            ka.init(priv);
+            ka.doPhase(pub, true);
+            return ka.generateSecret();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("ECDH failed: " + e.getMessage());
         }
     }
 }

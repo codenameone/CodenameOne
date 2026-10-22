@@ -42,24 +42,6 @@
       "time": 0.5
      }
     }
-   },
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.519,
-      "time": 0.499,
-      "tolerance": {
-       "time": 0.2
-      }
-     },
-     "memory": 0.519,
-     "reason": "Linux x64 EPYC 7763 translator time 0.49x on run 38943915665 (rounds 0.48-0.54); this PR's earlier runs on that model measured 0.51x and 0.55x against the 0.63x row",
-     "runs": 3,
-     "time": 0.508,
-     "tolerance": {
-      "time": 0.2
-     }
-    }
    }
   },
   "macos-arm64": {
@@ -153,55 +135,6 @@
      "time": 0.623,
      "tolerance": {
       "memory": 0.35
-     }
-    }
-   }
-  },
-  "windows-arm64@armv8-64-bit-family-8-model-d49-microsoft-corporation": {
-   "hello": {
-    "all": {
-     "from": {
-      "memory": 0.752,
-      "time": 1.107,
-      "tolerance": {
-       "memory": 0.35
-      }
-     },
-     "memory": 0.773,
-     "reason": "First run after merging master with the Flutter runtime (ff8f935c20): hello RAM fell on macOS arm64 (1.17-1.47x before, 0.92x now) and on Windows arm64 d49 (1.28x to 0.77x) in the same run, so the move comes from master's changes, not this PR's",
-     "runs": 1,
-     "time": 1.107,
-     "tolerance": {
-      "memory": 0.35
-     }
-    }
-   },
-   "translator": {
-    "all": {
-     "from": {
-      "memory": 0.506,
-      "time": 0.838
-     },
-     "memory": 0.503,
-     "reason": "Windows arm64 d49 translator RAM 0.50x (rounds 0.48-0.55) is the 0.513x the row held before pr/5883.json moved it to 0.43x from one run",
-     "runs": 1,
-     "time": 0.838
-    }
-   }
-  },
-  "windows-x64@intel64-family-6-model-207-genuineintel": {
-   "recursion": {
-    "all": {
-     "from": {
-      "memory": 0.059,
-      "time": 1.201
-     },
-     "memory": 0.059,
-     "reason": "Windows x64 Intel Family 6 Model 207 recursion time is bimodal: base folds moved it 1.204x -> 0.943x -> 1.212x -> 0.945x, each from one or two runs; this branch measured 1.207x across five rounds (1.197-1.217), the upper mode",
-     "runs": 1,
-     "time": 1.207,
-     "tolerance": {
-      "time": 0.2
      }
     }
    }

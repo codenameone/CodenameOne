@@ -558,6 +558,15 @@ public final class LinuxNative {
      */
     public static native byte[] generateRsaKeyPair(int bits);
 
+    /**
+     * A fresh P-256 pair, laid out as {@link #generateRsaKeyPair(int)} lays out
+     * an RSA one.
+     */
+    public static native byte[] generateEcKeyPair();
+
+    /** P-256 ECDH of a PKCS#8 private key and an X.509 public key: the x coordinate. */
+    public static native byte[] ecdh(byte[] privateKeyPkcs8, byte[] publicKeyX509);
+
     /** Why the most recent crypto call failed, for the CryptoException message. */
     public static native String lastCryptoError();
 

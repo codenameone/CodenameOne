@@ -28,12 +28,13 @@
 /// OS hands over and takes back, and the caller's name shown for an incoming
 /// number the address book has never seen.
 ///
-/// **What this is not.** Codename One does not carry the voice. There is no
-/// codec, no signalling and no WebRTC here, and none is planned: those are
-/// the app's, and there are good libraries for them. What was missing was
-/// everything *around* the media -- and without it an app could not ring at
-/// all while backgrounded, which is why a Codename One app could not
-/// previously be a calling app no matter how good its audio was.
+/// **What this is not.** This package does not carry the voice. There is no
+/// codec and no signalling here: the media is `com.codename1.webrtc`, which a
+/// calling app uses beside this package, and the signalling is the app's own.
+/// What this package adds is everything *around* the media -- and without it
+/// an app could not ring at all while backgrounded, which is why a Codename
+/// One app could not previously be a calling app no matter how good its
+/// audio was.
 ///
 /// #### The sub-packages are the opt-in
 ///

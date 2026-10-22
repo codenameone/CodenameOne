@@ -3363,6 +3363,36 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return new byte[][] { publicKey, privateKey };
     }
 
+    @Override
+    public byte[][] generateEcKeyPair(int bits) {
+        if (bits != 256) {
+            throw new RuntimeException("only P-256 is supported");
+        }
+        byte[] blob = cryptoResult(LinuxNative.generateEcKeyPair(), "EC key generation");
+        if (blob.length < 4) {
+            throw new RuntimeException("EC key generation returned a truncated pair");
+        }
+        int publicLength = ((blob[0] & 0xff) << 24) | ((blob[1] & 0xff) << 16)
+                | ((blob[2] & 0xff) << 8) | (blob[3] & 0xff);
+        if (publicLength < 0 || publicLength > blob.length - 4) {
+            throw new RuntimeException("EC key generation returned a malformed pair");
+        }
+        byte[] publicKey = new byte[publicLength];
+        byte[] privateKey = new byte[blob.length - 4 - publicLength];
+        System.arraycopy(blob, 4, publicKey, 0, publicKey.length);
+        System.arraycopy(blob, 4 + publicLength, privateKey, 0, privateKey.length);
+        // OpenSSL's PKCS#8 also carries the curve parameters; re-encode so the
+        // bytes match every other port.
+        byte[] scalar = com.codename1.impl.EcP256Codec.fromPkcs8(privateKey)[0];
+        byte[] point = com.codename1.impl.EcP256Codec.pointFromSpki(publicKey);
+        return new byte[][] { publicKey, com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar, point) };
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        return cryptoResult(LinuxNative.ecdh(privateKeyPkcs8, publicKeyX509), "ECDH");
+    }
+
     /* ------------------------------------------------------------ platform */
 
     @Override

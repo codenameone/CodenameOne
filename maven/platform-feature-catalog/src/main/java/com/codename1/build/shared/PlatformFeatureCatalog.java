@@ -830,6 +830,40 @@ public final class PlatformFeatureCatalog {
                 .androidMetaData("com.google.ar.core", "optional")
                 .description("Cross-platform augmented reality (world/image/face tracking)"));
 
+        // WebRTC calls (com.codename1.webrtc.*). Android half only: the iOS
+        // fields of this same entry are added separately -- extend it rather
+        // than adding a second entry for the prefix.
+        //
+        // io.github.webrtc-sdk:android declares minSdkVersion 21 in its own
+        // manifest (checked against the 150.7871.01 aar), hence the floor.
+        // CAMERA and RECORD_AUDIO are runtime permissions AndroidWebRtc asks
+        // for before opening the devices; MODIFY_AUDIO_SETTINGS is what the
+        // speakerphone toggle and MODE_IN_COMMUNICATION need. The camera
+        // features are declared not required, so an audio-only device keeps
+        // the app in its store listing.
+        e.add(new Entry("com/codename1/webrtc/")
+                .androidGradle("io.github.webrtc-sdk:android:150.7871.01")
+                .androidMinimumSdk(21)
+                .androidPermissions("android.permission.CAMERA",
+                        "android.permission.RECORD_AUDIO",
+                        "android.permission.MODIFY_AUDIO_SETTINGS")
+                .androidFeatures("android.hardware.camera",
+                        "android.hardware.camera.front")
+                // iOS: the stasel builds of the same WebRTC, as a Swift package.
+                // The define that compiles CN1WebRTC.m is switched by the
+                // builder on the same package reference.
+                .iosPod("WebRTC-SDK")
+                .iosSpm("WebRTC", "https://github.com/stasel/WebRTC.git", "from:155.0.0",
+                        "WebRTC")
+                .iosFrameworks("AVFoundation", "CoreMedia", "Metal", "MetalKit", "VideoToolbox",
+                        "AudioToolbox", "Network")
+                .iosMinimumDeploymentTarget("13.0")
+                .iosPlist("NSCameraUsageDescription",
+                        "Used for video calls.")
+                .iosPlist("NSMicrophoneUsageDescription",
+                        "Used for voice and video calls.")
+                .description("WebRTC audio and video calls"));
+
         // Invite / referral attribution. The Play Install Referrer library is
         // the deterministic half of the attribution: the invite code makes the
         // whole round trip through the store and comes back verbatim, so

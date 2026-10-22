@@ -1295,6 +1295,7 @@ public class IPhoneBuilder extends Executor {
         "com/codename1/call/directory/",
         "com/codename1/vpn/profile/",
         "com/codename1/vpn/tunnel/",
+        "com/codename1/webrtc/",
     };
 
     /// Folds call and VPN usage found inside submitted libraries into the
@@ -1315,12 +1316,17 @@ public class IPhoneBuilder extends Executor {
         usesCallDirectory |= found.contains("com/codename1/call/directory/");
         usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
         usesCustomTunnel |= found.contains("com/codename1/vpn/tunnel/");
+        usesWebRtc |= found.contains("com/codename1/webrtc/");
         return found;
     }
 
     private boolean usesCallSession;
     private boolean usesCallVoip;
     private boolean usesCallDirectory;
+
+    /// The app (or a submitted library) references `com.codename1.webrtc`,
+    /// which earns `CN1_INCLUDE_WEBRTC` and the WebRTC framework.
+    private boolean usesWebRtc;
     private boolean usesManagedVpn;
 
     /// Whether the app referenced com.codename1.vpn.tunnel.
@@ -2873,6 +2879,9 @@ public class IPhoneBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/call/directory/") == 0) {
                         usesCallDirectory = true;
+                    }
+                    if (cls.indexOf("com/codename1/webrtc/") == 0) {
+                        usesWebRtc = true;
                     }
                     if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
@@ -6226,6 +6235,16 @@ public class IPhoneBuilder extends Executor {
             // from the PlatformFeatureCatalog entries through the loop below;
             // only the defines are decided here, because a define is not
             // something a declarative table can express.
+            // WebRTC: uncomment CN1_INCLUDE_WEBRTC so CN1WebRTC.m compiles
+            // its real body instead of the stubs. The WebRTC framework itself
+            // (the pod or package) and the camera / microphone usage strings
+            // come from the PlatformFeatureCatalog entry through the loop
+            // below; only the define is decided here.
+            if (usesWebRtc) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_WEBRTC",
+                        "com.codename1.webrtc");
+            }
+
             if (usesNearbyRanging || usesNearbyTransport
                     || usesNearbyCompanion) {
                 enableNearbyDefine(buildinRes, "CN1_INCLUDE_NEARBY");
