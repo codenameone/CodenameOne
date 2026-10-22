@@ -44,4 +44,11 @@ public interface CardRepository extends CrudRepository<Card, String> {
     @Query("update Card c set c.dailyLimit = :limit where c.id = :id and c.owner = :owner")
     int setLimit(@Param("id") String id, @Param("owner") String owner,
             @Param("limit") long limit);
+
+    /// Writes the row without changing it, holding it until the transaction
+    /// ends: a spend reads the card's state behind it, so a freeze or a new
+    /// limit committed meanwhile is the one it sees.
+    @Modifying
+    @Query("update Card c set c.frozen = c.frozen where c.id = :id")
+    int hold(@Param("id") String id);
 }

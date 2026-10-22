@@ -114,13 +114,17 @@ public final class PayeesForm {
             name.setText(payee.nickname());
             Command ok = new Command(Lang.tr("Save"));
             if (Dialog.show(Lang.tr("Rename"), name, ok, new Command(Lang.tr("Cancel"))) == ok) {
-                Api.banking().renamePayee(payee.id(), new NewPayeeDto(payee.email(),
-                        name.getText().trim()), Net.to((PayeeDto done) -> load(content), failed));
+                final NewPayeeDto renamed = new NewPayeeDto(payee.email(), name.getText().trim());
+                DeviceSetup.withDevice(retry -> Api.banking().renamePayee(payee.id(),
+                        RequestSigner.sign("PUT", TARGET + "/" + payee.id(), null, renamed), renamed,
+                        Net.to((PayeeDto done) -> load(content), retry)), failed);
             }
         } else if (picked == remove && Ui.confirm("Remove payee",
                 Lang.tr("Remove {0}? Adding them again starts a new cooling-off.", payee.nickname()),
                 "Remove")) {
-            Api.banking().removePayee(payee.id(), Net.to((PayeeDto done) -> load(content), failed));
+            DeviceSetup.withDevice(retry -> Api.banking().removePayee(payee.id(),
+                    RequestSigner.sign("DELETE", TARGET + "/" + payee.id(), null, null),
+                    Net.to((PayeeDto done) -> load(content), retry)), failed);
         }
     }
 }

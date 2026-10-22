@@ -85,9 +85,9 @@ public class ClipboardContent {
     /// Takes the content off the clipboard again after the given time. iOS lets the pasteboard
     /// expire it (`UIPasteboardOptionExpirationDate`), which works even if the application is
     /// suspended or killed meanwhile. Elsewhere the application clears the clipboard when the
-    /// time is up, provided it has copied nothing else since; on Android it clears only a clip
-    /// that is still this one. That needs the application to be running, so it is a best effort
-    /// rather than a guarantee.
+    /// time is up, provided it has copied nothing else since and the clipboard still holds this
+    /// content -- a copy another application made meanwhile is left alone. That needs the
+    /// application to be running, so it is a best effort rather than a guarantee.
     ///
     /// #### Parameters
     ///

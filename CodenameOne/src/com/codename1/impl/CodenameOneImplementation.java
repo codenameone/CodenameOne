@@ -6158,14 +6158,19 @@ public abstract class CodenameOneImplementation {
 
     /// Takes a content copied with `ClipboardContent#setClearAfter(int)` off the clipboard once
     /// its time is up. Called only when this application has copied nothing since. The default
-    /// replaces it with an empty clip; a port that can tell whether the clipboard still holds this
-    /// content (another application may have copied over it) checks first, and one whose platform
+    /// replaces it with an empty clip, and only while the clipboard's text is still this
+    /// content's: another application may have copied over it meanwhile, and that copy is the
+    /// user's. A port that can identify its own clip checks that instead, and one whose platform
     /// expires the content by itself does nothing.
     ///
     /// #### Parameters
     ///
     /// - `content`: the content that was copied
     public void clearClipboardContent(ClipboardContent content) {
+        String copied = getPlainTextForClipboard(content);
+        if (copied == null || !copied.equals(getPlainTextForClipboard(getPasteDataFromClipboard()))) {
+            return;
+        }
         copyToClipboard(new ClipboardContent());
     }
 

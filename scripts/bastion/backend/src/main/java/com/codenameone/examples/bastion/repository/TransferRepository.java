@@ -38,4 +38,10 @@ public interface TransferRepository extends CrudRepository<Transfer, String> {
     /// What has gone through a payee or a card since `since`; null when nothing.
     @Query("select sum(t.amount) from Transfer t where t.via = :via and t.createdAt >= :since")
     Long throughSince(@Param("via") String via, @Param("since") long since);
+
+    /// What has gone through a payee in `asset` since `since`; null when nothing.
+    @Query("select sum(t.amount) from Transfer t where t.via = :via and t.asset = :asset "
+            + "and t.createdAt >= :since")
+    Long throughSinceIn(@Param("via") String via, @Param("asset") String asset,
+            @Param("since") long since);
 }

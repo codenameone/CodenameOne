@@ -30,6 +30,7 @@ import com.codename1.ui.CN;
 import com.codename1.util.Base64;
 import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.bastion.api.DeviceDto;
+import com.codenameone.examples.bastion.api.DeviceRevokeDto;
 import com.codenameone.examples.bastion.api.DeviceRegistrationDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
@@ -213,7 +214,17 @@ public final class DeviceKey {
         if (id == null || Session.user() == null) {
             return;
         }
-        Api.banking().revokeDevice(id, Net.to((DeviceDto gone) -> {
+        // Revoking is signed by this device's own key: the orphan's key was
+        // never kept, so there is nothing else to sign with. Until this device
+        // has a key of its own the orphan waits -- it is harmless meanwhile,
+        // since nobody holds its private key.
+        DeviceRevokeDto request = new DeviceRevokeDto(null);
+        String signature = RequestSigner.sign("POST", "/api/devices/" + id + "/revoke", null,
+                request);
+        if (signature == null) {
+            return;
+        }
+        Api.banking().revokeDevice(id, signature, request, Net.to((DeviceDto gone) -> {
             if (id.equals(orphan())) {
                 Preferences.delete(ORPHAN_KEY);
             }

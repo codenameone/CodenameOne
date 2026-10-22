@@ -219,4 +219,35 @@ class AuthTest {
         assertEquals(Boolean.TRUE, me.get("totpEnabled"));
         assertFalse(audit.verify().size() > 0);
     }
+
+    @Test
+    void theStepUpPasswordIsHeldToTheLockout() throws Exception {
+        String user = SignIn.register(mvc, "auth-stepup@bastion.test", PASSWORD);
+        String token = SignIn.token(mvc, user, PASSWORD);
+        String right = "{\"password\":\"" + PASSWORD + "\"}";
+        String wrong = "{\"password\":\"not the password\"}";
+        // No password yet is a client that has not asked: never counted.
+        for (int iter = 0; iter < 6; iter++) {
+            assertEquals(403, call("POST", "/api/account/mfa/totp", token, null).getStatus());
+        }
+        for (int iter = 0; iter < 4; iter++) {
+            assertEquals(401, SignIn.password(mvc, user, "not the password!").getStatus());
+        }
+        // A right one wipes the four the form counted.
+        assertEquals(200, call("POST", "/api/account/mfa/totp", token, right).getStatus());
+        for (int iter = 0; iter < 4; iter++) {
+            assertEquals(401, SignIn.password(mvc, user, "not the password!").getStatus());
+        }
+        assertTrue(SignIn.password(mvc, user, PASSWORD).getStatus() != 423, "not locked");
+        // A wrong one counts with the form's, and the lock then holds here too.
+        assertEquals(403, call("POST", "/api/account/mfa/totp", token, wrong).getStatus());
+        for (int iter = 0; iter < 4; iter++) {
+            assertEquals(401, SignIn.password(mvc, user, "not the password!").getStatus());
+        }
+        assertEquals(1, events(user, "ACCOUNT_LOCKED"));
+        MockResponse locked = call("POST", "/api/account/mfa/totp", token, right);
+        assertEquals(423, locked.getStatus());
+        assertTrue(locked.getContentAsString().indexOf("account-locked") >= 0,
+                locked.getContentAsString());
+    }
 }

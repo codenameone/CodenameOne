@@ -83,4 +83,15 @@ class SensitiveClipboardTest extends UITestBase {
         waitPast(200);
         assertEquals("plain", pasted());
     }
+
+    @FormTest
+    void anotherApplicationsCopyIsNeverCleared() throws InterruptedException {
+        Display.getInstance().copyToClipboard(new ClipboardContent()
+                .setData(ClipboardContent.MIME_TEXT, "secret").setClearAfter(50));
+        // Straight to the port, as a copy made in another application reaches the system
+        // clipboard: this application has copied nothing since, so the clear still fires.
+        implementation.copyToClipboard("another app's copy");
+        waitPast(400);
+        assertEquals("another app's copy", pasted());
+    }
 }

@@ -29,6 +29,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.bastion.api.AccountDto;
 import com.codenameone.examples.bastion.api.CardDto;
 import com.codenameone.examples.bastion.api.CardLimitDto;
+import com.codenameone.examples.bastion.security.RequestSigner;
 import com.codenameone.examples.bastion.money.Amounts;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
@@ -85,7 +86,9 @@ public final class CardsForm {
                     Dialog.show(Lang.tr("Not changed"), Lang.tr(message), Lang.tr("OK"), null);
                 };
                 if (card.frozen()) {
-                    Api.banking().unfreezeCard(card.id(), Net.to((CardDto c) -> load(content), failed));
+                    DeviceSetup.withDevice(retry -> Api.banking().unfreezeCard(card.id(),
+                            RequestSigner.sign("POST", "/api/cards/" + card.id() + "/unfreeze", null,
+                                    null), Net.to((CardDto c) -> load(content), retry)), failed);
                 } else {
                     Api.banking().freezeCard(card.id(), Net.to((CardDto c) -> load(content), failed));
                 }
@@ -110,9 +113,13 @@ public final class CardsForm {
                     Lang.tr("OK"), null);
             return;
         }
-        Api.banking().cardLimit(card.id(), new CardLimitDto(units), Net.to((CardDto c) -> load(content),
+        // Signed always; the server asks for it only when the limit goes up.
+        final CardLimitDto limit = new CardLimitDto(units);
+        DeviceSetup.withDevice(retry -> Api.banking().cardLimit(card.id(),
+                RequestSigner.sign("PUT", "/api/cards/" + card.id() + "/limit", null, limit), limit,
+                Net.to((CardDto c) -> load(content), retry)),
                 (status, message) -> Dialog.show(Lang.tr("Not changed"), Lang.tr(message),
-                        Lang.tr("OK"), null)));
+                        Lang.tr("OK"), null));
     }
 
     private static String assetOf(List<AccountDto> accounts, String accountId) {

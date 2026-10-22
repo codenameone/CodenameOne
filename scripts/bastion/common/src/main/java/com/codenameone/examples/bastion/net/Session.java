@@ -191,8 +191,18 @@ public final class Session {
         }
 
         @Override
-        public AsyncResource<OidcTokens> load(String key) {
-            return inner.load(key);
+        public AsyncResource<OidcTokens> load(final String key) {
+            AsyncResource<OidcTokens> loaded = inner.load(key);
+            loaded.ready(tokens -> {
+                // Read with the key open and nothing there: the marker is out
+                // of date (the store was wiped, or the sealing key replaced),
+                // and keeping it would send every start to a lock that guards
+                // nothing and then on to the sign-in form.
+                if (tokens == null || tokens.getAccessToken() == null) {
+                    Preferences.delete(HELD + key);
+                }
+            });
+            return loaded;
         }
 
         @Override

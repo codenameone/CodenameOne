@@ -121,13 +121,9 @@ public class Devices {
         // the password.
         boolean strong = how.contains("hwk") || how.contains("mfa") || how.contains("otp");
         if (!strong) {
-            String password = request.password();
-            if (password == null
-                    || !encoder.matches(password, users.loadUserByUsername(owner).getPassword())) {
-                guard.failed(owner);
-                audit.append(owner, "DEVICE_REFUSED", owner, "password");
-                throw Refused.with(403, "enter-password-add-device-turn", "Enter your password to add a device, or turn on an authenticator app");
-            }
+            guard.recheck(owner, request.password(), encoder, "DEVICE_REFUSED",
+                    "enter-password-add-device-turn",
+                    "Enter your password to add a device, or turn on an authenticator app");
         }
         return registerOnce(owner, request);
     }
@@ -184,6 +180,13 @@ public class Devices {
             }
         }
         return out;
+    }
+
+    /// The password again, for revoking a device that no device signs for.
+    public void recheck(String owner, String password) throws IOException {
+        guard.recheck(owner, password, encoder, "DEVICE_REVOKE_REFUSED",
+                "sign-or-enter-password-revoke",
+                "Approve this on another device, or enter your password");
     }
 
     @Transactional(rollbackFor = Exception.class)

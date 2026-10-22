@@ -88,16 +88,14 @@ public final class Protect {
         // A digest, never the text: what a killed app left on the clipboard
         // is recognised at the next start without keeping it anywhere.
         Preferences.set(LEFT, digest(text));
-        // The content clears itself (setClearAfter); this timer only forgets
-        // the digest, and wipes a clip the platform left behind. CN.setTimeout,
-        // not a UITimer: a UITimer runs only while the form it is bound to is
+        // The content clears itself (setClearAfter, or the pasteboard's own
+        // expiry on iOS): one mechanism writes the clipboard when the time is
+        // up, never two racing each other. This timer only forgets the
+        // digest, and never touches the clipboard. CN.setTimeout, not a
+        // UITimer: a UITimer runs only while the form it is bound to is
         // showing, and the user moves on after copying.
         CN.setTimeout((int) AppConfig.CLIPBOARD_CLEAR_MILLIS, () -> {
-            // Only what this app put there: never wipe something the user
-            // copied from elsewhere since.
-            if (text.equals(copied) && text.equals(clipText())) {
-                clear();
-            } else if (text.equals(copied)) {
+            if (text.equals(copied)) {
                 copied = null;
                 Preferences.delete(LEFT);
             }

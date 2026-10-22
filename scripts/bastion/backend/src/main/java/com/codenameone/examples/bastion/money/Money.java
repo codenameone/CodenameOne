@@ -37,6 +37,7 @@ import com.codenameone.examples.bastion.exchange.Markets;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
 import com.codenameone.examples.bastion.ledger.Ledger;
 import com.codenameone.examples.bastion.ledger.Leg;
+import com.codenameone.examples.bastion.repository.CardRepository;
 import com.codenameone.examples.bastion.repository.JournalEntryRepository;
 import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.repository.TransferRepository;
@@ -61,8 +62,8 @@ import java.util.Map;
 /// 3. **The device** is trusted ([Devices]) for money leaving the caller.
 /// 4. **The limits** ([#checkLimits]): per movement, per 24 hours, and per
 ///    new payee during its cooling-off period -- fiat valued in USD at
-///    `bastion.limit.fx` and summed across currencies (the payee and card
-///    limits in the payment's own units), crypto
+///    `bastion.limit.fx` and summed across currencies (the card limit in
+///    the card's own units), crypto
 ///    valued in USD at the index price.
 ///
 /// A retry of a movement already made skips 2 to 4's counting -- the money
@@ -77,6 +78,7 @@ public class Money {
     private final TransferRepository transfers;
     private final JournalEntryRepository entries;
     private final ProfileRepository profiles;
+    private final CardRepository cards;
     private final long perTransfer;
     private final long daily;
     private final long stepUp;
@@ -90,6 +92,7 @@ public class Money {
 
     public Money(Ledger ledger, Audit audit, TransferRepository transfers,
             JournalEntryRepository entries, ProfileRepository profiles, Markets markets,
+            CardRepository cards,
             @Value("${bastion.crypto.limit.per-withdrawal:1000000}") String cryptoPerMove,
             @Value("${bastion.crypto.limit.daily:2000000}") String cryptoDaily,
             @Value("${bastion.limit.per-transfer:500000}") String perTransfer,
@@ -104,6 +107,7 @@ public class Money {
         this.transfers = transfers;
         this.entries = entries;
         this.profiles = profiles;
+        this.cards = cards;
         // In USD cents, every fiat currency valued in USD: 5,000.00 a movement, 10,000.00
         // a day, a signature above 1,000.00, 100.00 to a payee for its first
         // day.
@@ -186,7 +190,7 @@ public class Money {
             return true;
         }
         Asset asset = ledger.asset(from.getAsset());
-        long value = "FIAT".equals(asset.getKind()) ? amount
+        long value = "FIAT".equals(asset.getKind()) ? fiatValue(asset.getCode(), Math.max(amount, 0L))
                 : markets.value(asset.getCode(), Math.max(amount, 0L), "USD");
         return value > stepUp;
     }
@@ -304,6 +308,17 @@ public class Money {
             // otherwise each count the day's total without the other and
             // together pass a limit neither may.
             profiles.hold(m.owner);
+            if (m.card != null) {
+                // The card as it is now, behind its row: the copy the endpoint
+                // checked was read before this transaction, and a freeze or a
+                // lower limit committed in between must not be spent past.
+                cards.hold(m.card.getId());
+                Card now = cards.findById(m.card.getId());
+                if (now == null || now.isFrozen()) {
+                    throw Refused.with(409, "card-frozen", "That card is frozen");
+                }
+                m.card = now;
+            }
             checkLimits(m);
         }
         JournalEntry entry = ledger.post(m.key, m.kind, m.owner, memo, legs);
@@ -360,8 +375,20 @@ public class Money {
             throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
         }
         if (m.payee != null && now < m.payee.getCreatedAt() + coolOffMillis) {
-            Long paid = transfers.throughSince(m.payee.getId(), m.payee.getCreatedAt());
-            if ((paid == null ? 0L : paid.longValue()) + m.amount > coolOffLimit) {
+            // In USD cents, each currency valued by itself: a raw sum would
+            // add euro cents to dollar cents, and the limit would mean a
+            // different amount in every currency.
+            long paid = value;
+            for (Asset fiat : ledger.assets()) {
+                if ("FIAT".equals(fiat.getKind())) {
+                    Long through = transfers.throughSinceIn(m.payee.getId(), fiat.getCode(),
+                            m.payee.getCreatedAt());
+                    if (through != null && through.longValue() > 0) {
+                        paid = saturatedAdd(paid, fiatValue(fiat.getCode(), through.longValue()));
+                    }
+                }
+            }
+            if (paid > coolOffLimit) {
                 throw Refused.with(409, "new-payee-receive-until-their", "A new payee can receive only {0} until their cooling-off period ends", coolOffLimit);
             }
         }

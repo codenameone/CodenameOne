@@ -73,4 +73,16 @@ class StoredSessionTest {
         marked.clear(key);
         assertFalse(Session.hasStoredSession("http://localhost:18080"), "and not one signed out of");
     }
+
+    @Test
+    void aMarkerWithNothingBehindItIsDropped() {
+        TokenStore marked = new Session.Marked(new Accepting());
+        String key = Session.storeKey("http://localhost:18081");
+        marked.save(key, null);
+        assertTrue(Session.hasStoredSession("http://localhost:18081"));
+        // Unlocked and read: the store holds nothing, so the next start must
+        // go straight to the sign-in form rather than to the lock.
+        marked.load(key);
+        assertFalse(Session.hasStoredSession("http://localhost:18081"), "the stale marker is gone");
+    }
 }

@@ -10227,6 +10227,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
+        // Whatever is copied now replaces the last restricted copy, expiry and all: a plain
+        // copy has no expiry, so a clear scheduled for it must not be skipped as if it had.
+        clipboardExpires = false;
         if(obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
             // Every representation, now, including any registered as a provider. The pasteboard

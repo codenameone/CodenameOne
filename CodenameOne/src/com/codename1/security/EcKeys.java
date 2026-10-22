@@ -200,9 +200,9 @@ final class EcKeys {
         if (q[2].signum() == 0) {
             return null;
         }
-        // Fermat's little theorem: modInverse has been wrong for 256-bit
-        // operands in this BigInteger.
-        BigInteger zInv = q[2].modPow(P.subtract(BigInteger.valueOf(2)), P);
+        // P is prime and 0 < z < P, so the inverse exists (BigIntegerModInverseTest
+        // holds modInverse to 256-bit operands).
+        BigInteger zInv = q[2].mod(P).modInverse(P);
         return new BigInteger[]{q[0].multiply(zInv).mod(P), q[1].multiply(zInv).mod(P)};
     }
 

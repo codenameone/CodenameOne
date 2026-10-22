@@ -285,6 +285,28 @@ class ExchangeTest {
     /// asset sums to zero, every balance is its postings, every hold is what
     /// its open orders say, and the audit chain is whole.
     @Test
+    void aTakerSellersFeeNeverExceedsTheProceeds() throws Exception {
+        // One lot at 1,000.00 USD a coin is a single cent; at 500.00 half of
+        // one, which rounds down to nothing. The taker's fee is on its running
+        // total, so a fill can pay a cent of fee out of a cent of proceeds --
+        // but never more than the fill brought in.
+        String buyer = trader(100000, 0);
+        String seller = trader(0, 6 * 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 100000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 100000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
+        OrderDto sell = limit(seller, "T9-USD", Exchange.SELL, 50000L, 6 * 1000L);
+        assertEquals(Exchange.FILLED, sell.status());
+        // 2 + 4 x 0.5 = 4 cents of proceeds, a cent of fee on them.
+        assertEquals(3, balance(seller, "USD", AccountKinds.CHECKING));
+        assertTrue(exchange.order(sell.id()).getFee() <= 4L);
+        booksBalance();
+    }
+
+    @Test
     void theBooksBalanceAfterAnOrderStorm() throws Exception {
         final String[] traders = new String[6];
         for (int i = 0; i < traders.length; i++) {

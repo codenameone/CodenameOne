@@ -106,7 +106,7 @@ Every transfer carries a key that makes it happen once: a payment retried after 
 
 === Cards
 
-*Order a card* on a checking account issues a card on it. *Cards* lists them, freezes and unfreezes each, and sets its daily spending limit. A frozen card is refused at once. The card number is on a sensitive screen.
+*Order a card* on a checking account issues a card on it. *Cards* lists them, freezes and unfreezes each, and sets its daily spending limit. A frozen card is refused at once. Freezing works from any signed-in session; unfreezing a card or raising its limit needs this device's approval, so somebody holding only your session can't undo a freeze. The card number is on a sensitive screen.
 
 image::img/bastion-cards.png["The cards screen with a card, its masked number, its daily limit and buttons to freeze it and change the limit",scaledwidth=40%]
 

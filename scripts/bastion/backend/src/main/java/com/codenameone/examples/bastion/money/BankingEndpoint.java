@@ -32,6 +32,7 @@ import com.codenameone.examples.bastion.api.CardSpendDto;
 import com.codenameone.examples.bastion.api.CashDto;
 import com.codenameone.examples.bastion.api.DeviceDto;
 import com.codenameone.examples.bastion.api.DeviceRegistrationDto;
+import com.codenameone.examples.bastion.api.DeviceRevokeDto;
 import com.codenameone.examples.bastion.api.NewPayeeDto;
 import com.codenameone.examples.bastion.api.OpenAccountDto;
 import com.codenameone.examples.bastion.api.PayeeDto;
@@ -231,13 +232,20 @@ public class BankingEndpoint implements BankingApiServer {
     }
 
     @Override
-    public PayeeDto renamePayee(String id, NewPayeeDto payee) throws Exception {
-        return payees.rename(Devices.customer(), id, payee);
+    public PayeeDto renamePayee(String id, String signature, NewPayeeDto payee)
+            throws Exception {
+        // Signed: the name is what the customer picks a payee by, so a token
+        // alone could otherwise relabel an attacker's payee as the landlord.
+        String owner = Devices.customer();
+        signing.require(owner);
+        return payees.rename(owner, id, payee);
     }
 
     @Override
-    public PayeeDto removePayee(String id) throws Exception {
-        return payees.remove(Devices.customer(), id);
+    public PayeeDto removePayee(String id, String signature) throws Exception {
+        String owner = Devices.customer();
+        signing.require(owner);
+        return payees.remove(owner, id);
     }
 
     @Override
@@ -257,16 +265,29 @@ public class BankingEndpoint implements BankingApiServer {
     }
 
     @Override
-    public CardDto unfreezeCard(String id) throws Exception {
-        return cards.freeze(Devices.customer(), id, false);
+    public CardDto unfreezeCard(String id, String signature) throws Exception {
+        // Freezing stays a token-only call -- anyone holding the session may
+        // stop a card, and should be able to the moment it is lost -- but
+        // unfreezing puts spending back, so it is held to what moving money is.
+        String owner = Devices.customer();
+        Device device = signing.require(owner);
+        money.requireTrusted(device);
+        return cards.freeze(owner, id, false);
     }
 
     @Override
-    public CardDto cardLimit(String id, CardLimitDto limit) throws Exception {
+    public CardDto cardLimit(String id, String signature, CardLimitDto limit) throws Exception {
         if (limit == null) {
             throw Refused.with(400, "send-limit", "Send the limit");
         }
-        return cards.limit(Devices.customer(), id, limit.dailyLimit());
+        String owner = Devices.customer();
+        // Lowering a limit is as harmless as freezing; raising one is more
+        // spending, so it is signed by a trusted device.
+        if (limit.dailyLimit() > cards.owned(owner, id).getDailyLimit()) {
+            Device device = signing.require(owner);
+            money.requireTrusted(device);
+        }
+        return cards.limit(owner, id, limit.dailyLimit());
     }
 
     @Override
@@ -299,8 +320,19 @@ public class BankingEndpoint implements BankingApiServer {
     }
 
     @Override
-    public DeviceDto revokeDevice(String id) throws Exception {
-        return devices.revoke(Devices.customer(), id);
+    public DeviceDto revokeDevice(String id, String signature, DeviceRevokeDto request)
+            throws Exception {
+        String owner = Devices.customer();
+        // A stolen token must not revoke the owner's phone, which would leave
+        // the thief's session as the only one that can approve anything. One
+        // of the account's devices signs it (another, or the one going), or,
+        // with none at hand, the password is entered again.
+        if (RequestSigning.present()) {
+            signing.require(owner);
+        } else {
+            devices.recheck(owner, request == null ? null : request.password());
+        }
+        return devices.revoke(owner, id);
     }
 
     private static AccountDto dto(LedgerAccount a) {

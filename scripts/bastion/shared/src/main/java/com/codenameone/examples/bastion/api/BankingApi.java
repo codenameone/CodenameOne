@@ -43,7 +43,9 @@ import java.util.List;
 ///   is refused (422).
 /// - **`Bastion-Signature`** where a request must come from a registered
 ///   device: transfers above the step-up threshold, anything paying someone
-///   else, withdrawals and new payees. It is
+///   else, withdrawals, adding, renaming and removing a payee, unfreezing a
+///   card, raising a card's limit and revoking a device (which takes the
+///   account password in its body instead when no other device signs). It is
 ///   `v1;device=<id>;ts=<millis>;nonce=<random>;sig=<base64url>`, where `sig`
 ///   is the device key's ES256 signature (r and s, 32 bytes each, as JOSE
 ///   writes them) of
@@ -98,11 +100,13 @@ public interface BankingApi {
             OnComplete<Response<PayeeDto>> callback);
 
     @PUT("/api/payees/{id}")
-    void renamePayee(@Path("id") String id, @Body NewPayeeDto payee,
+    void renamePayee(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            @Body NewPayeeDto payee,
             OnComplete<Response<PayeeDto>> callback);
 
     @DELETE("/api/payees/{id}")
-    void removePayee(@Path("id") String id, OnComplete<Response<PayeeDto>> callback);
+    void removePayee(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            OnComplete<Response<PayeeDto>> callback);
 
     @GET("/api/cards")
     void cards(OnComplete<Response<List<CardDto>>> callback);
@@ -115,10 +119,12 @@ public interface BankingApi {
     void freezeCard(@Path("id") String id, OnComplete<Response<CardDto>> callback);
 
     @POST("/api/cards/{id}/unfreeze")
-    void unfreezeCard(@Path("id") String id, OnComplete<Response<CardDto>> callback);
+    void unfreezeCard(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            OnComplete<Response<CardDto>> callback);
 
     @PUT("/api/cards/{id}/limit")
-    void cardLimit(@Path("id") String id, @Body CardLimitDto limit,
+    void cardLimit(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            @Body CardLimitDto limit,
             OnComplete<Response<CardDto>> callback);
 
     /// The card network asking to charge the card. Simulated, so development
@@ -135,6 +141,7 @@ public interface BankingApi {
             OnComplete<Response<DeviceDto>> callback);
 
     /// Withdraws a device's key, for a phone that was lost.
-    @DELETE("/api/devices/{id}")
-    void revokeDevice(@Path("id") String id, OnComplete<Response<DeviceDto>> callback);
+    @POST("/api/devices/{id}/revoke")
+    void revokeDevice(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            @Body DeviceRevokeDto request, OnComplete<Response<DeviceDto>> callback);
 }

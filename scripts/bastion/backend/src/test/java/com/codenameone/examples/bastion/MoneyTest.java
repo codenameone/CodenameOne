@@ -45,6 +45,7 @@ import java.util.Map;
 import static com.codename1.backend.test.MockMvcRequestBuilders.delete;
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcRequestBuilders.request;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -153,6 +154,18 @@ class MoneyTest {
                 request = request.header("Idempotency-Key", idempotencyKey);
             }
             return send(request);
+        }
+
+        /// `method` `path` with `body` (may be empty), signed by this device.
+        MockResponse signedAs(String method, String path, String body) throws Exception {
+            MockRequestBuilder request = request(method, path).contentType("application/json")
+                    .content(body).header("Bastion-Signature", signature(method, path, body, key,
+                            System.currentTimeMillis(), nonce(), null));
+            return send(request);
+        }
+
+        MockResponse unsigned(String method, String path, String body) throws Exception {
+            return send(request(method, path).contentType("application/json").content(body));
         }
 
         MockResponse signed(String path, String body, String idempotencyKey) throws Exception {
@@ -451,7 +464,10 @@ class MoneyTest {
         assertEquals(200, a.send(json(spend, coffee).header("Idempotency-Key", key())).getStatus());
         assertEquals(200, a.send(post("/api/cards/" + card.get("id") + "/freeze")).getStatus());
         assertEquals(409, a.send(json(spend, coffee).header("Idempotency-Key", key())).getStatus());
-        assertEquals(200, a.send(post("/api/cards/" + card.get("id") + "/unfreeze")).getStatus());
+        // Unfreezing puts spending back: a token alone cannot.
+        String unfreeze = "/api/cards/" + card.get("id") + "/unfreeze";
+        assertEquals(403, a.send(post(unfreeze)).getStatus());
+        assertEquals(200, a.signedAs("POST", unfreeze, "").getStatus());
         assertEquals(200, a.send(json(spend, coffee).header("Idempotency-Key", key())).getStatus());
         assertEquals(49100, a.balance(a.checking));
     }
@@ -664,6 +680,76 @@ class MoneyTest {
                 "{\"amount\":100,\"memo\":\"x\"}").header("Idempotency-Key", key())).getStatus());
         assertEquals(404, c.signed("/api/accounts/" + hold + "/withdraw", "{\"amount\":1}",
                 key()).getStatus());
+    }
+
+    @Test
+    void aNewPayeesLimitIsValuedInUsdAcrossCurrencies() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        a.deposit(a.checking, 100000);
+        String euros = a.open("EUR", "CHECKING");
+        a.deposit(euros, 100000);
+        b.open("EUR", "CHECKING");
+        String payee = a.addPayee(b);
+        assertEquals(200, a.signed("/api/transfers", a.payBody(payee, 5000), key()).getStatus());
+        // 46.00 EUR is 50.60 USD at the test rate: with the 50.00 USD paid,
+        // over the 100.00 USD a new payee may receive. Summed raw it is 96.00.
+        String inEuros = "{\"fromAccountId\":\"" + euros + "\",\"payeeId\":\"" + payee
+                + "\",\"amount\":4600,\"memo\":\"rent\"}";
+        MockResponse refused = a.signed("/api/transfers", inEuros, key());
+        assertTrue(refusedAs(refused, "new-payee-receive-until-their"), refused.getContentAsString());
+        // 95.00 EUR alone is 104.50 USD: over it too.
+        Customer c = new Customer(false);
+        String cEuros = c.open("EUR", "CHECKING");
+        c.deposit(cEuros, 100000);
+        String cPayee = c.addPayee(b);
+        MockResponse alone = c.signed("/api/transfers", "{\"fromAccountId\":\"" + cEuros
+                + "\",\"payeeId\":\"" + cPayee + "\",\"amount\":9500,\"memo\":\"rent\"}", key());
+        assertTrue(refusedAs(alone, "new-payee-receive-until-their"), alone.getContentAsString());
+    }
+
+    @Test
+    void theStepUpThresholdIsValuedInUsd() throws Exception {
+        Customer c = new Customer(false);
+        String euros = c.open("EUR", "CHECKING");
+        c.deposit(euros, 500000);
+        String savings = c.open("EUR", "SAVINGS");
+        // 950.00 EUR is 1,045.00 USD: over the 1,000.00 USD threshold.
+        String body = internal(euros, savings, 95000);
+        assertEquals(403, c.send(json("/api/transfers", body).header("Idempotency-Key", key()))
+                .getStatus());
+        assertEquals(200, c.signed("/api/transfers", body, key()).getStatus());
+    }
+
+    @Test
+    void sensitiveCardPayeeAndDeviceChangesAreSigned() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        MockResponse issued = a.send(post("/api/accounts/" + a.checking + "/card"));
+        String limit = "/api/cards/" + Json.parseObject(issued.getContentAsString()).get("id")
+                + "/limit";
+        // Lowering is harmless and token-only; raising is more spending.
+        assertEquals(200, a.unsigned("PUT", limit, "{\"dailyLimit\":100}").getStatus());
+        assertEquals(403, a.unsigned("PUT", limit, "{\"dailyLimit\":5000}").getStatus());
+        assertEquals(200, a.signedAs("PUT", limit, "{\"dailyLimit\":5000}").getStatus());
+
+        String payee = "/api/payees/" + a.addPayee(b);
+        String rename = "{\"email\":\"" + b.name + "\",\"nickname\":\"Landlord\"}";
+        assertEquals(403, a.unsigned("PUT", payee, rename).getStatus());
+        assertEquals(200, a.signedAs("PUT", payee, rename).getStatus());
+        assertEquals(403, a.unsigned("DELETE", payee, "").getStatus());
+        assertEquals(200, a.signedAs("DELETE", payee, "").getStatus());
+
+        // Revoking: another device's signature, or the password again.
+        String second = a.register(newKey(), false);
+        String revoke = "/api/devices/" + second + "/revoke";
+        assertEquals(403, a.unsigned("POST", revoke, "{}").getStatus());
+        assertEquals(403, a.unsigned("POST", revoke, "{\"password\":\"not it\"}").getStatus());
+        assertEquals(200, a.unsigned("POST", revoke, "{\"password\":\"" + PASSWORD + "\"}")
+                .getStatus());
+        String third = a.register(newKey(), false);
+        assertEquals(200, a.signedAs("POST", "/api/devices/" + third + "/revoke", "{}")
+                .getStatus());
     }
 
     @Test

@@ -100,7 +100,7 @@ The last column says whether the feature needs a build from the Codename One bui
 |Headers |`nosniff`, frame denial, `no-store`, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java` |No
 |Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java` |No
 |Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again unless the sign-in had a second factor or a passkey. A registration without a platform attestation token is recorded as untrusted, and an untrusted device's signature is refused for any money leaving the customer's accounts. If the app locks while a registration is on its way, the app revokes the server's record of that device after the next unlock. |`money/Devices.java` |No
-|Request signing |Signature, timestamp window and single-use nonce on every call that sends value away. |`money/RequestSigning.java`, `SignedRequest.java` |No
+|Request signing |Signature, timestamp window and single-use nonce on every call that sends value away, and on the calls that would let a stolen token do so later: changing a payee, unfreezing a card, raising its limit, revoking a device. |`money/RequestSigning.java`, `SignedRequest.java` |No
 |Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java` |No
 |Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see <<bastion-before-product>>. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java` |Token: yes
 |Limits and step-up |Per transfer, per day, per new payee during its cooling-off; own-account moves above a threshold signed too; crypto counted in dollars at the index price. |`money/Money.java`, `money/Payees.java` |No
@@ -196,11 +196,12 @@ Every endpoint but registration and sign-in needs a bearer token. *Signed* marks
 |`POST /api/transfers` |Moves money. |Signed, idempotent
 |`POST /api/accounts/{id}/deposit` |The demo deposit. |Idempotent
 |`POST /api/accounts/{id}/withdraw` |A withdrawal to the outside. |Signed, idempotent
-|`GET`, `POST`, `PUT`, `DELETE /api/payees[/{id}]` |Lists, adds, renames and removes payees. |Adding: signed
+|`GET`, `POST`, `PUT`, `DELETE /api/payees[/{id}]` |Lists, adds, renames and removes payees. |Adding, renaming, removing: signed
 |`GET /api/cards`, `POST /api/accounts/{id}/card` |Lists and issues cards. |
-|`POST /api/cards/{id}/freeze`, `.../unfreeze`, `PUT .../limit` |Freezes, unfreezes and limits a card. |
+|`POST /api/cards/{id}/freeze`, `.../unfreeze`, `PUT .../limit` |Freezes, unfreezes and limits a card. |Unfreezing and raising the limit: signed by a trusted device
 |`POST /api/cards/{id}/spend` |The demo card spend. |Idempotent
-|`GET`, `POST`, `DELETE /api/devices[/{id}]` |Lists, registers and removes device keys. |Recent sign-in
+|`GET`, `POST /api/devices` |Lists and registers device keys. |Registering: recent sign-in
+|`POST /api/devices/{id}/revoke` |Removes a device key. |Signed by a device, or the password in the body
 |`GET /api/exchange/markets`, `.../{id}/book`, `.../{id}/ticker` |Markets, order book and ticker. |
 |`POST`, `GET`, `DELETE /api/exchange/orders[/{id}]` |Places, lists and cancels orders. |
 |`GET /api/exchange/trades` |The customer's trades. |

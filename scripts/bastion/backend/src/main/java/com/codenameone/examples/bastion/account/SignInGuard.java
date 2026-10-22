@@ -28,6 +28,8 @@ import com.codename1.backend.security.AuthenticationSuccessHandler;
 import com.codename1.backend.security.RequestMatcher;
 import com.codename1.backend.security.SecurityFilter;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
+import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codenameone.examples.bastion.Refused;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.LoginFailure;
 import com.codenameone.examples.bastion.repository.LoginFailureRepository;
@@ -145,6 +147,31 @@ public class SignInGuard {
                     how + ": " + failure.getClass().getSimpleName());
             return json(401, "{\"signedIn\":false,\"authenticated\":false}");
         };
+    }
+
+    /// The password asked for again inside a signed-in session (adding an
+    /// app, a device, revoking one), held to the same lockout as the sign-in
+    /// form: a locked account is refused before the password is looked at,
+    /// a wrong one counts, a right one wipes the count. A missing password is
+    /// a client that has not asked yet, not a guess, so it is not counted.
+    /// `refusal` is what (`code`, English) a wrong or missing one answers.
+    public void recheck(String username, String password, PasswordEncoder encoder,
+            String event, String code, String english) throws IOException {
+        if (locked(username)) {
+            audit.append(username, event, username, "account locked");
+            throw Refused.with(423, "account-locked",
+                    "Too many wrong passwords: this account is locked for a while");
+        }
+        if (password == null || password.length() == 0) {
+            audit.append(username, event, username, "no password");
+            throw Refused.with(403, code, english);
+        }
+        if (!encoder.matches(password, users.loadUserByUsername(username).getPassword())) {
+            failed(username);
+            audit.append(username, event, username, "password");
+            throw Refused.with(403, code, english);
+        }
+        cleared(username);
     }
 
     @Transactional(readOnly = true)

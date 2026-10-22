@@ -82,12 +82,8 @@ public class SecondFactor {
             audit.append(username, "TOTP_REFUSED", username, "sign-in not fresh");
             throw Refused.with(403, "sign-in-first", "Sign in first");
         }
-        if (password == null
-                || !encoder.matches(password, users.loadUserByUsername(username).getPassword())) {
-            guard.failed(username);
-            audit.append(username, "TOTP_REFUSED", username, "password");
-            throw Refused.with(403, "enter-password-add-app", "Enter your password to add an authenticator app");
-        }
+        guard.recheck(username, password, encoder, "TOTP_REFUSED",
+                "enter-password-add-app", "Enter your password to add an authenticator app");
     }
 
     /// Makes a secret for the caller's app. Refused when they already have
