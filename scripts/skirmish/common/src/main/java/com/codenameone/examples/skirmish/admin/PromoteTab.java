@@ -92,10 +92,12 @@ final class PromoteTab {
                 e -> CN.execute(AppConfig.ANALYTICS_CONSOLE)));
         Container numbers = new Container(new GridLayout(2, 2));
         numbers.add(AdminConsole.stat("Players", p.players()));
-        numbers.add(AdminConsole.stat("New this week", p.joinedThisWeek()));
+        numbers.add(AdminConsole.stat("New", p.joinedThisWeek()));
         numbers.add(AdminConsole.stat("Invited", p.invited()));
-        numbers.add(AdminConsole.stat("Invited, played", p.invitedPlayed()));
+        numbers.add(AdminConsole.stat("Played", p.invitedPlayed()));
         col.add(numbers);
+        col.add(Fields.help("New: joined in the last seven days. Invited: joined through a friend's link. "
+                + "Played: of those, played a battle."));
         if (!p.inviters().isEmpty()) {
             col.add(Ui.label("Top inviters", "SectionTitle"));
             for (InviterDto i : p.inviters()) {

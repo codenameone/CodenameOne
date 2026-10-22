@@ -116,6 +116,9 @@ public final class PackScreen {
         ShareButton share = new ShareButton();
         share.setText("Send to a friend");
         share.setUIID("WoodButton");
+        // The share icon ShareButton brings is drawn on white; a material
+        // icon takes the button's own colours.
+        share.setMaterialIcon(com.codename1.ui.FontImage.MATERIAL_SHARE);
         share.setName("sharePack");
         share.setTextToShare("Play \"" + s.name() + "\" in Skirmish: " + AppConfig.packLink(s.id()));
         f.add(share);

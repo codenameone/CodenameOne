@@ -273,6 +273,7 @@ public final class HomeForm {
         SpanButton b = new SpanButton(s.text());
         b.setUIID("Spotlight");
         b.setTextUIID("SpotlightText");
+        b.setIconUIID("SpotlightIcon");
         b.setName("spotlight");
         b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
         b.addActionListener(e -> {

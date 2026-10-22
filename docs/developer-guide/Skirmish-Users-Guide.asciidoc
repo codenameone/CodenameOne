@@ -187,8 +187,12 @@ install the game first, and once they've played their first battle the player
 who invited them is paid too, for up to ten friends. The screen lists everyone
 who joined through the player's link and whether they've played yet.
 
+image::img/skirmish-friends.png["The Friends screen: what an invitation pays, the player's invite code, the Invite friends button and the friends who joined",scaledwidth=40%]
+
 The banner at the top of the home screen is the game's news, set by the
 operator. A tap opens what it's about: a Forge pack, the shop or another screen.
+
+image::img/skirmish-home-spotlight.png["The home screen with the operator's banner under the hero, announcing that levels can now be built in the Forge",scaledwidth=40%]
 
 === The Forge
 
@@ -200,6 +204,8 @@ editor: a pack an operator marks official appears first, for everyone.
 *Forge* on the home screen lists the packs. *Official* comes with the game,
 *Popular* and *New* are what players published, and *Yours* holds a player's own
 drafts and packs.
+
+image::img/skirmish-forge-home.png["The Forge: tabs for official, popular, new and the player's own packs, a Create a pack button and the official campaign",scaledwidth=40%]
 
 ==== Playing a pack
 
@@ -215,6 +221,9 @@ before a set second. Rewards come once per star, and the server plays every miss
 before it believes the stars, so they can't be claimed without being won.
 Missions in packs players made pay a small amount, up to a daily limit.
 
+image::img/skirmish-forge-pack.png["An official pack: its campaign with the first mission open and the others locked, and buttons to share, copy the link, remix, rate or report",scaledwidth=40%]
+image::img/skirmish-forge-mission-story.png["A mission under way, with Elda telling the story in a bubble and a Next button",scaledwidth=40%]
+
 *Share* sends a link that opens the pack in the app, *Remix* copies a pack into
 a new one of the player's own to change, and a pack can be rated or reported.
 
@@ -224,6 +233,8 @@ a new one of the player's own to change, and a pack can be rated or reported.
 The pack editor lists its cards, arenas, missions and campaigns, shows any
 problem that would stop it from being published, and saves a draft that only
 its author sees until *Publish*.
+
+image::img/skirmish-forge-editor.png["The pack editor: the name and description, then sections for cards, arenas, missions and campaigns, each with a button to add one",scaledwidth=40%]
 
 * *Cards* start from any card in the game and change its cost, hit points,
   damage, speed, range, targets and what it spawns. A card can look like any
@@ -240,6 +251,9 @@ its author sees until *Publish*.
   of the story, the stars and the reward. *Test play* plays the mission at once.
 * *Campaigns* put missions in order, with a story before the first and after the
   last.
+
+image::img/skirmish-forge-card.png["The card editor: a turntable preview of the character with Walk, Attack and Idle buttons, and fields for the name, kind, elixir and hit points",scaledwidth=40%]
+image::img/skirmish-forge-arena.png["The arena editor: tools for the king, towers, rocks and trees above the field, with both castles and the river drawn on the grid",scaledwidth=40%]
 
 === The admin console
 
@@ -266,6 +280,7 @@ image::img/skirmish-admin-overview.png["The admin console's overview: players on
   uploaded. An operator looks at a model on the turntable before approving or
   rejecting it, hides or restores a pack, and makes a pack official.
 
+image::img/skirmish-admin-promote.png["The Promote tab: a button to open Codename One analytics, the player numbers, and the form for broadcasting a push",scaledwidth=40%]
 image::img/skirmish-admin-flags.png["The flags tab: a report and an automatic flag, each with the reason and the match it came from",scaledwidth=40%]
 
 An operator can warn, mute, suspend or ban a player, reset their trophies or

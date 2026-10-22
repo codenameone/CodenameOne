@@ -76,7 +76,7 @@ public final class FriendsForm {
     private static void fillFriends(Container col, List<FriendDto> list) {
         col.add(Ui.label("Joined through you", "SectionTitle"));
         if (list.isEmpty()) {
-            col.add(Ui.text("Nobody yet. Share your link and battle a friend.", "Empty"));
+            col.add(Ui.label("Nobody yet. Share your link!", "Empty"));
             return;
         }
         for (FriendDto d : list) {

@@ -396,6 +396,8 @@ but only when it's rare and worth reading.
   campaign is how the console tells broadcasts apart.
 . Choose *Count players*, then *Send*, and confirm.
 
+image::img/skirmish-admin-promote.png["The Promote tab on a phone: the analytics button, the player numbers and the push form with its audience, days and title",scaledwidth=40%]
+
 A day later, compare that campaign's `push_open` count with the number of
 players it was sent to, and the cohort's return rate with the week before. A
 broadcast that nobody opens is worse than none: it teaches players to ignore
@@ -419,6 +421,8 @@ playing. The rewards decide how often players send one:
   few bring anyone in, raise the friend's reward; when few are shared at all,
   make the *Friends* screen easier to reach.
 
+image::img/skirmish-friends.png["The Friends screen a player invites from, with the rewards spelled out above the code",scaledwidth=40%]
+
 Set the `invite.domain` build hint to a domain of your own before release, so
 the links carry the game's name rather than the default service.
 
@@ -438,6 +442,8 @@ there is: no notification permission, no store review. Set it under *Home
 spotlight* with a line of text and either a Forge pack, which opens that pack,
 or a screen. Use it for what's new this week; take it down by saving an empty
 banner.
+
+image::img/skirmish-home-spotlight.png["The spotlight banner on a player's home screen, under the hero",scaledwidth=40%]
 
 ==== Step 7: Ratings
 

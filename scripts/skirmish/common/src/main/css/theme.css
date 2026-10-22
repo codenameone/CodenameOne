@@ -462,6 +462,11 @@ Spotlight.pressed {
     background-color: var(--night);
 }
 
+SpotlightIcon {
+    color: var(--gold);
+    padding: 0 1.5mm 0 0;
+}
+
 SpotlightText {
     color: var(--gold);
     font-family: "native:MainBold";
@@ -622,7 +627,7 @@ PlayerName, EnemyName, BattleClock, BattleClockHot, CrownsBlue, CrownsRed, NextL
 Victory, Defeat, Draw, ResultCrowns, ResultReward, ChallengeUrl, Empty, DeckSummary, Warning,
 ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw,
 MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, ForgeLabel, ForgeHelp,
-ForgeHelpText, ForgeByline, InviteCode, SpotlightText, Container {
+ForgeHelpText, ForgeByline, ForgeValue, InviteCode, SpotlightText, SpotlightIcon, Container {
     background-color: transparent;
 }
 
@@ -1049,13 +1054,12 @@ ForgeProblem {
 }
 
 ForgeOfficial {
-    background-color: var(--gold);
-    border-radius: 1mm;
-    color: var(--ink);
+    background-color: transparent;
+    color: var(--gold);
     font-family: "native:MainBold";
-    font-size: 2.4mm;
-    padding: 0.3mm 1.2mm;
-    margin: 0 1mm;
+    font-size: 3.4mm;
+    padding: 0.3mm 0;
+    margin: 0;
 }
 
 ForgeTab, ForgeTabOn {

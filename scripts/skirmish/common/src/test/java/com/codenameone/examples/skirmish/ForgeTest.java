@@ -54,7 +54,7 @@ public class ForgeTest extends E2e {
         shot("forge-card");
         click("cardDone");
         waitForForm("packEditor");
-        click("mission-hold-the-ford");
+        click("mission-first-mission");
         waitForForm("missionEditor");
         shot("forge-mission-editor");
         return true;
