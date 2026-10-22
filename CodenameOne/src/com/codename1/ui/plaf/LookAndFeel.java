@@ -109,6 +109,10 @@ public abstract class LookAndFeel {
     /// when the content is much taller/wider than the viewport. Resolved from the
     /// {@code scrollThumbMinSizeInt} theme constant, defaulting to roughly 4mm.
     private int interactiveScrollThumbMin;
+    /// When true a click on an interactive scrollbar's track moves the thumb to the click and
+    /// keeps it grabbed, instead of paging by one viewport. Resolved from the
+    /// {@code interactiveScrollTrackJumpBool} theme constant, off by default.
+    private boolean interactiveScrollTrackJump;
     private int fadeScrollBarSpeed = 5;
     private int fadeScrollEdgeLength = 15;
     private Image fadeScrollTop;
@@ -1099,6 +1103,7 @@ public abstract class LookAndFeel {
         interactiveScroll = manager.isThemeConstant("interactiveScrollBool", false);
         interactiveScrollThumbMin = manager.getThemeConstant("scrollThumbMinSizeInt",
                 Display.getInstance().convertToPixels(4f));
+        interactiveScrollTrackJump = manager.isThemeConstant("interactiveScrollTrackJumpBool", false);
         initScroll();
         if (menuRenderer != null) {
             if (menuRenderer instanceof Component) {
@@ -1642,6 +1647,17 @@ public abstract class LookAndFeel {
     /// true if interactive desktop scrollbars are enabled
     public boolean isInteractiveScroll() {
         return interactiveScroll;
+    }
+
+    /// Indicates whether a click on an interactive scrollbar's track jumps the thumb to the
+    /// click position (and keeps it grabbed for dragging) rather than paging one viewport
+    /// toward it. Controlled by the {@code interactiveScrollTrackJumpBool} theme constant.
+    ///
+    /// #### Returns
+    ///
+    /// true if a track click jumps to the clicked position
+    public boolean isInteractiveScrollTrackJump() {
+        return interactiveScrollTrackJump;
     }
 
     /// Scrollbar thumb used for interactive desktop scrollbars. It renders its selected style

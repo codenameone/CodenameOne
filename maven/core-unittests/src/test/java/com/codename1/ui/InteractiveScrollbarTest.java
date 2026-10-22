@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -123,6 +145,40 @@ class InteractiveScrollbarTest extends UITestBase {
         assertFalse(sc.isInteractiveScrollThumbGrabbed(), "a track click is not a thumb grab");
         assertTrue(sc.getScrollY() > before, "clicking the track below the thumb should page down");
         sc.pointerReleased(px, py);
+    }
+
+    @FormTest
+    void trackClickJumpsToPositionWhenEnabled() {
+        setInteractiveScroll(true);
+        Hashtable props = new Hashtable();
+        props.put("@interactiveScrollTrackJumpBool", "true");
+        UIManager.getInstance().addThemeProps(props);
+        assertTrue(UIManager.getInstance().getLookAndFeel().isInteractiveScrollTrackJump());
+        try {
+            Container sc = scrollableContainer(8000);
+            int thumbH = sc.getHeight() / 5;
+            injectVerticalThumb(sc, 0, thumbH);
+
+            // click the middle of the track: the thumb centers there, i.e. half the range
+            int px = sc.getAbsoluteX() + sc.getWidth() - GUTTER / 2;
+            int py = sc.getAbsoluteY() + sc.getHeight() / 2;
+            sc.pointerPressed(px, py);
+            assertTrue(sc.isInteractiveScrollThumbGrabbed(), "a jump keeps the thumb grabbed for dragging");
+            int max = sc.getScrollDimension().getHeight() - sc.getHeight();
+            int expected = max / 2;
+            assertTrue(Math.abs(sc.getScrollY() - expected) <= max / 50,
+                    "a track click should jump to the clicked position, got " + sc.getScrollY()
+                    + " expected about " + expected);
+
+            int mid = sc.getScrollY();
+            sc.pointerDragged(px, py + 50);
+            assertTrue(sc.getScrollY() > mid, "the same press goes on to drag the thumb");
+            sc.pointerReleased(px, py + 50);
+            assertFalse(sc.isInteractiveScrollThumbGrabbed());
+        } finally {
+            props.put("@interactiveScrollTrackJumpBool", "false");
+            UIManager.getInstance().addThemeProps(props);
+        }
     }
 
     @FormTest

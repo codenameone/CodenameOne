@@ -2908,6 +2908,18 @@
         "canonical_set": true,
         "syndicated_at": "2026-10-21T19:03:08+00:00"
       }
+    },
+    "maven-projects-with-less-scaffolding": {
+      "hashnode": {
+        "url": "https://debugagent.com/smaller-simpler-maven-projects",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ad9520ed1fd0e9ce7658baf",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-22T00:01:09+00:00"
+      }
     }
   }
 }
