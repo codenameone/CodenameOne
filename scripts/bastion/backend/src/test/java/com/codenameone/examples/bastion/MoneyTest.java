@@ -596,13 +596,16 @@ class MoneyTest {
         // A token whose sign-in is half an hour old cannot enrol an app.
         String fresh = c.token;
         c.token = aged(fresh, 30);
-        assertEquals(403, c.send(post("/api/account/mfa/totp")).getStatus());
+        String withPassword = "{\"password\":\"" + PASSWORD + "\"}";
+        assertEquals(403, c.send(json("/api/account/mfa/totp", withPassword)).getStatus());
         c.token = fresh;
-        MockResponse started = c.send(post("/api/account/mfa/totp"));
+        // Fresh but password-only: the password has to come with it.
+        assertEquals(403, c.send(json("/api/account/mfa/totp", "{}")).getStatus());
+        MockResponse started = c.send(json("/api/account/mfa/totp", withPassword));
         assertEquals(200, started.getStatus(), started.getContentAsString());
         String secret = (String) Json.parseObject(started.getContentAsString()).get("secret");
         MockResponse confirmed = c.send(json("/api/account/mfa/totp/confirm",
-                "{\"code\":\"" + totp(secret, 0) + "\"}"));
+                "{\"code\":\"" + totp(secret, 0) + "\",\"password\":\"" + PASSWORD + "\"}"));
         assertEquals(200, confirmed.getStatus(), confirmed.getContentAsString());
         // The token still says "pwd": the app does not make it a second factor.
         String noPassword = "{\"publicKey\":\"" + Base64Url.encode(newKey().publicKey)

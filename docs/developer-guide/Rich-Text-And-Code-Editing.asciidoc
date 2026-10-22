@@ -240,6 +240,16 @@ override clipboard handling in `CodenameOneImplementation` and return the format
 the system clipboard. Applications can use the same API for domain-specific formats without changing
 the editor.
 
+A password, a one-time code or a recovery key shouldn't linger on the clipboard.
+`ClipboardContent.setSensitive(true)` marks a copy as sensitive: Android 13 and newer keep its text
+out of the copy preview and the keyboard's suggestions (`ClipDescription.EXTRA_IS_SENSITIVE`), and
+iOS publishes it local only, so Universal Clipboard never sends it to the user's other devices. The
+simulator and the browser have no such marker. `setClearAfter(millis)` takes the copy off the
+clipboard again after that time. iOS hands the expiry to the pasteboard, which removes the copy even
+if the application was suspended or closed meanwhile. The other ports clear it from the application
+when the time is up, and only if the application copied nothing else since; Android also checks that
+the clip on the clipboard is still its own, so a later copy from another application stays.
+
 RTF is also recognized when a clipboard provider returns it as a string beginning with an RTF header.
 Format import is intentionally a practical interchange subset, not a layout-compatible word
 processor: unsupported RTF destinations and advanced Markdown or AsciiDoc extensions degrade to the

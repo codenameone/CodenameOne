@@ -214,10 +214,15 @@ public final class LiveE2e {
         }
 
         void enrolTotp() throws Exception {
-            secret = (String) json(call("POST", "/api/account/mfa/totp", "", null, null), 200)
+            // Password-only sign-in: the password goes with both calls.
+            check(call("POST", "/api/account/mfa/totp", "{}", null, null).statusCode() == 403,
+                    "a password-only token alone cannot add an authenticator app");
+            String pw = "{\"password\":\"" + PASSWORD + "\"}";
+            secret = (String) json(call("POST", "/api/account/mfa/totp", pw, null, null), 200)
                     .get("secret");
             Map confirmed = json(call("POST", "/api/account/mfa/totp/confirm",
-                    "{\"code\":\"" + totp(secret, 0) + "\"}", null, null), 200);
+                    "{\"code\":\"" + totp(secret, 0) + "\",\"password\":\"" + PASSWORD
+                    + "\"}", null, null), 200);
             check(((List) confirmed.get("codes")).size() == 10, "ten recovery codes");
         }
 

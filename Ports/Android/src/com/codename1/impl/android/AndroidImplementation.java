@@ -10909,6 +10909,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             // somewhere and tells that receiver it succeeded.
                             clip = ClipData.newPlainText("Codename One", "");
                         }
+                        markClip(clip, (ClipboardContent) obj, sdk);
                     } else {
                         // Nothing of ours is staged for a plain text clip.
                         clip = ClipData.newPlainText("Codename One", obj.toString());
@@ -10934,6 +10935,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             endStagingClip(staged);
                         }
                     }
+                }
+            }
+        });
+    }
+
+    /// The extra API 33 reads to keep a clip's text out of the copy preview and the keyboard's
+    /// suggestions. Spelled out because the platform jar this port compiles against predates the
+    /// constant; API 24 is the floor of `ClipDescription.setExtras`.
+    private static final String EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE";
+
+    /// Ours, so a scheduled clear can recognise its own clip without reading the clip itself
+    /// (reading it shows the "pasted from" notice on Android 12 and newer).
+    private static final String EXTRA_CN1_CLEAR_AFTER = "com.codename1.clipboard.clearAfter";
+
+    private static void markClip(ClipData clip, ClipboardContent content, int sdk) {
+        if (sdk < 24 || (!content.isSensitive() && content.getClearAfter() <= 0)) {
+            return;
+        }
+        PersistableBundle extras = new PersistableBundle();
+        if (content.isSensitive()) {
+            extras.putBoolean(EXTRA_IS_SENSITIVE, true);
+        }
+        if (content.getClearAfter() > 0) {
+            extras.putInt(EXTRA_CN1_CLEAR_AFTER, content.getClearAfter());
+        }
+        clip.getDescription().setExtras(extras);
+    }
+
+    @Override
+    public void clearClipboardContent(ClipboardContent content) {
+        if (getActivity() == null) {
+            return;
+        }
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (android.os.Build.VERSION.SDK_INT < 24) {
+                    // No extras to recognise the clip by: an empty clip replaces it, as on the
+                    // other ports.
+                    copyToClipboard(new ClipboardContent());
+                    return;
+                }
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                        getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard == null) {
+                    return;
+                }
+                android.content.ClipDescription description = clipboard.getPrimaryClipDescription();
+                PersistableBundle extras = description == null ? null : description.getExtras();
+                // Only our own clip: another application may have copied over it meanwhile.
+                // An empty clip rather than clearPrimaryClip (API 28), which the platform jar this
+                // port compiles against does not have.
+                if (extras != null && extras.containsKey(EXTRA_CN1_CLEAR_AFTER)) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
                 }
             }
         });

@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.bastion.security;
 
-import com.codename1.io.Preferences;
 import com.codename1.security.SecureStorage;
 import com.codename1.security.vault.AssociatedData;
 import com.codename1.security.vault.ProtectionReport;
@@ -39,16 +38,10 @@ import com.codename1.util.Base64;
 /// Only the quiet methods are implemented: the token store never asks this
 /// store for a biometric -- the biometric is what opens the key.
 public final class SealedStorage extends SecureStorage {
-    private static final String MARK = "bastion.sealed.";
     private final SecureStorage inner;
 
     public SealedStorage(SecureStorage inner) {
         this.inner = inner;
-    }
-
-    /// Whether there is a sealed value under `account`, readable or not.
-    public static boolean holds(String account) {
-        return Preferences.get(MARK + account, false);
     }
 
     @Override
@@ -59,11 +52,7 @@ public final class SealedStorage extends SecureStorage {
         }
         byte[] sealed = SecureEnvelope.seal(key, "app-key", 1, aad(account),
                 bytes(value));
-        if (!inner.set(account, Base64.encodeUrlSafe(sealed))) {
-            return false;
-        }
-        Preferences.set(MARK + account, true);
-        return true;
+        return inner.set(account, Base64.encodeUrlSafe(sealed));
     }
 
     @Override
@@ -86,7 +75,6 @@ public final class SealedStorage extends SecureStorage {
 
     @Override
     public boolean remove(String account) {
-        Preferences.delete(MARK + account);
         return inner.remove(account);
     }
 

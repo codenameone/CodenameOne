@@ -52,6 +52,59 @@ public class ClipboardContent {
 
     private final List<String> mimeTypes = new ArrayList<String>();
     private final List<Object> values = new ArrayList<Object>();
+    private boolean sensitive;
+    private int clearAfter;
+
+    /// Marks this content as sensitive: a password, a one-time code, a recovery key, an account
+    /// number. Each port hides or confines it as far as its platform allows:
+    ///
+    /// - Android (API 33 and newer) tags the clip with `ClipDescription.EXTRA_IS_SENSITIVE`, so
+    ///   the system's copy preview and keyboard suggestions do not show its text.
+    /// - iOS publishes it local only (`UIPasteboardOptionLocalOnly`), so Universal Clipboard
+    ///   never sends it to the user's other devices.
+    /// - The simulator and the browser have no such marker; there the flag only matters together
+    ///   with `#setClearAfter(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sensitive`: true to mark the content sensitive
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setSensitive(boolean sensitive) {
+        this.sensitive = sensitive;
+        return this;
+    }
+
+    /// Whether `#setSensitive(boolean)` marked this content sensitive.
+    public boolean isSensitive() {
+        return sensitive;
+    }
+
+    /// Takes the content off the clipboard again after the given time. iOS lets the pasteboard
+    /// expire it (`UIPasteboardOptionExpirationDate`), which works even if the application is
+    /// suspended or killed meanwhile. Elsewhere the application clears the clipboard when the
+    /// time is up, provided it has copied nothing else since; on Android it clears only a clip
+    /// that is still this one. That needs the application to be running, so it is a best effort
+    /// rather than a guarantee.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: the time the content stays on the clipboard, 0 (the default) to keep it
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setClearAfter(int millis) {
+        this.clearAfter = millis < 0 ? 0 : millis;
+        return this;
+    }
+
+    /// The time `#setClearAfter(int)` set, in milliseconds, or 0.
+    public int getClearAfter() {
+        return clearAfter;
+    }
 
     /// Adds or replaces a representation. Passing null removes the MIME type.
     public ClipboardContent setData(String mimeType, Object value) {

@@ -35,6 +35,7 @@ import com.codenameone.examples.bastion.api.RecoveryCodesDto;
 import com.codenameone.examples.bastion.api.RegisterDto;
 import com.codenameone.examples.bastion.api.TotpCodeDto;
 import com.codenameone.examples.bastion.api.TotpEnrollmentDto;
+import com.codenameone.examples.bastion.api.TotpStartDto;
 import com.codenameone.examples.bastion.api.UserDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
@@ -173,6 +174,24 @@ public final class OnboardingForm {
     }
 
     private static void totp(final Runnable done, final Runnable skipped) {
+        // Adding an app is a step-up: after a sign-in made with the password
+        // alone the server wants the password again, so a stolen token cannot
+        // put somebody else's app on the account (SecondFactor on the server).
+        // Asked once here and sent with both calls, then dropped.
+        String password = null;
+        if (!Session.signedInWith("mfa") && !Session.signedInWith("otp")
+                && !Session.signedInWith("hwk")) {
+            TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
+            field.setUIID("BnField");
+            Command ok = new Command(Lang.tr("Continue"));
+            if (Dialog.show(Lang.tr("Confirm it is you"), field, ok,
+                    new Command(Lang.tr("Cancel"))) != ok) {
+                skipped.run();
+                return;
+            }
+            password = field.getText();
+        }
+        final String confirmedPassword = password;
         final Form form = Ui.form("Authenticator app", null);
         form.add(Ui.title("Add a second factor"));
         form.add(Ui.muted(Lang.tr("Scan this with an authenticator app. From now on a sign-in with "
@@ -184,13 +203,14 @@ public final class OnboardingForm {
         form.add(later);
         Ui.show(form, true);
         Ui.loading(content);
-        Api.account().startTotp(Net.to((TotpEnrollmentDto enrollment) ->
-                showSecret(content, enrollment, done),
+        Api.account().startTotp(new TotpStartDto(confirmedPassword),
+                Net.to((TotpEnrollmentDto enrollment) ->
+                showSecret(content, enrollment, confirmedPassword, done),
                 (status, message) -> Ui.failed(content, message, () -> totp(done, skipped))));
     }
 
     private static void showSecret(final Container content, final TotpEnrollmentDto enrollment,
-            final Runnable done) {
+            final String password, final Runnable done) {
         content.removeAll();
         byte[] uri = utf8(enrollment.otpauthUri());
         // A URI too long for the encoder (a very long e-mail address) still
@@ -216,7 +236,7 @@ public final class OnboardingForm {
         content.addAll(code, error, confirm);
         confirm.addActionListener(evt -> {
             confirm.setEnabled(false);
-            Api.account().confirmTotp(new TotpCodeDto(code.getText().trim()),
+            Api.account().confirmTotp(new TotpCodeDto(code.getText().trim(), password),
                     Net.to((RecoveryCodesDto codes) -> Session.refreshUser(
                             () -> recoveryCodes(codes.codes(), done),
                             (status, message) -> recoveryCodes(codes.codes(), done)),
@@ -237,7 +257,7 @@ public final class OnboardingForm {
         if (Dialog.show(Lang.tr("New recovery codes"), code, ok, new Command(Lang.tr("Cancel"))) != ok) {
             return;
         }
-        Api.account().newRecoveryCodes(new TotpCodeDto(code.getText().trim()),
+        Api.account().newRecoveryCodes(new TotpCodeDto(code.getText().trim(), null),
                 Net.to((RecoveryCodesDto codes) -> Session.refreshUser(
                         () -> recoveryCodes(codes.codes(), done),
                         (status, message) -> recoveryCodes(codes.codes(), done)),
@@ -257,9 +277,19 @@ public final class OnboardingForm {
             grid.add(new Label(one, "BnSecret"));
         }
         form.add(grid);
-        // Shown, not copied: a clipboard is readable by other apps and by the
-        // keyboard's history until it is wiped, and these codes outlive the
-        // minute it takes to wipe one. Write them down.
+        // Copied as a sensitive clip that clears itself (Protect#copy): long
+        // enough to paste into a password manager, kept out of the keyboard's
+        // history and the copy preview where the platform allows it.
+        Button copy = Ui.secondary("Copy codes");
+        copy.addActionListener(evt -> {
+            StringBuilder all = new StringBuilder();
+            for (String one : codes) {
+                all.append(one).append('\n');
+            }
+            Protect.copy(all.toString());
+            Ui.toast("Copied. The clipboard clears itself in a minute.");
+        });
+        form.add(copy);
         Button saved = Ui.primary("I have saved them");
         saved.addActionListener(evt -> done.run());
         form.add(saved);

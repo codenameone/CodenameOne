@@ -21,6 +21,7 @@ package com.codenameone.examples.bastion.net;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
 import com.codename1.io.RequestAuthorizer;
 import com.codename1.io.Util;
 import com.codename1.io.oidc.OidcClient;
@@ -37,6 +38,7 @@ import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
 import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
 import com.codename1.io.webauthn.WebAuthnClient;
 import com.codename1.ui.CN;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.bastion.AppConfig;
 import com.codenameone.examples.bastion.api.UserDto;
@@ -111,8 +113,9 @@ public final class Session {
             // On a device without one the tokens are not kept at all: the
             // user signs in at every start, which is the right failure for a
             // bank.
-            store = new SecureStorageTokenStore(new SealedStorage(SecureStorage.getInstance()))
-                    .allowPlainStorageFallback(CN.isSimulator());
+            store = new Marked(new SecureStorageTokenStore(
+                    new SealedStorage(SecureStorage.getInstance()))
+                    .allowPlainStorageFallback(CN.isSimulator()));
         }
         if (base != null) {
             NetworkManager.getInstance().setAuthorizer(base + "/api", null);
@@ -169,7 +172,45 @@ public final class Session {
 
     /// Keeps the tokens somewhere else (the tests keep them in memory).
     public static void useStore(TokenStore tokens) {
-        store = tokens;
+        store = tokens == null ? null : new Marked(tokens);
+    }
+
+    private static final String HELD = "bastion.session.";
+
+    /// Notes, in the preferences, which keys hold a saved session, so the
+    /// start can tell "signed in, behind the lock" from "never signed in"
+    /// before the app key is open -- the tokens themselves cannot be read
+    /// until then. Kept here, under the key the session itself uses: the
+    /// account name the token store writes under is its own business, and
+    /// guessing it is how every reload used to land on the sign-in form.
+    static final class Marked implements TokenStore {
+        private final TokenStore inner;
+
+        Marked(TokenStore inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public AsyncResource<OidcTokens> load(String key) {
+            return inner.load(key);
+        }
+
+        @Override
+        public AsyncResource<Boolean> save(final String key, OidcTokens tokens) {
+            AsyncResource<Boolean> saved = inner.save(key, tokens);
+            saved.ready(ok -> {
+                if (ok != null && ok.booleanValue()) {
+                    Preferences.set(HELD + key, true);
+                }
+            });
+            return saved;
+        }
+
+        @Override
+        public AsyncResource<Boolean> clear(String key) {
+            Preferences.delete(HELD + key);
+            return inner.clear(key);
+        }
     }
 
     public static void onSignedOut(Runnable handler) {
@@ -225,7 +266,11 @@ public final class Session {
     /// Whether this device keeps a sealed session for the current server,
     /// readable once the app key is open.
     public static boolean hasStoredSession() {
-        return base != null && SealedStorage.holds(storeKey(base));
+        return base != null && hasStoredSession(base);
+    }
+
+    static boolean hasStoredSession(String server) {
+        return Preferences.get(HELD + storeKey(server), false);
     }
 
     /// Whether a refresh token is held: what the lock screen protects.

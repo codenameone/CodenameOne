@@ -974,6 +974,25 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
 #endif
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_restrictClipboard___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT expireSeconds) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    NSArray *items = pasteboard.items;
+    NSMutableDictionary *options = [NSMutableDictionary dictionary];
+    options[UIPasteboardOptionLocalOnly] = @YES;
+    if (expireSeconds > 0) {
+        options[UIPasteboardOptionExpirationDate] = [NSDate dateWithTimeIntervalSinceNow:expireSeconds];
+    }
+    // Written again with the options: they belong to a setItems call, not to the items.
+    [pasteboard setItems:items options:options];
+    POOL_END();
+    return expireSeconds > 0 ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
 #if TARGET_OS_OSX
     POOL_BEGIN();

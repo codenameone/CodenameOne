@@ -461,7 +461,13 @@ try {
     await press('Create account');
     say('asked for an account as ' + email);
 
-    // 3. The authenticator app: the key on screen is what an app would scan.
+    // 3. The authenticator app: the sign-in was made with the password alone,
+    // so adding an app asks for it again. The key on screen is then what an
+    // app would scan.
+    await waitFor('the password prompt', stepSeconds, async () =>
+        /Confirm it is you/.test(await screenText()));
+    await typeInto(0, password, 'password');
+    await press('Continue');
     const shown = await waitFor('the authenticator key', stepSeconds, async () =>
         (await components()).map(c => c.label || c.text || '')
             .find(text => /^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(text.trim())));

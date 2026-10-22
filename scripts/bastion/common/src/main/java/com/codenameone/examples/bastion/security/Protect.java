@@ -25,6 +25,7 @@ import com.codename1.security.TapjackingPolicy;
 import com.codename1.security.shield.ShieldSignal;
 import com.codename1.security.shield.ShieldSignals;
 import com.codename1.ui.CN;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Display;
 import com.codename1.util.Base64;
 import com.codenameone.examples.bastion.AppConfig;
@@ -43,10 +44,11 @@ import com.codenameone.examples.bastion.AppConfig;
 ///   copies is wiped from the clipboard after
 ///   [AppConfig#CLIPBOARD_CLEAR_MILLIS], as soon as the app goes to the
 ///   background, and at the next start if the app was killed first -- unless
-///   something else was copied in the meantime. Codename One has no portable
-///   way to mark a clip as sensitive (Android 13's `EXTRA_IS_SENSITIVE`, which
-///   keeps it out of the clipboard preview), so the clip is ordinary until it
-///   is wiped; recovery codes are therefore shown, never copied.
+///   something else was copied in the meantime. The clip is marked sensitive
+///   ([ClipboardContent#setSensitive(boolean)]): Android 13 and newer keep it
+///   out of the clipboard preview and the keyboard's suggestions, and iOS
+///   keeps it off Universal Clipboard and lets the pasteboard expire it even
+///   if the app is killed first.
 public final class Protect {
     private static boolean secure;
     private static String copied;
@@ -78,19 +80,26 @@ public final class Protect {
 
     /// Copies `text`, and clears it again later.
     public static void copy(final String text) {
-        Display.getInstance().copyToClipboard(text);
+        Display.getInstance().copyToClipboard(new ClipboardContent()
+                .setData(ClipboardContent.MIME_TEXT, text)
+                .setSensitive(true)
+                .setClearAfter((int) AppConfig.CLIPBOARD_CLEAR_MILLIS));
         copied = text;
         // A digest, never the text: what a killed app left on the clipboard
         // is recognised at the next start without keeping it anywhere.
         Preferences.set(LEFT, digest(text));
-        // CN.setTimeout, not a UITimer: a UITimer runs only while the form it
-        // is bound to is showing, and the user moves on after copying.
+        // The content clears itself (setClearAfter); this timer only forgets
+        // the digest, and wipes a clip the platform left behind. CN.setTimeout,
+        // not a UITimer: a UITimer runs only while the form it is bound to is
+        // showing, and the user moves on after copying.
         CN.setTimeout((int) AppConfig.CLIPBOARD_CLEAR_MILLIS, () -> {
-            Object now = Display.getInstance().getPasteDataFromClipboard();
             // Only what this app put there: never wipe something the user
             // copied from elsewhere since.
-            if (now instanceof String && now.equals(text) && text.equals(copied)) {
+            if (text.equals(copied) && text.equals(clipText())) {
                 clear();
+            } else if (text.equals(copied)) {
+                copied = null;
+                Preferences.delete(LEFT);
             }
         });
     }
@@ -98,8 +107,7 @@ public final class Protect {
     /// The app went to the background: what it copied does not wait for
     /// the timer.
     public static void paused() {
-        Object now = Display.getInstance().getPasteDataFromClipboard();
-        if (copied != null && copied.equals(now)) {
+        if (copied != null && copied.equals(clipText())) {
             clear();
         }
     }
@@ -110,11 +118,20 @@ public final class Protect {
         if (left.length() == 0) {
             return;
         }
-        Object now = Display.getInstance().getPasteDataFromClipboard();
-        if (now instanceof String && left.equals(digest((String) now))) {
+        String now = clipText();
+        if (now != null && left.equals(digest(now))) {
             Display.getInstance().copyToClipboard("");
         }
         Preferences.delete(LEFT);
+    }
+
+    /// The text on the clipboard, whichever form the port answers it in.
+    private static String clipText() {
+        Object now = Display.getInstance().getPasteDataFromClipboard();
+        if (now instanceof ClipboardContent) {
+            return ((ClipboardContent) now).getText(ClipboardContent.MIME_TEXT);
+        }
+        return now instanceof String ? (String) now : null;
     }
 
     private static void clear() {

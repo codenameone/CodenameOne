@@ -50,9 +50,10 @@ public interface AccountApi {
     void changePassword(@Body PasswordChangeDto change, OnComplete<Response<UserDto>> callback);
 
     /// Starts adding an authenticator app. Nothing changes at sign-in until
-    /// [#confirmTotp] proves the app was set up.
+    /// [#confirmTotp] proves the app was set up. Both take the password after
+    /// a password-only sign-in ([TotpStartDto]).
     @POST("/api/account/mfa/totp")
-    void startTotp(OnComplete<Response<TotpEnrollmentDto>> callback);
+    void startTotp(@Body TotpStartDto start, OnComplete<Response<TotpEnrollmentDto>> callback);
 
     /// Finishes adding the app with a code it shows, and answers the recovery
     /// codes.

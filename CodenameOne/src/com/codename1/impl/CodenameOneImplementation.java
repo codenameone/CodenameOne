@@ -6156,6 +6156,19 @@ public abstract class CodenameOneImplementation {
         copyToClipboard((Object) content);
     }
 
+    /// Takes a content copied with `ClipboardContent#setClearAfter(int)` off the clipboard once
+    /// its time is up. Called only when this application has copied nothing since. The default
+    /// replaces it with an empty clip; a port that can tell whether the clipboard still holds this
+    /// content (another application may have copied over it) checks first, and one whose platform
+    /// expires the content by itself does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the content that was copied
+    public void clearClipboardContent(ClipboardContent content) {
+        copyToClipboard(new ClipboardContent());
+    }
+
     /// Returns the current content of the clipboard
     ///
     /// #### Returns

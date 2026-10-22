@@ -168,19 +168,29 @@ class AuthTest {
     void anAuthenticatorAppMakesThePasswordNotEnough() throws Exception {
         String user = SignIn.register(mvc, "auth-totp@bastion.test", PASSWORD);
         String token = SignIn.token(mvc, user, PASSWORD);
-        MockResponse started = call("POST", "/api/account/mfa/totp", token, null);
+        // A password-only sign-in, however fresh, enrols an app only with
+        // the password: a stolen token must not put the thief's app on.
+        assertEquals(403, call("POST", "/api/account/mfa/totp", token, null).getStatus());
+        assertEquals(403, call("POST", "/api/account/mfa/totp", token,
+                "{\"password\":\"not the password\"}").getStatus());
+        assertEquals(2, events(user, "TOTP_REFUSED"));
+        String withPassword = "{\"password\":\"" + PASSWORD + "\"}";
+        MockResponse started = call("POST", "/api/account/mfa/totp", token, withPassword);
         assertEquals(200, started.getStatus());
         String secret = (String) Json.parseObject(started.getContentAsString()).get("secret");
+        // The confirmation takes the password too: without it a good code is refused.
+        assertEquals(403, call("POST", "/api/account/mfa/totp/confirm", token,
+                "{\"code\":\"" + totp(secret, 0) + "\"}").getStatus());
         assertEquals(400, call("POST", "/api/account/mfa/totp/confirm", token,
-                "{\"code\":\"000000\"}").getStatus());
+                "{\"code\":\"000000\",\"password\":\"" + PASSWORD + "\"}").getStatus());
         MockResponse confirmed = call("POST", "/api/account/mfa/totp/confirm", token,
-                "{\"code\":\"" + totp(secret, 0) + "\"}");
+                "{\"code\":\"" + totp(secret, 0) + "\",\"password\":\"" + PASSWORD + "\"}");
         assertEquals(200, confirmed.getStatus(), confirmed.getContentAsString());
         assertEquals(10, ((List) Json.parseObject(confirmed.getContentAsString()).get("codes"))
                 .size());
         assertEquals(1, events(user, "TOTP_ENROLLED"));
         // Starting over would turn the second factor off: refused.
-        assertEquals(409, call("POST", "/api/account/mfa/totp", token, null).getStatus());
+        assertEquals(409, call("POST", "/api/account/mfa/totp", token, withPassword).getStatus());
 
         // The password alone: accepted, held back, and not signed in.
         MockResponse first = SignIn.password(mvc, user, PASSWORD);

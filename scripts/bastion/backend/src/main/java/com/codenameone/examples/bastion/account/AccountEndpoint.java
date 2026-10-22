@@ -27,6 +27,7 @@ import com.codenameone.examples.bastion.api.RecoveryCodesDto;
 import com.codenameone.examples.bastion.api.RegisterDto;
 import com.codenameone.examples.bastion.api.TotpCodeDto;
 import com.codenameone.examples.bastion.api.TotpEnrollmentDto;
+import com.codenameone.examples.bastion.api.TotpStartDto;
 import com.codenameone.examples.bastion.api.UserDto;
 
 import java.util.List;
@@ -63,13 +64,14 @@ public class AccountEndpoint implements AccountApiServer {
     }
 
     @Override
-    public TotpEnrollmentDto startTotp() throws Exception {
-        return secondFactor.start(Caller.name());
+    public TotpEnrollmentDto startTotp(TotpStartDto start) throws Exception {
+        return secondFactor.start(Caller.name(), start == null ? null : start.password());
     }
 
     @Override
     public RecoveryCodesDto confirmTotp(TotpCodeDto code) throws Exception {
-        return secondFactor.confirm(Caller.name(), code == null ? null : code.code());
+        return secondFactor.confirm(Caller.name(), code == null ? null : code.code(),
+                code == null ? null : code.password());
     }
 
     @Override
