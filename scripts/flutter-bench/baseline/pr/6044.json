@@ -39,9 +39,9 @@
      "from": {
       "value": 14523602
      },
-     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
+     "reason": "Regex matching by code point, (?U) and Unicode script/block/category tables add executable code",
      "runs": 1,
-     "value": 14705154
+     "value": 14705602
     },
     "install_bytes": {
      "from": {
@@ -55,9 +55,9 @@
      "from": {
       "value": 84685068
      },
-     "reason": "Regex matches by code point and carries Unicode 15.0 script, block and category tables (UnicodeTables)",
+     "reason": "Regex matching by code point, (?U) and Unicode script/block/category tables add executable code",
      "runs": 1,
-     "value": 84763550
+     "value": 84763963
     }
    }
   }
