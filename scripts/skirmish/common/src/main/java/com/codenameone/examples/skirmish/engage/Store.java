@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.engage;
 
+import com.codename1.io.Log;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
@@ -110,7 +111,7 @@ public final class Store {
             if (listener != null) {
                 CN.callSerially(() -> listener.granted(wallet));
             }
-        }, (status, message) -> System.out.println("Receipt refused: " + status + " " + message)));
+        }, (status, message) -> Log.p("Receipt refused: " + status + " " + message)));
     }
 }
 // end::skirmish-store[]

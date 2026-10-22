@@ -60,7 +60,17 @@ public enum Template {
             "com.codenameone.examples.savor", "Savor", "/savor-preview.jpg",
             "The food-delivery template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/savor-modules.zip", "/savor-settings.properties");
+            new String[0], "/savor-modules.zip", "/savor-settings.properties"),
+    // A card battler: a real-time arena, rules shared by the app and the server, and
+    // a `rules` module of its own besides `shared`. It is the project in
+    // scripts/skirmish; its resources come from
+    // `scripts/sync-initializr-template.py skirmish`. Its look is painted art, so it
+    // has no colour scheme to choose.
+    SKIRMISH(false, "/skirmish-src.zip", "/skirmish-css.zip", "/skirmish-pom.xml",
+            "com.codenameone.examples.skirmish", "Skirmish", "/skirmish-preview.jpg",
+            "The card-battle template is an app, a server and the modules they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/skirmish-modules.zip", "/skirmish-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.
@@ -109,6 +119,12 @@ public enum Template {
     /// then Maven, has the `backend` and `shared` modules, and targets Java 17.
     public boolean isFullStack() {
         return MODULES_ZIP != null;
+    }
+
+    /// Whether the developer can choose a colour scheme for the template: false for
+    /// one whose look is art and not a palette its stylesheet declares.
+    public boolean hasColorScheme() {
+        return this != SKIRMISH;
     }
 
     public boolean supportsGradle() {

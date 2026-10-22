@@ -164,6 +164,7 @@ public final class Match {
 
     // ------------------------------------------------------------------ the tick
 
+    // tag::skirmish-step[]
     /// Advances one tick. `commands` may hold anything; only those stamped with
     /// the current tick are applied, in the order given (the server's order).
     public void step(List<Command> commands) {
@@ -192,6 +193,7 @@ public final class Match {
         tick++;
         checkEnd();
     }
+    // end::skirmish-step[]
 
     /// Steps until the match ends, feeding commands from `log`.
     public void runToEnd(List<Command> log) {

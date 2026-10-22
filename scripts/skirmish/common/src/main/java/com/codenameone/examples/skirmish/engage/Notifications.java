@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.engage;
 
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.push.PushClient;
 import com.codename1.push.PushError;
@@ -135,7 +136,7 @@ public final class Notifications {
 
         @Override
         public void onError(PushError error) {
-            System.out.println("Push registration failed: " + error.getCode() + " " + error.getMessage());
+            Log.p("Push registration failed: " + error.getCode() + " " + error.getMessage());
         }
     }
 }

@@ -1,0 +1,298 @@
+[[skirmish-implementors-guide]]
+== Skirmish: Making the game your own
+
+Skirmish shares the module layout, the accounts and sign-in, push notifications and
+the operations console with <<savor-implementors-guide,Savor>> and
+<<wayline-implementors-guide,Wayline>>. What it adds is a game: a deterministic
+simulation that the app, the server, the replay viewer and the tests all run, a 3D
+battle drawn over it, and the progression, store and moderation a live game needs.
+This chapter shows where each of those lives and what to change to make the game
+yours.
+
+[[skirmish-launch]]
+=== Running it
+
+The project is in `scripts/skirmish`, and the Initializr generates it under your own
+package and name. Start the server on the development profile, which keeps its
+database in memory, seeds the demo accounts and simulates purchases and push
+notifications:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-server,indent=0]
+----
+
+Then run the app in the simulator, from the project's directory:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-simulator,indent=0]
+----
+
+The app looks for the server at `http://localhost:8080/`; *Settings* changes the
+address, which is how a phone reaches a server on your computer. To build the native
+iOS app on a Mac, generate the Xcode project and open it, then run it on a
+simulator or a device from Xcode:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-ios,indent=0]
+----
+
+=== The modules
+
+[cols="1,3"]
+|===
+| Module | What it holds
+
+| `rules`
+| The game itself: the cards, the arena, the units, the bot and replays. It uses
+  nothing but a handful of `java.*` classes, no Codename One API and no floating
+  point, so the app, the server and the tests compile the same classes.
+
+| `shared`
+| The contract: the data transfer objects and the `@RestClient` interfaces both
+  sides compile against.
+
+| `common`
+| The app: the 3D battle, the menus, the store, ads, analytics, push and the
+  admin console.
+
+| `backend`
+| The server: accounts, decks, matchmaking, the authoritative match rooms,
+  replays, progression, receipts, push and moderation.
+
+| `ios`
+| The iOS build, for generating the Xcode project.
+|===
+
+=== The rules run everywhere
+
+Everything that decides a battle is in `Match.step`, and nothing else changes a
+match. It advances the game by one tick, a twentieth of a second, applying the
+cards played on that tick:
+
+[source,java]
+----
+include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/skirmish/rules/Match.java[tag=skirmish-step,indent=0]
+----
+
+Three rules keep every copy of a match identical:
+
+* *No floating point.* Positions are thousandths of a tile, held in `int`, and
+  `FixedMath` supplies the square root and the angles. Floating point rounds
+  differently on different processors and compilers, so a battle that used it
+  would drift apart between a phone and the server.
+* *No clock and no `java.util.Random`.* Time is the tick count, and chance comes
+  from `Rng`, seeded by the server when the match starts.
+* *The order is fixed.* Units act in the order they were created, and two cards
+  played on the same tick apply seat 0 first.
+
+Because of that, a replay is only the seed, the two decks and the list of cards
+played. `Replay` re-runs them through `Match` and arrives at the same battle, and
+the server and both players compare a hash of the state to detect a client that has
+gone its own way.
+
+==== Adding a card
+
+A card is a row in `Cards`:
+
+[source,java]
+----
+include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/skirmish/rules/Cards.java[tag=skirmish-cards,indent=0]
+----
+
+Hit points and damage are whole numbers, ranges and radii are in thousandths of a
+tile, speed is thousandths of a tile per tick, and `hitTicks` is the time between
+attacks. `CardDef` also describes what a card targets, whether it splashes, how many
+units it spawns and how long a building lasts.
+
+The look of a card on the field is a row in `Models`, the glTF character it uses,
+its height in tiles and its attack animation:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/Models.java[tag=skirmish-unit-looks,indent=0]
+----
+
+The card's portrait in the hand and the deck is a PNG in
+`common/src/main/resources`, `card_<id>.png`. `PortraitStudio` renders a portrait
+from the card's model, so a new card gets art that matches the others:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-portraits,indent=0]
+----
+
+Changing what any card does changes the outcome of recorded battles. Bump
+`RulesVersion.ID` with it: each replay records the version it was played under, and
+`GoldenReplayTest` fails until the golden replays are recorded again.
+
+=== The server is the referee
+
+An online battle is played in lockstep. Neither phone decides anything: each sends
+the card it wants to play, and the server's `MatchRoom` runs the match, stamps the
+play with the tick it takes effect on and sends it to both players:
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/game/MatchRoom.java[tag=skirmish-room,indent=0]
+----
+
+The play is scheduled a few ticks ahead, so it reaches both phones before it's
+due, and each phone advances its own copy of the match only as far as the server
+has said. `OnlineDriver` is the client's half:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/OnlineDriver.java[tag=skirmish-lockstep,indent=0]
+----
+
+A play that isn't legal is dropped by the rules, and a player who floods the room
+is flagged for the console. Practice against the bot and the replay viewer use the
+same screen with another `Driver`, which is why all three look and behave the same.
+
+=== The finishing camera
+
+The battle is a `com.codename1.gaming` 3D scene, and only the renderer knows about
+it. When the match is over, `BattleView` swings the camera around the field and
+down beside the fallen castle before the result screen appears:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/battle/BattleView.java[tag=skirmish-finale,indent=0]
+----
+
+Particle effects and the camera are cosmetic: they read the match and never
+change it, so they can be changed without touching a replay.
+
+=== Progression
+
+Levels, experience, chests, daily quests and achievements are all decided on the
+server, after it has recorded a result. The app only shows what the server says
+was earned:
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/progress/Progression.java[tag=skirmish-progression,indent=0]
+----
+
+The amounts and the quests are tables in that class, so balancing the economy is a
+change to one file.
+
+=== Re-skinning
+
+The menus are ordinary Codename One components, and the game's look is
+`common/src/main/css/theme.css`. Its palette is a set of variables at the top:
+
+[source,css]
+----
+include::../../scripts/skirmish/common/src/main/css/theme.css[tag=skirmish-palette,indent=0]
+----
+
+The wooden buttons are a style like any other, a gradient with a border and a
+shadow, so they need no images and stay sharp at any density:
+
+[source,css]
+----
+include::../../scripts/skirmish/common/src/main/css/theme.css[tag=skirmish-wood-button,indent=0]
+----
+
+The characters and buildings are glTF files in `common/src/main/resources`. They're
+KayKit models, packed from the original downloads by `tools/pack-models.py`; any
+rigged glTF character with the same animation names can replace one.
+
+=== Purchases
+
+The shop sells gems through the platform's store. The app's `Store` starts the
+purchase, and the server grants nothing until it has checked the receipt with Apple
+or Google:
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/shop/ReceiptValidator.java[tag=skirmish-receipt-validator,indent=0]
+----
+
+The server picks the validator from its configuration:
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/Services.java[tag=skirmish-receipt-choice,indent=0]
+----
+
+The product identifiers and the ad units are in `AppConfig`, and the server's
+`Catalog` names the same products. Replace both with your own before release:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/AppConfig.java[tag=skirmish-monetization-ids,indent=0]
+----
+
+=== Ads
+
+`Ads` shows an interstitial between battles and a rewarded video for extra coins
+after one. The units in `AppConfig` are Google's test units, which always fill and
+never pay:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Ads.java[tag=skirmish-ads,indent=0]
+----
+
+A rewarded video is only a request: the server pays the coins, once per battle.
+
+=== Push notifications and analytics
+
+The server tells a player when a chest is ready or a friend has challenged them.
+It sends through the Codename One push service once the app's push key is set:
+
+[source,java]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/AppConfig.java[tag=skirmish-push-key,indent=0]
+----
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/Services.java[tag=skirmish-push-choice,indent=0]
+----
+
+`Telemetry` records the funnel a game is measured by: sign-up, the first battle,
+the first win, a deck change and a purchase. It sends nothing unless the player
+allows it in *Settings*.
+
+=== Moderation
+
+The console is part of the same app, shown only to an account with the admin role.
+The server flags players on its own, as well as on reports:
+
+[source,java]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/admin/Flags.java[tag=skirmish-flags,indent=0]
+----
+
+Every action an operator takes goes through `Moderation`, which records it with its
+reason and removes a suspended or banned player from any battle they're in.
+
+=== The training battle
+
+`Tutorial` is a script of steps run over an ordinary practice battle. Each step
+freezes the clock, shows Elda's line and, if it asks for something, the finger and
+the one card that can be played. Changing the lesson means changing the list of
+steps.
+
+The app can also drive itself through its own screens: `Tour` signs in, collects
+rewards, visits the deck and plays a battle, which is how the promotional video is
+recorded. Any Codename One app can be driven the same way without code of its own,
+through its built-in MCP server; see <<mcp-headless-api>>.
+
+=== Tests
+
+`rules` has the determinism tests and the golden replays; `backend` plays whole
+online matches over its sockets and checks receipts, progression and moderation;
+`run-e2e.sh` drives the app through its screens in the simulator against a running
+server and takes the screenshots in this guide:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirmish-sh-tests,indent=0]
+----

@@ -86,10 +86,14 @@ public class GeneratorModel {
     /// The food-delivery template's `--brand`, held to its theme.css the same way.
     public static final int SAVOR_BRAND = 0x7ac943;
 
+    /// The card-battle template's accent, used for its icon: it has no `--brand`.
+    public static final int SKIRMISH_BRAND = 0xc8862f;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
-        return template == Template.SAVOR ? SAVOR_BRAND : FULL_STACK_BRAND;
+        return template == Template.SAVOR ? SAVOR_BRAND
+                : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
     }
 
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
@@ -1071,6 +1075,22 @@ public class GeneratorModel {
                 "dependency on the shared module");
         requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
                 "dependency on the shared module");
+        if (template == Template.SKIRMISH) {
+            // The rules pom takes its group and version from the parent, so its
+            // coordinates are the parent's and its artifact id.
+            requirePomFragment("rules/pom.xml", normalizedPom(entries, "rules/pom.xml"),
+                    "</modelVersion><parent><groupId>" + packageName + "</groupId><artifactId>"
+                            + toLowerCaseInvariant(appName) + "</artifactId><version>" + version
+                            + "</version></parent><artifactId>" + rootArtifactId + "-rules</artifactId>",
+                    "rules module coordinates");
+            String rules = "<artifactId>" + rootArtifactId + "-rules</artifactId>";
+            requirePomFragment("pom.xml", rootPom, "<module>rules</module><module>shared</module>",
+                    "rules module ahead of shared");
+            requirePomFragment("common/pom.xml", normalizedPom(entries, "common/pom.xml"), rules,
+                    "dependency on the rules module");
+            requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), rules,
+                    "dependency on the rules module");
+        }
         String packagePath = packageName.replace('.', '/');
         String sourcePath = template.SOURCE_PACKAGE.replace('.', '/');
         for (String path : entries.keySet()) {
@@ -1519,7 +1539,7 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
             if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
-                content = addSharedModule(content);
+                content = addSharedModule(content, template == Template.SKIRMISH);
             }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
@@ -1754,7 +1774,7 @@ public class GeneratorModel {
     /// The root pom with the `shared` module in it, ahead of `common`: Maven would
     /// order the two by their dependency anyway, and a reader should not have to
     /// know that to see which is built first.
-    private static String addSharedModule(String pom) throws IOException {
+    private static String addSharedModule(String pom, boolean withRules) throws IOException {
         String common = "<module>common</module>";
         int at = pom.indexOf(common);
         if (at < 0) {
@@ -1766,6 +1786,7 @@ public class GeneratorModel {
         return pom.substring(0, at)
                 + "<!-- What the app and its server have in common: the REST contract and the\n"
                 + indent + "     objects it transfers. Built first, because both depend on it. -->\n"
+                + (withRules ? indent + "<module>rules</module>\n" : "")
                 + indent + "<module>shared</module>\n" + indent
                 + pom.substring(at);
     }
@@ -1855,7 +1876,7 @@ public class GeneratorModel {
     /// the variables.
     private void applyColorScheme(Map<String, byte[]> entries) throws IOException {
         String path = appDir() + "src/main/css/theme.css";
-        if (!template.isFullStack() || !entries.containsKey(path)) {
+        if (!template.isFullStack() || !template.hasColorScheme() || !entries.containsKey(path)) {
             return;
         }
         entries.put(path, applyThemeVariables(StringUtil.newString(entries.get(path)), options).getBytes("UTF-8"));
@@ -1939,7 +1960,20 @@ public class GeneratorModel {
                     .append("`./mvnw -pl backend -Dcodename1.platform=backend cn1:backend` and package it as a native ")
                     .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
         }
-        if (template.isFullStack()) {
+        if (template == Template.SKIRMISH) {
+            out.append("## The game and its server\n\n")
+                    .append("This project is a working real-time card battler: a 3D arena, matchmaking, replays, ")
+                    .append("progression and an admin console, and the server they talk to.\n\n")
+                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
+                    .append("renders, the server enforces and the replay viewer re-runs.\n")
+                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `backend/` is the server.\n")
+                    .append("- `common/` is the app.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
@@ -2639,6 +2673,7 @@ public class GeneratorModel {
                 || path.endsWith(".css")
                 || path.endsWith(".xsd")
                 || path.endsWith(".md")
+                || path.endsWith(".txt")
                 || path.endsWith(".adoc")
                 || path.endsWith(".bat")
                 || path.endsWith(".cmd")

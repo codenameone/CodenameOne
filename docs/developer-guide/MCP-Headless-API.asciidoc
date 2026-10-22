@@ -1,3 +1,4 @@
+[[mcp-headless-api]]
 == MCP Headless API
 
 The Model Context Protocol (MCP) headless API lets an application expose itself to a large language model agent. An agent such as Claude Desktop, Claude Code, Codex, or opencode can read the current screen, drive the user interface, and call tools the application publishes.

@@ -60,7 +60,7 @@ class GameSocketTest {
     void twoPlayersMeetThroughAChallengeAndSeeTheSamePlays() throws Exception {
         String host = Api.player(accounts, "sockethost");
         String guest = Api.player(accounts, "socketguest");
-        String code = challenges.create(host, "").code();
+        String code = challenges.create(host).code();
         Tcp a = open("/ws/game?ticket=" + tickets.issue(host).ticket());
         Tcp b = open("/ws/game?ticket=" + tickets.issue(guest).ticket());
         try {

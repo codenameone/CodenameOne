@@ -222,7 +222,7 @@ public class SecurityConfig {
     /// This server's address: the configured issuer, and with none -- a
     /// development profile -- the address the request in hand arrived at. Null
     /// outside a request that says.
-    public static String here(String issuer) {
+    static String here(String issuer) {
         if (issuer != null && issuer.length() > 0) {
             return issuer;
         }

@@ -39,8 +39,10 @@ public final class Cards {
                 .hp(2300).damage(62).hitTicks(18).range(7500).sight(7500)
                 .targets(TargetKind.GROUND_AND_AIR).radius(1500));
 
+        // tag::skirmish-cards[]
         add(new CardDef("squire", "Squire", CardDef.TROOP, 3)
                 .hp(1450).damage(160).hitTicks(24).range(700).speed(45).radius(500));
+        // end::skirmish-cards[]
         add(new CardDef("twin-archers", "Twin Archers", CardDef.TROOP, 3)
                 .hp(300).damage(100).hitTicks(18).range(5000).speed(45)
                 .targets(TargetKind.GROUND_AND_AIR).count(2).radius(400));

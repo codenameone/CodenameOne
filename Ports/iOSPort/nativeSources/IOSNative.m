@@ -5258,7 +5258,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 
 // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
 
-// The pool's state belongs to the main thread, but a game plays its sounds
+// Creating and loading a pool, and starting a sound, run on the main thread, but a game plays its sounds
 // from its frame callback, and a GPU view renders on the main thread: a
 // dispatch_sync to the main queue from there waits on itself and traps.
 static void cn1_soundPoolOnMain(dispatch_block_t block) {

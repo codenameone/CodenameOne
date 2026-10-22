@@ -124,8 +124,7 @@ public class GameEndpoint implements GameApiServer {
 
     @Override
     public ChallengeDto challenge() throws Exception {
-        String base = SecurityConfig.here("");
-        return challenges.create(Caller.name(), base == null ? "" : base);
+        return challenges.create(Caller.name());
     }
 
     @Override

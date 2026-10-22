@@ -32,8 +32,7 @@ import java.util.Map;
 
 /// Private match links: "open this link and play me".
 ///
-/// The link opens the web build, so the person challenged needs nothing
-/// installed. Codes live in memory: a challenge is meant to be used in minutes,
+/// The link opens the installed app straight into the battle. Codes live in memory: a challenge is meant to be used in minutes,
 /// and losing the open ones on a restart costs a new link, not data.
 // tag::skirmish-challenge[]
 @Component
@@ -50,13 +49,18 @@ public class Challenges {
         this.publicUrl = publicUrl;
     }
 
-    public synchronized ChallengeDto create(String host, String requestBase) throws IOException {
+    public synchronized ChallengeDto create(String host) throws IOException {
         sweep();
         String code = Ids.hex(Crypto.randomBytes(5));
         hosts.put(code, host);
         expiry.put(code, Long.valueOf(Clock.now() + TTL_SECONDS * 1000L));
-        String base = publicUrl.length() > 0 ? publicUrl : requestBase;
-        return new ChallengeDto(code, base + "/?challenge=" + code, TTL_SECONDS);
+        // With a hosted browser build (skirmish.public-url) the link opens the
+        // game in a browser; otherwise it opens the installed app through its
+        // skirmish: URL scheme. Either way the app reads the code after
+        // "challenge=".
+        String link = publicUrl.length() > 0 ? publicUrl + "/?challenge=" + code
+                : "skirmish://join?challenge=" + code;
+        return new ChallengeDto(code, link, TTL_SECONDS);
     }
 
     synchronized String hostOf(String code) {

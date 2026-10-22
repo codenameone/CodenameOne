@@ -85,6 +85,7 @@ def check_maven_layout_fixture(archive, z):
 FULL_STACK = {
     'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
+    'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
 }
 
 
@@ -112,15 +113,19 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    for module in ('shared', 'common', 'backend'):
+    # SKIRMISH also has the game's rules as a module of its own, ahead of the contract.
+    rules = template == 'SKIRMISH'
+    assert (not rules) or '<module>rules</module><module>shared</module>' in root_pom, archive.name
+    for module in ('shared', 'common', 'backend') + (('rules',) if rules else ()):
         assert module + '/pom.xml' in names, (archive.name, module)
     for module in ('common', 'backend'):
-        assert '<artifactId>launcherprobe-shared</artifactId>' in z.read(module + '/pom.xml').decode(), \
-            (archive.name, module)
+        for dependency in ('shared',) + (('rules',) if rules else ()):
+            assert '<artifactId>launcherprobe-' + dependency + '</artifactId>' in z.read(module + '/pom.xml').decode(), \
+                (archive.name, module, dependency)
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',
-                 'backend/src/main/resources/db/migration/V1__accounts.sql',
+                 'backend/src/main/resources/db/migration/' + ('V1__game.sql' if rules else 'V1__accounts.sql'),
                  'backend/server.sh',
                  'common/src/main/java/com/example/probe/LauncherProbe.java',
                  'common/src/main/java/com/example/probe/' + screen]:
@@ -128,15 +133,17 @@ def check_full_stack_fixture(archive, z, template):
     # The generic server every other project gets is replaced, not merged with.
     assert 'backend/src/main/java/com/example/probe/Greeter.java' not in names, archive.name
     css = z.read('common/src/main/css/theme.css').decode()
-    assert '--brand: #0f766e;' in css and '--radius: 0.6mm;' in css and 'Initializr Theme Overrides' not in css, \
-        archive.name
+    # SKIRMISH's look is art, not a palette, so it takes no colour scheme.
+    assert rules or ('--brand: #0f766e;' in css and '--radius: 0.6mm;' in css
+                     and 'Initializr Theme Overrides' not in css), archive.name
     assert z.read('common/icon.png') == b'\x89PNG', archive.name
     settings = z.read('common/codenameone_settings.properties').decode()
-    assert 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
-    assert '## The app and its server' in z.read('README.md').decode(), archive.name
+    assert rules or 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
+    assert ('## The game and its server' if rules else '## The app and its server') in z.read('README.md').decode(), \
+        archive.name
     for name in names:
         assert token not in name.lower(), (archive.name, name)
-        if name.endswith(('.png', '.jar', '.res', '.ttf')):
+        if name.endswith(('.png', '.jar', '.res', '.ttf', '.glb')):
             continue
         text = z.read(name).decode('utf-8', 'replace')
         assert token not in text.lower() and 'myappname' not in text.lower(), (archive.name, name)

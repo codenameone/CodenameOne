@@ -10,8 +10,8 @@
 # --native compiles it to a native binary, which is how it ships.
 #
 # The profile comes from CN1_PROFILE. `test` and `dev` need nothing else: an
-# in-memory database, four demo accounts, a geocoder that knows ten places
-# (`test`) and text messages that are printed, not sent. Anything else is a
+# in-memory database, four demo accounts, simulated in-app purchases and
+# push notifications that are printed, not sent. Anything else is a
 # deployment and reads its settings from the environment -- see
 # application.properties.
 #

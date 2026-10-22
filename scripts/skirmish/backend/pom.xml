@@ -67,9 +67,9 @@
             <version>${project.version}</version>
         </dependency>
         <!--
-             The SQLite courier for `cn1:backend`, the local JVM run. It is optional in
+             The SQLite driver for `cn1:backend`, the local JVM run. It is optional in
              codenameone-backend, so Maven does not pass it down here, and without it
-             Database.open(":memory:") fails with "No suitable courier" in the loop the
+             Database.open(":memory:") fails with "No suitable driver" in the loop the
              guide documents. The native build links SQLite in and does not use this.
              Delete it if this server never opens a SQLite database.
         -->
