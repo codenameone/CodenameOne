@@ -8,56 +8,22 @@
       "tolerance": {
        "value": 0.005
       },
-      "value": 13238731
+      "value": 13418004
      },
-     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "reason": "Measured on this pull request merged with master after #6044 (class library additions) and #6055 (Flutter: ordinary apps unmodified), the first gallery run to include either; the nightly row predates both. For an application with no compatibility layer this pull request adds only the record and pattern-switch desugaring of plain applications' classes.",
      "runs": 1,
-     "tolerance": {
-      "value": 0.005
-     },
-     "value": 13356239
+     "value": 13498431
     },
     "install_bytes": {
      "from": {
       "tolerance": {
        "value": 0.005
       },
-      "value": 108271844
+      "value": 108855936
      },
-     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
+     "reason": "Measured on this pull request merged with master after #6044 (class library additions) and #6055 (Flutter: ordinary apps unmodified), the first gallery run to include either; the nightly row predates both. For an application with no compatibility layer this pull request adds only the record and pattern-switch desugaring of plain applications' classes.",
      "runs": 1,
-     "tolerance": {
-      "value": 0.005
-     },
-     "value": 108853545
-    }
-   }
-  },
-  "linux": {
-   "gallery": {
-    "code_bytes": {
-     "from": {
-      "value": 14523602
-     },
-     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
-     "runs": 1,
-     "value": 14603714
-    },
-    "install_bytes": {
-     "from": {
-      "value": 116342496
-     },
-     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
-     "runs": 1,
-     "value": 116543968
-    },
-    "wire_bytes": {
-     "from": {
-      "value": 84685068
-     },
-     "reason": "This pull request adds the desktop compatibility layer's class library to the Codename One runtime (java.time, java.text, streams, concurrency and more in vm/JavaAPI); the JavaScript and Linux gallery builds carry a little more of it, under 1% of code.",
-     "runs": 1,
-     "value": 84697277
+     "value": 108996981
     }
    }
   }

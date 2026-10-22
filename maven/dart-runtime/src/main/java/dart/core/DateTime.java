@@ -67,7 +67,12 @@ public final class DateTime {
 
     /// Dart's own grammar for DateTime.parse: an ISO 8601 date, an optional time
     /// after `T` or a space, an optional fraction, and an optional `Z` or offset.
-    private static final java.util.regex.Pattern ISO = java.util.regex.Pattern.compile(
+    ///
+    /// The framework's engine, never `java.util.regex`: no ParparVM target has
+    /// that package, and nothing relocates it in an ordinary application, so
+    /// naming it here failed every native build of a Flutter app on a missing
+    /// `java_util_regex_Pattern.h`.
+    private static final com.codename1.util.regex.Pattern ISO = com.codename1.util.regex.Pattern.compile(
             "^([+-]?\\d{4,6})-?(\\d\\d)-?(\\d\\d)(?:[ T](\\d\\d)(?::?(\\d\\d)(?::?(\\d\\d)(?:[.,](\\d+))?)?)?"
             + "( ?[zZ]| ?([-+])(\\d\\d)(?::?(\\d\\d))?)?)?$");
 
@@ -84,7 +89,7 @@ public final class DateTime {
         if (formattedString == null) {
             return null;
         }
-        java.util.regex.Matcher m = ISO.matcher(formattedString);
+        com.codename1.util.regex.Matcher m = ISO.matcher(formattedString);
         if (!m.matches()) {
             return null;
         }
