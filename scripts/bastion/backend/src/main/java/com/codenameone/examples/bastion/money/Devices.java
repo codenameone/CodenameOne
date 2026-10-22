@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.annotations.Component;
@@ -57,11 +58,12 @@ import java.util.List;
 ///    must be under `bastion.device.fresh-minutes` (10) old. A refresh keeps
 ///    the original sign-in time, so only someone who signed in just now
 ///    passes.
-/// 2. **The second factor, or the password again.** An account with an
-///    authenticator app cannot finish a sign-in without the code, so its
-///    fresh sign-in already *was* a second-factor sign-in. An account without
-///    one must type its password into the registration as well; a wrong one
-///    counts toward the sign-in lockout like any other. The token says how
+/// 2. **The second factor, or the password again.** A token whose sign-in
+///    was made with a code (`amr` holding `otp` or `mfa`) already *was* a
+///    second-factor sign-in. Any other must carry the password in the
+///    registration as well -- even on an account that has an authenticator
+///    app now, since the app may have been enrolled with the very token being
+///    used; a wrong one counts toward the sign-in lockout like any other. The token says how
 ///    its sign-in was made ([Caller#authMethods], the `amr` claim): a sign-in
 ///    with a passkey (`hwk`) already proved possession of a key bound to this
 ///    site, so it is not asked for a password it may not even have.
@@ -75,6 +77,7 @@ public class Devices {
     static final int MAX_DEVICES = 10;
 
     private final DeviceRepository devices;
+    private final ProfileRepository profiles;
     private final IntegrityVerifier integrity;
     private final Audit audit;
     private final TotpService totp;
@@ -85,8 +88,10 @@ public class Devices {
 
     public Devices(DeviceRepository devices, IntegrityVerifier integrity, Audit audit,
             TotpService totp, JdbcUserDetailsManager users, PasswordEncoder encoder,
-            SignInGuard guard, @Value("${bastion.device.fresh-minutes:10}") String freshMinutes) {
+            SignInGuard guard, ProfileRepository profiles,
+            @Value("${bastion.device.fresh-minutes:10}") String freshMinutes) {
         this.devices = devices;
+        this.profiles = profiles;
         this.integrity = integrity;
         this.audit = audit;
         this.totp = totp;
@@ -109,8 +114,13 @@ public class Devices {
             throw Refused.with(403, "sign-again-add-device-sign", "Sign in again to add a device: the sign-in must be a few minutes old");
         }
         java.util.List<String> how = Caller.authMethods();
-        boolean strong = how.contains("hwk") || how.contains("mfa");
-        if (!strong && !totp.isEnabled(owner)) {
+        // The token's own record of how its sign-in was made decides, never
+        // whether the account has an authenticator app *now*: a thief with a
+        // fresh password-only token could enrol an app of their own and then
+        // pass as "second factor". Only an `otp`/`mfa`/`hwk` sign-in is spared
+        // the password.
+        boolean strong = how.contains("hwk") || how.contains("mfa") || how.contains("otp");
+        if (!strong) {
             String password = request.password();
             if (password == null
                     || !encoder.matches(password, users.loadUserByUsername(owner).getPassword())) {
@@ -136,6 +146,9 @@ public class Devices {
         } catch (IOException unreadable) {
             throw Refused.with(400, "key-ec-p-256-public", "The key must be an EC P-256 public key");
         }
+        // Behind the customer's profile row: two of these at once would each
+        // count the rows before the other inserted and together pass the cap.
+        profiles.hold(owner);
         List<Device> held = devices.findByOwnerOrderByCreatedAtAsc(owner);
         int live = 0;
         for (Device d : held) {

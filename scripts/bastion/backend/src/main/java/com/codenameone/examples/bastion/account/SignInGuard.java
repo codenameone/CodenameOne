@@ -131,10 +131,10 @@ public class SignInGuard {
                 try {
                     failed(username);
                 } catch (IOException | RuntimeException race) {
-                    // Two first failures at once both insert the row, and one
-                    // insert loses on the key. That costs the count one guess
-                    // out of five; failing the answer would cost more.
-                    System.err.println("bastion: lockout count lost a race: " + race);
+                    // failed() already retries a lost first insert; anything
+                    // still thrown is the database, and failing the answer
+                    // would cost more than the one uncounted guess.
+                    System.err.println("bastion: lockout count failed: " + race);
                 }
             }
             // A made-up name is recorded as one: the actor column holds only
@@ -155,31 +155,47 @@ public class SignInGuard {
 
     /// One more wrong password for `username`; locks the account on the last
     /// one the window allows.
-    @Transactional(rollbackFor = Exception.class)
+    ///
+    /// Counted by the database, not read, incremented and written back: two
+    /// wrong passwords at once each read the same count, and one of them was
+    /// lost -- a guesser sending in parallel got more guesses than the window
+    /// allows. The row is made first (a duplicate-key loss to a concurrent
+    /// first failure is fine: the row exists either way), then the window
+    /// restart, the increment and the lock are each a single UPDATE on it.
     public void failed(String username) throws IOException {
+        if (!exists(username)) {
+            try {
+                create(username);
+            } catch (IOException | RuntimeException race) {
+                if (!exists(username)) {
+                    throw race;
+                }
+            }
+        }
+        countOne(username);
+    }
+
+    @Transactional(readOnly = true)
+    private boolean exists(String username) throws IOException {
+        return failures.existsById(username);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    private void create(String username) throws IOException {
+        LoginFailure row = new LoginFailure();
+        row.setUsername(username);
+        row.setFirstAt(System.currentTimeMillis());
+        failures.insert(row);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    private void countOne(String username) throws IOException {
         long now = System.currentTimeMillis();
-        LoginFailure row = failures.findById(username);
-        boolean fresh = row == null;
-        if (fresh) {
-            row = new LoginFailure();
-            row.setUsername(username);
-        }
-        if (fresh || now - row.getFirstAt() > windowMillis) {
-            row.setFailures(0);
-            row.setFirstAt(now);
-        }
-        row.setFailures(row.getFailures() + 1);
-        if (row.getFailures() >= attempts) {
-            row.setLockedUntil(now + lockMillis);
-            row.setFailures(0);
-            row.setFirstAt(now);
+        failures.restartWindow(username, now, now - windowMillis);
+        failures.increment(username);
+        if (failures.lockIfReached(username, attempts, now, now + lockMillis) == 1) {
             audit.append(username, "ACCOUNT_LOCKED", username,
                     attempts + " wrong passwords; " + lockMillis / 1000 + "s");
-        }
-        if (fresh) {
-            failures.insert(row);
-        } else {
-            failures.save(row);
         }
     }
 

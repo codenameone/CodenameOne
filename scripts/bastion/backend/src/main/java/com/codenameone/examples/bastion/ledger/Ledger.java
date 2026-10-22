@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion.ledger;
 
 import com.codenameone.examples.bastion.Refused;
+import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.Ids;
@@ -64,9 +65,11 @@ public class Ledger {
     private final LedgerAccountRepository accounts;
     private final JournalEntryRepository entries;
     private final PostingRepository postings;
+    private final DataSource db;
 
     public Ledger(AssetRepository assets, LedgerAccountRepository accounts,
-            JournalEntryRepository entries, PostingRepository postings) {
+            JournalEntryRepository entries, PostingRepository postings, DataSource db) {
+        this.db = db;
         this.assets = assets;
         this.accounts = accounts;
         this.entries = entries;
@@ -140,6 +143,20 @@ public class Ledger {
         return account;
     }
 
+    /// `owner`'s account `id` for a customer to move money into or out of:
+    /// [#owned], but never an order HOLD. A hold belongs to the customer only
+    /// as the exchange's escrow of an open order; moving it out directly
+    /// would drain the order's backing while the order still rests on the
+    /// book. Same 404 as a missing account.
+    @Transactional(readOnly = true)
+    public LedgerAccount movable(String owner, String id) throws IOException {
+        LedgerAccount account = owned(owner, id);
+        if (AccountKinds.HOLD.equals(account.getKind())) {
+            throw Refused.with(404, "no-such-account", "No such account");
+        }
+        return account;
+    }
+
     @Transactional(readOnly = true)
     public List<Posting> history(String accountId) throws IOException {
         return postings.findTop100ByAccountIdOrderByCreatedAtDescIdDesc(accountId);
@@ -150,6 +167,23 @@ public class Ledger {
         if (accounts.setFrozen(accountId, frozen) != 1) {
             throw Refused.with(404, "no-such-account", "No such account");
         }
+    }
+
+    /// The journal key for a client's `Idempotency-Key`. Every journal key
+    /// shares one unique index, and the exchange posts its own entries under
+    /// system keys (`hold:`, `release:`, `trade:` and the seeding keys). A
+    /// client key stored as sent could claim one of those first -- or another
+    /// customer's key -- and turn the system's posting into a "retry" of the
+    /// client's. So a client key is scoped to its owner and hashed under a
+    /// `c:` prefix no system key starts with, and a `:` in it is refused so a
+    /// key can never be read as a system one. 66 characters, within the column.
+    public static String clientKey(String owner, String key) throws IOException {
+        // The client makes base64url keys, which never hold ':'; a key that
+        // does is answered like any other malformed one.
+        if (key == null || key.length() < 16 || key.length() > 80 || key.indexOf(':') >= 0) {
+            throw Refused.with(400, "send-idempotency-key-16-80", "Send an Idempotency-Key of 16 to 80 characters");
+        }
+        return "c:" + Ids.sha256(owner + "\n" + key);
     }
 
     /// Moves value. See the class comment for the rules; a refusal is a 409
@@ -264,17 +298,33 @@ public class Ledger {
                 problems.add(asset.getCode() + " sums to " + total + ", not zero");
             }
         }
+        // Balance and postings in ONE statement, so both come from one
+        // snapshot. Read separately at READ COMMITTED, a transfer committing
+        // between the two reads showed a balance that its postings did not
+        // yet (or no longer) explain -- a false alarm on a sound ledger.
         for (String owner : owners) {
-            for (LedgerAccount account : accounts.findByOwnerOrderByCreatedAtAsc(owner)) {
-                Long total = postings.total(account.getId());
-                long expected = total == null ? 0L : total.longValue();
-                if (expected != account.getBalance()) {
-                    problems.add("account " + account.getId() + " holds " + account.getBalance()
+            List rows = db.query("SELECT a.id AS id, a.balance AS balance, "
+                    + "COALESCE(SUM(p.amount), 0) AS total FROM ledger_account a "
+                    + "LEFT JOIN posting p ON p.account_id = a.id WHERE a.owner = ? "
+                    + "GROUP BY a.id, a.balance", new Object[] {owner});
+            for (Object o : rows) {
+                Map row = (Map) o;
+                long balance = number(row.get("balance"));
+                long expected = number(row.get("total"));
+                if (expected != balance) {
+                    problems.add("account " + row.get("id") + " holds " + balance
                             + " but its postings say " + expected);
                 }
             }
         }
         return problems;
+    }
+
+    private static long number(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return value == null ? 0L : Long.parseLong(String.valueOf(value).trim());
     }
 
     static String requestHash(String kind, String memo, List<Leg> legs) throws IOException {

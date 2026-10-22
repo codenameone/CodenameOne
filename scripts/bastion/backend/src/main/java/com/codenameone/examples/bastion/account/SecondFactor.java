@@ -23,6 +23,8 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpEnrollment;
 import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.annotations.Value;
+import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.api.RecoveryCodesDto;
 import com.codenameone.examples.bastion.api.TotpEnrollmentDto;
 import com.codenameone.examples.bastion.audit.Audit;
@@ -43,10 +45,33 @@ public class SecondFactor {
     private final RecoveryCodeService recoveryCodes;
     private final Audit audit;
 
-    public SecondFactor(TotpService totp, RecoveryCodeService recoveryCodes, Audit audit) {
+    private final long freshSeconds;
+
+    public SecondFactor(TotpService totp, RecoveryCodeService recoveryCodes, Audit audit,
+            @Value("${bastion.device.fresh-minutes:10}") String freshMinutes) {
         this.totp = totp;
         this.recoveryCodes = recoveryCodes;
         this.audit = audit;
+        this.freshSeconds = Long.parseLong(freshMinutes.trim()) * 60L;
+    }
+
+    /// Enrolling an app is a step-up: once it is on, every sign-in needs its
+    /// codes, so a token stolen hours ago must not be able to put the
+    /// attacker's app on the account and lock the customer out. The token's
+    /// sign-in must be fresh (as for a device), or made with a second factor
+    /// or a passkey already. The client enrols right after sign-up, which is
+    /// fresh. (A password in the request would be stronger still; the shipped
+    /// client sends only the code, so freshness is the bar here.)
+    private void requireStepUp(String username) throws IOException {
+        java.util.List<String> how = Caller.authMethods();
+        if (how.contains("mfa") || how.contains("otp") || how.contains("hwk")) {
+            return;
+        }
+        long age = System.currentTimeMillis() / 1000L - Caller.authTime();
+        if (Caller.authTime() < 0 || age > freshSeconds || age < -60L) {
+            audit.append(username, "TOTP_REFUSED", username, "sign-in not fresh");
+            throw Refused.with(403, "sign-in-first", "Sign in first");
+        }
     }
 
     /// Makes a secret for the caller's app. Refused when they already have
@@ -57,6 +82,7 @@ public class SecondFactor {
         if (totp.isEnabled(username)) {
             throw Refused.with(409, "account-already-has-authenticator-app", "This account already has an authenticator app");
         }
+        requireStepUp(username);
         TotpEnrollment enrollment = totp.beginEnrollment(username);
         audit.append(username, "TOTP_STARTED", username, "");
         return new TotpEnrollmentDto(enrollment.getSecret(), enrollment.getOtpauthUri());
@@ -64,6 +90,7 @@ public class SecondFactor {
 
     /// Confirms the app with a code it shows, and makes the recovery codes.
     public RecoveryCodesDto confirm(String username, String code) throws IOException {
+        requireStepUp(username);
         if (code == null || !totp.confirmEnrollment(username, code)) {
             audit.append(username, "TOTP_CONFIRM_FAILED", username, "");
             throw Refused.with(400, "code-not-app-shows", "That code is not the one your app shows");

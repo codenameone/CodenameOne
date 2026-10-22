@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
+import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -54,13 +55,16 @@ public class CryptoWallets {
     static final int MAX_ADDRESSES = 20;
 
     private final CryptoAddressRepository addresses;
+    private final ProfileRepository profiles;
     private final Ledger ledger;
     private final Audit audit;
     private final long coolOffMillis;
 
-    public CryptoWallets(CryptoAddressRepository addresses, Ledger ledger, Audit audit,
+    public CryptoWallets(CryptoAddressRepository addresses, ProfileRepository profiles,
+            Ledger ledger, Audit audit,
             @Value("${bastion.address.cooloff-hours:24}") String coolOffHours) {
         this.addresses = addresses;
+        this.profiles = profiles;
         this.ledger = ledger;
         this.audit = audit;
         this.coolOffMillis = Long.parseLong(coolOffHours.trim()) * 3600L * 1000L;
@@ -79,6 +83,9 @@ public class CryptoWallets {
         if (!wellFormed(address)) {
             throw Refused.with(400, "not-address", "That is not an address");
         }
+        // Behind the customer's profile row: two of these at once would each
+        // count the rows before the other inserted and together pass the cap.
+        profiles.hold(owner);
         int live = 0;
         for (CryptoAddress a : addresses.findByOwnerOrderByCreatedAtAsc(owner)) {
             if (!a.isRemoved()) {

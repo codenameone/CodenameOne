@@ -27,6 +27,19 @@ package com.codenameone.examples.bastion.money;
 /// keeps from the real thing: no token, no attestation. A device that sent
 /// nothing to check is never counted as attested, whatever it claims.
 public class SimulatedIntegrityVerifier implements IntegrityVerifier {
+    /// The simulated verifier on a development profile; anywhere else a
+    /// startup failure, because trusting the client's own claims in
+    /// production would make the device policy decorative.
+    public static IntegrityVerifier forProfile(boolean development) {
+        if (!development) {
+            throw new IllegalStateException("SimulatedIntegrityVerifier trusts the device's own "
+                    + "claims and runs only on a development profile. Declare an "
+                    + "IntegrityVerifier bean that verifies Play Integrity / App Attest "
+                    + "server side.");
+        }
+        return new SimulatedIntegrityVerifier();
+    }
+
     @Override
     public Verdict verify(String platform, String token, boolean reportedRooted,
             boolean reportedAttested) {

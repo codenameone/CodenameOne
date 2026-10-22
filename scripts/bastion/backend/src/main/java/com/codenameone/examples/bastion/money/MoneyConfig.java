@@ -19,15 +19,23 @@
 package com.codenameone.examples.bastion.money;
 
 import com.codename1.backend.annotations.Bean;
+import com.codename1.backend.annotations.ConditionalOnMissingBean;
 import com.codename1.backend.annotations.Configuration;
+import com.codename1.backend.Config;
 
 /// The pieces of money movement a deployment replaces.
 @Configuration
 public class MoneyConfig {
-    /// The device integrity check. Simulated: see [IntegrityVerifier] for what
-    /// a production one calls, and why this sample cannot.
+    /// The device integrity check. Simulated, and only on a development
+    /// profile (`dev`, `test`, `local`): it believes whatever the device
+    /// reports, so on any other profile the server refuses to start until
+    /// the deployment declares its own [IntegrityVerifier] bean -- one that
+    /// sends the Play Integrity token to Google's `decodeIntegrityToken` and
+    /// checks an App Attest assertion against Apple's, see [IntegrityVerifier].
+    /// Declaring that bean makes this one step aside.
     @Bean
-    public IntegrityVerifier integrityVerifier() {
-        return new SimulatedIntegrityVerifier();
+    @ConditionalOnMissingBean(IntegrityVerifier.class)
+    public IntegrityVerifier integrityVerifier(Config config) {
+        return SimulatedIntegrityVerifier.forProfile(config.isDevelopmentProfile());
     }
 }

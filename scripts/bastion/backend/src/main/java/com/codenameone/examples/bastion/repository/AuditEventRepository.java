@@ -33,4 +33,7 @@ public interface AuditEventRepository extends CrudRepository<AuditEvent, Long> {
 
     @Query("select e from AuditEvent e where e.seq > :after order by e.seq asc")
     List<AuditEvent> after(@Param("after") long after);
+
+    /// One page of the chain, for walking it without loading it whole.
+    List<AuditEvent> findTop500BySeqGreaterThanOrderBySeqAsc(long seq);
 }

@@ -18,11 +18,11 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
-import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
 import com.codenameone.examples.bastion.Ids;
 import com.codenameone.examples.bastion.account.Accounts;
 import com.codenameone.examples.bastion.api.NewPayeeDto;
@@ -48,14 +48,14 @@ public class Payees {
     static final int MAX_PAYEES = 200;
 
     private final PayeeRepository payees;
-    private final JdbcUserDetailsManager users;
+    private final ProfileRepository profiles;
     private final Money money;
     private final Audit audit;
 
-    public Payees(PayeeRepository payees, JdbcUserDetailsManager users, Money money,
-            Audit audit) {
+    public Payees(PayeeRepository payees, Money money, Audit audit,
+            ProfileRepository profiles) {
         this.payees = payees;
-        this.users = users;
+        this.profiles = profiles;
         this.money = money;
         this.audit = audit;
     }
@@ -74,12 +74,17 @@ public class Payees {
         if (username.equals(owner)) {
             throw Refused.with(400, "move-money-between-own-accounts", "Move money between your own accounts instead");
         }
-        // Saying "no such customer" tells the caller who banks here. The
-        // request is signed by a registered device and audited, and every
-        // payee is a row a person reviews, which makes this a poor directory.
-        if (!users.userExists(username)) {
-            throw Refused.with(404, "no-customer-has-address", "No customer has that address");
-        }
+        // The same answer whether or not anyone banks under that address:
+        // "no such customer" turned this into a directory of who banks here,
+        // one signed request per guess. A payee whose address has no account
+        // is added like any other and simply cannot be paid -- the payment is
+        // refused with "That payee cannot receive", as it is for a payee with
+        // no account in that currency, so nothing tells the two apart. (Should
+        // somebody register that address later, they become payable from the
+        // payee's own creation time; the owner chose the address.)
+        // Behind the customer's profile row: two of these at once would each
+        // count the rows before the other inserted and together pass the cap.
+        profiles.hold(owner);
         if (payees.findFirstByOwnerAndUsername(owner, username) != null) {
             throw Refused.with(409, "payee-already-list", "That payee is already on your list");
         }

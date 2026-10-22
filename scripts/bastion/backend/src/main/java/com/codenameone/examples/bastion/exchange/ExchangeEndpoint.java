@@ -236,7 +236,7 @@ public class ExchangeEndpoint implements ExchangeApiServer {
     public ReceiptDto withdrawCrypto(String id, String idempotencyKey, String signature,
             CryptoWithdrawalDto withdrawal) throws Exception {
         String owner = Devices.customer();
-        LedgerAccount from = ledger.owned(owner, id);
+        LedgerAccount from = ledger.movable(owner, id);
         if (!AccountKinds.WALLET.equals(from.getKind())) {
             throw Refused.with(400, "coins-withdrawn-wallet", "Coins are withdrawn from a wallet");
         }

@@ -54,12 +54,32 @@ public class IsolationCheck {
         if (!"mysql".equals(db.dialect().getName())) {
             return;
         }
-        Map row = db.queryOne("SELECT @@transaction_isolation AS level", null);
-        Object level = row == null ? null : row.get("level");
+        Object level = level(sql -> {
+            Map row = db.queryOne(sql, null);
+            return row == null ? null : row.get("level");
+        });
         if (!"READ-COMMITTED".equals(String.valueOf(level))) {
             throw new IllegalStateException("Bastion needs MySQL at READ COMMITTED, and this "
                     + "server runs at " + level + ": SET GLOBAL transaction_isolation = "
                     + "'READ-COMMITTED' (see IsolationCheck)");
+        }
+    }
+
+    /// One query against the server.
+    public interface Query {
+        Object level(String sql) throws IOException;
+    }
+
+    /// The server's isolation level. `@@transaction_isolation` is MySQL's
+    /// (since 5.7.20) and MariaDB's only from 11.1; older MariaDB -- 10.11
+    /// LTS among them -- knows it only as `@@tx_isolation`, and refuses the
+    /// first with "Unknown system variable". So the second is asked when the
+    /// first is refused.
+    public static Object level(Query q) throws IOException {
+        try {
+            return q.level("SELECT @@transaction_isolation AS level");
+        } catch (IOException | RuntimeException unknown) {
+            return q.level("SELECT @@tx_isolation AS level");
         }
     }
 }

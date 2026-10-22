@@ -43,6 +43,8 @@ import com.codenameone.examples.bastion.repository.TransferRepository;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /// Every movement of a customer's money: between their own accounts, to a
 /// payee, out of the bank, onto a card, and (on a development server) in.
@@ -58,7 +60,9 @@ import java.util.Arrays;
 ///    is on, since that is how the server knows which device asked.
 /// 3. **The device** is trusted ([Devices]) for money leaving the caller.
 /// 4. **The limits** ([#checkLimits]): per movement, per 24 hours, and per
-///    new payee during its cooling-off period -- fiat in its own units, crypto
+///    new payee during its cooling-off period -- fiat valued in USD at
+///    `bastion.limit.fx` and summed across currencies (the payee and card
+///    limits in the payment's own units), crypto
 ///    valued in USD at the index price.
 ///
 /// A retry of a movement already made skips 2 to 4's counting -- the money
@@ -82,6 +86,7 @@ public class Money {
     private final Markets markets;
     private final long cryptoPerMove;
     private final long cryptoDaily;
+    private final Map<String, Long> fxBps;
 
     public Money(Ledger ledger, Audit audit, TransferRepository transfers,
             JournalEntryRepository entries, ProfileRepository profiles, Markets markets,
@@ -92,13 +97,14 @@ public class Money {
             @Value("${bastion.stepup.threshold:100000}") String stepUp,
             @Value("${bastion.payee.cooloff-hours:24}") String coolOffHours,
             @Value("${bastion.payee.cooloff-limit:10000}") String coolOffLimit,
-            @Value("${bastion.device.policy.enforce:true}") String enforceDevices) {
+            @Value("${bastion.device.policy.enforce:true}") String enforceDevices,
+            @Value("${bastion.limit.fx:EUR=11000}") String fx) {
         this.ledger = ledger;
         this.audit = audit;
         this.transfers = transfers;
         this.entries = entries;
         this.profiles = profiles;
-        // In ledger units of a fiat asset: cents. 5,000.00 a movement, 10,000.00
+        // In USD cents, every fiat currency valued in USD: 5,000.00 a movement, 10,000.00
         // a day, a signature above 1,000.00, 100.00 to a payee for its first
         // day.
         this.perTransfer = Long.parseLong(perTransfer.trim());
@@ -112,6 +118,54 @@ public class Money {
         // 10,000.00 a movement, 20,000.00 a day.
         this.cryptoPerMove = Long.parseLong(cryptoPerMove.trim());
         this.cryptoDaily = Long.parseLong(cryptoDaily.trim());
+        this.fxBps = parseFx(fx);
+    }
+
+    /// `bastion.limit.fx`: `CODE=bps,...`, what one unit of a fiat currency
+    /// is worth in USD, in basis points (`EUR=11000` is 1.1000 USD). The fiat
+    /// limits are in USD cents, so each currency is valued at this rate first;
+    /// a fiat asset not listed is valued at its index market, if it has one,
+    /// and refused if not.
+    static Map<String, Long> parseFx(String fx) {
+        Map<String, Long> out = new HashMap<String, Long>();
+        String text = fx == null ? "" : fx.trim();
+        int start = 0;
+        while (start < text.length()) {
+            int comma = text.indexOf(',', start);
+            String pair = (comma < 0 ? text.substring(start) : text.substring(start, comma)).trim();
+            start = comma < 0 ? text.length() : comma + 1;
+            int colon = pair.indexOf('=');
+            if (colon <= 0) {
+                if (pair.length() > 0) {
+                    throw new IllegalArgumentException("bastion.limit.fx: " + pair);
+                }
+                continue;
+            }
+            long bps = Long.parseLong(pair.substring(colon + 1).trim());
+            if (bps <= 0) {
+                throw new IllegalArgumentException("bastion.limit.fx: " + pair);
+            }
+            out.put(pair.substring(0, colon).trim(), Long.valueOf(bps));
+        }
+        return out;
+    }
+
+    /// `amount` ledger units of fiat `code` in USD cents, rounded up. Every
+    /// fiat asset here has two decimals, as USD does.
+    long fiatValue(String code, long amount) throws IOException {
+        if ("USD".equals(code) || amount == 0) {
+            return amount;
+        }
+        Long bps = fxBps.get(code);
+        if (bps == null) {
+            return markets.value(code, amount, "USD");
+        }
+        long b = bps.longValue();
+        if (amount > Long.MAX_VALUE / b) {
+            return Long.MAX_VALUE;
+        }
+        long scaled = amount * b;
+        return scaled / 10000L + (scaled % 10000L > 0 ? 1L : 0L);
     }
 
     public long coolOffMillis() {
@@ -207,6 +261,7 @@ public class Money {
         if (m.amount <= 0) {
             throw Refused.with(400, "amount-more-than-zero", "The amount must be more than zero");
         }
+        m.key = Ledger.clientKey(m.owner, m.key);
         try {
             return moveOnce(m);
         } catch (ResponseStatusException answered) {
@@ -285,11 +340,23 @@ public class Money {
             return;
         }
         long now = System.currentTimeMillis();
-        if (m.amount > perTransfer) {
+        // In USD cents across every fiat currency together, like the crypto
+        // limits: one limit per currency would let a customer with a USD and
+        // a EUR account move the day's limit twice.
+        long value = fiatValue(asset.getCode(), m.amount);
+        if (value > perTransfer) {
             throw Refused.with(409, "more-than-payment-may-move", "That is more than one payment may move");
         }
-        Long sent = transfers.sentSince(m.owner, asset.getCode(), now - DAY);
-        if ((sent == null ? 0L : sent.longValue()) + m.amount > daily) {
+        long sent = value;
+        for (Asset fiat : ledger.assets()) {
+            if ("FIAT".equals(fiat.getKind())) {
+                Long moved = transfers.sentSince(m.owner, fiat.getCode(), now - DAY);
+                if (moved != null && moved.longValue() > 0) {
+                    sent = saturatedAdd(sent, fiatValue(fiat.getCode(), moved.longValue()));
+                }
+            }
+        }
+        if (sent > daily) {
             throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
         }
         if (m.payee != null && now < m.payee.getCreatedAt() + coolOffMillis) {
@@ -343,7 +410,7 @@ public class Money {
     /// What one call asked to move.
     private static final class Move {
         final String owner;
-        final String key;
+        String key;
         final String kind;
         final LedgerAccount from;
         final LedgerAccount to;

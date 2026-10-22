@@ -84,32 +84,57 @@ public class Audit {
     /// hold: a row whose hash is not its own, a row that does not link to the
     /// one before it, a missing number, or a head that disagrees with the
     /// last row. Empty means intact.
-    @Transactional(readOnly = true)
+    ///
+    /// Page by page, each in its own read, so memory stays one page however
+    /// long the chain grows (a whole-table read held every row, and the ORM
+    /// session a copy of each). The head is read first and the walk stops at
+    /// it: rows appended while the walk runs are past the head it compares
+    /// against, and are checked on the next run.
     public List<String> verify() throws IOException {
         List<String> problems = new ArrayList<String>();
+        AuditHead tail = tail();
+        long end = tail == null ? Long.MAX_VALUE : tail.getSeq();
         String prev = GENESIS;
         long expected = 1;
-        // One pass over the whole table. A real deployment verifies from its
-        // last signed checkpoint instead of from the genesis row every time.
-        for (AuditEvent e : events.after(0L)) {
-            if (e.getSeq() != expected) {
-                problems.add("missing #" + expected + " before #" + e.getSeq());
+        long after = 0;
+        boolean more = true;
+        while (more) {
+            List<AuditEvent> page = page(after);
+            more = !page.isEmpty();
+            for (AuditEvent e : page) {
+                if (e.getSeq() > end) {
+                    more = false;
+                    break;
+                }
+                if (e.getSeq() != expected) {
+                    problems.add("missing #" + expected + " before #" + e.getSeq());
+                }
+                if (!prev.equals(e.getPrevHash())) {
+                    problems.add("#" + e.getSeq() + " does not link to the row before it");
+                }
+                if (!hash(e).equals(e.getHash())) {
+                    problems.add("#" + e.getSeq() + " was changed after it was written");
+                }
+                prev = e.getHash();
+                expected = e.getSeq() + 1;
+                after = e.getSeq();
             }
-            if (!prev.equals(e.getPrevHash())) {
-                problems.add("#" + e.getSeq() + " does not link to the row before it");
-            }
-            if (!hash(e).equals(e.getHash())) {
-                problems.add("#" + e.getSeq() + " was changed after it was written");
-            }
-            prev = e.getHash();
-            expected = e.getSeq() + 1;
         }
-        AuditHead tail = head.findById(AuditHeadRepository.ONLY);
         if (tail != null && (tail.getSeq() != expected - 1 || !tail.getHash().equals(prev))) {
             problems.add("the head says #" + tail.getSeq() + " but the chain ends at #"
                     + (expected - 1));
         }
         return problems;
+    }
+
+    @Transactional(readOnly = true)
+    private AuditHead tail() throws IOException {
+        return head.findById(AuditHeadRepository.ONLY);
+    }
+
+    @Transactional(readOnly = true)
+    private List<AuditEvent> page(long after) throws IOException {
+        return events.findTop500BySeqGreaterThanOrderBySeqAsc(after);
     }
 
     static String hash(AuditEvent e) throws IOException {

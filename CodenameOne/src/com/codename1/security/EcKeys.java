@@ -31,13 +31,10 @@ import com.codename1.util.BigInteger;
 /// JavaSE port has none. Apple's SecKey cannot import an EC private key
 /// without the point, and cannot derive it, so [Signature#sign] hands the
 /// port this completed form. The point is computed once per key (see
-/// [PrivateKey]) with plain affine double-and-add. That is not constant
-/// time, which is acceptable only because it runs once per key rather than
-/// once per signature.
+/// [PrivateKey]) with a fixed-length Montgomery ladder, see [#multiply].
 final class EcKeys {
     private static final BigInteger P = new BigInteger(
             "ffffffff00000001000000000000000000000000ffffffffffffffffffffffff", 16);
-    private static final BigInteger A = P.subtract(BigInteger.valueOf(3));
     private static final BigInteger GX = new BigInteger(
             "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16);
     private static final BigInteger GY = new BigInteger(
@@ -174,37 +171,104 @@ final class EcKeys {
     }
 
     /// `k * G` in affine coordinates, or null for the point at infinity.
+    ///
+    /// A Montgomery ladder over all 256 bits of the scalar, on projective
+    /// points with the complete addition formulas of Renes, Costello and
+    /// Batina ("Complete addition formulas for prime order elliptic curves",
+    /// 2016, algorithm 4 for a = -3). Every bit costs the same: one addition
+    /// and one doubling, both through the one formula, which has no special
+    /// case for the identity or for equal points, and no field inversion until
+    /// the single one at the end. The two ladder points trade places by array
+    /// index, never by a branch on the bit. What the private scalar decides is
+    /// therefore not which operations run, nor how many, nor whether a short
+    /// key ends early. The big-integer arithmetic underneath is not itself
+    /// constant time; a port with a native derivation should prefer it.
     static BigInteger[] multiply(BigInteger k) {
-        BigInteger[] r = null;
-        BigInteger[] g = {GX, GY};
-        for (int i = k.bitLength() - 1; i >= 0; i--) {
-            r = add(r, r);
-            if (k.testBit(i)) {
-                r = add(r, g);
-            }
+        BigInteger[][] r = {{BigInteger.ZERO, BigInteger.ONE, BigInteger.ZERO},
+            {GX, GY, BigInteger.ONE}};
+        for (int i = 255; i >= 0; i--) {
+            int bit = k.testBit(i) ? 1 : 0;
+            // With bit = 1 the roles swap: r[1] is doubled and r[0] gets the sum.
+            BigInteger[] lo = r[bit];
+            BigInteger[] hi = r[1 - bit];
+            BigInteger[] sum = add(lo, hi);
+            BigInteger[] twice = add(lo, lo);
+            r[bit] = twice;
+            r[1 - bit] = sum;
         }
-        return r;
+        BigInteger[] q = r[0];
+        if (q[2].signum() == 0) {
+            return null;
+        }
+        // Fermat's little theorem: modInverse has been wrong for 256-bit
+        // operands in this BigInteger.
+        BigInteger zInv = q[2].modPow(P.subtract(BigInteger.valueOf(2)), P);
+        return new BigInteger[]{q[0].multiply(zInv).mod(P), q[1].multiply(zInv).mod(P)};
     }
 
+    /// The curve's `b`.
+    private static final BigInteger B = new BigInteger(
+            "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b", 16);
+
+    private static BigInteger m(BigInteger a, BigInteger b) {
+        return a.multiply(b).mod(P);
+    }
+
+    private static BigInteger p(BigInteger a, BigInteger b) {
+        return a.add(b).mod(P);
+    }
+
+    private static BigInteger s(BigInteger a, BigInteger b) {
+        return a.subtract(b).mod(P);
+    }
+
+    /// Complete projective addition, `u + v`, for a = -3 (RCB algorithm 4).
+    /// Valid for every pair of points, the identity (0:1:0) and `u == v`
+    /// included.
     private static BigInteger[] add(BigInteger[] u, BigInteger[] v) {
-        if (u == null) {
-            return v;
-        }
-        if (v == null) {
-            return u;
-        }
-        BigInteger lambda;
-        if (u[0].equals(v[0])) {
-            if (!u[1].equals(v[1]) || u[1].signum() == 0) {
-                return null;
-            }
-            BigInteger num = u[0].multiply(u[0]).multiply(BigInteger.valueOf(3)).add(A);
-            lambda = num.multiply(u[1].shiftLeft(1).modInverse(P)).mod(P);
-        } else {
-            lambda = v[1].subtract(u[1]).multiply(v[0].subtract(u[0]).mod(P).modInverse(P)).mod(P);
-        }
-        BigInteger x = lambda.multiply(lambda).subtract(u[0]).subtract(v[0]).mod(P);
-        BigInteger y = lambda.multiply(u[0].subtract(x)).subtract(u[1]).mod(P);
-        return new BigInteger[]{x, y};
+        BigInteger x1 = u[0];
+        BigInteger y1 = u[1];
+        BigInteger z1 = u[2];
+        BigInteger x2 = v[0];
+        BigInteger y2 = v[1];
+        BigInteger z2 = v[2];
+        BigInteger t0 = m(x1, x2);
+        BigInteger t1 = m(y1, y2);
+        BigInteger t2 = m(z1, z2);
+        BigInteger t3 = m(p(x1, y1), p(x2, y2));
+        BigInteger t4 = p(t0, t1);
+        t3 = s(t3, t4);
+        t4 = m(p(y1, z1), p(y2, z2));
+        BigInteger x3 = p(t1, t2);
+        t4 = s(t4, x3);
+        x3 = m(p(x1, z1), p(x2, z2));
+        BigInteger y3 = p(t0, t2);
+        y3 = s(x3, y3);
+        BigInteger z3 = m(B, t2);
+        x3 = s(y3, z3);
+        z3 = p(x3, x3);
+        x3 = p(x3, z3);
+        z3 = s(t1, x3);
+        x3 = p(t1, x3);
+        y3 = m(B, y3);
+        t1 = p(t2, t2);
+        t2 = p(t1, t2);
+        y3 = s(y3, t2);
+        y3 = s(y3, t0);
+        t1 = p(y3, y3);
+        y3 = p(t1, y3);
+        t1 = p(t0, t0);
+        t0 = p(t1, t0);
+        t0 = s(t0, t2);
+        t1 = m(t4, y3);
+        t2 = m(t0, y3);
+        y3 = m(x3, z3);
+        y3 = p(y3, t2);
+        x3 = m(t3, x3);
+        x3 = s(x3, t1);
+        z3 = m(t4, z3);
+        t1 = m(t3, t0);
+        z3 = p(z3, t1);
+        return new BigInteger[]{x3, y3, z3};
     }
 }

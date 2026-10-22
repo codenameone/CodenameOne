@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Component;
@@ -71,9 +72,12 @@ public class BankingEndpoint implements BankingApiServer {
     private final RequestSigning signing;
     private final Audit audit;
     private final Config config;
+    private final ProfileRepository profiles;
 
     public BankingEndpoint(Ledger ledger, Money money, Payees payees, Cards cards,
-            Devices devices, RequestSigning signing, Audit audit, Config config) {
+            Devices devices, RequestSigning signing, Audit audit, Config config,
+            ProfileRepository profiles) {
+        this.profiles = profiles;
         this.ledger = ledger;
         this.money = money;
         this.payees = payees;
@@ -122,6 +126,9 @@ public class BankingEndpoint implements BankingApiServer {
     @Transactional(rollbackFor = Exception.class)
     private LedgerAccount openAudited(String owner, String asset, String kind, String name)
             throws IOException {
+        // Behind the customer's profile row: two of these at once would each
+        // count the rows before the other inserted and together pass the cap.
+        profiles.hold(owner);
         if (ledger.accountsOf(owner).size() >= MAX_ACCOUNTS) {
             throw Refused.with(409, "close-account-before-opening-another", "Close an account before opening another");
         }
@@ -151,7 +158,7 @@ public class BankingEndpoint implements BankingApiServer {
                 || (transfer.toAccountId() == null) == (transfer.payeeId() == null)) {
             throw Refused.with(400, "name-account-pay-either-account", "Name the account to pay from, and either an account or a payee to pay");
         }
-        LedgerAccount from = ledger.owned(owner, transfer.fromAccountId());
+        LedgerAccount from = ledger.movable(owner, transfer.fromAccountId());
         boolean leaves = transfer.payeeId() != null;
         Device device = null;
         // A signature that is sent is always checked, even where none is
@@ -160,7 +167,7 @@ public class BankingEndpoint implements BankingApiServer {
             device = signing.require(owner);
         }
         if (!leaves) {
-            LedgerAccount to = ledger.owned(owner, transfer.toAccountId());
+            LedgerAccount to = ledger.movable(owner, transfer.toAccountId());
             return money.internal(owner, idempotencyKey, from, to, transfer.amount(),
                     transfer.memo());
         }
@@ -169,8 +176,11 @@ public class BankingEndpoint implements BankingApiServer {
         List<LedgerAccount> theirs = ledger.accountsOf(payee.getUsername());
         LedgerAccount to = null;
         for (LedgerAccount a : theirs) {
+            // A frozen account is passed over, so paying a frozen customer
+            // gets the same "cannot receive" as one with no such account:
+            // the payer is not told that someone else's account is frozen.
             if (to == null && AccountKinds.CHECKING.equals(a.getKind())
-                    && a.getAsset().equals(from.getAsset())) {
+                    && a.getAsset().equals(from.getAsset()) && !a.isFrozen()) {
                 to = a;
             }
         }
@@ -189,7 +199,7 @@ public class BankingEndpoint implements BankingApiServer {
             // production server has.
             throw Refused.with(404, "not-found", "Not found");
         }
-        LedgerAccount to = ledger.owned(owner, id);
+        LedgerAccount to = ledger.movable(owner, id);
         return money.deposit(owner, idempotencyKey, to, cash == null ? 0 : cash.amount(),
                 cash == null ? null : cash.memo());
     }
@@ -198,7 +208,7 @@ public class BankingEndpoint implements BankingApiServer {
     public ReceiptDto withdraw(String id, String idempotencyKey, String signature, CashDto cash)
             throws Exception {
         String owner = Devices.customer();
-        LedgerAccount from = ledger.owned(owner, id);
+        LedgerAccount from = ledger.movable(owner, id);
         // Always signed, whatever the policy: money leaving the bank does not
         // come back.
         Device device = signing.require(owner);
@@ -238,7 +248,7 @@ public class BankingEndpoint implements BankingApiServer {
     @Override
     public CardDto issueCard(String accountId) throws Exception {
         String owner = Devices.customer();
-        return cards.issue(owner, ledger.owned(owner, accountId));
+        return cards.issue(owner, ledger.movable(owner, accountId));
     }
 
     @Override
@@ -273,7 +283,7 @@ public class BankingEndpoint implements BankingApiServer {
             audit.append(owner, "CARD_DECLINED", id, "frozen");
             throw Refused.with(409, "card-frozen", "That card is frozen");
         }
-        LedgerAccount from = ledger.owned(owner, card.getAccountId());
+        LedgerAccount from = ledger.movable(owner, card.getAccountId());
         return money.spend(owner, idempotencyKey, card, from, spend == null ? 0 : spend.amount(),
                 spend == null ? null : spend.merchant());
     }
