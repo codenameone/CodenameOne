@@ -1667,4 +1667,37 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("222222", theme.get("A.fgColor"));
         org.junit.jupiter.api.Assertions.assertNull(theme.get("A.sel#fgColor"));
     }
+
+    @Test
+    void testVarColorWritesABinding() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile(":root{--a:#112233;--b:var(--a);} Foo{color:var(--b);background-color:var(--a)}"
+                + " Bar{color:var(--a)} Bar.disabled{color:#000000}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("b", theme.get("@cn1-bind:Foo.fgColor"));
+        assertEquals("b", theme.get("@cn1-bind:Foo.sel#fgColor"));
+        assertEquals("a", theme.get("@cn1-bind:Foo.bgColor"));
+        assertEquals("a", theme.get("@cn1-bind:Bar.press#fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("@cn1-bind:Bar.dis#fgColor"));
+    }
+
+    @Test
+    void testLengthConstantIsUsableButNotStored() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("#Constants { --a: 5px; --b: 2mm; } Foo { padding: var(--a); }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("@a"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("@b"));
+        assertEquals("5,5,5,5", theme.get("Foo.padding"));
+    }
+
+    @Test
+    void testCombinatorRulesAreDropped() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("A B{color:#ff0000} A > B{color:#00ff00} C{color:#0000ff}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A B.fgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A > B.fgColor"));
+        assertEquals("0000ff", theme.get("C.fgColor"));
+    }
 }

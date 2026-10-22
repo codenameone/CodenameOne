@@ -547,6 +547,13 @@ public class CSSThemeCompiler {
                     value = unquotedFirst;
                 } else if (first.length() < value.length() && isColorLiteral(first)) {
                     value = constantColor(first);
+                } else if (declName.startsWith("--") && isDimensionToken(first)) {
+                    // `#Constants { --gap: 5px; }` exists to be used as var(--gap) in a
+                    // padding or margin; the build-time compiler resolves those and leaves the
+                    // constant itself out of the theme, without failing the sheet. A plain
+                    // `gap: 5px` has no such use and is still rejected below, so the author
+                    // learns the constant does not exist rather than reading null at runtime.
+                    continue;
                 } else {
                     value = buildConstant(name, first, first);
                 }
@@ -867,6 +874,9 @@ public class CSSThemeCompiler {
     private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts,
                            Hashtable<String, String> deferred) {
         if (":root".equals(rule.selector)) {
+            // Unlike the build-time compiler, `:root` custom properties are also kept as `@name`
+            // theme constants: that is this compiler's documented contract for `:root` (see the
+            // class comment), and applications already read them through getThemeConstant().
             for (Declaration declaration : rule.declarations) {
                 applyThemeConstantProperty(theme, declaration.name, declaration.value, deferred);
             }
@@ -893,6 +903,19 @@ public class CSSThemeCompiler {
                 continue;
             }
             String value = resolveVars(theme, declaration.value, new ArrayList<String>(), true);
+            if (!universal && ("color".equals(property) || "background-color".equals(property))) {
+                // `@cn1-bind:Foo.fgColor=accent`, as the build-time compiler writes it, lets
+                // UIManager retune every color that names `var(--accent)` through one
+                // addThemeProps({"@accent": ...}). A literal drops an earlier binding.
+                String bindKey = "@cn1-bind:" + uiid + "." + statePrefix
+                        + ("color".equals(property) ? "fgColor" : "bgColor");
+                String bound = boundVariable(declaration.value);
+                if (bound != null) {
+                    theme.put(bindKey, bound);
+                } else {
+                    theme.remove(bindKey);
+                }
+            }
             if ("cn1-derive".equals(property)) {
                 // The build-time compiler reads the target with getStringValue(): `"Base"` and
                 // `B\61se` both name the UIID `Base`.
@@ -1146,12 +1169,41 @@ public class CSSThemeCompiler {
                         continue;
                     }
                     theme.put(uiid + "." + state + key, value);
+                    Object binding = theme.get("@cn1-bind:" + uiid + "." + key);
+                    if (binding != null) {
+                        theme.put("@cn1-bind:" + uiid + "." + state + key, binding);
+                    }
                 }
             }
         }
     }
 
     /// Whether a UIID `uiid` derives from, at any depth, declares `key` for `state`.
+    /// The custom property `value` consists of, `accent` for `var(--accent)` or
+    /// `var(--accent, red)`, or null when the value is anything more than one var().
+    private static String boundVariable(String value) {
+        String v = value.trim();
+        if (!v.startsWith("var(") || !v.endsWith(")")) {
+            return null;
+        }
+        String inner = v.substring(4, v.length() - 1).trim();
+        int comma = inner.indexOf(',');
+        String name = (comma < 0 ? inner : inner.substring(0, comma)).trim();
+        if (!name.startsWith("--") || name.length() == 2) {
+            return null;
+        }
+        for (int i = 2; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '(' || c == ')' || c <= ' ') {
+                return null;
+            }
+        }
+        if (comma < 0 && inner.indexOf('(') >= 0) {
+            return null;
+        }
+        return name.substring(2);
+    }
+
     private boolean derivedStateDeclares(Hashtable theme, String uiid, String state, String key) {
         boolean dark = uiid.startsWith("$Dark");
         ArrayList<String> seen = new ArrayList<String>();
@@ -1445,6 +1497,20 @@ public class CSSThemeCompiler {
     /// The value the build-time compiler stores for an unquoted `#Constants` token: a number
     /// as it serializes the parsed value (`1.50` is `1.5`, `001` is `1`), an identifier as
     /// written. Every other token type is one it drops, so it is rejected here.
+    /// Whether `token` is a CSS length or percentage such as `5px`, `-1.5mm` or `50%`.
+    private static boolean isDimensionToken(String token) {
+        int end = token.length();
+        while (end > 0) {
+            char c = token.charAt(end - 1);
+            if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '%') {
+                end--;
+            } else {
+                break;
+            }
+        }
+        return end > 0 && end < token.length() && isCssNumber(token.substring(0, end));
+    }
+
     private static String buildConstant(String name, String raw, String value) {
         if (isCssNumber(value) && (value.indexOf('e') > -1 || value.indexOf('E') > -1)) {
             // The build-time parser reads `1e2` as a dimension, a token its constants emitter
@@ -1935,6 +2001,18 @@ public class CSSThemeCompiler {
         return new String[]{uiid, statePrefix};
     }
 
+    private static boolean isCombinatorSelector(String selector) {
+        for (int i = 0; i < selector.length(); i++) {
+            char c = selector.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c <= ' ' || c == '>' || c == '+' || c == '~') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isUnselectedSelector(String selector) {
         String s = selector.trim();
         int dot = s.indexOf('.');
@@ -2397,6 +2475,11 @@ public class CSSThemeCompiler {
                 String selector = selectorEntry.trim();
                 if (selector.length() == 0) {
                     throw new CSSSyntaxException("Empty selector in selector list: " + selectors);
+                }
+                if (isCombinatorSelector(selector)) {
+                    // `A B`, `A > B`, `A + B`, `A ~ B`: a theme has no element tree to match a
+                    // combinator against, and the build-time compiler drops such a rule.
+                    continue;
                 }
                 if (isConstantsSelector(selector)) {
                     // `#Constants, Other { ... }`: the build-time compiler still exports the
