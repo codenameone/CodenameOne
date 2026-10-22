@@ -9,7 +9,7 @@ mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
 // end::skirmish-sh-simulator[]
 
 // tag::skirmish-sh-ios[]
-mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 // end::skirmish-sh-ios[]
 
 // tag::skirmish-sh-tests[]
@@ -20,5 +20,5 @@ mvn -pl rules,shared,backend -Dcodename1.platform=backend test
 
 // tag::skirmish-sh-portraits[]
 mvn -pl common test-compile surefire:test -Dtest=PortraitStudio \
-    -Dskirmish.portraits=common/src/main/resources
+    -Dskirmish.portraits="$PWD/common/src/main/resources"
 // end::skirmish-sh-portraits[]

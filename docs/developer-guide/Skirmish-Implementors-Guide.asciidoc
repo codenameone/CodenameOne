@@ -31,8 +31,8 @@ include::../demos/common/src/main/snippets/developer-guide/skirmish.sh[tag=skirm
 
 The app looks for the server at `http://localhost:8080/`; *Settings* changes the
 address, which is how a phone reaches a server on your computer. To build the native
-iOS app on a Mac, generate the Xcode project and open it, then run it on a
-simulator or a device from Xcode:
+iOS app on a Mac, generate the Xcode project, which lands under `ios/target`,
+then open it and run it on a simulator or a device from Xcode:
 
 [source,bash]
 ----
@@ -80,13 +80,14 @@ include::../../scripts/skirmish/rules/src/main/java/com/codenameone/examples/ski
 Three rules keep every copy of a match identical:
 
 * *No floating point.* Positions are thousandths of a tile, held in `int`, and
-  `FixedMath` supplies the square root and the angles. Floating point rounds
+  `FixedMath` supplies the integer square root and distance checks. Floating point rounds
   differently on different processors and compilers, so a battle that used it
   would drift apart between a phone and the server.
 * *No clock and no `java.util.Random`.* Time is the tick count, and chance comes
   from `Rng`, seeded by the server when the match starts.
-* *The order is fixed.* Units act in the order they were created, and two cards
-  played on the same tick apply seat 0 first.
+* *The order is fixed.* Units act in the order they were created, and cards played
+  on the same tick apply in the order the server received them, which the
+  server's log fixes for every copy of the match.
 
 Because of that, a replay is only the seed, the two decks and the list of cards
 played. `Replay` re-runs them through `Match` and arrives at the same battle, and
@@ -239,7 +240,8 @@ never pay:
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/engage/Ads.java[tag=skirmish-ads,indent=0]
 ----
 
-A rewarded video is only a request: the server pays the coins, once per battle.
+A rewarded video is only a request: the server pays the coins, up to three
+times a day.
 
 === Push notifications and analytics
 
@@ -256,8 +258,9 @@ include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/sk
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/Services.java[tag=skirmish-push-choice,indent=0]
 ----
 
-`Telemetry` records the funnel a game is measured by: sign-up, the first battle,
-the first win, a deck change and a purchase. It sends nothing unless the player
+`Telemetry` records what a game is measured by: sign-ups and sign-ins, every
+battle and its result, the cards played, deck changes, spending, purchases, ad
+rewards and shares. It sends nothing unless the player
 allows it in *Settings*.
 
 === Moderation

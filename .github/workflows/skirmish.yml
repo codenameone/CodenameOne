@@ -4,7 +4,7 @@ name: Skirmish (game sample)
 # `rules` module (the pure, deterministic simulation both sides run), a `shared`
 # module of transfer objects and @RestClient contracts, the Codename One client
 # (`common`), a Codename One Backend that implements the contracts, and an `ios`
-# module for the device build. It is modelled on skirmish.yml.
+# module for the device build. It is modelled on savor.yml.
 #
 # Five things are checked here, because each fails without the others noticing:
 #
@@ -57,8 +57,16 @@ on:
     paths:
       - 'scripts/skirmish/**'
       - 'vm/backend/src/**'
+      - 'vm/backend/impl/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'CodenameOne/src/com/codename1/maps/**'
+      - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/rest/**'
+      # The REST client maps its responses through the mapper registry.
+      - 'CodenameOne/src/com/codename1/mapping/**'
       # The ORM validates every mapping against its migration when the
       # server starts, and the backend-database job is where that runs
       # against a real database.
@@ -66,7 +74,12 @@ on:
       - 'CodenameOne/src/com/codename1/orm/**'
       - 'CodenameOne/src/com/codename1/annotations/**'
       - 'scripts/ci/sample-server-tests-on-database.sh'
+      - 'scripts/build-android-app.sh'
+      - 'scripts/build-ios-app.sh'
       - 'scripts/sync-initializr-template.py'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/tests/GenerateInitializr.java'
+      # The generator and the template.
       - 'scripts/initializr/common/src/**'
       - '.github/workflows/skirmish.yml'
   workflow_dispatch:
@@ -84,7 +97,7 @@ permissions:
 
 jobs:
   template-sync:
-    name: Initializr template matches the sample (once the template exists)
+    name: Initializr template matches the sample
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

@@ -68,7 +68,7 @@ from Xcode:
 
 [source,bash]
 ----
-mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
 ----
 
 == Tests

@@ -37,7 +37,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 ///
 /// ```
 /// mvn -pl common test-compile surefire:test -Dtest=PortraitStudio \
-///     -Dskirmish.portraits=common/src/main/resources
+///     -Dskirmish.portraits="$PWD/common/src/main/resources"
 /// ```
 ///
 /// and writes `card_<card>.png` and `hero_<model>.png` there. Re-run it after
