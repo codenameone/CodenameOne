@@ -18875,6 +18875,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        JavaSEFileDialogs.showOpen(request, callback);
+    }
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        JavaSEFileDialogs.showSave(request, callback, new JavaSEFileDialogs.SaveCompleter() {
+            public void complete(com.codename1.io.filechooser.SaveFileRequest r,
+                                 com.codename1.io.filechooser.FileDialogResult result,
+                                 com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> cb) {
+                completeSaveDialog(r, result, cb);
+            }
+        });
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature != com.codename1.io.filechooser.FileDialogFeatures.ACCESSORY_COMPONENT;
+    }
+
+    @Override
     public void openFileChooser(final com.codename1.ui.events.ActionListener response, final String accept) {
         EventQueue.invokeLater(new Runnable() {
             public void run() {

@@ -2629,6 +2629,51 @@ public class WindowsImplementation extends CodenameOneImplementation {
         response.actionPerformed(result);
     }
 
+    /* IFileOpenDialog / IFileSaveDialog for Display.showOpenDialog/showSaveDialog:
+     * filter list, multi selection, folders, overwrite confirmation, and the
+     * portable options through IFileDialogCustomize. A Codename One accessory
+     * component and a preview cannot be hosted in the shell dialog, so neither
+     * is reported supported. */
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        String[] answer = WindowsNative.fileDialogEx(false, request.getTitle(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), null,
+                com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
+                request.isMultiSelect(), request.isDirectories(), false,
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
+                com.codename1.impl.NativeFileDialogCodec.encodeOptions(request),
+                request.getStringHint(com.codename1.io.filechooser.FileDialogRequest.HINT_WIN_CLIENT_GUID),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getStringHint(com.codename1.io.filechooser.FileDialogRequest.HINT_WIN_DEFAULT_FOLDER)));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
+    }
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        String[] answer = WindowsNative.fileDialogEx(true, request.getTitle(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()),
+                request.getSuggestedName(),
+                com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
+                false, false, request.isConfirmOverwrite(),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
+                com.codename1.impl.NativeFileDialogCodec.encodeOptions(request),
+                request.getStringHint(com.codename1.io.filechooser.FileDialogRequest.HINT_WIN_CLIENT_GUID),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getStringHint(com.codename1.io.filechooser.FileDialogRequest.HINT_WIN_DEFAULT_FOLDER)));
+        com.codename1.io.filechooser.FileDialogResult result = com.codename1.impl.NativeFileDialogCodec.decode(request, answer);
+        if (result.isCancelled()) {
+            com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
+        } else {
+            completeSaveDialog(request, result, callback);
+        }
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature != com.codename1.io.filechooser.FileDialogFeatures.ACCESSORY_COMPONENT
+                && feature != com.codename1.io.filechooser.FileDialogFeatures.PREVIEW;
+    }
+
     @Override
     public void openImageGallery(com.codename1.ui.events.ActionListener response) {
         openGallery(response, Display.GALLERY_IMAGE);

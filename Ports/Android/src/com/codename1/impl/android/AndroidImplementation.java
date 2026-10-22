@@ -13902,6 +13902,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        AndroidFileDialogs.showOpen(request, callback);
+    }
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+                               SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        AndroidFileDialogs.showSave(request, callback);
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return AndroidFileDialogs.isFeatureSupported(feature);
+    }
+
+    @Override
     public void openFileChooser(final ActionListener response, String accept) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open file chooser in background mode");

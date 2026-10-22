@@ -34,6 +34,9 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.VirtualKeyboardInterface;
+import com.codename1.io.filechooser.FileDialogResult;
+import com.codename1.io.filechooser.OpenFileRequest;
+import com.codename1.io.filechooser.SaveFileRequest;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
@@ -7035,6 +7038,50 @@ public final class Display extends CN1Constants {
     /// - `accept`: comma-separated extensions or MIME types, or `null` for all files
     public void openFileChooser(ActionListener response, String accept) {
         impl.openFileChooser(response, accept);
+    }
+
+    /// Shows the platform's Open dialog.
+    ///
+    /// Unlike `#openFileChooser(ActionListener, String)` this takes several
+    /// named filters, multiple selection, folder picking, extra controls, a
+    /// live preview and platform hints; each applies where the platform has it
+    /// (see `#isFileDialogFeatureSupported(int)`) and is ignored elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description
+    /// - `callback`: receives the result on the EDT, also when the user cancels
+    public void showOpenDialog(OpenFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        impl.showOpenDialog(request, callback);
+    }
+
+    /// Shows the platform's Save dialog and writes the request's content to
+    /// the location the user picks.
+    ///
+    /// Android saves through the Storage Access Framework and iOS through the
+    /// document picker, so no storage permission is needed; desktops show
+    /// their native save panel; other platforms show a Codename One form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the dialog description and the content to save
+    /// - `callback`: receives the result on the EDT once the content is written,
+    ///   also when the user cancels
+    public void showSaveDialog(SaveFileRequest request, SuccessCallback<FileDialogResult> callback) {
+        impl.showSaveDialog(request, callback);
+    }
+
+    /// Checks whether this platform's file dialogs have a capability.
+    ///
+    /// #### Parameters
+    ///
+    /// - `feature`: a `com.codename1.io.filechooser.FileDialogFeatures` constant
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return impl.isFileDialogFeatureSupported(feature);
     }
 
     /// Checks to see if the given gallery type is supported on the current platform.
