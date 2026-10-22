@@ -345,7 +345,7 @@ class HashnodeAdapter:
          /draft/<id>. (Once a draft is published the slot is freed and
          the next click creates a fresh draft, so weekly runs no
          longer overwrite each other.)
-      2. Fill the title textarea (placeholder "Article Title...") and
+      2. Fill the title textarea (placeholder "Article title...", matched case-insensitively) and
          paste the markdown body into the contenteditable editor. The
          leading header-image markdown line is stripped from the body
          because it lives separately as the "Cover" image (see step 3).
@@ -383,8 +383,22 @@ class HashnodeAdapter:
         "HASHNODE_PUBLICATION_URL", "https://debugagent.com"
     ).rstrip("/")
 
-    TITLE_SELECTOR = "textarea[placeholder='Article Title...']"
-    BODY_SELECTOR = "div[contenteditable='true']"
+    # Hashnode re-cased the placeholder to "Article title..." in 2026-10
+    # and every run timed out here for two days (issue #6070). Match it
+    # case-insensitively (the CSS ``i`` flag) and on any element kind the
+    # field could become, rather than pinning one spelling and tag again.
+    TITLE_SELECTOR = ", ".join(
+        f"{tag}[{attr}^='Article title' i]"
+        for tag in ("textarea", "input", "[contenteditable='true']")
+        for attr in ("placeholder", "data-placeholder")
+    )
+    # The first contenteditable that is not the title, in case the title
+    # itself turns into one.
+    BODY_SELECTOR = (
+        "div[contenteditable='true']"
+        ":not([placeholder^='Article title' i])"
+        ":not([data-placeholder^='Article title' i])"
+    )
     # Cover popover trigger has two captions: "Cover" when no cover is
     # set, "Change cover" once one is uploaded. Both buttons share
     # data-slot='popover-trigger'.
@@ -686,8 +700,13 @@ class HashnodeAdapter:
             # events — so we use Playwright's real click and loop on
             # the live count.
             dialog = page.locator(self.DIALOG_SELECTOR).first
-            selected_pills = dialog.locator("button").filter(
-                has_text=re.compile(r"^#[a-z0-9][a-z0-9-]*$")
+            # Since 2026-10 a pill is <span>#tag<button aria-label=
+            # "Remove #tag">x</button></span>; before that the pill was
+            # itself a "#tag" button. Match the remove button of either.
+            selected_pills = dialog.locator("button[aria-label^='Remove #']").or_(
+                dialog.locator("button").filter(
+                    has_text=re.compile(r"^#[a-z0-9][a-z0-9-]*$")
+                )
             )
             for _ in range(20):  # hard cap so we never loop forever
                 count = selected_pills.count()
@@ -730,12 +749,28 @@ class HashnodeAdapter:
                 else:
                     print(f"  [hashnode] tag '{tag}' could not be added after retry",
                           file=sys.stderr)
+                    self._save_dialog_diagnostics(page, f"tag-{tag}")
                     return False
             return all(self._tag_is_selected(dialog, tag) for tag in self.TAGS)
         except Exception as err:  # noqa: BLE001
             print(f"  [hashnode] tag set failed (non-fatal): {err}",
                   file=sys.stderr)
             return False
+
+    def _save_dialog_diagnostics(self, page, label: str) -> None:
+        # The failure screenshot is taken after the publish dialog has
+        # closed, so it never shows the control that broke. Keep the open
+        # dialog's screenshot and markup, which is what a selector fix needs.
+        try:
+            SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            base = SCREENSHOT_DIR / f"hashnode-dialog-{label}-{stamp}"
+            page.screenshot(path=str(base.with_suffix(".png")), full_page=True)
+            html = page.locator(self.DIALOG_SELECTOR).first.evaluate("e => e.outerHTML")
+            base.with_suffix(".html").write_text(html, encoding="utf-8")
+            print(f"  [hashnode] dialog diagnostics: {base}.png/.html", file=sys.stderr)
+        except Exception as err:  # noqa: BLE001 -- diagnostics must not mask the failure
+            print(f"  [hashnode] could not save dialog diagnostics: {err}", file=sys.stderr)
 
     @staticmethod
     def _pill_count(pill_row) -> int:
@@ -745,7 +780,8 @@ class HashnodeAdapter:
     def _tag_is_selected(dialog, tag: str) -> bool:
         return bool(dialog.locator("button").evaluate_all(
             "(buttons, wanted) => buttons.some(button => "
-            "(button.innerText || '').trim() === wanted)",
+            "(button.innerText || '').trim() === wanted"
+            " || button.getAttribute('aria-label') === 'Remove ' + wanted)",
             f"#{tag}",
         ))
 
