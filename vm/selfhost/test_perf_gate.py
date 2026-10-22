@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import os
 from pathlib import Path
 import re
 import unittest
@@ -510,33 +512,55 @@ class OverlayTests(unittest.TestCase):
 
     def test_a_rebaseline_measured_on_top_of_an_unfolded_one_chains(self):
         # pr/12 merged (1.0 -> 0.8) and is not folded yet; pr/15 measured on top of it.
-        for order in ([self.rebase(12, 0.8), self.rebase(15, 0.6, frm=0.8)],
-                      [self.rebase(15, 0.6, frm=0.8), self.rebase(12, 0.8)]):
-            rows, _ = self.resolve(order)
-            self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.6)
+        rows, notes = self.resolve([self.rebase(12, 0.8), self.rebase(15, 0.6, frm=0.8)])
+        self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.6)
+        self.assertEqual([], notes)
 
-    def test_two_rebaselines_of_one_row_are_a_conflict_naming_both(self):
-        with self.assertRaises(baselines.BaselineError) as caught:
-            self.resolve([self.rebase(12, 0.8), self.rebase(15, 0.9)])
-        self.assertIn('pr/12.json', str(caught.exception))
-        self.assertIn('pr/15.json', str(caught.exception))
+    def test_two_rebaselines_of_one_row_resolve_to_the_latest_merged(self):
+        # Two pull requests measured from the same value and both merged. Neither is an
+        # error: the list is in merge order and the later one wins, with a note naming it.
+        for overlays, expect in (([self.rebase(12, 0.8), self.rebase(15, 0.9)], 0.9),
+                                 ([self.rebase(15, 0.9), self.rebase(12, 0.8)], 0.8)):
+            rows, notes = self.resolve(overlays)
+            self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], expect)
+            self.assertTrue(any('merge order' in n for n in notes), notes)
 
-    def test_a_rebaseline_from_a_stale_value_is_rejected(self):
-        # pr/12 was folded into base; pr/15 measured against the value before it.
+    def test_a_rebaseline_from_a_stale_value_still_applies(self):
+        # pr/12 was folded into base; pr/15 measured against the value before it and
+        # merged later, so its measurement is the newest the gate has.
         moved = {'linux-x64@a': {'quicksort': {'all': row(0.8, 0.1)}}}
-        with self.assertRaises(baselines.BaselineError) as caught:
-            self.resolve([self.rebase(15, 0.9, frm=1.0)], base=moved)
-        self.assertIn('another merged change moved it first', str(caught.exception))
+        rows, notes = self.resolve([self.rebase(15, 0.9, frm=1.0)], base=moved)
+        self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.9)
+        self.assertTrue(any('pr/15.json' in n for n in notes), notes)
 
-    def test_a_rebaseline_from_a_row_whose_tolerance_moved_is_rejected(self):
-        # An earlier --all recalibration changed only the tolerance; the ratios match.
-        retuned = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, time=0.4)}}}
-        with self.assertRaises(baselines.BaselineError):
-            self.resolve([self.rebase(15, 0.8)], base=retuned)
-        number, overlay = self.rebase(15, 0.8)
-        overlay['rebaseline']['linux-x64@a']['quicksort']['all']['from']['tolerance'] = {'time': 0.4}
-        rows, _ = self.resolve([(number, overlay)], base=retuned)
-        self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.8)
+    def test_overlays_are_ordered_by_merge_not_by_number(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            run = lambda *a, **env: subprocess.run(['git'] + list(a), cwd=tmp, check=True,
+                                                   capture_output=True, env=dict(os.environ, **env))
+            run('init', '-q')
+            run('config', 'user.email', 't@example.com')
+            run('config', 'user.name', 't')
+            (Path(tmp) / 'pr').mkdir()
+            for number, stamp in ((20, '1700000000'), (9, '1700000100')):
+                (Path(tmp) / 'pr' / ('%d.json' % number)).write_text(
+                    json.dumps(self.rebase(number, 0.8)[1]))
+                run('add', '.')
+                run('commit', '-q', '-m', 'pr %d' % number,
+                    GIT_AUTHOR_DATE=stamp, GIT_COMMITTER_DATE=stamp)
+            (Path(tmp) / 'pr' / '5.json').write_text(json.dumps(self.rebase(5, 0.8)[1]))
+            saved = os.environ.pop('CN1_PR_NUMBER', None)
+            try:
+                self.assertEqual([20, 9, 5], [n for n, _ in baselines.load_overlays(tmp)])
+                os.environ['CN1_PR_NUMBER'] = '20'
+                # The running pull request's own overlay is always its newest.
+                self.assertEqual([9, 5, 20], [n for n, _ in baselines.load_overlays(tmp)])
+            finally:
+                os.environ.pop('CN1_PR_NUMBER', None)
+                if saved is not None:
+                    os.environ['CN1_PR_NUMBER'] = saved
 
     def test_bad_values_are_baseline_errors_not_crashes(self):
         number, overlay = self.rebase(12, 0.8)
@@ -625,12 +649,13 @@ class OverlayTests(unittest.TestCase):
         finally:
             tree.close()
 
-    def test_fold_refuses_contradicting_overlays(self):
+    def test_fold_folds_overlays_that_disagree(self):
         tree = BaselineTree(self.BASE, dict([self.rebase(12, 0.8), self.rebase(15, 0.9)]))
         try:
-            with self.assertRaises(baselines.BaselineError):
-                baselines.fold(tree.root)
-            self.assertEqual(len(list((tree.root / 'pr').iterdir())), 2)
+            self.assertEqual([12, 15], baselines.fold(tree.root))
+            self.assertEqual(list((tree.root / 'pr').iterdir()), [])
+            rows = baselines.load_base(tree.root)
+            self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.9)
         finally:
             tree.close()
 
@@ -727,42 +752,10 @@ class OverlayTests(unittest.TestCase):
             tree.close()
 
 
-class StaleOverlayGateTests(unittest.TestCase):
-    """perf-gate.py with this pull request's own overlay gone stale: it must still measure
-    (here it gets as far as looking for the binaries) and record why it will fail."""
-
-    def test_the_gate_measures_without_its_own_stale_overlay(self):
-        import json
-        import os
-        moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
-        mine = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {
-            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'first try'})}}}}
-        tree = BaselineTree(moved, {7: mine})
-        saved = os.environ.get('CN1_PR_NUMBER')
-        os.environ['CN1_PR_NUMBER'] = '7'
-        try:
-            out = tree.root.parent / 'results.json'
-            gate.main(['--baseline', str(tree.root), '--out', str(out), '--platform', 'linux-x64',
-                       '--binary', str(tree.root.parent / 'no-such-binary')])
-            report = json.loads(out.read_text())
-            self.assertIn('another merged change moved it first', report['stale_overlay'])
-            # It got past the baseline: what stopped it is the missing binary, not the overlay.
-            self.assertFalse(report['error'].startswith('perf-baseline'), report['error'])
-            text = gate.render_markdown(dict(report, error=None, results={}))
-            self.assertIn('perf-baseline/pr/7.json` is stale', text)
-            self.assertIn('**Result: stale overlay: re-measure required**', text)
-        finally:
-            if saved is None:
-                os.environ.pop('CN1_PR_NUMBER', None)
-            else:
-                os.environ['CN1_PR_NUMBER'] = saved
-            tree.close()
-
-
 class SummaryOverlayTests(unittest.TestCase):
     """perf_baseline.py summary: the website table is not the gate."""
 
-    def test_a_stale_overlay_is_left_out_of_the_table(self):
+    def test_overlays_that_disagree_still_reach_the_table(self):
         base = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
         stale = {'pr': 7, 'rebaseline': {'linux-x64': {'quicksort': {'all': dict(
             row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}, 'reason': 'faster sort'})}}}}
@@ -770,10 +763,9 @@ class SummaryOverlayTests(unittest.TestCase):
             row(0.6, 0.1), **{'from': {'time': 0.8, 'memory': 0.1}, 'reason': 'even faster'})}}}}
         tree = BaselineTree(base, {7: stale, 8: fine})
         try:
-            with self.assertRaises(baselines.BaselineError):
-                baselines.load(tree.root)
             rows = baselines.load_for_summary(tree.root)
             self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.6)
+            self.assertEqual(baselines.load(tree.root)['platforms'], rows)
         finally:
             tree.close()
 
@@ -939,13 +931,6 @@ class VerdictStepTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('IMPROVED', r.stdout)
         self.assertIn('perf-baseline/pr/5931.json', r.stdout)
-
-    def test_a_stale_overlay_fails_the_job(self):
-        r = self.verdict({'platform': 'linux-x64', 'pr': 7, 'labels': {},
-                          'results': {'quicksort': self.row('ok')}, 'regression': False,
-                          'stale_overlay': 'pr/7.json rebaselines ... moved it first'})
-        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        self.assertIn('pr/7.json is stale', r.stdout)
 
     def test_a_calibration_with_a_moved_row_asks_for_a_reason(self):
         results = {'quicksort': self.row('uncalibrated'), 'recursion': self.row('improved')}

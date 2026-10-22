@@ -96,6 +96,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: master
+          # Full history: resolve() orders overlays by when they merged, and the size
+          # follow checks no overlay merged after the measured commit.
+          fetch-depth: 0
 
       # The gate passes a pull request that beats its baseline (failing it turned every
       # VM win into a red master until someone rebaselined). What keeps such a win from
@@ -123,6 +126,35 @@ jobs:
           done
           find "${dest}" -name perf-results.json | wc -l | xargs echo "perf-results.json files:"
 
+      # The Flutter gate's SIZE rows follow master: they are deterministic, so the latest
+      # nightly measurement of master is what a pull request should be judged against
+      # (flutter_baseline.py follow explains why). Ratios are not followed.
+      - name: Collect master's latest nightly Flutter benchmark sizes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/flutter-sizes"
+          mkdir -p "${dest}"
+          # A finished run, success or failure: a size regression fails the nightly run,
+          # and that run is the signal; following it afterwards is what keeps it from
+          # failing every later pull request. A cancelled run measured nothing complete.
+          read -r run sha < <(gh run list --repo "${GITHUB_REPOSITORY}" --workflow flutter-bench.yml \
+              --branch master --event schedule --status completed --limit 10 \
+              --json databaseId,headSha,conclusion \
+              --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0] | "\(.databaseId) \(.headSha)"') || true
+          if [ -z "${run:-}" ] || [ "${run}" = "null" ]; then
+            echo "No finished nightly Flutter benchmark run; sizes stay as they are."
+            exit 0
+          fi
+          echo "${sha}" > "${dest}/measured-sha"
+          for name in $(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}/artifacts" \
+              --jq '.artifacts[] | select(.name | startswith("flutter-bench-")) | select(.expired | not) | .name'); do
+            gh run download "${run}" --repo "${GITHUB_REPOSITORY}" -n "${name}" \
+              -D "${dest}/${name}" || echo "could not download ${name} of run ${run}"
+          done
+          find "${dest}" -name 'baseline-*.json' | wc -l | xargs echo "nightly size files:"
+
       - name: Fold merged overlays into base/ and tighten consistently beaten rows
         id: fold
         run: |
@@ -137,6 +169,20 @@ jobs:
             git reset --quiet --hard origin/master
             python3 vm/selfhost/perf_baseline.py fold
             python3 scripts/flutter-bench/flutter_baseline.py fold
+            # Follow only a measurement of a master that already had every overlay merged
+            # since: an overlay merged after the measured commit moved a row that run never
+            # saw, and following the run would silently undo it. Skipped, the next night's
+            # run includes it.
+            : > "${RUNNER_TEMP}/followed.txt"
+            sha="$(cat "${RUNNER_TEMP}/flutter-sizes/measured-sha" 2>/dev/null || true)"
+            if [ -n "${sha}" ] && git merge-base --is-ancestor "${sha}" HEAD 2>/dev/null \
+                && [ -z "$(git log --format=%H "${sha}..HEAD" -- scripts/flutter-bench/baseline/pr)" ]; then
+              find "${RUNNER_TEMP}/flutter-sizes" -name 'baseline-*.json' -print0 \
+                | xargs -0 python3 scripts/flutter-bench/flutter_baseline.py follow \
+                | tee "${RUNNER_TEMP}/followed.txt"
+            else
+              echo "Not following sizes: no nightly run, or an overlay merged after ${sha:-it} was measured."
+            fi
             git add -A vm/selfhost/perf-baseline scripts/flutter-bench/baseline
             folded=true
             git diff --staged --quiet && folded=false
@@ -151,9 +197,11 @@ jobs:
             if grep -q '^tightened ' "${RUNNER_TEMP}/tightened.txt"; then
               subject="ci: tighten performance baselines master beat consistently"
               [ "${folded}" = true ] && subject="ci: fold merged performance baselines and tighten consistently beaten rows"
-              git commit --quiet -m "${subject}" -m "$(grep '^tightened ' "${RUNNER_TEMP}/tightened.txt")"
+              git commit --quiet -m "${subject}" -m "$(grep '^tightened ' "${RUNNER_TEMP}/tightened.txt")" \
+                -m "$(cat "${RUNNER_TEMP}/followed.txt")"
             else
-              git commit --quiet -m "ci: fold merged performance and Flutter benchmark baselines into base/"
+              git commit --quiet -m "ci: fold merged baselines and follow master's Flutter benchmark sizes" \
+                -m "$(cat "${RUNNER_TEMP}/followed.txt")"
             fi
             if git push origin HEAD:master; then
               echo "folded=true" >> "$GITHUB_OUTPUT"
