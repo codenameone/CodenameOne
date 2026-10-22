@@ -88,7 +88,8 @@ public class FlutterProjectImporterTest {
         File root = Files.createTempDirectory("flutter-import").toFile();
         File flutterProject = new File(root, "demo");
         write(new File(flutterProject, "pubspec.yaml"), PUBSPEC);
-        write(new File(flutterProject, "lib/main.dart"), "void main() {}\n");
+        // imported, so it is a real dependency: one lib/ never imports is not reported
+        write(new File(flutterProject, "lib/main.dart"), "import 'package:some_uncovered_pkg/a.dart';\nvoid main() {}\n");
         write(new File(flutterProject, "lib/pages/home.dart"), "class Home {}\n");
         write(new File(flutterProject, "assets/images/logo.png"), "PNGDATA");
         write(new File(flutterProject, "assets/icons/a.png"), "ICONA");
@@ -103,7 +104,8 @@ public class FlutterProjectImporterTest {
         assertEquals("1.2.3+4", r.appVersion);
         assertTrue(r.covered.toString(), r.covered.get(0).startsWith("flutter ("));
         assertTrue(r.covered.toString(), r.covered.get(1).startsWith("cupertino_icons ("));
-        assertEquals(java.util.Collections.singletonList("some_uncovered_pkg"), r.uncovered);
+        assertEquals(r.uncovered.toString(), 1, r.uncovered.size());
+        assertTrue(r.uncovered.toString(), r.uncovered.get(0).startsWith("some_uncovered_pkg (sources not found"));
         assertTrue(r.missingAssets.toString(), r.missingAssets.isEmpty());
 
         File flutterDir = new File(common, "src/main/flutter");
@@ -368,6 +370,37 @@ public class FlutterProjectImporterTest {
 
     /// lib/ is copied flat, so lib/assets/x.dart shares assets/ with the bundled
     /// assets; the lib-sources record lists exactly the Dart files that came from lib/.
+    /// A pure-Dart package importing an unsupported one cannot compile either: the
+    /// verdict travels to it, and none of its files reach the build.
+    @Test
+    public void aPackageImportingAnUnsupportedOneIsUnsupportedToo() throws Exception {
+        File root = Files.createTempDirectory("flutter-transitive").toFile();
+        File flutterProject = new File(root, "demo");
+        write(new File(flutterProject, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  outer: 1.0.0\n");
+        write(new File(flutterProject, "lib/main.dart"), "import 'package:outer/outer.dart';\nvoid main() {}\n");
+        File outer = new File(root, "cache/outer-1.0.0");
+        write(new File(outer, "lib/outer.dart"), "import 'package:inner/inner.dart';\nint o() => 1;\n");
+        File inner = new File(root, "cache/inner-1.0.0");
+        write(new File(inner, "lib/inner.dart"), "import 'dart:mirrors';\nint i() => 1;\n");
+        write(new File(flutterProject, ".dart_tool/package_config.json"), "{\n  \"configVersion\": 2,\n"
+                + "  \"packages\": [\n"
+                + "    {\n      \"name\": \"outer\",\n      \"rootUri\": \"" + outer.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    },\n"
+                + "    {\n      \"name\": \"inner\",\n      \"rootUri\": \"" + inner.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    }\n"
+                + "  ]\n}\n");
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(flutterProject, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.containsKey("inner"));
+        assertTrue(r.unsupportedPackages.toString(),
+                String.valueOf(r.unsupportedPackages.get("outer")).startsWith("depends on inner"));
+        assertFalse(new File(common, "src/main/flutter/packages/outer/outer.dart").exists());
+    }
+
     @Test
     public void recordsTheDartSourcesCopiedFromLib() throws Exception {
         File root = Files.createTempDirectory("flutter-lib-sources").toFile();
@@ -660,5 +693,46 @@ public class FlutterProjectImporterTest {
 
     private static String read(File f) throws IOException {
         return new String(Files.readAllBytes(f.toPath()), "UTF-8");
+    }
+
+    @Test
+    public void entryPointForwardsPluginCallbacksOnlyWhenUsed() {
+        String plain = FlutterProjectImporter.entryPointSource("com.example", "Main", "com.example.flutter",
+                java.util.Arrays.asList("flutter", "dio"));
+        assertFalse(plain.contains("implements"));
+        assertFalse(plain.contains("AppLinks"));
+        assertTrue(plain.contains("com.example.flutter.FlutterRegistry.invokeMain();"));
+        // naming com.codename1.push makes the Android build require google-services.json
+        assertFalse(plain.contains("com.codename1.push"));
+
+        String all = FlutterProjectImporter.entryPointSource("com.example", "Main", "com.example.flutter",
+                java.util.Arrays.asList("app_links", "flutter_local_notifications", "firebase_messaging"));
+        assertTrue(all.contains("implements com.codename1.notifications.LocalNotificationCallback, "
+                + "com.codename1.push.PushCallback"));
+        assertTrue(all.contains("AppLinks.appStarted();\n        super.start();"));
+        assertTrue(all.contains("FlutterLocalNotificationsPlugin.notificationTapped(notificationId);"));
+        assertTrue(all.contains("FirebaseMessaging.pushReceived(value);"));
+        assertTrue(all.contains("return com.codename1.push.Push.getPushKey();"));
+        assertTrue(all.contains("com.codename1.push.Push.subscribeToTopic(topic);"));
+    }
+
+    @Test
+    public void pluginPacksAreCovered() {
+        for (String p : new String[] {"share_plus", "geolocator", "image_picker", "firebase_auth",
+                "firebase_messaging", "google_maps_flutter", "flutter_local_notifications", "app_links"}) {
+            assertTrue(p, FlutterProjectImporter.COVERED.containsKey(p));
+        }
+    }
+
+    @Test
+    public void importLookingTextInTripleQuotedStringsIsNotADirective() {
+        String src = "import 'package:real/real.dart';\n"
+                + "const doc = \"\"\"\nimport 'package:fake/fake.dart';\n\"\"\";\n"
+                + "const raw = r'''\nimport 'package:fake2/x.dart';\\\n''';\n"
+                + "const re = r'\\d';\nimport 'package:after/after.dart';\n";
+        String out = FlutterProjectImporter.stripComments(src);
+        assertTrue(out, out.contains("package:real/real.dart"));
+        assertTrue(out, out.contains("package:after/after.dart"));
+        assertFalse(out, out.contains("fake"));
     }
 }

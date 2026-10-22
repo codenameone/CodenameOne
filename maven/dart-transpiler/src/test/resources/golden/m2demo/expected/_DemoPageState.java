@@ -76,7 +76,7 @@ public class _DemoPageState extends State<DemoPage> {
             $t12.width(8.0);
             var $t13 = new Expanded();
             $t13.child(new Text(this._items.idx(index)));
-            $t11.children(DartList.<Widget>of(new Icon(Icons.favorite), $t12, $t13, new Text("#" + DartRuntime.str(index))));
+            $t11.children(DartList.<Widget>of(new Icon(Icons.favorite()), $t12, $t13, new Text("#" + DartRuntime.str(index))));
             $t10.child($t11);
             $t9.child($t10);
             return $t9;

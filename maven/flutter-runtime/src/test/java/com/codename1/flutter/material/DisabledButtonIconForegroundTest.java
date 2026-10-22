@@ -79,7 +79,7 @@ class DisabledButtonIconForegroundTest {
 
     private static Button mount(dart.runtime.Funcs.VoidFunc0 onPressed) {
         TextButton b = TextButton.icon(null, onPressed, null,
-                new Icon(Icons.add), new Text("Button"));
+                new Icon(Icons.add()), new Text("Button"));
         Element root = FlutterUI.mount(b, new RenderHost(), new BuildOwner());
         Component c = ((ButtonRenderElement) root).component();
         assertNotNull(c, "RasterDisplay gives createComponent a real Button");

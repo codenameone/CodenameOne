@@ -1,0 +1,9 @@
+seen true
+Biscuit 3 0.5 [1, 2]
+wrong type null missing null
+keys count,favorites,name,ratio,seen
+count 4 true
+removed null false
+docs file hello
+support exists true
+tmp exists true

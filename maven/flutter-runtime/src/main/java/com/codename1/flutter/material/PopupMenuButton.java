@@ -176,8 +176,8 @@ public class PopupMenuButton<T> extends Widget {
         boolean apple = p == com.codename1.flutter.TargetPlatform.iOS
                 || p == com.codename1.flutter.TargetPlatform.macOS;
         return new com.codename1.flutter.widgets.Icon(apple
-                ? com.codename1.flutter.Icons.more_horiz
-                : com.codename1.flutter.Icons.more_vert);
+                ? com.codename1.flutter.Icons.more_horiz()
+                : com.codename1.flutter.Icons.more_vert());
     }
 
     @Override

@@ -1,0 +1,23 @@
+name: pet_adoption
+description: An ordinary Flutter app -- bloc, go_router, dio, shared_preferences -- used to check that Codename One imports such apps unmodified.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.0
+  bloc: ^9.0.0
+  equatable: ^2.0.5
+  go_router: ^16.0.0
+  dio: ^5.8.0
+  shared_preferences: ^2.5.0
+  cached_network_image: ^3.4.0
+  intl: ^0.20.0
+  json_annotation: ^4.9.0
+
+flutter:
+  uses-material-design: true

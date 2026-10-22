@@ -85,6 +85,16 @@ public interface BuildContext {
     <T> T read(Class<T> type);
 
     /**
+     * provider's {@code context.select<T, R>((T value) => ...)}: the selector applied to
+     * the value {@link #watch} answers. The dependency is on the whole value, so this
+     * context rebuilds on every change to it, not only when the selected part changes.
+     */
+    default <T, R> R select(dart.runtime.Funcs.Func1<T, R> selector, Class<T> type) {
+        T value = watch(type);
+        return selector.call(value);
+    }
+
+    /**
      * The nearest value published by an ancestor {@link InheritedValueProvider}
      * (Provider / ScopedModel) that is assignable to {@code type}, or null.
      */

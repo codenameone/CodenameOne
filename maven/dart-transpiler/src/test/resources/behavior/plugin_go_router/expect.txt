@@ -1,0 +1,9 @@
+push /pets/42 pet {id: 42} {sort: age} biscuit
+true
+false
+/pets/a%20b?q=1
+named /pets/7 pet {id: 7} {} null
+guarded /login null {} {} null
+redirected /account/profile null {} {} null
+error Exception: no routes for location: /nowhere
+false

@@ -60,7 +60,7 @@ public class M2Showcase extends StatelessWidget {
 
         // GridView.count with every named argument
         var $t2 = GridView.count(null, null, null, null, 3L, 1.5, 4.0, 4.0, EdgeInsets.all(8.0),
-                DartList.<Widget>of(new Icon(Icons.home), new Icon(Icons.settings)));
+                DartList.<Widget>of(new Icon(Icons.home()), new Icon(Icons.settings())));
 
         // Image.asset('logo.png', width: 100)
         var $t3 = Image.asset("logo.png", null, 100.0, null, null,
@@ -79,7 +79,7 @@ public class M2Showcase extends StatelessWidget {
         var $t7 = new Positioned();
         $t7.right(0.0);
         $t7.bottom(0.0);
-        $t7.child(new Icon(Icons.add));
+        $t7.child(new Icon(Icons.add()));
         var $t8 = new Align();
         $t8.alignment(Alignment.topCenter);
         $t8.child(new Text("aligned"));
@@ -119,7 +119,7 @@ public class M2Showcase extends StatelessWidget {
         $t15.child(new Text("Outlined"));
         var $t16 = new IconButton();
         $t16.onPressed(this::_onPressed);
-        $t16.icon(new Icon(Icons.share));
+        $t16.icon(new Icon(Icons.share()));
         $t16.iconSize(32.0);
         $t16.color(Colors.red);
 

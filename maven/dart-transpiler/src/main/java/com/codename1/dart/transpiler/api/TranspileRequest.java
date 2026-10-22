@@ -44,6 +44,12 @@ public final class TranspileRequest {
     public String packageName = "com.codename1.generated.flutter";
     /** Fast-skip digest state file; null disables the check. */
     public File stateFile;
+    /**
+     * The application's own Java source roots. A plugin pack they name is copied into
+     * the output even when no Dart code calls it (the import-generated entry point
+     * installs the firebase_messaging and app_links hooks). Never the output dir.
+     */
+    public final List<File> javaSourceRoots = new ArrayList<File>();
 
     public TranspileRequest sourceRoot(File root) {
         sourceRoots.add(root);
@@ -62,6 +68,11 @@ public final class TranspileRequest {
 
     public TranspileRequest packageName(String pkg) {
         this.packageName = pkg;
+        return this;
+    }
+
+    public TranspileRequest javaSourceRoot(File root) {
+        javaSourceRoots.add(root);
         return this;
     }
 

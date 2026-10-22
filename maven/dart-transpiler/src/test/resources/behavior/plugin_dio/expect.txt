@@ -1,0 +1,7 @@
+caught DioExceptionType.connectionError /pets
+auth GET https://example.com/api/pets?species=dog&page=2
+headers Bearer t0k3n application/json
+error connectionError
+recovered 200 {cached: true} POST
+201 mock /hello
+legacy name catches cancel

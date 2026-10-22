@@ -54,9 +54,12 @@ public class BehaviorTest {
     public List<DynamicTest> behaviorCases() {
         List<DynamicTest> tests = new ArrayList<DynamicTest>();
         File[] cases = BEHAVIOR_ROOT.listFiles();
+        // A local convenience: CN1_BEHAVIOR_ONLY=plugin_bloc runs just the cases whose
+        // directory name starts with it. CI never sets it.
+        String only = System.getenv("CN1_BEHAVIOR_ONLY");
         if (cases != null) {
             for (File dir : cases) {
-                if (dir.isDirectory()) {
+                if (dir.isDirectory() && (only == null || dir.getName().startsWith(only))) {
                     tests.add(DynamicTest.dynamicTest(dir.getName(), () -> runCase(dir)));
                 }
             }
@@ -124,8 +127,21 @@ public class BehaviorTest {
             TestSupport.write(out, gf.content);
             javacArgs.add(out.getAbsolutePath());
         }
+        List<CharSequence> packRoots = new ArrayList<CharSequence>();
+        for (GeneratedFile gf : r.files) {
+            packRoots.add(gf.content);
+        }
         for (File javaFile : javaSupportFiles) {
             File out = TestSupport.writeJavaSupportFile(srcRoot, javaFile);
+            javacArgs.add(out.getAbsolutePath());
+            packRoots.add(TestSupport.read(javaFile));
+        }
+        // The runtime jar carries no plugin pack classes: the packs the program names are
+        // compiled with it, exactly as the transpiler copies them into an app.
+        for (java.util.Map.Entry<String, String> e : com.codename1.dart.transpiler.api.DartTranspiler
+                .pluginPackSources(stubEntries, packRoots).entrySet()) {
+            File out = new File(srcRoot, e.getKey());
+            TestSupport.write(out, e.getValue());
             javacArgs.add(out.getAbsolutePath());
         }
         File runner = new File(work, "src/Runner.java");

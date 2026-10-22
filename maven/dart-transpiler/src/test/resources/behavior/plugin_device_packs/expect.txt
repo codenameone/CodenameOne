@@ -1,0 +1,13 @@
+berlin-paris 878 km
+north 0
+Pets 1.2.3+45
+offline true
+a.txt text/plain hello 5
+details true
+platform impl true
+before init: no-app
+apps 1 p
+headless: network-request-failed
+user null
+home 10.0 -170.0 Home
+camera 1.0 12.0

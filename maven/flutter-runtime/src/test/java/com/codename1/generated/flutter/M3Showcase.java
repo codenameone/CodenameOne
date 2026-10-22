@@ -111,18 +111,18 @@ public class M3Showcase extends StatelessWidget {
 
         // ListTile
         var $t6 = new ListTile();
-        $t6.leading(new Icon(Icons.home));
+        $t6.leading(new Icon(Icons.home()));
         $t6.title(new Text("Home"));
         $t6.subtitle(new Text("Front page"));
-        $t6.trailing(new Icon(Icons.add));
+        $t6.trailing(new Icon(Icons.add()));
         $t6.onTap(() -> { /* ... */ });
 
         // BottomNavigationBar
         var $t7 = new BottomNavigationBarItem();
-        $t7.icon(new Icon(Icons.home));
+        $t7.icon(new Icon(Icons.home()));
         $t7.label("Home");
         var $t8 = new BottomNavigationBarItem();
-        $t8.icon(new Icon(Icons.settings));
+        $t8.icon(new Icon(Icons.settings()));
         $t8.label("Settings");
         var $t9 = new BottomNavigationBar();
         $t9.items(DartList.<BottomNavigationBarItem>of($t7, $t8));

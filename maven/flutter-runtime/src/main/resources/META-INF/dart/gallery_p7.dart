@@ -467,7 +467,15 @@ class NotificationListener<T> extends Widget {
 // Intercepts the system back gesture — Flutter's `WillPopScope`.
 @JavaName('com.codename1.flutter.widgets.WillPopScope')
 class WillPopScope extends Widget {
-  external WillPopScope({Key? key, Object onWillPop, Widget child});
+  external WillPopScope({Key? key, Future<bool> Function()? onWillPop, Widget child});
+}
+
+// canPop: false vetoes a back press or maybePop on its route; onPopInvoked hears each try.
+@JavaName('com.codename1.flutter.widgets.PopScope')
+class PopScope<T> extends Widget {
+  external PopScope({Key? key, required Widget child, bool canPop,
+      void Function(bool didPop)? onPopInvoked,
+      void Function(bool didPop, T? result)? onPopInvokedWithResult});
 }
 
 // ======================================================================
@@ -598,6 +606,13 @@ class StatefulBuilder extends Widget {
 @JavaName('com.codename1.flutter.widgets.FutureBuilder')
 class FutureBuilder<T> extends Widget {
   external FutureBuilder({Key? key, Object? future, T? initialData, Object builder});
+}
+
+// Builds itself from the latest event of a Stream -- Flutter's `StreamBuilder<T>`.
+@JavaName('com.codename1.flutter.widgets.StreamBuilder')
+class StreamBuilder<T> extends Widget {
+  external StreamBuilder({Key? key, Stream<T>? stream, T? initialData,
+      required Widget Function(BuildContext context, AsyncSnapshot<T> snapshot) builder});
 }
 
 // The connection state of an async computation feeding an AsyncSnapshot —
@@ -814,11 +829,26 @@ abstract class AutofillHints {
 // The glue binding the widget layer to the engine — Flutter's `WidgetsBinding`.
 // new_gallery reaches the ambient brightness through
 // `WidgetsBinding.instance.platformDispatcher.platformBrightness`; the dispatcher
-// is left `dynamic` so that chain resolves without pulling in the engine types.
+// is typed (PlatformDispatcher below): left `dynamic`, the chain went through
+// Dyn.get, and the runtime's dispatcher is a plain Java object with no dynamic
+// members -- the native gallery threw NoSuchMethodError before its first frame.
+// `WidgetsFlutterBinding.ensureInitialized()` -- main()'s usual first line; the
+// binding is Codename One's Display, initialized before main() runs.
+@JavaName('com.codename1.flutter.widgets.WidgetsBinding')
+class WidgetsFlutterBinding extends WidgetsBinding {
+  external static WidgetsBinding ensureInitialized();
+}
+
+@JavaName('com.codename1.flutter.widgets.WidgetsBinding.PlatformDispatcher')
+class PlatformDispatcher {
+  external Brightness get platformBrightness;
+  external double get devicePixelRatio;
+}
+
 @JavaName('com.codename1.flutter.widgets.WidgetsBinding')
 class WidgetsBinding {
   external static WidgetsBinding get instance;
-  external dynamic get platformDispatcher;
+  external PlatformDispatcher get platformDispatcher;
   external Object get window;
   external void addPostFrameCallback(Object callback);
   external void addObserver(Object observer);
