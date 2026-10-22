@@ -111,9 +111,11 @@ public interface BankingApi {
     @GET("/api/cards")
     void cards(OnComplete<Response<List<CardDto>>> callback);
 
-    /// Issues the virtual card of a checking account; one per account.
+    /// Issues the virtual card of a checking account; one per account. Signed:
+    /// a new card is a new way for money to leave the account.
     @POST("/api/accounts/{id}/card")
-    void issueCard(@Path("id") String accountId, OnComplete<Response<CardDto>> callback);
+    void issueCard(@Path("id") String accountId, @Header("Bastion-Signature") String signature,
+            OnComplete<Response<CardDto>> callback);
 
     @POST("/api/cards/{id}/freeze")
     void freezeCard(@Path("id") String id, OnComplete<Response<CardDto>> callback);

@@ -66,21 +66,23 @@ public class SecondFactor {
 
     /// Enrolling an app is a step-up: once it is on, every sign-in needs its
     /// codes, so a stolen token must not be able to put the attacker's app on
-    /// the account and lock the customer out. A sign-in made with a second
-    /// factor or a passkey (`amr` holding `mfa`, `otp` or `hwk`) is enough by
-    /// itself. A password-only one must be fresh (as for a device) AND the
-    /// request must carry the password: freshness alone would let a token
-    /// stolen in its first minutes enrol, which is exactly the window a
-    /// phishing proxy works in. A wrong password counts toward the lockout.
+    /// the account and lock the customer out. Every caller's sign-in must be
+    /// fresh (as for a device), however it was made: a strong sign-in hours
+    /// old is a session somebody may have walked away from. A sign-in made
+    /// with a second factor or a passkey (`amr` holding `mfa`, `otp` or
+    /// `hwk`) then skips only the password. A password-only one must also
+    /// carry the password: freshness alone would let a token stolen in its
+    /// first minutes enrol, which is exactly the window a phishing proxy
+    /// works in. A wrong password counts toward the lockout.
     private void requireStepUp(String username, String password) throws IOException {
-        java.util.List<String> how = Caller.authMethods();
-        if (how.contains("mfa") || how.contains("otp") || how.contains("hwk")) {
-            return;
-        }
         long age = System.currentTimeMillis() / 1000L - Caller.authTime();
         if (Caller.authTime() < 0 || age > freshSeconds || age < -60L) {
             audit.append(username, "TOTP_REFUSED", username, "sign-in not fresh");
             throw Refused.with(403, "sign-in-first", "Sign in first");
+        }
+        java.util.List<String> how = Caller.authMethods();
+        if (how.contains("mfa") || how.contains("otp") || how.contains("hwk")) {
+            return;
         }
         guard.recheck(username, password, encoder, "TOTP_REFUSED",
                 "enter-password-add-app", "Enter your password to add an authenticator app");

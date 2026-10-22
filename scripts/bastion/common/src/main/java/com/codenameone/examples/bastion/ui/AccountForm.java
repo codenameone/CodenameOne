@@ -103,10 +103,13 @@ public final class AccountForm {
         }
         if ("CHECKING".equals(account.kind())) {
             Button card = Ui.secondary("Order a card");
-            card.addActionListener(evt -> Api.banking().issueCard(account.id(), Net.to(
-                    (CardDto issued) -> CardsForm.show(again),
+            // Signed: a card is one more way for money to leave the account.
+            card.addActionListener(evt -> DeviceSetup.withDevice(retry -> Api.banking()
+                    .issueCard(account.id(), RequestSigner.sign("POST", "/api/accounts/"
+                            + account.id() + "/card", null, null),
+                            Net.to((CardDto issued) -> CardsForm.show(again), retry)),
                     (status, message) -> Dialog.show(Lang.tr("No card"), Lang.tr(message),
-                            Lang.tr("OK"), null))));
+                            Lang.tr("OK"), null)));
             content.add(card);
         }
 
@@ -135,10 +138,13 @@ public final class AccountForm {
         }
         long units = Amounts.parse(amount.getText(), account.asset());
         if (units <= 0) {
-            Dialog.show(Lang.tr("Amount"), Lang.tr("Enter an amount, like 25.00."), Lang.tr("OK"), null);
+            Dialog.show(Lang.tr("Amount"), Ui.amountHint(), Lang.tr("OK"), null);
             return;
         }
-        final CashDto cash = new CashDto(units, deposit ? "Deposit" : "Cash withdrawal");
+        // A code, not English: the memo is stored and may be read back in
+        // another language ([ReceiptForm#memo]).
+        final CashDto cash = new CashDto(units, deposit ? ReceiptForm.MEMO_DEPOSIT
+                : ReceiptForm.MEMO_WITHDRAWAL);
         // One key for this action, kept across the retry after registering
         // AND across a second dialog for the same amount after a failure whose
         // answer was lost -- as TransferForm does -- so trying again cannot

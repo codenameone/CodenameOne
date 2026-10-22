@@ -254,8 +254,12 @@ public class BankingEndpoint implements BankingApiServer {
     }
 
     @Override
-    public CardDto issueCard(String accountId) throws Exception {
+    public CardDto issueCard(String accountId, String signature) throws Exception {
+        // Signed by a trusted device: a card is one more way for money to
+        // leave the account, so a token alone may not mint one.
         String owner = Devices.customer();
+        Device device = signing.require(owner);
+        money.requireTrusted(device);
         return cards.issue(owner, ledger.movable(owner, accountId));
     }
 
@@ -282,12 +286,18 @@ public class BankingEndpoint implements BankingApiServer {
         }
         String owner = Devices.customer();
         // Lowering a limit is as harmless as freezing; raising one is more
-        // spending, so it is signed by a trusted device.
-        if (limit.dailyLimit() > cards.owned(owner, id).getDailyLimit()) {
+        // spending, so it is signed by a trusted device. Whether this is a
+        // raise is decided by Cards.limit behind the card's row: compared
+        // here, a concurrent lower committed in between would let an unsigned
+        // request "lower" the limit back up. A signature, when sent, is
+        // checked first (it can be used only once).
+        boolean signed = false;
+        if (RequestSigning.present()) {
             Device device = signing.require(owner);
             money.requireTrusted(device);
+            signed = true;
         }
-        return cards.limit(owner, id, limit.dailyLimit());
+        return cards.limit(owner, id, limit.dailyLimit(), signed);
     }
 
     @Override

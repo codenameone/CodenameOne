@@ -181,9 +181,24 @@ final class EcKeys {
     /// the single one at the end. The two ladder points trade places by array
     /// index, never by a branch on the bit. What the private scalar decides is
     /// therefore not which operations run, nor how many, nor whether a short
-    /// key ends early. The big-integer arithmetic underneath is not itself
-    /// constant time; a port with a native derivation should prefer it.
+    /// key ends early.
+    ///
+    /// It is not constant time end to end: the big-integer arithmetic
+    /// underneath (`multiply`, `mod`) takes time that depends on its operands'
+    /// values and lengths, so the timing of a derivation still leaks something
+    /// about the scalar to an observer who can measure it closely and many
+    /// times. That is acceptable for its one use here -- deriving a stored
+    /// key's public point once, on the device -- and is why a port with a
+    /// native derivation should prefer it.
+    ///
+    /// A scalar outside `[1, n - 1]` is no private key: zero and `n` give the
+    /// point at infinity, and anything larger, or negative, would alias a
+    /// smaller key or fall outside the 256 bits the ladder walks. It answers
+    /// null, as the point at infinity does.
     static BigInteger[] multiply(BigInteger k) {
+        if (k == null || k.signum() <= 0 || k.compareTo(N) >= 0) {
+            return null;
+        }
         BigInteger[][] r = {{BigInteger.ZERO, BigInteger.ONE, BigInteger.ZERO},
             {GX, GY, BigInteger.ONE}};
         for (int i = 255; i >= 0; i--) {
@@ -205,6 +220,10 @@ final class EcKeys {
         BigInteger zInv = q[2].mod(P).modInverse(P);
         return new BigInteger[]{q[0].multiply(zInv).mod(P), q[1].multiply(zInv).mod(P)};
     }
+
+    /// The order of the base point.
+    private static final BigInteger N = new BigInteger(
+            "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551", 16);
 
     /// The curve's `b`.
     private static final BigInteger B = new BigInteger(

@@ -29,7 +29,24 @@ import com.codenameone.examples.bastion.money.Amounts;
 /// What the server booked: the ledger entry's id is the receipt's reference,
 /// the one a support agent would ask for.
 public final class ReceiptForm {
+    /// The memo the app sends with a counter deposit and withdrawal: a code,
+    /// so the text is the reader's language, not the sender's.
+    static final String MEMO_DEPOSIT = "@cash-in";
+    static final String MEMO_WITHDRAWAL = "@cash-out";
+
     private ReceiptForm() {
+    }
+
+    /// A memo as shown: the app's own codes translated, anything a customer
+    /// typed as it is.
+    static String memo(String memo) {
+        if (MEMO_DEPOSIT.equals(memo)) {
+            return Lang.tr("Deposit");
+        }
+        if (MEMO_WITHDRAWAL.equals(memo)) {
+            return Lang.tr("Cash withdrawal");
+        }
+        return memo;
     }
 
     public static void show(ReceiptDto receipt, final Runnable done) {
@@ -41,7 +58,7 @@ public final class ReceiptForm {
         form.add(Ui.row(Lang.tr("Reference"), null, receipt.entryId(), "BnRowValueMono", null));
         form.add(Ui.row(Lang.tr("When"), null, Ui.when(receipt.createdAt()), null, null));
         if (receipt.memo() != null && receipt.memo().length() > 0) {
-            form.add(Ui.row(Lang.tr("Note"), null, receipt.memo(), null, null));
+            form.add(Ui.row(Lang.tr("Note"), null, memo(receipt.memo()), null, null));
         }
         Button ok = Ui.primary("Done");
         ok.addActionListener(evt -> done.run());

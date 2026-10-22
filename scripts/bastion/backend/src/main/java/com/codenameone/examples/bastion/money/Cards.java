@@ -110,12 +110,31 @@ public class Cards {
         return dto(card);
     }
 
+    /// Sets the card's daily limit; a raise only when `mayRaise` (the request
+    /// was signed by a trusted device). Compared behind the card's row, so the
+    /// limit compared against is the one being replaced.
+    ///
+    /// The limit is in the card account's own currency, as a card network
+    /// counts it (a euro card's limit is euros), and so is [#MAX_LIMIT]. It is
+    /// not the only bound: card spending is also an outgoing movement, held
+    /// to the USD-valued per-payment and daily limits every movement is.
     @Transactional(rollbackFor = Exception.class)
-    public CardDto limit(String owner, String id, long limit) throws IOException {
+    public CardDto limit(String owner, String id, long limit, boolean mayRaise)
+            throws IOException {
         if (limit < 0 || limit > MAX_LIMIT) {
             throw Refused.with(400, "card-limit-range", "A card's limit is 0 to {0}", MAX_LIMIT);
         }
+        // The hold first, the read after it: a row read earlier in this
+        // transaction would be answered from the session, as it was before
+        // the lock (a concurrent change committed in between unseen).
+        if (id != null) {
+            cards.hold(id);
+        }
         Card card = owned(owner, id);
+        if (limit > card.getDailyLimit() && !mayRaise) {
+            throw Refused.with(403, "needs-device-signature",
+                    "This needs a signature from your device: {0}", "missing");
+        }
         cards.setLimit(id, owner, limit);
         audit.append(owner, "CARD_LIMIT", id, card.getDailyLimit() + " -> " + limit);
         card.setDailyLimit(limit);

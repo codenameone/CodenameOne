@@ -31,7 +31,9 @@ import com.codenameone.examples.bastion.domain.CryptoAddress;
 import com.codenameone.examples.bastion.domain.Device;
 import com.codenameone.examples.bastion.domain.JournalEntry;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
+import com.codenameone.examples.bastion.domain.Market;
 import com.codenameone.examples.bastion.domain.Payee;
+import com.codenameone.examples.bastion.domain.Trade;
 import com.codenameone.examples.bastion.domain.Transfer;
 import com.codenameone.examples.bastion.exchange.Markets;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
@@ -40,6 +42,7 @@ import com.codenameone.examples.bastion.ledger.Leg;
 import com.codenameone.examples.bastion.repository.CardRepository;
 import com.codenameone.examples.bastion.repository.JournalEntryRepository;
 import com.codenameone.examples.bastion.repository.ProfileRepository;
+import com.codenameone.examples.bastion.repository.TradeRepository;
 import com.codenameone.examples.bastion.repository.TransferRepository;
 
 import java.io.IOException;
@@ -89,10 +92,11 @@ public class Money {
     private final long cryptoPerMove;
     private final long cryptoDaily;
     private final Map<String, Long> fxBps;
+    private final TradeRepository trades;
 
     public Money(Ledger ledger, Audit audit, TransferRepository transfers,
             JournalEntryRepository entries, ProfileRepository profiles, Markets markets,
-            CardRepository cards,
+            CardRepository cards, TradeRepository trades,
             @Value("${bastion.crypto.limit.per-withdrawal:1000000}") String cryptoPerMove,
             @Value("${bastion.crypto.limit.daily:2000000}") String cryptoDaily,
             @Value("${bastion.limit.per-transfer:500000}") String perTransfer,
@@ -103,6 +107,7 @@ public class Money {
             @Value("${bastion.device.policy.enforce:true}") String enforceDevices,
             @Value("${bastion.limit.fx:EUR=11000}") String fx) {
         this.ledger = ledger;
+        this.trades = trades;
         this.audit = audit;
         this.transfers = transfers;
         this.entries = entries;
@@ -170,6 +175,77 @@ public class Money {
         }
         long scaled = amount * b;
         return scaled / 10000L + (scaled % 10000L > 0 ? 1L : 0L);
+    }
+
+    /// `amount` ledger units of any asset in USD cents, rounded up: a fiat
+    /// currency at its configured rate, a coin at its index price.
+    public long usdValue(String asset, long amount) throws IOException {
+        Asset a = ledger.asset(asset);
+        return "FIAT".equals(a.getKind()) ? fiatValue(asset, Math.max(amount, 0L))
+                : markets.value(asset, Math.max(amount, 0L), "USD");
+    }
+
+    /// What `owner` has traded since `since`, both sides, in USD cents: the
+    /// quote each fill paid or received, valued like any movement.
+    private long tradedSince(String owner, long since) throws IOException {
+        long sum = 0;
+        for (Trade t : trades.since(owner, since)) {
+            Market market = markets.find(t.getMarket());
+            if (market == null) {
+                continue;
+            }
+            long quote = owner.equals(t.getBuyer()) ? t.getBuyerPaid() : t.getSellerGot();
+            sum = saturatedAdd(sum, usdValue(market.getQuote(), quote));
+        }
+        return sum;
+    }
+
+    /// Takes the customer's row for an order's limit check, as a payment
+    /// does: two orders at once then cannot each pass alone. Before the
+    /// open orders are read for [#checkTrade].
+    public void holdCustomer(String owner) throws IOException {
+        profiles.hold(owner);
+    }
+
+    /// Holds a customer's order, worth at most `value` USD cents, to the
+    /// limits a payment is held to: no more than one payment may move, and
+    /// with `open` (what the customer's other open orders could still carry
+    /// away, in USD) and the day's payments and trades together no more than
+    /// the daily limit. Open orders count because a resting order is checked
+    /// once, when placed, and may fill later in one go: many small ones
+    /// would each pass alone. A trade is value leaving the customer as surely as a payment
+    /// is -- a thief selling the account's coins into their own resting
+    /// order, or buying from it -- and the price collar bounds only how bad
+    /// each fill can be, not how many there are. Behind the customer's row
+    /// ([#holdCustomer]), taken by the caller.
+    ///
+    /// Called inside the order's transaction, after the market lock: the
+    /// order is then market, customer, balances, audit, and no path takes
+    /// a customer's row before a market's.
+    public void checkTrade(String owner, long value, long open) throws IOException {
+        if (value > perTransfer) {
+            throw Refused.with(409, "more-than-payment-may-move", "That is more than one payment may move");
+        }
+        long now = System.currentTimeMillis();
+        long sent = saturatedAdd(saturatedAdd(value, open), tradedSince(owner, now - DAY));
+        sent = saturatedAdd(sent, fiatSentSince(owner, now - DAY));
+        if (sent > daily) {
+            throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
+        }
+    }
+
+    /// What `owner` has sent in every fiat currency since `since`, in USD cents.
+    private long fiatSentSince(String owner, long since) throws IOException {
+        long sent = 0;
+        for (Asset fiat : ledger.assets()) {
+            if ("FIAT".equals(fiat.getKind())) {
+                Long moved = transfers.sentSince(owner, fiat.getCode(), since);
+                if (moved != null && moved.longValue() > 0) {
+                    sent = saturatedAdd(sent, fiatValue(fiat.getCode(), moved.longValue()));
+                }
+            }
+        }
+        return sent;
     }
 
     public long coolOffMillis() {
@@ -362,15 +438,10 @@ public class Money {
         if (value > perTransfer) {
             throw Refused.with(409, "more-than-payment-may-move", "That is more than one payment may move");
         }
-        long sent = value;
-        for (Asset fiat : ledger.assets()) {
-            if ("FIAT".equals(fiat.getKind())) {
-                Long moved = transfers.sentSince(m.owner, fiat.getCode(), now - DAY);
-                if (moved != null && moved.longValue() > 0) {
-                    sent = saturatedAdd(sent, fiatValue(fiat.getCode(), moved.longValue()));
-                }
-            }
-        }
+        // The day's trades count too: one daily limit for everything that
+        // can carry value away, or a thief would get it once per channel.
+        long sent = saturatedAdd(value, fiatSentSince(m.owner, now - DAY));
+        sent = saturatedAdd(sent, tradedSince(m.owner, now - DAY));
         if (sent > daily) {
             throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
         }

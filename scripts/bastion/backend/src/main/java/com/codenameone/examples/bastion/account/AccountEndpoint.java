@@ -22,6 +22,9 @@ import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.api.AccountApiServer;
 import com.codenameone.examples.bastion.api.PasskeyDto;
+import com.codenameone.examples.bastion.api.PasskeyRemoveDto;
+import com.codenameone.examples.bastion.money.Devices;
+import com.codenameone.examples.bastion.money.RequestSigning;
 import com.codenameone.examples.bastion.api.PasswordChangeDto;
 import com.codenameone.examples.bastion.api.RecoveryCodesDto;
 import com.codenameone.examples.bastion.api.RegisterDto;
@@ -40,8 +43,13 @@ public class AccountEndpoint implements AccountApiServer {
     private final Accounts accounts;
     private final SecondFactor secondFactor;
     private final PasskeyList passkeys;
+    private final RequestSigning signing;
+    private final Devices devices;
 
-    public AccountEndpoint(Accounts accounts, SecondFactor secondFactor, PasskeyList passkeys) {
+    public AccountEndpoint(Accounts accounts, SecondFactor secondFactor, PasskeyList passkeys,
+            RequestSigning signing, Devices devices) {
+        this.signing = signing;
+        this.devices = devices;
         this.accounts = accounts;
         this.secondFactor = secondFactor;
         this.passkeys = passkeys;
@@ -85,7 +93,17 @@ public class AccountEndpoint implements AccountApiServer {
     }
 
     @Override
-    public List<PasskeyDto> removePasskey(String id) throws Exception {
-        return passkeys.remove(Caller.name(), id);
+    public List<PasskeyDto> removePasskey(String id, String signature, PasskeyRemoveDto request)
+            throws Exception {
+        String owner = Caller.name();
+        // The same step-up as revoking a device: a stolen token must not take
+        // away the passkeys the owner signs in with. A device of the account
+        // signs it or, with none at hand, the password is entered again.
+        if (RequestSigning.present()) {
+            signing.require(owner);
+        } else {
+            devices.recheck(owner, request == null ? null : request.password());
+        }
+        return passkeys.remove(owner, id);
     }
 }

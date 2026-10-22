@@ -35,6 +35,7 @@ import com.codenameone.examples.bastion.domain.TradeOrder;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
 import com.codenameone.examples.bastion.ledger.Ledger;
 import com.codenameone.examples.bastion.ledger.Leg;
+import com.codenameone.examples.bastion.money.Money;
 import com.codenameone.examples.bastion.repository.MarketRepository;
 import com.codenameone.examples.bastion.repository.TradeOrderRepository;
 import com.codenameone.examples.bastion.repository.TradeRepository;
@@ -118,10 +119,23 @@ public class Exchange {
     private final TradeOrderRepository orders;
     private final TradeRepository trades;
     private final long feeBps;
+    private final long collarBps;
+    private final Money money;
 
     public Exchange(Ledger ledger, Audit audit, Markets markets, MarketRepository marketRows,
-            TradeOrderRepository orders, TradeRepository trades,
-            @Value("${bastion.exchange.taker-fee-bps:20}") String feeBps) {
+            TradeOrderRepository orders, TradeRepository trades, Money money,
+            @Value("${bastion.exchange.taker-fee-bps:20}") String feeBps,
+            @Value("${bastion.exchange.collar-bps:1000}") String collarBps) {
+        this.money = money;
+        // How far from the index price an order may trade, in basis points:
+        // 1000 is 10%. A limit price outside it is refused, and a market
+        // order stops walking the book at its edge -- so a thief with a
+        // signed-in session who sells into their own resting order at a
+        // silly price, or a fat finger, loses at most this much a fill.
+        this.collarBps = Long.parseLong(collarBps.trim());
+        if (this.collarBps <= 0 || this.collarBps >= 10000) {
+            throw new IllegalArgumentException("bastion.exchange.collar-bps must be 1 to 9999");
+        }
         this.ledger = ledger;
         this.audit = audit;
         this.markets = markets;
@@ -136,9 +150,18 @@ public class Exchange {
         }
     }
 
-    /// Places `request` for `owner`. A retry with the same key answers the
-    /// order its first attempt placed.
+    /// Places `request` for `owner`, outside the customer limits: the market
+    /// maker's own quotes, and the tests of the engine itself.
     public OrderDto place(String owner, String key, NewOrderDto request) throws IOException {
+        return place(owner, key, request, false);
+    }
+
+    /// Places `request` for `owner`. A retry with the same key answers the
+    /// order its first attempt placed. With `limited`, a customer's order:
+    /// its worst-case worth in USD is held to the per-payment and daily
+    /// limits ([Money#checkTrade]) along with the day's payments and fills.
+    public OrderDto place(String owner, String key, NewOrderDto request, boolean limited)
+            throws IOException {
         if (key == null || key.length() < 16 || key.length() > 80) {
             throw Refused.with(400, "send-idempotency-key-16-80", "Send an Idempotency-Key of 16 to 80 characters");
         }
@@ -146,7 +169,7 @@ public class Exchange {
             throw Refused.with(400, "send-order", "Send the order");
         }
         try {
-            return placeOnce(owner, key, request);
+            return placeOnce(owner, key, request, limited);
         } catch (ResponseStatusException answered) {
             throw answered;
         } catch (IOException | RuntimeException failed) {
@@ -154,7 +177,7 @@ public class Exchange {
             // (owner, client_key) index and rolled back whole. Asked again it
             // finds the first.
             if (existing(owner, key) != null) {
-                return placeOnce(owner, key, request);
+                return placeOnce(owner, key, request, limited);
             }
             throw failed;
         }
@@ -166,7 +189,8 @@ public class Exchange {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    private OrderDto placeOnce(String owner, String key, NewOrderDto r) throws IOException {
+    private OrderDto placeOnce(String owner, String key, NewOrderDto r, boolean limited)
+            throws IOException {
         TradeOrder earlier = orders.findFirstByOwnerAndClientKey(owner, key);
         if (earlier != null) {
             if (!earlier.getMarket().equals(r.market()) || !earlier.getSide().equals(r.side())
@@ -196,6 +220,10 @@ public class Exchange {
             if (limit && r.price() <= 0) {
                 throw Refused.with(400, "limit-order-needs-price", "A limit order needs a price");
             }
+            if (limit && (r.price() < low(m) || r.price() > high(m))) {
+                throw Refused.with(400, "price-outside-collar",
+                        "The price must be within {0}% of the index price", collarBps / 100);
+            }
             if (!limit && (r.price() != 0 || r.budget() != 0)) {
                 throw Refused.with(400, "market-sell-names-quantity", "A market sell names only a quantity");
             }
@@ -213,6 +241,13 @@ public class Exchange {
                 throw Refused.with(400, "market-buy-names-budget", "A market buy names only a budget");
             }
             held = r.budget();
+        }
+        if (limited) {
+            // The most the order can carry away, in USD: what a buy holds
+            // (its quote, fee included), or a sell's coins at the index.
+            money.holdCustomer(owner);
+            money.checkTrade(owner, buy ? money.usdValue(m.getQuote(), held)
+                    : money.usdValue(m.getBase(), held), openValue(owner));
         }
 
         long now = System.currentTimeMillis();
@@ -310,9 +345,11 @@ public class Exchange {
             throws IOException {
         boolean buy = BUY.equals(taker.getSide());
         boolean limit = LIMIT.equals(taker.getType());
+        // A market order walks only as far as the collar: its worst case is
+        // the edge, as a limit order's is its price.
         List<TradeOrder> book = buy
-                ? orders.asks(m.getId(), SELL, OPEN, limit ? taker.getPrice() : Long.MAX_VALUE)
-                : orders.bids(m.getId(), BUY, OPEN, limit ? taker.getPrice() : 0L);
+                ? orders.asks(m.getId(), SELL, OPEN, limit ? taker.getPrice() : high(m))
+                : orders.bids(m.getId(), BUY, OPEN, limit ? taker.getPrice() : low(m));
         long scale = Markets.scale(base);
         for (TradeOrder resting : book) {
             if (taker.getQuantity() > 0 && taker.getFilled() == taker.getQuantity()) {
@@ -479,6 +516,34 @@ public class Exchange {
             events.add(new String[] {o.getOwner(), "ORDER_CANCELLED", o.getId(),
                     o.getMarket() + " filled " + o.getFilled() + " of " + o.getQuantity()});
         }
+    }
+
+    /// What `owner`'s open orders hold, in USD: each one's hold valued in its
+    /// own asset (a buy's quote, a sell's coins). The whole hold, even of a
+    /// partly filled order, so it can only over-count.
+    private long openValue(String owner) throws IOException {
+        long sum = 0;
+        for (TradeOrder o : orders.findByOwnerAndStatusOrderByCreatedAtDesc(owner, OPEN)) {
+            Market om = markets.get(o.getMarket());
+            long v = money.usdValue(BUY.equals(o.getSide()) ? om.getQuote() : om.getBase(),
+                    o.getHeld());
+            sum = sum + v < sum ? Long.MAX_VALUE : sum + v;
+        }
+        return sum;
+    }
+
+    /// The lowest price the collar lets `m` trade at.
+    private long low(Market m) {
+        return Math.max(1L, m.getIndexPrice() - band(m));
+    }
+
+    /// The highest price the collar lets `m` trade at.
+    private long high(Market m) {
+        return Markets.addExact(m.getIndexPrice(), band(m));
+    }
+
+    private long band(Market m) {
+        return Markets.multiplyExact(m.getIndexPrice(), collarBps) / 10000L;
     }
 
     private Market lock(String id) throws IOException {

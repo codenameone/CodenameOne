@@ -100,10 +100,10 @@ The last column says whether the feature needs a build from the Codename One bui
 |Headers |`nosniff`, frame denial, `no-store`, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java` |No
 |Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java` |No
 |Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again unless the sign-in had a second factor or a passkey. A registration without a platform attestation token is recorded as untrusted, and an untrusted device's signature is refused for any money leaving the customer's accounts. If the app locks while a registration is on its way, the app revokes the server's record of that device after the next unlock. |`money/Devices.java` |No
-|Request signing |Signature, timestamp window and single-use nonce on every call that sends value away, and on the calls that would let a stolen token do so later: changing a payee, unfreezing a card, raising its limit, revoking a device. |`money/RequestSigning.java`, `SignedRequest.java` |No
+|Request signing |Signature, timestamp window and single-use nonce on every call that sends value away, and on the calls that would let a stolen token do so later: changing a payee or an address, issuing or unfreezing a card, raising its limit, revoking a device or removing a passkey. Placing an order is signed too: selling into a resting order moves value to its owner. |`money/RequestSigning.java`, `SignedRequest.java` |No
 |Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java` |No
 |Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see <<bastion-before-product>>. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java` |Token: yes
-|Limits and step-up |Per transfer, per day, per new payee during its cooling-off; own-account moves above a threshold signed too; crypto counted in dollars at the index price. |`money/Money.java`, `money/Payees.java` |No
+|Limits and step-up |Per transfer, per day, per new payee during its cooling-off; own-account moves above a threshold signed too; crypto counted in dollars at the index price. Orders count against the same per-payment and daily limits, valued in dollars at their worst case, and trade only within a price collar around the index (`bastion.exchange.collar-bps`, 10%). A card's own daily limit is in the card account's currency, as a card network counts it. |`money/Money.java`, `money/Payees.java` |No
 |Allow-list |Coins leave only to a signed, cooled-off address. |`exchange/CryptoWallets.java` |No
 |Audit chain |Hash-chained event rows appended under a lock on the head. |`audit/Audit.java` |No
 |Ledger check |Every entry balances and every balance equals its postings. |`admin/AdminEndpoint.java` |No
@@ -123,7 +123,7 @@ The last column says whether the feature needs a build from the Codename One bui
 |Device key |A P-256 pair from `KeyGenerator.ecP256()`, the private half sealed with AES-256-GCM in a `SecureEnvelope` under the app key. |`security/DeviceKey.java` |No
 |Request signer |Signs the exact bytes the request sends, in the canonical form the server checks. |`security/RequestSigner.java` |No
 |App lock |Locks on start with a stored session, after 30 seconds in the background and after two minutes idle; biometric, then PIN, then a fresh sign-in. Locking also drops the session's tokens from memory and ignores every answer still on its way; the unlock reads the tokens back from the sealed store. Signing out erases every key on the device, and a sign-in by another account starts the device over. |`security/Lock.java`, `ui/LockForm.java` |No
-|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself after a minute, when the app goes to the background, and at the next start. Each copy is a `ClipboardContent` marked sensitive with `setClearAfter`, so Android 13 and newer keep it out of the preview and iOS keeps it local and expires it. |`security/Protect.java` |No (a device)
+|Screen protection |Secure windows on sensitive screens, tapjacking protection, and a clipboard that clears itself after a minute and at the next start, without reading the clipboard when the app goes to the background. Each copy is a `ClipboardContent` marked sensitive with `setClearAfter`, so Android 13 and newer keep it out of the preview and iOS keeps it local and expires it. |`security/Protect.java` |No (a device)
 |App switcher cover |A blank card in the iOS app switcher. |`codenameone_settings.properties` |Yes
 |Root and jailbreak |Root signals reported to the server; a jailbroken iPhone refuses to start. |`security/DeviceKey.java`, `codenameone_settings.properties` |Jailbreak exit: yes
 |Code hardening |Class renaming, string encryption, control-flow flattening and tamper checks. |`codenameone_settings.properties` |Yes
@@ -166,6 +166,7 @@ The server reads these at start-up. A system property of the same name wins, the
 |`bastion.device.fresh-minutes` |10 |How recent a sign-in must be to register a device key.
 |`bastion.device.policy.enforce` |`true` |Whether money leaving a customer needs a trusted device. Turn it off only for development and screenshots.
 |`bastion.stepup.threshold` |100000 |Own-account moves above this are signed by the device too.
+|`bastion.exchange.collar-bps` |1000 |How far from the index price, in basis points, an order may trade: the server refuses a limit price outside it and a market order stops at its edge.
 |`bastion.limit.per-transfer`, `bastion.limit.daily` |500000, 1000000 |Transfer limits.
 |`bastion.payee.cooloff-hours`, `bastion.payee.cooloff-limit` |24, 10000 |How long a new payee cools off and what it can receive meanwhile.
 |`bastion.address.cooloff-hours` |24 |How long a new coin address waits.
@@ -186,10 +187,10 @@ Every endpoint but registration and sign-in needs a bearer token. *Signed* marks
 |Endpoint |What it does |Needs
 |`POST /api/account/register` |Opens an account. |Rate limited
 |`GET /api/me` |The signed-in customer. |
-|`POST /api/account/password` |Changes the password and ends every other sign-in. |
+|`POST /api/account/password` |Changes the password and ends every other sign-in. |The current password, held to the lockout
 |`POST /api/account/mfa/totp`, `.../totp/confirm` |Starts and confirms the authenticator app. |
 |`POST /api/account/mfa/recovery-codes` |New recovery codes. |
-|`GET`, `DELETE /api/account/passkeys[/{id}]` |Lists and removes passkeys. |
+|`GET /api/account/passkeys`, `POST .../{id}/remove` |Lists and removes passkeys. |Removing: signed by a device, or the password in the body
 |`GET /api/assets` |The currencies and coins and their decimals. |
 |`GET`, `POST /api/accounts` |Lists and opens accounts. |
 |`GET /api/accounts/{id}/postings` |An account's history. |
@@ -197,15 +198,15 @@ Every endpoint but registration and sign-in needs a bearer token. *Signed* marks
 |`POST /api/accounts/{id}/deposit` |The demo deposit. |Idempotent
 |`POST /api/accounts/{id}/withdraw` |A withdrawal to the outside. |Signed, idempotent
 |`GET`, `POST`, `PUT`, `DELETE /api/payees[/{id}]` |Lists, adds, renames and removes payees. |Adding, renaming, removing: signed
-|`GET /api/cards`, `POST /api/accounts/{id}/card` |Lists and issues cards. |
+|`GET /api/cards`, `POST /api/accounts/{id}/card` |Lists and issues cards. |Issuing: signed by a trusted device
 |`POST /api/cards/{id}/freeze`, `.../unfreeze`, `PUT .../limit` |Freezes, unfreezes and limits a card. |Unfreezing and raising the limit: signed by a trusted device
 |`POST /api/cards/{id}/spend` |The demo card spend. |Idempotent
 |`GET`, `POST /api/devices` |Lists and registers device keys. |Registering: recent sign-in
 |`POST /api/devices/{id}/revoke` |Removes a device key. |Signed by a device, or the password in the body
 |`GET /api/exchange/markets`, `.../{id}/book`, `.../{id}/ticker` |Markets, order book and ticker. |
-|`POST`, `GET`, `DELETE /api/exchange/orders[/{id}]` |Places, lists and cancels orders. |
+|`POST`, `GET`, `DELETE /api/exchange/orders[/{id}]` |Places, lists and cancels orders. |Placing: signed by a trusted device, idempotent
 |`GET /api/exchange/trades` |The customer's trades. |
-|`GET`, `POST`, `DELETE /api/crypto/addresses[/{id}]` |The coin address allow-list. |Adding: signed
+|`GET`, `POST`, `DELETE /api/crypto/addresses[/{id}]` |The coin address allow-list. |Adding and removing: signed
 |`POST /api/accounts/{id}/crypto-withdraw` |Sends coins to an allowed address. |Signed, idempotent
 |`GET /api/admin/audit/verify`, `GET /api/admin/ledger/verify` |The administrator's checks. |Administrator
 |===
@@ -220,11 +221,11 @@ Bastion is built against these, the likeliest first:
 |===
 |Threat |What stops it |Where
 |Stolen or guessed passwords |A second factor or a passkey, a lockout per account, rate limits per address, and a password minimum checked on the server. |`SecurityConfig.java`, `account/SignInGuard.java`
-|A stolen session |Five-minute access tokens; a password change ends every other sign-in; money leaving the account also needs a device signature, so a token alone moves nothing out. |`account/Grants.java`, `money/RequestSigning.java`
+|A stolen session |Five-minute access tokens; a password change ends every other sign-in; money leaving the account, and every order, also needs a device signature, so a token alone moves nothing out; the step-ups that ask for the password again are held to the sign-in lockout. |`account/Grants.java`, `money/RequestSigning.java`
 |Account takeover that adds a mule |A new payee or address cools off for a day with a small limit, and adding one is signed by the device. |`money/Payees.java`, `exchange/CryptoWallets.java`
 |A tampered or replayed request |The signature covers the body and the path; each nonce is accepted once within a short time window. |`money/RequestSigning.java`
 |An attacker in the network path |No cleartext, a host allow-list and certificate pins in the app; HSTS on the server. |`net/Guard.java`, `SecurityConfig.java`
-|A lost or stolen phone |The app lock, keys sealed under an app key that only a biometric or PIN opens, removal of the device from another sign-in, and secure windows that keep balances out of screenshots and the app switcher. |`security/Lock.java`, `security/Keys.java`, `security/Protect.java`
+|A lost or stolen phone |The app lock, keys sealed under an app key that only a biometric or PIN opens (five wrong PINs erase the keys, and the count is kept in the OS secure store beside the PIN's pepper rather than in a preferences file a copy of the phone's storage could reset), removal of the device from another sign-in, and secure windows that keep balances out of screenshots and the app switcher. |`security/Lock.java`, `security/Keys.java`, `security/Protect.java`
 |A rooted device or a repackaged app |Root and jailbreak signals, platform attestation, and code hardening in a cloud build. None is proof; the server treats them as signals that decide whether a device is trusted. |`money/Devices.java`, `codenameone_settings.properties`
 |A careless or malicious insider |The audit chain makes changing history detectable, the ledger check makes a wrong balance detectable, and no request creates an administrator. |`audit/Audit.java`, `admin/AdminEndpoint.java`
 |Races and retries |Conditional balance updates, ordered locks and idempotency keys keep money exact under concurrent and repeated requests. |`ledger/Ledger.java`

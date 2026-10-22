@@ -109,7 +109,7 @@ public final class CardsForm {
         }
         long units = Amounts.parse(amount.getText(), asset);
         if (units < 0) {
-            Dialog.show(Lang.tr("Daily limit"), Lang.tr("Enter an amount, like 25.00."),
+            Dialog.show(Lang.tr("Daily limit"), Ui.amountHint(),
                     Lang.tr("OK"), null);
             return;
         }

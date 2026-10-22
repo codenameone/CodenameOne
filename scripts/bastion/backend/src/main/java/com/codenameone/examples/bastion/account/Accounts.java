@@ -61,10 +61,12 @@ public class Accounts {
     private final Grants grants;
     private final TotpService totp;
     private final RecoveryCodeService recoveryCodes;
+    private final SignInGuard guard;
 
     public Accounts(JdbcUserDetailsManager users, PasswordEncoder encoder,
             ProfileRepository profiles, Ledger ledger, Audit audit, Grants grants,
-            TotpService totp, RecoveryCodeService recoveryCodes) {
+            TotpService totp, RecoveryCodeService recoveryCodes, SignInGuard guard) {
+        this.guard = guard;
         this.users = users;
         this.encoder = encoder;
         this.profiles = profiles;
@@ -159,10 +161,17 @@ public class Accounts {
 
     public UserDto changePassword(String username, String current, String replacement)
             throws IOException {
+        // The current password is a password guess like any other: held to
+        // the sign-in lockout (a locked account is refused before it is looked
+        // at, a wrong one counts), or a stolen token would be an oracle with
+        // unlimited guesses. Audited outside the change's transaction, which a
+        // refusal rolls back.
+        guard.recheck(username, current, encoder, "PASSWORD_CHANGE_REFUSED",
+                "not-current-password", "That is not your current password");
         if (!replace(username, current, replacement)) {
-            // Recorded outside the change's transaction, which a refusal rolls
-            // back: someone guessing at the current password with a stolen
-            // token is exactly what the audit is for.
+            // Changed by a concurrent request after the check above: still a
+            // wrong password for this one, and counted as one.
+            guard.failed(username);
             audit.append(username, "PASSWORD_CHANGE_REFUSED", username, "wrong current password");
             throw Refused.with(403, "not-current-password", "That is not your current password");
         }

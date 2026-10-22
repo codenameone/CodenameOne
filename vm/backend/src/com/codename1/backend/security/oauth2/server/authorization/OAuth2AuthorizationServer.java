@@ -476,7 +476,10 @@ public final class OAuth2AuthorizationServer {
         if (nonce != null) {
             attributes.put("nonce", nonce);
         }
-        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
+        long authTime = authTime(request);
+        if (authTime >= 0) {
+            attributes.put("auth_time", Long.valueOf(authTime));
+        }
         List<Object> amr = authMethods(request);
         if (amr != null) {
             attributes.put("amr", amr);
@@ -502,18 +505,19 @@ public final class OAuth2AuthorizationServer {
         return redirect(OAuth2Parameters.append(redirectUri, answer));
     }
 
-    /// When this session completed a credential check, in epoch seconds.
-    /// Authentication supplied without a session has no stored sign-in time.
-    private static long authTime(HttpServer.Request request, long now) {
+    /// When this session completed a credential check, in epoch seconds, or
+    /// -1 when that is not known: authentication supplied without a session,
+    /// or a session that recorded no sign-in time. Unknown is answered as
+    /// unknown -- the grant then carries no `auth_time` -- never as "now",
+    /// which would make every freshness check (`max_age`, a step-up) pass
+    /// for a sign-in of any age.
+    private static long authTime(HttpServer.Request request) {
         HttpSession session = request.getSession(false);
-        if (session == null) {
-            return now / 1000L;
-        }
-        Object known = session.getAttribute(AUTH_TIME);
+        Object known = session == null ? null : session.getAttribute(AUTH_TIME);
         if (known instanceof Number) {
             return ((Number) known).longValue();
         }
-        return now / 1000L;
+        return -1L;
     }
 
     /// How this session's credential check was made, as RFC 8176 `amr`
@@ -1536,7 +1540,10 @@ public final class OAuth2AuthorizationServer {
             return new Verification(Verification.INVALID);
         }
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
-        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
+        long authTime = authTime(request);
+        if (authTime >= 0) {
+            attributes.put("auth_time", Long.valueOf(authTime));
+        }
         List<Object> amr = authMethods(request);
         if (amr != null) {
             attributes.put("amr", amr);

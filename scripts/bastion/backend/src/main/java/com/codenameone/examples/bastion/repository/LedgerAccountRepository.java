@@ -52,6 +52,11 @@ public interface LedgerAccountRepository extends CrudRepository<LedgerAccount, S
     @Query("update LedgerAccount a set a.balance = a.balance + :delta where a.id = :id")
     int applyUnguarded(@Param("id") String id, @Param("delta") long delta);
 
+    /// 1 when account `id` is frozen now, 0 when not: read from the table,
+    /// not the session, whose copy may predate a freeze committed since.
+    @Query("select count(a) from LedgerAccount a where a.id = :id and a.frozen = TRUE")
+    Long frozenNow(@Param("id") String id);
+
     @Modifying
     @Query("update LedgerAccount a set a.frozen = :frozen where a.id = :id")
     int setFrozen(@Param("id") String id, @Param("frozen") boolean frozen);

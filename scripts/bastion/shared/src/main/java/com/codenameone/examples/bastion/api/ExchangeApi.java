@@ -51,9 +51,12 @@ public interface ExchangeApi {
     void ticker(@Path("id") String market, OnComplete<Response<TickerDto>> callback);
 
     /// Places an order. The `Idempotency-Key` makes a retry answer the order
-    /// the first attempt placed instead of placing a second.
+    /// the first attempt placed instead of placing a second. Always signed by
+    /// a trusted device, as a payment is: selling into another customer's
+    /// resting order moves value to them.
     @POST("/api/exchange/orders")
-    void place(@Header("Idempotency-Key") String idempotencyKey, @Body NewOrderDto order,
+    void place(@Header("Idempotency-Key") String idempotencyKey,
+            @Header("Bastion-Signature") String signature, @Body NewOrderDto order,
             OnComplete<Response<OrderDto>> callback);
 
     @DELETE("/api/exchange/orders/{id}")
@@ -75,8 +78,11 @@ public interface ExchangeApi {
     void addAddress(@Header("Bastion-Signature") String signature,
             @Body NewCryptoAddressDto address, OnComplete<Response<CryptoAddressDto>> callback);
 
+    /// Takes an address off the list. Signed, like removing a payee: the list
+    /// is what the customer reads before a withdrawal.
     @DELETE("/api/crypto/addresses/{id}")
-    void removeAddress(@Path("id") String id, OnComplete<Response<CryptoAddressDto>> callback);
+    void removeAddress(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            OnComplete<Response<CryptoAddressDto>> callback);
 
     /// Coins out of wallet `id` to an allow-listed address. Always signed.
     @POST("/api/accounts/{id}/crypto-withdraw")

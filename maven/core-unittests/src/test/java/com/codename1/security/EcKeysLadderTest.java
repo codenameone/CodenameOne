@@ -1,6 +1,24 @@
 /*
- * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
- * Distributed under the same terms as the rest of Codename One.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.security;
 
@@ -55,6 +73,9 @@ class EcKeysLadderTest {
         assertEquals(pad(new BigInteger(P, 16).subtract(new BigInteger(GY, 16))),
                 pad(minusOne[1]));
         assertNull(EcKeys.multiply(n), "n * G is the point at infinity");
+        assertNull(EcKeys.multiply(BigInteger.ZERO), "zero is no private key");
+        assertNull(EcKeys.multiply(n.add(BigInteger.ONE)), "a scalar past n is refused");
+        assertNull(EcKeys.multiply(BigInteger.ONE.negate()), "a negative scalar is refused");
         // 2G and 3G = 2G + G, which an affine ladder handles as special cases.
         BigInteger[] two = EcKeys.multiply(BigInteger.valueOf(2));
         assertEquals("7cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978",

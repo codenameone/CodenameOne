@@ -177,7 +177,7 @@ public final class TransferForm {
             }
             long units = Amounts.parse(amount.getText(), source.asset());
             if (units <= 0) {
-                Ui.showError(error, Lang.tr("Enter an amount, like 25.00."));
+                Ui.showError(error, Ui.amountHint());
                 return;
             }
             if (units > source.balance()) {

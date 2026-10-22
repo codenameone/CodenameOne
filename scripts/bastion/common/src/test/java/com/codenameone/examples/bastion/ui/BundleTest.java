@@ -40,19 +40,123 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// file is a complete list for a translator to work from. A string added to
 /// the code without its line fails here, named.
 ///
-/// What is checked is the plain case: a single literal handed to `Lang.tr`,
-/// to one of the builders that translate their argument, or to a failure
-/// callback (`onSucess`, `failed`) whose text a screen shows translated. A sentence built of
-/// several literals is the writer's to add by hand.
+/// What is checked: every literal operand of a call that translates its
+/// argument -- `Lang.tr`, the builders that translate theirs (`Ui.form`,
+/// `Ui.secondary`, `Ui.segments(new String[] {...})`, `Ui.failed`...), a
+/// failure callback (`onSucess`, `failed`) whose text a screen shows
+/// translated, and a Security Center `Item` -- including each side of a
+/// `?:` among them; the Security Center's group names; and the `return`
+/// literals of a method whose result is handed to `Lang.tr` (`stateName`).
+/// A sentence built of several literals is the writer's to add by hand, and
+/// is better written as one pattern with `{0}`.
 class BundleTest {
+    /// Where a translated argument list starts.
     private static final Pattern CALL = Pattern.compile(
-            "(?:(?:Lang\\.tr|Ui\\.(?:form|title|primary|secondary|section|empty|field|toast)|Nav\\.form)"
-            + "\\(\\s*"
-            // A reason handed to a failure callback, which the screen shows
-            // through Lang.tr: `failed.onSucess("...")`, `result.failed("...")`
-            // and `failed.failed(401, "...")`.
-            + "|onSucess\\(\\s*|\\.failed\\(\\s*(?:-?\\d+\\s*,\\s*)?)"
-            + "\"((?:[^\"\\\\]|\\\\.)*)\"\\s*[,)]");
+            "(?:(?<![\\w.])(?:Lang\\.tr|Ui\\.(?:form|title|primary|secondary|section|empty|field|toast"
+            + "|segments|failed)|Nav\\.form|primary|secondary|result|new Item)"
+            + "|onSucess|\\.failed)\\(");
+
+    /// A literal that is a whole operand: after `(`, `,`, `?`, `:` or `{`,
+    /// and before `,`, `)`, `:` or `}`.
+    private static final Pattern OPERAND = Pattern.compile(
+            "[(,?:{]\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*(?=[,):}])");
+
+    /// The text of the call's arguments, from the `(` at `open` to its match,
+    /// skipping string and character literals.
+    static String arguments(String text, int open) {
+        int depth = 0;
+        for (int at = open; at < text.length(); at++) {
+            char c = text.charAt(at);
+            if (c == '"' || c == '\'') {
+                for (at++; at < text.length() && text.charAt(at) != c; at++) {
+                    if (text.charAt(at) == '\\') {
+                        at++;
+                    }
+                }
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')' && --depth == 0) {
+                return text.substring(open, at + 1);
+            }
+        }
+        return text.substring(open);
+    }
+
+    /// `args` with the arguments of every call nested in it emptied: what
+    /// `hint("cn1.hardenLevel")` is given is not translated, and a nested
+    /// translating call is scanned by itself.
+    static String withoutNestedCalls(String args) {
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (at < args.length()) {
+            char c = args.charAt(at);
+            if (c == '"' || c == '\'') {
+                int end = at + 1;
+                while (end < args.length() && args.charAt(end) != c) {
+                    end += args.charAt(end) == '\\' ? 2 : 1;
+                }
+                out.append(args, at, Math.min(end + 1, args.length()));
+                at = end + 1;
+            } else if (c == '(' && at > 0 && Character.isJavaIdentifierPart(args.charAt(at - 1))) {
+                String nested = arguments(args, at);
+                out.append("()");
+                at += nested.length();
+            } else {
+                out.append(c);
+                at++;
+            }
+        }
+        return out.toString();
+    }
+
+    /// Every English text `source` hands to a translation.
+    static List<String> translated(String text) {
+        List<String> out = new ArrayList<>();
+        Matcher call = CALL.matcher(text);
+        while (call.find()) {
+            Matcher m = OPERAND.matcher(withoutNestedCalls(arguments(text, call.end() - 1)));
+            while (m.find()) {
+                out.add(m.group(1));
+            }
+        }
+        // The Security Center's groups: `g = "Network";`.
+        Matcher group = Pattern.compile("(?<![\\w.])g = \"((?:[^\"\\\\]|\\\\.)*)\";").matcher(text);
+        while (group.find()) {
+            out.add(group.group(1));
+        }
+        // What a method returns when its result is translated:
+        // `Lang.tr(stateName(...))` makes every `return "...";` of
+        // `stateName` a key.
+        Matcher wrapped = Pattern.compile("Lang\\.tr\\(\\s*(\\w+)\\(").matcher(text);
+        while (wrapped.find()) {
+            Matcher body = Pattern.compile("\\s" + wrapped.group(1) + "\\([^)]*\\)\\s*\\{").matcher(text);
+            if (body.find()) {
+                String method = arguments(text.replace('{', '(').replace('}', ')'),
+                        body.end() - 1);
+                Matcher ret = Pattern.compile("return \"((?:[^\"\\\\]|\\\\.)*)\";").matcher(
+                        text.substring(body.end() - 1, body.end() - 1 + method.length()));
+                while (ret.find()) {
+                    out.add(ret.group(1));
+                }
+            }
+        }
+        return out;
+    }
+
+    @Test
+    void theScanSeesEveryShape() {
+        String code = "Ui.segments(new String[] {\"A\", \"B\"}, 0, i -> { });\n"
+                + "Ui.secondary(x ? \"C\" : \"D\");\n"
+                + "Ui.failed(content, \"E\", back);\n"
+                + "secondary(\"F\");\n"
+                + "new Item(g, \"G\", ACTIVE, y ? \"H {0}\" : \"I\", v);\n"
+                + "g = \"J\";\n"
+                + "Lang.tr(stateName(s));\n"
+                + "static String stateName(int s) { if (s == 1) { return \"K\"; } return \"L\"; }\n"
+                + "new Item(g, \"M\", OFF, \"N {0}\", hint(\"not.a.key\"));\n";
+        assertEquals(java.util.Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H {0}", "I", "M", "N {0}",
+                "J", "K", "L"), translated(code));
+    }
 
     @Test
     void everyTranslatedLiteralHasAnEnglishLine() throws Exception {
@@ -68,9 +172,9 @@ class BundleTest {
                     .collect(java.util.stream.Collectors.toList());
         }
         for (Path source : sources) {
-            Matcher m = CALL.matcher(new String(Files.readAllBytes(source), StandardCharsets.UTF_8));
-            while (m.find()) {
-                String key = m.group(1).replace("\\\"", "\"").replace("\\\\", "\\");
+            for (String literal : translated(new String(Files.readAllBytes(source),
+                    StandardCharsets.UTF_8))) {
+                String key = literal.replace("\\\"", "\"").replace("\\\\", "\\");
                 if (key.length() > 0 && !bundle.containsKey(key)) {
                     missing.add(source.getFileName() + ": " + key);
                 }

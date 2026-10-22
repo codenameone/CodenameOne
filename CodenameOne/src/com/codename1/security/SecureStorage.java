@@ -143,7 +143,13 @@ public class SecureStorage {
         strictBiometricBinding = strict;
     }
 
-    /// Whether [#setStrictBiometricBinding(boolean)] is on.
+    /// Whether [#setStrictBiometricBinding(boolean)] is on. This is the
+    /// policy for keys created from now on, not a statement about the key in
+    /// use: on Android a key that existed before the call (made unbound on
+    /// API 33+) is kept as it is, so an installed app that turned this on in
+    /// an update can answer true here while its entries still sit under an
+    /// unbound key. Do not report it to the user as "the stored data is bound
+    /// to the biometric" without that caveat.
     public boolean isStrictBiometricBinding() {
         return strictBiometricBinding;
     }

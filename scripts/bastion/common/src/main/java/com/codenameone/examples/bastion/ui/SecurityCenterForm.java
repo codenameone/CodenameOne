@@ -58,7 +58,7 @@ public final class SecurityCenterForm {
         Container row = new Container(new BorderLayout(), "BnRow");
         Container words = new Container(BoxLayout.y());
         words.add(new Label(Lang.tr(item.name), "BnRowTitle"));
-        SpanLabel detail = new SpanLabel(item.detail);
+        SpanLabel detail = new SpanLabel(Lang.tr(item.detail, item.values));
         detail.setTextUIID("BnRowDetail");
         words.add(detail);
         row.add(BorderLayout.CENTER, words);

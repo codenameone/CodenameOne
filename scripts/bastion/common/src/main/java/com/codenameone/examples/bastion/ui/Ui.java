@@ -35,6 +35,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.spinner.Picker;
 import java.util.Date;
+import com.codenameone.examples.bastion.money.Amounts;
 import com.codenameone.examples.bastion.security.Lock;
 import com.codenameone.examples.bastion.security.Protect;
 
@@ -325,6 +326,12 @@ public final class Ui {
         content.removeAll();
         content.add(muted(Lang.tr("Loading...")));
         content.revalidate();
+    }
+
+    /// "Enter an amount, like 25.00.", with the example written the way this
+    /// locale writes an amount (25,00 in much of Europe).
+    public static String amountHint() {
+        return Lang.tr("Enter an amount, like {0}.", Amounts.format(2500L, 2, 2));
     }
 
     public static void failed(final Container content, String message, final Runnable retry) {

@@ -145,8 +145,12 @@ class AuthTest {
         String user = SignIn.register(mvc, "auth-limit@bastion.test", PASSWORD);
         String token = SignIn.token(mvc, user, PASSWORD);
         String wrong = "{\"current\":\"guess guess guess\",\"replacement\":\"a new long password\"}";
+        // The current password is held to the sign-in lockout: five wrong
+        // ones lock the account, and then even the right one is refused.
+        String right = "{\"current\":\"" + PASSWORD + "\",\"replacement\":\"a new long password\"}";
         for (int iter = 0; iter < 10; iter++) {
-            assertEquals(403, call("POST", "/api/account/password", token, wrong).getStatus());
+            assertEquals(iter < 5 ? 403 : 423, call("POST", "/api/account/password", token,
+                    iter == 7 ? right : wrong).getStatus());
         }
         assertEquals(429, call("POST", "/api/account/password", token, wrong).getStatus());
         assertEquals(10, events(user, "PASSWORD_CHANGE_REFUSED"));

@@ -233,9 +233,13 @@ public final class WithdrawForm {
                 address.label()), "Remove")) {
             return;
         }
-        Api.exchange().removeAddress(address.id(), Net.to((CryptoAddressDto gone) -> done.run(),
+        // Signed, as adding one is: the list is what a withdrawal is checked
+        // against.
+        DeviceSetup.withDevice(retry -> Api.exchange().removeAddress(address.id(),
+                RequestSigner.sign("DELETE", "/api/crypto/addresses/" + address.id(), null, null),
+                Net.to((CryptoAddressDto gone) -> done.run(), retry)),
                 (status, message) -> Dialog.show(Lang.tr("Not removed"), Lang.tr(message),
-                        Lang.tr("OK"), null)));
+                        Lang.tr("OK"), null));
     }
 
     /// The start and end of a long address: enough to compare with the

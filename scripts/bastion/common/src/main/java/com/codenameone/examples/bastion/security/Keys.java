@@ -116,7 +116,9 @@ public final class Keys {
         SecureStorage platform = SecureStorage.getInstance();
         // The strict binding is opt-in (installed apps keep their keys): on
         // Android it binds the key on every API level and revokes it when a
-        // biometric is enrolled. Set before the first write creates the key.
+        // biometric is enrolled. Set before the first write creates the key:
+        // a key made before it (an update of an app that ran without it)
+        // stays unbound, and isStrictBiometricBinding() still answers true.
         platform.setStrictBiometricBinding(true);
         return platform;
     }
@@ -149,8 +151,34 @@ public final class Keys {
     }
 
     /// Wrong PINs since the last good one.
+    ///
+    /// Kept in the OS secure store beside the pepper, not in Preferences: a
+    /// plain file is one a thief with the phone's storage (a backup, a rooted
+    /// shell) could reset between guesses, and the count is what turns five
+    /// wrong PINs into a wipe. Removing the secure store's entry resets it
+    /// too, but that store is also where the pepper lives, so the same
+    /// access already loses the vault.
     public static int pinFailures() {
-        return Preferences.get(FAILURES, 0);
+        String stored = storage().get(FAILURES);
+        if (stored == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(stored);
+        } catch (NumberFormatException damaged) {
+            // Unreadable counts as the last try, never as none.
+            return PIN_ATTEMPTS - 1;
+        }
+    }
+
+    private static void setPinFailures(int failures) {
+        storage().set(FAILURES, Integer.toString(failures));
+    }
+
+    private static void clearPinFailures() {
+        storage().remove(FAILURES);
+        // The copy an earlier version kept in Preferences.
+        Preferences.delete(FAILURES);
     }
 
     /// Drops the key from memory: the app lock calls this.
@@ -243,7 +271,7 @@ public final class Keys {
         Preferences.delete(MADE);
         Preferences.delete(BIO_ON);
         Preferences.delete(PIN_ON);
-        Preferences.delete(FAILURES);
+        clearPinFailures();
         Preferences.delete(OWNER);
         DeviceKey.forget();
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
@@ -393,7 +421,7 @@ public final class Keys {
                     .ready(enrolled -> vault.putSecret(SECRET, secret).ready(stored -> {
                         vault.lock();
                         Preferences.set(PIN_ON, true);
-                        Preferences.delete(FAILURES);
+                        clearPinFailures();
                         storage().remove(PLAIN_ACCOUNT);
                         done.run();
                     }).except(err -> failed.onSucess("The PIN could not be saved.")))
@@ -408,8 +436,10 @@ public final class Keys {
     }
 
     /// Removes the PIN copy; with no biometric either, the plain copy comes
-    /// back.
-    public static void removePin(final Runnable done) {
+    /// back. `failed` gets the reason, untranslated, when the vault could not
+    /// be destroyed: the PIN then still unlocks, and saying otherwise would
+    /// leave the customer believing it is gone.
+    public static void removePin(final Runnable done, final SuccessCallback<String> failed) {
         if (!pinEnabled()) {
             done.run();
             return;
@@ -417,10 +447,10 @@ public final class Keys {
         vault().destroyLocalData().ready(gone -> {
             storage().remove(PEPPER_ACCOUNT);
             Preferences.delete(PIN_ON);
-            Preferences.delete(FAILURES);
+            clearPinFailures();
             restorePlainIfUnprotected();
             done.run();
-        }).except(err -> done.run());
+        }).except(err -> failed.onSucess("The PIN could not be removed."));
     }
 
     /// Opens the key with the PIN. A wrong one counts; [#PIN_ATTEMPTS] in a
@@ -445,7 +475,7 @@ public final class Keys {
                         result.failed("The PIN vault is damaged.");
                         return;
                     }
-                    Preferences.delete(FAILURES);
+                    clearPinFailures();
                     key = opened;
                     result.unlocked();
                 }).except(err -> {
@@ -458,7 +488,7 @@ public final class Keys {
                         if (failures >= PIN_ATTEMPTS) {
                             wipe().ready(done -> result.wiped());
                         } else {
-                            Preferences.set(FAILURES, failures);
+                            setPinFailures(failures);
                             result.wrong(PIN_ATTEMPTS - failures);
                         }
                     } else {

@@ -124,11 +124,14 @@ public final class LiveE2e {
         String bobWallet = bob.open("BTC", "WALLET");
         bob.deposit(bobWallet, 10000000L);
         String aliceWallet = alice.open("BTC", "WALLET");
-        Map sell = alice.json(bob.call("POST", "/api/exchange/orders",
-                order("SELL", 6000000L, 100000L), id(), null), 200);
+        // An order moves value, so it is signed as a payment is.
+        bob.expect("POST", "/api/exchange/orders", order("SELL", 6000000L, 100000L), id(), null,
+                403);
+        Map sell = bob.signed("POST", "/api/exchange/orders", order("SELL", 6000000L, 100000L),
+                id(), 200);
         check("OPEN".equals(sell.get("status")), "the sell rests on the book: " + sell);
-        Map buy = alice.json(alice.call("POST", "/api/exchange/orders",
-                order("BUY", 6000000L, 100000L), id(), null), 200);
+        Map buy = alice.signed("POST", "/api/exchange/orders", order("BUY", 6000000L, 100000L),
+                id(), 200);
         check("FILLED".equals(buy.get("status")), "the buy fills against it: " + buy);
         check(alice.balance(aliceWallet) == 100000L, "Alice holds the coins she bought");
         check(bob.balance(bobWallet) == 10000000L - 100000L, "Bob no longer does");

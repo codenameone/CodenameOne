@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codenameone.examples.bastion.security.RequestSigner;
+import com.codenameone.examples.bastion.api.PasskeyRemoveDto;
 import com.codename1.components.Switch;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -133,7 +135,7 @@ public final class SettingsForm {
             remove.addActionListener(evt -> Keys.removePin(() -> {
                 dialog.dispose();
                 show(back);
-            }));
+            }, why -> Ui.showError(error, Lang.tr(why))));
             dialog.add(remove);
         }
         Button cancel = Ui.secondary("Cancel");
@@ -177,7 +179,36 @@ public final class SettingsForm {
                 Lang.tr("Remove"), Lang.tr("Cancel"))) {
             return;
         }
-        Api.account().removePasskey(passkey.id(), Net.to(
+        // A step-up, as revoking a device is: signed by this device's key
+        // when it has one, else (or when that is refused) the password again.
+        final String id = passkey.id();
+        PasskeyRemoveDto signedBody = new PasskeyRemoveDto(null);
+        String signature = RequestSigner.sign("POST", "/api/account/passkeys/" + id + "/remove",
+                null, signedBody);
+        if (signature == null) {
+            removePasskeyWithPassword(box, id);
+            return;
+        }
+        Api.account().removePasskey(id, signature, signedBody, Net.to(
+                (List<PasskeyDto> left) -> fillPasskeys(box, left),
+                (status, message) -> {
+                    if (status == 403) {
+                        removePasskeyWithPassword(box, id);
+                    } else {
+                        Ui.toast(Lang.tr(message));
+                    }
+                }));
+    }
+
+    private static void removePasskeyWithPassword(final Container box, String id) {
+        TextField password = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
+        password.setUIID("BnField");
+        Command ok = new Command(Lang.tr("Continue"));
+        if (Dialog.show(Lang.tr("Confirm it is you"), password, ok,
+                new Command(Lang.tr("Cancel"))) != ok) {
+            return;
+        }
+        Api.account().removePasskey(id, null, new PasskeyRemoveDto(password.getText()), Net.to(
                 (List<PasskeyDto> left) -> fillPasskeys(box, left),
                 (status, message) -> Ui.toast(Lang.tr(message))));
     }

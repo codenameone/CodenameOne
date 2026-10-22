@@ -19,7 +19,7 @@
 package com.codenameone.examples.bastion.api;
 
 import com.codename1.annotations.rest.Body;
-import com.codename1.annotations.rest.DELETE;
+import com.codename1.annotations.rest.Header;
 import com.codename1.annotations.rest.GET;
 import com.codename1.annotations.rest.POST;
 import com.codename1.annotations.rest.Path;
@@ -71,7 +71,9 @@ public interface AccountApi {
     @GET("/api/account/passkeys")
     void passkeys(OnComplete<Response<List<PasskeyDto>>> callback);
 
-    /// Removes a passkey and answers the ones left.
-    @DELETE("/api/account/passkeys/{id}")
-    void removePasskey(@Path("id") String id, OnComplete<Response<List<PasskeyDto>>> callback);
+    /// Removes a passkey and answers the ones left. Signed by a device of the
+    /// account or, with none, carrying the password ([PasskeyRemoveDto]).
+    @POST("/api/account/passkeys/{id}/remove")
+    void removePasskey(@Path("id") String id, @Header("Bastion-Signature") String signature,
+            @Body PasskeyRemoveDto request, OnComplete<Response<List<PasskeyDto>>> callback);
 }

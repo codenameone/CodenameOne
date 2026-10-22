@@ -236,10 +236,27 @@ class MoneyTest {
         assertEquals(0, ((List) Json.parse(other.send(get("/api/account/passkeys"))
                 .getContentAsString())).size());
 
-        assertEquals(404, other.send(delete("/api/account/passkeys/" + id)).getStatus());
-        MockResponse removed = c.send(delete("/api/account/passkeys/" + id));
+        // A step-up, as revoking a device is: the token alone, or a wrong
+        // password, removes nothing.
+        String remove = "/api/account/passkeys/" + id + "/remove";
+        String right = "{\"password\":\"" + PASSWORD + "\"}";
+        assertEquals(404, other.unsigned("POST", remove, right).getStatus());
+        assertEquals(403, c.unsigned("POST", remove, "{}").getStatus());
+        assertEquals(403, c.unsigned("POST", remove, "{\"password\":\"not it\"}").getStatus());
+        assertEquals(1, ((List) Json.parse(c.send(get("/api/account/passkeys"))
+                .getContentAsString())).size());
+        MockResponse removed = c.unsigned("POST", remove, right);
         assertEquals(200, removed.getStatus(), removed.getContentAsString());
         assertEquals(0, ((List) Json.parse(removed.getContentAsString())).size());
+        // Or signed by a device of the account, with no password.
+        byte[] second = TestKeys.random().getBytes("UTF-8");
+        passkeys.save(CredentialRecord.builder().credentialId(second)
+                .userEntityUserId(handle).algorithm(-7).publicKey(new byte[] {1})
+                .label("laptop").created(1).lastUsed(2).build());
+        MockResponse signed = c.signedAs("POST", "/api/account/passkeys/"
+                + Base64Url.encode(second) + "/remove", "{}");
+        assertEquals(200, signed.getStatus(), signed.getContentAsString());
+        assertTrue(passkeys.findByCredentialId(second) == null);
         assertTrue(passkeys.findByCredentialId(credentialId) == null);
         assertTrue(audit.verify().isEmpty());
     }
@@ -455,7 +472,7 @@ class MoneyTest {
     void aFrozenCardIsDeclined() throws Exception {
         Customer a = new Customer(false);
         a.deposit(a.checking, 50000);
-        MockResponse issued = a.send(post("/api/accounts/" + a.checking + "/card"));
+        MockResponse issued = a.signedAs("POST", "/api/accounts/" + a.checking + "/card", "");
         assertEquals(200, issued.getStatus(), issued.getContentAsString());
         Map card = Json.parseObject(issued.getContentAsString());
         assertEquals(4, ((String) card.get("last4")).length());
@@ -551,6 +568,14 @@ class MoneyTest {
         MockResponse added = c.signed("/api/crypto/addresses", add, null);
         assertEquals(200, added.getStatus(), added.getContentAsString());
         String id = (String) Json.parseObject(added.getContentAsString()).get("id");
+        // So is removing one: the list is what a withdrawal is checked against.
+        MockResponse spare = c.signed("/api/crypto/addresses", "{\"asset\":\"BTC\",\"address\":"
+                + "\"bc1qspareexamplespareexample00\",\"label\":\"spare\"}", null);
+        String spareId = (String) Json.parseObject(spare.getContentAsString()).get("id");
+        assertEquals(403, c.unsigned("DELETE", "/api/crypto/addresses/" + spareId, "")
+                .getStatus());
+        assertEquals(200, c.signedAs("DELETE", "/api/crypto/addresses/" + spareId, "")
+                .getStatus());
         String body = "{\"addressId\":\"" + id + "\",\"amount\":100000}";
         assertEquals(409, c.signed(path, body, key()).getStatus(), "still cooling off");
         // A day later, as far as the address is concerned.
@@ -631,6 +656,57 @@ class MoneyTest {
         // A sign-in made with the code does.
         c.token = aged(fresh, 1, java.util.Arrays.asList("pwd", "otp", "mfa"));
         assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());
+    }
+
+    @Test
+    void anOrderIsSignedAndHeldToTheLimits() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        a.deposit(a.checking, 2000000);
+        String bWallet = b.open("BTC", "WALLET");
+        b.deposit(bWallet, 16000000L);
+        String path = "/api/exchange/orders";
+        // 0.01 BTC at 55,000.00 rests, holding 550.00 and its fee.
+        String resting = "{\"market\":\"BTC-USD\",\"side\":\"BUY\",\"type\":\"LIMIT\","
+                + "\"price\":5500000,\"quantity\":1000000,\"budget\":0}";
+        assertEquals(403, a.send(json(path, resting).header("Idempotency-Key", key()))
+                .getStatus(), "a token alone places nothing");
+        MockResponse placed = a.signed(path, resting, key());
+        assertEquals(200, placed.getStatus(), placed.getContentAsString());
+        // 0.1 BTC is 5,900.00: more than one payment may move.
+        String big = "{\"market\":\"BTC-USD\",\"side\":\"BUY\",\"type\":\"LIMIT\","
+                + "\"price\":5900000,\"quantity\":10000000,\"budget\":0}";
+        assertTrue(refusedAs(a.signed(path, big, key()), "more-than-payment-may-move"));
+        // b sells 0.08 BTC, a buys it: about 4,729.44 of a's day.
+        String ask = "{\"market\":\"BTC-USD\",\"side\":\"SELL\",\"type\":\"LIMIT\","
+                + "\"price\":5900000,\"quantity\":8000000,\"budget\":0}";
+        assertEquals(200, b.signed(path, ask, key()).getStatus());
+        String take = ask.replace("SELL", "BUY");
+        MockResponse filled = a.signed(path, take, key());
+        assertEquals(200, filled.getStatus(), filled.getContentAsString());
+        assertTrue(filled.getContentAsString().indexOf("FILLED") >= 0, filled.getContentAsString());
+        // The fill, the resting order and another 0.08 pass 10,000.00.
+        assertTrue(refusedAs(a.signed(path, take, key()), "would-pass-limit-day"));
+        // A payment counts the day's fills too: 5,000.00 more fits, 300.00
+        // after it does not, though alone the two would.
+        String withdraw = "/api/accounts/" + a.checking + "/withdraw";
+        assertEquals(200, a.signed(withdraw, "{\"amount\":500000}", key()).getStatus());
+        assertTrue(refusedAs(a.signed(withdraw, "{\"amount\":30000}", key()),
+                "would-pass-limit-day"));
+        assertTrue(audit.verify().isEmpty());
+    }
+
+    @Test
+    void aStrongSignInMustStillBeFreshToEnrolAnApp() throws Exception {
+        Customer c = new Customer(false);
+        String fresh = c.token;
+        // A passkey sign-in skips the password, never the freshness: hours
+        // old, it is a session somebody may have walked away from.
+        c.token = aged(fresh, 30, java.util.Arrays.asList("hwk", "user", "mfa"));
+        assertEquals(403, c.send(json("/api/account/mfa/totp", "{}")).getStatus());
+        c.token = aged(fresh, 1, java.util.Arrays.asList("hwk", "user", "mfa"));
+        MockResponse started = c.send(json("/api/account/mfa/totp", "{}"));
+        assertEquals(200, started.getStatus(), started.getContentAsString());
     }
 
     @Test
@@ -725,13 +801,19 @@ class MoneyTest {
     void sensitiveCardPayeeAndDeviceChangesAreSigned() throws Exception {
         Customer a = new Customer(false);
         Customer b = new Customer(false);
-        MockResponse issued = a.send(post("/api/accounts/" + a.checking + "/card"));
+        // Issuing a card is a new way for money to leave: signed.
+        assertEquals(403, a.send(post("/api/accounts/" + a.checking + "/card")).getStatus());
+        MockResponse issued = a.signedAs("POST", "/api/accounts/" + a.checking + "/card", "");
+        assertEquals(200, issued.getStatus(), issued.getContentAsString());
         String limit = "/api/cards/" + Json.parseObject(issued.getContentAsString()).get("id")
                 + "/limit";
         // Lowering is harmless and token-only; raising is more spending.
         assertEquals(200, a.unsigned("PUT", limit, "{\"dailyLimit\":100}").getStatus());
         assertEquals(403, a.unsigned("PUT", limit, "{\"dailyLimit\":5000}").getStatus());
         assertEquals(200, a.signedAs("PUT", limit, "{\"dailyLimit\":5000}").getStatus());
+        // Setting it to what it already is is no raise; one cent more is.
+        assertEquals(200, a.unsigned("PUT", limit, "{\"dailyLimit\":5000}").getStatus());
+        assertEquals(403, a.unsigned("PUT", limit, "{\"dailyLimit\":5001}").getStatus());
 
         String payee = "/api/payees/" + a.addPayee(b);
         String rename = "{\"email\":\"" + b.name + "\",\"nickname\":\"Landlord\"}";

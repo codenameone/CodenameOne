@@ -27,6 +27,7 @@ import com.codenameone.examples.bastion.api.OrderDto;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
 import com.codenameone.examples.bastion.exchange.Exchange;
+import com.codenameone.examples.bastion.exchange.Markets;
 import com.codenameone.examples.bastion.exchange.ExchangeEndpoint;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
 import com.codenameone.examples.bastion.ledger.Ledger;
@@ -65,6 +66,9 @@ class ExchangeTest {
 
     @Autowired
     private Ledger ledger;
+
+    @Autowired
+    private Markets markets;
 
     @Autowired
     private Audit audit;
@@ -131,6 +135,38 @@ class ExchangeTest {
     }
 
     @Test
+    void aLimitPriceOutsideTheCollarIsRefused() throws Exception {
+        String buyer = trader(10000000, 0);
+        // 10% either side of the 60,000.00 index.
+        assertStatus(400, () -> limit(buyer, "T10-USD", Exchange.BUY, 6600001L, QTY));
+        assertStatus(400, () -> limit(buyer, "T10-USD", Exchange.SELL, 5399999L, QTY));
+        assertEquals(Exchange.OPEN, status(limit(buyer, "T10-USD", Exchange.BUY, 6600000L,
+                QTY)));
+        booksBalance();
+    }
+
+    @Test
+    void aMarketOrderStopsAtTheCollar() throws Exception {
+        String seller = trader(0, 2 * QTY);
+        String buyer = trader(10000000, 0);
+        OrderDto near = limit(seller, "T11-USD", Exchange.SELL, 6000000L, QTY);
+        OrderDto far = limit(seller, "T11-USD", Exchange.SELL, 6500000L, QTY);
+        // The index falls to 58,000.00: the collar now ends at 63,800.00, and
+        // the ask at 65,000.00 is past it.
+        markets.index("T11-USD", 5800000L);
+        try {
+            OrderDto buy = exchange.place(buyer, key(), new NewOrderDto("T11-USD", Exchange.BUY,
+                    Exchange.MARKET, 0L, 0L, 5000000L));
+            assertEquals(QTY, buy.filled(), "only the ask inside the collar");
+            assertEquals(Exchange.FILLED, status(near));
+            assertEquals(Exchange.OPEN, status(far));
+        } finally {
+            markets.index("T11-USD", 6000000L);
+        }
+        booksBalance();
+    }
+
+    @Test
     void aLimitOrderRestsThenFills() throws Exception {
         String seller = trader(0, QTY);
         String buyer = trader(100000, 0);
@@ -194,10 +230,10 @@ class ExchangeTest {
     @Test
     void cancellingReleasesTheHold() throws Exception {
         String buyer = trader(100000, 0);
-        OrderDto bid = limit(buyer, "T4-USD", Exchange.BUY, 5000000L, QTY);
+        OrderDto bid = limit(buyer, "T4-USD", Exchange.BUY, 5500000L, QTY);
         // 5,000 at the limit and the most fee it could pay, 10.
-        assertEquals(5010, balance(buyer, "USD", AccountKinds.HOLD));
-        assertEquals(100000 - 5010, balance(buyer, "USD", AccountKinds.CHECKING));
+        assertEquals(5511, balance(buyer, "USD", AccountKinds.HOLD));
+        assertEquals(100000 - 5511, balance(buyer, "USD", AccountKinds.CHECKING));
         String stranger = trader(0, 0);
         assertStatus(404, () -> exchange.cancel(stranger, bid.id()));
         OrderDto cancelled = exchange.cancel(buyer, bid.id());
@@ -269,14 +305,14 @@ class ExchangeTest {
     void aRetriedOrderIsPlacedOnce() throws Exception {
         String buyer = trader(100000, 0);
         String k = key();
-        NewOrderDto order = new NewOrderDto("T8-USD", Exchange.BUY, Exchange.LIMIT, 5000000L,
+        NewOrderDto order = new NewOrderDto("T8-USD", Exchange.BUY, Exchange.LIMIT, 5500000L,
                 QTY, 0L);
         OrderDto first = exchange.place(buyer, k, order);
         OrderDto again = exchange.place(buyer, k, order);
         assertEquals(first.id(), again.id());
-        assertEquals(5010, balance(buyer, "USD", AccountKinds.HOLD));
+        assertEquals(5511, balance(buyer, "USD", AccountKinds.HOLD));
         assertStatus(422, () -> exchange.place(buyer, k, new NewOrderDto("T8-USD", Exchange.BUY,
-                Exchange.LIMIT, 5000000L, 2 * QTY, 0L)));
+                Exchange.LIMIT, 5500000L, 2 * QTY, 0L)));
         booksBalance();
     }
 
@@ -286,23 +322,23 @@ class ExchangeTest {
     /// its open orders say, and the audit chain is whole.
     @Test
     void aTakerSellersFeeNeverExceedsTheProceeds() throws Exception {
-        // One lot at 1,000.00 USD a coin is a single cent; at 500.00 half of
-        // one, which rounds down to nothing. The taker's fee is on its running
-        // total, so a fill can pay a cent of fee out of a cent of proceeds --
-        // but never more than the fill brought in.
+        // One lot at 1,000.00 USD a coin is a single cent; at 950.00 it is
+        // 0.95 of one, which rounds down to nothing alone. The taker's fee is
+        // on its running total, so a fill can pay a cent of fee out of a cent
+        // of proceeds -- but never more than the fill brought in.
         String buyer = trader(100000, 0);
         String seller = trader(0, 6 * 1000L);
         limit(buyer, "T9-USD", Exchange.BUY, 100000L, 1000L);
         limit(buyer, "T9-USD", Exchange.BUY, 100000L, 1000L);
-        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
-        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
-        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
-        limit(buyer, "T9-USD", Exchange.BUY, 50000L, 1000L);
-        OrderDto sell = limit(seller, "T9-USD", Exchange.SELL, 50000L, 6 * 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 95000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 95000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 95000L, 1000L);
+        limit(buyer, "T9-USD", Exchange.BUY, 95000L, 1000L);
+        OrderDto sell = limit(seller, "T9-USD", Exchange.SELL, 95000L, 6 * 1000L);
         assertEquals(Exchange.FILLED, sell.status());
-        // 2 + 4 x 0.5 = 4 cents of proceeds, a cent of fee on them.
-        assertEquals(3, balance(seller, "USD", AccountKinds.CHECKING));
-        assertTrue(exchange.order(sell.id()).getFee() <= 4L);
+        // 2 + 4 x 0.95 = 5.8, so 5 cents of proceeds, a cent of fee on them.
+        assertEquals(4, balance(seller, "USD", AccountKinds.CHECKING));
+        assertTrue(exchange.order(sell.id()).getFee() <= 5L);
         booksBalance();
     }
 

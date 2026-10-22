@@ -42,8 +42,8 @@ import com.codenameone.examples.bastion.AppConfig;
 ///   the app is in front where the OS allows it (Android 12+).
 /// - **Clipboard**: an account number, address or authenticator key the user
 ///   copies is wiped from the clipboard after
-///   [AppConfig#CLIPBOARD_CLEAR_MILLIS], as soon as the app goes to the
-///   background, and at the next start if the app was killed first -- unless
+///   [AppConfig#CLIPBOARD_CLEAR_MILLIS], whether or not the app is in the
+///   foreground (the background is not a trigger: that would need a read), and at the next start if the app was killed first -- unless
 ///   something else was copied in the meantime. The clip is marked sensitive
 ///   ([ClipboardContent#setSensitive(boolean)]): Android 13 and newer keep it
 ///   out of the clipboard preview and the keyboard's suggestions, and iOS
@@ -102,12 +102,16 @@ public final class Protect {
         });
     }
 
-    /// The app went to the background: what it copied does not wait for
-    /// the timer.
+    /// The app went to the background. Nothing is read or written here:
+    /// reading the clipboard to see whether our copy is still on it shows the
+    /// iOS paste banner and reports a read to Android 12+, and writing without
+    /// reading could wipe what the user copied in another app since. The
+    /// clip's own clear (setClearAfter, which clears only while nothing newer
+    /// was copied, and the pasteboard expiry on iOS) keeps running, and the
+    /// digest left by copy() lets the next start clear it if the app is
+    /// killed first.
     public static void paused() {
-        if (copied != null && copied.equals(clipText())) {
-            clear();
-        }
+        // Deliberately empty; kept so the lifecycle call site documents it.
     }
 
     /// At start: the clip a killed app could not clear, if it is still there.
@@ -130,12 +134,6 @@ public final class Protect {
             return ((ClipboardContent) now).getText(ClipboardContent.MIME_TEXT);
         }
         return now instanceof String ? (String) now : null;
-    }
-
-    private static void clear() {
-        Display.getInstance().copyToClipboard("");
-        copied = null;
-        Preferences.delete(LEFT);
     }
 
     static String digest(String text) {

@@ -66,18 +66,23 @@ public final class SecurityStatus {
         "android.playIntegrity=true",
     };
 
-    /// One line of the Security Center.
+    /// One line of the Security Center. `name` and `detail` are English
+    /// bundle keys, translated where they are shown; `detail` is a pattern
+    /// whose `{0}`, `{1}`... are `values`, so a translation can put them where
+    /// its own grammar wants them.
     public static final class Item {
         public final String group;
         public final String name;
         public final int state;
         public final String detail;
+        public final Object[] values;
 
-        Item(String group, String name, int state, String detail) {
+        Item(String group, String name, int state, String detail, Object... values) {
             this.group = group;
             this.name = name;
             this.state = state;
             this.detail = detail;
+            this.values = values;
         }
     }
 
@@ -96,23 +101,27 @@ public final class SecurityStatus {
         // ------------------------------------------------------------ network
         String g = "Network";
         out.add(dev
-                ? new Item(g, "No cleartext", WARNING, "Development server " + server
-                        + " is exempt: plain HTTP to this machine only")
-                : new Item(g, "No cleartext", ACTIVE, "Every request is https; http is refused"
-                        + refusals(guard)));
+                ? new Item(g, "No cleartext", WARNING,
+                        "Development server {0} is exempt: plain HTTP to this machine only", server)
+                : refusals(guard) == 0
+                ? new Item(g, "No cleartext", ACTIVE, "Every request is https; http is refused")
+                : new Item(g, "No cleartext", ACTIVE,
+                        "Every request is https; http is refused ({0} refused)", refusals(guard)));
         out.add(dev
                 ? new Item(g, "Host allow-list", WARNING, "Exempt while the development server is in use")
-                : new Item(g, "Host allow-list", ACTIVE, "Only " + join(AppConfig.ALLOWED_HOSTS)));
+                : new Item(g, "Host allow-list", ACTIVE, "Only {0}",
+                        join(AppConfig.ALLOWED_HOSTS)));
         out.add(pins(g, guard, dev));
         PinSet ota = AppShield.getPinSet();
         out.add(ota.isEmpty()
                 ? new Item(g, "Over-the-air pins", CLOUD_BUILD,
                         "Published by the attestation service; none in this build")
-                : new Item(g, "Over-the-air pins", ACTIVE, ota.hostCount() + " hosts, version "
-                        + ota.getVersion() + (ota.isStale() ? " (refresh due)" : "")));
+                : new Item(g, "Over-the-air pins", ACTIVE, ota.isStale()
+                        ? "{0} hosts, version {1} (refresh due)" : "{0} hosts, version {1}",
+                        ota.hostCount(), ota.getVersion()));
         out.add(AppShield.isProtected()
-                ? new Item(g, "App attestation token", ACTIVE, "AppShield engine "
-                        + AppShield.getEngineName() + ": " + AppShield.getStatus())
+                ? new Item(g, "App attestation token", ACTIVE, "AppShield engine {0}: {1}",
+                        AppShield.getEngineName(), AppShield.getStatus())
                 : new Item(g, "App attestation token", CLOUD_BUILD,
                         "AppShield needs the enterprise engine in a cloud build; inert here"));
 
@@ -121,19 +130,18 @@ public final class SecurityStatus {
         out.add(storage(g, sim));
         out.add(appKey(g, sim, ios, android));
         out.add(Keys.pinEnabled()
-                ? new Item(g, "Unlock PIN", ACTIVE, "A vault opened by the PIN (PBKDF2, "
-                        + KdfProfile.current().getIterations() + " rounds, peppered from the OS "
-                        + "store); " + Keys.PIN_ATTEMPTS + " wrong tries in a row erase the keys"
-                        + (Keys.pinFailures() > 0 ? ". Wrong tries so far: " + Keys.pinFailures() : ""))
+                ? new Item(g, "Unlock PIN", ACTIVE, Keys.pinFailures() > 0
+                        ? "A vault opened by the PIN (PBKDF2, {0} rounds, peppered from the OS store); {1} wrong tries in a row erase the keys. Wrong tries so far: {2}"
+                        : "A vault opened by the PIN (PBKDF2, {0} rounds, peppered from the OS store); {1} wrong tries in a row erase the keys",
+                        KdfProfile.current().getIterations(), Keys.PIN_ATTEMPTS, Keys.pinFailures())
                 : new Item(g, "Unlock PIN", OFF, "Not set: Settings, Unlock PIN"));
         out.add(new Item(g, "Refresh token", Keys.protectedByUser() ? ACTIVE : WARNING,
                 Keys.protectedByUser()
                         ? "Sealed under the app key: unreadable until the lock is opened"
-                        : "Sealed under the app key, which opens without asking until a "
-                                + "biometric or PIN is set up"));
+                        : "Sealed under the app key, which opens without asking until a biometric or PIN is set up"));
         out.add(DeviceKey.deviceId() != null
-                ? new Item(g, "Device signing key", ACTIVE, "P-256, registered as "
-                        + DeviceKey.deviceId() + "; signs every payment")
+                ? new Item(g, "Device signing key", ACTIVE, "P-256, registered as {0}; signs every payment",
+                        DeviceKey.deviceId())
                 : new Item(g, "Device signing key", OFF,
                         "Not registered: payments that need a signature are refused"));
         out.add(new Item(g, "Idempotency keys", ACTIVE,
@@ -144,7 +152,8 @@ public final class SecurityStatus {
         // ------------------------------------------------------ app and device
         g = "This device";
         out.add(new Item(g, "App lock", ACTIVE, Keys.biometricEnabled()
-                ? "On start, on return and when idle: biometric" + (Keys.pinEnabled() ? ", then PIN" : "")
+                ? Keys.pinEnabled() ? "On start, on return and when idle: biometric, then PIN"
+                : "On start, on return and when idle: biometric"
                 : Keys.pinEnabled() ? "On start, on return and when idle: PIN"
                 : "On start, on return and when idle: the password"));
         out.add(Lock.biometricsAvailable()
@@ -153,8 +162,8 @@ public final class SecurityStatus {
                                 : "Available; turn it on in Settings")
                 : new Item(g, "Biometrics", sim ? SIMULATOR : OFF,
                         "None enrolled: the PIN or the password unlocks instead"));
-        out.add(new Item(g, "Auto-lock", ACTIVE, "After " + (AppConfig.IDLE_LOCK_MILLIS / 1000)
-                + "s idle or " + (AppConfig.BACKGROUND_LOCK_MILLIS / 1000) + "s in the background"));
+        out.add(new Item(g, "Auto-lock", ACTIVE, "After {0}s idle or {1}s in the background",
+                AppConfig.IDLE_LOCK_MILLIS / 1000, AppConfig.BACKGROUND_LOCK_MILLIS / 1000));
         out.add(integrity(g, sim));
         out.add(DeviceIntegrity.isAttestationSupported()
                 ? new Item(g, "Platform attestation", ACTIVE,
@@ -162,8 +171,8 @@ public final class SecurityStatus {
                 : new Item(g, "Platform attestation", CLOUD_BUILD,
                         "Play Integrity / App Attest need a device build"));
         out.add(DeviceIntegrity.hasUntrustedAccessibilityService()
-                ? new Item(g, "Accessibility services", WARNING, "Can read the screen: "
-                        + join(DeviceIntegrity.getEnabledAccessibilityServices()))
+                ? new Item(g, "Accessibility services", WARNING, "Can read the screen: {0}",
+                        join(DeviceIntegrity.getEnabledAccessibilityServices()))
                 : new Item(g, "Accessibility services", ACTIVE, "None that can read the screen"));
         out.add(android && DeviceIntegrity.getTapjackingPolicy() == TapjackingPolicy.BLOCK
                 ? new Item(g, "Tapjacking", ACTIVE, "Touches through overlays are dropped")
@@ -174,23 +183,23 @@ public final class SecurityStatus {
                 : new Item(g, "Screenshot blocking", ACTIVE, ios
                         ? "Sensitive screens, and the app switcher card"
                         : "Sensitive screens and the recent-apps card"));
-        out.add(new Item(g, "Clipboard clearing", ACTIVE, "Copied numbers are wiped after "
-                + (AppConfig.CLIPBOARD_CLEAR_MILLIS / 1000) + "s"));
+        out.add(new Item(g, "Clipboard clearing", ACTIVE, "Copied numbers are wiped after {0}s",
+                AppConfig.CLIPBOARD_CLEAR_MILLIS / 1000));
 
         // ------------------------------------------------------------- build
         g = "Build hardening";
         out.add(Hardening.isHardened()
-                ? new Item(g, "Code hardening", ACTIVE, "Level " + Hardening.getLevel()
-                        + ", mapping " + Hardening.getMappingId())
+                ? new Item(g, "Code hardening", ACTIVE, "Level {0}, mapping {1}", Hardening.getLevel(),
+                        Hardening.getMappingId())
                 : new Item(g, "Code hardening", CLOUD_BUILD,
-                        "Declared " + hint("cn1.hardenLevel") + "; applied by the build server"));
+                        "Declared {0}; applied by the build server", hint("cn1.hardenLevel")));
         out.add(new Item(g, "Jailbreak exit (iOS)", ios && !sim ? ACTIVE : CLOUD_BUILD,
-                "ios.detectJailbreak=" + hint("ios.detectJailbreak")));
+                "ios.detectJailbreak={0}", hint("ios.detectJailbreak")));
         out.add(new Item(g, "App switcher blanking (iOS)", ios && !sim ? ACTIVE : CLOUD_BUILD,
-                "ios.blockScreenshotsOnEnterBackground="
-                        + hint("ios.blockScreenshotsOnEnterBackground")));
+                "ios.blockScreenshotsOnEnterBackground={0}",
+                hint("ios.blockScreenshotsOnEnterBackground")));
         out.add(new Item(g, "Play Integrity (Android)", android && !sim ? ACTIVE : CLOUD_BUILD,
-                "android.playIntegrity=" + hint("android.playIntegrity")));
+                "android.playIntegrity={0}", hint("android.playIntegrity")));
         return out;
     }
 
@@ -219,9 +228,10 @@ public final class SecurityStatus {
             return new Item(g, "Certificate pinning", WARNING,
                     "Placeholder pins: put the server's SPKI digests in AppConfig.PINS");
         }
-        return new Item(g, "Certificate pinning", ACTIVE, AppConfig.PINS.length + " hosts pinned"
-                + (guard == null || guard.pinFailureCount() == 0 ? ""
-                        : ", " + guard.pinFailureCount() + " mismatches refused"));
+        return guard == null || guard.pinFailureCount() == 0
+                ? new Item(g, "Certificate pinning", ACTIVE, "{0} hosts pinned", AppConfig.PINS.length)
+                : new Item(g, "Certificate pinning", ACTIVE, "{0} hosts pinned, {1} mismatches refused",
+                        AppConfig.PINS.length, guard.pinFailureCount());
     }
 
     private static Item storage(String g, boolean sim) {
@@ -244,16 +254,13 @@ public final class SecurityStatus {
         String name = "App key";
         if (Keys.biometricEnabled()) {
             if (sim) {
-                return new Item(g, name, SIMULATOR, "Biometric copy simulated: a file gated by "
-                        + "the simulator's Biometric Simulation menu");
+                return new Item(g, name, SIMULATOR, "Biometric copy simulated: a file gated by the simulator's Biometric Simulation menu");
             }
             if (ios) {
-                return new Item(g, name, ACTIVE, "Keychain item with biometric access control "
-                        + "(current set): released only after Face ID or Touch ID");
+                return new Item(g, name, ACTIVE, "Keychain item with biometric access control (current set): released only after Face ID or Touch ID");
             }
             if (android) {
-                return new Item(g, name, ACTIVE, "Keystore key that requires user "
-                        + "authentication: released only after a strong biometric");
+                return new Item(g, name, ACTIVE, "Keystore key that requires user authentication: released only after a strong biometric");
             }
             return new Item(g, name, ACTIVE, "Released by the platform after a biometric");
         }
@@ -271,16 +278,15 @@ public final class SecurityStatus {
                     "Run on a phone; the simulator reports nothing");
         }
         if (DeviceIntegrity.isDeviceCompromised()) {
-            return new Item(g, "Root and jailbreak checks", WARNING, "This device looks modified: "
-                    + join(DeviceIntegrity.getCompromiseReasons())
-                    + ". The bank will not move money from it.");
+            return new Item(g, "Root and jailbreak checks", WARNING,
+                    "This device looks modified: {0}. The bank will not move money from it.",
+                    join(DeviceIntegrity.getCompromiseReasons()));
         }
         return new Item(g, "Root and jailbreak checks", ACTIVE, "No signs of root or jailbreak");
     }
 
-    private static String refusals(Guard guard) {
-        int n = guard == null ? 0 : guard.refusedCount();
-        return n == 0 ? "" : " (" + n + " refused)";
+    private static int refusals(Guard guard) {
+        return guard == null ? 0 : guard.refusedCount();
     }
 
     private static String join(String[] values) {

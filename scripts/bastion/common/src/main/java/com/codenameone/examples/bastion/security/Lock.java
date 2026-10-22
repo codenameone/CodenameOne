@@ -21,8 +21,8 @@ package com.codenameone.examples.bastion.security;
 import com.codename1.security.Biometrics;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
-import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.bastion.AppConfig;
 import com.codenameone.examples.bastion.net.Session;
@@ -52,7 +52,8 @@ public final class Lock {
     private static long lastTouch = System.currentTimeMillis();
     private static long backgroundSince;
     private static Form hidden;
-    private static UITimer idle;
+    private static boolean ticking;
+    private static Form lastForm;
 
     private Lock() {
     }
@@ -61,22 +62,42 @@ public final class Lock {
         screens = app;
     }
 
-    /// Called by every form the app shows: a touch anywhere is activity, and
-    /// the idle check moves to the form.
+    /// Called by every form the app shows: a touch anywhere is activity.
     ///
-    /// A UITimer runs only while the form it is bound to is showing, so the
-    /// check is bound again to each new form rather than once at start --
-    /// where, before the first form, there is nothing to bind it to (the
-    /// browser has no current form at that point at all).
+    /// The idle check is a timer of its own, not a UITimer: a UITimer runs
+    /// only while the form it is bound to is showing, so an open dialog --
+    /// a Dialog is a form of its own -- stopped it, and an app left on a
+    /// confirmation never locked. `CN.setTimeout` belongs to no form (and,
+    /// unlike a UITimer bound to no form, works in the browser), so it is
+    /// armed once, by the first form, and re-armed by every check.
     public static void watch(Form form) {
+        listen(form);
+        lastForm = form;
+        if (!ticking) {
+            ticking = true;
+            CN.setTimeout(IDLE_CHECK_MILLIS, Lock::tick);
+        }
+    }
+
+    private static final int IDLE_CHECK_MILLIS = 5000;
+
+    private static void listen(Form form) {
+        if (form.getClientProperty("bastion.lock.watched") != null) {
+            return;
+        }
+        form.putClientProperty("bastion.lock.watched", Boolean.TRUE);
         form.addPointerPressedListener(evt -> touched());
         form.addPointerDraggedListener(evt -> touched());
-        if (idle == null) {
-            idle = new UITimer(Lock::checkIdle);
-        } else {
-            idle.cancel();
+    }
+
+    private static void tick() {
+        // A dialog is a form nobody called watch for: a touch in it counts too.
+        Form current = CN.getCurrentForm();
+        if (current instanceof Dialog) {
+            listen(current);
         }
-        idle.schedule(5000, true, form);
+        checkIdle();
+        CN.setTimeout(IDLE_CHECK_MILLIS, Lock::tick);
     }
 
     public static void touched() {
@@ -107,7 +128,14 @@ public final class Lock {
         // session epoch moves), and the unlock reads them back from the
         // sealed store (Session#restore).
         Session.suspend();
-        hidden = CN.getCurrentForm();
+        Form current = CN.getCurrentForm();
+        if (current instanceof Dialog) {
+            // A dialog cannot be put back after the lock: it is closed (as if
+            // cancelled) and the unlock returns to the form it was over.
+            ((Dialog) current).dispose();
+            current = lastForm;
+        }
+        hidden = current;
         screens.showLocked();
     }
 

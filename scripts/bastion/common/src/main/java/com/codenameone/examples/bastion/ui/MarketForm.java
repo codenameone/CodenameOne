@@ -221,17 +221,21 @@ public final class MarketForm {
                 key[0] = RequestSigner.idempotencyKey();
             }
             place.setEnabled(false);
-            Api.exchange().place(key[0], order, Net.to((OrderDto done) -> {
-                place.setEnabled(true);
-                tried[0] = null;
-                quantity.setText("");
-                budget.setText("");
-                Ui.toast(Lang.tr("Order {0}", status(done.status())));
-                placed.run();
-            }, (status, message) -> {
-                place.setEnabled(true);
-                Ui.showError(error, Lang.tr(message));
-            }));
+            // Signed by this device, as a payment is: an order moves value.
+            final String k = key[0];
+            DeviceSetup.withDevice(retry -> Api.exchange().place(k,
+                    RequestSigner.sign("POST", "/api/exchange/orders", k, order), order,
+                    Net.to((OrderDto done) -> {
+                        place.setEnabled(true);
+                        tried[0] = null;
+                        quantity.setText("");
+                        budget.setText("");
+                        Ui.toast(Lang.tr("Order {0}", status(done.status())));
+                        placed.run();
+                    }, retry)), (status, message) -> {
+                        place.setEnabled(true);
+                        Ui.showError(error, Lang.tr(message));
+                    });
         });
         return ticket;
     }

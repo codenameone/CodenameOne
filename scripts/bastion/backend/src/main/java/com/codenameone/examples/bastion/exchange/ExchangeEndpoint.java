@@ -165,8 +165,17 @@ public class ExchangeEndpoint implements ExchangeApiServer {
     }
 
     @Override
-    public OrderDto place(String idempotencyKey, NewOrderDto order) throws Exception {
-        return exchange.place(Devices.customer(), idempotencyKey, order);
+    public OrderDto place(String idempotencyKey, String signature, NewOrderDto order)
+            throws Exception {
+        // Signed by a trusted device, as a payment is: a thief holding only
+        // the token could otherwise sell the account's coins into their own
+        // resting order, or buy from it at their price. The engine then holds
+        // the price to a collar around the index and the order's worth to the
+        // daily limit ([Exchange#place(String, String, NewOrderDto, boolean)]).
+        String owner = Devices.customer();
+        Device device = signing.require(owner);
+        money.requireTrusted(device);
+        return exchange.place(owner, idempotencyKey, order, true);
     }
 
     @Override
@@ -224,8 +233,12 @@ public class ExchangeEndpoint implements ExchangeApiServer {
     }
 
     @Override
-    public CryptoAddressDto removeAddress(String id) throws Exception {
-        return wallets.remove(Devices.customer(), id);
+    public CryptoAddressDto removeAddress(String id, String signature) throws Exception {
+        // Signed, like removing a payee: a token alone must not edit the
+        // list a customer checks a withdrawal against.
+        String owner = Devices.customer();
+        signing.require(owner);
+        return wallets.remove(owner, id);
     }
 
     /// Coins out of the bank: always signed by a trusted device, only to an
