@@ -72,7 +72,12 @@ public final class SharedPreferences {
             }
         }
         instance = new SharedPreferences(v);
+        // As in pub, a mocked store lives in memory only: a test's clear() or set*
+        // must not overwrite the app's real persisted preferences.
+        mocked = true;
     }
+
+    private static boolean mocked;
 
     @SuppressWarnings("unchecked")
     private static Hashtable<String, Object> load() {
@@ -87,7 +92,7 @@ public final class SharedPreferences {
 
     private Future<Boolean> save() {
         boolean ok = true;
-        if (Display.isInitialized()) {
+        if (!mocked && Display.isInitialized()) {
             ok = Storage.getInstance().writeObject(STORAGE_NAME, values);
         }
         return Future.value(Boolean.valueOf(ok));
@@ -188,8 +193,8 @@ public final class SharedPreferences {
     }
 
     public Future<Object> reload() {
-        Hashtable<String, Object> fresh = load();
-        if (Display.isInitialized()) {
+        if (!mocked && Display.isInitialized()) {
+            Hashtable<String, Object> fresh = load();
             values.clear();
             values.putAll(fresh);
         }

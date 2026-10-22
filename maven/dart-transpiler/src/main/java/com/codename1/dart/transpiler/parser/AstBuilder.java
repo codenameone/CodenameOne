@@ -1236,6 +1236,20 @@ public final class AstBuilder {
         lf.returnType = sig.type() != null ? buildType(sig.type()) : TypeRef.VAR;
         lf.name = sig.identifier().getText();
         buildParams(sig.formalParameterPart().formalParameterList(), lf.params);
+        if (sig.formalParameterPart().typeParameters() != null) {
+            // `T id<T>(T t) => t;` is a local bound to a Funcs.* lambda, which cannot be
+            // generic: its type parameters are erased to dynamic, as a generic closure's
+            // are (buildLambda), and the call site coerces the dynamic result.
+            List<String> tps = new ArrayList<String>();
+            for (Dart2Parser.TypeParameterContext tp
+                    : sig.formalParameterPart().typeParameters().typeParameter()) {
+                tps.add(tp.identifier().getText());
+            }
+            for (Param p : lf.params) {
+                p.type = eraseTypeParams(p.type, tps);
+            }
+            lf.returnType = eraseTypeParams(lf.returnType, tps);
+        }
         Dart2Parser.FunctionBodyContext body = ctx.functionBody();
         lf.isAsync = checkBodyModifiers(body);
         if (body.block() != null) {

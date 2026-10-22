@@ -54,6 +54,27 @@ public class FirebaseMessaging {
     static {
         onMessage = MESSAGES.stream();
         onMessageOpenedApp = OPENED.stream();
+        // Cold-start pushes after the first (which getInitialMessage hands over) wait
+        // for the app's first onMessageOpenedApp listener; sent at once, no Dart
+        // listener existed yet and the broadcast stream dropped them.
+        OPENED.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                new dart.async.Timer(dart.core.Duration.zero, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        String[] held;
+                        synchronized (FirebaseMessaging.class) {
+                            held = HELD.toArray(new String[HELD.size()]);
+                            HELD.clear();
+                        }
+                        for (String p : held) {
+                            deliver(p, true);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     FirebaseMessaging() {
@@ -78,11 +99,16 @@ public class FirebaseMessaging {
                     initialMessage = message(payload);
                     return;
                 }
+                if (!OPENED.hasListener()) {
+                    HELD.add(payload);
+                    return;
+                }
             }
         }
         deliver(payload, cold || com.codename1.ui.Display.getInstance().isMinimized());
     }
 
+    private static final java.util.List<String> HELD = new java.util.ArrayList<String>();
     private static RemoteMessage initialMessage;
     private static boolean initialTaken;
 

@@ -4468,6 +4468,20 @@ public final class JavaEmitter {
                 // Duration's unary minus, under the mangled name (see emitBinary).
                 return new Out(paren(o.code) + ".$minus()", o.type);
             }
+            if ((u.op.equals("-") || u.op.equals("~")) && o.type != null && !isNumeric(o.type)
+                    && !o.type.is("bool")) {
+                // A class's own `operator -()` / `operator ~()`: declared under the mangled
+                // binary name with no parameter (see AstBuilder.mangleOperator).
+                String mangled = u.op.equals("-") ? "$minus" : "$bitNot";
+                ClassDecl cls = program.classes.get(o.type.name);
+                MethodDecl m = cls != null ? findMethodInHierarchy(cls, mangled) : null;
+                boolean declares = cls != null ? m != null
+                        : stubs.isStubClass(o.type.name) && stubs.findMethod(o.type.name, mangled, false) != null;
+                if (declares) {
+                    TypeRef rt = m != null && m.returnType != null && !m.returnType.is("var") ? m.returnType : o.type;
+                    return new Out(paren(o.code) + "." + mangled + "()", rt);
+                }
+            }
             return new Out(u.op + paren(o.code), o.type);
         }
         if (e instanceof IncDec) {
@@ -4488,6 +4502,9 @@ public final class JavaEmitter {
             }
             try {
                 if (needsShort(inc)
+                        // `a[i]++`: the read is `a.get(i)`, a call `++` cannot apply to; the
+                        // index assignment writes through `[]=` (the old value for a postfix).
+                        || id.operand instanceof IndexGet
                         || (id.operand instanceof Ident && isTopLevelSetter(((Ident) id.operand).name, ctx))) {
                     // `a?.b++` is shorted like every assignment behind a `?.`; `top++` on a
                     // library-level getter/setter pair writes through the setter.
@@ -6428,27 +6445,50 @@ public final class JavaEmitter {
     /**
      * {@code d.x = v}, {@code d[k] = v} and their compound forms on a {@code dynamic}
      * receiver, through dart.runtime.Dyn; null when the receiver is statically typed.
-     * A compound write reads the receiver expression twice, as the plain-field path does.
+     * A compound write pins the receiver and key in temps so each is evaluated once.
      */
     private Out emitDynamicMemberAssign(Assign a, Ctx ctx) {
+        return emitDynamicMemberAssign(a, null, ctx);
+    }
+
+    /**
+     * As above; {@code pre} is the receiver when the caller has already emitted it (a
+     * receiver whose type only emission reveals as dynamic, such as a call).
+     */
+    private Out emitDynamicMemberAssign(Assign a, Out pre, Ctx ctx) {
         Expr recv = a.lhs instanceof PropertyGet ? ((PropertyGet) a.lhs).target
                 : a.lhs instanceof IndexGet ? ((IndexGet) a.lhs).target : null;
         if (recv == null || a.op.equals("??=")) {
             return null;
         }
-        TypeRef rt = inferExprTypeQuiet(recv, ctx);
-        if (rt == null || !rt.is("dynamic")) {
-            return null;
+        Out t = pre;
+        if (t == null) {
+            TypeRef rt = inferExprTypeQuiet(recv, ctx);
+            if (rt == null || !rt.is("dynamic")) {
+                return null;
+            }
+            t = emitExpr(recv, null, ctx);
         }
-        Out t = emitExpr(recv, null, ctx);
         if (!t.type.is("dynamic") || t.fromError) {
             return null;
         }
         ctx.importClass("dart.runtime.Dyn");
         String key = a.lhs instanceof PropertyGet ? "\"" + ((PropertyGet) a.lhs).name + "\""
                 : boxIfPrimitive(emitExpr(((IndexGet) a.lhs).index, null, ctx), ctx);
-        String value = boxIfPrimitive(emitExpr(a.rhs, null, ctx), ctx);
         boolean prop = a.lhs instanceof PropertyGet;
+        String recvCode = t.code;
+        if (!a.op.equals("=")) {
+            // `d[i++] += 1` / `f().x += 1`: the receiver and the key are read and then
+            // written, so each is pinned in a temp and evaluated once, ahead of the value.
+            recvCode = ctx.newTemp();
+            ctx.writer().line("Object " + recvCode + " = " + t.code + ";");
+            if (!prop) {
+                String kTmp = ctx.newTemp();
+                ctx.writer().line("Object " + kTmp + " = " + key + ";");
+                key = kTmp;
+            }
+        }
+        String value = boxIfPrimitive(emitExpr(a.rhs, null, ctx), ctx);
         if (prop) {
             dynNames.add(((PropertyGet) a.lhs).name);
         } else {
@@ -6457,11 +6497,39 @@ public final class JavaEmitter {
         }
         if (!a.op.equals("=")) {
             ctx.importClass("dart.runtime.DartRuntime");
-            String cur = prop ? "Dyn.get(" + t.code + ", " + key + ")" : "Dyn.index(" + t.code + ", " + key + ")";
+            String cur = prop ? "Dyn.get(" + recvCode + ", " + key + ")" : "Dyn.index(" + recvCode + ", " + key + ")";
+            if (postfixValue(a, ctx)) {
+                // `d[i]++` as a value: the old value.
+                String oldTmp = ctx.newTemp();
+                ctx.writer().line("Object " + oldTmp + " = " + cur + ";");
+                cur = oldTmp;
+                value = "DartRuntime.dynBinary(\"" + a.op.substring(0, a.op.length() - 1) + "\", " + cur + ", " + value + ")";
+                ctx.writer().line((prop ? "Dyn.set(" : "Dyn.indexSet(") + recvCode + ", " + key + ", " + value + ");");
+                return new Out(oldTmp, TypeRef.DYNAMIC);
+            }
             value = "DartRuntime.dynBinary(\"" + a.op.substring(0, a.op.length() - 1) + "\", " + cur + ", " + value + ")";
         }
-        return new Out((prop ? "Dyn.set(" : "Dyn.indexSet(") + t.code + ", " + key + ", " + value + ")",
+        return new Out((prop ? "Dyn.set(" : "Dyn.indexSet(") + recvCode + ", " + key + ", " + value + ")",
                 TypeRef.DYNAMIC);
+    }
+
+    /** {@code a[i]++} used as a value: it yields the element read before the write. */
+    private static boolean postfixValue(Assign a, Ctx ctx) {
+        return ctx.postfixAssign == a && ctx.statementExpr != a;
+    }
+
+    /**
+     * The value form of a postfix {@code a[i]++}: the old element is read once into a
+     * temp, the incremented value written through {@code write}, and the temp returned.
+     * The receiver and index are already temps (the compound path pins them).
+     */
+    private Out postfixIndex(String read, TypeRef t, Assign a, Ctx ctx,
+            java.util.function.Function<String, String> write) {
+        String jt = declarableType(t, false, ctx);
+        String old = ctx.newTemp();
+        ctx.writer().line((jt != null ? jt : "var") + " " + old + " = " + read + ";");
+        ctx.writer().line(write.apply(compoundValue(old, t, a, ctx)) + ";");
+        return new Out(old, t);
     }
 
     private Out emitAssign(Assign a, Ctx ctx) {
@@ -6520,6 +6588,14 @@ public final class JavaEmitter {
         if (a.lhs instanceof IndexGet) {
             IndexGet ig = (IndexGet) a.lhs;
             Out target = emitExpr(ig.target, null, ctx);
+            if (target.type.is("dynamic") && !target.fromError) {
+                // `f()[k] += 1` where f returns dynamic: inference did not see it, the
+                // emitted receiver does. Index through Dyn, not a typed `.idx`.
+                Out dyn = emitDynamicMemberAssign(a, target, ctx);
+                if (dyn != null) {
+                    return dyn;
+                }
+            }
             Out idx = emitExpr(ig.index, null, ctx);
             boolean compound = !a.op.equals("=");
             ClassDecl idxOpClass = program.classes.get(target.type.name);
@@ -6543,6 +6619,11 @@ public final class JavaEmitter {
                     // carries no type argument to take it from, and `grid[i] += 1` became
                     // dynamic arithmetic passed to an int parameter.
                     ivt = readOp.returnType;
+                }
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code, ic = idx.code;
+                    return postfixIndex(tc + ".$index(" + ic + ")", ivt, a, ctx,
+                            v -> tc + ".$indexSet(" + ic + ", " + v + ")");
                 }
                 Out rhsOut = compound ? null : emitExpr(a.rhs, null, ctx);
                 String rhsCode = compound
@@ -6569,6 +6650,11 @@ public final class JavaEmitter {
             TypeRef vt = target.type.is("Map") ? target.type.arg(1) : target.type.arg(0);
             String pk = primitiveListKind(target.type);
             if (pk != null) {
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code, ic = idx.code;
+                    return postfixIndex(tc + ".get" + pk + "(" + ic + ")", vt, a, ctx,
+                            v -> tc + ".set" + pk + "(" + ic + ", " + v + ")");
+                }
                 String rhsCode = compound
                         ? compoundValue(target.code + ".get" + pk + "(" + idx.code + ")", vt, a, ctx)
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
@@ -6579,12 +6665,22 @@ public final class JavaEmitter {
                 // The key is coerced like the value: a dynamic one (an untyped forEach
                 // parameter, say) did not compile against putLong(long, long).
                 String key = coerce(idx, TypeRef.INT, ctx);
+                if (postfixValue(a, ctx)) {
+                    final String tc = target.code;
+                    return postfixIndex(tc + ".idxLong(" + key + ")", vt, a, ctx,
+                            v -> tc + ".putLong(" + key + ", " + v + ")");
+                }
                 String rhsCode = compound
                         ? compoundValue(target.code + ".idxLong(" + key + ")", vt, a, ctx)
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
                 return new Out(target.code + ".putLong(" + key + ", " + rhsCode + ")", vt);
             }
             String key = target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
+            if (postfixValue(a, ctx)) {
+                final String tc = target.code;
+                return postfixIndex(tc + ".idx(" + key + ")", vt, a, ctx,
+                        v -> tc + ".idxSet(" + key + ", " + v + ")");
+            }
             String rhsCode = compound
                     ? compoundValue(target.code + ".idx(" + key + ")", vt, a, ctx)
                     : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
@@ -7357,7 +7453,20 @@ public final class JavaEmitter {
             return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r.out, ctx), TypeRef.BOOL);
         }
         Out l = emitExpr(b.left, null, ctx);
+        ctx.pushWriter(ctx.currentIndent());
         Out r = emitExpr(b.right, null, ctx);
+        String rLifted = ctx.popWriter();
+        if (!rLifted.isEmpty() && !(b.left instanceof IntLit || b.left instanceof StringLit
+                || b.left instanceof BoolLit || b.left instanceof NullLit)) {
+            // `f() + await g()`: the right operand lifted statements, which would run
+            // before the left operand's expression. Dart evaluates left first, so the
+            // left value is pinned in a temp ahead of them.
+            String jt = declarableType(l.type, false, ctx);
+            String lt = ctx.newTemp();
+            ctx.writer().line((jt != null ? jt : "var") + " " + lt + " = " + l.code + ";");
+            l = new Out(lt, l.type);
+        }
+        ctx.writer().raw(rLifted);
         boolean numeric = isNumeric(l.type) && isNumeric(r.type);
         // user-defined operators on program classes
         ClassDecl opClass = program.classes.get(l.type.name);
