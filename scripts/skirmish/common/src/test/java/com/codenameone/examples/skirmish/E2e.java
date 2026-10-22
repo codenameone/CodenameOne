@@ -190,6 +190,15 @@ public abstract class E2e extends AbstractTest {
 
     protected void touch(String name) {
         until(() -> findByName(name) != null, 20000, name);
+        // A tap lands only on what is on screen: scroll a row below the fold
+        // into view first.
+        onEdt(() -> {
+            Component k = findByName(name);
+            if (k.getComponentForm() != null) {
+                k.getComponentForm().scrollComponentToVisible(k);
+            }
+        });
+        waitFor(600);
         Component c = findByName(name);
         touch(c.getAbsoluteX() + c.getWidth() / 2, c.getAbsoluteY() + c.getHeight() / 2);
     }
