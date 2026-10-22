@@ -130,7 +130,7 @@
              a package to one file is not adding it. -->
         <javac destdir="build/tmp"
             classpath="${javac.classpath}:build/tmp"
-            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**,com/codename1/impl/android/cipher/**,com/codename1/impl/android/nearby/**,com/codename1/impl/android/referrer/**,com/codename1/impl/android/biometrics/**,com/codename1/impl/android/BillingSupport.java">
+            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**,com/codename1/impl/android/cipher/**,com/codename1/impl/android/nearby/**,com/codename1/impl/android/webrtc/**,com/codename1/impl/android/referrer/**,com/codename1/impl/android/biometrics/**,com/codename1/impl/android/BillingSupport.java">
             <src path="${src.dir}" />
         </javac>
         <jar jarfile="${dist.jar}" basedir="build/tmp">

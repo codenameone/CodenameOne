@@ -85,6 +85,7 @@ def check_maven_layout_fixture(archive, z):
 FULL_STACK = {
     'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
+    'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
 }
 
 

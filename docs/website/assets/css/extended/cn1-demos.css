@@ -170,7 +170,7 @@ body.dark .cn1-demo-card__thumb img {
     }
 }
 
-/* Full-stack samples (Savor, Wayline): the head of the demos page, and a
+/* Full-stack samples (Savor, Wayline, Parley): the head of the demos page, and a
    compact banner on every individual demo page. */
 .post-single--demo .cn1-flagship {
     --cn1-demos-card: var(--cn1-demo-card);

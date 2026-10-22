@@ -449,6 +449,28 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private IOSVpnBridge vpnBridge;
 
+    private IOSWebRtc webRtc;
+
+    /// The WebRTC bridge, on the WebRTC framework.
+    ///
+    /// Unlike [#getCallBridge()] this answers null when the build did not
+    /// compile the natives in (`CN1_INCLUDE_WEBRTC`, flipped by the builder
+    /// when the app references `com.codename1.webrtc`): null IS the
+    /// capability query `WebRtc.isSupported()` reads, and the stub natives
+    /// cannot answer a request, because in such a build the
+    /// `com.codename1.webrtc.WebRtc` callbacks were never translated.
+    @Override
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        if (webRtc == null) {
+            if (!nativeInstance.isWebRtcSupported()) {
+                return null;
+            }
+            webRtc = new IOSWebRtc(this, nativeInstance);
+        }
+        return webRtc;
+    }
+
+
     /// The call bridge, on CallKit and PushKit.
     ///
     /// Only meaningful in builds that linked the call natives
@@ -16300,6 +16322,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
         int alg = signatureAlgorithmKind(algorithm);
+        checkSignatureKeyFamily(alg, keyAlgorithm);
+        if (alg >= 3) {
+            byte[] sig = new byte[160];
+            int n = nativeInstance.ecSign(alg, ecPrivateX963(privateKeyPkcs8), data, sig);
+            if (n < 0) throw new RuntimeException("sign failed: code " + n);
+            return cryptoTrim(sig, n);
+        }
         byte[] outBuf = new byte[2048];
         int written = nativeInstance.sign(alg, privateKeyPkcs8, data, outBuf);
         return cryptoTrim(outBuf, written);
@@ -16308,9 +16337,64 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
         int alg = signatureAlgorithmKind(algorithm);
-        int rc = nativeInstance.verify(alg, publicKeyX509, data, signature);
+        checkSignatureKeyFamily(alg, keyAlgorithm);
+        int rc = alg >= 3
+                ? nativeInstance.ecVerify(alg, com.codename1.impl.EcP256Codec.pointFromSpki(publicKeyX509), data, signature)
+                : nativeInstance.verify(alg, publicKeyX509, data, signature);
         if (rc < 0) throw new RuntimeException("verify failed: code " + rc);
         return rc == 1;
+    }
+
+    /// An ECDSA algorithm needs an EC key and RSA an RSA one; the natives
+    /// load the key by the family the algorithm implies, so a mismatch would
+    /// otherwise fail as an unreadable key rather than say what is wrong.
+    /// ECDSA here is P-256 only, the curve [com.codename1.security.KeyGenerator#ec(int)]
+    /// makes.
+    private static void checkSignatureKeyFamily(int alg, String keyAlgorithm) {
+        boolean ec = "EC".equals(keyAlgorithm);
+        if ((alg >= 3) != ec) {
+            throw new RuntimeException("signature algorithm cannot be used with a " + keyAlgorithm + " key");
+        }
+    }
+
+    /// Security.framework imports an EC private key as X9.63: the public point
+    /// followed by the scalar. A PKCS#8 key that omits the point cannot be
+    /// converted without computing it; every key KeyGenerator.ec hands out
+    /// carries it.
+    private static byte[] ecPrivateX963(byte[] pkcs8) {
+        byte[][] parts = com.codename1.impl.EcP256Codec.fromPkcs8(pkcs8);
+        if (parts[1] == null) {
+            throw new RuntimeException("EC private key must include its public point on iOS");
+        }
+        byte[] x963 = new byte[97];
+        System.arraycopy(parts[1], 0, x963, 0, 65);
+        System.arraycopy(parts[0], 0, x963, 65, 32);
+        return x963;
+    }
+
+    @Override
+    public byte[][] generateEcKeyPair(int bits) {
+        if (bits != 256) throw new RuntimeException("only P-256 is supported");
+        byte[] x963 = new byte[97];
+        int rc = nativeInstance.ecGenerate(x963);
+        if (rc != 97) throw new RuntimeException("EC keypair generation failed: code " + rc);
+        byte[] point = new byte[65];
+        byte[] scalar = new byte[32];
+        System.arraycopy(x963, 0, point, 0, 65);
+        System.arraycopy(x963, 65, scalar, 0, 32);
+        return new byte[][]{
+            com.codename1.impl.EcP256Codec.spkiFromPoint(point),
+            com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar, point)
+        };
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        byte[] out = new byte[32];
+        int rc = nativeInstance.ecdh(ecPrivateX963(privateKeyPkcs8),
+                com.codename1.impl.EcP256Codec.pointFromSpki(publicKeyX509), out);
+        if (rc != 32) throw new RuntimeException("ECDH failed: code " + rc);
+        return out;
     }
 
     private static int signatureAlgorithmKind(String algorithm) {

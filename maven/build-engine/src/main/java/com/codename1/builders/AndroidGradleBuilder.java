@@ -1459,6 +1459,11 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+
+    /// Whether the app referenced com.codename1.webrtc, which keeps the
+    /// org.webrtc-backed impl package (deleted otherwise). The dependency,
+    /// permissions and minSdk come from the catalog entry.
+    private boolean webRtcSupport;
     /** The catalog entry that carries the SQLCipher dependencies and their minimum SDK. */
     private static final String DATABASE_CIPHER_CATALOG_CLASS = "com/codename1/db/DatabaseConfig";
 
@@ -2651,6 +2656,9 @@ public class AndroidGradleBuilder extends Executor {
                         // floor.
                         arSupport = true;
                     }
+                    if (cls.indexOf("com/codename1/webrtc/") == 0) {
+                        webRtcSupport = true;
+                    }
                     if (cls.indexOf("com/codename1/notifications") == 0) {
                         recieveBootCompletedPermission = true;
                         if (targetSDKVersionInt >= 33) {
@@ -3327,6 +3335,15 @@ public class AndroidGradleBuilder extends Executor {
         // referrer sources in the project with nothing to compile them against.
         for (String invitePrefix : foldInInviteLibraryUsage(libsDir)) {
             aiAcc.consume(invitePrefix);
+        }
+        // WebRTC, for the same reason: a library-only caller would otherwise
+        // lose the impl package and the org.webrtc dependency together.
+        java.util.Set<String> webRtcFromLibraries = LibraryClassPrefixScan.prefixesFound(
+                libsDir, new String[] {"com/codename1/webrtc/"});
+        if (!webRtcFromLibraries.isEmpty()) {
+            debug("WebRTC usage found inside a submitted library");
+            webRtcSupport = true;
+            aiAcc.consume("com/codename1/webrtc/");
         }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(libsDir);
@@ -5208,6 +5225,20 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
             arPackage.delete();
+        }
+
+        if (!webRtcSupport) {
+            // Compiles against org.webrtc, which the catalog adds only for an
+            // app that referenced com.codename1.webrtc. AndroidImplementation
+            // reaches it by name, so deleting it costs other apps nothing.
+            File webRtcPackage = new File(srcDir, "com/codename1/impl/android/webrtc");
+            File[] webRtcFiles = webRtcPackage.listFiles();
+            if (webRtcFiles != null) {
+                for (File f : webRtcFiles) {
+                    f.delete();
+                }
+            }
+            webRtcPackage.delete();
         }
 
         if (!dbCipherSupport) {
