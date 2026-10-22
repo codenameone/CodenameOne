@@ -167,7 +167,7 @@ public final class GltfScene {
         final int skin;
 
         Node(String name, int parent, int[] children, float[] translation, float[] rotation,
-             float[] scale, int skin) {
+                float[] scale, int skin) {
             this.name = name;
             this.parent = parent;
             this.children = children;
