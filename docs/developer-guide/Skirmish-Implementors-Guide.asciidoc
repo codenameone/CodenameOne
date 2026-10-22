@@ -552,7 +552,7 @@ image::img/skirmish-desktop-admin-pipelines.png["The Pipelines tab listing Win b
 
 The demo seeds two. *Win back* pushes "Your troops miss you" to a player away
 for a week who has played before, and *Keen, never paid* gives 20 gems to a
-player with ten battles and no purchases. *Count players* says how many players
+player with ten battles and no purchases. The *Count players* button shows how many players
 match today before a pipeline is saved.
 
 image::img/skirmish-desktop-admin-pipeline-edit.png["Editing Win back: name, an on switch, two conditions, the push action with its title, message and screen, a 14 day cool-down, and Cancel, Count players and Save",scaledwidth=80%]
