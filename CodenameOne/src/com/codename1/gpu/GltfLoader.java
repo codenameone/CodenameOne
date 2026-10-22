@@ -50,9 +50,11 @@ import java.util.Map;
 /// - `TEXCOORD_0` is read when present; otherwise zero texture coordinates are
 ///   written.
 ///
-/// Materials, textures, skinning and animation in the glTF are ignored -- this
-/// is a geometry loader. Apply a `Material` (and a `Texture` loaded via the
-/// device) to the returned mesh as usual.
+/// Materials, textures, skinning and animation in the glTF are ignored by
+/// `load` -- it is a geometry loader. Apply a `Material` (and a `Texture`
+/// loaded via the device) to the returned mesh as usual. To keep the whole file
+/// -- every part, the materials, the skeleton and the animation clips -- use
+/// `loadScene(byte[])` and draw it with `com.codename1.gaming.AnimatedModel`.
 ///
 /// Example:
 ///
@@ -71,6 +73,8 @@ public final class GltfLoader {
     private static final int UNSIGNED_INT = 5125;
     private static final int UNSIGNED_SHORT = 5123;
     private static final int UNSIGNED_BYTE = 5121;
+    private static final int SHORT = 5122;
+    private static final int BYTE = 5120;
 
     private static final int FLOATS_PER_VERTEX = 8; // pos(3) + normal(3) + uv(2)
 
@@ -209,6 +213,347 @@ public final class GltfLoader {
             return loadImageModel(readFully(in));
         } finally {
             Util.cleanup(in);
+        }
+    }
+
+    /// Loads every node, primitive, material, skin and animation clip of a glTF
+    /// file, keeping the vertex data on the CPU. Use this for characters and
+    /// other multi-part or animated models; `com.codename1.gaming.AnimatedModel`
+    /// poses and draws the result.
+    ///
+    /// Unlike `load(byte[])` this reads every triangle primitive of every mesh
+    /// node, the base color factor and embedded base color image of each
+    /// material, every skin (joints and inverse bind matrices) and every
+    /// animation clip with `LINEAR` or `STEP` sampling. `CUBICSPLINE` samplers
+    /// are read as linear through their value keys. Morph targets are ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the bytes of a `.glb` or `.gltf` (with embedded buffers) file
+    ///
+    /// #### Returns
+    ///
+    /// the parsed scene
+    public static GltfScene loadScene(byte[] data) {
+        Object[] parsed = parse(data);
+        return buildScene((Map) parsed[0], (byte[]) parsed[1]);
+    }
+
+    /// Reads all bytes from the stream and loads them with `loadScene(byte[])`.
+    /// The stream is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: a stream over `.glb` or `.gltf` bytes
+    ///
+    /// #### Returns
+    ///
+    /// the parsed scene
+    public static GltfScene loadScene(InputStream in) throws IOException {
+        return loadScene(readFully(in));
+    }
+
+    private static GltfScene buildScene(Map root, byte[] bin) {
+        List accessors = (List) root.get("accessors");
+        List views = (List) root.get("bufferViews");
+        List buffers = (List) root.get("buffers");
+        List nodeList = list(root, "nodes");
+        List meshList = list(root, "meshes");
+
+        int nodeCount = nodeList.size();
+        int[] parents = new int[nodeCount];
+        for (int i = 0; i < nodeCount; i++) {
+            parents[i] = -1;
+        }
+        int[][] children = new int[nodeCount][];
+        for (int i = 0; i < nodeCount; i++) {
+            List c = (List) ((Map) nodeList.get(i)).get("children");
+            int n = c == null ? 0 : c.size();
+            children[i] = new int[n];
+            for (int j = 0; j < n; j++) {
+                int child = asInt(c.get(j));
+                children[i][j] = child;
+                if (child >= 0 && child < nodeCount) {
+                    parents[child] = i;
+                }
+            }
+        }
+
+        GltfScene.Node[] nodes = new GltfScene.Node[nodeCount];
+        List prims = new java.util.ArrayList();
+        for (int i = 0; i < nodeCount; i++) {
+            Map node = (Map) nodeList.get(i);
+            float[] t = floats(node.get("translation"), new float[]{0f, 0f, 0f});
+            float[] r = floats(node.get("rotation"), new float[]{0f, 0f, 0f, 1f});
+            float[] s = floats(node.get("scale"), new float[]{1f, 1f, 1f});
+            Object matrix = node.get("matrix");
+            if (matrix instanceof List) {
+                decompose(floats(matrix, Matrix4.identity()), t, r, s);
+            }
+            int skin = node.containsKey("skin") ? asInt(node.get("skin")) : -1;
+            Object name = node.get("name");
+            nodes[i] = new GltfScene.Node(name == null ? "" : name.toString(), parents[i], children[i], t, r, s, skin);
+            if (node.containsKey("mesh")) {
+                Map mesh = (Map) meshList.get(asInt(node.get("mesh")));
+                List primitives = (List) mesh.get("primitives");
+                for (int p = 0; primitives != null && p < primitives.size(); p++) {
+                    GltfScene.Primitive prim = readPrimitive(i, (Map) primitives.get(p), accessors, views, buffers, bin);
+                    if (prim != null) {
+                        prims.add(prim);
+                    }
+                }
+            }
+        }
+
+        int[] roots;
+        List sceneList = (List) root.get("scenes");
+        if (sceneList != null && !sceneList.isEmpty()) {
+            int sceneIndex = root.containsKey("scene") ? asInt(root.get("scene")) : 0;
+            List sceneNodes = (List) ((Map) sceneList.get(sceneIndex)).get("nodes");
+            roots = new int[sceneNodes == null ? 0 : sceneNodes.size()];
+            for (int i = 0; i < roots.length; i++) {
+                roots[i] = asInt(sceneNodes.get(i));
+            }
+        } else {
+            int n = 0;
+            for (int i = 0; i < nodeCount; i++) {
+                if (parents[i] < 0) {
+                    n++;
+                }
+            }
+            roots = new int[n];
+            n = 0;
+            for (int i = 0; i < nodeCount; i++) {
+                if (parents[i] < 0) {
+                    roots[n++] = i;
+                }
+            }
+        }
+
+        List imageList = list(root, "images");
+        Image[] images = new Image[imageList.size()];
+        for (int i = 0; i < images.length; i++) {
+            byte[] bytes = readImageBytes((Map) imageList.get(i), root, bin);
+            if (bytes != null) {
+                images[i] = Image.createImage(bytes, 0, bytes.length);
+            }
+        }
+
+        List textureList = list(root, "textures");
+        List materialList = list(root, "materials");
+        GltfScene.MaterialInfo[] materials = new GltfScene.MaterialInfo[materialList.size()];
+        for (int i = 0; i < materials.length; i++) {
+            Map m = (Map) materialList.get(i);
+            Map pbr = (Map) m.get("pbrMetallicRoughness");
+            float[] factor = floats(pbr == null ? null : pbr.get("baseColorFactor"), new float[]{1f, 1f, 1f, 1f});
+            int argb = (channel(factor[3]) << 24) | (channel(factor[0]) << 16)
+                    | (channel(factor[1]) << 8) | channel(factor[2]);
+            int image = -1;
+            Map baseTex = pbr == null ? null : (Map) pbr.get("baseColorTexture");
+            if (baseTex != null) {
+                int ti = asInt(baseTex.get("index"));
+                if (ti >= 0 && ti < textureList.size()) {
+                    Map tex = (Map) textureList.get(ti);
+                    if (tex.containsKey("source")) {
+                        image = asInt(tex.get("source"));
+                    }
+                }
+            }
+            Object name = m.get("name");
+            materials[i] = new GltfScene.MaterialInfo(name == null ? "" : name.toString(), argb, image,
+                    isTrue(m.get("doubleSided")), "BLEND".equals(m.get("alphaMode")));
+        }
+
+        List skinList = list(root, "skins");
+        GltfScene.Skin[] skins = new GltfScene.Skin[skinList.size()];
+        for (int i = 0; i < skins.length; i++) {
+            Map skin = (Map) skinList.get(i);
+            List jointList = (List) skin.get("joints");
+            int[] joints = new int[jointList == null ? 0 : jointList.size()];
+            for (int j = 0; j < joints.length; j++) {
+                joints[j] = asInt(jointList.get(j));
+            }
+            float[] ibm;
+            if (skin.containsKey("inverseBindMatrices")) {
+                ibm = readFloatAccessor(asInt(skin.get("inverseBindMatrices")), 16, accessors, views, buffers, bin);
+            } else {
+                ibm = new float[joints.length * 16];
+                for (int j = 0; j < joints.length; j++) {
+                    ibm[j * 16] = 1f;
+                    ibm[j * 16 + 5] = 1f;
+                    ibm[j * 16 + 10] = 1f;
+                    ibm[j * 16 + 15] = 1f;
+                }
+            }
+            skins[i] = new GltfScene.Skin(joints, ibm);
+        }
+
+        List animationList = list(root, "animations");
+        GltfScene.Animation[] animations = new GltfScene.Animation[animationList.size()];
+        for (int i = 0; i < animations.length; i++) {
+            Map anim = (Map) animationList.get(i);
+            List samplers = (List) anim.get("samplers");
+            List channelList = (List) anim.get("channels");
+            List channels = new java.util.ArrayList();
+            for (int c = 0; channelList != null && c < channelList.size(); c++) {
+                Map ch = (Map) channelList.get(c);
+                Map target = (Map) ch.get("target");
+                if (target == null || !target.containsKey("node")) {
+                    continue;
+                }
+                String path = String.valueOf(target.get("path"));
+                int p;
+                if ("translation".equals(path)) {
+                    p = GltfScene.Channel.TRANSLATION;
+                } else if ("rotation".equals(path)) {
+                    p = GltfScene.Channel.ROTATION;
+                } else if ("scale".equals(path)) {
+                    p = GltfScene.Channel.SCALE;
+                } else {
+                    continue; // morph target weights
+                }
+                Map sampler = (Map) samplers.get(asInt(ch.get("sampler")));
+                int width = p == GltfScene.Channel.ROTATION ? 4 : 3;
+                float[] times = readFloatAccessor(asInt(sampler.get("input")), 1, accessors, views, buffers, bin);
+                float[] values = readFloatAccessor(asInt(sampler.get("output")), width, accessors, views, buffers, bin);
+                String interp = String.valueOf(sampler.get("interpolation"));
+                if ("CUBICSPLINE".equals(interp)) {
+                    // in-tangent, value, out-tangent per key: keep the values
+                    float[] kept = new float[times.length * width];
+                    for (int k = 0; k < times.length; k++) {
+                        System.arraycopy(values, (k * 3 + 1) * width, kept, k * width, width);
+                    }
+                    values = kept;
+                }
+                channels.add(new GltfScene.Channel(asInt(target.get("node")), p, times, values, "STEP".equals(interp)));
+            }
+            GltfScene.Channel[] arr = new GltfScene.Channel[channels.size()];
+            for (int c = 0; c < arr.length; c++) {
+                arr[c] = (GltfScene.Channel) channels.get(c);
+            }
+            Object name = anim.get("name");
+            animations[i] = new GltfScene.Animation(name == null ? "" : name.toString(), arr);
+        }
+
+        GltfScene.Primitive[] primArr = new GltfScene.Primitive[prims.size()];
+        for (int i = 0; i < primArr.length; i++) {
+            primArr[i] = (GltfScene.Primitive) prims.get(i);
+        }
+        return new GltfScene(nodes, roots, primArr, materials, images, skins, animations);
+    }
+
+    private static GltfScene.Primitive readPrimitive(int node, Map primitive, List accessors, List views,
+                                                     List buffers, byte[] bin) {
+        int mode = primitive.containsKey("mode") ? asInt(primitive.get("mode")) : 4;
+        Map attributes = (Map) primitive.get("attributes");
+        if (mode != 4 || attributes == null || !attributes.containsKey("POSITION")) {
+            return null;
+        }
+        float[] positions = readFloatAccessor(asInt(attributes.get("POSITION")), 3, accessors, views, buffers, bin);
+        int vertexCount = positions.length / 3;
+        int[] indices;
+        if (primitive.containsKey("indices")) {
+            indices = readIntAccessor(asInt(primitive.get("indices")), accessors, views, buffers, bin);
+        } else {
+            indices = new int[vertexCount];
+            for (int i = 0; i < vertexCount; i++) {
+                indices[i] = i;
+            }
+        }
+        float[] normals = attributes.containsKey("NORMAL")
+                ? readFloatAccessor(asInt(attributes.get("NORMAL")), 3, accessors, views, buffers, bin)
+                : computeFlatNormals(positions, indices);
+        float[] uv = attributes.containsKey("TEXCOORD_0")
+                ? readFloatAccessor(asInt(attributes.get("TEXCOORD_0")), 2, accessors, views, buffers, bin)
+                : null;
+        int[] joints = null;
+        float[] weights = null;
+        if (attributes.containsKey("JOINTS_0") && attributes.containsKey("WEIGHTS_0")) {
+            float[] j = readFloatAccessor(asInt(attributes.get("JOINTS_0")), 4, accessors, views, buffers, bin);
+            joints = new int[j.length];
+            for (int i = 0; i < j.length; i++) {
+                joints[i] = (int) j[i];
+            }
+            weights = readFloatAccessor(asInt(attributes.get("WEIGHTS_0")), 4, accessors, views, buffers, bin);
+        }
+        int material = primitive.containsKey("material") ? asInt(primitive.get("material")) : -1;
+        return new GltfScene.Primitive(node, material, positions, normals, uv, indices, joints, weights);
+    }
+
+    private static List list(Map root, String key) {
+        Object o = root.get(key);
+        return o instanceof List ? (List) o : new java.util.ArrayList();
+    }
+
+    private static float[] floats(Object o, float[] fallback) {
+        if (!(o instanceof List)) {
+            return fallback;
+        }
+        List l = (List) o;
+        float[] out = new float[l.size()];
+        for (int i = 0; i < out.length; i++) {
+            Object v = l.get(i);
+            out[i] = v instanceof Number ? ((Number) v).floatValue() : 0f;
+        }
+        return out;
+    }
+
+    /// JSONParser reports a JSON boolean as a Boolean or as the string "true"
+    /// depending on its settings; accept both.
+    private static boolean isTrue(Object o) {
+        return Boolean.TRUE.equals(o) || "true".equals(o);
+    }
+
+    private static int channel(float f) {
+        int v = (int) (f * 255f + 0.5f);
+        return v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+
+    /// Splits a column-major affine matrix into translation, rotation and scale.
+    static void decompose(float[] m, float[] t, float[] r, float[] s) {
+        t[0] = m[12];
+        t[1] = m[13];
+        t[2] = m[14];
+        float sx = (float) Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+        float sy = (float) Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
+        float sz = (float) Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+        s[0] = sx;
+        s[1] = sy;
+        s[2] = sz;
+        float r00 = sx == 0f ? 0f : m[0] / sx;
+        float r10 = sx == 0f ? 0f : m[1] / sx;
+        float r20 = sx == 0f ? 0f : m[2] / sx;
+        float r01 = sy == 0f ? 0f : m[4] / sy;
+        float r11 = sy == 0f ? 0f : m[5] / sy;
+        float r21 = sy == 0f ? 0f : m[6] / sy;
+        float r02 = sz == 0f ? 0f : m[8] / sz;
+        float r12 = sz == 0f ? 0f : m[9] / sz;
+        float r22 = sz == 0f ? 0f : m[10] / sz;
+        float trace = r00 + r11 + r22;
+        if (trace > 0f) {
+            float k = (float) Math.sqrt(trace + 1f) * 2f;
+            r[3] = 0.25f * k;
+            r[0] = (r21 - r12) / k;
+            r[1] = (r02 - r20) / k;
+            r[2] = (r10 - r01) / k;
+        } else if (r00 > r11 && r00 > r22) {
+            float k = (float) Math.sqrt(1f + r00 - r11 - r22) * 2f;
+            r[3] = (r21 - r12) / k;
+            r[0] = 0.25f * k;
+            r[1] = (r01 + r10) / k;
+            r[2] = (r02 + r20) / k;
+        } else if (r11 > r22) {
+            float k = (float) Math.sqrt(1f + r11 - r00 - r22) * 2f;
+            r[3] = (r02 - r20) / k;
+            r[0] = (r01 + r10) / k;
+            r[1] = 0.25f * k;
+            r[2] = (r12 + r21) / k;
+        } else {
+            float k = (float) Math.sqrt(1f + r22 - r00 - r11) * 2f;
+            r[3] = (r10 - r01) / k;
+            r[0] = (r02 + r20) / k;
+            r[1] = (r12 + r21) / k;
+            r[2] = 0.25f * k;
         }
     }
 
@@ -369,7 +714,7 @@ public final class GltfLoader {
         int count = asInt(accessor.get("count"));
         int componentType = asInt(accessor.get("componentType"));
         int accessorOffset = accessor.containsKey("byteOffset") ? asInt(accessor.get("byteOffset")) : 0;
-        boolean normalized = accessor.containsKey("normalized") && Boolean.TRUE.equals(accessor.get("normalized"));
+        boolean normalized = isTrue(accessor.get("normalized"));
         Map view = (Map) bufferViews.get(asInt(accessor.get("bufferView")));
         byte[] buffer = resolveBuffer(view, buffers, binChunk);
         int viewOffset = view.containsKey("byteOffset") ? asInt(view.get("byteOffset")) : 0;
@@ -431,6 +776,14 @@ public final class GltfLoader {
                 int v = readUInt16(buffer, p);
                 return normalized ? v / 65535f : v;
             }
+            case BYTE: {
+                int v = buffer[p];
+                return normalized ? Math.max(v / 127f, -1f) : v;
+            }
+            case SHORT: {
+                int v = (short) readUInt16(buffer, p);
+                return normalized ? Math.max(v / 32767f, -1f) : v;
+            }
             default:
                 throw new IllegalArgumentException("Unsupported attribute componentType " + componentType);
         }
@@ -457,8 +810,10 @@ public final class GltfLoader {
     private static int componentSize(int componentType) {
         switch (componentType) {
             case UNSIGNED_BYTE:
+            case BYTE:
                 return 1;
             case UNSIGNED_SHORT:
+            case SHORT:
                 return 2;
             case FLOAT:
             case UNSIGNED_INT:

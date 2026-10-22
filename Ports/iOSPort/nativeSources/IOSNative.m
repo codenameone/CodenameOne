@@ -5258,9 +5258,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 
 // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
 
+// Creating and loading a pool, and starting a sound, run on the main thread, but a game plays its sounds
+// from its frame callback, and a GPU view renders on the main thread: a
+// dispatch_sync to the main queue from there waits on itself and traps.
+static void cn1_soundPoolOnMain(dispatch_block_t block) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
     __block JAVA_LONG result = 0;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1_soundPoolOnMain(^{
         POOL_BEGIN();
         result = (JAVA_LONG)((BRIDGE_CAST void*)[[CN1SoundPool alloc] initWithMaxStreams:maxStreams]);
         POOL_END();
@@ -5270,7 +5281,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int_R_long(CN
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
     __block JAVA_LONG result = 0;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    // Resolved before POOL_BEGIN(): without ARC that macro declares a local
+    // NSAutoreleasePool named `pool`, which shadows this parameter, and the
+    // load message was sent to the autorelease pool.
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    cn1_soundPoolOnMain(^{
         POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* byteArray = b;
@@ -5281,7 +5296,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
         int len = ((JAVA_ARRAY)b)->length;
 #endif
         NSData* d = [NSData dataWithBytes:data length:len];
-        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
         CN1Sound* s = [sp loadData:d ringSize:ringSize];
         result = (JAVA_LONG)((BRIDGE_CAST void*)s);
         POOL_END();
@@ -5291,7 +5305,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
 
 JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
     __block JAVA_INT result = -1;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1_soundPoolOnMain(^{
         CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
         CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
         result = [sp play:s volume:volume pan:pan rate:rate loop:loop];

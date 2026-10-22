@@ -180,8 +180,9 @@ public class Initializr extends Lifecycle {
                     }
                 }
                 if (lookPanelHolder[0] != null) {
-                    lookPanelHolder[0].setHidden(!fullStack);
-                    lookPanelHolder[0].setVisible(fullStack);
+                    boolean look = fullStack && selectedTemplate[0].hasColorScheme();
+                    lookPanelHolder[0].setHidden(!look);
+                    lookPanelHolder[0].setVisible(look);
                 }
                 lookSubtitle.setText(schemeLabel(brandColor[0])
                         + (roundedCorners[0] ? "" : " . Square corners"));
@@ -441,11 +442,13 @@ public class Initializr extends Lifecycle {
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
-                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR, Template.PARLEY}
+                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR,
+                    Template.SKIRMISH, Template.PARLEY}
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
                 ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
-                    "Food delivery app with its server, Java", "Messaging app with its server, Java"}
+                    "Food delivery app with its server, Java",
+                    "Card battle game with its server, Java", "Messaging app with its server, Java"}
                 : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];
@@ -486,7 +489,7 @@ public class Initializr extends Lifecycle {
 
     /// The colour a scheme paints with, which for the template's own is not -1.
     private static int schemeColor(int brandColor, Template template) {
-        return brandColor < 0 ? GeneratorModel.brandOf(template) : brandColor;
+        return brandColor < 0 || !template.hasColorScheme() ? GeneratorModel.brandOf(template) : brandColor;
     }
 
     /// A round swatch of `color`, the icon of a scheme's choice.
@@ -1175,7 +1178,8 @@ public class Initializr extends Lifecycle {
         String safePackage = packageName == null ? "" : packageName.trim();
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
-                + (template == Template.PARLEY ? "Template MESSAGING APP + SERVER\n"
+                + (template == Template.SKIRMISH ? "Template CARD-BATTLE GAME + SERVER\n"
+                : template == Template.PARLEY ? "Template MESSAGING APP + SERVER\n"
                 : template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
                         : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"

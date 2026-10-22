@@ -66,7 +66,7 @@ public class GenerateInitializr {
    }
    // The full-stack templates, each in both of its layouts and in a colour scheme of
    // its own with an icon: an app, its server and the module they share.
-   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.PARLEY}) {
+   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY}) {
     for (boolean full : new boolean[] {false, true}) {
      ProjectOptions options = ProjectOptions.defaults().forFullStack().withPlatformModules(full)
        .withScheme(0x0f766e, false).withIcon(new byte[] {(byte)0x89, 'P', 'N', 'G'});
