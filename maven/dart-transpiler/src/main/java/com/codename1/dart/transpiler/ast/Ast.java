@@ -463,6 +463,8 @@ public final class Ast {
         public Block body;                        // nullable when expression-bodied
         public Expr exprBody;                     // for `=> expr`
         public boolean isAsync;
+        public boolean isSyncStar;                // Iterable<T> f() sync* { ... }
+        public boolean isAsyncStar;               // Stream<T> f() async* { ... }
     }
 
     // ------------------------------------------------------------------

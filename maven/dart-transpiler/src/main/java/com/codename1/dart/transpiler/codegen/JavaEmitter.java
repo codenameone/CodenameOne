@@ -2965,7 +2965,14 @@ public final class JavaEmitter {
                         ? iter.type.arg(0) : TypeRef.DYNAMIC);
             String ej = javaType(elem, true, ctx);
             String it = ctx.newTemp();
-            w.line("StreamIterator<" + ej + "> " + it + " = new StreamIterator<" + ej + ">(" + iter.code + ");");
+            String src = iter.code;
+            if (isDynamic(elem)) {
+                // The element type is unknown here (a call through a local function, say)
+                // while the Java value may be a Stream<String>; read it as Stream<Object>.
+                ctx.importClass("dart.async.Stream");
+                src = "(Stream<Object>) (Stream<?>) " + paren(src);
+            }
+            w.line("StreamIterator<" + ej + "> " + it + " = new StreamIterator<" + ej + ">(" + src + ");");
             w.line("try {");
             ctx.indent(1);
             ctx.pushScope();
@@ -3076,12 +3083,24 @@ public final class JavaEmitter {
         l.line = lf.line;
         l.col = lf.col;
         l.isAsync = lf.isAsync;
+        l.isSyncStar = lf.isSyncStar;
+        l.isAsyncStar = lf.isAsyncStar;
         l.params = lf.params;
         l.body = lf.body;
         l.exprBody = lf.exprBody;
         // Declare the local first so a recursive body can reference the name.
         String jn = ctx.declareShadowSafe(lf.name, new TypeRef("Function"));
-        Out init = emitExpr(l, funcTypeRef(lf.returnType, lf.params), ctx);
+        TypeRef expected = funcTypeRef(lf.returnType, lf.params);
+        if (lf.isSyncStar || lf.isAsyncStar) {
+            // A generator's element type comes from its declared Iterable<T>/Stream<T>,
+            // which the generator lowering reads from the target's return type.
+            expected.funcParams = new ArrayList<TypeRef>();
+            for (Param p : lf.params) {
+                expected.funcParams.add(paramValueType(p));
+            }
+            expected.funcReturn = lf.returnType;
+        }
+        Out init = emitExpr(l, expected, ctx);
         ctx.writer().line(samType + " " + jn + " = " + init.code + ";");
     }
 
@@ -7961,6 +7980,10 @@ public final class JavaEmitter {
 
     /** Whether the most recently emitted lambda had a {@code void}-typed expression body. */
     private boolean lastLambdaVoid;
+    /// The last block lambda was emitted with a `return null;` tail (see emitLambda), so
+    /// it is value-shaped in Java whatever its Dart body returns; a caller choosing the
+    /// lambda's SAM by its body shape must pick the value form.
+    private boolean lastLambdaNullTail;
     /**
      * What the most recently emitted lambda yields: its arrow body's type, or the value
      * types of its block body's returns (empty when it returns nothing).
@@ -7987,6 +8010,7 @@ public final class JavaEmitter {
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         lastLambdaVoid = false;
+        lastLambdaNullTail = false;
         lastLambdaExprIsStatementShaped = false;
         // typedef-typed target position gives untyped lambda params real types
         TypeRef[] sigTypes = expected != null ? typedefSig(expected.name) : null;
@@ -8118,6 +8142,7 @@ public final class JavaEmitter {
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
             ctx.bareReturnIsNull = outerNullReturn;
+            lastLambdaNullTail = nullTail;
             if (nullTail) {
                 String in = indentStr(ctx.currentIndent() + 1);
                 body = in + "if (true) {\n" + body + in + "}\n" + in + "return null;\n";
@@ -9525,7 +9550,7 @@ public final class JavaEmitter {
                 String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
                         "dart.runtime.Funcs.VoidFunc1");
                 boolean valueHandler = pos.get(0) instanceof Lambda
-                        && (((Lambda) pos.get(0)).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(pos.get(0)));
+                        && (((Lambda) pos.get(0)).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(pos.get(0)));
                 // `test` is a NAMED parameter in Dart; reading it positionally meant it was
                 // always null, so the handler caught failures its predicate rejected. The
                 // runtime takes it as an Object, so a lambda is given its predicate type.
@@ -9553,7 +9578,7 @@ public final class JavaEmitter {
                 Out cb = emitExpr(action, null, ctx);
                 boolean value;
                 if (action instanceof Lambda) {
-                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(action);
+                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(action);
                 } else {
                     // A tear-off is typed a bare Function, so its declared return is read
                     // from the method or function it names; unresolved stays on the void form.
@@ -11292,7 +11317,7 @@ public final class JavaEmitter {
         if (!(src instanceof Lambda)) {
             return o.code;
         }
-        boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(src);
+        boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(src);
         boolean ambiguous = ((Lambda) src).exprBody != null && lastLambdaExprIsStatementShaped;
         if (value && !forceCast && !ambiguous) {
             return o.code;

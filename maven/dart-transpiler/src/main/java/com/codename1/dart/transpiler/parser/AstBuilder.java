@@ -1251,7 +1251,13 @@ public final class AstBuilder {
             lf.returnType = eraseTypeParams(lf.returnType, tps);
         }
         Dart2Parser.FunctionBodyContext body = ctx.functionBody();
-        lf.isAsync = checkBodyModifiers(body);
+        if (body.ST() != null && body.block() != null && body.NATIVE_() == null) {
+            // A local generator is lowered like a generator closure (see buildLambda).
+            lf.isSyncStar = body.SYNC_() != null;
+            lf.isAsyncStar = body.SYNC_() == null;
+        } else {
+            lf.isAsync = checkBodyModifiers(body);
+        }
         if (body.block() != null) {
             lf.body = buildBlock(body.block());
         } else if (body.expr() != null) {
