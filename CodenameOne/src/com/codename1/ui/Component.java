@@ -6382,7 +6382,15 @@ public class Component implements Animation, StyleListener, Editable {
             int trackTop = absY + scrollTrackY;
             int trackLeft = absX + scrollTrackX;
             if (x >= trackLeft && x < trackLeft + scrollTrackW && y >= trackTop && y < trackTop + scrollTrackH) {
-                pageScroll(true, y < thumbTop);
+                if (getUIManager().getLookAndFeel().isInteractiveScrollTrackJump()) {
+                    // jump the thumb's center to the click and keep it grabbed, so the
+                    // same press can go on to drag it
+                    draggingScrollThumbY = true;
+                    scrollThumbGrabOffset = scrollThumbH / 2;
+                    dragScrollThumb(x, y);
+                } else {
+                    pageScroll(true, y < thumbTop);
+                }
                 return true;
             }
         }
@@ -6399,7 +6407,13 @@ public class Component implements Animation, StyleListener, Editable {
             int trackLeft = absX + hScrollTrackX;
             int trackTop = absY + hScrollTrackY;
             if (x >= trackLeft && x < trackLeft + hScrollTrackW && y >= trackTop && y < trackTop + hScrollTrackH) {
-                pageScroll(false, x < thumbLeft);
+                if (getUIManager().getLookAndFeel().isInteractiveScrollTrackJump()) {
+                    draggingScrollThumbX = true;
+                    scrollThumbGrabOffset = hScrollThumbW / 2;
+                    dragScrollThumb(x, y);
+                } else {
+                    pageScroll(false, x < thumbLeft);
+                }
                 return true;
             }
         }

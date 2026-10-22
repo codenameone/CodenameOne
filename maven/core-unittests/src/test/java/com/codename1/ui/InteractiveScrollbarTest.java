@@ -126,6 +126,40 @@ class InteractiveScrollbarTest extends UITestBase {
     }
 
     @FormTest
+    void trackClickJumpsToPositionWhenEnabled() {
+        setInteractiveScroll(true);
+        Hashtable props = new Hashtable();
+        props.put("@interactiveScrollTrackJumpBool", "true");
+        UIManager.getInstance().addThemeProps(props);
+        assertTrue(UIManager.getInstance().getLookAndFeel().isInteractiveScrollTrackJump());
+        try {
+            Container sc = scrollableContainer(8000);
+            int thumbH = sc.getHeight() / 5;
+            injectVerticalThumb(sc, 0, thumbH);
+
+            // click the middle of the track: the thumb centers there, i.e. half the range
+            int px = sc.getAbsoluteX() + sc.getWidth() - GUTTER / 2;
+            int py = sc.getAbsoluteY() + sc.getHeight() / 2;
+            sc.pointerPressed(px, py);
+            assertTrue(sc.isInteractiveScrollThumbGrabbed(), "a jump keeps the thumb grabbed for dragging");
+            int max = sc.getScrollDimension().getHeight() - sc.getHeight();
+            int expected = max / 2;
+            assertTrue(Math.abs(sc.getScrollY() - expected) <= max / 50,
+                    "a track click should jump to the clicked position, got " + sc.getScrollY()
+                    + " expected about " + expected);
+
+            int mid = sc.getScrollY();
+            sc.pointerDragged(px, py + 50);
+            assertTrue(sc.getScrollY() > mid, "the same press goes on to drag the thumb");
+            sc.pointerReleased(px, py + 50);
+            assertFalse(sc.isInteractiveScrollThumbGrabbed());
+        } finally {
+            props.put("@interactiveScrollTrackJumpBool", "false");
+            UIManager.getInstance().addThemeProps(props);
+        }
+    }
+
+    @FormTest
     void disabledIsInert() {
         setInteractiveScroll(false);
         Container sc = scrollableContainer(8000);
