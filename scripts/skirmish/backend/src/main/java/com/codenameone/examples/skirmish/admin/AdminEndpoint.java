@@ -28,13 +28,17 @@ import com.codenameone.examples.skirmish.account.Accounts;
 import com.codenameone.examples.skirmish.api.AdminActionDto;
 import com.codenameone.examples.skirmish.api.AdminApiServer;
 import com.codenameone.examples.skirmish.api.AdminStatsDto;
+import com.codenameone.examples.skirmish.api.AssetDto;
 import com.codenameone.examples.skirmish.api.AuditDto;
 import com.codenameone.examples.skirmish.api.FlagDto;
+import com.codenameone.examples.skirmish.api.ForgeActionDto;
 import com.codenameone.examples.skirmish.api.LiveMatchDto;
+import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.api.PlayerDetailDto;
 import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.domain.Profile;
 import com.codenameone.examples.skirmish.domain.StorePurchase;
+import com.codenameone.examples.skirmish.forge.Forge;
 import com.codenameone.examples.skirmish.game.GameEndpoint;
 import com.codenameone.examples.skirmish.game.Rooms;
 import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
@@ -57,8 +61,12 @@ public class AdminEndpoint implements AdminApiServer {
     private final Rooms rooms;
     private final Shop shop;
 
+    private final Forge forge;
+
     public AdminEndpoint(Accounts accounts, ProfileRepository profiles, MatchRecordRepository matches,
-            StorePurchaseRepository purchases, Flags flags, Moderation moderation, Rooms rooms, Shop shop) {
+            StorePurchaseRepository purchases, Flags flags, Moderation moderation, Rooms rooms, Shop shop,
+            Forge forge) {
+        this.forge = forge;
         this.accounts = accounts;
         this.profiles = profiles;
         this.matches = matches;
@@ -134,5 +142,30 @@ public class AdminEndpoint implements AdminApiServer {
     public List<AuditDto> audit() throws Exception {
         return moderation.newest();
     }
+
+    @Override
+    public List<PackSummaryDto> forgeQueue() throws Exception {
+        return forge.queue();
+    }
+
+    @Override
+    public List<AssetDto> forgeAssets() throws Exception {
+        return forge.pendingAssets();
+    }
+
+    @Override
+    public PackSummaryDto forgePackAction(ForgeActionDto body) throws Exception {
+        if (body == null) {
+            throw new ResponseStatusException(400, "Nothing to do");
+        }
+        return forge.packAction(Caller.name(), body.target(), body.action(), body.reason());
+    }
+
+    @Override
+    public AssetDto forgeAssetAction(ForgeActionDto body) throws Exception {
+        if (body == null) {
+            throw new ResponseStatusException(400, "Nothing to do");
+        }
+        return forge.assetAction(Caller.name(), body.target(), body.action(), body.reason());
+    }
 }
-// end::skirmish-admin[]

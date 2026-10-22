@@ -157,8 +157,8 @@ public class BattleView extends GameView {
         scenery();
 
         zone = flat(new Material(Material.Type.UNLIT).setColor(0x50e0302a)
-                .setRenderState(RenderState.transparent()), 18f, Arena.RIVER_TOP / (float) Arena.TILE);
-        zone.setPosition(0f, 0.04f, -16f + Arena.RIVER_TOP / (float) Arena.TILE / 2f);
+                .setRenderState(RenderState.transparent()), 18f, Arena.CLASSIC.riverTop() / (float) Arena.TILE);
+        zone.setPosition(0f, 0.04f, -16f + Arena.CLASSIC.riverTop() / (float) Arena.TILE / 2f);
         zone.setVisible(false);
         addModel(zone);
         ghost = Actor.ringModel(d, quad, ringTexture, true, 1f);
@@ -207,11 +207,11 @@ public class BattleView extends GameView {
 
     /// Rules coordinates to world: the player's own side is toward the camera.
     private float wx(int ax, int ay) {
-        return sign * (ax - Arena.WIDTH / 2) / (float) Arena.TILE;
+        return sign * (ax - Arena.CLASSIC.width() / 2) / (float) Arena.TILE;
     }
 
     private float wz(int ax, int ay) {
-        return sign * (ay - Arena.HEIGHT / 2) / (float) Arena.TILE;
+        return sign * (ay - Arena.CLASSIC.height() / 2) / (float) Arena.TILE;
     }
 
     @Override
@@ -426,9 +426,9 @@ public class BattleView extends GameView {
             finaleX = 0f;
             finaleZ = 0f;
         } else {
-            int ky = loser == 0 ? Arena.KING_Y_BOTTOM : Arena.mirrorY(Arena.KING_Y_BOTTOM);
-            finaleX = wx(Arena.KING_X, ky);
-            finaleZ = wz(Arena.KING_X, ky);
+            int ky = loser == 0 ? Arena.CLASSIC.king(0).y : Arena.CLASSIC.mirrorY(Arena.CLASSIC.king(0).y);
+            finaleX = wx(Arena.CLASSIC.king(0).x, ky);
+            finaleZ = wz(Arena.CLASSIC.king(0).x, ky);
         }
         finale = 0f;
     }
@@ -538,11 +538,11 @@ public class BattleView extends GameView {
     // end::skirmish-touch[]
 
     private int ax(float x, float z) {
-        return Math.round(x * sign * Arena.TILE) + Arena.WIDTH / 2;
+        return Math.round(x * sign * Arena.TILE) + Arena.CLASSIC.width() / 2;
     }
 
     private int ay(float x, float z) {
-        return Math.round(z * sign * Arena.TILE) + Arena.HEIGHT / 2;
+        return Math.round(z * sign * Arena.TILE) + Arena.CLASSIC.height() / 2;
     }
 
     /// Where the ray from the camera through screen point `(px, py)` meets

@@ -55,4 +55,20 @@ public interface AdminApi {
 
     @GET("/api/admin/audit")
     void audit(OnComplete<Response<List<AuditDto>>> callback);
+
+    /// Packs and files waiting for a moderator: reported or hidden packs, and
+    /// uploaded files nobody has looked at yet.
+    @GET("/api/admin/forge/packs")
+    void forgeQueue(OnComplete<Response<List<PackSummaryDto>>> callback);
+
+    @GET("/api/admin/forge/assets")
+    void forgeAssets(OnComplete<Response<List<AssetDto>>> callback);
+
+    /// `hide`, `restore`, `official` or `unofficial` a pack.
+    @POST("/api/admin/forge/packs/action")
+    void forgePackAction(@Body ForgeActionDto action, OnComplete<Response<PackSummaryDto>> callback);
+
+    /// `approve` or `reject` an uploaded file.
+    @POST("/api/admin/forge/assets/action")
+    void forgeAssetAction(@Body ForgeActionDto action, OnComplete<Response<AssetDto>> callback);
 }

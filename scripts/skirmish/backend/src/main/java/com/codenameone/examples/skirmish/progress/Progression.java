@@ -182,6 +182,24 @@ public class Progression {
         return r.dto(g);
     }
 
+    /// Pays for stars won in a Forge mission. The caller has already verified
+    /// the result and decided the amounts; this only books them, so experience
+    /// still levels the player up and reaches achievements as it does anywhere.
+    @Transactional(rollbackFor = IOException.class)
+    public RewardDto missionReward(String username, String title, int coins, int xp) throws IOException {
+        Profile p = profile(username);
+        Progress g = load(username);
+        Reward r = new Reward(title);
+        if (coins > 0 || xp > 0) {
+            r.coins(p, coins);
+            r.xp(g, p, xp);
+            unlock(g, p, r);
+            progress.save(g);
+            profiles.save(p);
+        }
+        return r.dto(g);
+    }
+
     /// Gives a demo account some history -- a few levels, two chests, a
     /// finished quest waiting to be claimed -- so the development server's
     /// home screen shows what a regular player sees, and the tutorial does not

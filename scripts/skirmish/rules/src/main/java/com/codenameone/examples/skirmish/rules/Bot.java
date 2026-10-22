@@ -53,6 +53,9 @@ public final class Bot {
             return null;
         }
         PlayerState ps = match.player(player);
+        if (!ps.hasDeck()) {
+            return null;
+        }
         if (saveUpTo < 0) {
             saveUpTo = 4 + rng.nextInt(5);
         }
@@ -63,7 +66,7 @@ public final class Bot {
         int slot = rng.nextInt(Deck.HAND);
         for (int i = 0; i < Deck.HAND; i++) {
             String id = ps.hand((slot + i) % Deck.HAND);
-            CardDef card = Cards.get(id);
+            CardDef card = match.cards().get(id);
             int[] at = placement(match, card, threat);
             if (at != null && match.canPlay(player, id, at[0], at[1])) {
                 saveUpTo = -1;
@@ -78,7 +81,7 @@ public final class Bot {
         for (int i = 0; i < match.units().size(); i++) {
             Unit u = match.units().get(i);
             if (u.owner() != player && u.card().kind == CardDef.TROOP
-                    && Arena.ownHalf(player, u.y()) && (best == null || u.hp() > best.hp())) {
+                    && match.arena().ownHalf(player, u.y()) && (best == null || u.hp() > best.hp())) {
                 best = u;
             }
         }
@@ -92,14 +95,22 @@ public final class Bot {
         }
         if (pushLane < 0 || rng.nextInt(6) == 0) {
             // Commit to a lane for a while: cards played together make a push.
-            pushLane = rng.nextInt(2);
+            pushLane = rng.nextInt(match.arena().laneCount());
         }
-        int lane = threat != null ? Arena.laneOf(threat.x()) : pushLane;
-        int x = Arena.laneX(lane) + (rng.nextInt(3) - 1) * Arena.TILE;
-        int depth = threat != null ? 25 : 21 + rng.nextInt(7);
-        int y = depth * Arena.TILE;
+        Arena arena = match.arena();
+        int lane = threat != null ? arena.laneOf(threat.x()) : pushLane % arena.laneCount();
+        int x = arena.laneX(lane) + (rng.nextInt(3) - 1) * Arena.TILE;
+        int y;
+        if (arena == Arena.CLASSIC) {
+            int depth = threat != null ? 25 : 21 + rng.nextInt(7);
+            y = depth * Arena.TILE;
+        } else {
+            // The same depths, measured from the river so they fit any field.
+            int depth = threat != null ? 8 : 4 + rng.nextInt(7);
+            y = Math.min(arena.height() - Arena.TILE, arena.riverBottom() + depth * Arena.TILE);
+        }
         if (player == 1) {
-            y = Arena.mirrorY(y);
+            y = arena.mirrorY(y);
         }
         return new int[] {x, y};
     }

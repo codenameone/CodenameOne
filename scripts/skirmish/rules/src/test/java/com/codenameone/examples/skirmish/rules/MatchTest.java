@@ -61,8 +61,8 @@ class MatchTest {
     static void checkInvariants(Match m) {
         for (Unit u : m.units()) {
             assertTrue(u.hp() > 0 && u.hp() <= u.maxHp(), "hp of " + u.card().id);
-            assertTrue(u.x() >= 0 && u.x() <= Arena.WIDTH, "x of " + u.card().id);
-            assertTrue(u.y() >= 0 && u.y() <= Arena.HEIGHT, "y of " + u.card().id);
+            assertTrue(u.x() >= 0 && u.x() <= Arena.CLASSIC.width(), "x of " + u.card().id);
+            assertTrue(u.y() >= 0 && u.y() <= Arena.CLASSIC.height(), "y of " + u.card().id);
         }
         for (int p = 0; p < 2; p++) {
             int e = m.player(p).elixir();
@@ -128,13 +128,13 @@ class MatchTest {
         String notInHand = m.player(0).next();
         int ownY = 25 * Arena.TILE;
         int enemyY = 8 * Arena.TILE;
-        assertFalse(m.canPlay(0, notInHand, Arena.LEFT_LANE_X, ownY));
+        assertFalse(m.canPlay(0, notInHand, Arena.CLASSIC.laneX(0), ownY));
         CardDef card = Cards.get(inHand);
         if (card.kind != CardDef.SPELL) {
-            assertFalse(m.canPlay(0, inHand, Arena.LEFT_LANE_X, enemyY));
+            assertFalse(m.canPlay(0, inHand, Arena.CLASSIC.laneX(0), enemyY));
         }
         assertFalse(m.canPlay(0, inHand, -1, ownY));
-        assertFalse(m.canPlay(0, "king-tower", Arena.LEFT_LANE_X, ownY));
+        assertFalse(m.canPlay(0, "king-tower", Arena.CLASSIC.laneX(0), ownY));
     }
 
     @Test
@@ -151,7 +151,7 @@ class MatchTest {
         String next = m.player(0).next();
         int before = m.player(0).elixir();
         List<Command> cmds = new ArrayList<Command>();
-        cmds.add(new Command(0, 0, card, Arena.LEFT_LANE_X, 25 * Arena.TILE));
+        cmds.add(new Command(0, 0, card, Arena.CLASSIC.laneX(0), 25 * Arena.TILE));
         m.step(cmds);
         int cost = Cards.get(card).cost * PlayerState.ELIXIR_UNIT;
         assertEquals(before - cost + 1, m.player(0).elixir());
@@ -172,7 +172,7 @@ class MatchTest {
             m.player(0).cycle(0);
         }
         List<Command> cmds = new ArrayList<Command>();
-        cmds.add(new Command(0, 0, "ogre", Arena.LEFT_LANE_X, 20 * Arena.TILE));
+        cmds.add(new Command(0, 0, "ogre", Arena.CLASSIC.laneX(0), 20 * Arena.TILE));
         m.step(cmds);
         for (int i = 0; i < 60 * Match.TICKS_PER_SECOND && m.player(0).crowns() == 0; i++) {
             m.step(none);

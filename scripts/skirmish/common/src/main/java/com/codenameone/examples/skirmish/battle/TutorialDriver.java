@@ -87,8 +87,8 @@ public final class TutorialDriver extends Driver {
     /// The opponent sends a troop down the left lane, so the lesson has
     /// something to defend against.
     public void enemyAttack() {
-        int x = Arena.LEFT_LANE_X;
-        int y = Arena.mirrorY(21 * Arena.TILE);
+        int x = Arena.CLASSIC.laneX(0);
+        int y = Arena.CLASSIC.mirrorY(21 * Arena.TILE);
         for (int i = 0; i < Deck.HAND; i++) {
             String card = match.player(1).hand(i);
             CardDef def = Cards.get(card);

@@ -26,10 +26,17 @@ public final class PlayerState {
     public static final int START_ELIXIR = 5 * ELIXIR_UNIT;
 
     final String[] order;
-    int elixir = START_ELIXIR;
+    int elixir;
     int crowns;
 
-    PlayerState(String[] deck, Rng rng) {
+    PlayerState(String[] deck, Rng rng, int startElixir) {
+        elixir = startElixir;
+        if (deck == null) {
+            // A side that only plays scripted waves. It draws nothing from the
+            // generator, so adding one to a mission does not reshuffle the other deck.
+            order = new String[0];
+            return;
+        }
         order = new String[deck.length];
         System.arraycopy(deck, 0, order, 0, deck.length);
         for (int i = order.length - 1; i > 0; i--) {
@@ -45,6 +52,9 @@ public final class PlayerState {
     public int wholeElixir() { return elixir / ELIXIR_UNIT; }
     public int crowns() { return crowns; }
 
+    /// False for a side that plays only a mission's scripted waves.
+    public boolean hasDeck() { return order.length > 0; }
+
     /// Card in hand slot `i`, `0 <= i < Deck.HAND`.
     public String hand(int i) { return order[i]; }
 
@@ -52,6 +62,9 @@ public final class PlayerState {
     public String next() { return order[Deck.HAND]; }
 
     int handSlotOf(String cardId) {
+        if (order.length == 0) {
+            return -1;
+        }
         for (int i = 0; i < Deck.HAND; i++) {
             if (order[i].equals(cardId)) {
                 return i;

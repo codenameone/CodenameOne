@@ -57,7 +57,7 @@ public class TutorialTest extends E2e {
         until(() -> TutorialDriver.TROOP.equals(view.selected()), 5000, "the squire to be picked");
         waitFor(900);
         shot("tutorial-drag");
-        place(view, Arena.LEFT_LANE_X, 21 * Arena.TILE);
+        place(view, Arena.CLASSIC.laneX(0), 21 * Arena.TILE);
         until(() -> !view.driver().match().units().isEmpty() && has("coachText"), 5000, "the squire placed");
         // The defence step waits for elixir and for the enemy.
         until(() -> slotHas(view, TutorialDriver.RANGED) && isPicking(view, TutorialDriver.RANGED), 30000,
@@ -65,13 +65,13 @@ public class TutorialTest extends E2e {
         shot("tutorial-defend");
         touch("card" + slot(view, TutorialDriver.RANGED));
         until(() -> TutorialDriver.RANGED.equals(view.selected()), 5000, "the archers to be picked");
-        place(view, Arena.LEFT_LANE_X, 24 * Arena.TILE);
+        place(view, Arena.CLASSIC.laneX(0), 24 * Arena.TILE);
         until(() -> isPicking(view, TutorialDriver.SPELL), 40000, "the spell step");
         touch("card" + slot(view, TutorialDriver.SPELL));
         until(() -> TutorialDriver.SPELL.equals(view.selected()), 5000, "the orb to be picked");
         waitFor(900);
         shot("tutorial-spell");
-        place(view, Arena.LEFT_LANE_X, Arena.mirrorY(Arena.PRINCESS_Y_BOTTOM));
+        place(view, Arena.CLASSIC.laneX(0), Arena.CLASSIC.mirrorY(Arena.CLASSIC.princessY()));
         until(() -> has("coachNext"), 10000, "the last word");
         click("coachNext");
         waitFor(2500);

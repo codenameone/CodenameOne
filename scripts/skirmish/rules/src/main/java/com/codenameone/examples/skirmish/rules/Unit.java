@@ -35,8 +35,9 @@ public final class Unit {
     int age;
     int lane;
     boolean active = true;
+    boolean king;
 
-    Unit(int id, CardDef card, int owner, int x, int y) {
+    Unit(int id, CardDef card, int owner, int x, int y, int lane) {
         this.id = id;
         this.card = card;
         this.owner = owner;
@@ -46,7 +47,7 @@ public final class Unit {
         this.hp = card.kind == CardDef.SPELL ? 1 : card.hp;
         this.maxHp = this.hp;
         this.deployTimer = card.kind == CardDef.TOWER ? 0 : card.deployTicks;
-        this.lane = Arena.laneOf(x);
+        this.lane = lane;
     }
 
     public int id() { return id; }
@@ -64,6 +65,8 @@ public final class Unit {
     public boolean isDeploying() { return deployTimer > 0; }
     /// A king tower stays asleep until it is hit or loses a princess tower.
     public boolean isActive() { return active; }
+    /// True for the tower whose fall ends the match.
+    public boolean isKing() { return king; }
 
     boolean isFlying() {
         return card.flying;

@@ -83,33 +83,33 @@ public final class Tutorial {
     private static final int ELIXIR = -2;
     private static final int OWN_LEFT_Y = 21 * Arena.TILE;
     private static final int OWN_BACK_Y = 24 * Arena.TILE;
-    private static final int ENEMY_TOWER_Y = Arena.mirrorY(Arena.PRINCESS_Y_BOTTOM);
+    private static final int ENEMY_TOWER_Y = Arena.CLASSIC.mirrorY(Arena.CLASSIC.princessY());
 
     private static final Step[] STEPS = {
         new Step(TAP, null, "Welcome to the arena, commander! I am Elda. Let me show you how battles are won.",
                 "Tap Next. Skip any time, and replay it from \"How to play\".", NONE, NONE, 0),
         new Step(TAP, null, "Those red towers across the river are your targets. Every tower you topple "
                 + "wins you a crown, and the most crowns wins the battle.", "Tap Next",
-                Arena.LEFT_LANE_X, ENEMY_TOWER_Y, 0),
+                Arena.CLASSIC.laneX(0), ENEMY_TOWER_Y, 0),
         new Step(TAP, null, "Cards cost elixir, this purple bar. It refills by itself, so spend it rather "
                 + "than let it overflow.", "Tap Next", ELIXIR, 0, 0),
         new Step(CHOOSE, TutorialDriver.TROOP, "Let's attack! Tap the Squire card to pick it up.",
                 "Tap the glowing card", NONE, NONE, 0),
         new Step(PLACE, TutorialDriver.TROOP, "Now drag it onto the field by the left bridge. You can only "
                 + "deploy on your own side of the river.", "Drag to the circle and let go",
-                Arena.LEFT_LANE_X, OWN_LEFT_Y, 0),
+                Arena.CLASSIC.laneX(0), OWN_LEFT_Y, 0),
         new Step(WAIT, null, "Watch: troops march over the nearest bridge and attack the first thing in "
                 + "their way.", "", NONE, NONE, 90),
         new Step(CHOOSE, TutorialDriver.RANGED, "Enemies! Defend with the Twin Archers. Pick them up.",
                 "Tap the glowing card", NONE, NONE, 0),
         new Step(PLACE, TutorialDriver.RANGED, "Drop them behind your tower. Archers shoot from a distance, "
                 + "while your towers shoot too.", "Drag to the circle and let go",
-                Arena.LEFT_LANE_X, OWN_BACK_Y, 0),
+                Arena.CLASSIC.laneX(0), OWN_BACK_Y, 0),
         new Step(WAIT, null, "Good! Let the elixir build up while your army fights.", "", NONE, NONE, 120),
         new Step(CHOOSE, TutorialDriver.SPELL, "Spells can land anywhere on the field. Pick the Fire Orb.",
                 "Tap the glowing card", NONE, NONE, 0),
         new Step(PLACE, TutorialDriver.SPELL, "Throw it at the red tower!", "Drag onto the tower and let go",
-                Arena.LEFT_LANE_X, ENEMY_TOWER_Y, 0),
+                Arena.CLASSIC.laneX(0), ENEMY_TOWER_Y, 0),
         new Step(TAP, null, "That's all there is to it: deploy troops, defend your towers, break theirs. "
                 + "Topple the King's castle in the middle for an instant win. Now finish this battle!",
                 "Tap Fight!", NONE, NONE, 0),
@@ -298,7 +298,7 @@ public final class Tutorial {
     /// The bubble sits under the battle's top bar, unless what the finger
     /// points at is up there: then it moves down, above the hand.
     private void place(Step s) {
-        boolean high = s.targetX >= 0 && s.card == null || s.kind == PLACE && s.targetY < Arena.RIVER_TOP;
+        boolean high = s.targetX >= 0 && s.card == null || s.kind == PLACE && s.targetY < Arena.CLASSIC.riverTop();
         Style st = top.getAllStyles();
         st.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
         int formH = battle.form().getHeight();

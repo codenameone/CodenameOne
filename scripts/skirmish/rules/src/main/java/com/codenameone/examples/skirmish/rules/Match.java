@@ -46,12 +46,21 @@ public final class Match {
     public static final int POCKET_DEPTH = 4 * Arena.TILE;
 
     /// Result: no winner yet.
+    /// No more units than this are ever on the field. Ranked battles never come
+    /// close; it keeps a designed card that spawns too much from stalling a phone.
+    public static final int MAX_UNITS = 400;
+
     public static final int ONGOING = -2;
     /// Result: the match ended level.
     public static final int DRAW = -1;
 
     private final long seed;
+    private final MatchRules rules;
+    private final Arena arena;
+    private final CardSet cards;
     private final Rng rng;
+    private final int[] elixirCarry = new int[2];
+    private int nextWave;
     private final PlayerState[] players = new PlayerState[2];
     private final List<Unit> units = new ArrayList<Unit>();
     private final List<Event> events = new ArrayList<Event>();
@@ -60,30 +69,49 @@ public final class Match {
     private int result = ONGOING;
 
     public Match(long seed, String[] deck0, String[] deck1) {
-        if (!Cards.isValidDeck(deck0) || !Cards.isValidDeck(deck1)) {
+        this(seed, deck0, deck1, MatchRules.CLASSIC);
+    }
+
+    /// A match under `rules`. Outside classic play a side may have no deck (null):
+    /// it plays nothing itself, which is how a mission's scripted enemy is built.
+    public Match(long seed, String[] deck0, String[] deck1, MatchRules rules) {
+        this.rules = rules;
+        this.arena = rules.arena;
+        this.cards = rules.cards;
+        if (!deckOk(deck0) || !deckOk(deck1)) {
             throw new IllegalArgumentException("invalid deck");
         }
         this.seed = seed;
         this.rng = new Rng(seed);
-        players[0] = new PlayerState(deck0, rng);
-        players[1] = new PlayerState(deck1, rng);
-        for (int p = 0; p < 2; p++) {
-            placeTower(p, Cards.KING_TOWER, Arena.KING_X, Arena.KING_Y_BOTTOM).active = false;
-            placeTower(p, Cards.PRINCESS_TOWER, Arena.LEFT_LANE_X, Arena.PRINCESS_Y_BOTTOM);
-            placeTower(p, Cards.PRINCESS_TOWER, Arena.RIGHT_LANE_X, Arena.PRINCESS_Y_BOTTOM);
+        players[0] = new PlayerState(deck0, rng, rules.startElixir[0]);
+        players[1] = new PlayerState(deck1, rng, rules.startElixir[1]);
+        List<Arena.Tower> towers = arena.towers;
+        for (int i = 0; i < towers.size(); i++) {
+            Arena.Tower t = towers.get(i);
+            CardDef card = cards.get(t.card);
+            if (card == null) {
+                throw new IllegalArgumentException("unknown tower card: " + t.card);
+            }
+            Unit u = new Unit(nextId++, card, t.owner, t.x, t.y, arena.laneOf(t.x));
+            u.king = t.king;
+            u.active = !(t.king && rules.kingsAsleep);
+            units.add(u);
         }
     }
 
-    private Unit placeTower(int player, String card, int x, int bottomY) {
-        int y = player == 0 ? bottomY : Arena.mirrorY(bottomY);
-        Unit u = new Unit(nextId++, Cards.get(card), player, x, y);
-        units.add(u);
-        return u;
+    private boolean deckOk(String[] deck) {
+        if (deck == null) {
+            return !rules.isClassic();
+        }
+        return cards.isValidDeck(deck);
     }
 
     // ------------------------------------------------------------------ queries
 
     public long seed() { return seed; }
+    public MatchRules rules() { return rules; }
+    public Arena arena() { return arena; }
+    public CardSet cards() { return cards; }
     public int tick() { return tick; }
     public PlayerState player(int p) { return players[p]; }
     /// Live units in creation order. Do not modify.
@@ -93,12 +121,12 @@ public final class Match {
     public boolean isOver() { return result != ONGOING; }
     /// The winning player, [#DRAW], or [#ONGOING].
     public int result() { return result; }
-    public boolean isOvertime() { return tick >= REGULAR_TICKS; }
-    public boolean isDoubleElixir() { return tick >= DOUBLE_ELIXIR_FROM; }
+    public boolean isOvertime() { return tick >= rules.regularTicks; }
+    public boolean isDoubleElixir() { return tick >= rules.doubleElixirFrom; }
 
     /// Seconds left in the current period (regular time or overtime).
     public int secondsLeft() {
-        int end = tick < REGULAR_TICKS ? REGULAR_TICKS : MAX_TICKS;
+        int end = tick < rules.regularTicks ? rules.regularTicks : rules.maxTicks();
         return (end - tick + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND;
     }
 
@@ -119,7 +147,7 @@ public final class Match {
             return false;
         }
         PlayerState ps = players[player];
-        CardDef card = Cards.get(cardId);
+        CardDef card = cards.get(cardId);
         if (card == null || !card.isPlayable() || ps.handSlotOf(cardId) < 0) {
             return false;
         }
@@ -131,31 +159,34 @@ public final class Match {
 
     /// True when (x, y) is inside the area `player` may drop `card` into.
     public boolean isValidDrop(int player, CardDef card, int x, int y) {
-        if (x < 0 || x > Arena.WIDTH || y < 0 || y > Arena.HEIGHT) {
+        if (x < 0 || x > arena.width || y < 0 || y > arena.height) {
             return false;
         }
         if (card.kind == CardDef.SPELL) {
             return true;
         }
-        if (Arena.ownHalf(player, y)) {
+        if (arena.blocked(x, y)) {
+            return false;
+        }
+        if (arena.ownHalf(player, y)) {
             return true;
         }
         // The pocket: once a lane's enemy princess tower falls, its side of the
         // enemy half opens up to the river plus POCKET_DEPTH.
-        int lane = Arena.laneOf(x);
+        int lane = arena.laneOf(x);
         if (princessStanding(1 - player, lane)) {
             return false;
         }
         if (player == 0) {
-            return y >= Arena.RIVER_TOP - POCKET_DEPTH && y < Arena.RIVER_TOP;
+            return y >= arena.riverTop - POCKET_DEPTH && y < arena.riverTop;
         }
-        return y <= Arena.RIVER_BOTTOM + POCKET_DEPTH && y > Arena.RIVER_BOTTOM;
+        return y <= arena.riverBottom + POCKET_DEPTH && y > arena.riverBottom;
     }
 
     private boolean princessStanding(int player, int lane) {
         for (int i = 0; i < units.size(); i++) {
             Unit u = units.get(i);
-            if (u.owner == player && u.card.id.equals(Cards.PRINCESS_TOWER) && u.lane == lane && u.hp > 0) {
+            if (u.owner == player && u.card.kind == CardDef.TOWER && !u.king && u.lane == lane && u.hp > 0) {
                 return true;
             }
         }
@@ -180,6 +211,7 @@ public final class Match {
                 }
             }
         }
+        runWaves();
         regenElixir();
         int count = units.size();
         for (int i = 0; i < count; i++) {
@@ -202,16 +234,30 @@ public final class Match {
         }
     }
 
+    private void runWaves() {
+        List<MatchRules.Wave> waves = rules.waves;
+        while (nextWave < waves.size() && waves.get(nextWave).tick <= tick) {
+            MatchRules.Wave w = waves.get(nextWave++);
+            CardDef card = cards.get(w.card);
+            if (w.tick < tick || card == null || !card.isPlayable() || w.x < 0 || w.x > arena.width
+                    || w.y < 0 || w.y > arena.height) {
+                continue;
+            }
+            events.add(new Event(Event.PLAYED, w.player, -1, w.x, w.y, cards.indexOf(card.id)));
+            spawn(card, w.player, w.x, w.y);
+        }
+    }
+
     private void apply(Command c) {
         if (!canPlay(c.player, c.cardId, c.x, c.y)) {
             events.add(new Event(Event.REJECTED, c.player, -1, c.x, c.y, 0));
             return;
         }
         PlayerState ps = players[c.player];
-        CardDef card = Cards.get(c.cardId);
+        CardDef card = cards.get(c.cardId);
         ps.elixir -= card.cost * PlayerState.ELIXIR_UNIT;
         ps.cycle(ps.handSlotOf(c.cardId));
-        events.add(new Event(Event.PLAYED, c.player, -1, c.x, c.y, Cards.indexOf(card.id)));
+        events.add(new Event(Event.PLAYED, c.player, -1, c.x, c.y, cards.indexOf(card.id)));
         spawn(card, c.player, c.x, c.y);
     }
 
@@ -231,9 +277,12 @@ public final class Match {
                     oy = 0;
                 }
             }
-            int sx = FixedMath.clamp(x + ox, 0, Arena.WIDTH);
-            int sy = FixedMath.clamp(y + oy, 0, Arena.HEIGHT);
-            Unit u = new Unit(nextId++, card, owner, sx, sy);
+            if (units.size() >= MAX_UNITS) {
+                return;
+            }
+            int sx = FixedMath.clamp(x + ox, 0, arena.width);
+            int sy = FixedMath.clamp(y + oy, 0, arena.height);
+            Unit u = new Unit(nextId++, card, owner, sx, sy, arena.laneOf(sx));
             units.add(u);
             events.add(new Event(card.kind == CardDef.SPELL ? Event.SPELL : Event.SPAWN, u.id, -1, sx, sy, 0));
         }
@@ -243,7 +292,16 @@ public final class Match {
         int gain = isDoubleElixir() ? 2 : 1;
         for (int p = 0; p < 2; p++) {
             PlayerState ps = players[p];
-            ps.elixir = Math.min(PlayerState.MAX_ELIXIR, ps.elixir + gain);
+            int add = gain;
+            int pct = rules.elixirPercent[p];
+            if (pct != 100) {
+                // Whole hundredths carried from tick to tick, so a rate of 150 is
+                // exactly one and a half times as fast over any stretch of time.
+                int carry = elixirCarry[p] + gain * pct;
+                add = carry / 100;
+                elixirCarry[p] = carry % 100;
+            }
+            ps.elixir = Math.min(PlayerState.MAX_ELIXIR, ps.elixir + add);
         }
     }
 
@@ -268,7 +326,10 @@ public final class Match {
             }
             if (c.spawns != null && c.spawnTicks > 0 && u.age % c.spawnTicks == 0) {
                 int dir = u.owner == 0 ? -1 : 1;
-                spawn(Cards.get(c.spawns), u.owner, u.x, u.y + dir * (c.radius + 300));
+                CardDef spawned = cards.get(c.spawns);
+                if (spawned != null) {
+                    spawn(spawned, u.owner, u.x, u.y + dir * (c.radius + 300));
+                }
             }
         }
         if (c.damage <= 0 || !u.active) {
@@ -365,7 +426,7 @@ public final class Match {
             return;
         }
         u.hp -= amount;
-        if (u.card.kind == CardDef.TOWER && u.card.id.equals(Cards.KING_TOWER) && source >= 0) {
+        if (u.card.kind == CardDef.TOWER && u.king && source >= 0) {
             u.active = true;
         }
         if (u.hp <= 0) {
@@ -380,14 +441,14 @@ public final class Match {
     private void towerDown(Unit tower) {
         int scorer = 1 - tower.owner;
         events.add(new Event(Event.TOWER_DOWN, tower.id, scorer, tower.x, tower.y, 0));
-        if (tower.card.id.equals(Cards.KING_TOWER)) {
+        if (tower.king) {
             players[scorer].crowns = 3;
             return;
         }
         players[scorer].crowns = Math.min(3, players[scorer].crowns + 1);
         for (int i = 0; i < units.size(); i++) {
             Unit k = units.get(i);
-            if (k.owner == tower.owner && k.card.id.equals(Cards.KING_TOWER)) {
+            if (k.owner == tower.owner && k.king) {
                 k.active = true;
             }
         }
@@ -417,11 +478,11 @@ public final class Match {
     }
 
     /// 1 for the bottom bank, -1 for the top one, 0 for the river band.
-    private static int side(int y) {
-        if (y >= Arena.RIVER_BOTTOM) {
+    private int side(int y) {
+        if (y >= arena.riverBottom) {
             return 1;
         }
-        if (y <= Arena.RIVER_TOP) {
+        if (y <= arena.riverTop) {
             return -1;
         }
         return 0;
@@ -430,11 +491,11 @@ public final class Match {
     /// Where an unengaged unit walks: to its lane's bridge, over it, then at the
     /// nearest enemy tower.
     private int[] waypoint(Unit u) {
-        if (!u.isFlying() && !Arena.crossed(u.owner, u.y)) {
-            int lx = Arena.laneX(Arena.laneOf(u.x));
-            int nearBank = u.owner == 0 ? Arena.RIVER_BOTTOM : Arena.RIVER_TOP;
-            int farBank = u.owner == 0 ? Arena.RIVER_TOP - 1 : Arena.RIVER_BOTTOM + 1;
-            if (Math.abs(u.x - lx) > 150 && Arena.ownHalf(u.owner, u.y)) {
+        if (!u.isFlying() && !arena.crossed(u.owner, u.y)) {
+            int lx = arena.laneX(arena.laneOf(u.x));
+            int nearBank = u.owner == 0 ? arena.riverBottom : arena.riverTop;
+            int farBank = u.owner == 0 ? arena.riverTop - 1 : arena.riverBottom + 1;
+            if (Math.abs(u.x - lx) > 150 && arena.ownHalf(u.owner, u.y)) {
                 return new int[] {lx, nearBank};
             }
             return new int[] {lx, farBank};
@@ -472,7 +533,7 @@ public final class Match {
             u.x += (int) (dx * speed / dist);
             u.y += (int) (dy * speed / dist);
         }
-        u.lane = Arena.laneOf(u.x);
+        u.lane = arena.laneOf(u.x);
     }
 
     /// Pushes overlapping troops apart so a group spreads instead of stacking.
@@ -504,9 +565,34 @@ public final class Match {
                     a.x += (int) ((a.x - (long) b.x) * share / d);
                     a.y += (int) ((a.y - (long) b.y) * share / d);
                 }
-                a.x = FixedMath.clamp(a.x, 0, Arena.WIDTH);
-                a.y = FixedMath.clamp(a.y, 0, Arena.HEIGHT);
+                a.x = FixedMath.clamp(a.x, 0, arena.width);
+                a.y = FixedMath.clamp(a.y, 0, arena.height);
             }
+            if (!a.isFlying()) {
+                pushOutOfObstacles(a);
+            }
+        }
+    }
+
+    private void pushOutOfObstacles(Unit a) {
+        List<Arena.Obstacle> rocks = arena.obstacles;
+        for (int k = 0; k < rocks.size(); k++) {
+            Arena.Obstacle o = rocks.get(k);
+            int minD = o.radius + a.card.radius;
+            long d2 = FixedMath.distSq(a.x, a.y, o.x, o.y);
+            if (d2 >= (long) minD * minD) {
+                continue;
+            }
+            long d = FixedMath.isqrt(d2);
+            if (d == 0) {
+                // Dead centre: step out sideways, away from the middle of the field.
+                a.x = o.x + (o.x < arena.width / 2 ? -minD : minD);
+            } else {
+                a.x = o.x + (int) ((a.x - (long) o.x) * minD / d);
+                a.y = o.y + (int) ((a.y - (long) o.y) * minD / d);
+            }
+            a.x = FixedMath.clamp(a.x, 0, arena.width);
+            a.y = FixedMath.clamp(a.y, 0, arena.height);
         }
     }
 
@@ -521,20 +607,36 @@ public final class Match {
     private void checkEnd() {
         int c0 = players[0].crowns;
         int c1 = players[1].crowns;
+        if (rules.objective == MatchRules.DEFEND) {
+            if (c1 >= 3) {
+                result = 1;
+            } else if (tick >= rules.regularTicks) {
+                result = 0;
+            }
+            return;
+        }
+        if (rules.objective == MatchRules.RAID) {
+            if (c0 >= rules.objectiveCount || c0 >= 3) {
+                result = 0;
+            } else if (c1 >= 3 || tick >= rules.regularTicks) {
+                result = 1;
+            }
+            return;
+        }
         if (c0 >= 3 || c1 >= 3) {
             result = c0 > c1 ? 0 : 1;
             return;
         }
-        if (tick == REGULAR_TICKS && c0 != c1) {
+        if (tick == rules.regularTicks && c0 != c1) {
             result = c0 > c1 ? 0 : 1;
             return;
         }
-        if (tick > REGULAR_TICKS && c0 != c1) {
+        if (tick > rules.regularTicks && c0 != c1) {
             // Sudden death: the first crown in overtime decides it.
             result = c0 > c1 ? 0 : 1;
             return;
         }
-        if (tick >= MAX_TICKS) {
+        if (tick >= rules.maxTicks()) {
             result = DRAW;
         }
     }
@@ -566,18 +668,25 @@ public final class Match {
         h = mix(h, result);
         h = mix(h, rng.state());
         h = mix(h, nextId);
+        if (!rules.isClassic()) {
+            // Ranked hashes predate custom rules and stay as they were.
+            h = rules.hash(h);
+            h = mix(h, nextWave);
+            h = mix(h, elixirCarry[0]);
+            h = mix(h, elixirCarry[1]);
+        }
         for (int p = 0; p < 2; p++) {
             PlayerState ps = players[p];
             h = mix(h, ps.elixir);
             h = mix(h, ps.crowns);
             for (int i = 0; i < ps.order.length; i++) {
-                h = mix(h, Cards.indexOf(ps.order[i]));
+                h = mix(h, cards.indexOf(ps.order[i]));
             }
         }
         for (int i = 0; i < units.size(); i++) {
             Unit u = units.get(i);
             h = mix(h, u.id);
-            h = mix(h, Cards.indexOf(u.card.id));
+            h = mix(h, cards.indexOf(u.card.id));
             h = mix(h, u.owner);
             h = mix(h, u.x);
             h = mix(h, u.y);
@@ -589,6 +698,10 @@ public final class Match {
             h = mix(h, u.active ? 1 : 0);
         }
         return h;
+    }
+
+    static long mixValue(long h, long v) {
+        return mix(h, v);
     }
 
     private static long mix(long h, long v) {

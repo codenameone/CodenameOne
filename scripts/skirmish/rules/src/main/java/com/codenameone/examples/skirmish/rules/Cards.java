@@ -79,56 +79,29 @@ public final class Cards {
         ALL.add(def);
     }
 
+    static List<CardDef> builtins() {
+        return new ArrayList<CardDef>(ALL);
+    }
+
+    // The built-in set. A match on custom content asks its own `CardSet`.
+
     public static CardDef get(String id) {
-        for (int i = 0; i < ALL.size(); i++) {
-            CardDef d = ALL.get(i);
-            if (d.id.equals(id)) {
-                return d;
-            }
-        }
-        return null;
+        return CardSet.BUILTIN.get(id);
     }
 
     public static int indexOf(String id) {
-        for (int i = 0; i < ALL.size(); i++) {
-            if (ALL.get(i).id.equals(id)) {
-                return i;
-            }
-        }
-        return -1;
+        return CardSet.BUILTIN.indexOf(id);
     }
 
     public static CardDef at(int index) {
-        return ALL.get(index);
+        return CardSet.BUILTIN.at(index);
     }
 
-    /// The cards a player may put in a deck, in catalog order.
     public static List<CardDef> playable() {
-        List<CardDef> out = new ArrayList<CardDef>();
-        for (int i = 0; i < ALL.size(); i++) {
-            if (ALL.get(i).isPlayable()) {
-                out.add(ALL.get(i));
-            }
-        }
-        return out;
+        return CardSet.BUILTIN.playable();
     }
 
-    /// A deck is valid when it holds exactly [Deck#SIZE] distinct playable cards.
     public static boolean isValidDeck(String[] deck) {
-        if (deck == null || deck.length != Deck.SIZE) {
-            return false;
-        }
-        for (int i = 0; i < deck.length; i++) {
-            CardDef d = get(deck[i]);
-            if (d == null || !d.isPlayable()) {
-                return false;
-            }
-            for (int j = 0; j < i; j++) {
-                if (deck[j].equals(deck[i])) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        return CardSet.BUILTIN.isValidDeck(deck);
     }
 }

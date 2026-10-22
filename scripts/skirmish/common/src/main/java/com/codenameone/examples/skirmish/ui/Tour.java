@@ -207,8 +207,8 @@ public final class Tour implements Runnable {
                 CardDef card = Cards.get(m.player(view.driver().me()).hand(slot));
                 tap("card" + slot);
                 pause(700);
-                int x = lane % 2 == 0 ? Arena.LEFT_LANE_X : Arena.RIGHT_LANE_X;
-                int y = card.kind == CardDef.SPELL ? Arena.mirrorY(Arena.PRINCESS_Y_BOTTOM) : 19 * Arena.TILE;
+                int x = lane % 2 == 0 ? Arena.CLASSIC.laneX(0) : Arena.CLASSIC.laneX(1);
+                int y = card.kind == CardDef.SPELL ? Arena.CLASSIC.mirrorY(Arena.CLASSIC.princessY()) : 19 * Arena.TILE;
                 place(view, x, y);
                 lane++;
                 pause(2200);

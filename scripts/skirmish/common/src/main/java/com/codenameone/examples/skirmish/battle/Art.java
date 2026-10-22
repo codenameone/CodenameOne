@@ -65,18 +65,18 @@ public final class Art {
         g.setColor(0xc9b27a);
         g.setAlpha(150);
         for (int lane = 0; lane < 2; lane++) {
-            int lx = Arena.laneX(lane) * t / Arena.TILE;
+            int lx = Arena.CLASSIC.laneX(lane) * t / Arena.TILE;
             g.fillRoundRect(lx - t * 3 / 4, t * 5, t * 3 / 2, h - t * 10, t, t);
         }
         // the cross path between the king towers and the lanes
-        g.fillRoundRect(Arena.LEFT_LANE_X * t / Arena.TILE, t * 5 / 2, (Arena.RIGHT_LANE_X - Arena.LEFT_LANE_X)
+        g.fillRoundRect(Arena.CLASSIC.laneX(0) * t / Arena.TILE, t * 5 / 2, (Arena.CLASSIC.laneX(1) - Arena.CLASSIC.laneX(0))
                 * t / Arena.TILE, t, t, t);
-        g.fillRoundRect(Arena.LEFT_LANE_X * t / Arena.TILE, h - t * 7 / 2, (Arena.RIGHT_LANE_X - Arena.LEFT_LANE_X)
+        g.fillRoundRect(Arena.CLASSIC.laneX(0) * t / Arena.TILE, h - t * 7 / 2, (Arena.CLASSIC.laneX(1) - Arena.CLASSIC.laneX(0))
                 * t / Arena.TILE, t, t, t);
         g.setAlpha(255);
         // Banks, then the water with a lighter centre.
-        int r1 = Arena.RIVER_TOP * t / Arena.TILE;
-        int r2 = Arena.RIVER_BOTTOM * t / Arena.TILE;
+        int r1 = Arena.CLASSIC.riverTop() * t / Arena.TILE;
+        int r2 = Arena.CLASSIC.riverBottom() * t / Arena.TILE;
         g.setColor(0xd8c48e);
         g.fillRect(0, r1 - t / 4, w, r2 - r1 + t / 2);
         g.fillLinearGradient(0x2f7fc8, 0x46a6e8, 0, r1, w, (r2 - r1) / 2, false);
@@ -90,8 +90,8 @@ public final class Art {
         g.setAlpha(255);
         // Plank bridges over the river.
         for (int lane = 0; lane < 2; lane++) {
-            int bx = (Arena.laneX(lane) - Arena.BRIDGE_HALF_WIDTH) * t / Arena.TILE;
-            int bw = 2 * Arena.BRIDGE_HALF_WIDTH * t / Arena.TILE;
+            int bx = (Arena.CLASSIC.laneX(lane) - Arena.CLASSIC.bridgeHalfWidth()) * t / Arena.TILE;
+            int bw = 2 * Arena.CLASSIC.bridgeHalfWidth() * t / Arena.TILE;
             g.setColor(0x5a3a1c);
             g.fillRect(bx - 3, r1 - t / 3, bw + 6, r2 - r1 + t * 2 / 3);
             for (int py = r1 - t / 3; py < r2 + t / 3; py += 8) {
