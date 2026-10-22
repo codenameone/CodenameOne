@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion;
 
 import com.codename1.io.Preferences;
+import com.codename1.ui.CN;
 
 import java.util.Hashtable;
 import java.util.Vector;
@@ -37,6 +38,9 @@ public final class AppConfig {
     /// reads the code off the redirect and never opens it
     /// (`SecurityConfig.LOOPBACK_REDIRECT`).
     public static final String REDIRECT_URI = "http://127.0.0.1/callback";
+    /// The path the server hands the code back on when the app runs in a
+    /// browser. The same constant is in the server's `SecurityConfig`.
+    public static final String WEB_REDIRECT_PATH = "/signin/code";
 
     /// The hosts the app may talk to at all. Anything else is refused before a
     /// connection is opened (see `net/Guard`), so a link, a redirect or a
@@ -75,14 +79,45 @@ public final class AppConfig {
     }
 
     /// The server's address with no trailing slash: a `bastion.server.url`
-    /// system property (the tests), then the one chosen in the app, then
-    /// [#DEFAULT_SERVER].
+    /// system property (the tests), then -- in a browser -- the address the
+    /// page came from, since the server that hosts the app is the server it
+    /// talks to, then the one chosen in the app, then [#DEFAULT_SERVER].
     public static String serverUrl() {
         String url = System.getProperty("bastion.server.url");
         if (url == null || url.length() == 0) {
-            url = Preferences.get(SERVER_KEY, DEFAULT_SERVER);
+            String origin = pageOrigin();
+            url = origin != null ? origin : Preferences.get(SERVER_KEY, DEFAULT_SERVER);
         }
         return clean(url);
+    }
+
+    /// The address of the page the app is running in -- `https://host`, with
+    /// no path -- or null when it is not running in a browser.
+    public static String pageOrigin() {
+        String origin = CN.getProperty("browser.window.location.origin", null);
+        if (origin == null || !(origin.regionMatches(true, 0, "http://", 0, 7)
+                || origin.regionMatches(true, 0, "https://", 0, 8))) {
+            return null;
+        }
+        return clean(origin);
+    }
+
+    /// Where the server is asked to send the authorization code. The
+    /// installed app names the loopback address and reads the code off the
+    /// redirect without following it. A browser follows a redirect itself and
+    /// will not show the page an answer from another origin, so there the code
+    /// is sent to the server the page came from, which hands it back
+    /// (`SignInCodePage` on the server).
+    public static String redirectUri() {
+        String origin = pageOrigin();
+        return origin == null ? REDIRECT_URI : origin + WEB_REDIRECT_PATH;
+    }
+
+    /// Whether the app may be pointed at another server. Not in a browser:
+    /// there the code comes back to the page's own server, which no other
+    /// server has registered as one of its addresses.
+    public static boolean serverSwitchable() {
+        return pageOrigin() == null;
     }
 
     /// Points the app at another server. Refused unless the address is
@@ -90,6 +125,9 @@ public final class AppConfig {
     /// server on this machine: the app is never talked into plain HTTP, or
     /// into a server nobody listed, from a settings screen.
     public static boolean setServerUrl(String url) {
+        if (!serverSwitchable()) {
+            return false;
+        }
         String cleaned = clean(url);
         if (!isDevelopmentServer(cleaned)
                 && (!isHttps(cleaned) || !isAllowedHost(hostOf(cleaned)))) {

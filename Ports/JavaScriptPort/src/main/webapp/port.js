@@ -1315,6 +1315,16 @@ bindNative([
   return pair;
 });
 
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_generateEcKeyPair_java_lang_String_R_byte_2ARRAY"
+], function*(_impl, curve) {
+  const result = yield* cn1CryptoHost({ op: "generateEcKeyPair", curve: jvm.toNativeString(curve) });
+  const pair = jvm.newArray(2, "JAVA_BYTE", 2);
+  pair[0] = cn1CryptoJavaBytes(result[0]);
+  pair[1] = cn1CryptoJavaBytes(result[1]);
+  return pair;
+});
+
 // --------------------------------------------------------------------------
 // com.codename1.impl.html5.HTML5DeviceProtection -- the browser half of
 // com.codename1.security.vault.
@@ -1523,6 +1533,43 @@ bindNative([
     op: "prfForget",
     keyId: jvm.toNativeString(keyId)
   }));
+});
+
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5WebAuthn -- WebAuthnClient's passkey ceremonies,
+// run by the page (the worker has no navigator.credentials) through the
+// __cn1_webauthn__ host bridge in browser_bridge.js. An older host bundle
+// without the handler rejects the call; that is "not supported", not a crash.
+// --------------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5WebAuthn_nativeSupported_R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  try {
+    return (yield jvm.invokeHostNative("__cn1_webauthn__", [{ op: "supported" }])) ? 1 : 0;
+  } catch (err) {
+    return 0;
+  }
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5WebAuthn_nativeCeremony_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(op, options) {
+  let reply;
+  try {
+    reply = yield jvm.invokeHostNative("__cn1_webauthn__", [{
+      op: jvm.toNativeString(op),
+      options: jvm.toNativeString(options)
+    }]);
+  } catch (err) {
+    reply = { status: 2, text: "transport_error:" + String(err && err.message || err) };
+  }
+  const status = reply && typeof reply.status === "number" ? reply.status : 2;
+  const bytes = Array.from(new TextEncoder().encode(String(reply && reply.text || "")));
+  return cn1VaultJavaBytes([status].concat(bytes));
 });
 
 // PBKDF2 through Web Crypto. The portable fallback in KdfProfile is the same

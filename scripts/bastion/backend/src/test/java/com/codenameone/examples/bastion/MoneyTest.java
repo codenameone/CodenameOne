@@ -260,6 +260,18 @@ class MoneyTest {
     }
 
     @Test
+    void aMoveBetweenTwoCurrenciesIsRefusedNotAFault() throws Exception {
+        Customer c = new Customer(false);
+        c.deposit(c.checking, 50000);
+        String euros = c.open("EUR", "CHECKING");
+        MockResponse answer = c.send(json("/api/transfers", internal(c.checking, euros, 2500))
+                .header("Idempotency-Key", key()));
+        assertEquals(400, answer.getStatus(), answer.getContentAsString());
+        assertEquals(50000, c.balance(c.checking));
+        assertEquals(0, c.balance(euros));
+    }
+
+    @Test
     void refusesWhatTheAccountDoesNotHold() throws Exception {
         Customer c = new Customer(false);
         String savings = c.open("USD", "SAVINGS");
@@ -431,6 +443,12 @@ class MoneyTest {
     /// The token's sign-in, `minutes` older: the same claims, re-signed with
     /// the server's key, as a token kept alive by refreshing would carry.
     private String aged(String token, long minutes) throws Exception {
+        return aged(token, minutes, null);
+    }
+
+    /// As [#aged(String, long)], with the `amr` claim replaced when `amr` is
+    /// not null.
+    private String aged(String token, long minutes, List<String> amr) throws Exception {
         String payload = token.substring(token.indexOf('.') + 1, token.lastIndexOf('.'));
         Map claims = Json.parseObject(new String(Base64Url.decode(payload), "UTF-8"));
         JwtClaimsSet.Builder b = JwtClaimsSet.builder();
@@ -440,6 +458,9 @@ class MoneyTest {
         }
         long authTime = ((Number) claims.get("auth_time")).longValue();
         b.claim("auth_time", Long.valueOf(authTime - minutes * 60L));
+        if (amr != null) {
+            b.claim("amr", amr);
+        }
         return new DefaultJwtEncoder(signingKeys).encode(JwtEncoderParameters.from(b.build()))
                 .getTokenValue();
     }
@@ -462,6 +483,22 @@ class MoneyTest {
         c.token = aged(fresh, 1);
         assertEquals(200, c.send(json("/api/devices", right)).getStatus());
         assertTrue(audit.verify().isEmpty());
+    }
+
+    @Test
+    void aPasskeySignInAddsADeviceWithoutThePassword() throws Exception {
+        Customer c = new Customer(false);
+        // The token says how its sign-in was made: here, a password alone.
+        String payload = c.token.substring(c.token.indexOf('.') + 1, c.token.lastIndexOf('.'));
+        Map claims = Json.parseObject(new String(Base64Url.decode(payload), "UTF-8"));
+        assertEquals(java.util.Arrays.asList("pwd"), claims.get("amr"));
+        String noPassword = "{\"publicKey\":\"" + Base64Url.encode(newKey().publicKey)
+                + "\",\"platform\":\"and\",\"rooted\":false,\"attested\":true,"
+                + "\"integrityToken\":\"t\"}";
+        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        // A fresh passkey sign-in needs none.
+        c.token = aged(c.token, 1, java.util.Arrays.asList("hwk", "user", "mfa"));
+        assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());
     }
 
     @Test

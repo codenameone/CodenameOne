@@ -62,6 +62,12 @@ import java.util.Map;
 ///   rotating refresh token; [OidcRequestAuthorizer] renews them, and keeps
 ///   the pair in the platform's secure storage (Keychain / Keystore), never in
 ///   plain preferences outside the simulator.
+/// - **The same flow in a browser.** There the app sees neither the session
+///   cookie nor a redirect: the browser keeps the first in its own jar and
+///   follows the second. So in a browser every step is read from its answer
+///   instead -- the server's JSON for the password, the code and the passkey,
+///   and the authorization code from the page the redirect ends on
+///   ([AppConfig#redirectUri]) -- and no `Cookie` header is ever written.
 public final class Session {
     private static final String STORE_PREFIX = "bastion";
     private static final String SESSION_COOKIE = "CN1SESSION";
@@ -119,7 +125,7 @@ public final class Session {
                         .jwksUri(base + "/oauth2/jwks")
                         .build())
                 .setClientId(AppConfig.CLIENT_ID)
-                .setRedirectUri(AppConfig.REDIRECT_URI)
+                .setRedirectUri(AppConfig.redirectUri())
                 .setScopes("openid", "profile")
                 .setTokenStore(store)
                 .setStoreKey(storeKey(base));
@@ -246,10 +252,13 @@ public final class Session {
                 failed.failed(429, "Too many attempts. Wait a minute and try again.");
             } else if (login.status == 423) {
                 failed.failed(423, "This account is locked for a while after too many attempts.");
-            } else if (login.session != null && login.status == 302 && login.location != null
+            } else if (web() ? login.status == 200 && !login.signedIn()
+                    : login.session != null && login.status == 302 && login.location != null
                     && login.location.indexOf("/login/mfa") >= 0) {
+                // In a browser the redirect to /login/mfa was followed: the
+                // answer is that page, not the handler's `signedIn` JSON.
                 needsCode.got(new Pending(server, login.session));
-            } else if (login.session != null && login.status == 200) {
+            } else if (login.status == 200 && (web() ? login.signedIn() : login.session != null)) {
                 authorize(server, login.session, done, failed);
             } else {
                 failed.failed(401, "That e-mail and password do not match an account.");
@@ -262,7 +271,7 @@ public final class Session {
     public static void submitCode(final Pending pending, String code, final Runnable done,
             final Net.Failed failed) {
         final Step mfa = new Step("POST", pending.server + "/login/mfa");
-        mfa.addRequestHeader("Cookie", pending.cookie);
+        mfa.cookie(pending.cookie);
         mfa.addArgument("code", code == null ? "" : code.trim());
         mfa.send(() -> {
             if (!pending.server.equals(base)) {
@@ -271,7 +280,9 @@ public final class Session {
                 failed.failed(0, "Could not reach the server. Check your connection.");
             } else if (mfa.status == 429) {
                 failed.failed(429, "Too many attempts. Wait a minute and try again.");
-            } else if (mfa.status == 200) {
+            } else if (mfa.status == 200 && (!web() || mfa.signedIn())) {
+                // A wrong code is a redirect back to the code page, which a
+                // browser follows to a 200 without `signedIn`.
                 // The session id changes once the user is fully signed in.
                 authorize(pending.server, mfa.session != null ? mfa.session : pending.cookie,
                         done, failed);
@@ -293,7 +304,8 @@ public final class Session {
         final Step options = new Step("POST", server + "/webauthn/authenticate/options");
         options.json("{}");
         options.send(() -> {
-            if (!server.equals(base) || options.status != 200 || options.session == null) {
+            if (!server.equals(base) || options.status != 200
+                    || (!web() && options.session == null)) {
                 failed.failed(options.status, "Passkey sign-in is not available right now.");
                 return;
             }
@@ -308,7 +320,7 @@ public final class Session {
                 @Override
                 public void onSucess(PublicKeyCredential credential) {
                     final Step login = new Step("POST", server + "/login/webauthn");
-                    login.addRequestHeader("Cookie", options.session);
+                    login.cookie(options.session);
                     login.json(credential.toJson());
                     login.send(() -> {
                         if (!server.equals(base)) {
@@ -337,27 +349,34 @@ public final class Session {
         final PkceChallenge pkce = PkceChallenge.generate();
         final String state = PkceChallenge.generate().getVerifier();
         final Step authorize = new Step("GET", server + "/oauth2/authorize");
-        authorize.addRequestHeader("Cookie", cookie);
+        authorize.cookie(cookie);
+        if (web()) {
+            // Or a session that did not take is answered with a page.
+            authorize.addRequestHeader("Accept", "application/json");
+        }
         authorize.addArgument("response_type", "code");
         authorize.addArgument("client_id", AppConfig.CLIENT_ID);
-        authorize.addArgument("redirect_uri", AppConfig.REDIRECT_URI);
+        authorize.addArgument("redirect_uri", AppConfig.redirectUri());
         authorize.addArgument("scope", "openid profile");
         authorize.addArgument("state", state);
         authorize.addArgument("code_challenge", pkce.getChallenge());
         authorize.addArgument("code_challenge_method", pkce.getMethod());
         authorize.send(() -> {
-            String code = parameter(authorize.location, "code");
+            // In a browser the redirect was followed to SignInCodePage, which
+            // answers the code and state as JSON.
+            String code = web() ? authorize.answer("code") : parameter(authorize.location, "code");
+            String returned = web() ? authorize.answer("state")
+                    : parameter(authorize.location, "state");
             // A code that comes back with another state was not issued for
             // this sign-in.
-            if (!server.equals(base) || code == null
-                    || !state.equals(parameter(authorize.location, "state"))) {
+            if (!server.equals(base) || code == null || !state.equals(returned)) {
                 failed.failed(authorize.status, "Signing in failed. Try again.");
                 return;
             }
             final Step token = new Step("POST", server + "/oauth2/token");
             token.addArgument("grant_type", "authorization_code");
             token.addArgument("code", code);
-            token.addArgument("redirect_uri", AppConfig.REDIRECT_URI);
+            token.addArgument("redirect_uri", AppConfig.redirectUri());
             token.addArgument("code_verifier", pkce.getVerifier());
             token.addArgument("client_id", AppConfig.CLIENT_ID);
             token.send(() -> {
@@ -373,7 +392,9 @@ public final class Session {
                 if (keepForPasskey) {
                     keepForPasskey = false;
                     ceremonyServer = server;
-                    ceremonyCookie = cookie;
+                    // In a browser the session is the browser's cookie; an
+                    // empty marker says one is kept.
+                    ceremonyCookie = cookie == null ? "" : cookie;
                 } else {
                     endServerSession(server, cookie);
                 }
@@ -412,7 +433,7 @@ public final class Session {
             return;
         }
         final Step options = new Step("POST", server + "/webauthn/register/options");
-        options.addRequestHeader("Cookie", cookie);
+        options.cookie(cookie);
         options.json("{}");
         options.send(() -> {
             PublicKeyCredentialCreationOptions create = null;
@@ -432,7 +453,7 @@ public final class Session {
                 @Override
                 public void onSucess(PublicKeyCredential credential) {
                     final Step register = new Step("POST", server + "/webauthn/register");
-                    register.addRequestHeader("Cookie", cookie);
+                    register.cookie(cookie);
                     register.json("{\"publicKey\":{\"credential\":" + credential.toJson()
                             + ",\"label\":\"" + jsonText(label) + "\"}}");
                     register.send(() -> {
@@ -466,8 +487,43 @@ public final class Session {
 
     private static void endServerSession(String server, String cookie) {
         Step end = new Step("POST", server + "/logout");
-        end.addRequestHeader("Cookie", cookie);
+        end.cookie(cookie);
         end.send(() -> { });
+    }
+
+    /// How the current sign-in was made, as the server wrote it into the
+    /// access token's `amr` claim (`pwd`, `otp`, `hwk`, `mfa`). The token is
+    /// the server's word and is checked there; this reads it only to know
+    /// what the server will ask -- a passkey sign-in adds a device without
+    /// the password.
+    public static boolean signedInWith(String method) {
+        OidcTokens tokens = authorizer == null ? null : authorizer.getTokens();
+        String token = tokens == null ? null : tokens.getAccessToken();
+        int first = token == null ? -1 : token.indexOf('.');
+        int second = first < 0 ? -1 : token.indexOf('.', first + 1);
+        if (second < 0) {
+            return false;
+        }
+        try {
+            byte[] payload = com.codename1.util.Base64.decodeUrlSafe(
+                    token.substring(first + 1, second));
+            if (payload == null) {
+                return false;
+            }
+            Map<String, Object> claims = new JSONParser().parseJSON(new InputStreamReader(
+                    new ByteArrayInputStream(payload), "UTF-8"));
+            Object amr = claims == null ? null : claims.get("amr");
+            return amr instanceof java.util.List && ((java.util.List) amr).contains(method);
+        } catch (IOException malformed) {
+            return false;
+        } catch (RuntimeException malformed) {
+            return false;
+        }
+    }
+
+    /// Whether the app runs in a browser.
+    static boolean web() {
+        return AppConfig.pageOrigin() != null;
     }
 
     /// `text` as the inside of a JSON string.
@@ -549,6 +605,20 @@ public final class Session {
             setDuplicateSupported(true);
             setFailSilently(true);
             setAuthorizer(RequestAuthorizer.NONE);
+        }
+
+        /// The server session to send: a `Cookie` header outside a browser.
+        /// In one the browser sends its own cookie and a page may not set
+        /// that header, so nothing is written.
+        void cookie(String value) {
+            if (!web() && value != null && value.length() > 0) {
+                addRequestHeader("Cookie", value);
+            }
+        }
+
+        /// Whether the answer is the sign-in handlers' `{"signedIn":true}`.
+        boolean signedIn() {
+            return status == 200 && "true".equals(answer("signedIn"));
         }
 
         void json(String text) {

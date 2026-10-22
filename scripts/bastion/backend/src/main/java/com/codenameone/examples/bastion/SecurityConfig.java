@@ -110,6 +110,10 @@ public class SecurityConfig {
     /// this is never opened; it is the loopback address because that is the
     /// one address nobody else can register a listener on.
     public static final String LOOPBACK_REDIRECT = "http://127.0.0.1/callback";
+    /// Where the code is sent back to when the app runs in a browser: a path on
+    /// this server, which answers with the code it was given. See
+    /// [#withWebRedirect].
+    public static final String WEB_REDIRECT_PATH = "/signin/code";
     /// Whom the access tokens are for. The API accepts no token issued for
     /// anything else.
     public static final String AUDIENCE = "urn:bastion:api";
@@ -139,8 +143,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public RegisteredClientRepository clients(DataSource db) throws IOException {
-        JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(db);
+    public RegisteredClientRepository clients(DataSource db,
+            @Value("${" + ISSUER_KEY + ":}") final String issuer) throws IOException {
+        final JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(db);
         // Written once. A database from before a change to these settings
         // keeps its old row; drop it (or the database, on a development
         // profile) to pick the change up.
@@ -159,8 +164,74 @@ public class SecurityConfig {
                             .build())
                     .build());
         }
-        return clients;
+        // The app in a browser is the same client with one more address: this
+        // server's own. It is worked out and not stored, because on a
+        // development profile the server has no one address to store -- and a
+        // row written by an earlier version would not have it either.
+        return new RegisteredClientRepository() {
+            @Override
+            public void save(RegisteredClient client) {
+                clients.save(client);
+            }
+
+            @Override
+            public RegisteredClient findByClientId(String clientId) {
+                return withWebRedirect(clients.findByClientId(clientId), issuer);
+            }
+
+            @Override
+            public RegisteredClient findById(String id) {
+                return withWebRedirect(clients.findById(id), issuer);
+            }
+        };
     }
+
+    /// The app's registration with [#WEB_REDIRECT_PATH] on this server added
+    /// to the addresses a code may be sent back to.
+    ///
+    /// A browser will not show a page the answer to a request that was
+    /// redirected to another origin, so the app running in one cannot read its
+    /// code off a redirect to the loopback address the way the installed app
+    /// does. It asks for the code to be sent to this server instead, which
+    /// hands it straight back ([SignInCodePage]).
+    ///
+    /// "This server" is the configured issuer where there is one, and is then
+    /// the only web address accepted. With none -- a development profile -- it
+    /// is the address the request arrived at, the same rule
+    /// [#issuedAtThisAddress] holds a token to: a code is only ever sent back
+    /// to the server the browser was already talking to.
+    static RegisteredClient withWebRedirect(RegisteredClient client, String issuer) {
+        if (client == null || !CLIENT_ID.equals(client.getClientId())) {
+            return client;
+        }
+        String here = here(issuer);
+        if (here == null) {
+            return client;
+        }
+        RegisteredClient.Builder copy = RegisteredClient.withId(client.getId())
+                .clientId(client.getClientId())
+                .clientName(client.getClientName())
+                .clientSettings(client.getClientSettings())
+                .tokenSettings(client.getTokenSettings())
+                .redirectUri(here + WEB_REDIRECT_PATH);
+        for (ClientAuthenticationMethod method : client.getClientAuthenticationMethods()) {
+            copy.clientAuthenticationMethod(method);
+        }
+        for (AuthorizationGrantType grant : client.getAuthorizationGrantTypes()) {
+            copy.authorizationGrantType(grant);
+        }
+        for (String uri : client.getRedirectUris()) {
+            copy.redirectUri(uri);
+        }
+        for (String scope : client.getScopes()) {
+            copy.scope(scope);
+        }
+        for (String resource : client.getResources()) {
+            copy.resource(resource);
+        }
+        return copy.build();
+    }
+
 
     /// Kept in the database, so a refresh token outlives a restart and is good
     /// on every instance of the server.
@@ -301,6 +372,14 @@ public class SecurityConfig {
                             if (at instanceof Number) {
                                 context.getClaims().claim("auth_time",
                                         Long.valueOf(((Number) at).longValue()));
+                            }
+                            // And how: `amr`, which the server records on
+                            // the grant. A passkey sign-in (`hwk`) may add a
+                            // device without retyping a password.
+                            Object amr = context.getAuthorization().getAttribute("amr");
+                            if (amr instanceof java.util.List) {
+                                context.getClaims().claim("amr",
+                                        new java.util.ArrayList<Object>((java.util.List) amr));
                             }
                         }
                     }));

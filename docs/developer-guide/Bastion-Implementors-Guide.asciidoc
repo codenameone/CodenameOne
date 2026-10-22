@@ -54,14 +54,14 @@ Every amount is a `long` in the asset's smallest unit: cents for dollars and eur
 [cols="1,2,1",options="header"]
 |===
 |Feature |What it does |Where
-|Sign-in |The authorization server with the authorization-code flow and PKCE, five-minute access tokens and rotating twelve-hour refresh tokens. |`SecurityConfig.java`
+|Sign-in |The authorization server with the authorization-code flow and PKCE, five-minute access tokens and rotating twelve-hour refresh tokens. The app in a browser asks for its code at `/signin/code` on the server it came from, which hands the code back. Every access token says how its sign-in was made in the `amr` claim: `pwd`, `otp` and `mfa`, or `hwk` for a passkey. |`SecurityConfig.java`, `SignInCodePage.java`
 |Second factor |TOTP enrolment and confirmation, ten single-use recovery codes, and the `/login/mfa` step that holds the session back until the code. |`account/SecondFactor.java`, `SecurityConfig.java`
 |Passkeys |WebAuthn registration and sign-in; listing and removing them. |`SecurityConfig.java`, `account/PasskeyList.java`
 |Lockout |Failed passwords counted per account in `login_failure`, locking it for a period after too many. |`account/SignInGuard.java`
 |Rate limits |Per-address limits on sign-in, registration and transfers. |`SecurityConfig.java`
 |Headers |`nosniff`, frame denial, a strict referrer policy and HSTS over TLS on every answer. |`SecurityConfig.java`
 |Ending sessions |A password change ends every other sign-in by removing its grants, so a refresh token on a lost phone stops working. |`account/Grants.java`
-|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again when the account has no authenticator. |`money/Devices.java`
+|Device registration |A device's P-256 public key is registered only within minutes of a sign-in, and with the password again when the account has no authenticator and the sign-in didn't use a passkey. |`money/Devices.java`
 |Request signing |A payment is signed over the method, path, body hash, a nonce and a timestamp. A replayed nonce, an old timestamp or a wrong key is refused, and the nonce is recorded in its own transaction before any money moves. |`money/RequestSigning.java`, `shared/.../SignedRequest.java`
 |Device policy |Money leaving the customer needs a signature from a trusted device: registered, not reported rooted, and passing the integrity check. |`money/Money.java`, `money/Devices.java`
 |Integrity |The check of the platform's attestation token. The sample's verifier is simulated; see below. |`money/IntegrityVerifier.java`, `money/SimulatedIntegrityVerifier.java`
@@ -78,7 +78,7 @@ Every amount is a `long` in the asset's smallest unit: cents for dollars and eur
 |===
 |Feature |What it does |Where
 |Network guard |Installed before the first request: no cleartext except to a development server on this machine, a host allow-list, and certificate pins, through `AppShield`. |`net/Guard.java`, `AppConfig.java`
-|Sign-in |The password form and the second-factor step, then the authorization-code flow with PKCE; passkey sign-in. |`net/Session.java`
+|Sign-in |The password form and the second-factor step, then the authorization-code flow with PKCE; passkey sign-in. In a browser the same steps run from the page, with the browser's own session cookie and the code read from `/signin/code`. |`net/Session.java`
 |Token storage |The tokens are kept in `SecureStorage`, the Keychain on iOS and the Keystore-backed store on Android. |`net/Session.java`
 |Device key |A P-256 pair from `KeyGenerator.ecP256()`. The private half is sealed with AES-256-GCM in a `SecureEnvelope` under a wrapping key in `SecureStorage`; the server gets the public half. |`security/DeviceKey.java`
 |Request signer |Signs the exact bytes the request sends, in the canonical form the server checks. |`security/RequestSigner.java`
@@ -140,7 +140,7 @@ mvn -Dcodename1.platform=javase -Djava.awt.headless=true package
 ./run-web-e2e.sh
 ----
 
-The server's tests cover the ledger's invariants under concurrent transfers and trades, idempotency, sign-in with each factor, the access rules of every endpoint, signing and replay, the device policy, limits and cooling-off, the matching engine and its rounding, and the audit chain's detection of a changed row. `run-e2e.sh` registers two customers, enrols an authenticator and signs in with it, registers device keys, makes a signed payment and checks that the unsigned and replayed copies are refused, fills an order between the two, and checks that a withdrawal is refused until its address is allowed and cooled off.
+The server's tests cover the ledger's invariants under concurrent transfers and trades, idempotency, sign-in with each factor, the access rules of every endpoint, signing and replay, the device policy, limits and cooling-off, the matching engine and its rounding, and the audit chain's detection of a changed row. `run-e2e.sh` registers two customers, enrols an authenticator and signs in with it, registers device keys, makes a signed payment and checks that the unsigned and replayed copies are refused, fills an order between the two, and checks that a withdrawal is refused until its address is allowed and cooled off. `run-web-e2e.sh` does it in a headless browser, through the app's own screens: it opens an account, turns on the authenticator app, creates a passkey, signs in again with the password and a code, moves money between two accounts, then signs in with the passkey alone and registers the browser as a device without the password.
 
 === Before it's a product
 
@@ -154,7 +154,6 @@ The sample is complete as a demonstration and stops where a real bank's own syst
 * *A real market.* The market maker is a development-only random walk. A product takes its prices from a market data provider and its liquidity from real counterparties, and runs the exchange's own surveillance.
 * *Regulatory reporting.* Suspicious activity reports, transaction reporting, statements and tax documents, and records kept for as long as the law asks.
 * *Audit anchoring off the database.* The audit chain shows that history was changed, but whoever controls the database can rewrite the whole chain. Publishing the chain's head at intervals to a store the database's administrators can't write, such as write-once storage or a timestamping service, closes that.
-* *Sign-in in the browser.* The browser build loads and shows its sign-in form, but the app's sign-in uses a loopback redirect that a page can't follow. A browser product signs in through the server's own pages, with a redirect back to the app's origin and a CSRF token on every form.
 * *Translations.* The app ships only English, and the server's refusals are English text. Every string is in `Bundle_en.properties`, so adding a language is a copy and a translation, and the server's refusals would need codes the app translates.
-* *Device registration by passkey only.* A customer who signs in only with a passkey still gives a password to register a device. Recording how a sign-in was made, and accepting a fresh passkey sign-in in place of the password, removes that.
+* *Your own origin for passkeys.* A passkey belongs to the domain in `bastion.webauthn.rp-id` and is accepted only from the origins in `bastion.webauthn.origins`. A deployment sets both to its own domain, and adds the Android app's `android:apk-key-hash:` origin and the iOS app's associated domain.
 * *Operations.* Monitoring and alerting on the audit and ledger checks, fraud scoring on transfers, a support console with its own access controls and audit, backups and disaster recovery, and penetration testing.

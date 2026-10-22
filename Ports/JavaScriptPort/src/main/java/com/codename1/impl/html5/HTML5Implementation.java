@@ -5216,6 +5216,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (JavaScriptInputCoordinator.shouldInstallKeyboard(isPhoneOrTablet_())) {
             HTML5Keyboard.install();
         }
+        // Passkeys through the page's navigator.credentials.
+        HTML5WebAuthn.install();
         // Set the locale
         installBeforeUnload();
         

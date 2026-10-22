@@ -150,6 +150,12 @@ public class Money {
         if (from.getId().equals(to.getId())) {
             throw new ResponseStatusException(400, "Choose two different accounts");
         }
+        // A move is one asset in and the same out; changing one into another
+        // is a trade, at a price, on the exchange.
+        if (!from.getAsset().equals(to.getAsset())) {
+            throw new ResponseStatusException(400,
+                    "Both accounts must hold the same currency. Use the exchange to convert.");
+        }
         return move(new Move(owner, key, "TRANSFER", from, to, "", amount, false, memo, null));
     }
 

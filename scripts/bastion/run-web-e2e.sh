@@ -10,7 +10,13 @@
 # `backend/server.sh build --web` left.
 #
 # What it proves: a person who opens the server's address gets the app, from
-# this server, and it starts without an error at its sign-in form.
+# this server, and it starts without an error at its sign-in form; then that
+# a new customer can open an account, turn on the authenticator app, sign in
+# again from a fresh browser with the password and a code (the app runs the
+# authorization-code flow with PKCE from the page, the code handed back on
+# /signin/code), see the dashboard and move money between two accounts; and
+# that a passkey made in the browser signs in alone and is enough to register
+# the browser as a signing device without the password.
 # Screenshots of each step and the browser's log go to target/web-e2e.
 #
 # Needs JAVA_HOME on JDK 17 or newer, the Codename One artifacts this project builds
@@ -51,7 +57,9 @@ if [ ! -f "$HERE/backend/target/webapp/index.html" ]; then
 fi
 
 echo "[bastion-web] starting the server on port $PORT"
-CN1_PROFILE=test "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
+# Passkeys are accepted only from the listed origins: this one.
+BASTION_WEBAUTHN_ORIGINS="http://localhost:$PORT" \
+  CN1_PROFILE=test "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
 SERVER_PID=$!
 cleanup() {
   kill "$SERVER_PID" >/dev/null 2>&1 || true

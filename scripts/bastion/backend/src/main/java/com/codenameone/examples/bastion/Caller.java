@@ -72,6 +72,18 @@ public final class Caller {
         return at == null ? -1L : at.longValue();
     }
 
+    /// How the caller's sign-in was made: the token's `amr` claim (RFC 8176
+    /// names -- `pwd`, `otp`, `hwk`, `mfa`), empty when it carries none.
+    public static java.util.List<String> authMethods() {
+        Authentication who = SecurityContextHolder.getContext().getAuthentication();
+        if (!(who instanceof JwtAuthenticationToken)) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.List<String> amr = ((JwtAuthenticationToken) who).getToken()
+                .getClaimAsStringList("amr");
+        return amr == null ? java.util.Collections.<String>emptyList() : amr;
+    }
+
     public static String address() {
         SecurityExchange exchange = SecurityExchange.current();
         if (exchange == null) {

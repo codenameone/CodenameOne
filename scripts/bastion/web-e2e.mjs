@@ -4,8 +4,12 @@
 //
 // It checks what a person opening the server's address gets: the app loads from
 // the server, with no error, and shows its sign-in form with the way to open an
-// account. With BASTION_USER and BASTION_PASSWORD it then signs in through that
-// form and waits for the dashboard.
+// account. Then, all through the app's own screens and the authorization-code
+// flow the app runs from the page (no Cookie header, the browser's own jar):
+// it opens an account, turns on the authenticator app with the key it is shown,
+// signs in again in a fresh browser with the password and a six-digit code,
+// reaches the dashboard, adds money, opens a second account and moves money
+// between the two. BASTION_WEB_ACCOUNTS=0 stops after the sign-in form.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
 //
 // The app draws on a canvas, so there are no buttons in the page to ask a
@@ -15,6 +19,7 @@
 // what it clicks at. Text fields become real <input> elements while they are
 // being edited, so typing is ordinary typing.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -34,8 +39,10 @@ try {
 
 const url = process.env.URL;
 const out = process.env.OUT || 'target/web-e2e';
-const email = process.env.BASTION_USER || '';
-const password = process.env.BASTION_PASSWORD || '';
+const accounts = process.env.BASTION_WEB_ACCOUNTS !== '0';
+// A new address each run: the server under test may have kept the last one.
+const email = `web-${Date.now()}@bastion.example`;
+const password = 'correct horse battery staple';
 // A cold runner translates nothing at this point, but it does parse several
 // megabytes of JavaScript before the first screen.
 const startSeconds = Number(process.env.BASTION_WEB_START_SECONDS || '120');
@@ -63,9 +70,35 @@ const browser = await chromium.launch({
   args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--disable-features=IntensiveWakeUpThrottling']
 });
-// A browser reports where it is, and the restaurants listed are the ones that
-// deliver there: this one is by the seeded restaurants, near Pier 39.
-const page = await browser.newPage({ viewport: { width: 420, height: 860 } });
+let page;
+let cdp;
+let authenticator;
+/// A page in a browser of its own: no cookie and no storage from the page
+/// before. It has a platform authenticator -- Chromium's virtual one, through
+/// the DevTools protocol -- holding whatever passkeys the last one held, the
+/// way a phone keeps its passkeys while the browser forgets its session.
+async function newPage() {
+  let passkeys = [];
+  if (page) {
+    passkeys = (await cdp.send('WebAuthn.getCredentials', { authenticatorId: authenticator }))
+        .credentials;
+    await page.context().close();
+  }
+  const context = await browser.newContext({ viewport: { width: 420, height: 860 } });
+  page = await context.newPage();
+  cdp = await context.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  ({ authenticatorId: authenticator } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true,
+      hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
+  }));
+  for (const credential of passkeys) {
+    await cdp.send('WebAuthn.addCredential', { authenticatorId: authenticator, credential });
+  }
+  watch(page);
+}
+
+function watch(page) {
 page.on('console', message => {
   const text = message.text();
   if (text.startsWith('LF-SHIM')) {
@@ -100,6 +133,7 @@ page.on('websocket', socket => {
     note('WS frame ' + String(frame.payload).slice(0, 200));
   });
 });
+}
 
 /// What the app has on screen, as the port describes it to assistive technology.
 async function components() {
@@ -141,7 +175,7 @@ const button = label => async () =>
 
 /// The single-line fields of the form on screen, top to bottom.
 async function fields() {
-  return (await components()).filter(c => c.role === 'textbox' && c.height > 40 && c.height < 120)
+  return (await components()).filter(c => c.role === 'textbox' && c.height > 44 && c.height < 66)
       .sort((a, b) => a.y - b.y);
 }
 
@@ -164,8 +198,10 @@ async function settled() {
 
 async function typeInto(index, text, type) {
   const editing = () => page.evaluate(
-      wanted => document.activeElement && document.activeElement.tagName === 'INPUT'
-          && document.activeElement.type === wanted, type);
+      wanted => document.activeElement && (wanted === 'any'
+          ? /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)
+          : document.activeElement.tagName === 'INPUT' && document.activeElement.type === wanted),
+      type);
   await waitFor(`the ${type} field to take the keyboard`, stepSeconds, async () => {
     await settled();
     const all = await fields();
@@ -189,6 +225,37 @@ async function signInAs(who) {
   say('submitted the sign-in form as ' + who);
 }
 
+async function press(label, seconds = stepSeconds) {
+  // A field still being edited commits on the first click elsewhere, and
+  // the button it enables would not take that click: end the edit first, on
+  // the title bar, which does nothing.
+  if (await page.evaluate(() => document.activeElement
+      && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName))) {
+    await page.mouse.click(210, 8);
+  }
+  await settled();
+  await click(await waitFor(`the ${label} button`, seconds, button(label)));
+}
+
+/// RFC 6238 with the authenticator-app defaults: SHA-1, six digits, 30 s.
+function totp(secret, step) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const c of secret.replace(/[\s=]/g, '').toUpperCase()) {
+    bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
+  }
+  const key = Buffer.alloc(Math.floor(bits.length / 8));
+  for (let i = 0; i < key.length; i++) {
+    key[i] = parseInt(bits.substr(i * 8, 8), 2);
+  }
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(step));
+  const mac = crypto.createHmac('sha1', key).update(counter).digest();
+  const at = mac[mac.length - 1] & 0xf;
+  return String((mac.readUInt32BE(at) & 0x7fffffff) % 1000000).padStart(6, '0');
+}
+const step = () => Math.floor(Date.now() / 30000);
+
 /// Fails on the dialog the app shows for an error nothing handled.
 async function noErrorDialog() {
   if (/internal application error/i.test(await screenText())) {
@@ -202,6 +269,7 @@ async function noErrorDialog() {
 let failed = null;
 try {
   say('opening ' + url);
+  await newPage();
   const first = await page.goto(url, { waitUntil: 'load' });
   if (!first || first.status() !== 200) {
     throw new Error('the server answered ' + (first ? first.status() : 'nothing') + ' at /');
@@ -223,14 +291,120 @@ try {
     }
   }
 
-  // 2. Signing in, when an account is given.
-  if (email) {
-    await signInAs(email);
+  if (accounts) {
+    // 2. Opening an account: the app registers, then signs in from the page.
+    await press('Open an account');
+    await typeInto(0, 'Web Tester', 'any');
+    await typeInto(1, email, 'email');
+    await typeInto(2, password, 'password');
+    await typeInto(3, password, 'password');
+    await press('Create account');
+    say('asked for an account as ' + email);
+
+    // 3. The authenticator app: the key on screen is what an app would scan.
+    const shown = await waitFor('the authenticator key', stepSeconds, async () =>
+        (await components()).map(c => c.label || c.text || '')
+            .find(text => /^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(text.trim())));
+    const secret = shown.replace(/\s/g, '');
+    await page.screenshot({ path: path.join(out, '2-authenticator.png') });
+    const confirmedAt = step();
+    await typeInto(0, totp(secret, confirmedAt), 'any');
+    await press('Turn on');
+    await press('I have saved them');
+    say('turned the authenticator app on');
+    // A passkey, made in the browser with the session the sign-in kept.
+    await press('Create a passkey');
+    await waitFor('the passkey to be saved', stepSeconds, async () =>
+        requests.includes('200 POST /webauthn/register'));
+    say('created a passkey');
+    // Biometrics and this device are offered next; the first is missing in a
+    // headless browser, and the device is registered later, after a passkey
+    // sign-in.
+    await waitFor('the rest of onboarding', stepSeconds, async () =>
+        (await button('Continue')()) || (await button('Not now')())
+            || (await button('Later')()) || /Total balance/.test(await screenText()));
+    for (const next of ['Continue', 'Not now', 'Later']) {
+      await settled();
+      const hit = await button(next)();
+      if (hit) {
+        await click(hit);
+      }
+    }
     await waitFor('the dashboard', stepSeconds, async () =>
-        /Total balance|Accounts/.test(await screenText()));
+        /Total balance/.test(await screenText()));
     await noErrorDialog();
-    await page.screenshot({ path: path.join(out, '2-home.png') });
-    say('signed in as ' + email);
+    say('onboarded');
+
+    // 4. A fresh browser: password, then the code the account now asks for.
+    await newPage();
+    await page.goto(url, { waitUntil: 'load' });
+    await signInAs(email);
+    await waitFor('the code screen', stepSeconds, button('Continue'));
+    // The step the code was confirmed in is used up; wait for the next one.
+    await waitFor('a new code', 35, async () => step() > confirmedAt);
+    await typeInto(0, totp(secret, step()), 'any');
+    await press('Continue');
+    await waitFor('the dashboard', stepSeconds, async () =>
+        /Total balance/.test(await screenText()));
+    await noErrorDialog();
+    await page.screenshot({ path: path.join(out, '3-home.png') });
+    say('signed in with the password and a code');
+    for (const done of ['302 POST /login', '200 GET /login/mfa', '200 POST /login/mfa',
+      '302 GET /oauth2/authorize', '200 GET /signin/code',
+      '200 POST /oauth2/token']) {
+      if (!requests.includes(done)) {
+        throw new Error('the sign-in did not go ' + done + ': ' + requests.join(', '));
+      }
+    }
+
+    // 5. A second account, money in, and a move between the two.
+    await press('Open an account');
+    await press('Open');
+    await settled();
+    const checking = await waitFor('the checking account', stepSeconds, async () =>
+        (await components()).find(c => /Checking/.test(c.label || c.text || '')
+            && c.height < 200));
+    await click(checking);
+    await press('Add money');
+    await typeInto(0, '100.00', 'any');
+    await press('Add');
+    await waitFor('the deposit', stepSeconds, async () => /100\.00/.test(await screenText()));
+    say('opened a second account and added 100.00');
+    await press('Move money');
+    await typeInto(0, '25.00', 'any');
+    await press('Review');
+    await press('Send');
+    await waitFor('the receipt', stepSeconds, async () => /Sent/.test(await screenText()));
+    await noErrorDialog();
+    await page.screenshot({ path: path.join(out, '4-receipt.png') });
+    if (!requests.some(line => line === '200 POST /api/transfers')) {
+      throw new Error('no transfer was made: ' + requests.join(', '));
+    }
+    say('moved 25.00 between own accounts');
+
+    // 6. A fresh browser, and the passkey alone: no password, no code. The
+    // token says so (amr "hwk"), and that is enough to register this browser
+    // as a signing device without typing a password.
+    await newPage();
+    await page.goto(url, { waitUntil: 'load' });
+    await press('Sign in with a passkey', startSeconds);
+    await waitFor('the dashboard', stepSeconds, async () =>
+        /Total balance/.test(await screenText()));
+    if (!requests.includes('200 POST /login/webauthn')) {
+      throw new Error('the passkey sign-in did not go through /login/webauthn: '
+          + requests.join(', '));
+    }
+    say('signed in with the passkey');
+    await press('Register this device');
+    await waitFor('the device to be registered', stepSeconds, async () =>
+        requests.includes('200 POST /api/devices'));
+    await settled();
+    await noErrorDialog();
+    if (/Confirm it is you/.test(await screenText())) {
+      throw new Error('a passkey sign-in was asked for its password');
+    }
+    await page.screenshot({ path: path.join(out, '5-device.png') });
+    say('registered this browser as a device after a passkey sign-in');
   }
 } catch (err) {
   failed = err;

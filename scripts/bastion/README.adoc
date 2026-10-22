@@ -98,8 +98,10 @@ mvn -Dcodename1.platform=javase -Djava.awt.headless=true package   # <4>
     between the two, and has a withdrawal refused until its address is allowed
     and cooled off. Pass `--native` to run it against the compiled server.
 <6> Builds the browser version of the application, starts the server hosting
-    it, and opens it in a headless browser: it loads from the server and shows
-    its sign-in form. Needs Node with Playwright and its Chromium (`npm ci` and
+    it, and drives it in a headless browser: it opens an account, turns on the
+    authenticator app and creates a passkey, signs in again with the password
+    and a code, moves money between two accounts, then signs in with the
+    passkey alone and registers the browser as a signing device. Needs Node with Playwright and its Chromium (`npm ci` and
     `npx playwright install chromium` in `scripts/`). Screenshots and logs go to
     `target/web-e2e`.
 

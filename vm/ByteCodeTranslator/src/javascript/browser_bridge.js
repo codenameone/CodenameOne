@@ -326,10 +326,64 @@
   }
 
   function cn1RsaSignatureAlgorithm(algorithm, keyAlgorithm) {
-    if (String(keyAlgorithm || '').toUpperCase() !== 'RSA') {
-      throw new Error('Web Crypto bridge currently supports RSA signatures; requested ' + keyAlgorithm);
+    var kind = String(keyAlgorithm || '').toUpperCase();
+    if (kind === 'EC') {
+      // P-256 is the one curve CodenameOneImplementation.generateEcKeyPair defines.
+      return { name: 'ECDSA', namedCurve: 'P-256', hash: cn1CryptoHash(algorithm) };
+    }
+    if (kind !== 'RSA') {
+      throw new Error('Web Crypto bridge supports RSA and EC signatures; requested ' + keyAlgorithm);
     }
     return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+  }
+
+  // Web Crypto's ECDSA signature is r || s, each the curve's size; Java's
+  // SHA256withECDSA -- what every other port answers -- is the DER SEQUENCE of
+  // two INTEGERs. These convert between the two.
+  function cn1EcdsaDerInteger(bytes) {
+    var start = 0;
+    while (start < bytes.length - 1 && bytes[start] === 0) {
+      start++;
+    }
+    var body = Array.prototype.slice.call(bytes, start);
+    if (body[0] & 0x80) {
+      body.unshift(0);
+    }
+    return [0x02, body.length].concat(body);
+  }
+
+  function cn1EcdsaRawToDer(raw) {
+    var bytes = new Uint8Array(raw);
+    var half = bytes.length / 2;
+    var r = cn1EcdsaDerInteger(bytes.subarray(0, half));
+    var sPart = cn1EcdsaDerInteger(bytes.subarray(half));
+    var body = r.concat(sPart);
+    return [0x30, body.length].concat(body);
+  }
+
+  function cn1EcdsaDerToRaw(der, size) {
+    var bytes = cn1CryptoBytes(der);
+    var out = new Uint8Array(size * 2);
+    var at = 2;
+    if (bytes[1] & 0x80) {
+      at = 2 + (bytes[1] & 0x7f);
+    }
+    for (var part = 0; part < 2; part++) {
+      if (bytes[at] !== 0x02) {
+        throw new Error('Malformed ECDSA signature');
+      }
+      var length = bytes[at + 1];
+      var value = bytes.subarray(at + 2, at + 2 + length);
+      while (value.length > size && value[0] === 0) {
+        value = value.subarray(1);
+      }
+      if (value.length > size) {
+        throw new Error('Malformed ECDSA signature');
+      }
+      out.set(value, part * size + (size - value.length));
+      at += 2 + length;
+    }
+    return out;
   }
 
   hostBridge.register('__cn1_crypto__', function(request) {
@@ -375,10 +429,20 @@
       var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
       return subtle.importKey(signatureKeyFormat, cn1CryptoBytes(request.key), signatureAlgorithm, false, [signatureUsage])
         .then(function(key) {
+          var ec = signatureAlgorithm.name === 'ECDSA';
           if (op === 'sign') {
-            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(cn1CryptoResult);
+            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(function(raw) {
+              return ec ? cn1EcdsaRawToDer(raw) : cn1CryptoResult(raw);
+            });
           }
-          return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
+          var signature;
+          try {
+            signature = ec ? cn1EcdsaDerToRaw(request.signature, 32) : cn1CryptoBytes(request.signature);
+          } catch (malformed) {
+            // A signature that is not even well formed does not verify.
+            return false;
+          }
+          return subtle.verify(signatureAlgorithm, key, signature, cn1CryptoBytes(request.data));
         });
     }
     if (op === 'pbkdf2') {
@@ -407,6 +471,23 @@
         hash: 'SHA-256'
       };
       return subtle.generateKey(generationAlgorithm, true, ['encrypt', 'decrypt'])
+        .then(function(pair) {
+          return Promise.all([
+            subtle.exportKey('spki', pair.publicKey),
+            subtle.exportKey('pkcs8', pair.privateKey)
+          ]);
+        })
+        .then(function(encoded) {
+          return [cn1CryptoResult(encoded[0]), cn1CryptoResult(encoded[1])];
+        });
+    }
+    if (op === 'generateEcKeyPair') {
+      if (String(request.curve || '') !== 'P-256') {
+        throw new Error('Web Crypto bridge supports the P-256 curve; requested ' + request.curve);
+      }
+      // Chromium, Firefox and Safari all export the PKCS#8 ECPrivateKey with
+      // its optional publicKey member, which the iOS port needs to load it.
+      return subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
         .then(function(pair) {
           return Promise.all([
             subtle.exportKey('spki', pair.publicKey),
@@ -4243,6 +4324,129 @@
       } catch (ignored) { /* console unavailable */ }
       throw err;
     }
+  });
+
+  // Passkeys for com.codename1.impl.html5.HTML5WebAuthn. The options and the
+  // credential travel as WebAuthn JSON -- binary members as base64url -- which is
+  // what a relying party sends and expects, so they pass through unchanged
+  // around the ceremony. Answers { status, text }: 0 and the credential JSON,
+  // 1 for a dismissed sheet (NotAllowedError, which the browser also uses for
+  // a timeout and gives no way to tell apart), 2 and "Name:message".
+  function cn1WebAuthnFromB64(text) {
+    var b64 = String(text).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) {
+      b64 += '=';
+    }
+    var raw = global.atob(b64);
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) {
+      out[i] = raw.charCodeAt(i);
+    }
+    return out.buffer;
+  }
+
+  function cn1WebAuthnToB64(buffer) {
+    if (buffer == null) {
+      return null;
+    }
+    var bytes = new Uint8Array(buffer);
+    var raw = '';
+    for (var i = 0; i < bytes.length; i++) {
+      raw += String.fromCharCode(bytes[i]);
+    }
+    return global.btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function cn1WebAuthnIds(list) {
+    if (!list) {
+      return list;
+    }
+    return list.map(function(entry) {
+      var copy = {};
+      for (var key in entry) {
+        copy[key] = entry[key];
+      }
+      copy.id = cn1WebAuthnFromB64(entry.id);
+      return copy;
+    });
+  }
+
+  function cn1WebAuthnCredentialJson(credential) {
+    if (typeof credential.toJSON === 'function') {
+      return credential.toJSON();
+    }
+    var r = credential.response;
+    var response = { clientDataJSON: cn1WebAuthnToB64(r.clientDataJSON) };
+    if (r.attestationObject) {
+      response.attestationObject = cn1WebAuthnToB64(r.attestationObject);
+      if (typeof r.getTransports === 'function') {
+        response.transports = r.getTransports();
+      }
+    }
+    if (r.authenticatorData) {
+      response.authenticatorData = cn1WebAuthnToB64(r.authenticatorData);
+      response.signature = cn1WebAuthnToB64(r.signature);
+      response.userHandle = cn1WebAuthnToB64(r.userHandle);
+    }
+    return {
+      id: credential.id,
+      rawId: cn1WebAuthnToB64(credential.rawId),
+      type: credential.type,
+      authenticatorAttachment: credential.authenticatorAttachment || null,
+      response: response,
+      clientExtensionResults: typeof credential.getClientExtensionResults === 'function'
+        ? credential.getClientExtensionResults() : {}
+    };
+  }
+
+  hostBridge.register('__cn1_webauthn__', function(request) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    var available = !!(nav && nav.credentials && typeof global.PublicKeyCredential === 'function');
+    var op = request && request.op;
+    if (op === 'supported') {
+      return available;
+    }
+    if (!available) {
+      return { status: 2, text: 'NotSupportedError:This browser has no passkey support' };
+    }
+    var publicKey;
+    try {
+      var parsed = JSON.parse(request.options);
+      publicKey = {};
+      var source = parsed.publicKey || parsed;
+      for (var key in source) {
+        publicKey[key] = source[key];
+      }
+      publicKey.challenge = cn1WebAuthnFromB64(source.challenge);
+      if (op === 'create') {
+        publicKey.user = {
+          id: cn1WebAuthnFromB64(source.user.id),
+          name: source.user.name,
+          displayName: source.user.displayName
+        };
+        publicKey.excludeCredentials = cn1WebAuthnIds(source.excludeCredentials);
+      } else if (op === 'get') {
+        publicKey.allowCredentials = cn1WebAuthnIds(source.allowCredentials);
+      } else {
+        return { status: 2, text: 'invalid_options:Unknown ceremony ' + op };
+      }
+    } catch (err) {
+      return { status: 2, text: 'invalid_options:' + (err && err.message || err) };
+    }
+    var ceremony = op === 'create' ? nav.credentials.create({ publicKey: publicKey })
+      : nav.credentials.get({ publicKey: publicKey });
+    return ceremony.then(function(credential) {
+      if (!credential) {
+        return { status: 1, text: '' };
+      }
+      return { status: 0, text: JSON.stringify(cn1WebAuthnCredentialJson(credential)) };
+    }, function(error) {
+      var name = error && error.name || 'transport_error';
+      if (name === 'NotAllowedError') {
+        return { status: 1, text: '' };
+      }
+      return { status: 2, text: name + ':' + (error && error.message || '') };
+    });
   });
 
   hostBridge.register('__cn1_copy_to_clipboard__', function(request) {

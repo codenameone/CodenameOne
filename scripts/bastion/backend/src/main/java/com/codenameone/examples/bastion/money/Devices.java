@@ -61,10 +61,10 @@ import java.util.List;
 ///    authenticator app cannot finish a sign-in without the code, so its
 ///    fresh sign-in already *was* a second-factor sign-in. An account without
 ///    one must type its password into the registration as well; a wrong one
-///    counts toward the sign-in lockout like any other. (A passkey-only
-///    account is asked too: the token does not say *how* its sign-in was
-///    made, and a passkey account can still sign in by password. Carrying an
-///    `amr` claim would let a passkey sign-in skip it.)
+///    counts toward the sign-in lockout like any other. The token says how
+///    its sign-in was made ([Caller#authMethods], the `amr` claim): a sign-in
+///    with a passkey (`hwk`) already proved possession of a key bound to this
+///    site, so it is not asked for a password it may not even have.
 ///
 /// Every registration and every refusal is audited, and the customer's
 /// device list shows every key.
@@ -109,7 +109,9 @@ public class Devices {
             throw new ResponseStatusException(403,
                     "Sign in again to add a device: the sign-in must be a few minutes old");
         }
-        if (!totp.isEnabled(owner)) {
+        java.util.List<String> how = Caller.authMethods();
+        boolean strong = how.contains("hwk") || how.contains("mfa");
+        if (!strong && !totp.isEnabled(owner)) {
             String password = request.password();
             if (password == null
                     || !encoder.matches(password, users.loadUserByUsername(owner).getPassword())) {

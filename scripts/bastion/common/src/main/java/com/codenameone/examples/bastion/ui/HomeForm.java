@@ -190,7 +190,8 @@ public final class HomeForm {
         for (int iter = 0; iter < ids.length; iter++) {
             ids[iter] = choices.get(iter)[0] + "/" + choices.get(iter)[1];
         }
-        Picker which = Ui.picker(ids, names, null);
+        // Most people's second account is savings in their own currency.
+        Picker which = Ui.picker(ids, names, Assets.REPORTING + "/SAVINGS");
         TextField name = Ui.field("Name (optional)", TextField.ANY);
         Container body = new Container(BoxLayout.y());
         body.addAll(which, name);

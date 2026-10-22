@@ -35,7 +35,8 @@ import com.codenameone.examples.bastion.security.DeviceKey;
 /// The server asks for two things before it trusts a new key: a sign-in a
 /// few minutes old, and -- for an account without an authenticator app --
 /// the password again, since a stolen session alone must not be able to add
-/// the device that then signs payments.
+/// the device that then signs payments. A sign-in made with a passkey is
+/// asked for neither: its token says so (`amr`), and the server accepts it.
 public final class DeviceSetup {
     private DeviceSetup() {
     }
@@ -54,7 +55,9 @@ public final class DeviceSetup {
             return;
         }
         String password = null;
-        if (!user.totpEnabled()) {
+        // A passkey sign-in already proved a key bound to this site; the
+        // server does not ask it for a password (see Devices on the server).
+        if (!user.totpEnabled() && !Session.signedInWith("hwk")) {
             TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
             field.setUIID("BnField");
             Command ok = new Command(Lang.tr("Continue"));

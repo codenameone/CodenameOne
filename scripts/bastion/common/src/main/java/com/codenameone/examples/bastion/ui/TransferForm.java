@@ -80,6 +80,30 @@ public final class TransferForm {
                         () -> load(content, fromId, toPayee, back))));
     }
 
+    /// The account a move from `fromId` most likely goes to: the first other
+    /// account in the same currency (a move cannot change currency; that is a
+    /// trade), else the first other account at all.
+    static String partner(List<AccountDto> accounts, String fromId) {
+        String asset = null;
+        for (AccountDto account : accounts) {
+            if (account.id().equals(fromId)) {
+                asset = account.asset();
+            }
+        }
+        String other = null;
+        for (AccountDto account : accounts) {
+            if (!account.id().equals(fromId)) {
+                if (account.asset().equals(asset)) {
+                    return account.id();
+                }
+                if (other == null) {
+                    other = account.id();
+                }
+            }
+        }
+        return other != null ? other : fromId;
+    }
+
     private static void fill(final Container content, final List<AccountDto> all,
             final List<PayeeDto> payees, String fromId, boolean toPayee, final Runnable back) {
         content.removeAll();
@@ -118,7 +142,7 @@ public final class TransferForm {
                         to[0] = null;
                     } else {
                         to[0] = Ui.picker(toIds[0], toLabels[0],
-                                toIds[0][payee[0] ? 0 : Math.min(1, toIds[0].length - 1)]);
+                                payee[0] ? toIds[0][0] : partner(accounts, Ui.pickedId(from)));
                         target.add(to[0]);
                     }
                     target.revalidate();
