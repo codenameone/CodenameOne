@@ -279,7 +279,7 @@ reason and removes a suspended or banned player from any battle they're in.
 === Inviting friends and promoting the game
 
 Growth uses what Codename One already has, and the game counts nothing of its
-own. An invite link comes from `com.codename1.analytics.invite`. The app makes
+own. An invitation link comes from `com.codename1.analytics.invite`. The app makes
 it, with a campaign, a channel and the player's code as its payload:
 
 [source,java,role=cn1-no-try]
@@ -311,7 +311,7 @@ friend has played a battle, for at most ten friends:
 include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/social/Referrals.java[tag=skirmish-referrals,indent=0]
 ----
 
-The console's *Promote* tab is the operator's side. It opens the analytics
+The *Promote* tab in the console is where the operator works. It opens the analytics
 console, and it sends Codename One push notifications to a segment of players:
 everyone, players away for some days, new players, or those who came through an
 invite. A broadcast is counted before it's confirmed, the server sends at most
@@ -335,7 +335,7 @@ only of a player who keeps coming back:
 include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/Skirmish.java[tag=skirmish-app-review,indent=0]
 ----
 
-On a desktop or a tablet, the console puts its tabs in a side bar:
+On a desktop or a tablet, the console puts its tabs in a sidebar:
 
 [source,java,role=cn1-no-try]
 ----
@@ -344,6 +344,107 @@ include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/sk
 
 `run-e2e.sh` runs its tests a second time on Linux with the simulator as a
 desktop window, and that pass captures the *Promote* tab.
+
+[[skirmish-growing]]
+=== Tutorial: Growing your game
+
+A game that's finished still needs players, and players who come back. This
+tutorial walks through the levers Skirmish already has, in the order a new game
+usually needs them, and what to read in the analytics console to know whether
+each one is working. Everything here is measured by Codename One analytics, so
+nothing needs a dashboard of its own.
+
+==== Step 1: Switch the measurements on
+
+. Turn on analytics for the app in the Codename One console. `Telemetry` sends
+  through `CodenameOneAnalyticsProvider` once the player agrees on the consent
+  screen; without that agreement nothing leaves the device.
+. Set `AppConfig.PUSH_APP_KEY` to the app's push key from the console's Push
+  section. Without it the game works, but sends no notifications.
+. Run a few battles in the simulator. The events, `battle_start`,
+  `battle_end`, `share` and the rest, appear in the console's event list, and
+  every report can be sliced by the `level_band` and `trophy_band` user
+  properties.
+
+==== Step 2: Read the funnel
+
+The first report to open is the funnel a new player walks: `sign_up`, the
+training battle's reward, the first `battle_end` with a win, `deck_saved`,
+`purchase`. The step where most players stop is the one to work on first:
+
+* Players who sign up and never battle need a shorter way in. The training
+  battle is in `Tutorial`; its lines are in a `MissionDef`, and a shorter one
+  is a smaller list.
+* Players who battle once and leave need a reason to return. That's what the
+  next steps are for.
+* Players who play but never spend may need a cheaper first offer. The prices
+  are in the server's `Catalog`.
+
+==== Step 3: Bring players back with push
+
+Retention, the share of players who return a day and a week after they
+installed, is the number most games live or die by. Push brings players back,
+but only when it's rare and worth reading.
+
+. Sign in as the administrator, open the console, and choose *Promote*.
+. Under *Broadcast a push*, choose who it's for. *Away for a while* with 3 days
+  reaches players who stopped recently and still remember the game.
+. Write a title and a message about something new, and choose the screen a tap
+  opens: the shop for a sale, the Forge for new content.
+. Give it a campaign name, such as `comeback-march`. The app reports a
+  `push_open` event with that name when the notification is tapped, and the
+  campaign is how the console tells broadcasts apart.
+. Choose *Count players*, then *Send*, and confirm.
+
+A day later, compare that campaign's `push_open` count with the number of
+players it was sent to, and the cohort's return rate with the week before. A
+broadcast that nobody opens is worse than none: it teaches players to ignore
+the next one. The server allows five a day for that reason, and
+`MAX_BROADCASTS_PER_DAY` in `Promotion` is the place to lower it.
+
+==== Step 4: Grow through invitations
+
+An invitation is the cheapest player a game gets, because a friend is already
+playing. The rewards decide how often players send one:
+
+. The amounts are constants at the top of the server's `Referrals`:
+  `FRIEND_COINS` for the friend, `INVITER_COINS` and `INVITER_XP` for the
+  player who invited them, and `MAX_REWARDED` for how many friends pay.
+. The inviter is paid only once the friend has played a battle, so a reward
+  can't be farmed with empty accounts, and the friend must claim within a
+  week of joining.
+. In the console, compare the `share` events with `content` set to `invite`
+  against the installs attributed to the `friends` campaign and their
+  `first_battle` and `first_win` conversions. When many links are shared and
+  few bring anyone in, raise the friend's reward; when few are shared at all,
+  make the *Friends* screen easier to reach.
+
+Set the `invite.domain` build hint to a domain of your own before release, so
+the links carry the game's name rather than the default service.
+
+==== Step 5: Campaign links for the world outside
+
+An advert, a post or a newsletter gets a link from *Campaign link* on the same
+tab. It's an invitation without a player's code: it opens the store for anyone
+without the game, rewards nobody, and every player it brings in is reported
+under its campaign. Use one name per channel, such as `newsletter-may` and
+`video-launch`, and the console compares what each one brought in, down to
+revenue.
+
+==== Step 6: The home screen spotlight
+
+The banner at the top of every player's home screen is the quickest message
+there is: no notification permission, no store review. Set it under *Home
+spotlight* with a line of text and either a Forge pack, which opens that pack,
+or a screen. Use it for what's new this week; take it down by saving an empty
+banner.
+
+==== Step 7: Ratings
+
+A store's rating is what a stranger sees first. `AppReview` asks only players
+who've launched the game five times over three days, never more than once a
+month, and only after a win. A low score goes to feedback rather than the
+store. Tune those numbers in `Skirmish.runApp`.
 
 === The training battle
 

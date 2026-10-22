@@ -23,7 +23,9 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.skirmish.admin.Flags;
+import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.progress.Progression;
+import com.codenameone.examples.skirmish.social.Promotion;
 import java.io.IOException;
 
 /// The accounts a development server starts with: two players to challenge
@@ -42,16 +44,18 @@ public class DemoAccounts {
     private final Flags flags;
     private final Progression progression;
     private final Config config;
+    private final Promotion promotion;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Flags flags, Progression progression, Config config,
-            @Value("${skirmish.admin.email:}") String adminEmail,
+            Promotion promotion, @Value("${skirmish.admin.email:}") String adminEmail,
             @Value("${skirmish.admin.password:}") String adminPassword) {
         this.accounts = accounts;
         this.flags = flags;
         this.progression = progression;
         this.config = config;
+        this.promotion = promotion;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
     }
@@ -71,6 +75,13 @@ public class DemoAccounts {
         if (!accounts.exists(TROUBLE)) {
             add(TROUBLE, "Sore Loser", false);
             flags.auto(TROUBLE, "Left three matches in a row", null);
+        }
+        // A banner on the home screen from the start, so the spotlight the
+        // console's Promote tab sets is there to be seen and changed.
+        String banner = promotion.spotlight().text();
+        if (banner == null || banner.length() == 0) {
+            promotion.spotlight(ADMIN, new SpotlightDto("New: build your own levels in the Forge and share them",
+                    "", "forge", 0L));
         }
     }
 

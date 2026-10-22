@@ -18,6 +18,9 @@
  */
 package com.codenameone.examples.skirmish;
 
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.Tabs;
 
 /// The console's Promote tab, in a desktop window: the numbers, a push
@@ -39,19 +42,40 @@ public class PromoteTest extends E2e {
         shot("desktop-admin-overview");
         onEdt(() -> ((Tabs) findByName("adminTabs")).setSelectedIndex(6));
         until(() -> has("promoteTitle") && has("openAnalytics"), 20000, "the Promote tab");
+        shot("desktop-admin-promote");
         type("promoteTitle", "Season two is here");
         type("promoteBody", "New arena, new cards. Come and battle!");
         type("promoteCampaign", "season-two");
+        reveal("promoteTitle");
         click("promoteCount");
         waitFor(1500);
-        shot("desktop-admin-promote");
+        shot("desktop-admin-broadcast");
+        // Send asks first; the shot is the question, and the answer is no.
+        click("promoteSend");
+        until(() -> Display.getInstance().getCurrent() instanceof Dialog, 20000, "the confirmation");
+        shot("desktop-admin-broadcast-confirm");
+        onEdt(() -> ((Dialog) Display.getInstance().getCurrent()).dispose());
+        waitForForm("admin");
+        reveal("spotlightText");
         type("spotlightText", "Season two: the Frost Arena is open");
         click("spotlightSave");
         waitFor(1500);
+        reveal("linkCampaign");
+        click("linkMake");
+        waitFor(1500);
+        shot("desktop-admin-spotlight");
         onEdt(() -> com.codenameone.examples.skirmish.ui.Nav.home());
         waitForForm("home");
         until(() -> has("spotlight"), 20000, "the spotlight banner");
         shot("desktop-home-spotlight");
         return true;
+    }
+
+    private void reveal(final String name) {
+        onEdt(() -> {
+            Component c = findByName(name);
+            c.getComponentForm().scrollComponentToVisible(c);
+        });
+        waitFor(600);
     }
 }
