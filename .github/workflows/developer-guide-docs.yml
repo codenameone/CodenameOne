@@ -17,6 +17,7 @@ on:
       # The Savor and Parley chapters, the same way; savor.yml and parley.yml
       # compile and test the samples.
       - 'scripts/savor/**'
+      - 'scripts/skirmish/**'
       - 'scripts/parley/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
@@ -133,6 +134,7 @@ jobs:
               # renamed or deleted tag there has to reach the snippet check.
               - 'scripts/wayline/**'
               - 'scripts/savor/**'
+              - 'scripts/skirmish/**'
               - 'scripts/parley/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'

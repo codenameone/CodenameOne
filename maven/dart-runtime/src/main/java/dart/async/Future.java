@@ -77,6 +77,30 @@ public class Future<T> {
         }
     }
 
+    /**
+     * The value of a future that has already completed with one, else null. Lets Java
+     * code act on a {@code FutureOr} answer that is ready now without waiting for it.
+     */
+    /** Whether this future has already completed, with a value or an error (Java side only). */
+    public boolean completedNow() {
+        synchronized (lock) {
+            return done;
+        }
+    }
+
+    public T completedValue() {
+        synchronized (lock) {
+            return done && error == null ? value : null;
+        }
+    }
+
+    /** The error of a future that has already failed, else null (Java side only). */
+    public Throwable completedError() {
+        synchronized (lock) {
+            return done ? error : null;
+        }
+    }
+
     /** An already-completed future. */
     public static <T> Future<T> value(T v) {
         Future<T> f = new Future<T>();

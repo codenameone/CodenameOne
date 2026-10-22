@@ -1,0 +1,9 @@
+sum 10
+start
+v2
+v4
+end
+break at 3
+got 1
+error boom
+done

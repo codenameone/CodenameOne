@@ -1,0 +1,82 @@
+name: Flutter app acceptance
+
+# Imports, transpiles and compiles the "ordinary" Flutter apps under
+# scripts/flutter-apps with no edits (scripts/flutter-apps/run-acceptance.sh).
+# The unit and behavior tests (dart-flutter-tests.yml) check constructs one at a
+# time; this checks that a whole app built from pub packages and plugins gets
+# through the importer, the transpiler and javac together.
+#
+# `flutter pub get` is real: the importer transpiles pure-Dart dependencies
+# (dio, ...) from the pub cache, so the Flutter SDK is needed for resolution,
+# never to build anything.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectImporter.java'
+      - 'scripts/flutter-apps/**'
+      - '.github/workflows/flutter-acceptance.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectImporter.java'
+      - 'scripts/flutter-apps/**'
+      - '.github/workflows/flutter-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-flutter-acceptance-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-flutter-acceptance-
+            ${{ runner.os }}-m2
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.35.4'
+
+      # The runtimes join the reactor only on JDK 17+ (flutter-modules).
+      - name: Build the transpiler and runtimes
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B install \
+            -pl core,dart-runtime,flutter-runtime,dart-transpiler -am -DskipTests \
+            -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true
+
+      - name: Import, transpile and compile each app
+        run: JAVA17_HOME="$JAVA_HOME" scripts/flutter-apps/run-acceptance.sh

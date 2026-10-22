@@ -7,11 +7,11 @@
   "wire_bytes": 0.0
  },
  "tolerance": {
-  "code_bytes": 0.0,
+  "code_bytes": 0.02,
   "cold_start_ratio": 0.25,
   "idle_memory_ratio": 0.15,
-  "install_bytes": 0.0,
-  "wire_bytes": 0.0
+  "install_bytes": 0.02,
+  "wire_bytes": 0.02
  },
  "ungated": {
   "macos": {

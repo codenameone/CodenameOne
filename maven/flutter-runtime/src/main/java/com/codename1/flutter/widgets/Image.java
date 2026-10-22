@@ -199,6 +199,15 @@ public class Image extends Widget {
         return i;
     }
 
+    /// {@link #network} with request headers, for Java-side wrappers such as
+    /// CachedNetworkImage(httpHeaders:) that have no NetworkImage provider to carry them.
+    public static Image networkWithHeaders(String src, Key key, Double width, Double height, BoxFit fit,
+            java.util.Map<?, ?> headers) {
+        Image i = network(src, key, width, height, fit);
+        i.headers = headers == null || headers.isEmpty() ? null : headers;
+        return i;
+    }
+
     /// The decode size a ResizeImage asked for, in raw pixels, or null.
     private Long resizeWidthPx;
     private Long resizeHeightPx;

@@ -45,9 +45,10 @@ AN OVERLAY (pr/<number>.json)
                Rebaselines of one row chain, each from the value the last one left, so a
                pull request measured on top of a merged one need not wait for the fold.
                Two from the SAME value, or one whose "from" the row never reaches --
-               another merged change moved it first -- are rejected, naming them: two
-               changes moved the same benchmark, and someone has to re-measure. That is
-               the conflict git used to report as a JSON hunk, now reported as what it is.
+               another merged change moved it first -- are applied in merge order, the
+               latest merged winning, with a note. They are never an error: refusing
+               them turned master and every open pull request red over two changes that
+               had each been measured, while nothing had regressed.
 
 Every overlay on master belongs to a merged pull request, so `fold` needs no knowledge
 of GitHub: it writes the resolved rows into base/, deletes every overlay, and refuses to
@@ -293,7 +294,45 @@ def load_overlays(root=ROOT, layout=None):
         overlay = _read_json(path)
         validate_overlay(int(path.stem), overlay, path.name, layout)
         overlays.append((int(path.stem), overlay))
-    return sorted(overlays)
+    order = _merge_order(Path(root), [n for n, _ in overlays])
+    own = _own_pr()
+    # The running pull request's own overlay is its newest change whatever git says: the
+    # gate jobs check out with depth 1, where every overlay looks added by the one commit
+    # and the order would fall back to the numbers.
+    return sorted(overlays, key=lambda o: (o[0] == own, order.get(o[0], math.inf), o[0]))
+
+
+def _own_pr():
+    """The pull request this CI run is for, from the environment alone (no network)."""
+    explicit = os.environ.get('CN1_PR_NUMBER', '')
+    if explicit.isdigit():
+        return int(explicit)
+    event = os.environ.get('GITHUB_EVENT_PATH')
+    if event and Path(event).is_file():
+        try:
+            number = (json.loads(Path(event).read_text()).get('pull_request') or {}).get('number')
+            return int(number) if number else None
+        except (ValueError, OSError):
+            return None
+    return None
+
+
+def _merge_order(root, numbers):
+    """{number: when pr/<number>.json reached this branch}, for resolve()'s "latest merged
+    wins". Read along the FIRST-PARENT history, so on master it is the order the pull
+    requests merged in, and in a pull request's CI checkout (a synthetic merge commit) the
+    pull request's own overlay arrives with that merge commit -- after everything already
+    on master. An overlay git does not know (uncommitted, or a tree outside a repository
+    as in the tests) sorts last, by number."""
+    order = {}
+    for number in numbers:
+        out = subprocess.run(['git', 'log', '--first-parent', '--diff-filter=A', '-1',
+                              '--format=%ct', '--', 'pr/%d.json' % number],
+                             capture_output=True, text=True, cwd=str(root))
+        stamp = out.stdout.strip()
+        if out.returncode == 0 and stamp.isdigit():
+            order[number] = int(stamp)
+    return order
 
 
 def validate_overlay(number, overlay, where, layout=None):
@@ -422,36 +461,29 @@ def resolve(base, overlays, tolerance=None, layout=None):
             rebaselines.setdefault((key, bench, cores), []).append((number, row))
     for (key, bench, cores), entries in sorted(rebaselines.items()):
         where = '%s %s/%s' % (key, bench, cores)
-        # Several rebaselines of one row are applied as a CHAIN, each from the value the
-        # previous one left: a pull request that measured on top of one merged but not yet
-        # folded names that one's result as its "from", and must not wait for the nightly
-        # fold. Two entries from the SAME value are two changes that each moved the row
-        # without seeing the other -- the real conflict. The order comes from the "from"
-        # values alone, so it does not depend on which merged first.
-        pending = list(entries)
-        while pending:
+        # Several rebaselines of one row are applied in MERGE ORDER (`overlays` is in it,
+        # see load_overlays), so the latest merged wins. A pull request measured on top of
+        # a merged but not yet folded one names that one's result as its "from" and
+        # merged after it, so a chain needs nothing special. One whose "from" is not the
+        # row it lands on -- two changes measured from the same value, or one measured
+        # before another moved the row -- gets a note, never an error. It used to be an
+        # error, and an error here fails master and every open pull request at once over
+        # two changes that had each been measured and reviewed: the gate sat red for
+        # weeks over baseline bookkeeping while nothing regressed. The gate's job is to
+        # catch a regression in the NEXT run, and the latest merged measurement is the
+        # best value it has to judge that run by.
+        for number, row in entries:
             current = rows.get(key, {}).get(bench, {}).get(cores)
             if current is None:
                 raise BaselineError('pr/%d.json rebaselines %s, which has no row; a new row is '
-                                    'a "calibrate" entry' % (pending[0][0], where))
-            ready = [(n, r) for n, r in pending if _same(r['from'], current, layout)]
-            if len(ready) > 1:
-                raise BaselineError(
-                    '%s is rebaselined from the same value by more than one pull request (%s): '
-                    'two changes moved the same benchmark without seeing each other. '
-                    'Re-measure on top of both and keep one rebaseline.'
-                    % (where, ', '.join('pr/%d.json' % n for n, _ in ready)))
-            if not ready:
-                number, row = pending[0]
-                raise BaselineError(
-                    'pr/%d.json rebaselines %s from %s, but the row is now %s: another merged '
-                    'change moved it first. Re-measure on top of it and update the rebaseline.'
-                    % (number, where, json.dumps(row['from'], sort_keys=True),
-                       json.dumps(from_row(current, layout), sort_keys=True)))
-            number, row = ready[0]
+                                    'a "calibrate" entry' % (number, where))
+            if not _same(row['from'], current, layout):
+                notes.append('%s: pr/%d.json was measured from %s, not the current %s; '
+                             'applied in merge order, so the latest merged rebaseline wins'
+                             % (where, number, json.dumps(row['from'], sort_keys=True),
+                                json.dumps(from_row(current, layout), sort_keys=True)))
             rows[key][bench][cores] = {k: v for k, v in row.items()
                                        if k not in ('from', 'reason')}
-            pending.remove(ready[0])
     return rows, notes
 
 

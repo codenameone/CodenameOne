@@ -11,8 +11,9 @@
 //  - named constructor parameters       -> void setter methods of the same name
 //  - instance getters                   -> no-arg method calls (name())
 //  - named parameters of methods        -> canonical positional order as declared
-//  - every callback-shaped parameter here stays Object/dynamic, matching
-//    the convention of every other stub's optional callbacks -- the Java
+//  - the callbacks a closure's parameter is read from (listen's onData, map,
+//    where, forEach, ...) are typed, so `stream.listen((xs) => xs.contains(1))`
+//    knows xs; the rest stay Object/dynamic -- the Java
 //    SIGNATURE that actually receives a transpiled closure lives in
 //    dart.async.Stream/StreamSubscription/StreamController (maven/dart-runtime),
 //    never in this file. Outside a few names the emitter special-cases
@@ -31,6 +32,13 @@
 //    Future.then's onError:. See dart.async.Stream's class comment for the
 //    full detail.
 
+@JavaName('dart.async.TimeoutException')
+class TimeoutException implements Exception {
+  external TimeoutException(String? message, [Duration? duration]);
+  external String? get message;
+  external Duration? get duration;
+}
+
 @JavaName('dart.async.StreamSubscription')
 abstract class StreamSubscription<T> {
   external Future<void> cancel();
@@ -44,10 +52,51 @@ abstract class StreamSubscription<T> {
 
 @JavaName('dart.async.Stream')
 abstract class Stream<T> {
-  external StreamSubscription<T> listen(Object? onData,
-      {Object? onError, Object? onDone, bool? cancelOnError});
-  external Stream<R> map<R>(Object transform);
-  external Stream<T> where(Object test);
+  external StreamSubscription<T> listen(void Function(T event)? onData,
+      {Object? onError, void Function()? onDone, bool? cancelOnError});
+  external Stream<R> map<R>(R Function(T event) transform);
+  external Stream<T> where(bool Function(T event) test);
+  // Named constructors, as static factories with a raw return (see broadcast below).
+  external static Stream fromIterable(Iterable elements);
+  external static Stream value(Object? value);
+  external static Stream empty();
+  external static Stream error(Object error);
+  external static Stream fromFuture(Future future);
+  external static Stream fromFutures(Iterable futures);
+  external static Stream periodic(Duration period, [Object? computation]);
+  external Stream<R> expand<R>(Object convert);
+  external Stream<R> asyncMap<R>(Object convert);
+  external Stream<T> take(int count);
+  external Stream<T> skip(int count);
+  external Stream<T> takeWhile(bool Function(T element) test);
+  external Stream<T> skipWhile(bool Function(T element) test);
+  external Stream<T> distinct([Object? equals]);
+  external Stream<T> handleError(Object onError, {Object? test});
+  external Stream<R> transform<R>(Object streamTransformer);
+  external Stream<R> cast<R>();
+  external Stream<T> asBroadcastStream({Object? onListen, Object? onCancel});
+  external bool get isBroadcast;
+  external Future<List<T>> toList();
+  external Future<Set<T>> toSet();
+  external Future<void> forEach(void Function(T element) action);
+  external Future drain([Object? futureValue]);
+  external Future<int> get length;
+  external Future<bool> get isEmpty;
+  external Future<T> get first;
+  external Future<T> get last;
+  external Future<T> firstWhere(bool Function(T element) test, {Object? orElse});
+  external Future<bool> any(bool Function(T element) test);
+  external Future<bool> every(Object test);
+  external Future<bool> contains(Object? needle);
+  external Future<String> join([String separator = ""]);
+  external Future<S> fold<S>(S initialValue, Object combine);
+  external Future<T> reduce(Object combine);
+  external Future<T> elementAt(int index);
+}
+
+@JavaName('dart.async.StreamTransformer')
+abstract class StreamTransformer<S, T> {
+  external Stream<T> bind(Stream<S> stream);
 }
 
 @JavaName('dart.async.StreamController')

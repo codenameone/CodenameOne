@@ -3246,6 +3246,12 @@ public class CSSTheme {
                     }
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
                     res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
+                } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_REAL) {
+                    // A decimal such as `switchTrackScaleY: 1.5` was silently dropped, so the
+                    // built theme fell back to the default the runtime compiler did not.
+                    String real = String.valueOf(lu.getFloatValue());
+                    res.setThemeProperty(themeName, "@"+constantKey,
+                            real.endsWith(".0") ? real.substring(0, real.length() - 2) : real);
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_RGBCOLOR
                         || (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION
                                 && ("rgb".equals(lu.getFunctionName())
@@ -6825,6 +6831,13 @@ public class CSSTheme {
                                 ttfSizeType = TTF_SIZE_TYPE_LARGE;
                                 sysSize = Font.SIZE_LARGE;
                                 break outer;
+                            case "medium":
+                                // Without this case `medium` fell through to the pixel branch
+                                // and stored a zero-size font.
+                                iFontSizeType = Font.SIZE_MEDIUM;
+                                ttfSizeType = TTF_SIZE_TYPE_MEDIUM;
+                                sysSize = Font.SIZE_MEDIUM;
+                                break outer;
                                 
                         }
                     }
@@ -6953,6 +6966,8 @@ public class CSSTheme {
                         case "arial" :
                         case "cursive" :
                         case "fantasy" :
+                        // The platform's own UI font: a generic family, as in the runtime compiler.
+                        case "system-ui" :
                             iFontFace = Font.FACE_SYSTEM;
                             break loop;
                         case "monospace" :
@@ -9348,6 +9363,21 @@ public class CSSTheme {
         return "#" + leftPad(Integer.toHexString(getColorInt(color)), 6) + leftPad(Integer.toHexString(getColorAlphaInt(color)), 2);
     }
 
+    /// One `rgb()` channel: `50%` is half of 255, which getIntegerValue() read as 0, so every
+    /// percentage color came out black.
+    private static int rgbChannel(ScaledUnit channel) {
+        if (channel.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+            return clampChannel(Math.round(channel.getFloatValue() * 255f / 100f));
+        }
+        return clampChannel(channel.getIntegerValue());
+    }
+
+    /// Out of range is clamped, as CSS specifies: `200%` or `300` is 255, not a value `%02X`
+    /// would write as three digits, breaking the six-digit color.
+    private static int clampChannel(int value) {
+        return Math.max(0, Math.min(255, value));
+    }
+
     static String getColorString(LexicalUnit color) {
         return getColorString(color, false);
     }
@@ -9388,9 +9418,9 @@ public class CSSTheme {
                     blue = (ScaledUnit)blue.getNextLexicalUnit();
                 }
                 return String.format( "%02X%02X%02X",
-                        red.getIntegerValue(),
-                        green.getIntegerValue(),
-                        blue.getIntegerValue());
+                        rgbChannel(red),
+                        rgbChannel(green),
+                        rgbChannel(blue));
 
             }
             case LexicalUnit.SAC_FUNCTION: {
@@ -9435,9 +9465,9 @@ public class CSSTheme {
                             throw new RuntimeException("Failed to parse color " + color + ". Received null alpha parameter:" + color);
                         }
                     }
-                    int r = (int)(red.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
-                    int g = (int)(green.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
-                    int b = (int)(blue.getIntegerValue() * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int r = (int)(rgbChannel(red) * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int g = (int)(rgbChannel(green) * (premultiplied?(1-alpha.getNumericValue()):1));
+                    int b = (int)(rgbChannel(blue) * (premultiplied?(1-alpha.getNumericValue()):1));
 
 
                     return String.format( "%02X%02X%02X",

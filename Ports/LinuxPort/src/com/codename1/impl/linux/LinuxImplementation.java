@@ -2884,6 +2884,74 @@ public class LinuxImplementation extends CodenameOneImplementation {
         response.actionPerformed(result);
     }
 
+    /* GtkFileChooser for Display.showOpenDialog/showSaveDialog: filter list,
+     * multi selection, folders, overwrite confirmation, and the portable
+     * options as GtkFileChooser choices (text options in the extra widget).
+     * A Codename One accessory component and a preview cannot be hosted in a
+     * GTK dialog, so neither is reported supported. */
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (rejectOversized(request, callback)) {
+            return;
+        }
+        String[] answer = LinuxNative.fileDialogEx(false, request.getTitle(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()), null,
+                com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
+                request.isMultiSelect(), request.isDirectories(), false,
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
+                com.codename1.impl.NativeFileDialogCodec.encodeOptions(request));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, com.codename1.impl.NativeFileDialogCodec.decode(request, answer));
+    }
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+                               com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (rejectOversized(request, callback)) {
+            return;
+        }
+        String[] answer = LinuxNative.fileDialogEx(true, request.getTitle(), request.getAcceptLabel(),
+                com.codename1.impl.NativeFileDialogCodec.toNativePath(request.getInitialDirectory()),
+                request.getSuggestedName(),
+                com.codename1.impl.NativeFileDialogCodec.encodeFilters(request), request.getSelectedFilter(),
+                false, false, request.isConfirmOverwrite(),
+                request.getBooleanHint(com.codename1.io.filechooser.FileDialogRequest.HINT_DESKTOP_SHOW_HIDDEN, false),
+                com.codename1.impl.NativeFileDialogCodec.encodeOptions(request));
+        com.codename1.io.filechooser.FileDialogResult result =
+                com.codename1.impl.NativeFileDialogCodec.decode(request, answer);
+        if (result.isCancelled()) {
+            com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
+        } else {
+            completeSaveDialog(request, result, callback);
+        }
+    }
+
+    /* cn1_linux_services.c holds filters and options in fixed arrays of
+     * CN1_FDX_MAX_ITEMS (64). Truncating there would leave the Java decoder
+     * expecting a value slot per original option, so an accepted dialog would
+     * decode as a cancel; such a request fails up front with an error instead. */
+    private static final int MAX_FILE_DIALOG_ITEMS = 64;
+
+    private static boolean rejectOversized(com.codename1.io.filechooser.FileDialogRequest<?> request,
+                                           com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        if (request.getFilters().length <= MAX_FILE_DIALOG_ITEMS
+                && request.getOptions().length <= MAX_FILE_DIALOG_ITEMS) {
+            return false;
+        }
+        com.codename1.io.filechooser.FileDialogResult result =
+                com.codename1.io.filechooser.FileDialogResult.cancelled(request);
+        result.setError(new java.io.IOException("A file dialog supports at most "
+                + MAX_FILE_DIALOG_ITEMS + " filters and " + MAX_FILE_DIALOG_ITEMS + " options"));
+        com.codename1.impl.NativeFileDialogCodec.deliver(callback, result);
+        return true;
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature != com.codename1.io.filechooser.FileDialogFeatures.ACCESSORY_COMPONENT
+                && feature != com.codename1.io.filechooser.FileDialogFeatures.PREVIEW;
+    }
+
     @Override
     public void openImageGallery(com.codename1.ui.events.ActionListener response) {
         openGallery(response, Display.GALLERY_IMAGE);

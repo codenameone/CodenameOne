@@ -875,6 +875,17 @@ public final class LinuxNative {
      */
     public static native String fileDialog(boolean save, int type, String title);
 
+    /**
+     * Shows the rich open/save dialog behind Display.showOpenDialog and
+     * showSaveDialog. Filters and options are encoded by
+     * {@link com.codename1.impl.NativeFileDialogCodec}, which also decodes the
+     * answer; {@code null} means cancelled or headless. Runs on the GTK thread;
+     * the caller blocks until the user chooses.
+     */
+    public static native String[] fileDialogEx(boolean save, String title, String acceptLabel,
+            String initialDir, String suggestedName, String[] filters, int selectedFilter,
+            boolean multi, boolean dirs, boolean confirmOverwrite, boolean showHidden, String[] options);
+
     /* ----------------------------------------------------------- media */
 
     /** Creates a Media Foundation player from the given bytes (spooled to a temp

@@ -34,6 +34,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -77,6 +78,49 @@ public final class FlutterProjectImporter {
         COVERED.put("flutter_localized_locales", "LocaleNames/LocaleNamesLocalizationsDelegate stubs");
         COVERED.put("adaptive_breakpoints", "AdaptiveBreakpoints.getWindowType only; "
                 + "isDisplayDesktop/isDisplaySmallDesktop/isDisplayMobile are not stubbed");
+        // Plugin and state-management packs (flutter-runtime com.codename1.flutter.plugins.*,
+        // META-INF/dart/plugin_*.dart). Stubbed rather than transpiled from pub: the
+        // plugins call platform channels, and bloc/go_router depend on reified generics
+        // and the Router page API, neither of which a transpile can reproduce.
+        COVERED.put("bloc", "Bloc/Cubit/Emitter/BlocObserver (plugins.bloc)");
+        COVERED.put("flutter_bloc", "BlocProvider/BlocBuilder/BlocListener/BlocConsumer/BlocSelector/"
+                + "RepositoryProvider and their Multi* forms (plugins.bloc)");
+        COVERED.put("equatable", "Equatable with deep props equality (plugins.equatable)");
+        COVERED.put("json_annotation", "@JsonSerializable/@JsonKey/@JsonValue and $enumDecode "
+                + "for committed *.g.dart sources (plugins.json)");
+        COVERED.put("shared_preferences", "SharedPreferences over Storage (plugins.sharedpreferences)");
+        COVERED.put("path_provider", "application/support/temporary/cache directories (plugins.pathprovider)");
+        COVERED.put("dio", "Dio/BaseOptions/Options/Response/DioException/interceptors/FormData "
+                + "over ConnectionRequest (plugins.dio)");
+        COVERED.put("go_router", "GoRouter/GoRoute/ShellRoute/GoRouterState and the context.go/push/pop "
+                + "extension; MaterialApp.router (plugins.gorouter)");
+        COVERED.put("cached_network_image", "CachedNetworkImage/CachedNetworkImageProvider over "
+                + "Image.network (plugins.cachednetworkimage)");
+        COVERED.put("cross_file", "XFile over FileSystemStorage or in-memory bytes (plugins.crossfile)");
+        COVERED.put("share_plus", "SharePlus.instance.share and the static Share API over Display.share "
+                + "(plugins.share)");
+        COVERED.put("package_info_plus", "PackageInfo.fromPlatform from the build properties (plugins.packageinfo)");
+        COVERED.put("device_info_plus", "DeviceInfoPlugin android/ios/deviceInfo from Display properties "
+                + "(plugins.deviceinfo)");
+        COVERED.put("connectivity_plus", "Connectivity.checkConnectivity/onConnectivityChanged over "
+                + "NetworkManager (plugins.connectivity)");
+        COVERED.put("geolocator", "Geolocator positions, permissions and distance/bearing over "
+                + "LocationManager (plugins.geolocator)");
+        COVERED.put("image_picker", "ImagePicker pickImage/pickVideo/pickMedia/pickMultiImage over Capture and "
+                + "the gallery (plugins.imagepicker)");
+        COVERED.put("app_links", "AppLinks initial link and link streams from the AppArg launch property "
+                + "(plugins.applinks)");
+        COVERED.put("flutter_local_notifications", "show/periodicallyShow/zonedSchedule/cancel and tap "
+                + "callbacks over LocalNotification (plugins.notifications)");
+        COVERED.put("firebase_core", "Firebase.initializeApp/FirebaseOptions (plugins.firebase)");
+        COVERED.put("firebase_auth", "FirebaseAuth email/password and anonymous accounts over the Identity "
+                + "Toolkit REST API (plugins.firebase)");
+        COVERED.put("firebase_analytics", "FirebaseAnalytics events logged, screen views to AnalyticsService "
+                + "(plugins.firebase)");
+        COVERED.put("firebase_messaging", "FirebaseMessaging token and foreground onMessage over Codename One "
+                + "push (plugins.firebase)");
+        COVERED.put("google_maps_flutter", "GoogleMap widget with markers, camera and taps over MapView "
+                + "(plugins.googlemaps)");
         // NOT covered, checked and confirmed absent: "collection" (no ListEquality/MapEquality/
         // SetEquality stub -- the one hit on that name is a comment, not an implementation),
         // "flutter_staggered_grid_view" and "nested" (provider's internal composition helper,
@@ -121,6 +165,13 @@ public final class FlutterProjectImporter {
         /// directory, so the two cannot both be there. The source is kept, every time,
         /// and the asset is not copied.
         public final List<String> assetCollisions = new ArrayList<String>();
+        /// Pure-Dart pub packages whose sources were copied to be transpiled with the
+        /// app, each with the number of its files the app reaches.
+        public final Map<String, Integer> transpiledPackages = new TreeMap<String, Integer>();
+        /// A package the app imports that cannot be transpiled and has no stub, with
+        /// the reason: a platform plugin, or a library that needs dart:ffi, dart:html
+        /// or dart:mirrors. These are what an import of this app cannot provide.
+        public final Map<String, String> unsupportedPackages = new TreeMap<String, String>();
         public String appName;
         public String appVersion;
         public int copiedFiles;
@@ -186,6 +237,13 @@ public final class FlutterProjectImporter {
                             imported);
                 }
             }
+            // The pub packages the app imports: pure-Dart ones are transpiled from their
+            // own sources, stubbed ones come from the runtime, anything else is reported.
+            Map<String, File> packageConfig = readPackageConfig(source);
+            Map<String, String> lockVersions = readLockVersions(source);
+            List<String> packageSources = new ArrayList<String>();
+            r.copiedFiles += importPackageSources(libDir, pubspec.name, packageConfig, lockVersions, target,
+                    previous, imported, packageSources, r);
             // Everything copied so far came from lib/. An asset landing on one of those
             // paths silently replaced the source on a first import, and a later import's
             // kept-local-edit check could keep either -- the result depended on how many
@@ -197,8 +255,6 @@ public final class FlutterProjectImporter {
             // checkout, not this project: resolve it the same way `flutter pub get`
             // left it resolvable, via .dart_tool/package_config.json first and the
             // pub cache (by the version pubspec.lock locked) otherwise.
-            Map<String, File> packageConfig = readPackageConfig(source);
-            Map<String, String> lockVersions = readLockVersions(source);
             Map<String, File> resolvedPackageLibDirs = new HashMap<String, File>();
             Set<String> packagesWithCopiedAssets = new LinkedHashSet<String>();
             // Every declared key that resolved to real content, recorded for
@@ -292,12 +348,13 @@ public final class FlutterProjectImporter {
             r.assetCollisions.addAll(collisions);
             sourcePaths = null;
             writeImportRecord(target, imported);
-            writeLibSources(target, libDir);
+            writeLibSources(target, libDir, packageSources);
             writeDeclaredAssetKeys(target, declaredAssetKeys);
             writePackageName(target, pubspec.name);
 
             if (mainPackage != null && mainClass != null) {
-                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage);
+                writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass, entryPointPackage,
+                        pubspec.dependencies);
             }
             updateSettings(commonDir, pubspec);
 
@@ -316,6 +373,7 @@ public final class FlutterProjectImporter {
                 }
             }
 
+            Set<String> reachedPackages = new HashSet<String>(lastReachedPackages);
             for (String dep : pubspec.dependencies) {
                 boolean ignored = false;
                 for (String i : IGNORED) {
@@ -331,16 +389,370 @@ public final class FlutterProjectImporter {
                 if (note == null) {
                     note = assetOnlyCovered.get(dep);
                 }
+                if (note == null && r.transpiledPackages.containsKey(dep)) {
+                    note = "transpiled from its sources, " + r.transpiledPackages.get(dep) + " file(s)";
+                }
+                if (note == null && !r.unsupportedPackages.containsKey(dep) && !reachedPackages.contains(dep)) {
+                    note = "not imported by lib/";
+                }
                 if (note != null) {
                     r.covered.add(dep + " (" + note + ")");
                 } else {
-                    r.uncovered.add(dep);
+                    String why = r.unsupportedPackages.get(dep);
+                    r.uncovered.add(why == null ? dep : dep + " (" + why + ")");
+                }
+            }
+            // A package reached only through another one (a transitive dependency) is not
+            // in pubspec.yaml's list, but the app cannot build without it either.
+            for (Map.Entry<String, String> u : r.unsupportedPackages.entrySet()) {
+                if (!pubspec.dependencies.contains(u.getKey())) {
+                    r.uncovered.add(u.getKey() + " (" + u.getValue() + ", needed by a dependency)");
                 }
             }
         } catch (IOException e) {
             throw new BuildException("Import failed: " + e.getMessage(), e);
         }
         return r;
+    }
+
+    /// SDK packages the runtime itself provides; never copied, never reported.
+    static final Set<String> SDK_PACKAGES = new HashSet<String>(java.util.Arrays.asList(
+            "flutter", "flutter_test", "flutter_driver", "flutter_web_plugins", "flutter_localizations",
+            "sky_engine", "integration_test"));
+
+    /// The `dart:` libraries the transpiler implements -- its configurable-import
+    /// test answers true for exactly these, and the walk below follows the same
+    /// alternative it will pick.
+    static final Set<String> SUPPORTED_DART_LIBRARIES = new HashSet<String>(java.util.Arrays.asList(
+            "core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
+
+    private static final Pattern DIRECTIVE = Pattern.compile(
+            "(?m)^\\s*(import|export|part)\\s+(?!of\\b)(['\"])([^'\"]+)\\2([^;]*);");
+    private static final Pattern CONDITIONAL = Pattern.compile(
+            "if\\s*\\(\\s*dart\\.library\\.([A-Za-z_]+)\\s*\\)\\s*(['\"])([^'\"]+)\\2");
+
+    /// The packages the last [#importPackageSources] reached, stubbed ones included.
+    private final Set<String> lastReachedPackages = new HashSet<String>();
+
+    /// Follows the app's imports from every file in `lib/`, file by file, into its pub
+    /// packages. A package the runtime stubs (COVERED) or the SDK provides is not
+    /// followed. A pure-Dart package has every file the app reaches copied to
+    /// `packages/<name>/` -- where Flutter's `packages/<name>/...` asset keys already
+    /// put that package's files -- for the transpiler to compile with the app. A
+    /// platform plugin, or a file that needs a `dart:` library with no counterpart, is
+    /// recorded in [Result#unsupportedPackages] and not followed further.
+    ///
+    /// Only reachable files are copied: a package's tests, tools and web-only
+    /// libraries never reach the transpiler.
+    private int importPackageSources(File libDir, String ownName, Map<String, File> packageConfig,
+            Map<String, String> lockVersions, File target, Map<String, String> previous,
+            Map<String, String> imported, List<String> packageSources, Result r) throws IOException {
+        lastReachedPackages.clear();
+        // (package, path inside its lib/) of every file visited; own package is null.
+        Set<String> seen = new HashSet<String>();
+        java.util.ArrayDeque<String[]> work = new java.util.ArrayDeque<String[]>();
+        List<String> own = new ArrayList<String>();
+        collectDartSources(libDir, "", own);
+        // Seeded from EVERY lib/ file, not just the entry point's import graph: all of
+        // lib/ is copied and the transpiler compiles the whole program, so a file nothing
+        // imports is still compiled, and the packages it imports must resolve too.
+        // Reporting them here names the problem; skipping them would only move it to a
+        // compile error in the transpiler.
+        for (String f : own) {
+            work.add(new String[] {null, f});
+            seen.add("\u0000" + f);
+        }
+        Map<String, File> libDirs = new HashMap<String, File>();
+        Map<String, Integer> counts = new TreeMap<String, Integer>();
+        Map<String, Set<String>> importers = new HashMap<String, Set<String>>();
+        Map<String, Boolean> pluginCache = new HashMap<String, Boolean>();
+        int copied = 0;
+        while (!work.isEmpty()) {
+            String[] item = work.poll();
+            String pkg = item[0];
+            String rel = item[1];
+            File base = pkg == null ? libDir : libDirs.get(pkg);
+            File file = new File(base, rel.replace('/', File.separatorChar));
+            if (!file.isFile()) {
+                continue;
+            }
+            String text = new String(Files.readAllBytes(file.toPath()), Charset.forName("UTF-8"));
+            if (pkg != null) {
+                String dest = "packages/" + pkg + "/" + rel;
+                copied += copy(file, new File(target, dest.replace('/', File.separatorChar)), dest, previous,
+                        imported);
+                packageSources.add(dest);
+                Integer c = counts.get(pkg);
+                counts.put(pkg, Integer.valueOf(c == null ? 1 : c.intValue() + 1));
+            }
+            Matcher m = DIRECTIVE.matcher(stripComments(text));
+            while (m.find()) {
+                String uri = selectUri(m.group(3), m.group(4));
+                if (uri.startsWith("dart:")) {
+                    String lib = uri.substring(5);
+                    // Anything the transpiler does not implement is unsupported, not only
+                    // the libraries listed as such: dart:developer copied through would
+                    // only fail later, in the transpiler, instead of in this report.
+                    if (pkg != null && !SUPPORTED_DART_LIBRARIES.contains(lib)
+                            && !r.unsupportedPackages.containsKey(pkg)) {
+                        r.unsupportedPackages.put(pkg, "needs dart:" + lib + ", which has no Codename One "
+                                + "counterpart (" + rel + ")");
+                    }
+                    continue;
+                }
+                String nextPkg;
+                String nextRel;
+                if (uri.startsWith("package:")) {
+                    int slash = uri.indexOf('/');
+                    if (slash < 0) {
+                        continue;
+                    }
+                    nextPkg = uri.substring("package:".length(), slash);
+                    nextRel = uri.substring(slash + 1);
+                    if (nextPkg.equals(ownName)) {
+                        nextPkg = null;
+                    }
+                } else if (uri.indexOf(':') >= 0) {
+                    continue;
+                } else {
+                    nextPkg = pkg;
+                    int cut = rel.lastIndexOf('/');
+                    nextRel = normalize((cut < 0 ? "" : rel.substring(0, cut + 1)) + uri);
+                }
+                if (nextPkg != null) {
+                    lastReachedPackages.add(nextPkg);
+                    if (pkg != null && !pkg.equals(nextPkg)) {
+                        Set<String> by = importers.get(nextPkg);
+                        if (by == null) {
+                            by = new TreeSet<String>();
+                            importers.put(nextPkg, by);
+                        }
+                        by.add(pkg);
+                    }
+                    if (SDK_PACKAGES.contains(nextPkg) || COVERED.containsKey(nextPkg)
+                            || r.unsupportedPackages.containsKey(nextPkg)) {
+                        continue;
+                    }
+                    if (!libDirs.containsKey(nextPkg)) {
+                        File dir = resolvePackageLibDir(nextPkg, packageConfig, lockVersions);
+                        if (dir == null) {
+                            if (!r.unresolvedPackages.contains(nextPkg)) {
+                                r.unresolvedPackages.add(nextPkg);
+                                log.warn("Flutter package '" + nextPkg + "' is imported but not resolvable from "
+                                        + ".dart_tool/package_config.json or the pub cache; run `flutter pub get` "
+                                        + "once in the Flutter project");
+                            }
+                            r.unsupportedPackages.put(nextPkg, "sources not found; run `flutter pub get`");
+                            continue;
+                        }
+                        Boolean plugin = pluginCache.get(nextPkg);
+                        if (plugin == null) {
+                            plugin = Boolean.valueOf(isPlatformPlugin(dir));
+                            pluginCache.put(nextPkg, plugin);
+                        }
+                        if (plugin.booleanValue()) {
+                            r.unsupportedPackages.put(nextPkg, "a platform plugin with no Codename One stub");
+                            continue;
+                        }
+                        libDirs.put(nextPkg, dir);
+                    }
+                }
+                if (seen.add((nextPkg == null ? "\u0000" : nextPkg + "\u0000") + nextRel)) {
+                    work.add(new String[] {nextPkg, nextRel});
+                }
+            }
+        }
+        // A package that imports an unsupported one cannot compile either (its symbols
+        // were never imported), so the verdict travels up to every importer -- else the
+        // build failed in the importer's sources while this report blamed only the leaf.
+        java.util.ArrayDeque<String> verdicts = new java.util.ArrayDeque<String>(r.unsupportedPackages.keySet());
+        while (!verdicts.isEmpty()) {
+            String dep = verdicts.poll();
+            Set<String> by = importers.get(dep);
+            if (by == null) {
+                continue;
+            }
+            for (String p : by) {
+                if (!r.unsupportedPackages.containsKey(p)) {
+                    r.unsupportedPackages.put(p, "depends on " + dep + ", which is unsupported");
+                    verdicts.add(p);
+                }
+            }
+        }
+        // A package found unsupported after some of its files were copied is not
+        // transpiled: drop what was copied, so the build does not compile half of it.
+        for (String bad : r.unsupportedPackages.keySet()) {
+            if (counts.remove(bad) != null) {
+                String prefix = "packages/" + bad + "/";
+                for (java.util.Iterator<String> it = packageSources.iterator(); it.hasNext();) {
+                    String ps = it.next();
+                    if (ps.startsWith(prefix)) {
+                        it.remove();
+                        String written = imported.remove(ps);
+                        File f = new File(target, ps.replace('/', File.separatorChar));
+                        // Only a file that is still exactly the importer's copy goes. One
+                        // edited locally (copy() kept it, recording the earlier hash) is
+                        // left for removeStaleImports, which keeps it with a warning.
+                        if (f.isFile() && (written == null || !written.equals(sha256(f)))) {
+                            continue;
+                        }
+                        if (f.isFile() && !f.delete()) {
+                            log.warn("Could not remove " + f);
+                        }
+                    }
+                }
+            }
+        }
+        r.transpiledPackages.putAll(counts);
+        return copied;
+    }
+
+    /// The uri a configurable import names here: the first `if (dart.library.x)`
+    /// alternative whose library the transpiler implements, else the default.
+    static String selectUri(String defaultUri, String conditions) {
+        Matcher c = CONDITIONAL.matcher(conditions);
+        while (c.find()) {
+            if (SUPPORTED_DART_LIBRARIES.contains(c.group(1))) {
+                return c.group(3);
+            }
+        }
+        return defaultUri;
+    }
+
+    /// Whether a package's pubspec declares `flutter: plugin:` -- a federated or
+    /// classic platform plugin, whose Dart side calls into native code.
+    static boolean isPlatformPlugin(File packageLibDir) {
+        File pubspec = new File(packageLibDir.getParentFile(), "pubspec.yaml");
+        if (!pubspec.isFile()) {
+            return false;
+        }
+        try {
+            boolean inFlutter = false;
+            for (String line : Files.readAllLines(pubspec.toPath(), Charset.forName("UTF-8"))) {
+                if (line.trim().isEmpty() || line.trim().startsWith("#")) {
+                    continue;
+                }
+                if (!line.startsWith(" ")) {
+                    inFlutter = line.startsWith("flutter:");
+                    continue;
+                }
+                if (inFlutter && line.trim().startsWith("plugin:")) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /// Removes `//` and `/* */` comments, keeping string literals intact enough for
+    /// directive matching (a directive is never inside a string). A triple-quoted
+    /// string's contents are blanked, newlines kept: it spans lines, and a line of it
+    /// that reads like `import 'package:x/x.dart';` is text, not a dependency. A raw
+    /// string (`r'...'`) has no escapes.
+    static String stripComments(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        int i = 0;
+        int n = s.length();
+        char quote = 0;
+        boolean rawQuote = false;
+        while (i < n) {
+            char ch = s.charAt(i);
+            if (quote == 0 && (ch == '\'' || ch == '"') && i + 2 < n
+                    && s.charAt(i + 1) == ch && s.charAt(i + 2) == ch) {
+                boolean raw = i > 0 && (s.charAt(i - 1) == 'r' || s.charAt(i - 1) == 'R');
+                String close = new String(new char[] {ch, ch, ch});
+                out.append(close);
+                i += 3;
+                while (i < n && !s.startsWith(close, i)) {
+                    char c = s.charAt(i);
+                    if (c == '\\' && !raw && i + 1 < n) {
+                        out.append(s.charAt(i + 1) == '\n' ? "\n " : "  ");
+                        i += 2;
+                        continue;
+                    }
+                    out.append(c == '\n' ? '\n' : ' ');
+                    i++;
+                }
+                if (i < n) {
+                    out.append(close);
+                    i += 3;
+                }
+                continue;
+            }
+            if (quote != 0) {
+                out.append(ch);
+                if (ch == '\\' && i + 1 < n && !rawQuote) {
+                    out.append(s.charAt(i + 1));
+                    i += 2;
+                    continue;
+                }
+                if (ch == quote || ch == '\n') {
+                    quote = 0;
+                }
+                i++;
+                continue;
+            }
+            if (ch == '/' && i + 1 < n && s.charAt(i + 1) == '/') {
+                while (i < n && s.charAt(i) != '\n') {
+                    i++;
+                }
+                continue;
+            }
+            if (ch == '/' && i + 1 < n && s.charAt(i + 1) == '*') {
+                int depth = 0;
+                while (i < n) {
+                    if (s.startsWith("/*", i)) {
+                        depth++;
+                        i += 2;
+                    } else if (s.startsWith("*/", i)) {
+                        depth--;
+                        i += 2;
+                        if (depth == 0) {
+                            break;
+                        }
+                    } else {
+                        if (s.charAt(i) == '\n') {
+                            out.append('\n');
+                        }
+                        i++;
+                    }
+                }
+                continue;
+            }
+            if (ch == '\'' || ch == '"') {
+                quote = ch;
+                rawQuote = i > 0 && (s.charAt(i - 1) == 'r' || s.charAt(i - 1) == 'R');
+            }
+            out.append(ch);
+            i++;
+        }
+        return out.toString();
+    }
+
+    private static String normalize(String path) {
+        List<String> out = new ArrayList<String>();
+        for (String p : path.split("/")) {
+            if (p.isEmpty() || p.equals(".")) {
+                continue;
+            }
+            if (p.equals("..")) {
+                if (!out.isEmpty()) {
+                    out.remove(out.size() - 1);
+                }
+            } else {
+                out.add(p);
+            }
+        }
+        StringBuilder b = new StringBuilder();
+        for (String p : out) {
+            if (b.length() > 0) {
+                b.append('/');
+            }
+            b.append(p);
+        }
+        return b.toString();
     }
 
     /// Rewrites `codename1.version`/`codename1.displayName` in
@@ -365,6 +777,9 @@ public final class FlutterProjectImporter {
     /// (`CodenameOne/src/.../buildhints/Ios.java`, which backs
     /// `CFBundleVersion`) -- added rather than updated-if-present, since the
     /// archetype's settings file never declares either by default.
+    /// Must match com.codename1.flutter.plugins.packageinfo.PackageInfo.
+    static final String BUILD_NUMBER_RESOURCE = "cn1-flutter-build-number.txt";
+
     private void updateSettings(File commonDir, Pubspec pubspec) throws IOException {
         File settings = new File(commonDir, "codenameone_settings.properties");
         if (!settings.isFile()) {
@@ -380,6 +795,23 @@ public final class FlutterProjectImporter {
                 String buildNumber = pubspec.version.substring(plus + 1);
                 updated = setOrAppendProperty(updated, "codename1.arg.android.versionCode", buildNumber);
                 updated = setOrAppendProperty(updated, "codename1.arg.ios.bundleVersion", buildNumber);
+                // No device property reports the native build number, so package_info_plus
+                // reads it from here (PackageInfo.BUILD_NUMBER_RESOURCE).
+                File res = new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE);
+                res.getParentFile().mkdirs();
+                Files.write(res.toPath(), buildNumber.getBytes(Charset.forName("UTF-8")));
+            } else {
+                // A reimport after the pubspec dropped its +build part: the resource an
+                // earlier import wrote would keep reporting the old build number, and the
+                // native hints it appended would keep building with it. A hint whose value
+                // is not the one this importer wrote was set by hand and is kept.
+                File res = new File(commonDir, "src/main/resources/" + BUILD_NUMBER_RESOURCE);
+                if (res.isFile()) {
+                    String old = new String(Files.readAllBytes(res.toPath()), Charset.forName("UTF-8")).trim();
+                    updated = removePropertyIfValue(updated, "codename1.arg.android.versionCode", old);
+                    updated = removePropertyIfValue(updated, "codename1.arg.ios.bundleVersion", old);
+                    Files.delete(res.toPath());
+                }
             }
         }
         if (pubspec.name != null) {
@@ -389,6 +821,13 @@ public final class FlutterProjectImporter {
             Files.write(settings.toPath(), updated.getBytes(Charset.forName("UTF-8")));
             log.info("Set codename1.version/codename1.displayName from pubspec.yaml");
         }
+    }
+
+    /// Removes the `key=value` line whose value is exactly `value`; any other
+    /// value (or no line) leaves the file untouched.
+    static String removePropertyIfValue(String properties, String key, String value) {
+        return properties.replaceAll("(?m)^" + Pattern.quote(key) + "\\s*=\\s*" + Pattern.quote(value)
+                + "[ \\t]*(\\r?\\n|$)", "");
     }
 
     /// Replaces the value of a `key=value` line in a `.properties` file,
@@ -417,17 +856,11 @@ public final class FlutterProjectImporter {
         return properties + separator + key + "=" + value + "\n";
     }
 
-    private void writeEntryPoint(File javaDir, String pkg, String cls, String flutterPackage) throws IOException {
+    private void writeEntryPoint(File javaDir, String pkg, String cls, String flutterPackage,
+            java.util.Collection<String> dependencies) throws IOException {
         File f = new File(javaDir, pkg.replace('.', File.separatorChar) + File.separator + cls + ".java");
         f.getParentFile().mkdirs();
-        String src = "package " + pkg + ";\n\n"
-                + "/// The Codename One entry point: starts the imported Flutter application's Dart `main()`.\n"
-                + "public class " + cls + " extends com.codename1.system.Lifecycle {\n"
-                + "    @Override\n"
-                + "    public void runApp() {\n"
-                + "        " + flutterPackage + ".FlutterRegistry.invokeMain();\n"
-                + "    }\n"
-                + "}\n";
+        String src = entryPointSource(pkg, cls, flutterPackage, dependencies);
         byte[] bytes = src.getBytes(Charset.forName("UTF-8"));
         if (f.isFile()) {
             File backup = new File(f.getPath() + ".pre-flutter-import");
@@ -446,6 +879,87 @@ public final class FlutterProjectImporter {
             }
         }
         Files.write(f.toPath(), bytes);
+    }
+
+    /// The entry point's source. The plugin packs that need the platform to call the
+    /// app -- a deep link (app_links), a notification tap (flutter_local_notifications), a
+    /// push (firebase_messaging) -- get their callbacks forwarded here, and only when the
+    /// app depends on them: implementing PushCallback is what turns push on in a build.
+    static String entryPointSource(String pkg, String cls, String flutterPackage,
+            java.util.Collection<String> dependencies) {
+        boolean links = dependencies.contains("app_links");
+        boolean notifications = dependencies.contains("flutter_local_notifications");
+        boolean push = dependencies.contains("firebase_messaging");
+        StringBuilder implementsList = new StringBuilder();
+        if (notifications) {
+            implementsList.append("com.codename1.notifications.LocalNotificationCallback");
+        }
+        if (push) {
+            implementsList.append(implementsList.length() > 0 ? ", " : "").append("com.codename1.push.PushCallback");
+        }
+        StringBuilder b = new StringBuilder();
+        b.append("package ").append(pkg).append(";\n\n")
+                .append("/// The Codename One entry point: starts the imported Flutter application's Dart `main()`.\n")
+                .append("public class ").append(cls).append(" extends com.codename1.system.Lifecycle");
+        if (implementsList.length() > 0) {
+            b.append("\n        implements ").append(implementsList);
+        }
+        b.append(" {\n");
+        if (links) {
+            b.append("    @Override\n")
+                    .append("    public void start() {\n")
+                    .append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n")
+                    .append("        super.start();\n")
+                    .append("    }\n\n");
+        }
+        b.append("    @Override\n")
+                .append("    public void runApp() {\n");
+        if (push) {
+            // the runtime reads the key through this, so only an app using push names Push
+            b.append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.tokenSource(\n")
+                    .append("                new dart.runtime.Funcs.Func0<String>() {\n")
+                    .append("                    @Override\n")
+                    .append("                    public String call() {\n")
+                    .append("                        return com.codename1.push.Push.getPushKey();\n")
+                    .append("                    }\n")
+                    .append("                });\n");
+            b.append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.topicSink(\n")
+                    .append("                new dart.runtime.Funcs.VoidFunc2<String, Boolean>() {\n")
+                    .append("                    @Override\n")
+                    .append("                    public void call(String topic, Boolean subscribe) {\n")
+                    .append("                        if (subscribe.booleanValue()) {\n")
+                    .append("                            com.codename1.push.Push.subscribeToTopic(topic);\n")
+                    .append("                        } else {\n")
+                    .append("                            com.codename1.push.Push.unsubscribeFromTopic(topic);\n")
+                    .append("                        }\n")
+                    .append("                    }\n")
+                    .append("                });\n");
+        }
+        b.append("        ").append(flutterPackage).append(".FlutterRegistry.invokeMain();\n")
+                .append("    }\n");
+        if (notifications) {
+            b.append("\n    @Override\n")
+                    .append("    public void localNotificationReceived(String notificationId) {\n")
+                    .append("        com.codename1.flutter.plugins.notifications.FlutterLocalNotificationsPlugin")
+                    .append(".notificationTapped(notificationId);\n")
+                    .append("    }\n");
+        }
+        if (push) {
+            b.append("\n    @Override\n")
+                    .append("    public void push(String value) {\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.pushReceived(value);\n")
+                    .append("    }\n\n")
+                    .append("    @Override\n")
+                    .append("    public void registeredForPush(String deviceId) {\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.tokenRegistered(deviceId);\n")
+                    .append("    }\n\n")
+                    .append("    @Override\n")
+                    .append("    public void pushRegistrationError(String error, int errorCode) {\n")
+                    .append("        com.codename1.io.Log.p(\"Push registration failed: \" + error);\n")
+                    .append("        com.codename1.flutter.plugins.firebase.FirebaseMessaging.registrationFailed(error);\n")
+                    .append("    }\n");
+        }
+        return b.append("}\n").toString();
     }
 
     /// The manifest-free minimal record: one `<sha-256> <path>` line per file
@@ -509,9 +1023,10 @@ public final class FlutterProjectImporter {
     /// as source there. Read by `com.codename1.dart.transpiler.api.DartTranspiler`.
     static final String LIB_SOURCES_RECORD = ".flutter-lib-sources";
 
-    private static void writeLibSources(File target, File libDir) throws IOException {
+    private static void writeLibSources(File target, File libDir, List<String> packageSources) throws IOException {
         List<String> sources = new ArrayList<String>();
         collectDartSources(libDir, "", sources);
+        sources.addAll(packageSources);
         java.util.Collections.sort(sources);
         StringBuilder b = new StringBuilder();
         for (String s : sources) {

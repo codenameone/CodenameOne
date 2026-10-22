@@ -366,6 +366,10 @@ HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control);
  * that returns once the user has chosen -- and cn1WinWndProc forwards it here. */
 #define WM_CN1_FILEDIALOG (WM_APP + 19)
 LRESULT cn1WinFileDialogHandleMessage(WPARAM wParam);
+/* Rich IFileOpenDialog/IFileSaveDialog behind Display.showOpenDialog and
+ * showSaveDialog (cn1_windows_filedialog.cpp), marshaled the same way. */
+#define WM_CN1_FILEDIALOGEX (WM_APP + 29)
+LRESULT cn1WinFileDialogExHandleMessage(WPARAM wParam);
 
 /* Local notifications via Shell_NotifyIcon (cn1_windows_notify.c). A Timer on a
  * worker thread posts WM_CN1_NOTIFY to the pump thread (which owns the tray icon)

@@ -6617,6 +6617,112 @@ public class HTML5Implementation extends CodenameOneImplementation {
         chooser.showDialog();
     }
 
+    // File dialogs. Opening uses the browser's own <input type=file> picker.
+    // Saving downloads the content: showSaveFilePicker would let the user pick
+    // a folder, but it needs a user gesture on the main thread and the content
+    // is only ready after the worker has written it, so the gesture is gone
+    // by then. The download keeps the suggested name and the selected
+    // filter's extension.
+    @Override
+    public void showOpenDialog(final com.codename1.io.filechooser.OpenFileRequest request,
+                               final com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        StringBuilder accept = new StringBuilder();
+        boolean allFiles = false;
+        for (com.codename1.io.filechooser.FileTypeFilter f : request.getFilters()) {
+            // A filter with no extensions and no MIME types accepts every file
+            // (FileTypeFilter.acceptsName), so it unconstrains the union too.
+            if (f.getExtensions().length == 0 && f.getMimeTypes().length == 0) {
+                allFiles = true;
+            }
+            for (String e : f.getExtensions()) {
+                // "*" is the all-files extension, but ".*" in accept names one
+                // literal extension; a filter that takes everything means the
+                // picker must not be narrowed at all.
+                if ("*".equals(e)) {
+                    allFiles = true;
+                    continue;
+                }
+                accept.append(accept.length() == 0 ? "." : ",.").append(e);
+            }
+            for (String m : f.getMimeTypes()) {
+                accept.append(accept.length() == 0 ? "" : ",").append(m);
+            }
+        }
+        com.codename1.teavm.ext.usermedia.FileChooser chooser = new com.codename1.teavm.ext.usermedia.FileChooser(
+                new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        Object src = evt == null ? null : evt.getSource();
+                        String[] paths = null;
+                        if (src instanceof String[]) {
+                            paths = (String[]) src;
+                        } else if (src instanceof String) {
+                            paths = new String[]{(String) src};
+                        }
+                        callback.onSucess(new com.codename1.io.filechooser.FileDialogResult(request, paths, -1, null));
+                    }
+                }, allFiles || accept.length() == 0 ? null : accept.toString(), null);
+        chooser.setMultiple(request.isMultiSelect());
+        chooser.showDialog();
+    }
+
+    @Override
+    public void showSaveDialog(final com.codename1.io.filechooser.SaveFileRequest request,
+                               final com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        String name = request.getSuggestedName();
+        if (name == null || name.length() == 0) {
+            name = "download";
+        }
+        int sel = request.getSelectedFilter();
+        if (sel >= 0) {
+            com.codename1.io.filechooser.FileTypeFilter f = request.getFilters()[sel];
+            if (!f.acceptsName(name) && f.getExtensions().length > 0) {
+                name = name + "." + f.getExtensions()[0];
+            }
+        }
+        final String fileName = name;
+        final com.codename1.io.filechooser.FileDialogResult result =
+                new com.codename1.io.filechooser.FileDialogResult(request, new String[]{fileName}, sel, null);
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                // The content is buffered whole: a download reaches the page as a
+                // base64 data URL because a worker-side Blob does not survive the
+                // worker->main bridge (see downloadBytesAsFile), so there is no
+                // stream to write into. A document too large for the heap must
+                // still answer the callback, hence the OutOfMemoryError catch.
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                try {
+                    request.writeContent(result, out);
+                    byte[] data = out.toByteArray();
+                    out = null;
+                    if (!downloadBytesAsFile(fileName, data)) {
+                        result.setError(new IOException("The browser refused the download"));
+                    }
+                } catch (IOException err) {
+                    Log.e(err);
+                    result.setError(err);
+                } catch (RuntimeException err) {
+                    // an unchecked failure in the application's writer
+                    Log.e(err);
+                    result.setError(err);
+                } catch (OutOfMemoryError err) {
+                    out = null;
+                    result.setError(new IOException("The document is too large to download from the browser"));
+                }
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        callback.onSucess(result);
+                    }
+                });
+            }
+        });
+    }
+
+    @Override
+    public boolean isFileDialogFeatureSupported(int feature) {
+        return feature == com.codename1.io.filechooser.FileDialogFeatures.NATIVE
+                || feature == com.codename1.io.filechooser.FileDialogFeatures.MULTI_SELECT;
+    }
+
     @Override
     public void captureVideo(ActionListener response) {
         new com.codename1.teavm.ext.usermedia.FileChooser(response, "video/*", "camcorder").showDialog();

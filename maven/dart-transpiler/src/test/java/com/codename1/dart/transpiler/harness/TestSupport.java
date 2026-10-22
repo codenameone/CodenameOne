@@ -204,19 +204,49 @@ public final class TestSupport {
         return artifactId;
     }
 
-    /** Runs a process, returns [exitCode, stdout+stderr]. */
+    /**
+     * Runs a process, returns [exitCode, stdout+stderr]. A process still running after
+     * CN1_DART_PROCESS_TIMEOUT_SECONDS (default 600) is killed and reported as exit -1:
+     * a generated program that deadlocks (an await nothing completes) otherwise held the
+     * whole suite, and CI's job, for hours with no output naming the case.
+     */
     public static Object[] run(List<String> cmd, File dir) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(dir);
         pb.redirectErrorStream(true);
-        Process p = pb.start();
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        byte[] chunk = new byte[8192];
-        int n;
-        while ((n = p.getInputStream().read(chunk)) > 0) {
-            out.write(chunk, 0, n);
+        final Process p = pb.start();
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            byte[] chunk = new byte[8192];
+            int n;
+            try {
+                while ((n = p.getInputStream().read(chunk)) > 0) {
+                    synchronized (out) {
+                        out.write(chunk, 0, n);
+                    }
+                }
+            } catch (IOException ignored) {
+                // the process was killed; what was read so far is reported
+            }
+        });
+        reader.setDaemon(true);
+        reader.start();
+        long limit = 600;
+        String env = System.getenv("CN1_DART_PROCESS_TIMEOUT_SECONDS");
+        if (env != null && env.matches("[0-9]+")) {
+            limit = Long.parseLong(env);
         }
-        int code = p.waitFor();
-        return new Object[] {code, new String(out.toByteArray(), StandardCharsets.UTF_8)};
+        if (!p.waitFor(limit, java.util.concurrent.TimeUnit.SECONDS)) {
+            p.destroyForcibly();
+            reader.join(5000);
+            synchronized (out) {
+                return new Object[] {-1, new String(out.toByteArray(), StandardCharsets.UTF_8)
+                        + "\n[TIMED OUT after " + limit + "s: " + String.join(" ", cmd) + "]"};
+            }
+        }
+        reader.join();
+        synchronized (out) {
+            return new Object[] {p.exitValue(), new String(out.toByteArray(), StandardCharsets.UTF_8)};
+        }
     }
 }

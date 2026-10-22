@@ -31,7 +31,41 @@
     </properties>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- The plugin packs (com.codename1.flutter.plugins.*) are not compiled into
+                 this jar. They ship as SOURCES under META-INF/dart/java, and the transpiler
+                 copies into its output only the packs the generated code (or the app's own
+                 Java) names, so an app that never imports geolocator never contains a
+                 class that names LocationManager, and no builder has to prune anything.
+                 Builders already drop META-INF/dart/ from every bundle. -->
+            <resource>
+                <directory>src/main/plugins</directory>
+                <targetPath>META-INF/dart/java</targetPath>
+            </resource>
+        </resources>
         <plugins>
+            <plugin>
+                <!-- Compile-check the packs with the tests (never packaged as classes). -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>plugin-pack-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/plugins</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>

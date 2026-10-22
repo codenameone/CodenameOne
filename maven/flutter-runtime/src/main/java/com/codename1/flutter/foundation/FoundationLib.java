@@ -120,4 +120,10 @@ public final class FoundationLib {
         }
         return null;
     }
+
+    /// Flutter's `debugPrint(message, wrapWidth: ...)`: prints the message, as Flutter
+    /// does outside a test; `wrapWidth` is ignored.
+    public static void debugPrint(String message, Long wrapWidth) {
+        dart.runtime.DartRuntime.print(message);
+    }
 }

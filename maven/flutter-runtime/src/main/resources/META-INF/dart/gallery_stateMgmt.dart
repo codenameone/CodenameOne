@@ -50,7 +50,7 @@ class SingleChildWidget extends Widget {
 
 @JavaName('com.codename1.flutter.provider.Provider')
 class Provider extends SingleChildWidget {
-  external Provider({Key? key, dynamic create, Object? value, bool? lazy, Widget? child});
+  external Provider({Key? key, dynamic create, Object? value, bool? lazy, dynamic dispose, Widget? child});
   // named constructors are declared as static factory methods for the emitter
   external static Provider value({Key? key, Object value, Widget? child});
   external static T of(BuildContext context, {bool listen});

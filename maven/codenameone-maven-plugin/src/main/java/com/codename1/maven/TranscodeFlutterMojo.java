@@ -97,6 +97,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (flutterSourceDir == null || !flutterSourceDir.isDirectory()) {
             sweepStaleOutput();
+            removeDeselectedPackClasses();
             // Flutter was removed from the project: its assets go with it.
             removeStaleAssets(new HashSet<String>());
             return;
@@ -114,6 +115,15 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
             org.apache.maven.artifact.Artifact a = (org.apache.maven.artifact.Artifact) o;
             if (a.getFile() != null) {
                 req.stubClasspathEntry(a.getFile());
+            }
+        }
+        // The app's own Java can name a plugin pack too (the import-generated entry point
+        // installs the firebase_messaging and app_links hooks): the transpiler copies
+        // exactly the packs that are named, so it must see that Java as well.
+        for (Object root : project.getCompileSourceRoots()) {
+            File dir = new File(String.valueOf(root));
+            if (dir.isDirectory() && !dir.getAbsoluteFile().equals(flutterOutputDir.getAbsoluteFile())) {
+                req.javaSourceRoot(dir);
             }
         }
         TranspileResult result = new DartTranspiler().transpile(req);
@@ -139,8 +149,30 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         } else {
             getLog().info("Transpiled Flutter sources to " + flutterOutputDir);
         }
+        removeDeselectedPackClasses();
         copyAssets();
         registerSourceRoot();
+    }
+
+    /**
+     * The transpiler deletes the source of a plugin pack the app stopped naming, but javac
+     * does not reliably delete the class compiled from it on an earlier build. Left in
+     * target/classes, those classes would still ship -- and still imply the permissions
+     * (location, push, ...) the builders derive from the classes they find.
+     */
+    private void removeDeselectedPackClasses() {
+        String packs = "com/codename1/flutter/plugins".replace('/', File.separatorChar);
+        File[] compiled = new File(project.getBuild().getOutputDirectory(), packs).listFiles();
+        if (compiled == null) {
+            return;
+        }
+        File selected = new File(flutterOutputDir, packs);
+        for (File pack : compiled) {
+            if (pack.isDirectory() && !new File(selected, pack.getName()).isDirectory()) {
+                deleteRecursive(pack);
+                getLog().debug("Removed classes of unused Flutter plugin pack " + pack.getName());
+            }
+        }
     }
 
     private void checkJdk() throws MojoFailureException {

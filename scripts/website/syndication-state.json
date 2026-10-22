@@ -2919,6 +2919,15 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-22T00:01:09+00:00"
+      },
+      "devto": {
+        "id": 4898963,
+        "url": "https://dev.to/codenameone/smaller-simpler-maven-projects-4ca5",
+        "syndicated_at": "2026-10-22T17:57:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/smaller-simpler-maven-projects-e772b8922acc?postPublishedType=initial",
+        "syndicated_at": "2026-10-22T19:01:13+00:00"
       }
     }
   }

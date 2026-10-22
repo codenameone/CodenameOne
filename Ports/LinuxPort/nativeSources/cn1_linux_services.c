@@ -42,6 +42,7 @@
 #include <geoclue.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -683,6 +684,382 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileDialog___boolean_int_java_l
     }
     cn1LinuxRunOnMainAndWait(cn1FileDialogOnMain, &d);
     return d.got ? newStringFromCString(threadStateData, d.result) : JAVA_NULL;
+}
+
+/* ------------------------------------------------- rich open/save dialog
+ * The dialog behind Display.showOpenDialog/showSaveDialog. Every Java string is
+ * copied into C memory before the hop to the GTK thread, because that thread
+ * must not touch the Java heap; the answer comes back the same way and is only
+ * turned into Java strings on the calling thread.
+ *
+ * filters[i] is "label\next1\next2...", options[i] is
+ * "type\nid\nlabel\ndefault\nchoice1\nchoice2..." (type 1 checkbox, 2 choice,
+ * 3 text). The answer is null on cancel, else
+ * [selected filter index, one value per option, path...]. */
+
+#define CN1_FDX_MAX_ITEMS 64
+
+typedef struct {
+    int save;
+    int multi;
+    int dirs;
+    int confirmOverwrite;
+    int showHidden;
+    char* title;
+    char* acceptLabel;
+    char* initialDir;
+    char* suggestedName;
+    int filterCount;
+    char* filters[CN1_FDX_MAX_ITEMS];
+    int selectedFilter;
+    int optionCount;
+    char* options[CN1_FDX_MAX_ITEMS];
+    /* answer */
+    int accepted;
+    int chosenFilter;
+    char* values[CN1_FDX_MAX_ITEMS];
+    GSList* paths;
+} CN1FileDlgEx;
+
+static char* cn1FdxDup(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
+    const char* c;
+    if (s == JAVA_NULL) {
+        return 0;
+    }
+    c = stringToUTF8(threadStateData, s);
+    return c ? strdup(c) : 0;
+}
+
+static int cn1FdxDupArray(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, char** out) {
+    int n, i;
+    JAVA_OBJECT* elements;
+    if (arr == JAVA_NULL) {
+        return 0;
+    }
+    n = (int) (*(JAVA_ARRAY) arr).length;
+    if (n > CN1_FDX_MAX_ITEMS) {
+        n = CN1_FDX_MAX_ITEMS;
+    }
+    elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
+    for (i = 0; i < n; i++) {
+        out[i] = cn1FdxDup(threadStateData, elements[i]);
+    }
+    return n;
+}
+
+/* Splits a "\n" separated spec in place; returns the number of fields. */
+static int cn1FdxSplit(char* spec, char** fields, int max) {
+    int n = 0;
+    char* p = spec;
+    if (!spec) {
+        return 0;
+    }
+    while (n < max) {
+        char* nl = strchr(p, '\n');
+        fields[n++] = p;
+        if (!nl) {
+            break;
+        }
+        *nl = 0;
+        p = nl + 1;
+    }
+    return n;
+}
+
+/* Appends the filter's first extension to a save path that carries none of
+ * its extensions, the same rule as FileDialogSupport.withExtension, so the
+ * overwrite check sees the file that will really be written. The filter
+ * string was already split by cn1FdxSplit into n NUL separated fields: the
+ * label, then the extensions. Returns 1 when the path was changed. */
+static int cn1FdxAddExtension(GSList* paths, const char* filter, int n) {
+    const char* path = (const char*) paths->data;
+    const char* field = filter + strlen(filter) + 1;
+    const char* first = 0;
+    size_t len = strlen(path);
+    int j;
+    for (j = 1; j < n; j++) {
+        size_t el = strlen(field);
+        if (strcmp(field, "*") == 0) {
+            /* the all-files filter accepts any name as typed */
+            return 0;
+        }
+        if (!first) {
+            first = field;
+        }
+        /* >= so a dotfile such as ".gitignore" already counts as carrying it */
+        if (len >= el + 1 && path[len - el - 1] == '.'
+                && g_ascii_strcasecmp(path + len - el, field) == 0) {
+            return 0;
+        }
+        field += el + 1;
+    }
+    if (!first || !*first) {
+        return 0;
+    }
+    paths->data = g_strconcat(path, ".", first, NULL);
+    g_free((gpointer) path);
+    return 1;
+}
+
+static int cn1FdxConfirmReplace(GtkWidget* parent, const char* path) {
+    GtkWidget* q;
+    int answer;
+    gchar* base = g_path_get_basename(path);
+    q = gtk_message_dialog_new(GTK_WINDOW(parent), GTK_DIALOG_MODAL,
+            GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+            "A file named \"%s\" already exists. Do you want to replace it?", base);
+    answer = gtk_dialog_run(GTK_DIALOG(q));
+    gtk_widget_destroy(q);
+    g_free(base);
+    return answer == GTK_RESPONSE_YES;
+}
+
+static void cn1FileDialogExOnMain(void* p) {
+    CN1FileDlgEx* d = (CN1FileDlgEx*) p;
+    GtkFileChooserAction action;
+    GtkWidget* dialog;
+    GtkWidget* extra = 0;
+    GtkWidget* entries[CN1_FDX_MAX_ITEMS];
+    GtkFileFilter* filters[CN1_FDX_MAX_ITEMS];
+    int filterFields[CN1_FDX_MAX_ITEMS];
+    int i;
+    if (d->save) {
+        action = GTK_FILE_CHOOSER_ACTION_SAVE;
+    } else {
+        action = d->dirs ? GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER : GTK_FILE_CHOOSER_ACTION_OPEN;
+    }
+    dialog = gtk_file_chooser_dialog_new(
+            d->title ? d->title : (d->save ? "Save" : "Open"),
+            GTK_WINDOW(cn1LinuxWindowWidget()), action,
+            "_Cancel", GTK_RESPONSE_CANCEL,
+            d->acceptLabel ? d->acceptLabel : (d->save ? "_Save" : "_Open"), GTK_RESPONSE_ACCEPT, NULL);
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), d->multi && !d->save);
+    gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog), d->showHidden);
+    /* GTK would confirm the typed name, before cn1FdxAddExtension changes it,
+     * and so warn about the wrong file (or miss the real one). The loop below
+     * confirms the final path itself instead. */
+    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), FALSE);
+    if (d->initialDir) {
+        gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), d->initialDir);
+    }
+    if (d->save && d->suggestedName) {
+        gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), d->suggestedName);
+    }
+    for (i = 0; i < d->filterCount; i++) {
+        /* Sized from the record, like the option parser below: a filter may
+         * list any number of extensions, and a fixed array would drop the
+         * extra ones from both the glob list and cn1FdxAddExtension. */
+        int max = 1;
+        const char* c;
+        char** fields;
+        int n;
+        int j;
+        for (c = d->filters[i]; c && *c; c++) {
+            if (*c == '\n') {
+                max++;
+            }
+        }
+        fields = g_new0(char*, max);
+        n = cn1FdxSplit(d->filters[i], fields, max);
+        filterFields[i] = n;
+        filters[i] = gtk_file_filter_new();
+        gtk_file_filter_set_name(filters[i], n > 0 ? fields[0] : "");
+        for (j = 1; j < n; j++) {
+            if (strcmp(fields[j], "*") == 0) {
+                /* the all-files extension: "*.*" would hide README */
+                gtk_file_filter_add_pattern(filters[i], "*");
+                continue;
+            }
+            /* case-insensitive glob, so "png" also matches IMG.PNG */
+            char glob[256];
+            int k, o = 0;
+            glob[o++] = '*';
+            glob[o++] = '.';
+            for (k = 0; fields[j][k] && o < (int) sizeof(glob) - 5; k++) {
+                char c = fields[j][k];
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                    glob[o++] = '[';
+                    glob[o++] = (char) (c | 0x20);
+                    glob[o++] = (char) (c & ~0x20);
+                    glob[o++] = ']';
+                } else {
+                    glob[o++] = c;
+                }
+            }
+            glob[o] = 0;
+            gtk_file_filter_add_pattern(filters[i], glob);
+        }
+        if (n <= 1) {
+            gtk_file_filter_add_pattern(filters[i], "*");
+        }
+        gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filters[i]);
+        g_free(fields);
+    }
+    if (d->filterCount > 0 && d->selectedFilter >= 0 && d->selectedFilter < d->filterCount) {
+        gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(dialog), filters[d->selectedFilter]);
+    }
+    /* Checkboxes and choices are GtkFileChooser choices, which the desktop
+     * portal can show too; a text option has no choice form and goes into the
+     * extra widget. */
+    for (i = 0; i < d->optionCount; i++) {
+        /* Sized from the spec itself: a choice option may carry any number of
+         * choices, and a fixed array would silently drop the extra ones. */
+        int max = 1;
+        const char* c;
+        char** fields;
+        int n;
+        for (c = d->options[i]; c && *c; c++) {
+            if (*c == '\n') {
+                max++;
+            }
+        }
+        fields = g_new0(char*, max);
+        n = cn1FdxSplit(d->options[i], fields, max);
+        entries[i] = 0;
+        if (n < 4) {
+            g_free(fields);
+            continue;
+        }
+        if (fields[0][0] == '1') {
+            gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[2], NULL, NULL);
+            gtk_file_chooser_set_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[3]);
+        } else if (fields[0][0] == '2') {
+            const char** ids = g_new0(const char*, n - 3);
+            int k;
+            for (k = 4; k < n; k++) {
+                ids[k - 4] = fields[k];
+            }
+            ids[n - 4] = NULL;
+            gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[2], ids, ids);
+            gtk_file_chooser_set_choice(GTK_FILE_CHOOSER(dialog), fields[1], fields[3]);
+            g_free(ids);
+        } else {
+            GtkWidget* label = gtk_label_new(fields[2]);
+            if (!extra) {
+                extra = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+            }
+            entries[i] = gtk_entry_new();
+            gtk_entry_set_text(GTK_ENTRY(entries[i]), fields[3]);
+            gtk_box_pack_start(GTK_BOX(extra), label, FALSE, FALSE, 0);
+            gtk_box_pack_start(GTK_BOX(extra), entries[i], FALSE, FALSE, 0);
+        }
+        g_free(fields);
+    }
+    if (extra) {
+        gtk_widget_show_all(extra);
+        gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), extra);
+    }
+    while (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        GtkFileFilter* chosen = gtk_file_chooser_get_filter(GTK_FILE_CHOOSER(dialog));
+        d->accepted = 1;
+        d->chosenFilter = -1;
+        for (i = 0; i < d->filterCount; i++) {
+            if (filters[i] == chosen) {
+                d->chosenFilter = i;
+            }
+        }
+        for (i = 0; i < d->optionCount; i++) {
+            const char* v = 0;
+            if (entries[i]) {
+                v = gtk_entry_get_text(GTK_ENTRY(entries[i]));
+            } else if (d->options[i]) {
+                /* cn1FdxSplit left the id as the second field */
+                const char* id = d->options[i] + strlen(d->options[i]) + 1;
+                v = gtk_file_chooser_get_choice(GTK_FILE_CHOOSER(dialog), id);
+            }
+            d->values[i] = v ? strdup(v) : 0;
+        }
+        d->paths = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
+        if (d->save && d->paths && d->chosenFilter >= 0) {
+            cn1FdxAddExtension(d->paths, d->filters[d->chosenFilter], filterFields[d->chosenFilter]);
+        }
+        if (d->save && d->paths && d->confirmOverwrite
+                && g_file_test((const char*) d->paths->data, G_FILE_TEST_EXISTS)
+                && !cn1FdxConfirmReplace(dialog, (const char*) d->paths->data)) {
+            /* confirmed against the final, extension-adjusted path; the user
+             * declined replacing it, so the dialog is shown again */
+            for (i = 0; i < d->optionCount; i++) {
+                free(d->values[i]);
+                d->values[i] = 0;
+            }
+            g_slist_free_full(d->paths, g_free);
+            d->paths = 0;
+            d->accepted = 0;
+            continue;
+        }
+        break;
+    }
+    gtk_widget_destroy(dialog);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileDialogEx___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_1ARRAY_int_boolean_boolean_boolean_boolean_java_lang_String_1ARRAY_R_java_lang_String_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN save, JAVA_OBJECT title, JAVA_OBJECT acceptLabel,
+        JAVA_OBJECT initialDir, JAVA_OBJECT suggestedName, JAVA_OBJECT filters, JAVA_INT selectedFilter,
+        JAVA_BOOLEAN multi, JAVA_BOOLEAN dirs, JAVA_BOOLEAN confirmOverwrite, JAVA_BOOLEAN showHidden,
+        JAVA_OBJECT options) {
+    CN1FileDlgEx d;
+    JAVA_OBJECT arr = JAVA_NULL;
+    JAVA_OBJECT* elements;
+    GSList* it;
+    int count, i, o;
+    char num[16];
+    memset(&d, 0, sizeof(d));
+    if (cn1LinuxWindowWidget() == 0) {
+        return JAVA_NULL; /* headless */
+    }
+    d.save = save ? 1 : 0;
+    d.multi = multi ? 1 : 0;
+    d.dirs = dirs ? 1 : 0;
+    d.confirmOverwrite = confirmOverwrite ? 1 : 0;
+    d.showHidden = showHidden ? 1 : 0;
+    d.selectedFilter = selectedFilter;
+    d.title = cn1FdxDup(threadStateData, title);
+    d.acceptLabel = cn1FdxDup(threadStateData, acceptLabel);
+    d.initialDir = cn1FdxDup(threadStateData, initialDir);
+    d.suggestedName = cn1FdxDup(threadStateData, suggestedName);
+    d.filterCount = cn1FdxDupArray(threadStateData, filters, d.filters);
+    d.optionCount = cn1FdxDupArray(threadStateData, options, d.options);
+    cn1LinuxRunOnMainAndWait(cn1FileDialogExOnMain, &d);
+    if (d.accepted && d.paths) {
+        count = 1 + d.optionCount + (int) g_slist_length(d.paths);
+        arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+        if (arr != JAVA_NULL) {
+            JAVA_OBJECT s;
+            o = 0;
+            snprintf(num, sizeof(num), "%d", d.chosenFilter);
+            s = newStringFromCString(threadStateData, num);
+            elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
+            CN1_WRITE_BARRIER(arr, s);
+            elements[o++] = s;
+            for (i = 0; i < d.optionCount; i++) {
+                s = d.values[i] ? newStringFromCString(threadStateData, d.values[i]) : JAVA_NULL;
+                elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
+                CN1_WRITE_BARRIER(arr, s);
+                elements[o++] = s;
+            }
+            for (it = d.paths; it; it = it->next) {
+                s = newStringFromCString(threadStateData, (const char*) it->data);
+                elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
+                CN1_WRITE_BARRIER(arr, s);
+                elements[o++] = s;
+            }
+        }
+    }
+    if (d.paths) {
+        g_slist_free_full(d.paths, g_free);
+    }
+    free(d.title);
+    free(d.acceptLabel);
+    free(d.initialDir);
+    free(d.suggestedName);
+    for (i = 0; i < d.filterCount; i++) {
+        free(d.filters[i]);
+    }
+    for (i = 0; i < d.optionCount; i++) {
+        free(d.options[i]);
+        free(d.values[i]);
+    }
+    return arr;
 }
 
 /* ------------------------------------------------------------- location */

@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -67,8 +68,18 @@ public final class DartTranspiler {
         // The output PACKAGE is part of what was generated, so it is part of the
         // key: changing cn1.flutter.package alone used to leave every generated
         // source declared in the old package, because nothing else had changed.
+        // The packs the app's own Java names decide output too, and editing that Java
+        // touches no Dart file, so they are part of the key.
+        Set<String> javaPacks;
+        try {
+            javaPacks = PluginPacks.namedByJava(req.javaSourceRoots);
+        } catch (IOException e) {
+            diags.error(null, 0, 0, "E0005", "Cannot read application Java sources: " + e);
+            return new TranspileResult(diags.asList(), new ArrayList<GeneratedFile>(), false);
+        }
+        // "-pkg:" stays LAST: removePreviousPackage reads the package back from it.
         String digest = digest(dartFiles) + stubDigest(req.stubClasspath)
-                + "-pkg:" + req.packageName;
+                + "-java:" + javaPacks + "-pkg:" + req.packageName;
         if (req.stateFile != null && req.stateFile.exists() && req.outputDir != null && req.outputDir.exists()) {
             try {
                 List<String> lines = Files.readAllLines(req.stateFile.toPath(), StandardCharsets.UTF_8);
@@ -120,8 +131,24 @@ public final class DartTranspiler {
         JavaEmitter emitter = new JavaEmitter(program, stubs, diags, req.packageName);
         List<GeneratedFile> files = emitter.emit();
 
+        Map<String, String> packSources = new java.util.TreeMap<String, String>();
+        if (!diags.hasErrors() && req.outputDir != null) {
+            try {
+                List<CharSequence> roots = new ArrayList<CharSequence>();
+                for (GeneratedFile gf : files) {
+                    roots.add(gf.content);
+                }
+                for (String p : javaPacks) {
+                    roots.add(PluginPacks.PACKAGE + p + ".");
+                }
+                packSources = pluginPackSources(req.stubClasspath, roots);
+            } catch (IOException e) {
+                diags.error(null, 0, 0, "E0005", "Cannot read plugin pack sources: " + e);
+            }
+        }
         if (!diags.hasErrors() && req.outputDir != null) {
             writeOutput(req, files, diags);
+            writePackSources(req, packSources, diags);
             if (req.stateFile != null && diags.hasErrors()) {
                 // A file failed to write, so the output does not match these inputs.
                 // Recording the digest anyway sent the next unchanged build down the
@@ -134,7 +161,8 @@ public final class DartTranspiler {
             } else if (req.stateFile != null) {
                 try {
                     req.stateFile.getParentFile().mkdirs();
-                    Files.write(req.stateFile.toPath(), stateFileContent(digest, files).getBytes(StandardCharsets.UTF_8));
+                    Files.write(req.stateFile.toPath(),
+                            stateFileContent(digest, files, packSources).getBytes(StandardCharsets.UTF_8));
                 } catch (IOException e) {
                     diags.warn(null, "W0001", "Could not write transpiler state file: " + e);
                 }
@@ -442,13 +470,79 @@ public final class DartTranspiler {
      * -- a compile failure the transpiler itself reported as "up to date". Recording the
      * file set here lets a cache hit verify it is still true before trusting it.</p>
      */
-    private static String stateFileContent(String digest, List<GeneratedFile> files) {
+    private static String stateFileContent(String digest, List<GeneratedFile> files,
+            Map<String, String> packSources) {
         StringBuilder sb = new StringBuilder(digest);
         for (GeneratedFile gf : files) {
             sb.append('\n').append(gf.relativePath).append('\t')
                     .append(gf.content.getBytes(StandardCharsets.UTF_8).length);
         }
+        // Pack sources live under the output root, not the package: PACK_LINE marks them.
+        for (Map.Entry<String, String> e : packSources.entrySet()) {
+            sb.append('\n').append(PACK_LINE).append(e.getKey()).append('\t')
+                    .append(e.getValue().getBytes(StandardCharsets.UTF_8).length);
+        }
         return sb.toString();
+    }
+
+    private static final String PACK_LINE = "@";
+
+    /**
+     * The flutter-runtime plugin pack sources {@code roots} need -- the packs they name,
+     * and the packs those name -- keyed by path relative to a Java source root. The
+     * transpiler writes these beside its output; a caller that drives the emitter itself
+     * (a test harness, a benchmark) must compile them with the generated code too.
+     */
+    public static Map<String, String> pluginPackSources(List<File> stubClasspath,
+            Iterable<? extends CharSequence> roots) throws IOException {
+        PluginPacks packs = PluginPacks.load(stubClasspath);
+        return packs.sources(packs.closure(roots));
+    }
+
+    /**
+     * Writes the selected plugin pack sources under the output root and deletes any
+     * pack file an earlier run copied that this one did not select -- an import the app
+     * dropped must take its pack (and the permissions its classes imply) with it.
+     */
+    private static void writePackSources(TranspileRequest req, Map<String, String> packSources,
+            Diagnostics diags) {
+        for (Map.Entry<String, String> e : packSources.entrySet()) {
+            File out = new File(req.outputDir, e.getKey().replace('/', File.separatorChar));
+            out.getParentFile().mkdirs();
+            try {
+                byte[] content = e.getValue().getBytes(StandardCharsets.UTF_8);
+                if (out.exists() && Arrays.equals(Files.readAllBytes(out.toPath()), content)) {
+                    continue;
+                }
+                Files.write(out.toPath(), content);
+            } catch (IOException ex) {
+                diags.error(e.getKey(), 0, 0, "E0004", "Cannot write plugin pack source: " + ex);
+            }
+        }
+        File root = new File(req.outputDir, PluginPacks.PATH.replace('/', File.separatorChar));
+        sweepPacks(req.outputDir, root, packSources.keySet());
+    }
+
+    private static void sweepPacks(File outputDir, File dir, Set<String> keep) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        String base = outputDir.getPath() + File.separator;
+        for (File c : children) {
+            if (c.isDirectory()) {
+                sweepPacks(outputDir, c, keep);
+                String[] left = c.list();
+                if (left != null && left.length == 0) {
+                    c.delete();
+                }
+            } else {
+                String rel = c.getPath().substring(base.length()).replace(File.separatorChar, '/');
+                if (!keep.contains(rel)) {
+                    c.delete();
+                }
+            }
+        }
     }
 
     /**
@@ -474,7 +568,10 @@ public final class DartTranspiler {
             } catch (NumberFormatException e) {
                 return false;
             }
-            File f = new File(pkgDir, line.substring(0, tab));
+            String name = line.substring(0, tab);
+            File f = name.startsWith(PACK_LINE)
+                    ? new File(req.outputDir, name.substring(PACK_LINE.length()).replace('/', File.separatorChar))
+                    : new File(pkgDir, name);
             if (!f.isFile() || f.length() != expectedLength) {
                 return false;
             }

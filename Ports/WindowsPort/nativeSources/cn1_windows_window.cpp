@@ -874,6 +874,9 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* Modal file open/save dialog, run synchronously on this (pump) thread
              * while the EDT blocks in SendMessage (cn1_windows_io.c). */
             return cn1WinFileDialogHandleMessage(wParam);
+        case WM_CN1_FILEDIALOGEX:
+            /* Rich open/save dialog (cn1_windows_filedialog.cpp), same contract. */
+            return cn1WinFileDialogExHandleMessage(wParam);
         case WM_CN1_NOTIFY:
             /* Show a local-notification balloon on the tray icon, marshaled from
              * the notification Timer thread (cn1_windows_notify.c). */

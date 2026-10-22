@@ -1,0 +1,8 @@
+equal true hash true
+identical false
+Pet(7, Rex, Species.dog, [a, b], 2024-03-05 10:20:30.000)
+{id: 7, name: Rex, species: dog, tags: [a, b], born: 2024-03-05T10:20:30.000}
+differs false
+2
+[1, 2, 30]
+bad enum: `fish` is not one of the supported values: dog, cat

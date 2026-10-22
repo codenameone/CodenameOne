@@ -93,8 +93,14 @@ print("\n".join([user, password, p.hostname or "localhost", str(p.port or 3306),
 
 cd "$SAMPLE"
 reset_schema
+# A sample whose server depends on another reactor module (Skirmish's rules)
+# builds it in the same run; -pl alone would resolve it from the repository.
+MODULES=shared,backend
+if [ -f rules/pom.xml ]; then
+  MODULES=rules,$MODULES
+fi
 log "compiling the server and its tests"
-"$MVN" -B -q -Dcodename1.platform=backend -pl shared,backend test-compile "$@"
+"$MVN" -B -q -Dcodename1.platform=backend -pl "$MODULES" test-compile "$@"
 
 classes=()
 while IFS= read -r file; do
@@ -116,7 +122,7 @@ failed=()
 for class in "${classes[@]}"; do
   reset_schema
   log "$class"
-  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -pl shared,backend \
+  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -pl "$MODULES" \
       test -Dtest="$class" -Dsurefire.failIfNoSpecifiedTests=false "$@"; then
     failed+=("$class")
   fi

@@ -184,7 +184,7 @@ enum DismissDirection { vertical, horizontal, endToStart, startToEnd, up, down, 
 
 @JavaName('com.codename1.flutter.widgets.Dismissible')
 class Dismissible extends Widget {
-  external Dismissible({required Key key, required Widget child, Widget? background, Widget? secondaryBackground, Object? confirmDismiss, VoidCallback? onResize, Object? onUpdate, Object? onDismissed, Object? direction, Object? resizeDuration, Object? dismissThresholds, Object? movementDuration, double? crossAxisEndOffset, Object? dragStartBehavior, Object? behavior});
+  external Dismissible({required Key key, required Widget child, Widget? background, Widget? secondaryBackground, Future<bool?> Function(DismissDirection direction)? confirmDismiss, VoidCallback? onResize, Object? onUpdate, void Function(DismissDirection direction)? onDismissed, Object? direction, Object? resizeDuration, Object? dismissThresholds, Object? movementDuration, double? crossAxisEndOffset, Object? dragStartBehavior, Object? behavior});
 }
 
 // ======================================================================

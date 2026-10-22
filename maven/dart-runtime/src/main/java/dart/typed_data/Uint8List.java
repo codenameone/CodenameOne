@@ -54,6 +54,10 @@ public final class Uint8List {
 
     /** {@code Uint8List.fromList(source)} with a source typed only dynamic. */
     public static Uint8List fromList(Object source) {
+        if (source instanceof Uint8List) {
+            // a Uint8List IS a List<int> in Dart (utf8.encode returns one), but not a java.util.List here
+            return fromBytes(((Uint8List) source).bytes);
+        }
         if (!(source instanceof List)) {
             throw new dart.core.TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
                     + "' is not a subtype of type 'List<int>'");
@@ -79,6 +83,47 @@ public final class Uint8List {
 
     public long length() {
         return bytes.length;
+    }
+
+    /** {@code bytes[i]}: the unsigned byte, as Dart reads a Uint8List. */
+    public long $index(long index) {
+        dart.core.RangeError.checkValidIndex(index, bytes.length);
+        return bytes[(int) index] & 0xff;
+    }
+
+    public void $indexSet(long index, long value) {
+        dart.core.RangeError.checkValidIndex(index, bytes.length);
+        bytes[(int) index] = (byte) value;
+    }
+
+    public dart.core.DartList<Long> toList() {
+        dart.core.DartList<Long> out = new dart.core.DartList<Long>();
+        for (byte b : bytes) {
+            out.add(Long.valueOf(b & 0xff));
+        }
+        return out;
+    }
+
+    public Uint8List sublist(long start) {
+        return sublist(start, null);
+    }
+
+    public Uint8List sublist(long start, Long end) {
+        int e = end == null ? bytes.length : (int) end.longValue();
+        if (start < 0 || start > e || e > bytes.length) {
+            throw new dart.core.RangeError("Invalid range " + start + ".." + e);
+        }
+        byte[] out = new byte[e - (int) start];
+        System.arraycopy(bytes, (int) start, out, 0, out.length);
+        return new Uint8List(out);
+    }
+
+    public boolean isEmpty() {
+        return bytes.length == 0;
+    }
+
+    public boolean isNotEmpty() {
+        return bytes.length != 0;
     }
 
     /** The raw backing array (used by image decoders). */

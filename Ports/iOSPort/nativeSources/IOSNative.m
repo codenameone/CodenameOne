@@ -5258,9 +5258,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 
 // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
 
+// Creating and loading a pool, and starting a sound, run on the main thread, but a game plays its sounds
+// from its frame callback, and a GPU view renders on the main thread: a
+// dispatch_sync to the main queue from there waits on itself and traps.
+static void cn1_soundPoolOnMain(dispatch_block_t block) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
     __block JAVA_LONG result = 0;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1_soundPoolOnMain(^{
         POOL_BEGIN();
         result = (JAVA_LONG)((BRIDGE_CAST void*)[[CN1SoundPool alloc] initWithMaxStreams:maxStreams]);
         POOL_END();
@@ -5270,7 +5281,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int_R_long(CN
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
     __block JAVA_LONG result = 0;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    // Resolved before POOL_BEGIN(): without ARC that macro declares a local
+    // NSAutoreleasePool named `pool`, which shadows this parameter, and the
+    // load message was sent to the autorelease pool.
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    cn1_soundPoolOnMain(^{
         POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* byteArray = b;
@@ -5281,7 +5296,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
         int len = ((JAVA_ARRAY)b)->length;
 #endif
         NSData* d = [NSData dataWithBytes:data length:len];
-        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
         CN1Sound* s = [sp loadData:d ringSize:ringSize];
         result = (JAVA_LONG)((BRIDGE_CAST void*)s);
         POOL_END();
@@ -5291,7 +5305,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
 
 JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
     __block JAVA_INT result = -1;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1_soundPoolOnMain(^{
         CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
         CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
         result = [sp play:s volume:volume pan:pan rate:rate loop:loop];
@@ -9189,6 +9203,570 @@ void com_codename1_impl_ios_IOSNative_openFileChooserWithId___java_lang_String_i
 #else
     com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
 #endif
+#endif
+}
+
+// ---- FileDialogRequest support (showOpenDialog / showSaveDialog) ----------
+// Each dialog gets its own delegate carrying the Java request id, so it never
+// shares the single-slot fileChooserResult path openFileChooser uses. The
+// controller's delegate property is weak; the delegate is kept alive by an
+// associated-object reference on the controller it serves.
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+#import <objc/runtime.h>
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#define CN1_FILE_DIALOG_HAS_UTTYPE 1
+#endif
+
+static char cn1FileDialogDelegateKey;
+
+static void cn1FileDialogDeliver(NSString *paths, JAVA_INT requestId) {
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(
+        threadStateData, paths == nil ? JAVA_NULL : fromNSString(threadStateData, paths), requestId);
+}
+
+// Copies a picked item (file or folder) into the app's tmp directory, the way
+// the single-file chooser does, so the app can read it after the
+// security-scoped access ends.
+static NSString *cn1FileDialogCopyToTemp(NSURL *url) {
+    if (url == nil) {
+        return nil;
+    }
+    BOOL securityScoped = [url startAccessingSecurityScopedResource];
+    NSString *result = nil;
+    @try {
+        NSString *fileName = [url lastPathComponent];
+        if (fileName == nil || [fileName length] == 0) {
+            fileName = @"selected-file";
+        }
+        NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        [fileManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *destinationPath = [folder stringByAppendingPathComponent:fileName];
+        NSURL *destinationURL = [NSURL fileURLWithPath:destinationPath];
+        __block NSError *error = nil;
+        __block BOOL copied = NO;
+        if ([url isFileURL]) {
+            // A File Provider (iCloud Drive, a third-party provider) requires
+            // coordinated access to the item, folders above all; an
+            // uncoordinated copy can fail or read a half-updated tree.
+            NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+            NSError *coordError = nil;
+            [coordinator coordinateReadingItemAtURL:url options:NSFileCoordinatorReadingWithoutChanges
+                    error:&coordError byAccessor:^(NSURL *readURL) {
+                NSError *copyError = nil;
+                copied = [[NSFileManager defaultManager] copyItemAtURL:readURL toURL:destinationURL error:&copyError];
+                if (!copied) {
+                    error = copyError;
+                }
+            }];
+            if (coordError != nil && error == nil) {
+                error = coordError;
+            }
+#if !__has_feature(objc_arc)
+            [coordinator release];
+#endif
+        }
+        if (copied) {
+            result = destinationPath;
+        } else {
+            // A separate local: &error on a __block variable is not a valid
+            // ARC write-back target.
+            NSError *dataError = nil;
+            NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&dataError];
+            if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&dataError]) {
+                result = destinationPath;
+            } else {
+                NSLog(@"Codename One file dialog failed to copy selected item: %@ %@", error, dataError);
+                // Nothing is returned for this item, so its staging folder,
+                // with whatever a partial folder copy left in it, goes now.
+                [fileManager removeItemAtPath:folder error:nil];
+            }
+        }
+    } @finally {
+        if (securityScoped) {
+            [url stopAccessingSecurityScopedResource];
+        }
+    }
+    return result;
+}
+
+// Newline separates the paths handed to fileDialogResult, and a file name may
+// legally contain one, so each path is escaped first ('%' before '\n', so a
+// literal "%0a" stays literal). IOSImplementation.fileDialogResult undoes it.
+static NSString *cn1FileDialogJoin(NSArray *paths) {
+    if ([paths count] == 0) {
+        return nil;
+    }
+    NSMutableArray *escaped = [NSMutableArray arrayWithCapacity:[paths count]];
+    for (NSString *p in paths) {
+        NSString *e = [p stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        [escaped addObject:[e stringByReplacingOccurrencesOfString:@"\n" withString:@"%0a"]];
+    }
+    return [escaped componentsJoinedByString:@"\n"];
+}
+
+@interface CN1FileDialogDelegate : NSObject <UIDocumentPickerDelegate>
+@property (nonatomic, assign) JAVA_INT requestId;
+@property (nonatomic, assign) BOOL exporting;
+@property (nonatomic, assign) BOOL delivered;
+@end
+
+@implementation CN1FileDialogDelegate
+- (void)finish:(UIDocumentPickerViewController *)controller paths:(NSString *)paths {
+    if (!self.delivered) {
+        self.delivered = YES;
+        cn1FileDialogDeliver(paths, self.requestId);
+    }
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    if (self.exporting) {
+        // An export reports where the file went; it is not copied back.
+        NSMutableArray *paths = [NSMutableArray array];
+        for (NSURL *url in urls) {
+            if ([url path] != nil) {
+                [paths addObject:[url path]];
+            }
+        }
+        [self finish:controller paths:cn1FileDialogJoin(paths)];
+        return;
+    }
+    // Delegate callbacks run on the main thread, and an import may copy a
+    // whole folder or wait for a cloud download; copying here would freeze
+    // the UI. The copy takes and releases security-scoped access itself, and
+    // the blocks keep the controller and the URLs alive until it is done.
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSMutableArray *paths = [NSMutableArray array];
+        BOOL copyFailed = NO;
+        NSString *failed = nil;
+        for (NSURL *url in urls) {
+            NSString *p = cn1FileDialogCopyToTemp(url);
+            if (p == nil) {
+                copyFailed = YES;
+                failed = [url lastPathComponent];
+                // The import fails as a whole, so the items already staged are
+                // never handed to the app; each lives in its own UUID folder,
+                // which is removed with it.
+                NSFileManager *fm = [NSFileManager defaultManager];
+                for (NSString *staged in paths) {
+                    [fm removeItemAtPath:[staged stringByDeletingLastPathComponent] error:nil];
+                }
+                [paths removeAllObjects];
+                break;
+            }
+            [paths addObject:p];
+        }
+        // A copy that failed (a cloud download, a full disk) fails the whole
+        // import rather than quietly dropping the item. Paths are absolute, so
+        // a leading '!' can only be this marker; fileDialogResult reads the
+        // rest as the error message.
+        NSString *joined = copyFailed
+                ? [NSString stringWithFormat:@"!Could not import %@", failed == nil ? @"the selected item" : failed]
+                : cn1FileDialogJoin(paths);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self finish:controller paths:joined];
+        });
+    });
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    [self documentPicker:controller didPickDocumentsAtURLs:url == nil ? @[] : @[url]];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    [self finish:controller paths:nil];
+}
+@end
+
+static void cn1FileDialogPresent(UIDocumentPickerViewController *picker, JAVA_INT requestId, BOOL exporting, NSString *initialDirectory) {
+#ifndef CN1_USE_ARC
+    CN1FileDialogDelegate *delegate = [[[CN1FileDialogDelegate alloc] init] autorelease];
+#else
+    CN1FileDialogDelegate *delegate = [[CN1FileDialogDelegate alloc] init];
+#endif
+    delegate.requestId = requestId;
+    delegate.exporting = exporting;
+    objc_setAssociatedObject(picker, &cn1FileDialogDelegateKey, delegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    picker.delegate = delegate;
+    if (initialDirectory != nil && [initialDirectory length] > 0) {
+        if (@available(iOS 13.0, *)) {
+            picker.directoryURL = [NSURL fileURLWithPath:initialDirectory isDirectory:YES];
+        }
+    }
+    if (popoverSupported()) {
+        picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    }
+    UIViewController *presenter = cn1PresentingController();
+    if (presenter.presentedViewController != nil) {
+        // UIKit does not queue a second presentation: it would be dropped
+        // with no delegate call and this request would never answer. Report
+        // it as cancelled instead (an earlier picker or another modal is up).
+        NSLog(@"Codename One file dialog: another view controller is already presented");
+        delegate.delivered = YES;
+        cn1FileDialogDeliver(nil, requestId);
+        return;
+    }
+    [presenter presentViewController:picker animated:YES completion:nil];
+}
+
+static NSArray *cn1FileDialogSplit(NSString *joined) {
+    NSMutableArray *out = [NSMutableArray array];
+    if (joined == nil) {
+        return out;
+    }
+    for (NSString *token in [joined componentsSeparatedByString:@"\n"]) {
+        NSString *t = [token stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if ([t length] > 0) {
+            [out addObject:t];
+        }
+    }
+    return out;
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_showOpenFileDialog___java_lang_String_java_lang_String_boolean_boolean_java_lang_String_boolean_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT utTypes, JAVA_OBJECT extensions, JAVA_BOOLEAN multiSelect, JAVA_BOOLEAN directories, JAVA_OBJECT initialDirectory, JAVA_BOOLEAN showExtensions, JAVA_INT requestId) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSArray *utList = cn1FileDialogSplit(utTypes == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG utTypes));
+    NSArray *extList = cn1FileDialogSplit(extensions == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG extensions));
+    NSString *initialDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+#ifndef CN1_USE_ARC
+    [utList retain];
+    [extList retain];
+    [initialDir retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        UIDocumentPickerViewController *picker = nil;
+#ifdef CN1_FILE_DIALOG_HAS_UTTYPE
+        if (@available(iOS 14.0, *)) {
+            NSMutableArray<UTType *> *types = [NSMutableArray array];
+            if (directories) {
+                [types addObject:UTTypeFolder];
+            } else {
+                for (NSString *identifier in utList) {
+                    UTType *t = [UTType typeWithIdentifier:identifier];
+                    if (t != nil) [types addObject:t];
+                }
+                for (NSString *ext in extList) {
+                    UTType *t = [UTType typeWithFilenameExtension:ext];
+                    if (t != nil) [types addObject:t];
+                }
+                if ([types count] == 0) {
+                    [types addObject:UTTypeItem];
+                }
+            }
+            // asCopy:YES imports a copy we own; the folder case needs the
+            // original, which is then copied below like any file.
+            picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:!directories];
+#ifndef CN1_USE_ARC
+            [picker autorelease];
+#endif
+        }
+#endif
+        if (picker == nil) {
+            NSMutableArray *legacy = [NSMutableArray array];
+            if (directories) {
+                // The stable UTI strings rather than kUTTypeFolder/kUTTypeItem,
+                // which iOS 15 deprecates (see cn1AddFileChooserDocumentType).
+                [legacy addObject:@"public.folder"];
+            } else {
+                [legacy addObjectsFromArray:utList];
+                // Before iOS 14 there is no UTType class, so an extension-only
+                // filter is converted to its legacy UTI here; without that the
+                // picker would fall back to every document.
+                for (NSString *ext in extList) {
+                    cn1AddFileChooserDocumentType(legacy, kUTTagClassFilenameExtension, ext);
+                }
+                if ([legacy count] == 0) {
+                    [legacy addObject:@"public.item"];
+                }
+            }
+            picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:legacy
+                inMode:(directories ? UIDocumentPickerModeOpen : UIDocumentPickerModeImport)];
+#ifndef CN1_USE_ARC
+            [picker autorelease];
+#endif
+        }
+        if (@available(iOS 11.0, *)) {
+            picker.allowsMultipleSelection = multiSelect ? YES : NO;
+        }
+        if (@available(iOS 13.0, *)) {
+            picker.shouldShowFileExtensions = showExtensions ? YES : NO;
+        }
+        cn1FileDialogPresent(picker, requestId, NO, initialDir);
+#ifndef CN1_USE_ARC
+        [utList release];
+        [extList release];
+        [initialDir release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_showSaveFileDialog___java_lang_String_boolean_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_BOOLEAN asCopy, JAVA_OBJECT initialDirectory, JAVA_INT requestId) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSString *filePath = path == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString *initialDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+    if (filePath == nil) {
+        com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+        return;
+    }
+#ifndef CN1_USE_ARC
+    [filePath retain];
+    [initialDir retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSURL *url = [NSURL fileURLWithPath:filePath];
+        UIDocumentPickerViewController *picker = nil;
+        if (@available(iOS 14.0, *)) {
+            picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url] asCopy:(asCopy ? YES : NO)];
+        } else {
+            picker = [[UIDocumentPickerViewController alloc] initWithURL:url inMode:UIDocumentPickerModeExportToService];
+        }
+#ifndef CN1_USE_ARC
+        [picker autorelease];
+#endif
+        cn1FileDialogPresent(picker, requestId, YES, initialDir);
+#ifndef CN1_USE_ARC
+        [filePath release];
+        [initialDir release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
+#endif
+}
+
+// macOS open/save panels for Display.showOpenDialog/showSaveDialog. Filters
+// and options arrive in NativeFileDialogCodec's form, records separated by
+// the RS control character (0x1e); the answer goes back the same way.
+#if TARGET_OS_OSX
+@interface CN1MacFileDialogFilterTarget : NSObject
+@property (nonatomic, assign) NSSavePanel *panel;
+@property (nonatomic, retain) NSArray *filterExtensions;
+- (void)filterChanged:(id)sender;
+- (void)applyFilter:(NSInteger)index;
+@end
+
+@implementation CN1MacFileDialogFilterTarget
+- (void)applyFilter:(NSInteger)index {
+    if (index < 0 || index >= (NSInteger)self.filterExtensions.count) {
+        return;
+    }
+    NSArray *exts = [self.filterExtensions objectAtIndex:index];
+    BOOL any = exts.count == 0;
+    for (NSString *e in exts) {
+        if ([e isEqualToString:@"*"]) any = YES;
+    }
+    // allowedFileTypes is what the existing chooser uses; it takes plain
+    // extensions and UTIs alike (NativeFileDialogCodec appends the filter's
+    // UTIs for the Mac) and avoids linking UniformTypeIdentifiers on the Mac slice.
+    self.panel.allowedFileTypes = any ? nil : exts;
+}
+- (void)filterChanged:(id)sender {
+    [self applyFilter:[(NSPopUpButton *)sender indexOfSelectedItem]];
+}
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_filterExtensions release];
+    [super dealloc];
+}
+#endif
+@end
+
+static NSArray *cn1MacSplitRecords(NSString *s) {
+    if (s == nil || s.length == 0) return [NSArray array];
+    return [s componentsSeparatedByString:@"\x1e"];
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_showMacFileDialog___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_java_lang_String_boolean_boolean_boolean_boolean_boolean_boolean_boolean_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN save, JAVA_OBJECT title, JAVA_OBJECT message, JAVA_OBJECT prompt, JAVA_OBJECT initialDirectory, JAVA_OBJECT suggestedName, JAVA_OBJECT filters, JAVA_INT selectedFilter, JAVA_OBJECT options, JAVA_BOOLEAN multiSelect, JAVA_BOOLEAN directories, JAVA_BOOLEAN showsTagField, JAVA_BOOLEAN canCreateDirectories, JAVA_BOOLEAN showsHiddenFiles, JAVA_BOOLEAN canSelectHiddenExtension, JAVA_BOOLEAN treatsPackagesAsDirectories, JAVA_INT requestId) {
+#if TARGET_OS_OSX
+    NSString *nsTitle = title == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    NSString *nsMessage = message == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG message);
+    NSString *nsPrompt = prompt == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG prompt);
+    NSString *nsDir = initialDirectory == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG initialDirectory);
+    NSString *nsName = suggestedName == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG suggestedName);
+    NSArray *filterRecords = cn1MacSplitRecords(filters == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG filters));
+    NSArray *optionRecords = cn1MacSplitRecords(options == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG options));
+#ifndef CN1_USE_ARC
+    [nsTitle retain]; [nsMessage retain]; [nsPrompt retain]; [nsDir retain]; [nsName retain];
+    [filterRecords retain]; [optionRecords retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSSavePanel *panel;
+        if (save) {
+            panel = [NSSavePanel savePanel];
+            if (nsName.length > 0) panel.nameFieldStringValue = nsName;
+            panel.showsTagField = showsTagField;
+            panel.canSelectHiddenExtension = canSelectHiddenExtension;
+        } else {
+            NSOpenPanel *open = [NSOpenPanel openPanel];
+            open.allowsMultipleSelection = multiSelect;
+            open.canChooseDirectories = directories;
+            open.canChooseFiles = !directories;
+            panel = open;
+        }
+        if (nsTitle.length > 0) panel.title = nsTitle;
+        if (nsMessage.length > 0) panel.message = nsMessage;
+        if (nsPrompt.length > 0) panel.prompt = nsPrompt;
+        if (nsDir.length > 0) panel.directoryURL = [NSURL fileURLWithPath:nsDir isDirectory:YES];
+        panel.canCreateDirectories = canCreateDirectories;
+        panel.showsHiddenFiles = showsHiddenFiles;
+        panel.treatsFilePackagesAsDirectories = treatsPackagesAsDirectories;
+
+        NSStackView *stack = [NSStackView stackViewWithViews:[NSArray array]];
+        stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+        stack.alignment = NSLayoutAttributeLeading;
+        stack.edgeInsets = NSEdgeInsetsMake(8, 16, 8, 16);
+
+        CN1MacFileDialogFilterTarget *target = [[CN1MacFileDialogFilterTarget alloc] init];
+#ifndef CN1_USE_ARC
+        [target autorelease];
+#endif
+        target.panel = panel;
+        NSPopUpButton *filterPopup = nil;
+        if (filterRecords.count > 0 && !directories) {
+            NSMutableArray *exts = [NSMutableArray array];
+            filterPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 240, 26) pullsDown:NO];
+#ifndef CN1_USE_ARC
+            [filterPopup autorelease];
+#endif
+            for (NSString *rec in filterRecords) {
+                NSArray *parts = [rec componentsSeparatedByString:@"\n"];
+                [filterPopup addItemWithTitle:[parts objectAtIndex:0]];
+                NSMutableArray *e = [NSMutableArray array];
+                for (NSUInteger i = 1; i < parts.count; i++) {
+                    NSString *x = [parts objectAtIndex:i];
+                    if ([x hasPrefix:@"."]) x = [x substringFromIndex:1];
+                    if (x.length > 0) [e addObject:x];
+                }
+                [exts addObject:e];
+            }
+            target.filterExtensions = exts;
+            NSInteger sel = selectedFilter >= 0 && selectedFilter < (JAVA_INT)filterRecords.count ? selectedFilter : 0;
+            [filterPopup selectItemAtIndex:sel];
+            filterPopup.target = target;
+            filterPopup.action = @selector(filterChanged:);
+            [target applyFilter:sel];
+            if (filterRecords.count > 1) {
+                [stack addArrangedSubview:filterPopup];
+            }
+        }
+
+        // One control per option, in order: type 1 checkbox, 2 choice, 3 text.
+        NSMutableArray *optionControls = [NSMutableArray array];
+        for (NSString *rec in optionRecords) {
+            NSArray *parts = [rec componentsSeparatedByString:@"\n"];
+            if (parts.count < 4) { [optionControls addObject:[NSNull null]]; continue; }
+            int type = [[parts objectAtIndex:0] intValue];
+            NSString *label = [parts objectAtIndex:2];
+            NSString *def = [parts objectAtIndex:3];
+            NSView *control;
+            if (type == 1) {
+                NSButton *b = [NSButton checkboxWithTitle:label target:nil action:nil];
+                b.state = [def isEqualToString:@"true"] ? NSControlStateValueOn : NSControlStateValueOff;
+                control = b;
+                [stack addArrangedSubview:b];
+            } else {
+                NSTextField *l = [NSTextField labelWithString:label];
+                NSView *field;
+                if (type == 2) {
+                    NSPopUpButton *p = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 200, 26) pullsDown:NO];
+#ifndef CN1_USE_ARC
+                    [p autorelease];
+#endif
+                    for (NSUInteger i = 4; i < parts.count; i++) [p addItemWithTitle:[parts objectAtIndex:i]];
+                    if (def.length > 0 && [p indexOfItemWithTitle:def] >= 0) [p selectItemWithTitle:def];
+                    field = p;
+                } else {
+                    NSTextField *t = [NSTextField textFieldWithString:def];
+                    [t.widthAnchor constraintGreaterThanOrEqualToConstant:200].active = YES;
+                    field = t;
+                }
+                control = field;
+                [stack addArrangedSubview:[NSStackView stackViewWithViews:[NSArray arrayWithObjects:l, field, nil]]];
+            }
+            [optionControls addObject:control];
+        }
+        if (stack.arrangedSubviews.count > 0) {
+            [stack layoutSubtreeIfNeeded];
+            NSSize fit = stack.fittingSize;
+            stack.frame = NSMakeRect(0, 0, MAX(fit.width, 300), fit.height);
+            panel.accessoryView = stack;
+            if ([panel isKindOfClass:[NSOpenPanel class]]) {
+                ((NSOpenPanel *)panel).accessoryViewDisclosed = YES;
+            }
+        }
+
+        NSWindow *owner = [CN1MacKeyRenderingHostView() window];
+        void (^completed)(NSModalResponse) = ^(NSModalResponse response) {
+            POOL_BEGIN();
+            NSString *answer = nil;
+            if (response == NSModalResponseOK) {
+                NSMutableArray *out = [NSMutableArray array];
+                [out addObject:[NSString stringWithFormat:@"%ld", (long)(filterPopup == nil ? -1 : [filterPopup indexOfSelectedItem])]];
+                for (id c in optionControls) {
+                    // NSPopUpButton is an NSButton subclass, so it is tested first.
+                    if ([c isKindOfClass:[NSPopUpButton class]]) {
+                        NSString *t = [(NSPopUpButton *)c titleOfSelectedItem];
+                        [out addObject:t == nil ? @"" : t];
+                    } else if ([c isKindOfClass:[NSButton class]]) {
+                        [out addObject:((NSButton *)c).state == NSControlStateValueOn ? @"true" : @"false"];
+                    } else if ([c isKindOfClass:[NSTextField class]]) {
+                        [out addObject:((NSTextField *)c).stringValue];
+                    } else {
+                        [out addObject:@""];
+                    }
+                }
+                NSArray *urls = [panel isKindOfClass:[NSOpenPanel class]] ? ((NSOpenPanel *)panel).URLs
+                        : (panel.URL == nil ? [NSArray array] : [NSArray arrayWithObject:panel.URL]);
+                for (NSURL *u in urls) [out addObject:[u path]];
+                if (urls.count > 0) {
+                    // A Mac file name may contain the separator itself, so every
+                    // field is escaped ('%' first); macFileDialogResult undoes it.
+                    NSMutableArray *escaped = [NSMutableArray arrayWithCapacity:out.count];
+                    for (NSString *f in out) {
+                        NSString *e = [f stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+                        [escaped addObject:[e stringByReplacingOccurrencesOfString:@"\x1e" withString:@"%1e"]];
+                    }
+                    answer = [escaped componentsJoinedByString:@"\x1e"];
+                }
+            }
+            // The popup holds its target weakly; this capture keeps it alive
+            // until the panel closes.
+            [target self];
+            [panel orderOut:nil];
+            if (owner != nil && owner.visible) [owner makeKeyAndOrderFront:nil];
+            struct ThreadLocalData *threadStateData = getThreadLocalData();
+            com_codename1_impl_ios_IOSImplementation_macFileDialogResult___java_lang_String_int(
+                threadStateData, answer == nil ? JAVA_NULL : fromNSString(threadStateData, answer), requestId);
+            POOL_END();
+        };
+        if (owner != nil) {
+            [panel beginSheetModalForWindow:owner completionHandler:completed];
+        } else {
+            [panel beginWithCompletionHandler:completed];
+        }
+#ifndef CN1_USE_ARC
+        [nsTitle release]; [nsMessage release]; [nsPrompt release]; [nsDir release]; [nsName release];
+        [filterRecords release]; [optionRecords release];
+#endif
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_macFileDialogResult___java_lang_String_int(CN1_THREAD_STATE_PASS_ARG JAVA_NULL, requestId);
 #endif
 }
 

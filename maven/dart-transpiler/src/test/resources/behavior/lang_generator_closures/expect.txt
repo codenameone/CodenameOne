@@ -1,0 +1,8 @@
+sq 0
+sq 1
+sq 4
+sq 9
+a,b
+7
+seven
+1

@@ -821,6 +821,8 @@ aarch64
 Parley
 Savor
 Wayline
+Lousberg
+Elda
 prekey
 prekeys
 rekey

@@ -50,10 +50,25 @@ public final class WidgetsBinding {
 
         /** The primary display's device-pixel ratio. */
         public double devicePixelRatio = 1.0;
+
+        /** Dart's {@code platformBrightness} getter, as the typed stub calls it. */
+        public Brightness platformBrightness() {
+            return platformBrightness;
+        }
+
+        /** Dart's {@code devicePixelRatio} getter. */
+        public double devicePixelRatio() {
+            return devicePixelRatio;
+        }
     }
 
     /** Dart's {@code WidgetsBinding.instance}. */
     public static final WidgetsBinding instance = new WidgetsBinding();
+
+    /** {@code WidgetsFlutterBinding.ensureInitialized()}: the Display is up before main() runs. */
+    public static WidgetsBinding ensureInitialized() {
+        return instance;
+    }
 
     private final PlatformDispatcher platformDispatcher = new PlatformDispatcher();
 
