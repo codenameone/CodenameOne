@@ -327,7 +327,7 @@ it behind an interface the application owns, keep the desktop
 implementation in the desktop project, and give the Codename One build an
 implementation that uses the Codename One API, a server, or nothing:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/ExternalTools.java[tag=desktopInteropIsolate,indent=0]
 ----
@@ -425,7 +425,7 @@ A Swing component that overrides `paintComponent` paints as it does on the
 desktop, through a `Graphics2D` with shapes, strokes, paints, clipping and
 an affine transform:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/BadgePanel.java[tag=desktopInteropSwingPaint,indent=0]
 ----
@@ -467,7 +467,7 @@ JavaFX `Alert` all return after the user answers, while painting and input
 continue, so code written as a sequence of questions needs no
 restructuring:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/GreeterApp.java[tag=desktopInteropSwingApp,indent=0]
 ----
@@ -518,7 +518,7 @@ Three display properties adjust how a desktop application maps onto a
 device. Set them with `CN.setProperty` before the first window opens, for
 example in the generated main class or at the top of `main`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/DeviceSettings.java[tag=desktopInteropDisplayProperties,indent=0]
 ----
@@ -552,7 +552,7 @@ run there. Long work belongs on another thread, as on the desktop:
 `SwingWorker` and a JavaFX `Task` or `Service` run their work in the
 background and deliver results on the EDT:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/LoadNames.java[tag=desktopInteropSwingWorker,indent=0]
 ----
@@ -576,7 +576,7 @@ FXML documents are compiled when the application is built, into classes
 that build the same node tree with plain constructors and setters. The
 application loads a document the way it does on the desktop:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/GreeterFxApp.java[tag=desktopInteropFxmlLoad,indent=0]
 ----
@@ -590,7 +590,7 @@ The controller's `@FXML` fields and handlers can stay private, and
 `initialize()` runs after they're set. The build writes direct code for
 the assignments, so no reflection is involved:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/GreeterController.java[tag=desktopInteropFxmlController,indent=0]
 ----
@@ -603,7 +603,7 @@ build reports a typo with the file, line, and column, where the desktop
 would only find it when loading the document. A JavaFX application that builds its scene
 in code needs none of this:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/CounterApp.java[tag=desktopInteropJavaFxApp,indent=0]
 ----
@@ -752,7 +752,7 @@ API, so they can call it directly. That's how a ported application adapts
 to the device it runs on, and how it reaches the camera, the database,
 push notifications and the rest of <<desktop-interop-motivation>>:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/CompactLayout.java[tag=desktopInteropCodenameOneApi,indent=0]
 ----
@@ -772,7 +772,7 @@ One forms instead of calling the desktop application's `main`.
 `SwingInterop.asComponent` wraps a Swing component in a Codename One
 component that you add to a form like any other:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/EmbeddedReport.java[tag=desktopInteropEmbedSwing,indent=0]
 ----
@@ -780,7 +780,7 @@ include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/d
 `FxInterop.asComponent` does the same for the root of a JavaFX scene graph,
 or for a `Scene` when the screen needs style sheets:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/EmbeddedChart.java[tag=desktopInteropEmbedFx,indent=0]
 ----
@@ -793,12 +793,12 @@ Frames, stages and modal dialogs work from Codename One code too. A frame
 or a stage opens as a form over the current one, and closing it returns
 there:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/swing/EmbeddedReport.java[tag=desktopInteropSwingWindows,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/desktop-interop/src/main/java/com/codenameone/developerguide/desktopinterop/javafx/EmbeddedChart.java[tag=desktopInteropFxWindows,indent=0]
 ----
