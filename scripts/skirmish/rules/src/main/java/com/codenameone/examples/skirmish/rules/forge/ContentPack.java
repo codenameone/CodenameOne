@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.rules.forge;
 import com.codenameone.examples.skirmish.rules.Arena;
 import com.codenameone.examples.skirmish.rules.CardDef;
 import com.codenameone.examples.skirmish.rules.CardSet;
+import com.codenameone.examples.skirmish.rules.Match;
 import com.codenameone.examples.skirmish.rules.MatchRules;
 
 import java.util.ArrayList;
@@ -118,7 +119,7 @@ public final class ContentPack {
             h ^= (c >>> 8) & 0xff;
             h *= 0x100000001b3L;
         }
-        String hex = Long.toHexString(h);
+        String hex = Match.hex(h);
         StringBuilder sb = new StringBuilder();
         for (int i = hex.length(); i < 16; i++) {
             sb.append('0');

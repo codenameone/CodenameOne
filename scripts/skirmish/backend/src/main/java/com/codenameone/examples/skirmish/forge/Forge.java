@@ -27,6 +27,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.skirmish.Clock;
 import com.codenameone.examples.skirmish.Ids;
+import com.codenameone.examples.skirmish.account.Lists;
 import com.codenameone.examples.skirmish.api.AssetDto;
 import com.codenameone.examples.skirmish.api.AssetUploadDto;
 import com.codenameone.examples.skirmish.api.MissionOutcomeDto;
@@ -65,7 +66,6 @@ import com.codenameone.examples.skirmish.rules.forge.Samples;
 import com.codenameone.examples.skirmish.rules.forge.Validator;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /// The Forge on the server: players' content packs from draft to published
@@ -741,8 +741,7 @@ public class Forge {
     }
 
     private static AssetDto asset(ForgeAsset a, boolean withData) {
-        List<String> anims = a.getAnimations().isEmpty()
-                ? new ArrayList<String>() : new ArrayList<>(Arrays.asList(a.getAnimations().split(",")));
+        List<String> anims = Lists.split(a.getAnimations());
         return new AssetDto(a.getSha256(), a.getName(), a.getKind(), a.getBytes(), a.getStatus(), anims,
                 withData ? a.getData() : null);
     }
