@@ -142,7 +142,7 @@ jobs:
           read -r run sha < <(gh run list --repo "${GITHUB_REPOSITORY}" --workflow flutter-bench.yml \
               --branch master --event schedule --status completed --limit 10 \
               --json databaseId,headSha,conclusion \
-              --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0] | "\(.databaseId) \(.headSha)"' || true)
+              --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0] | "\(.databaseId) \(.headSha)"') || true
           if [ -z "${run:-}" ] || [ "${run}" = "null" ]; then
             echo "No finished nightly Flutter benchmark run; sizes stay as they are."
             exit 0
