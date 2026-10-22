@@ -35,9 +35,9 @@ public class ForgeTest extends E2e {
         shot("forge-home");
         click("pack-" + Samples.OFFICIAL_ID);
         waitForForm("pack");
-        until(() -> has("mission-first-mission"), 20000, "the campaign");
+        until(() -> has("mission-hold-the-ford"), 20000, "the campaign");
         shot("forge-pack");
-        click("mission-first-mission");
+        click("mission-hold-the-ford");
         until(() -> has("mission-next"), 30000, "the first line of the story");
         shot("forge-mission-story");
 
@@ -54,7 +54,7 @@ public class ForgeTest extends E2e {
         shot("forge-card");
         click("cardDone");
         waitForForm("packEditor");
-        click("mission-first-mission");
+        click("mission-hold-the-ford");
         waitForForm("missionEditor");
         shot("forge-mission-editor");
         return true;

@@ -442,7 +442,8 @@ ChallengeUrl, Empty, DeckSummary {
     color: var(--text-muted);
     font-size: 2.6mm;
     text-align: center;
-    margin: 1mm 2mm;
+    padding: 1mm 2mm;
+    margin: 0;
 }
 
 Spotlight {
@@ -459,6 +460,13 @@ Spotlight {
 
 Spotlight.pressed {
     background-color: var(--night);
+}
+
+SpotlightText {
+    color: var(--gold);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: left;
 }
 
 InviteCode {
@@ -613,7 +621,8 @@ Label, SpanLabel, SpanLabelText, Logo, Tagline, SectionTitle, Trophies, Coins, G
 PlayerName, EnemyName, BattleClock, BattleClockHot, CrownsBlue, CrownsRed, NextLabel, NextCard,
 Victory, Defeat, Draw, ResultCrowns, ResultReward, ChallengeUrl, Empty, DeckSummary, Warning,
 ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw,
-MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, Container {
+MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, ForgeLabel, ForgeHelp,
+ForgeHelpText, ForgeByline, InviteCode, SpotlightText, Container {
     background-color: transparent;
 }
 

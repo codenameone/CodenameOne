@@ -110,6 +110,9 @@ public final class AdminConsole {
         // way an operator's tools usually are; on a phone, tabs along the top.
         if (wide()) {
             tabs.setTabPlacement(Component.LEFT);
+        } else {
+            // Seven tabs do not fit across a phone: they scroll sideways.
+            tabs.getTabsContainer().setScrollableX(true);
         }
         // end::skirmish-admin-desktop[]
         tabs.addSelectionListener((was, now) -> refresh(now));

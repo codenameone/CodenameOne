@@ -314,7 +314,7 @@ include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/s
 The *Promote* tab in the console is where the operator works. It opens the analytics
 console, and it sends Codename One push notifications to a segment of players:
 everyone, players away for some days, new players, or those who came through an
-invite. A broadcast is counted before it's confirmed, the server sends at most
+invitation. A broadcast is counted before it's confirmed, the server sends at most
 five a day, and each one carries a campaign name in its data, which the app
 reports when the notification is tapped:
 

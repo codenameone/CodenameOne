@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.skirmish.ui;
 
+import com.codename1.components.SpanButton;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -268,14 +269,19 @@ public final class HomeForm {
         if (s == null || s.text() == null || s.text().length() == 0) {
             return null;
         }
-        Button b = Ui.button(s.text(), "Spotlight", "spotlight", e -> {
+        // A SpanButton, so a long line wraps instead of being cut off.
+        SpanButton b = new SpanButton(s.text());
+        b.setUIID("Spotlight");
+        b.setTextUIID("SpotlightText");
+        b.setName("spotlight");
+        b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
+        b.addActionListener(e -> {
             if (s.packId() != null && s.packId().length() > 0) {
                 PackScreen.show(s.packId());
             } else {
                 Nav.screen(s.screen() == null ? "" : s.screen());
             }
         });
-        b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
         return b;
     }
     // end::skirmish-spotlight[]
