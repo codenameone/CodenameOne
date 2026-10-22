@@ -60,7 +60,16 @@ public enum Template {
             "com.codenameone.examples.savor", "Savor", "/savor-preview.jpg",
             "The food-delivery template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/savor-modules.zip", "/savor-settings.properties");
+            new String[0], "/savor-modules.zip", "/savor-settings.properties"),
+    // A third of the same kind: a bank with a customer and an admin mode, and its
+    // server -- a ledger, transfers, cards, an exchange and the security around
+    // them. It is the project in scripts/bastion, and its resources come from
+    // `scripts/sync-initializr-template.py bastion`.
+    BASTION(false, "/bastion-src.zip", "/bastion-css.zip", "/bastion-pom.xml",
+            "com.codenameone.examples.bastion", "Bastion", "/bastion-preview.jpg",
+            "The banking template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/bastion-modules.zip", "/bastion-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.

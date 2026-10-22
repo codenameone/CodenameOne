@@ -59,6 +59,11 @@ on:
       - 'Ports/JavaScriptPort/src/main/**'
       - 'scripts/build-android-app.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/sync-initializr-template.py'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/tests/GenerateInitializr.java'
+      # The generator and the template.
+      - 'scripts/initializr/common/src/**'
       - '.github/workflows/bastion.yml'
   push:
     branches: [ master ]
@@ -72,6 +77,8 @@ on:
       - 'CodenameOne/src/com/codename1/orm/**'
       - 'CodenameOne/src/com/codename1/annotations/**'
       - 'scripts/ci/sample-server-tests-on-database.sh'
+      - 'scripts/sync-initializr-template.py'
+      - 'scripts/initializr/common/src/**'
       - '.github/workflows/bastion.yml'
   workflow_dispatch:
 
@@ -87,6 +94,18 @@ permissions:
   packages: read
 
 jobs:
+  template-sync:
+    name: Initializr template matches the sample
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      # The template's resources are derived from scripts/bastion and committed.
+      # A change to one without the other is a template that is not the project
+      # this workflow tests.
+      - name: Compare the template with scripts/bastion
+        run: python3 scripts/sync-initializr-template.py bastion
+
   backend:
     name: Server tests (JVM and compiled)
     runs-on: ubuntu-24.04
@@ -296,6 +315,15 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JDK_8_HOME }}
           RETRY_ONLY_MATCHING: transient
+
+      # Ahead of the app's own build: a template that does not build should
+      # not wait behind the end-to-end runs to say so. The Initializr's own
+      # tests, which cover this template too, run in wayline.yml.
+      - name: Build a project generated from the Initializr template
+        run: scripts/bastion/check-template.sh "$RUNNER_TEMP/bastion-template"
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
 
       # The app's own tests run headless in the build: the request signer
       # against the JDK, the network guard, the declared build hints against

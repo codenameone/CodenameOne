@@ -437,15 +437,15 @@ public class Initializr extends Lifecycle {
     /// the food-delivery app with its server.
     private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
         boolean fullStack = GeneratorModel.isTemplateOffered(Template.WAYLINE);
-        Container selector = new Container(new GridLayout(fullStack ? 4 : 1, fullStack ? 1 : 2));
+        Container selector = new Container(new GridLayout(fullStack ? 5 : 1, fullStack ? 1 : 2));
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
-                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR}
+                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR, Template.BASTION}
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
                 ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
-                    "Food delivery app with its server, Java"}
+                    "Food delivery app with its server, Java", "Banking app with its server, Java"}
                 : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];
@@ -1176,6 +1176,7 @@ public class Initializr extends Lifecycle {
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
                 + (template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
+                        : template == Template.BASTION ? "Template BANKING APP + SERVER\n"
                         : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"

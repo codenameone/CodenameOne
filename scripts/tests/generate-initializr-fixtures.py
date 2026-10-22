@@ -85,6 +85,15 @@ def check_maven_layout_fixture(archive, z):
 FULL_STACK = {
     'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
+    'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
+}
+
+
+# A build hint each template's settings carry and a plain project's do not.
+TEMPLATE_HINT = {
+    'WAYLINE': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'SAVOR': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'BASTION': 'codename1.arg.ios.detectJailbreak=true',
 }
 
 
@@ -120,11 +129,13 @@ def check_full_stack_fixture(archive, z, template):
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',
-                 'backend/src/main/resources/db/migration/V1__accounts.sql',
                  'backend/server.sh',
                  'common/src/main/java/com/example/probe/LauncherProbe.java',
                  'common/src/main/java/com/example/probe/' + screen]:
         assert name in names, (archive.name, name)
+    # The accounts table, whichever migration creates it.
+    assert any(n.startswith('backend/src/main/resources/db/migration/V') and n.endswith('__accounts.sql')
+               for n in names), archive.name
     # The generic server every other project gets is replaced, not merged with.
     assert 'backend/src/main/java/com/example/probe/Greeter.java' not in names, archive.name
     css = z.read('common/src/main/css/theme.css').decode()
@@ -132,7 +143,7 @@ def check_full_stack_fixture(archive, z, template):
         archive.name
     assert z.read('common/icon.png') == b'\x89PNG', archive.name
     settings = z.read('common/codenameone_settings.properties').decode()
-    assert 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
+    assert TEMPLATE_HINT[template] in settings, archive.name
     assert '## The app and its server' in z.read('README.md').decode(), archive.name
     for name in names:
         assert token not in name.lower(), (archive.name, name)
