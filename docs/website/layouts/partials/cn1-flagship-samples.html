@@ -17,7 +17,7 @@
     "kind" "Private messaging"
     "url" "/parley/"
     "summary" "A messenger with a Java backend: end-to-end encrypted chats and groups, voice notes, voice and video calls, linked devices and an admin console."
-    "images" (slice)
+    "images" (slice "/developer-guide/img/parley-chats.png" "/developer-guide/img/parley-bot-chat.png" "/developer-guide/img/parley-call-connected.png")
     "guide" "/developer-guide/parley-users-guide/"
     "source" "https://github.com/codenameone/CodenameOne/tree/master/scripts/parley")
   (dict
@@ -42,11 +42,12 @@
   </div>
   <div class="cn1-flagship__grid">
     {{- range $samples }}
+    {{- $name := .name }}
     <article class="cn1-flagship-card">
       <a class="cn1-flagship-card__shots" href="{{ .url }}">
         {{- range $i, $img := .images }}
         {{- if or (not $compact) (eq $i 0) }}
-        <img src="{{ $img }}" alt="{{ $.name }} screen" loading="lazy">
+        <img src="{{ $img }}" alt="{{ $name }} screen" loading="lazy">
         {{- end }}
         {{- end }}
       </a>
