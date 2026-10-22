@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
-import com.codename1.backend.ResponseStatusException;
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
@@ -69,27 +69,27 @@ public class CryptoWallets {
     @Transactional(rollbackFor = Exception.class)
     public CryptoAddressDto add(String owner, NewCryptoAddressDto request) throws IOException {
         if (request == null || request.address() == null) {
-            throw new ResponseStatusException(400, "Send the address");
+            throw Refused.with(400, "send-address", "Send the address");
         }
         Asset asset = ledger.asset(request.asset());
         if ("FIAT".equals(asset.getKind())) {
-            throw new ResponseStatusException(400, "Only a coin is withdrawn to an address");
+            throw Refused.with(400, "coin-withdrawn-address", "Only a coin is withdrawn to an address");
         }
         String address = request.address().trim();
         if (!wellFormed(address)) {
-            throw new ResponseStatusException(400, "That is not an address");
+            throw Refused.with(400, "not-address", "That is not an address");
         }
         int live = 0;
         for (CryptoAddress a : addresses.findByOwnerOrderByCreatedAtAsc(owner)) {
             if (!a.isRemoved()) {
                 live++;
                 if (a.getAsset().equals(asset.getCode()) && a.getAddress().equals(address)) {
-                    throw new ResponseStatusException(409, "That address is already on your list");
+                    throw Refused.with(409, "address-already-list", "That address is already on your list");
                 }
             }
         }
         if (live >= MAX_ADDRESSES) {
-            throw new ResponseStatusException(409, "Remove an address before adding another");
+            throw Refused.with(409, "remove-address-before-adding-another", "Remove an address before adding another");
         }
         long now = System.currentTimeMillis();
         CryptoAddress a = new CryptoAddress();
@@ -133,7 +133,7 @@ public class CryptoWallets {
     public CryptoAddress owned(String owner, String id) throws IOException {
         CryptoAddress a = id == null ? null : addresses.findById(id);
         if (a == null || a.isRemoved() || !a.getOwner().equals(owner)) {
-            throw new ResponseStatusException(404, "No such address");
+            throw Refused.with(404, "no-such-address", "No such address");
         }
         return a;
     }

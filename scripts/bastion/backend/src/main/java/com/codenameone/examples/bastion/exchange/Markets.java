@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
-import com.codename1.backend.ResponseStatusException;
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Transactional;
@@ -111,7 +111,7 @@ public class Markets {
     public Market get(String id) throws IOException {
         Market m = find(id);
         if (m == null) {
-            throw new ResponseStatusException(404, "No such market");
+            throw Refused.with(404, "no-such-market", "No such market");
         }
         return m;
     }
@@ -140,7 +140,7 @@ public class Markets {
         }
         List<Market> found = markets.findByBaseAndQuoteOrderByIdAsc(asset, quote);
         if (found.isEmpty()) {
-            throw new ResponseStatusException(409, "There is no price for " + asset);
+            throw Refused.with(409, "there-no-price", "There is no price for {0}", asset);
         }
         // The shortest id is the configured "BTC-USD" rather than any other
         // market on the same pair.

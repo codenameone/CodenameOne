@@ -39,6 +39,7 @@ import com.codenameone.examples.bastion.api.UserDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
 import com.codenameone.examples.bastion.net.Session;
+import com.codenameone.examples.bastion.security.Keys;
 import com.codenameone.examples.bastion.security.Lock;
 import com.codenameone.examples.bastion.security.Protect;
 import java.util.List;
@@ -307,26 +308,47 @@ public final class OnboardingForm {
 
     private static void biometricStep(final Runnable signedIn) {
         if (!Lock.biometricsAvailable()) {
-            deviceStep(signedIn);
+            pinStep(signedIn);
             return;
         }
         Form form = Ui.form("Unlock", null);
         form.add(Ui.title("Unlock with your face or fingerprint?"));
-        form.add(Ui.muted(Lang.tr("Bastion locks itself when you leave it. With this on, a "
-                + "biometric unlocks it; with it off, you sign in again. The device passcode "
-                + "is never accepted.")));
+        form.add(Ui.muted(Lang.tr("Bastion locks itself when you leave it. With this on, the "
+                + "phone keeps the key to your session and payments where only your biometric "
+                + "releases it. The device passcode is never accepted.")));
+        final Label error = Ui.error();
         Button yes = Ui.primary("Use biometrics");
-        yes.addActionListener(evt -> {
-            Prefs.setBiometricUnlock(true);
-            deviceStep(signedIn);
-        });
+        yes.addActionListener(evt -> UnlockSetup.biometric(() -> pinStep(signedIn), error));
         Button no = Ui.secondary("Not now");
         no.addActionListener(evt -> {
-            Prefs.setBiometricUnlock(false);
-            deviceStep(signedIn);
+            Keys.disableBiometric();
+            pinStep(signedIn);
         });
-        form.addAll(yes, no);
+        form.addAll(error, yes, no);
         Ui.show(form, false);
+    }
+
+    // ------------------------------------------------------------------ PIN
+
+    private static void pinStep(final Runnable signedIn) {
+        if (Keys.pinEnabled()) {
+            deviceStep(signedIn);
+            return;
+        }
+        Form form = Ui.form("Unlock PIN", null);
+        form.add(Ui.title("Choose an unlock PIN"));
+        form.add(Ui.muted(Lang.tr("For when a biometric is not available or you would rather "
+                + "not use one: {0} to {1} digits, not your card PIN. {2} wrong tries in a row "
+                + "erase the keys on this device.", String.valueOf(Keys.MIN_PIN),
+                String.valueOf(Keys.MAX_PIN), String.valueOf(Keys.PIN_ATTEMPTS))));
+        final Label error = Ui.error();
+        final UnlockSetup.PinFields fields = new UnlockSetup.PinFields();
+        Button set = Ui.primary("Set PIN");
+        set.addActionListener(evt -> fields.save(() -> deviceStep(signedIn), error));
+        Button no = Ui.secondary("Not now");
+        no.addActionListener(evt -> deviceStep(signedIn));
+        form.addAll(error, fields.pin, fields.again, set, no);
+        Ui.show(form, true);
     }
 
     // --------------------------------------------------------------- device

@@ -27,6 +27,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyInfo;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -53,6 +54,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import com.codename1.security.vault.Protection;
@@ -71,8 +73,11 @@ import com.codename1.security.vault.ProtectionReport;
  * <p>Carries forward two non-obvious workarounds from the original cn1lib that
  * must NOT be reverted without re-testing:</p>
  * <ul>
- *   <li>On API 33+ the {@code setUserAuthenticationRequired} call is skipped
- *   to side-step <a href="https://github.com/codenameone/FingerprintScanner/issues/8">FingerprintScanner #8</a>.
+ *   <li>The key is user-authentication bound on every API level and invalidated
+ *   when a biometric is enrolled (API 24+). An older key made without that
+ *   binding (this class once skipped it on API 33+, see
+ *   <a href="https://github.com/codenameone/FingerprintScanner/issues/8">FingerprintScanner #8</a>)
+ *   is replaced on first use and its entries are reported as revoked.
  *   <li>On Samsung devices running 8.0.0 the cipher init can succeed but
  *   final decryption then fails with a key-invalidated error; we delete the
  *   key and recreate it on first failure to recover.
@@ -1363,6 +1368,16 @@ public final class AndroidSecureStorage extends SecureStorage {
                                             final int mode, final AsyncResource<V> result,
                                             final CipherWork<V> work) {
         SecretKey secret = getSecretKey();
+        if (secret != null && !isUserBound(secret)) {
+            // A key made while this class skipped user authentication on API
+            // 33+. Entries under it were never bound to a biometric, so they are
+            // reported revoked -- the contract's word for "store it again" --
+            // and the next write makes a bound key, rather than a prompt keeping
+            // up the appearance of a protection the key does not have.
+            removePermanentlyInvalidatedKey();
+            keyRevoked = true;
+            secret = null;
+        }
         if (secret == null) {
             if (mode == Cipher.ENCRYPT_MODE) {
                 if (!createKey()) {
@@ -1543,12 +1558,23 @@ public final class AndroidSecureStorage extends SecureStorage {
                     KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                     .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7);
-            // Skip setUserAuthenticationRequired on API 33+ per
-            // FingerprintScanner #8; the BiometricPrompt still authenticates
-            // the user, but the keystore no longer ties the key lifetime to
-            // biometric enrolment (which caused recovery failures).
-            if (Build.VERSION.SDK_INT < 33) {
-                b.setUserAuthenticationRequired(true);
+            // Bound to the user on EVERY API level. This used to be skipped on
+            // API 33+ (FingerprintScanner #8), which left the key usable by any
+            // code in the process without a prompt: the BiometricPrompt was then
+            // decoration, and an entry read with get(reason, account) was no
+            // better protected than the quiet tier. The prompt this class raises
+            // carries the cipher as its CryptoObject, which is exactly what a
+            // per-use auth-bound key needs -- the same arrangement
+            // AndroidBiometrics' probe key has always used on 33+. Without a
+            // validity duration the key is unlocked by a Class 3 biometric for
+            // one operation, never by the device credential.
+            b.setUserAuthenticationRequired(true);
+            if (Build.VERSION.SDK_INT >= 24) {
+                // The documented contract of SecureStorage: entries are bound to
+                // the biometrics enrolled now, and enrolling another one revokes
+                // them (KEY_REVOKED), so a fingerprint added by whoever learned
+                // the passcode does not open them.
+                b.setInvalidatedByBiometricEnrollment(true);
             }
             keyGenerator.init(b.build());
             keyGenerator.generateKey();
@@ -1633,6 +1659,22 @@ public final class AndroidSecureStorage extends SecureStorage {
         } catch (InvalidAlgorithmParameterException e) {
             Log.e(e);
             return null;
+        }
+    }
+
+    /**
+     * Whether the keystore enforces user authentication for {@code key}. When
+     * the keystore cannot say, the answer is yes: deleting a key on a question
+     * nobody could answer would destroy every entry for nothing.
+     */
+    private static boolean isUserBound(SecretKey key) {
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(key.getAlgorithm(),
+                    ANDROID_KEY_STORE);
+            KeyInfo info = (KeyInfo) factory.getKeySpec(key, KeyInfo.class);
+            return info.isUserAuthenticationRequired();
+        } catch (Throwable cannotAsk) {
+            return true;
         }
     }
 

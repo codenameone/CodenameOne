@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.bastion.ledger;
 
-import com.codename1.backend.ResponseStatusException;
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.Ids;
@@ -78,7 +78,7 @@ public class Ledger {
     public Asset asset(String code) throws IOException {
         Asset asset = code == null ? null : assets.findById(code);
         if (asset == null || !asset.isEnabled()) {
-            throw new ResponseStatusException(400, "No such asset");
+            throw Refused.with(400, "no-such-asset", "No such asset");
         }
         return asset;
     }
@@ -94,7 +94,7 @@ public class Ledger {
             throws IOException {
         Asset asset = asset(assetCode);
         if (!AccountKinds.isCustomer(kind) && !AccountKinds.isSystem(kind)) {
-            throw new ResponseStatusException(400, "No such kind of account");
+            throw Refused.with(400, "no-such-kind-account", "No such kind of account");
         }
         if (AccountKinds.isSystem(kind) != AccountKinds.BANK.equals(owner)) {
             throw new IllegalArgumentException("Only the bank holds SYS_ accounts");
@@ -102,7 +102,7 @@ public class Ledger {
         // A hold is either: a buy order holds fiat, a sell order holds coins.
         boolean either = AccountKinds.isSystem(kind) || AccountKinds.HOLD.equals(kind);
         if (!either && "CRYPTO".equals(asset.getKind()) != AccountKinds.WALLET.equals(kind)) {
-            throw new ResponseStatusException(400, "Crypto is held in a wallet, fiat in an account");
+            throw Refused.with(400, "crypto-held-wallet-fiat-account", "Crypto is held in a wallet, fiat in an account");
         }
         LedgerAccount account = new LedgerAccount();
         account.setId(Ids.next());
@@ -135,7 +135,7 @@ public class Ledger {
     public LedgerAccount owned(String owner, String id) throws IOException {
         LedgerAccount account = id == null ? null : accounts.findById(id);
         if (account == null || !account.getOwner().equals(owner)) {
-            throw new ResponseStatusException(404, "No such account");
+            throw Refused.with(404, "no-such-account", "No such account");
         }
         return account;
     }
@@ -148,7 +148,7 @@ public class Ledger {
     @Transactional(rollbackFor = Exception.class)
     public void freeze(String accountId, boolean frozen) throws IOException {
         if (accounts.setFrozen(accountId, frozen) != 1) {
-            throw new ResponseStatusException(404, "No such account");
+            throw Refused.with(404, "no-such-account", "No such account");
         }
     }
 
@@ -161,17 +161,16 @@ public class Ledger {
                 || idempotencyKey.length() > 80) {
             // 16 characters at least: a key a client can collide with by
             // accident is a key that drops a real payment as a "retry".
-            throw new ResponseStatusException(400, "Send an Idempotency-Key of 16 to 80 characters");
+            throw Refused.with(400, "send-idempotency-key-16-80", "Send an Idempotency-Key of 16 to 80 characters");
         }
         if (legs == null || legs.size() < 2) {
-            throw new ResponseStatusException(400, "An entry needs two sides");
+            throw Refused.with(400, "entry-needs-two-sides", "An entry needs two sides");
         }
         String hash = requestHash(kind, memo, legs);
         JournalEntry earlier = entries.findFirstByIdempotencyKey(idempotencyKey);
         if (earlier != null) {
             if (!earlier.getRequestHash().equals(hash)) {
-                throw new ResponseStatusException(422,
-                        "That Idempotency-Key was already used for a different request");
+                throw Refused.with(422, "idempotency-key-reused", "That Idempotency-Key was already used for a different request");
             }
             return earlier;
         }
@@ -180,13 +179,13 @@ public class Ledger {
         Map<String, LedgerAccount> touched = new HashMap<String, LedgerAccount>();
         for (Leg leg : legs) {
             if (leg.amount() == 0) {
-                throw new ResponseStatusException(400, "An amount cannot be zero");
+                throw Refused.with(400, "amount-cannot-zero", "An amount cannot be zero");
             }
             LedgerAccount account = touched.get(leg.accountId());
             if (account == null) {
                 account = leg.accountId() == null ? null : accounts.findById(leg.accountId());
                 if (account == null) {
-                    throw new ResponseStatusException(404, "No such account");
+                    throw Refused.with(404, "no-such-account", "No such account");
                 }
                 touched.put(account.getId(), account);
             }
@@ -194,7 +193,7 @@ public class Ledger {
             long next = (sum == null ? 0L : sum.longValue()) + leg.amount();
             // Overflow is the one way a sum of longs can lie about being zero.
             if (sum != null && ((sum.longValue() ^ next) & (leg.amount() ^ next)) < 0) {
-                throw new ResponseStatusException(400, "That amount is too large");
+                throw Refused.with(400, "amount-too-large", "That amount is too large");
             }
             perAsset.put(account.getAsset(), Long.valueOf(next));
         }
@@ -233,8 +232,9 @@ public class Ledger {
                     ? accounts.applyUnguarded(account.getId(), leg.amount())
                     : accounts.applyGuarded(account.getId(), leg.amount());
             if (applied != 1) {
-                throw new ResponseStatusException(409, account.isFrozen()
-                        ? "That account is frozen" : "Insufficient funds");
+                throw account.isFrozen()
+                        ? Refused.with(409, "account-frozen", "That account is frozen")
+                        : Refused.with(409, "insufficient-funds", "Insufficient funds");
             }
             Posting posting = new Posting();
             posting.setId(Ids.next());

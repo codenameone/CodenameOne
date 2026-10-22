@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Crypto;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.Ids;
@@ -59,10 +59,10 @@ public class Cards {
     @Transactional(rollbackFor = Exception.class)
     public CardDto issue(String owner, LedgerAccount account) throws IOException {
         if (!AccountKinds.CHECKING.equals(account.getKind())) {
-            throw new ResponseStatusException(400, "Cards are issued on checking accounts");
+            throw Refused.with(400, "cards-issued-checking-accounts", "Cards are issued on checking accounts");
         }
         if (cards.findFirstByAccountId(account.getId()) != null) {
-            throw new ResponseStatusException(409, "That account already has a card");
+            throw Refused.with(409, "account-already-has-card", "That account already has a card");
         }
         byte[] random = Crypto.randomBytes(2);
         int digits = (((random[0] & 0xff) << 8) | (random[1] & 0xff)) % 10000;
@@ -94,7 +94,7 @@ public class Cards {
     public Card owned(String owner, String id) throws IOException {
         Card card = id == null ? null : cards.findById(id);
         if (card == null || !card.getOwner().equals(owner)) {
-            throw new ResponseStatusException(404, "No such card");
+            throw Refused.with(404, "no-such-card", "No such card");
         }
         return card;
     }
@@ -113,7 +113,7 @@ public class Cards {
     @Transactional(rollbackFor = Exception.class)
     public CardDto limit(String owner, String id, long limit) throws IOException {
         if (limit < 0 || limit > MAX_LIMIT) {
-            throw new ResponseStatusException(400, "A card's limit is 0 to " + MAX_LIMIT);
+            throw Refused.with(400, "card-limit-range", "A card's limit is 0 to {0}", MAX_LIMIT);
         }
         Card card = owned(owner, id);
         cards.setLimit(id, owner, limit);

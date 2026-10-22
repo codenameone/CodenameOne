@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Base64Url;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
@@ -101,13 +101,12 @@ public class Devices {
     /// refusals are audited here, outside the registration's transaction.
     public DeviceDto register(String owner, DeviceRegistrationDto request) throws IOException {
         if (request == null || request.publicKey() == null) {
-            throw new ResponseStatusException(400, "Send the device's public key");
+            throw Refused.with(400, "send-device-public-key", "Send the device's public key");
         }
         long age = System.currentTimeMillis() / 1000L - Caller.authTime();
         if (Caller.authTime() < 0 || age > freshSeconds || age < -60L) {
             audit.append(owner, "DEVICE_REFUSED", owner, "sign-in not fresh");
-            throw new ResponseStatusException(403,
-                    "Sign in again to add a device: the sign-in must be a few minutes old");
+            throw Refused.with(403, "sign-again-add-device-sign", "Sign in again to add a device: the sign-in must be a few minutes old");
         }
         java.util.List<String> how = Caller.authMethods();
         boolean strong = how.contains("hwk") || how.contains("mfa");
@@ -117,8 +116,7 @@ public class Devices {
                     || !encoder.matches(password, users.loadUserByUsername(owner).getPassword())) {
                 guard.failed(owner);
                 audit.append(owner, "DEVICE_REFUSED", owner, "password");
-                throw new ResponseStatusException(403,
-                        "Enter your password to add a device, or turn on an authenticator app");
+                throw Refused.with(403, "enter-password-add-device-turn", "Enter your password to add a device, or turn on an authenticator app");
             }
         }
         return registerOnce(owner, request);
@@ -133,10 +131,10 @@ public class Devices {
         try {
             if (key == null || !Der.EC.equals(Der.publicKeyType(key))
                     || !Der.P256.equals(Der.ecCurve(key))) {
-                throw new ResponseStatusException(400, "The key must be an EC P-256 public key");
+                throw Refused.with(400, "key-ec-p-256-public", "The key must be an EC P-256 public key");
             }
         } catch (IOException unreadable) {
-            throw new ResponseStatusException(400, "The key must be an EC P-256 public key");
+            throw Refused.with(400, "key-ec-p-256-public", "The key must be an EC P-256 public key");
         }
         List<Device> held = devices.findByOwnerOrderByCreatedAtAsc(owner);
         int live = 0;
@@ -144,7 +142,7 @@ public class Devices {
             live += d.isRevoked() ? 0 : 1;
         }
         if (live >= MAX_DEVICES) {
-            throw new ResponseStatusException(409, "Remove a device before adding another");
+            throw Refused.with(409, "remove-device-before-adding-another", "Remove a device before adding another");
         }
         String platform = clip(request.platform(), 20);
         IntegrityVerifier.Verdict verdict = integrity.verify(platform, request.integrityToken(),
@@ -180,7 +178,7 @@ public class Devices {
         Device device = id == null ? null : devices.findById(id);
         if (device == null || !device.getOwner().equals(owner)
                 || devices.revoke(id, owner) != 1) {
-            throw new ResponseStatusException(404, "No such device");
+            throw Refused.with(404, "no-such-device", "No such device");
         }
         device.setRevoked(true);
         audit.append(owner, "DEVICE_REVOKED", id, device.getPlatform());
@@ -225,7 +223,7 @@ public class Devices {
     public static String customer() {
         String name = Caller.name();
         if (!Caller.hasRole(com.codenameone.examples.bastion.Roles.CUSTOMER)) {
-            throw new ResponseStatusException(403, "Only customers hold accounts");
+            throw Refused.with(403, "customers-hold-accounts", "Only customers hold accounts");
         }
         return name;
     }

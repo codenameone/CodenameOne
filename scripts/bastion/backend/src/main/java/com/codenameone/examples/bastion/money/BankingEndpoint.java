@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Config;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.api.AccountDto;
@@ -109,12 +109,12 @@ public class BankingEndpoint implements BankingApiServer {
     public AccountDto open(OpenAccountDto request) throws Exception {
         String owner = Devices.customer();
         if (request == null) {
-            throw new ResponseStatusException(400, "Say which account to open");
+            throw Refused.with(400, "say-which-account-open", "Say which account to open");
         }
         String kind = request.kind();
         if (!AccountKinds.CHECKING.equals(kind) && !AccountKinds.SAVINGS.equals(kind)
                 && !AccountKinds.WALLET.equals(kind)) {
-            throw new ResponseStatusException(400, "Open a CHECKING, SAVINGS or WALLET account");
+            throw Refused.with(400, "open-checking-savings-wallet-account", "Open a CHECKING, SAVINGS or WALLET account");
         }
         return dto(openAudited(owner, request.asset(), kind, request.name()));
     }
@@ -123,7 +123,7 @@ public class BankingEndpoint implements BankingApiServer {
     private LedgerAccount openAudited(String owner, String asset, String kind, String name)
             throws IOException {
         if (ledger.accountsOf(owner).size() >= MAX_ACCOUNTS) {
-            throw new ResponseStatusException(409, "Close an account before opening another");
+            throw Refused.with(409, "close-account-before-opening-another", "Close an account before opening another");
         }
         String clipped = name == null ? kind : (name.length() > 80 ? name.substring(0, 80) : name);
         LedgerAccount account = ledger.open(owner, asset, kind, clipped);
@@ -149,8 +149,7 @@ public class BankingEndpoint implements BankingApiServer {
         String owner = Devices.customer();
         if (transfer == null || transfer.fromAccountId() == null
                 || (transfer.toAccountId() == null) == (transfer.payeeId() == null)) {
-            throw new ResponseStatusException(400,
-                    "Name the account to pay from, and either an account or a payee to pay");
+            throw Refused.with(400, "name-account-pay-either-account", "Name the account to pay from, and either an account or a payee to pay");
         }
         LedgerAccount from = ledger.owned(owner, transfer.fromAccountId());
         boolean leaves = transfer.payeeId() != null;
@@ -176,7 +175,7 @@ public class BankingEndpoint implements BankingApiServer {
             }
         }
         if (to == null) {
-            throw new ResponseStatusException(409, "That payee cannot receive " + from.getAsset());
+            throw Refused.with(409, "payee-cannot-receive", "That payee cannot receive {0}", from.getAsset());
         }
         return money.pay(owner, idempotencyKey, from, payee, to, transfer.amount(),
                 transfer.memo());
@@ -188,7 +187,7 @@ public class BankingEndpoint implements BankingApiServer {
         if (!config.isDevelopmentProfile()) {
             // Money appears from nowhere: a simulation for the demo, which no
             // production server has.
-            throw new ResponseStatusException(404, "Not found");
+            throw Refused.with(404, "not-found", "Not found");
         }
         LedgerAccount to = ledger.owned(owner, id);
         return money.deposit(owner, idempotencyKey, to, cash == null ? 0 : cash.amount(),
@@ -255,7 +254,7 @@ public class BankingEndpoint implements BankingApiServer {
     @Override
     public CardDto cardLimit(String id, CardLimitDto limit) throws Exception {
         if (limit == null) {
-            throw new ResponseStatusException(400, "Send the limit");
+            throw Refused.with(400, "send-limit", "Send the limit");
         }
         return cards.limit(Devices.customer(), id, limit.dailyLimit());
     }
@@ -267,12 +266,12 @@ public class BankingEndpoint implements BankingApiServer {
         if (!config.isDevelopmentProfile()) {
             // A real authorization arrives from the card network over its own
             // authenticated channel, never from the cardholder's token.
-            throw new ResponseStatusException(404, "Not found");
+            throw Refused.with(404, "not-found", "Not found");
         }
         Card card = cards.owned(owner, id);
         if (card.isFrozen()) {
             audit.append(owner, "CARD_DECLINED", id, "frozen");
-            throw new ResponseStatusException(409, "That card is frozen");
+            throw Refused.with(409, "card-frozen", "That card is frozen");
         }
         LedgerAccount from = ledger.owned(owner, card.getAccountId());
         return money.spend(owner, idempotencyKey, card, from, spend == null ? 0 : spend.amount(),

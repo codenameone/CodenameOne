@@ -73,9 +73,9 @@ public final class DeviceSetup {
     /// A refusal that a registered device would have avoided, as the server
     /// words it: no signature, or one from a device it does not know.
     public static boolean needsDevice(int status, String message) {
-        return status == 403 && message != null
-                && (message.indexOf("signature from your device") >= 0
-                || message.indexOf("not attested") >= 0);
+        String code = Net.refusalCode();
+        return status == 403 && ("needs-device-signature".equals(code)
+                || "device-not-attested".equals(code));
     }
 
     /// After such a refusal: offers to register this device, and runs

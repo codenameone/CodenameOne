@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.bastion;
 
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.security.Authentication;
 import com.codename1.backend.security.GrantedAuthority;
 import com.codename1.backend.security.SecurityContextHolder;
@@ -37,7 +36,7 @@ public final class Caller {
     public static String name() {
         Authentication who = SecurityContextHolder.getContext().getAuthentication();
         if (who == null || !who.isAuthenticated() || who.getName() == null) {
-            throw new ResponseStatusException(401, "Sign in first");
+            throw Refused.with(401, "sign-in-first", "Sign in first");
         }
         return who.getName();
     }

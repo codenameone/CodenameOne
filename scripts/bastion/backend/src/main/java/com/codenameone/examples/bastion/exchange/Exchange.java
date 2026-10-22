@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -139,10 +140,10 @@ public class Exchange {
     /// order its first attempt placed.
     public OrderDto place(String owner, String key, NewOrderDto request) throws IOException {
         if (key == null || key.length() < 16 || key.length() > 80) {
-            throw new ResponseStatusException(400, "Send an Idempotency-Key of 16 to 80 characters");
+            throw Refused.with(400, "send-idempotency-key-16-80", "Send an Idempotency-Key of 16 to 80 characters");
         }
         if (request == null) {
-            throw new ResponseStatusException(400, "Send the order");
+            throw Refused.with(400, "send-order", "Send the order");
         }
         try {
             return placeOnce(owner, key, request);
@@ -171,19 +172,18 @@ public class Exchange {
             if (!earlier.getMarket().equals(r.market()) || !earlier.getSide().equals(r.side())
                     || !earlier.getType().equals(r.type()) || earlier.getPrice() != r.price()
                     || earlier.getQuantity() != r.quantity() || earlier.getBudget() != r.budget()) {
-                throw new ResponseStatusException(422,
-                        "That Idempotency-Key was already used for a different order");
+                throw Refused.with(422, "idempotency-key-reused-order", "That Idempotency-Key was already used for a different order");
             }
             return dto(earlier);
         }
         Market m = lock(r.market());
         boolean buy = BUY.equals(r.side());
         if (!buy && !SELL.equals(r.side())) {
-            throw new ResponseStatusException(400, "An order is a BUY or a SELL");
+            throw Refused.with(400, "order-buy-sell", "An order is a BUY or a SELL");
         }
         boolean limit = LIMIT.equals(r.type());
         if (!limit && !MARKET.equals(r.type())) {
-            throw new ResponseStatusException(400, "An order is LIMIT or MARKET");
+            throw Refused.with(400, "order-limit-market", "An order is LIMIT or MARKET");
         }
         Asset base = ledger.asset(m.getBase());
         long scale = Markets.scale(base);
@@ -191,17 +191,16 @@ public class Exchange {
         if (limit || !buy) {
             if (r.quantity() <= 0 || r.quantity() % m.getLot() != 0
                     || r.quantity() / m.getLot() > MAX_LOTS) {
-                throw new ResponseStatusException(400, "The quantity must be a whole number of "
-                        + m.getLot() + "-unit lots");
+                throw Refused.with(400, "quantity-whole-number-unit-lots", "The quantity must be a whole number of {0}-unit lots", m.getLot());
             }
             if (limit && r.price() <= 0) {
-                throw new ResponseStatusException(400, "A limit order needs a price");
+                throw Refused.with(400, "limit-order-needs-price", "A limit order needs a price");
             }
             if (!limit && (r.price() != 0 || r.budget() != 0)) {
-                throw new ResponseStatusException(400, "A market sell names only a quantity");
+                throw Refused.with(400, "market-sell-names-quantity", "A market sell names only a quantity");
             }
             if (limit && r.budget() != 0) {
-                throw new ResponseStatusException(400, "A limit order names no budget");
+                throw Refused.with(400, "limit-order-names-no-budget", "A limit order names no budget");
             }
             if (buy) {
                 long most = Markets.ceilDiv(exact(r.price(), r.quantity()), scale);
@@ -211,7 +210,7 @@ public class Exchange {
             }
         } else {
             if (r.budget() <= 0 || r.price() != 0 || r.quantity() != 0) {
-                throw new ResponseStatusException(400, "A market buy names only a budget");
+                throw Refused.with(400, "market-buy-names-budget", "A market buy names only a budget");
             }
             held = r.budget();
         }
@@ -266,7 +265,7 @@ public class Exchange {
     public OrderDto cancel(String owner, String id) throws IOException {
         String market = id == null ? null : orders.marketOf(id, owner);
         if (market == null) {
-            throw new ResponseStatusException(404, "No such order");
+            throw Refused.with(404, "no-such-order", "No such order");
         }
         Market m = lock(market);
         // The first read of the row, and behind the lock: it may have filled
@@ -275,7 +274,7 @@ public class Exchange {
         // between; SQLite serializes the writers and hid it).
         TradeOrder o = orders.findById(id);
         if (!OPEN.equals(o.getStatus())) {
-            throw new ResponseStatusException(409, "That order is already " + o.getStatus());
+            throw Refused.with(409, "order-already-status", "That order is already {0}", o.getStatus());
         }
         List<String[]> events = new ArrayList<String[]>();
         finish(m, o, events);
@@ -484,7 +483,7 @@ public class Exchange {
 
     private Market lock(String id) throws IOException {
         if (id == null || marketRows.hold(id) != 1) {
-            throw new ResponseStatusException(404, "No such market");
+            throw Refused.with(404, "no-such-market", "No such market");
         }
         return markets.get(id);
     }
@@ -496,8 +495,9 @@ public class Exchange {
         String kind = fiatSide ? AccountKinds.CHECKING : AccountKinds.WALLET;
         LedgerAccount found = first(owner, asset, kind);
         if (found == null) {
-            throw new ResponseStatusException(409, "Open a " + asset + " "
-                    + (fiatSide ? "checking account" : "wallet") + " first");
+            throw fiatSide
+                    ? Refused.with(409, "open-checking-first", "Open a {0} checking account first", asset)
+                    : Refused.with(409, "open-wallet-first", "Open a {0} wallet first", asset);
         }
         return found;
     }
@@ -531,7 +531,7 @@ public class Exchange {
         try {
             return Markets.multiplyExact(a, b);
         } catch (ArithmeticException tooLarge) {
-            throw new ResponseStatusException(400, "That order is too large");
+            throw Refused.with(400, "order-too-large", "That order is too large");
         }
     }
 

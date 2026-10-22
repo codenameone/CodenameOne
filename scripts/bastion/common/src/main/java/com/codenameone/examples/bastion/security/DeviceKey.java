@@ -24,8 +24,6 @@ import com.codename1.security.KeyGenerator;
 import com.codename1.security.KeyPair;
 import com.codename1.security.PrivateKey;
 import com.codename1.security.PublicKey;
-import com.codename1.security.SecureRandom;
-import com.codename1.security.SecureStorage;
 import com.codename1.security.vault.AssociatedData;
 import com.codename1.security.vault.SecureEnvelope;
 import com.codename1.ui.CN;
@@ -35,6 +33,7 @@ import com.codenameone.examples.bastion.api.DeviceDto;
 import com.codenameone.examples.bastion.api.DeviceRegistrationDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
+import com.codenameone.examples.bastion.ui.Lang;
 
 /// This device's signing key: the second thing, after the session, that the
 /// server asks for before money leaves an account.
@@ -44,14 +43,13 @@ import com.codenameone.examples.bastion.net.Net;
 /// the PKCS#8 private half never leaves the device. It is kept sealed: an
 /// AES-256-GCM [SecureEnvelope] whose associated data names the account and
 /// purpose (so a blob copied to another account's slot does not open), under
-/// a 256-bit wrapping key that lives in [SecureStorage] -- the iOS Keychain or
-/// the Android Keystore-backed store. The sealed blob alone, in the app's
-/// preferences, is useless off the device.
+/// the app key ([Keys]), which the OS releases only after a biometric check
+/// or which the user's PIN opens -- whichever they set up. The sealed blob
+/// alone, in the app's preferences, is useless without one of those.
 ///
-/// In the simulator `SecureStorage` is an ordinary file, and the Security
-/// Center reports the key as not hardware protected there.
+/// In the simulator the OS store is an ordinary file, and the Security
+/// Center says so.
 public final class DeviceKey {
-    private static final String WRAP_ACCOUNT = "bastion.device.wrap";
     private static final String SEALED_KEY = "bastion.device.sealed";
     private static final String ID_KEY = "bastion.device.id";
     private static final String OWNER_KEY = "bastion.device.owner";
@@ -85,7 +83,7 @@ public final class DeviceKey {
         }
         String sealed = Preferences.get(SEALED_KEY, "");
         String owner = owner();
-        byte[] wrap = wrapKey(false);
+        byte[] wrap = Keys.current();
         if (sealed.length() == 0 || owner == null || wrap == null) {
             return null;
         }
@@ -150,9 +148,9 @@ public final class DeviceKey {
         DeviceRegistrationDto request = new DeviceRegistrationDto(publicKey,
                 CN.getPlatformName(), rooted, token != null, token, password);
         Api.banking().registerDevice(request, Net.to(device -> {
-            byte[] wrap = wrapKey(true);
+            byte[] wrap = Keys.current();
             if (wrap == null) {
-                failed.failed(0, "This device has no secure storage for the key.");
+                failed.failed(0, Lang.tr("Unlock Bastion first."));
                 return;
             }
             byte[] sealed = SecureEnvelope.seal(wrap, "device-key", 1, aad(owner), key.getEncoded());
@@ -166,21 +164,5 @@ public final class DeviceKey {
 
     private static AssociatedData aad(String owner) {
         return AssociatedData.of("bastion", "device", owner, "request-signing");
-    }
-
-    /// The wrapping key from secure storage, made on first use when `create`.
-    private static byte[] wrapKey(boolean create) {
-        SecureStorage storage = SecureStorage.getInstance();
-        String stored = storage.get(WRAP_ACCOUNT);
-        if (stored == null && create) {
-            // setIfAbsent: two starts racing make one key, not two.
-            stored = storage.setIfAbsent(WRAP_ACCOUNT,
-                    Base64.encodeUrlSafe(SecureRandom.bytes(32)));
-        }
-        if (stored == null) {
-            return null;
-        }
-        byte[] key = Base64.decodeUrlSafe(stored);
-        return key != null && key.length == 32 ? key : null;
     }
 }

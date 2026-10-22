@@ -30,12 +30,12 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codenameone.examples.bastion.Prefs;
 import com.codenameone.examples.bastion.api.PasskeyDto;
 import com.codenameone.examples.bastion.api.UserDto;
 import com.codenameone.examples.bastion.net.Api;
 import com.codenameone.examples.bastion.net.Net;
 import com.codenameone.examples.bastion.net.Session;
+import com.codenameone.examples.bastion.security.Keys;
 import com.codenameone.examples.bastion.security.Lock;
 
 import java.util.List;
@@ -52,18 +52,33 @@ public final class SettingsForm {
         form.add(Ui.section("Unlock"));
         if (Lock.biometricsAvailable()) {
             final Switch bio = new Switch();
-            bio.setValue(Prefs.biometricUnlock());
-            bio.addActionListener(evt -> Prefs.setBiometricUnlock(bio.isValue()));
+            bio.setValue(Keys.biometricEnabled());
+            final Label bioError = Ui.error();
+            bio.addActionListener(evt -> {
+                if (bio.isValue()) {
+                    UnlockSetup.biometric(() -> show(back), bioError);
+                    bio.setValue(false);
+                } else {
+                    Keys.disableBiometric();
+                }
+            });
             Container row = new Container(new BorderLayout(), "BnRow");
             row.add(BorderLayout.CENTER, new Label(Lang.tr("Unlock with fingerprint or face"),
                     "BnRowTitle"));
             row.add(BorderLayout.EAST, bio);
-            form.add(row);
+            form.addAll(row, bioError);
         } else {
             form.add(Ui.row(Lang.tr("Unlock with fingerprint or face"),
-                    Lang.tr("This device has no biometric enrolled. The lock asks for your "
-                            + "password."), Lang.tr("Off"), "BnBadgeWarn", null));
+                    Lang.tr("This device has no biometric enrolled. Set an unlock PIN instead."),
+                    Lang.tr("Off"), "BnBadgeWarn", null));
         }
+        boolean pin = Keys.pinEnabled();
+        form.add(Ui.row(Lang.tr("Unlock PIN"), pin
+                ? Lang.tr("Opens the lock when a biometric cannot. {0} wrong tries erase the keys "
+                        + "on this device.", String.valueOf(Keys.PIN_ATTEMPTS))
+                : Lang.tr("Without a biometric or a PIN the lock asks for your password."),
+                Lang.tr(pin ? "On" : "Off"), pin ? "BnBadgeGood" : "BnBadgeWarn",
+                () -> pinDialog(back)));
         form.add(Ui.section("Sign-in"));
         boolean totp = user != null && user.totpEnabled();
         form.add(Ui.row(Lang.tr("Authenticator app"), totp
@@ -83,10 +98,48 @@ public final class SettingsForm {
                 Lang.tr(device ? "On" : "Off"), device ? "BnBadgeGood" : "BnBadgeWarn",
                 device ? null : () -> DeviceSetup.register(() -> show(back),
                         (status, message) -> Ui.toast(message))));
+        form.add(Ui.section("Language"));
+        String speaking = Lang.current();
+        for (final String code : Lang.CODES) {
+            // A language is called what its speakers call it, whatever
+            // language the rest of the screen is in.
+            form.add(Ui.row(Lang.name(code), null, code.equals(speaking) ? Lang.tr("On") : null,
+                    "BnBadgeGood", () -> {
+                        Lang.choose(code);
+                        show(back);
+                    }));
+        }
         Button center = Ui.secondary("Security Center");
         center.addActionListener(evt -> SecurityCenterForm.show(() -> show(back)));
         form.add(center);
         Ui.show(form, false);
+    }
+
+    // ------------------------------------------------------------------ PIN
+
+    /// Sets, changes or removes the unlock PIN.
+    private static void pinDialog(final Runnable back) {
+        final Dialog dialog = new Dialog(Lang.tr("Unlock PIN"), BoxLayout.y());
+        final Label error = Ui.error();
+        final UnlockSetup.PinFields fields = new UnlockSetup.PinFields();
+        Button save = Ui.primary(Keys.pinEnabled() ? "Change PIN" : "Set PIN");
+        save.addActionListener(evt -> fields.save(() -> {
+            dialog.dispose();
+            show(back);
+        }, error));
+        dialog.addAll(error, fields.pin, fields.again, save);
+        if (Keys.pinEnabled()) {
+            Button remove = Ui.secondary("Remove PIN");
+            remove.addActionListener(evt -> Keys.removePin(() -> {
+                dialog.dispose();
+                show(back);
+            }));
+            dialog.add(remove);
+        }
+        Button cancel = Ui.secondary("Cancel");
+        cancel.addActionListener(evt -> dialog.dispose());
+        dialog.add(cancel);
+        dialog.show();
     }
 
     // ------------------------------------------------------------- passkeys

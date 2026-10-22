@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -139,8 +140,7 @@ public class Money {
     /// Refuses a device that may not send money away, when the policy says so.
     public void requireTrusted(Device device) {
         if (enforceDevices && !Devices.trusted(device)) {
-            throw new ResponseStatusException(403, "This device is not attested, or is rooted: "
-                    + "it can move money only between your own accounts");
+            throw Refused.with(403, "device-not-attested", "This device is not attested, or is rooted: it can move money only between your own accounts");
         }
     }
 
@@ -148,13 +148,12 @@ public class Money {
     public ReceiptDto internal(String owner, String key, LedgerAccount from, LedgerAccount to,
             long amount, String memo) throws IOException {
         if (from.getId().equals(to.getId())) {
-            throw new ResponseStatusException(400, "Choose two different accounts");
+            throw Refused.with(400, "choose-two-different-accounts", "Choose two different accounts");
         }
         // A move is one asset in and the same out; changing one into another
         // is a trade, at a price, on the exchange.
         if (!from.getAsset().equals(to.getAsset())) {
-            throw new ResponseStatusException(400,
-                    "Both accounts must hold the same currency. Use the exchange to convert.");
+            throw Refused.with(400, "both-accounts-hold-same-currency", "Both accounts must hold the same currency. Use the exchange to convert.");
         }
         return move(new Move(owner, key, "TRANSFER", from, to, "", amount, false, memo, null));
     }
@@ -206,7 +205,7 @@ public class Money {
     /// One movement. See the class comment; this is the half that retries.
     private ReceiptDto move(Move m) throws IOException {
         if (m.amount <= 0) {
-            throw new ResponseStatusException(400, "The amount must be more than zero");
+            throw Refused.with(400, "amount-more-than-zero", "The amount must be more than zero");
         }
         try {
             return moveOnce(m);
@@ -241,8 +240,7 @@ public class Money {
             JournalEntry same = ledger.post(m.key, m.kind, m.owner, memo, legs);
             Transfer first = transfers.findById(same.getId());
             if (first == null || !first.getOwner().equals(m.owner)) {
-                throw new ResponseStatusException(422,
-                        "That Idempotency-Key was already used for a different request");
+                throw Refused.with(422, "idempotency-key-reused", "That Idempotency-Key was already used for a different request");
             }
             return receipt(first);
         }
@@ -288,23 +286,22 @@ public class Money {
         }
         long now = System.currentTimeMillis();
         if (m.amount > perTransfer) {
-            throw new ResponseStatusException(409, "That is more than one payment may move");
+            throw Refused.with(409, "more-than-payment-may-move", "That is more than one payment may move");
         }
         Long sent = transfers.sentSince(m.owner, asset.getCode(), now - DAY);
         if ((sent == null ? 0L : sent.longValue()) + m.amount > daily) {
-            throw new ResponseStatusException(409, "That would pass your limit for the day");
+            throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
         }
         if (m.payee != null && now < m.payee.getCreatedAt() + coolOffMillis) {
             Long paid = transfers.throughSince(m.payee.getId(), m.payee.getCreatedAt());
             if ((paid == null ? 0L : paid.longValue()) + m.amount > coolOffLimit) {
-                throw new ResponseStatusException(409, "A new payee can receive only "
-                        + coolOffLimit + " until their cooling-off period ends");
+                throw Refused.with(409, "new-payee-receive-until-their", "A new payee can receive only {0} until their cooling-off period ends", coolOffLimit);
             }
         }
         if (m.card != null) {
             Long spent = transfers.throughSince(m.card.getId(), now - DAY);
             if ((spent == null ? 0L : spent.longValue()) + m.amount > m.card.getDailyLimit()) {
-                throw new ResponseStatusException(409, "That is over the card's daily limit");
+                throw Refused.with(409, "over-card-daily-limit", "That is over the card's daily limit");
             }
         }
     }
@@ -313,7 +310,7 @@ public class Money {
         long now = System.currentTimeMillis();
         long value = markets.value(asset.getCode(), m.amount, "USD");
         if (value > cryptoPerMove) {
-            throw new ResponseStatusException(409, "That is more than one crypto movement may move");
+            throw Refused.with(409, "more-than-crypto-movement-may", "That is more than one crypto movement may move");
         }
         long sent = value;
         for (Asset coin : ledger.assets()) {
@@ -326,7 +323,7 @@ public class Money {
             }
         }
         if (sent > cryptoDaily) {
-            throw new ResponseStatusException(409, "That would pass your crypto limit for the day");
+            throw Refused.with(409, "would-pass-crypto-limit-day", "That would pass your crypto limit for the day");
         }
         // No payee branch: a payee is paid into a fiat checking account, so
         // coins leave a customer only by withdrawal, to an allow-listed address

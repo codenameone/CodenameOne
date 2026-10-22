@@ -44,9 +44,8 @@ import java.util.Map;
 /// add a language: copy that file to `Bundle_<code>.properties`, translate the
 /// values, and add the code to [#CODES].
 public final class Lang {
-    /// The languages there is a translation for. English is the source and,
-    /// so far, the only one; the bundle is ready for others.
-    public static final String[] CODES = {"en"};
+    /// The languages there is a translation for, English (the source) first.
+    public static final String[] CODES = {"en", "es", "fr", "de", "he"};
 
     private static final String BUNDLE = "Bundle";
     /// The entry each file names its own language in, in that language.
@@ -79,6 +78,12 @@ public final class Lang {
             bundle.putAll(translated);
         }
         UIManager.getInstance().setBundle(bundle);
+    }
+
+    /// Speaks `code` from now on (Settings), and installs it.
+    public static void choose(String code) {
+        Preferences.set("bastion.language", code);
+        apply();
     }
 
     /// What `code`'s language calls itself.

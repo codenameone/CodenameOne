@@ -18,9 +18,9 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.SecurityExchange;
@@ -97,8 +97,7 @@ public class RequestSigning {
         String why = check(owner);
         if (why != null) {
             audit.append(owner, "SIGNATURE_REFUSED", target(), why);
-            throw new ResponseStatusException(403, "This needs a signature from your device: "
-                    + why);
+            throw Refused.with(403, "needs-device-signature", "This needs a signature from your device: {0}", why);
         }
         return devices.live(owner, field(request().getHeader(HEADER), "device"));
     }

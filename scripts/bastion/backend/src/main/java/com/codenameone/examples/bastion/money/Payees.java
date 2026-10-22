@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -62,28 +63,28 @@ public class Payees {
     @Transactional(rollbackFor = Exception.class)
     public PayeeDto add(String owner, NewPayeeDto request) throws IOException {
         if (request == null) {
-            throw new ResponseStatusException(400, "Name the payee");
+            throw Refused.with(400, "name-payee", "Name the payee");
         }
         String username;
         try {
             username = Accounts.email(request.email());
         } catch (ResponseStatusException malformed) {
-            throw new ResponseStatusException(400, "That is not an e-mail address");
+            throw Refused.with(400, "not-e-mail-address", "That is not an e-mail address");
         }
         if (username.equals(owner)) {
-            throw new ResponseStatusException(400, "Move money between your own accounts instead");
+            throw Refused.with(400, "move-money-between-own-accounts", "Move money between your own accounts instead");
         }
         // Saying "no such customer" tells the caller who banks here. The
         // request is signed by a registered device and audited, and every
         // payee is a row a person reviews, which makes this a poor directory.
         if (!users.userExists(username)) {
-            throw new ResponseStatusException(404, "No customer has that address");
+            throw Refused.with(404, "no-customer-has-address", "No customer has that address");
         }
         if (payees.findFirstByOwnerAndUsername(owner, username) != null) {
-            throw new ResponseStatusException(409, "That payee is already on your list");
+            throw Refused.with(409, "payee-already-list", "That payee is already on your list");
         }
         if (payees.findByOwnerOrderByCreatedAtAsc(owner).size() >= MAX_PAYEES) {
-            throw new ResponseStatusException(409, "Remove a payee before adding another");
+            throw Refused.with(409, "remove-payee-before-adding-another", "Remove a payee before adding another");
         }
         Payee payee = new Payee();
         payee.setId(Ids.next());
@@ -110,7 +111,7 @@ public class Payees {
     public Payee owned(String owner, String id) throws IOException {
         Payee payee = id == null ? null : payees.findById(id);
         if (payee == null || !payee.getOwner().equals(owner)) {
-            throw new ResponseStatusException(404, "No such payee");
+            throw Refused.with(404, "no-such-payee", "No such payee");
         }
         return payee;
     }

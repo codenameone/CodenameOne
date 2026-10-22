@@ -20,6 +20,7 @@ package com.codenameone.examples.bastion.security;
 
 import com.codename1.security.DeviceIntegrity;
 import com.codename1.security.SecureStorage;
+import com.codename1.security.vault.KdfProfile;
 import com.codename1.security.TapjackingPolicy;
 import com.codename1.security.hardening.Hardening;
 import com.codename1.security.shield.AppShield;
@@ -118,6 +119,18 @@ public final class SecurityStatus {
         // ---------------------------------------------------------- the keys
         g = "Keys and sign-in";
         out.add(storage(g, sim));
+        out.add(appKey(g, sim, ios, android));
+        out.add(Keys.pinEnabled()
+                ? new Item(g, "Unlock PIN", ACTIVE, "A vault opened by the PIN (PBKDF2, "
+                        + KdfProfile.current().getIterations() + " rounds, peppered from the OS "
+                        + "store); " + Keys.PIN_ATTEMPTS + " wrong tries in a row erase the keys"
+                        + (Keys.pinFailures() > 0 ? ". Wrong tries so far: " + Keys.pinFailures() : ""))
+                : new Item(g, "Unlock PIN", OFF, "Not set: Settings, Unlock PIN"));
+        out.add(new Item(g, "Refresh token", Keys.protectedByUser() ? ACTIVE : WARNING,
+                Keys.protectedByUser()
+                        ? "Sealed under the app key: unreadable until the lock is opened"
+                        : "Sealed under the app key, which opens without asking until a "
+                                + "biometric or PIN is set up"));
         out.add(DeviceKey.deviceId() != null
                 ? new Item(g, "Device signing key", ACTIVE, "P-256, registered as "
                         + DeviceKey.deviceId() + "; signs every payment")
@@ -130,10 +143,16 @@ public final class SecurityStatus {
 
         // ------------------------------------------------------ app and device
         g = "This device";
+        out.add(new Item(g, "App lock", ACTIVE, Keys.biometricEnabled()
+                ? "On start, on return and when idle: biometric" + (Keys.pinEnabled() ? ", then PIN" : "")
+                : Keys.pinEnabled() ? "On start, on return and when idle: PIN"
+                : "On start, on return and when idle: the password"));
         out.add(Lock.biometricsAvailable()
-                ? new Item(g, "Biometric lock", ACTIVE, "On start, on return and when idle")
-                : new Item(g, "Biometric lock", sim ? SIMULATOR : WARNING,
-                        "No biometrics enrolled: the lock asks for the password instead"));
+                ? new Item(g, "Biometrics", Keys.biometricEnabled() ? ACTIVE : OFF,
+                        Keys.biometricEnabled() ? "Unlock with a biometric is on"
+                                : "Available; turn it on in Settings")
+                : new Item(g, "Biometrics", sim ? SIMULATOR : OFF,
+                        "None enrolled: the PIN or the password unlocks instead"));
         out.add(new Item(g, "Auto-lock", ACTIVE, "After " + (AppConfig.IDLE_LOCK_MILLIS / 1000)
                 + "s idle or " + (AppConfig.BACKGROUND_LOCK_MILLIS / 1000) + "s in the background"));
         out.add(integrity(g, sim));
@@ -216,6 +235,34 @@ public final class SecurityStatus {
         return new Item(g, "Token and key storage", sim ? SIMULATOR : WARNING, sim
                 ? "The simulator keeps them in a plain file"
                 : "No keystore on this device: tokens are not kept between runs");
+    }
+
+    /// Where the app key that seals the payment key and the refresh token is
+    /// held, said as it is on this platform: only iOS and Android bind a key
+    /// to a biometric in the OS.
+    private static Item appKey(String g, boolean sim, boolean ios, boolean android) {
+        String name = "App key";
+        if (Keys.biometricEnabled()) {
+            if (sim) {
+                return new Item(g, name, SIMULATOR, "Biometric copy simulated: a file gated by "
+                        + "the simulator's Biometric Simulation menu");
+            }
+            if (ios) {
+                return new Item(g, name, ACTIVE, "Keychain item with biometric access control "
+                        + "(current set): released only after Face ID or Touch ID");
+            }
+            if (android) {
+                return new Item(g, name, ACTIVE, "Keystore key that requires user "
+                        + "authentication: released only after a strong biometric");
+            }
+            return new Item(g, name, ACTIVE, "Released by the platform after a biometric");
+        }
+        if (Keys.pinEnabled()) {
+            return new Item(g, name, ACTIVE, "Opened only by the unlock PIN");
+        }
+        return new Item(g, name, WARNING, ios || android || sim
+                ? "Opened without asking: set up a biometric or a PIN"
+                : "This platform has no biometric-bound store: set up a PIN");
     }
 
     private static Item integrity(String g, boolean sim) {

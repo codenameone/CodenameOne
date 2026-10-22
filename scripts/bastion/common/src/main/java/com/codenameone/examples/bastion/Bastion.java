@@ -22,6 +22,7 @@ import com.codename1.system.Lifecycle;
 import com.codename1.ui.Form;
 import com.codenameone.examples.bastion.net.Guard;
 import com.codenameone.examples.bastion.net.Session;
+import com.codenameone.examples.bastion.security.Keys;
 import com.codenameone.examples.bastion.security.Lock;
 import com.codenameone.examples.bastion.security.Protect;
 import com.codenameone.examples.bastion.ui.Lang;
@@ -59,19 +60,30 @@ public class Bastion extends Lifecycle {
 
             @Override
             public void showUnlocked(Form previous) {
-                if (previous != null) {
+                if (Session.user() == null) {
+                    // Unlocked at start: the session's tokens could not be
+                    // read until now.
+                    Session.restore(Bastion::home, Bastion::signInScreen,
+                            Bastion::signInScreen);
+                } else if (previous != null) {
                     Ui.show(previous, true);
                 } else {
                     home();
                 }
             }
         });
-        Session.restore(() -> {
-            // A stored session opens behind the lock: whoever holds the phone
-            // proves they are its owner first -- with a biometric if they
-            // chose one, else with the password (LockForm).
-            Lock.lock();
-        }, Bastion::signInScreen, Bastion::signInScreen);
+        if (Session.hasStoredSession() && Keys.exists() && Keys.protectedByUser()) {
+            // The stored session is sealed under the app key: the biometric
+            // or PIN that opens the key comes first (LockForm), then the
+            // session is read.
+            Lock.lockAtStart();
+        } else if (Session.hasStoredSession() && Keys.openPlain()) {
+            // No biometric or PIN set up: the session opens behind the lock,
+            // whose only way out is the password (LockForm).
+            Session.restore(Lock::lock, Bastion::signInScreen, Bastion::signInScreen);
+        } else {
+            signInScreen();
+        }
     }
 
     @Override
@@ -87,6 +99,9 @@ public class Bastion extends Lifecycle {
     }
 
     static void signInScreen() {
+        // A key the user did not open is given up here, before the sign-in
+        // stores new tokens under whatever key is current (Keys#signedIn).
+        Keys.signedIn();
         SignInForm.show(() -> {
             // A fresh sign-in is the strongest unlock there is; whatever was
             // on screen before belonged to the session that ended.

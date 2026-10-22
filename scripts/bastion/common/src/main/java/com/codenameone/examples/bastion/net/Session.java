@@ -29,6 +29,8 @@ import com.codename1.io.oidc.OidcRequestAuthorizer;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.PkceChallenge;
 import com.codename1.io.oidc.SecureStorageTokenStore;
+import com.codename1.security.SecureStorage;
+import com.codenameone.examples.bastion.security.SealedStorage;
 import com.codename1.io.oidc.TokenStore;
 import com.codename1.io.webauthn.PublicKeyCredential;
 import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
@@ -103,10 +105,14 @@ public final class Session {
     /// Points the app at a server.
     public static void start(String baseUrl) {
         if (store == null) {
-            // Plain storage only in the simulator, which has no keystore. On a
-            // device without one the tokens are not kept at all: the user
-            // signs in at every start, which is the right failure for a bank.
-            store = new SecureStorageTokenStore().allowPlainStorageFallback(CN.isSimulator());
+            // Sealed under the app key (Keys), which a biometric or the PIN
+            // opens: the refresh token is behind the same lock as the payment
+            // key. Plain storage only in the simulator, which has no keystore.
+            // On a device without one the tokens are not kept at all: the
+            // user signs in at every start, which is the right failure for a
+            // bank.
+            store = new SecureStorageTokenStore(new SealedStorage(SecureStorage.getInstance()))
+                    .allowPlainStorageFallback(CN.isSimulator());
         }
         if (base != null) {
             NetworkManager.getInstance().setAuthorizer(base + "/api", null);
@@ -171,6 +177,12 @@ public final class Session {
 
     public static UserDto user() {
         return user;
+    }
+
+    /// Whether this device keeps a sealed session for the current server,
+    /// readable once the app key is open.
+    public static boolean hasStoredSession() {
+        return base != null && SealedStorage.holds(storeKey(base));
     }
 
     /// Whether a refresh token is held: what the lock screen protects.

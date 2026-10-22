@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.admin;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.DataSource;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.Roles;
@@ -82,7 +82,7 @@ public class AdminEndpoint implements AdminApiServer {
     private static String admin() {
         String name = Caller.name();
         if (!Caller.hasRole(Roles.ADMIN)) {
-            throw new ResponseStatusException(403, "Administrators only");
+            throw Refused.with(403, "administrators", "Administrators only");
         }
         return name;
     }

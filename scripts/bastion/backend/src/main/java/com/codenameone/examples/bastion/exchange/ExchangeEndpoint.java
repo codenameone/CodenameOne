@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -237,28 +238,27 @@ public class ExchangeEndpoint implements ExchangeApiServer {
         String owner = Devices.customer();
         LedgerAccount from = ledger.owned(owner, id);
         if (!AccountKinds.WALLET.equals(from.getKind())) {
-            throw new ResponseStatusException(400, "Coins are withdrawn from a wallet");
+            throw Refused.with(400, "coins-withdrawn-wallet", "Coins are withdrawn from a wallet");
         }
         Device device = signing.require(owner);
         money.requireTrusted(device);
         if (withdrawal == null) {
-            throw new ResponseStatusException(400, "Send the address and the amount");
+            throw Refused.with(400, "send-address-amount", "Send the address and the amount");
         }
         CryptoAddress address;
         try {
             address = wallets.owned(owner, withdrawal.addressId());
         } catch (ResponseStatusException unknown) {
             audit.append(owner, "CRYPTO_OUT_REFUSED", from.getId(), "address not allow-listed");
-            throw new ResponseStatusException(403, "Withdraw only to an address on your list");
+            throw Refused.with(403, "withdraw-address-list", "Withdraw only to an address on your list");
         }
         if (!address.getAsset().equals(from.getAsset())) {
-            throw new ResponseStatusException(400, "That address is for " + address.getAsset());
+            throw Refused.with(400, "address-wrong-asset", "That address is for {0}", address.getAsset());
         }
         if (System.currentTimeMillis() < address.getUsableAt()) {
             audit.append(owner, "CRYPTO_OUT_REFUSED", address.getId(), "cooling off until "
                     + address.getUsableAt());
-            throw new ResponseStatusException(409, "That address is new: it can be used from "
-                    + address.getUsableAt());
+            throw Refused.with(409, "address-new-used", "That address is new: it can be used from {0}", address.getUsableAt());
         }
         try {
             return money.withdrawCrypto(owner, idempotencyKey, from, address,

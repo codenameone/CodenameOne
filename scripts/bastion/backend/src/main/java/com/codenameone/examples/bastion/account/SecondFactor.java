@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.bastion.account;
 
-import com.codename1.backend.ResponseStatusException;
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpEnrollment;
@@ -55,8 +55,7 @@ public class SecondFactor {
     /// access token strip the account of its second factor.
     public TotpEnrollmentDto start(String username) throws IOException {
         if (totp.isEnabled(username)) {
-            throw new ResponseStatusException(409,
-                    "This account already has an authenticator app");
+            throw Refused.with(409, "account-already-has-authenticator-app", "This account already has an authenticator app");
         }
         TotpEnrollment enrollment = totp.beginEnrollment(username);
         audit.append(username, "TOTP_STARTED", username, "");
@@ -67,7 +66,7 @@ public class SecondFactor {
     public RecoveryCodesDto confirm(String username, String code) throws IOException {
         if (code == null || !totp.confirmEnrollment(username, code)) {
             audit.append(username, "TOTP_CONFIRM_FAILED", username, "");
-            throw new ResponseStatusException(400, "That code is not the one your app shows");
+            throw Refused.with(400, "code-not-app-shows", "That code is not the one your app shows");
         }
         audit.append(username, "TOTP_ENROLLED", username, "");
         return new RecoveryCodesDto(recoveryCodes.generate(username));
@@ -77,11 +76,11 @@ public class SecondFactor {
     /// still have the app.
     public RecoveryCodesDto renew(String username, String code) throws IOException {
         if (!totp.isEnabled(username)) {
-            throw new ResponseStatusException(409, "Add an authenticator app first");
+            throw Refused.with(409, "add-authenticator-app", "Add an authenticator app first");
         }
         if (code == null || !totp.verify(username, code)) {
             audit.append(username, "RECOVERY_CODES_REFUSED", username, "");
-            throw new ResponseStatusException(403, "That code is not the one your app shows");
+            throw Refused.with(403, "code-not-app-shows", "That code is not the one your app shows");
         }
         audit.append(username, "RECOVERY_CODES_RENEWED", username, "");
         return new RecoveryCodesDto(recoveryCodes.generate(username));

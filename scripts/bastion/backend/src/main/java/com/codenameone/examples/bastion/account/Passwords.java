@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.bastion.account;
 
-import com.codename1.backend.ResponseStatusException;
+import com.codenameone.examples.bastion.Refused;
 
 /// What a password must be.
 ///
@@ -42,11 +42,10 @@ public final class Passwords {
     /// Refuses `password` for `username` with a 400 that says why.
     public static void check(String username, String password) {
         if (password == null || password.length() < MINIMUM) {
-            throw new ResponseStatusException(400,
-                    "Choose a password of at least " + MINIMUM + " characters");
+            throw Refused.with(400, "choose-password-least-characters", "Choose a password of at least {0} characters", MINIMUM);
         }
         if (password.length() > MAXIMUM) {
-            throw new ResponseStatusException(400, "That password is too long");
+            throw Refused.with(400, "password-too-long", "That password is too long");
         }
         if (username != null) {
             int at = username.indexOf('@');
@@ -55,8 +54,7 @@ public final class Passwords {
             // folding the whole string in the server's language.
             if (password.trim().equalsIgnoreCase(username)
                     || password.trim().equalsIgnoreCase(local)) {
-                throw new ResponseStatusException(400,
-                        "Your password cannot be your e-mail address");
+                throw Refused.with(400, "password-cannot-e-mail-address", "Your password cannot be your e-mail address");
             }
         }
     }

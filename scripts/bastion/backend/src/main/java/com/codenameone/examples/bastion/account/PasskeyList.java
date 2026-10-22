@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.account;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Base64Url;
-import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.security.webauthn.CredentialRecord;
 import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity;
@@ -75,7 +75,7 @@ public class PasskeyList {
         CredentialRecord record = credentialId == null || holder == null
                 ? null : credentials.findByCredentialId(credentialId);
         if (record == null || !Arrays.equals(record.getUserEntityUserId(), holder.getId())) {
-            throw new ResponseStatusException(404, "No such passkey");
+            throw Refused.with(404, "no-such-passkey", "No such passkey");
         }
         credentials.delete(credentialId);
         audit.append(username, "PASSKEY_REMOVED", username, record.getLabel());

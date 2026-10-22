@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bastion.net;
 
+import com.codename1.ui.plaf.UIManager;
+import com.codenameone.examples.bastion.api.Refusal;
 import com.codename1.io.rest.Response;
 import com.codename1.util.OnComplete;
 import com.codenameone.examples.bastion.ui.Lang;
@@ -34,6 +36,8 @@ import com.codenameone.examples.bastion.ui.Lang;
 /// Api.orders().order(id, Net.to(order -> show(order), Ui::fail));
 /// ```
 public final class Net {
+    private static String lastCode;
+
     /// A call to a generated client method, waiting for its callback.
     public interface Call<T> {
         void run(OnComplete<Response<T>> callback);
@@ -59,7 +63,8 @@ public final class Net {
             @Override
             public void completed(Response<T> response) {
                 if (response == null) {
-                    failed.failed(0, "Could not reach the server. Check your connection.");
+                    lastCode = null;
+                    failed.failed(0, Lang.tr("Could not reach the server. Check your connection."));
                     return;
                 }
                 int status = response.getResponseCode();
@@ -82,21 +87,47 @@ public final class Net {
     /// never cast to the type the call was declared with: on a refusal the body
     /// is text whatever that type is.
     private static String reason(Response<?> response, int status) {
+        lastCode = null;
         Object body = response.getResponseData();
         if (body instanceof String && ((String) body).length() > 0
-                && ((String) body).length() < 200 && ((String) body).indexOf('<') < 0
+                && ((String) body).length() < 300 && ((String) body).indexOf('<') < 0
                 && ((String) body).indexOf('{') < 0) {
-            return (String) body;
+            lastCode = Refusal.code((String) body);
+            return localize((String) body);
         }
         if (status == 401) {
-            return "Please sign in again.";
+            return Lang.tr("Please sign in again.");
         }
         if (status == 403) {
-            return "Your account is not allowed to do that.";
+            return Lang.tr("Your account is not allowed to do that.");
         }
         if (status == 429) {
-            return "Too many attempts. Wait a moment and try again.";
+            return Lang.tr("Too many attempts. Wait a moment and try again.");
         }
         return Lang.tr("Something went wrong ({0}). Try again.", String.valueOf(status));
+    }
+
+    /// A refusal in the user's language: the server sends a stable code with
+    /// its English sentence ([Refusal]), the bundle has the code as
+    /// `error.<code>`. A code this app does not know yet (a newer server)
+    /// is shown in the server's English rather than not at all.
+    public static String localize(String body) {
+        String code = Refusal.code(body);
+        if (code == null) {
+            return body;
+        }
+        String key = "error." + code;
+        String pattern = UIManager.getInstance().localize(key, null);
+        if (pattern == null || pattern.length() == 0 || pattern.equals(key)) {
+            return Refusal.english(body);
+        }
+        return Refusal.fill(pattern, Refusal.values(body));
+    }
+
+    /// The stable code of the refusal being reported, or null: read inside a
+    /// [Failed] callback, which runs on the EDT right after it is set, to
+    /// tell one refusal from another without comparing translated text.
+    public static String refusalCode() {
+        return lastCode;
     }
 }

@@ -23,21 +23,9 @@ import com.codename1.io.Preferences;
 /// The few choices the user makes on this device. Nothing here is a secret:
 /// a choice is a preference, and every secret is in secure storage.
 public final class Prefs {
-    private static final String BIOMETRIC = "bastion.biometricUnlock";
     private static final String ONBOARDED = "bastion.onboarded.";
 
     private Prefs() {
-    }
-
-    /// Whether the user chose to unlock with a fingerprint or face. Off, the
-    /// lock asks for the password again: a stronger default than a
-    /// biometric nobody agreed to.
-    public static boolean biometricUnlock() {
-        return Preferences.get(BIOMETRIC, false);
-    }
-
-    public static void setBiometricUnlock(boolean on) {
-        Preferences.set(BIOMETRIC, on);
     }
 
     /// Whether `user` has been through onboarding on this device; the steps

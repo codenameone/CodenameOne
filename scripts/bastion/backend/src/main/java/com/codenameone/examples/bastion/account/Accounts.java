@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.account;
 
+import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -88,7 +89,7 @@ public class Accounts {
             // rolled back, so nothing is left of it; say what happened.
             if (request != null && request.email() != null
                     && users.userExists(email(request.email()))) {
-                throw new ResponseStatusException(409, "That e-mail already has an account");
+                throw Refused.with(409, "e-mail-already-has-account", "That e-mail already has an account");
             }
             throw failed;
         }
@@ -97,7 +98,7 @@ public class Accounts {
     @Transactional(rollbackFor = Exception.class)
     private UserDto open(RegisterDto request) throws IOException {
         if (request == null) {
-            throw new ResponseStatusException(400, "Nothing to register");
+            throw Refused.with(400, "nothing-register", "Nothing to register");
         }
         String username = email(request.email());
         Passwords.check(username, request.password());
@@ -108,7 +109,7 @@ public class Accounts {
             // cases -- needs a mail service this sample does not have. The
             // rate limit on this route is what keeps it from being a cheap
             // directory of customers.
-            throw new ResponseStatusException(409, "That e-mail already has an account");
+            throw Refused.with(409, "e-mail-already-has-account", "That e-mail already has an account");
         }
         create(username, request.password(), name, false, System.currentTimeMillis());
         LedgerAccount checking = ledger.open(username, FIRST_ASSET, AccountKinds.CHECKING,
@@ -140,7 +141,7 @@ public class Accounts {
     public UserDto describe(String username) throws IOException {
         Profile profile = profiles.findById(username);
         if (profile == null || !users.userExists(username)) {
-            throw new ResponseStatusException(404, "No such account");
+            throw Refused.with(404, "no-such-account", "No such account");
         }
         UserDetails signIn = users.loadUserByUsername(username);
         boolean customer = false;
@@ -163,7 +164,7 @@ public class Accounts {
             // back: someone guessing at the current password with a stolen
             // token is exactly what the audit is for.
             audit.append(username, "PASSWORD_CHANGE_REFUSED", username, "wrong current password");
-            throw new ResponseStatusException(403, "That is not your current password");
+            throw Refused.with(403, "not-current-password", "That is not your current password");
         }
         return describe(username);
     }
@@ -199,13 +200,13 @@ public class Accounts {
         int at = text.indexOf('@');
         if (at < 1 || at != text.lastIndexOf('@') || at > text.length() - 4
                 || text.indexOf('.', at) < 0 || text.length() > 190) {
-            throw new ResponseStatusException(400, "That is not an e-mail address");
+            throw Refused.with(400, "not-e-mail-address", "That is not an e-mail address");
         }
         String folded = asciiLower(text);
         for (int iter = 0; iter < folded.length(); iter++) {
             char c = folded.charAt(iter);
             if (c <= ' ' || c > '~') {
-                throw new ResponseStatusException(400, "That is not an e-mail address");
+                throw Refused.with(400, "not-e-mail-address", "That is not an e-mail address");
             }
         }
         return folded;
@@ -226,10 +227,10 @@ public class Accounts {
     private static String displayName(String value) {
         String text = value == null ? "" : value.trim();
         if (text.length() == 0) {
-            throw new ResponseStatusException(400, "Tell us your name");
+            throw Refused.with(400, "tell-us-name", "Tell us your name");
         }
         if (text.length() > 120) {
-            throw new ResponseStatusException(400, "That name is too long");
+            throw Refused.with(400, "name-too-long", "That name is too long");
         }
         return text;
     }

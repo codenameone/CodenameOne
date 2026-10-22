@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.bastion.security;
 
-import com.codename1.security.AuthenticationOptions;
 import com.codename1.security.Biometrics;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -29,16 +28,17 @@ import com.codenameone.examples.bastion.AppConfig;
 import com.codenameone.examples.bastion.net.Session;
 import com.codenameone.examples.bastion.ui.Lang;
 
-/// The app lock: a biometric check when the app starts with a stored
-/// session, when it comes back from the background after
-/// [AppConfig#BACKGROUND_LOCK_MILLIS], and after [AppConfig#IDLE_LOCK_MILLIS]
-/// without a touch.
+/// The app lock: when the app starts with a stored session, when it comes
+/// back from the background after [AppConfig#BACKGROUND_LOCK_MILLIS], and
+/// after [AppConfig#IDLE_LOCK_MILLIS] without a touch.
 ///
 /// Locked, nothing of the account is on screen (the lock screen replaces the
-/// form) and the unsealed device key is dropped from memory, so nothing can
-/// sign a payment until [DeviceKey] unseals it again after the check. Where the device has no biometrics, or the user has none
-/// enrolled, the fallback is the password: the lock signs the session out
-/// rather than letting the device passcode stand in for the bank's.
+/// form), and the app key ([Keys]) and the unsealed device key are dropped
+/// from memory, so nothing can sign a payment or read the stored refresh
+/// token until a copy of the key is opened again: by a biometric the OS
+/// checks, else by the app PIN, else not at all -- the lock then signs the
+/// session out, rather than letting the device passcode stand in for the
+/// bank's.
 public final class Lock {
     /// What to show while locked, and what to show once unlocked.
     public interface Screens {
@@ -100,7 +100,19 @@ public final class Lock {
         }
         locked = true;
         DeviceKey.dropFromMemory();
+        Keys.lock();
         hidden = CN.getCurrentForm();
+        screens.showLocked();
+    }
+
+    /// Locks at start, before the stored session is read: its refresh token
+    /// is sealed under the key the unlock opens.
+    public static void lockAtStart() {
+        if (screens == null) {
+            return;
+        }
+        locked = true;
+        hidden = null;
         screens.showLocked();
     }
 
@@ -125,34 +137,36 @@ public final class Lock {
         }
     }
 
-    /// Asks for the biometric check. `fallback` runs when there is none to
-    /// ask for; `failed` when the user cancelled or failed it.
-    public static void unlock(final Runnable fallback, final Runnable failed) {
-        if (!biometricsAvailable()) {
-            fallback.run();
-            return;
-        }
-        AuthenticationOptions options = new AuthenticationOptions()
-                .setTitle(Lang.tr("Unlock Bastion"))
-                .setReason(Lang.tr("Unlock Bastion and the keys that sign your payments"))
-                .setNegativeButtonText(Lang.tr("Cancel"))
-                // Only a biometric: the device passcode is a second way in for
-                // anyone who watched it typed.
-                .setBiometricOnly(true)
-                .setSensitiveTransaction(true);
-        Biometrics.getInstance().authenticate(options).ready(new SuccessCallback<Boolean>() {
+    /// Asks the OS for the biometric copy of the app key: the prompt is the
+    /// OS's, and only a match releases the key. `failed` gets true when that
+    /// copy is gone for good and the PIN (or a sign-in) is the way in.
+    public static void unlockWithBiometric(final SuccessCallback<Boolean> failed) {
+        Keys.unlockWithBiometric(Lang.tr("Unlock Bastion and the keys that sign your payments"),
+                Lock::unlocked, failed);
+    }
+
+    /// Tries the app PIN; see [Keys#unlockWithPin].
+    public static void unlockWithPin(String pin, final Keys.PinResult result) {
+        Keys.unlockWithPin(pin, new Keys.PinResult() {
             @Override
-            public void onSucess(Boolean ok) {
-                if (ok != null && ok.booleanValue()) {
-                    unlocked();
-                } else {
-                    failed.run();
-                }
+            public void unlocked() {
+                result.unlocked();
+                Lock.unlocked();
             }
-        }).except(new SuccessCallback<Throwable>() {
+
             @Override
-            public void onSucess(Throwable err) {
-                failed.run();
+            public void wrong(int left) {
+                result.wrong(left);
+            }
+
+            @Override
+            public void wiped() {
+                result.wiped();
+            }
+
+            @Override
+            public void failed(String why) {
+                result.failed(why);
             }
         });
     }
