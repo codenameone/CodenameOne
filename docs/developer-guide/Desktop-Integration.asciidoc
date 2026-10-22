@@ -194,8 +194,11 @@ The recognized values are (case-insensitive):
 
 [cols="1,3"]
 |===
-|`DESKTOP_MENU_APP`, `DESKTOP_MENU_ABOUT`, `DESKTOP_MENU_PREFERENCES`, `DESKTOP_MENU_QUIT`
-|Placed in the application menu (the macOS app menu / a leading menu).
+|`DESKTOP_MENU_APP`
+|The macOS application menu. Other platforms have none, so these commands go to File.
+|`DESKTOP_MENU_ABOUT`, `DESKTOP_MENU_PREFERENCES`, `DESKTOP_MENU_QUIT`
+|The About, Settings and Quit standard commands, placed where each platform keeps them. See
+<<desktop-standard-commands>>.
 |`DESKTOP_MENU_FILE`, `DESKTOP_MENU_EDIT`, `DESKTOP_MENU_VIEW`, `DESKTOP_MENU_WINDOW`, `DESKTOP_MENU_HELP`
 |Placed in the matching standard top-level menu.
 |Any other string |Becomes a top-level menu with that literal title.
@@ -236,6 +239,100 @@ Java SE build the accelerator becomes a Swing `KeyStroke`; on the native macOS b
 menu item's `keyEquivalent` and `keyEquivalentModifierMask`.
 Like the placement hint, the accelerator is inert on platforms without a native menu bar, so it's
 safe to set unconditionally.
+
+==== Submenus, separators, check items and icons
+
+The same `Command` carries the rest of a menu item's structure:
+
+[cols="1,3"]
+|===
+|`setDesktopMenu("File/Open Recent")`
+|A path: each `/` nests a submenu, created on demand. The first segment is the placement hint
+from the table above. Write `//` for a slash that belongs in a title.
+|`setDesktopMenuGroup(int)`
+|Orders the items of a menu by group, keeping the order you added them in within a group, and
+draws a separator wherever the group changes. `Command.createDesktopSeparator(menu)` adds one
+at an exact spot instead.
+|`setDesktopChecked(boolean)`
+|Makes the item a check item. Choosing it flips the state *before* the action runs, so the
+action reads the new value from `isDesktopChecked()`.
+|`setDesktopRadioGroup(String)`
+|Makes the item one of a radio group: checking one unchecks the others.
+|`setEnabled(boolean)`
+|A disabled command is greyed out in the menu and can't be chosen.
+|`setIcon(...)`, `setMaterialIcon(...)`
+|Shown beside the item where the platform draws menu icons.
+|===
+
+[source,java]
+-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DesktopMenuStructure.java[tag=desktop-menu-structure,indent=0]
+-----
+
+Changing a command's enabled or checked state updates the visible menu. After changing
+anything else about a published command, such as its name or icon, call
+`Display.getInstance().refreshNativeMenu()`.
+
+Each platform draws these items in its own style. macOS and Mac Catalyst show a radio item with the same
+checkmark as a check item, as every Mac application does. Windows draws a bullet. The Windows
+and Linux menus show no icons: Win32 menu bitmaps need a decoder that port doesn't have, and GTK 3
+deprecated menu item images, so no GNOME application shows them.
+
+[[desktop-standard-commands]]
+==== Standard commands
+
+About, Settings and Quit live in different places on each desktop, under different names. Give
+such a command a *role* with `Command.setDesktopRole(String)` and the `Command.DESKTOP_ROLE_*`
+constants, and each platform puts it where its own applications do, with the platform's standard
+shortcut:
+
+[cols="1,2,2,2"]
+|===
+|Role |macOS |Windows |Linux
+
+|`DESKTOP_ROLE_ABOUT`
+|Application menu, first
+|Help, last
+|Help, last
+|`DESKTOP_ROLE_SETTINGS`
+|"Settings..." in the application menu, Cmd+,
+|"Options" under Tools
+|"Preferences" at the foot of Edit
+|`DESKTOP_ROLE_QUIT`
+|"Quit" in the application menu, Cmd+Q
+|"Exit" at the foot of File
+|"Quit" at the foot of File, Ctrl+Q
+|`DESKTOP_ROLE_HIDE_APP`
+|Application menu, Cmd+H
+|Not shown
+|Not shown
+|===
+
+The File roles (`NEW`, `OPEN`, `SAVE`, `SAVE_AS`, `CLOSE`, `PRINT`), the Edit roles (`UNDO`, `REDO`,
+`CUT`, `COPY`, `PASTE`, `SELECT_ALL`, `FIND`) and `FULL_SCREEN`, `MINIMIZE`, `ZOOM` and `HELP` work the
+same way. Redo is Cmd+Shift+Z on macOS and Ctrl+Y on Windows, for example. On macOS a role command
+takes the place of the matching built-in item, so the menu never shows two Quit or Copy items.
+The browser's in-page menu follows the Windows layout. It leaves out Quit, Minimize and Zoom, and it
+drops the shortcuts the browser keeps for itself.
+
+`Command.createDesktopRole(role, listener)` creates the command with the platform's name for it
+("Exit" on Windows, "Quit" elsewhere). The resource key `cn1.menu.<role>`, such as `cn1.menu.quit`,
+translates it. Anything the command sets itself wins over its role: its own menu, group and
+shortcut. The older `DESKTOP_MENU_ABOUT`, `DESKTOP_MENU_PREFERENCES` and `DESKTOP_MENU_QUIT` hints
+are read as these roles.
+
+`setDesktopPlatforms("mac", "win", "linux", "web")` limits a command to the native menu bars of the
+platforms it lists. The application's own menus still show it everywhere.
+
+`Form.setDocumentModified(boolean)`, and the same method on `Window`, shows that the document has
+unsaved changes. macOS draws a dot in the close button; Windows and Linux put `*` before the title.
+A Save command follows that state: it's enabled while there are changes to save.
+`Command.setDesktopEnabledWhenModified(boolean)` makes any other command follow it too.
+
+[source,java]
+-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DesktopStandardCommands.java[tag=desktop-standard-commands,indent=0]
+-----
 
 === Interactive scrollbars
 

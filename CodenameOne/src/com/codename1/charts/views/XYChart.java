@@ -30,6 +30,7 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.util.MathHelper;
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
+import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
 
@@ -56,6 +57,15 @@ public abstract class XYChart extends AbstractChart {
     private float mTranslate;
     /// The canvas center point.
     private Point mCenter;
+    /// The transform that was in effect before `#drawText` rotated the canvas,
+    /// reused between calls. See `Canvas#getTransform(Transform)` for why a
+    /// rotation is undone by restoring this and not by rotating back.
+    private Transform mTextTransform;
+    /// The transform that was in effect before `#transform` turned the canvas
+    /// for the vertical orientation, or null while the canvas is not turned.
+    private Transform mOrientationTransform;
+    /// Storage for `#mOrientationTransform`, reused between paints.
+    private Transform mOrientationTransformStore;
     /// The visible chart area, in screen coordinates.
     private Rectangle mScreenR;
     /// The clickable areas for all points. The array index is the series index,
@@ -694,12 +704,19 @@ public abstract class XYChart extends AbstractChart {
                             float extraAngle) {
         float angle = -mRenderer.getOrientation().getAngle() + extraAngle;
         if (angle != 0) {
+            if (mTextTransform == null) {
+                mTextTransform = Transform.makeIdentity();
+            }
+            canvas.getTransform(mTextTransform);
             // canvas.scale(1 / mScale, mScale);
             canvas.rotate(angle, x, y);
         }
         drawString(canvas, text, x, y, paint);
         if (angle != 0) {
-            canvas.rotate(-angle, x, y);
+            // Restored, not rotated back by -angle: the round trip is not exact
+            // in float arithmetic and would leave a transform that is no longer
+            // the identity for everything painted after this text.
+            canvas.setTransform(mTextTransform);
             // canvas.scale(mScale, 1 / mScale);
         }
     }
@@ -719,10 +736,22 @@ public abstract class XYChart extends AbstractChart {
             return;
         }
         if (inverse) {
+            if (mOrientationTransform != null) {
+                // The exact transform the forward call replaced; the computed
+                // inverse below only approximates it.
+                canvas.setTransform(mOrientationTransform);
+                mOrientationTransform = null;
+                return;
+            }
             canvas.scale(1 / mScale, mScale);
             canvas.translate(mTranslate, -mTranslate);
             canvas.rotate(-angle, mCenter.getX(), mCenter.getY());
         } else {
+            if (mOrientationTransformStore == null) {
+                mOrientationTransformStore = Transform.makeIdentity();
+            }
+            canvas.getTransform(mOrientationTransformStore);
+            mOrientationTransform = mOrientationTransformStore;
             canvas.rotate(angle, mCenter.getX(), mCenter.getY());
             canvas.translate(-mTranslate, mTranslate);
             canvas.scale(mScale, 1 / mScale);

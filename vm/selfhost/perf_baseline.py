@@ -466,6 +466,24 @@ def load(root=ROOT, exclude=None, layout=None):
             'notes': notes, 'policy': policy}
 
 
+def load_for_summary(root=ROOT, layout=None):
+    """The rows the Port Status table is rendered from: base with every overlay that
+    resolves. The table is documentation of the ratios, not the gate, so an overlay the
+    gate refuses -- a stale rebaseline of a pull request still open -- is left out with a
+    warning instead of failing the website build of every branch that carries it. The
+    gate itself (check, perf-gate.py) still refuses it."""
+    policy = load_policy(root, layout)
+    base = load_base(root, layout)
+    accepted = []
+    for overlay in load_overlays(root, layout):
+        try:
+            resolve(base, accepted + [overlay], policy['tolerance'], layout)
+            accepted.append(overlay)
+        except BaselineError as error:
+            print('perf-baseline: summary leaves out pr/%d.json: %s' % (overlay[0], error))
+    return resolve(base, accepted, policy['tolerance'], layout)[0]
+
+
 def write_base(root, rows):
     directory = Path(root) / 'base'
     directory.mkdir(parents=True, exist_ok=True)
@@ -1029,7 +1047,7 @@ def main(argv=None):
         elif args.command == 'summary':
             out = Path(args.out)
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(dump(summary(load(root)['platforms'])))
+            out.write_text(dump(summary(load_for_summary(root))))
             print('perf-baseline: wrote %s' % out)
         elif args.command == 'import-legacy':
             number = args.pr or pr_number()

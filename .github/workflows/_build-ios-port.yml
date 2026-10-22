@@ -8,6 +8,11 @@ name: _Build iOS port (reusable)
 
 on:
   workflow_call:
+    inputs:
+      test_server:
+        description: "Also build the CN1SS test server and hand it over beside the bundle. For callers whose jobs run a screenshot suite."
+        type: boolean
+        default: false
     outputs:
       cn1_built_cache_key:
         description: "Cache key the build job used for the cn1-built artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
@@ -191,10 +196,57 @@ jobs:
             "${RUNNER_TEMP#/}/codenameone-tools"
           ls -la "$RUNNER_TEMP/cn1-built-bundle.tar"
 
+      # The CI test server (scripts/hellocodenameone/backend) as a runnable copy,
+      # the way linux-build-run.yml and the Windows workflows hand theirs over:
+      # `server.sh dist` here, CN1SS_SERVER_DIST in the jobs that run a suite.
+      #
+      # Every screenshot job used to build it for itself, at the top of its
+      # test step: install the backend runtime, the build engine and the
+      # plugin from this checkout, then compile the server. Measured, that was
+      # 3 to 3.6 minutes in each macos-15 job and 6.5 to 9.7 minutes on the
+      # Xcode 27 leg, whose runner is slower and whose 95 minute limit it was
+      # spending -- five or six builds of the same classes per run. Built once
+      # here it costs this job the 3.5 minutes one of them paid.
+      #
+      # After the bundle, on purpose: the install below rewrites the plugin and
+      # the backend jars in ~/.m2, and the bundle is what the application
+      # builds read. It is the tree the consumers always restored.
+      #
+      # A second tar in the same artifact, not an entry appended to the first,
+      # so nothing done here can damage the handoff every job depends on. The
+      # server is JVM classes and jars (the SQLite driver carries every
+      # platform's library), so the copy runs anywhere; a consumer runs it on
+      # the JAVA17_HOME this job built it with, which is in the bundle.
+      #
+      # Never fatal. A job that finds no copy builds its own, exactly as it did
+      # before (cn1ss_ws_prepare in scripts/lib/cn1ss.sh), so a failure here
+      # costs the minutes back and nothing else.
+      - name: Build the test server
+        if: ${{ inputs.test_server }}
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/codenameone-tools/tools/env.sh"
+          DIST="$RUNNER_TEMP/cn1ss-server"
+          if RETRY_ATTEMPTS=2 bash scripts/ci/retry.sh \
+                scripts/hellocodenameone/backend/server.sh dist "$DIST" \
+              && test -f "$DIST/classes/META-INF/cn1-backend-main"; then
+            tar -C / -cf "$RUNNER_TEMP/cn1ss-server.tar.partial" "${DIST#/}"
+            mv "$RUNNER_TEMP/cn1ss-server.tar.partial" "$RUNNER_TEMP/cn1ss-server.tar"
+            ls -la "$RUNNER_TEMP/cn1ss-server.tar"
+          else
+            rm -f "$RUNNER_TEMP/cn1ss-server.tar"
+            echo "::warning::The test server did not build here; each suite job will build its own."
+          fi
+
       - name: Upload built CN1 + iOS port bundle
         uses: actions/upload-artifact@v4
         with:
           name: cn1-built-bundle
-          path: ${{ runner.temp }}/cn1-built-bundle.tar
+          # cn1ss-server.tar is there only when the step above produced it.
+          path: |
+            ${{ runner.temp }}/cn1-built-bundle.tar
+            ${{ runner.temp }}/cn1ss-server.tar
           retention-days: 1
           if-no-files-found: error

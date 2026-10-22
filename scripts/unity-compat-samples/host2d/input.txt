@@ -1,0 +1,23 @@
+# The host adds to the keeper's total from outside the frame. A press on the
+# pad's collider and a release off it; a press beside it reaches nothing.
+# The application goes to the background and comes back. N loads the second
+# scene, where the keeper is still there and its coroutine still runs; the
+# host adds again; N loads the first scene again, whose own keeper removes
+# itself.
+5 host 10
+10 pointer:200,150 down
+14 pointer:20,20 up
+20 pointer:20,20 down
+22 pointer:20,20 up
+40 app pause
+44 app resume
+50 n down
+52 n up
+70 host 7
+80 pointer:200,150 down
+82 pointer:200,150 up
+90 n down
+92 n up
+100 pointer:200,150 down
+100 host 1
+103 pointer:200,150 up

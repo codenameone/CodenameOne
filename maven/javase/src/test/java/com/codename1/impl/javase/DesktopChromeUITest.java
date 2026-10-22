@@ -178,6 +178,69 @@ public class DesktopChromeUITest {
     }
 
     @Test
+    public void nativeMenuBuildsSubmenusSeparatorsAndCheckItems() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        assumeTrue(Display.getInstance().isDesktop(), "needs the desktop port (no skin)");
+
+        runOnCn1AndWait(new Runnable() {
+            @Override
+            public void run() {
+                JavaSEPort.setDesktopTitleBarMode("native");
+                Toolbar.setGlobalToolbar(true);
+                Form f = new Form("StructureProbe");
+                Command sidebar = new Command("Sidebar Probe").setDesktopMenu("View").setDesktopChecked(true);
+                Command zoom = new Command("Zoom Probe").setDesktopMenu("View/Zoom Sub")
+                        .setDesktopMenuGroup(1).setDesktopRadioGroup("probe");
+                Command off = new Command("Off Probe").setDesktopMenu("View").setDesktopMenuGroup(1);
+                off.setEnabled(false);
+                f.addCommand(sidebar);
+                f.addCommand(zoom);
+                f.addCommand(off);
+                f.show();
+            }
+        });
+        flushAwt();
+
+        final JFrame frame = cn1Frame();
+        assertNotNull(frame);
+        final AtomicReference<String> shape = new AtomicReference<String>();
+        SwingUtilities.invokeAndWait(new Runnable() {
+            @Override
+            public void run() {
+                JMenuBar mb = frame.getJMenuBar();
+                for (int i = 0; mb != null && i < mb.getMenuCount(); i++) {
+                    javax.swing.JMenu m = mb.getMenu(i);
+                    if (m == null || !"View".equals(m.getText())) {
+                        continue;
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    for (java.awt.Component c : m.getMenuComponents()) {
+                        if (c instanceof javax.swing.JSeparator) {
+                            sb.append("---|");
+                        } else if (c instanceof javax.swing.JMenu) {
+                            javax.swing.JMenu sub = (javax.swing.JMenu) c;
+                            JMenuItem inner = sub.getItem(0);
+                            sb.append(sub.getText()).append('>')
+                                    .append(inner instanceof javax.swing.JRadioButtonMenuItem ? "radio:" : "?:")
+                                    .append(inner.getText()).append('|');
+                        } else if (c instanceof JMenuItem) {
+                            JMenuItem it = (JMenuItem) c;
+                            sb.append(it instanceof javax.swing.JCheckBoxMenuItem ? "check" : "item")
+                                    .append(it.isSelected() ? "+" : "")
+                                    .append(it.isEnabled() ? "" : "(off)")
+                                    .append(':').append(it.getText()).append('|');
+                        }
+                    }
+                    shape.set(sb.toString());
+                }
+            }
+        });
+        // Within group 1 the order is the published order, and Form.addCommand puts each new
+        // command first -- so "Off Probe" (added last) precedes the submenu.
+        assertEquals("check+:Sidebar Probe|---|item(off):Off Probe|Zoom Sub>radio:Zoom Probe|", shape.get());
+    }
+
+    @Test
     public void nativeMenuItemCarriesKeyboardAccelerator() throws Exception {
         assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
         assumeTrue(Display.getInstance().isDesktop(), "needs the desktop port (no skin)");

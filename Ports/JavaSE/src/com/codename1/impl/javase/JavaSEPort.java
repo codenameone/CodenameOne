@@ -2834,14 +2834,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (frame == null || f == null) {
             return;
         }
-        final String t = f.getTitle() == null ? "" : f.getTitle();
+        // On macOS the modified state is the dot in the close button, which Swing exposes as
+        // the Window.documentModified root pane property; elsewhere it is the title's "*".
+        final boolean modified = f.isDocumentModified();
+        final String t = IS_MAC ? (f.getTitle() == null ? "" : f.getTitle()) : getNativeWindowTitle(f);
         if (EventQueue.isDispatchThread()) {
             frame.setTitle(t);
+            frame.getRootPane().putClientProperty("Window.documentModified", Boolean.valueOf(modified));
         } else {
             EventQueue.invokeLater(new Runnable() {
                 @Override
                 public void run() {
                     frame.setTitle(t);
+                    frame.getRootPane().putClientProperty("Window.documentModified", Boolean.valueOf(modified));
                 }
             });
         }
@@ -2873,24 +2878,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (frame == null) {
             return;
         }
-        // snapshot the commands on the CN1 EDT; build Swing on the AWT EDT
+        // snapshot the commands on the CN1 EDT; build Swing on the AWT EDT. The encoding carries
+        // the enabled and check state and the icons, so a change in any of them rebuilds the menu.
         final java.util.ArrayList<com.codename1.ui.Command> snapshot = new java.util.ArrayList<com.codename1.ui.Command>();
-        final StringBuilder sig = new StringBuilder();
         if (commands != null) {
             for (int i = 0; i < commands.size(); i++) {
                 Object o = commands.elementAt(i);
                 if (o instanceof com.codename1.ui.Command) {
-                    com.codename1.ui.Command c = (com.codename1.ui.Command) o;
-                    String name = c.getCommandName();
-                    if (name == null || name.length() == 0) {
-                        // skip icon-only commands (back arrow, hamburger) - nothing to label
-                        continue;
-                    }
-                    snapshot.add(c);
-                    sig.append(name).append('\n');
+                    snapshot.add((com.codename1.ui.Command) o);
                 }
             }
         }
+        final com.codename1.impl.NativeMenuEncoder encoded = encodeMenu(snapshot);
+        StringBuilder sig = new StringBuilder(encoded.toWireFormat(false));
+        // The icon bytes go into the signature, so replacing one icon with another rebuilds.
+        final java.util.Map<Integer, java.awt.Image> icons = menuIcons(encoded, sig);
         final String signature = sig.toString();
         if (signature.equals(lastNativeMenuSignature)) {
             return;
@@ -2899,16 +2901,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame, null));
+                frame.setJMenuBar(buildNativeMenuBar(encoded, icons, frame, null));
                 frame.revalidate();
             }
         });
     }
 
-    /// Builds a Swing menu bar from the given Codename One commands, grouping them into top-level
-    /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
-    /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
-    /// Codename One EDT before invoking the command's action.
     /// Builds a menu bar for a secondary desktop window's commands.
     ///
     /// Same builder as the main window's, with the owning window passed through so
@@ -2919,37 +2917,141 @@ public class JavaSEPort extends CodenameOneImplementation {
     ///
     /// #### Parameters
     ///
-    /// - `commands`: the window's named commands
+    /// - `menu`: the window's menu, from `#encodeWindowMenu(java.util.List)`
     ///
     /// - `owner`: the window these commands belong to
     ///
     /// #### Returns
     ///
     /// the menu bar to install on the window
-    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands,
-            com.codename1.ui.Window owner) {
-        return buildNativeMenuBar(commands, null, owner);
+    JMenuBar buildWindowMenuBar(Object[] menu, com.codename1.ui.Window owner) {
+        return buildNativeMenuBar((com.codename1.impl.NativeMenuEncoder) menu[0],
+                (java.util.Map<Integer, java.awt.Image>) menu[1], null, owner);
     }
 
-    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame,
+    /// Encodes a secondary window's menu and renders its icons. Called on the Codename One
+    /// EDT, which owns the commands and their images; the result is handed to
+    /// `#buildWindowMenuBar(Object[], com.codename1.ui.Window)` on the AWT EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the window's named commands
+    ///
+    /// #### Returns
+    ///
+    /// the encoded menu and its icons
+    Object[] encodeWindowMenu(java.util.List<com.codename1.ui.Command> commands) {
+        com.codename1.impl.NativeMenuEncoder encoded = encodeMenu(commands);
+        if (encoded.getRows().isEmpty()) {
+            // Every command was filtered out for this platform (a platform list, a role this
+            // platform lacks): no bar at all, rather than an empty strip.
+            return null;
+        }
+        return new Object[]{encoded, menuIcons(encoded, null)};
+    }
+
+    private static com.codename1.impl.NativeMenuEncoder encodeMenu(java.util.List<com.codename1.ui.Command> commands) {
+        Vector v = new Vector();
+        for (int i = 0; i < commands.size(); i++) {
+            v.addElement(commands.get(i));
+        }
+        return com.codename1.impl.NativeMenuEncoder.encode(v, 0);
+    }
+
+    /// The menu icons as AWT images keyed by row id. Rendered on the Codename One EDT, which
+    /// owns the images, and read on the AWT EDT.
+    private static java.util.Map<Integer, java.awt.Image> menuIcons(com.codename1.impl.NativeMenuEncoder encoded,
+            StringBuilder signature) {
+        java.util.Map<Integer, java.awt.Image> out = new java.util.HashMap<Integer, java.awt.Image>();
+        for (com.codename1.impl.NativeMenuEncoder.Row r : encoded.getRows()) {
+            if (r.getCommand() == null) {
+                continue;
+            }
+            String png = com.codename1.impl.NativeMenuEncoder.iconPngBase64(r.getCommand());
+            if (png == null) {
+                continue;
+            }
+            if (signature != null) {
+                signature.append('\n').append(r.getId()).append('=').append(png);
+            }
+            try {
+                java.awt.image.BufferedImage bi = javax.imageio.ImageIO.read(
+                        new java.io.ByteArrayInputStream(com.codename1.util.Base64.decode(png.getBytes("UTF-8"))));
+                if (bi != null) {
+                    out.put(Integer.valueOf(r.getId()),
+                            bi.getScaledInstance(16, 16, java.awt.Image.SCALE_SMOOTH));
+                }
+            } catch (java.io.IOException err) {
+                // no icon for this item
+            }
+        }
+        return out;
+    }
+
+    private JMenuBar buildNativeMenuBar(com.codename1.impl.NativeMenuEncoder encoded,
+            java.util.Map<Integer, java.awt.Image> icons, JFrame frame,
             final com.codename1.ui.Window owner) {
         JMenuBar bar = new JMenuBar();
-        // preserve first-seen order of the menu groups
-        java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
-        for (int i = 0; i < commands.size(); i++) {
-            final com.codename1.ui.Command cmd = commands.get(i);
-            String group = cmd.getDesktopMenu();
-            if (group == null || group.length() == 0) {
-                group = "Commands";
+        // Menus by their joined path; rows arrive depth first, so creating a menu on its first
+        // row puts a submenu at its place among the parent's items.
+        java.util.HashMap<String, JMenu> menus = new java.util.HashMap<String, JMenu>();
+        java.util.HashMap<String, javax.swing.ButtonGroup> radioGroups =
+                new java.util.HashMap<String, javax.swing.ButtonGroup>();
+        for (com.codename1.impl.NativeMenuEncoder.Row row : encoded.getRows()) {
+            String[] path = row.getPath();
+            JMenu menu = null;
+            StringBuilder key = new StringBuilder();
+            for (int p = 0; p < path.length; p++) {
+                key.append('\u001f').append(path[p]);
+                String k = key.toString();
+                JMenu m = menus.get(k);
+                if (m == null) {
+                    String title = path[p];
+                    if (p == 0 && title.length() == 0) {
+                        title = "Commands";
+                    } else if (p == 0 && com.codename1.ui.Command.DESKTOP_MENU_APP.equals(title)) {
+                        // The macOS application menu, which a Swing menu bar cannot reach:
+                        // a leading menu named after the application stands in for it.
+                        title = Display.getInstance().getProperty("AppName", "Application");
+                    }
+                    m = new JMenu(title);
+                    menus.put(k, m);
+                    if (menu == null) {
+                        bar.add(m);
+                    } else {
+                        menu.add(m);
+                    }
+                }
+                menu = m;
             }
-            JMenu menu = menus.get(group);
-            if (menu == null) {
-                menu = new JMenu(group);
-                menus.put(group, menu);
-                bar.add(menu);
+            if (row.isSeparator()) {
+                menu.addSeparator();
+                continue;
             }
-            JMenuItem item = new JMenuItem(cmd.getCommandName());
-            KeyStroke accelerator = acceleratorFor(cmd);
+            final com.codename1.ui.Command cmd = row.getCommand();
+            int flags = row.getFlags();
+            JMenuItem item;
+            if ((flags & com.codename1.impl.NativeMenuEncoder.FLAG_RADIO) != 0) {
+                item = new javax.swing.JRadioButtonMenuItem(row.getLabel());
+                String g = cmd.getDesktopRadioGroup();
+                javax.swing.ButtonGroup bg = radioGroups.get(g);
+                if (bg == null) {
+                    bg = new javax.swing.ButtonGroup();
+                    radioGroups.put(g, bg);
+                }
+                bg.add(item);
+            } else if ((flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKABLE) != 0) {
+                item = new javax.swing.JCheckBoxMenuItem(row.getLabel());
+            } else {
+                item = new JMenuItem(row.getLabel());
+            }
+            item.setSelected((flags & com.codename1.impl.NativeMenuEncoder.FLAG_CHECKED) != 0);
+            item.setEnabled((flags & com.codename1.impl.NativeMenuEncoder.FLAG_ENABLED) != 0);
+            java.awt.Image icon = icons.get(Integer.valueOf(row.getId()));
+            if (icon != null) {
+                item.setIcon(new javax.swing.ImageIcon(icon));
+            }
+            KeyStroke accelerator = acceleratorFor(row);
             if (accelerator != null) {
                 item.setAccelerator(accelerator);
             }
@@ -2959,16 +3061,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            com.codename1.ui.events.ActionEvent ev =
-                                    new com.codename1.ui.events.ActionEvent(cmd);
                             if (owner != null) {
                                 // Through the window, not straight to the command:
                                 // TopLevelContainer says listeners registered with
                                 // addCommandListener observe activated commands, and
                                 // invoking the command directly bypasses them.
-                                owner.dispatchCommand(cmd, ev);
+                                if (!cmd.isEnabled()) {
+                                    return;
+                                }
+                                if (cmd.getDesktopRadioGroup() != null) {
+                                    cmd.setDesktopChecked(true);
+                                } else if (cmd.isDesktopCheckable()) {
+                                    cmd.setDesktopChecked(!cmd.isDesktopChecked());
+                                }
+                                owner.dispatchCommand(cmd, new com.codename1.ui.events.ActionEvent(cmd));
                             } else {
-                                cmd.actionPerformed(ev);
+                                // Through the owning form, which also applies the check state.
+                                dispatchNativeMenuCommand(cmd);
                             }
                         }
                     });
@@ -2986,15 +3095,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         return bar;
     }
 
-    /// Builds a Swing {@link KeyStroke} from a command's desktop-shortcut hint, mapping the
-    /// platform-primary modifier to the OS menu-shortcut mask (Command on macOS, Control
-    /// elsewhere). Returns null when the command has no accelerator.
-    private static KeyStroke acceleratorFor(com.codename1.ui.Command cmd) {
-        int keyChar = cmd.getDesktopShortcutKeyChar();
+    /// Builds a Swing {@link KeyStroke} from a row's shortcut -- the command's own, or the
+    /// platform's for its standard role -- mapping the platform-primary modifier to the OS
+    /// menu-shortcut mask (Command on macOS, Control elsewhere). Returns null when the row has
+    /// no accelerator.
+    private static KeyStroke acceleratorFor(com.codename1.impl.NativeMenuEncoder.Row row) {
+        int keyChar = row.getShortcutKeyChar();
         if (keyChar == 0) {
             return null;
         }
-        int mods = cmd.getDesktopShortcutModifiers();
+        int mods = row.getShortcutModifiers();
         int awtMods = 0;
         if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
             awtMods |= Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
