@@ -3103,6 +3103,13 @@ public abstract class Executor {
     }
 
     private void isNativeInterface(ClassLoader cl, String className, List<Class> classList) {
+        // The scanned classes carry the app's own java.* classes (CLDC/JavaAPI
+        // additions). The JVM refuses to define any class in a java.* package
+        // ("Prohibited package name"), and a native interface can never live
+        // there anyway, so loading them only logged a stack trace per class.
+        if (className.startsWith("java.")) {
+            return;
+        }
         try {
             Class cls = cl.loadClass(className);
             if (cls.isInterface()) {
