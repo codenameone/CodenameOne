@@ -7061,6 +7061,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.webrtc` API: the native WebRTC
+    /// stack, or the simulator's loopback. The default answers `null`, which is the capability
+    /// query -- `WebRtc.isSupported()` reads it.
+    ///
+    /// #### Returns
+    ///
+    /// the WebRTC bridge, or null when unsupported
+    public com.codename1.webrtc.spi.WebRtcBridge getWebRtcBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.vpn` API to install and control VPN
     /// configurations. Ports supporting VPN management override this; the default answers `null`.
     ///
@@ -13594,6 +13605,20 @@ public abstract class CodenameOneImplementation {
     /// `{publicKeyX509, privateKeyPkcs8}`.
     public byte[][] generateRsaKeyPair(int bits) {
         throw cryptoUnsupported("generateRsaKeyPair");
+    }
+
+    /// Generates a fresh P-256 key pair. Returns
+    /// `{publicKeyX509, privateKeyPkcs8}`; the PKCS#8 encoding must carry the
+    /// public point, as [EcP256Codec#pkcs8FromScalar(byte[], byte[])] writes it,
+    /// because some providers will not import the private key without it.
+    public byte[][] generateEcKeyPair(int bits) {
+        throw cryptoUnsupported("generateEcKeyPair");
+    }
+
+    /// Computes the P-256 ECDH shared secret (the 32-byte x coordinate) of a
+    /// PKCS#8 private key and an X.509 public key.
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        throw cryptoUnsupported("ecdhAgree");
     }
 
     /// Generates `bytes` of fresh symmetric key material. The default just

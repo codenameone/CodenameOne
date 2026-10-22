@@ -45,6 +45,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef BCRYPT_KDF_RAW_SECRET
+#define BCRYPT_KDF_RAW_SECRET L"TRUNCATE"
+#endif
 #ifndef STATUS_SUCCESS
 #define STATUS_SUCCESS ((NTSTATUS) 0x00000000L)
 #endif
@@ -1163,6 +1166,115 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
 }
 
 /* ------------------------------------------------------------ key pairs */
+
+/* P-256 through BCrypt's raw ECC blobs: BCRYPT_ECCKEY_BLOB, then X, Y and (for
+ * a private blob) D, each 32 bytes big-endian. The Java side owns the DER. */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_generateEcRaw___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    BCRYPT_ALG_HANDLE alg = NULL;
+    BCRYPT_KEY_HANDLE key = NULL;
+    unsigned char blob[sizeof(BCRYPT_ECCKEY_BLOB) + 96];
+    ULONG blobLength = 0;
+    NTSTATUS status;
+    JAVA_OBJECT result = JAVA_NULL;
+
+    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_ECDH_P256_ALGORITHM, NULL, 0);
+    if (status != STATUS_SUCCESS) {
+        cn1CryptoFail("ECDH provider", status);
+        return JAVA_NULL;
+    }
+    status = BCryptGenerateKeyPair(alg, &key, 256, 0);
+    if (status == STATUS_SUCCESS) {
+        status = BCryptFinalizeKeyPair(key, 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        status = BCryptExportKey(key, NULL, BCRYPT_ECCPRIVATE_BLOB, blob, (ULONG) sizeof(blob), &blobLength, 0);
+    }
+    if (status != STATUS_SUCCESS || blobLength != sizeof(blob)) {
+        cn1CryptoFail("EC keygen", status);
+    } else {
+        result = cn1WinNewByteArray(threadStateData, blob + sizeof(BCRYPT_ECCKEY_BLOB), 96);
+    }
+    SecureZeroMemory(blob, sizeof(blob));
+    if (key != NULL) {
+        BCryptDestroyKey(key);
+    }
+    BCryptCloseAlgorithmProvider(alg, 0);
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_ecdhRaw___byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT privateArray, JAVA_OBJECT peerArray) {
+    BCRYPT_ALG_HANDLE alg = NULL;
+    BCRYPT_KEY_HANDLE mine = NULL;
+    BCRYPT_KEY_HANDLE theirs = NULL;
+    BCRYPT_SECRET_HANDLE secret = NULL;
+    unsigned char privateBlob[sizeof(BCRYPT_ECCKEY_BLOB) + 96];
+    unsigned char publicBlob[sizeof(BCRYPT_ECCKEY_BLOB) + 64];
+    unsigned char raw[32];
+    unsigned char out[32];
+    ULONG rawLength = 0;
+    int privateLength = 0, peerLength = 0, i;
+    unsigned char* privateBytes = cn1Bytes(privateArray, &privateLength);
+    unsigned char* peerBytes = cn1Bytes(peerArray, &peerLength);
+    BCRYPT_ECCKEY_BLOB* header;
+    NTSTATUS status;
+    JAVA_OBJECT result = JAVA_NULL;
+
+    if (privateLength != 96 || peerLength != 64) {
+        cn1CryptoFail("ECDH key length", 0);
+        return JAVA_NULL;
+    }
+    header = (BCRYPT_ECCKEY_BLOB*) privateBlob;
+    header->dwMagic = BCRYPT_ECDH_PRIVATE_P256_MAGIC;
+    header->cbKey = 32;
+    memcpy(privateBlob + sizeof(BCRYPT_ECCKEY_BLOB), privateBytes, 96);
+    header = (BCRYPT_ECCKEY_BLOB*) publicBlob;
+    header->dwMagic = BCRYPT_ECDH_PUBLIC_P256_MAGIC;
+    header->cbKey = 32;
+    memcpy(publicBlob + sizeof(BCRYPT_ECCKEY_BLOB), peerBytes, 64);
+
+    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_ECDH_P256_ALGORITHM, NULL, 0);
+    if (status == STATUS_SUCCESS) {
+        status = BCryptImportKeyPair(alg, NULL, BCRYPT_ECCPRIVATE_BLOB, &mine,
+                                     privateBlob, (ULONG) sizeof(privateBlob), 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        status = BCryptImportKeyPair(alg, NULL, BCRYPT_ECCPUBLIC_BLOB, &theirs,
+                                     publicBlob, (ULONG) sizeof(publicBlob), 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        status = BCryptSecretAgreement(mine, theirs, &secret, 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        /* RAW_SECRET answers the x coordinate little-endian; every other
+         * provider, and the portable contract, is big-endian. */
+        status = BCryptDeriveKey(secret, BCRYPT_KDF_RAW_SECRET, NULL, raw, (ULONG) sizeof(raw), &rawLength, 0);
+    }
+    if (status != STATUS_SUCCESS || rawLength != 32) {
+        cn1CryptoFail("ECDH", status);
+    } else {
+        for (i = 0; i < 32; i++) {
+            out[i] = raw[31 - i];
+        }
+        result = cn1WinNewByteArray(threadStateData, out, 32);
+    }
+    SecureZeroMemory(privateBlob, sizeof(privateBlob));
+    SecureZeroMemory(raw, sizeof(raw));
+    SecureZeroMemory(out, sizeof(out));
+    if (secret != NULL) {
+        BCryptDestroySecret(secret);
+    }
+    if (theirs != NULL) {
+        BCryptDestroyKey(theirs);
+    }
+    if (mine != NULL) {
+        BCryptDestroyKey(mine);
+    }
+    if (alg != NULL) {
+        BCryptCloseAlgorithmProvider(alg, 0);
+    }
+    return result;
+}
 
 /* Returns the pair as one array: a four-byte big-endian public-key length,
  * the X.509 public key, then the PKCS#8 private key. A pair has to come from

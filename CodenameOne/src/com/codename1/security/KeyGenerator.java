@@ -33,6 +33,7 @@ import com.codename1.io.Util;
 /// ```java
 /// SecretKey aes = KeyGenerator.aes(256);   // AES-256
 /// KeyPair   rsa = KeyGenerator.rsa(2048);  // RSA-2048
+/// KeyPair   ec  = KeyGenerator.ec(256);    // P-256, for ECDSA and ECDH
 /// ```
 public final class KeyGenerator {
     private KeyGenerator() {}
@@ -69,6 +70,28 @@ public final class KeyGenerator {
             byte[][] pair = Util.generateRsaKeyPair(bits);
             PublicKey pub = PublicKey.fromX509(PublicKey.RSA, pair[0]);
             PrivateKey priv = PrivateKey.fromPkcs8(PublicKey.RSA, pair[1]);
+            return new KeyPair(pub, priv);
+        } catch (RuntimeException re) {
+            throw new CryptoException(re.getMessage(), re);
+        }
+    }
+
+    /// Generates a fresh elliptic-curve key pair on NIST P-256 (secp256r1),
+    /// the curve every platform provider implements. The pair signs with
+    /// [Signature#SHA256_WITH_ECDSA] and agrees secrets with
+    /// [KeyAgreement#ecdh(PrivateKey, PublicKey)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `bits`: the curve size; only 256 is supported
+    public static KeyPair ec(int bits) {
+        if (bits != 256) {
+            throw new CryptoException("unsupported EC key size: " + bits + " (only 256, P-256, is supported)");
+        }
+        try {
+            byte[][] pair = Util.generateEcKeyPair(bits);
+            PublicKey pub = PublicKey.fromX509(PublicKey.EC, pair[0]);
+            PrivateKey priv = PrivateKey.fromPkcs8(PublicKey.EC, pair[1]);
             return new KeyPair(pub, priv);
         } catch (RuntimeException re) {
             throw new CryptoException(re.getMessage(), re);

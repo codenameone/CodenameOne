@@ -19634,6 +19634,53 @@ JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_b
 
 #endif /* CN1_INCLUDE_CRYPTO */
 
+// P-256 bridge. Outside the CN1_INCLUDE_CRYPTO guard on purpose: the
+// cn1_crypto_ec_* functions it calls have their own stubs in CN1Crypto.m, so
+// with the suite compiled out these return CN1_CRYPTO_E_UNSUPPORTED and no
+// Security.framework EC symbol is referenced.
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecGenerate___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    if (out == JAVA_NULL || CN1_PRIM_ARR_LEN(out) < 97) return CN1_CRYPTO_E_BAD_INPUT;
+    return cn1_crypto_ec_generate((uint8_t*) CN1_PRIM_ARR_DATA(out));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecdh___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT priv, JAVA_OBJECT point, JAVA_OBJECT out) {
+    if (priv == JAVA_NULL || point == JAVA_NULL || out == JAVA_NULL
+            || CN1_PRIM_ARR_LEN(priv) != 97 || CN1_PRIM_ARR_LEN(point) != 65) return CN1_CRYPTO_E_BAD_INPUT;
+    return cn1_crypto_ecdh((uint8_t*) CN1_PRIM_ARR_DATA(priv), (uint8_t*) CN1_PRIM_ARR_DATA(point),
+        (uint8_t*) CN1_PRIM_ARR_DATA(out), (int) CN1_PRIM_ARR_LEN(out));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecSign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT priv, JAVA_OBJECT data, JAVA_OBJECT out) {
+    if (priv == JAVA_NULL || data == JAVA_NULL || out == JAVA_NULL || CN1_PRIM_ARR_LEN(priv) != 97) return CN1_CRYPTO_E_BAD_INPUT;
+    return cn1_crypto_ec_sign(algorithm, (uint8_t*) CN1_PRIM_ARR_DATA(priv),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data), (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(out), (int) CN1_PRIM_ARR_LEN(out));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecVerify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT point, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    if (point == JAVA_NULL || data == JAVA_NULL || sig == JAVA_NULL || CN1_PRIM_ARR_LEN(point) != 65) return CN1_CRYPTO_E_BAD_INPUT;
+    return cn1_crypto_ec_verify(algorithm, (uint8_t*) CN1_PRIM_ARR_DATA(point),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data), (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(sig), (int) CN1_PRIM_ARR_LEN(sig));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecGenerate___byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    return com_codename1_impl_ios_IOSNative_ecGenerate___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, out);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecdh___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT priv, JAVA_OBJECT point, JAVA_OBJECT out) {
+    return com_codename1_impl_ios_IOSNative_ecdh___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, priv, point, out);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecSign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT priv, JAVA_OBJECT data, JAVA_OBJECT out) {
+    return com_codename1_impl_ios_IOSNative_ecSign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, algorithm, priv, data, out);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_ecVerify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT point, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    return com_codename1_impl_ios_IOSNative_ecVerify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, algorithm, point, data, sig);
+}
+
 // ============================================================================
 // Biometrics + SecureStorage natives (LocalAuthentication + Security framework)
 // ============================================================================
