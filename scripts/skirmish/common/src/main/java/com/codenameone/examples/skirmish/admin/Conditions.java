@@ -119,7 +119,10 @@ final class Conditions {
         FontImage.setMaterialIcon(remove, FontImage.MATERIAL_CLOSE);
         Container row = new Container(new BorderLayout());
         row.setUIID("DeskConditionRow");
-        row.add(BorderLayout.WEST, new com.codename1.ui.Label(i == 0 ? "Where" : "and", "DeskLabel"));
+        // One width for "Where" and "and", so the rows' fields line up.
+        com.codename1.ui.Label joint = new com.codename1.ui.Label(i == 0 ? "Where" : "and", "DeskLabel");
+        joint.setPreferredW(new com.codename1.ui.Label("Where", "DeskLabel").getPreferredW());
+        row.add(BorderLayout.WEST, joint);
         row.add(BorderLayout.CENTER, fields).add(BorderLayout.EAST, remove);
         return row;
     }

@@ -77,6 +77,7 @@ public class Pipelines {
         this.audit = audit;
     }
 
+    // tag::skirmish-pipelines-schedule[]
     /// Every enabled pipeline, once an hour, on one server at a time.
     /// Transactional itself: a call to [#run] from here is a call on `this`,
     /// which does not go through the transaction wrapper.
@@ -89,6 +90,7 @@ public class Pipelines {
             }
         }
     }
+    // end::skirmish-pipelines-schedule[]
 
     /// Runs one pipeline now: answers it with how many players it reached
     /// in total.

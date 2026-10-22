@@ -414,9 +414,9 @@ The admin account sees *Admin console* on the home screen. Its tabs are:
 image::img/skirmish-admin-overview.png["The admin console's overview: players online, matches today, purchases and gems sold",scaledwidth=40%]
 
 * *Overview* counts players online, matches and purchases.
-* *Live matches* lists the battles being played, and any of them can be watched
+* The *Live matches* tab lists the battles being played, and any of them can be watched
   as it happens.
-* *Flags* lists reports from players and signals the server raises on its own: a
+* The *Flags* tab lists reports from players and signals the server raises on its own: a
   player who keeps leaving matches, whose game state keeps diverging from the
   server's, or who floods it with invalid plays.
 * *Players* finds an account by name or e-mail and shows its matches, purchases
@@ -507,7 +507,55 @@ include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/sk
 ----
 
 `run-e2e.sh` runs its tests a second time on Linux with the simulator as a
-desktop window, and that pass captures the *Promote* tab.
+desktop window, and that pass captures the console's tabs.
+
+[[skirmish-engagement]]
+=== Reports, queries and engagement pipelines
+
+The console is an operator's tool, so it doesn't wear the game's theme. Its
+styles are a separate set of `Desk` UIIDs in the same `theme.css`: a light
+page, cards with thin borders, and one accent colour. Every form puts its labels
+in a right-aligned column of one width, so the fields start at the same place:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/common/src/main/java/com/codenameone/examples/skirmish/admin/Desk.java[tag=skirmish-desk-field,indent=0]
+----
+
+The *Overview* tab draws its trends with Codename One's charts package: daily
+players and new accounts, battles, gems sold, the funnel from joining to
+paying, retention, and the trophy ladder. The server's `Insights` builds them
+from the game's own records, accounts, battles and purchases, so they need no
+extra tracking. What players do inside the app, the screens they open and the
+pushes they read, is in Codename One analytics, one button away.
+
+image::img/skirmish-desktop-admin-reports.png["The Overview tab's trends: line charts of daily players and battles, a bar chart of the funnel, and gems sold over the last 30 days",scaledwidth=80%]
+
+The *Query* tab finds players by conditions on what the server knows about
+them: days since they last played or joined, trophies, battles, wins, gems,
+coins, purchases and friends invited. *Make a pipeline* turns the same
+conditions into an automated pipeline.
+
+image::img/skirmish-desktop-admin-query.png["The Query tab: a condition that purchases equal 0, the Run button, and the four matching players with their trophies, battles and gems",scaledwidth=80%]
+
+A pipeline is a rule of the form "players who match these conditions get this":
+a push that opens a chosen screen, or gems. Each player is reached at most once
+per cool-down, and the server runs every enabled pipeline once an hour, on one
+server at a time:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/skirmish/backend/src/main/java/com/codenameone/examples/skirmish/social/Pipelines.java[tag=skirmish-pipelines-schedule,indent=0]
+----
+
+image::img/skirmish-desktop-admin-pipelines.png["The Pipelines tab listing Win back, which is on, and Keen, never paid, which is off, each with its conditions, action, cool-down and players reached",scaledwidth=80%]
+
+The demo seeds two. *Win back* pushes "Your troops miss you" to a player away
+for a week who has played before, and *Keen, never paid* gives 20 gems to a
+player with ten battles and no purchases. *Count players* says how many players
+match today before a pipeline is saved.
+
+image::img/skirmish-desktop-admin-pipeline-edit.png["Editing Win back: name, an on switch, two conditions, the push action with its title, message and screen, a 14 day cool-down, and Cancel, Count players and Save",scaledwidth=80%]
 
 [[skirmish-growing]]
 === Tutorial: Growing your game

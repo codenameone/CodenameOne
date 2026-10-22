@@ -90,6 +90,7 @@ final class Desk {
         return l;
     }
 
+    // tag::skirmish-desk-field[]
     /// A label and its field on one line, the label in a column of its own,
     /// right aligned, so every field of a form starts at the same place.
     static Container field(String label, Component input) {
@@ -100,6 +101,7 @@ final class Desk {
         c.add(BorderLayout.WEST, l).add(BorderLayout.CENTER, input);
         return c;
     }
+    // end::skirmish-desk-field[]
 
     static TextField text(String name, String value, String hint, int max, final Text sink) {
         final TextField t = new TextField(value == null ? "" : value, hint, 20, TextArea.ANY);
@@ -259,6 +261,13 @@ final class Desk {
         }
         axis(r, labels, most);
         r.setShowLegend(series.length > 1);
+        if (series.length > 1) {
+            // The legend is drawn inside the bottom margin, under the day
+            // labels: give it a row of its own or it is clipped.
+            int m = CN.convertToPixels(3);
+            r.setLegendHeight(m * 2);
+            r.setMargins(new int[] {m, m * 2, m * 4, m});
+        }
         return wrap(name, new ChartComponent(new LineChart(data, r)));
     }
 

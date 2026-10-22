@@ -134,7 +134,7 @@ public class Insights {
         funnel.add(new NameCountDto("Played", played));
         funnel.add(new NameCountDto("Won", won));
         funnel.add(new NameCountDto("Paid", paid.size()));
-        funnel.add(new NameCountDto("Invited a friend", inviters.size()));
+        funnel.add(new NameCountDto("Invited", inviters.size()));
         return new InsightsDto(first, list(active), list(joined), list(battles), list(gems), funnel,
                 retention(all, now), bands(all));
     }

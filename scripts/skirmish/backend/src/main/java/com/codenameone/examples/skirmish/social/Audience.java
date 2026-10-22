@@ -173,10 +173,26 @@ public final class Audience {
         if (line == null) {
             return out;
         }
-        for (String part : line.split(";")) {
-            String[] w = part.trim().split(" ");
-            if (w.length == 3) {
-                out.add(new ConditionDto(w[0], w[1], Integer.parseInt(w[2])));
+        // String.split is a JDK method the compiled backend does not have.
+        for (String part : words(line, ';')) {
+            List<String> w = words(part, ' ');
+            if (w.size() == 3) {
+                out.add(new ConditionDto(w.get(0), w.get(1), Integer.parseInt(w.get(2))));
+            }
+        }
+        return out;
+    }
+
+    private static List<String> words(String s, char sep) {
+        List<String> out = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i <= s.length(); i++) {
+            if (i == s.length() || s.charAt(i) == sep) {
+                String w = s.substring(start, i).trim();
+                if (w.length() > 0) {
+                    out.add(w);
+                }
+                start = i + 1;
             }
         }
         return out;
