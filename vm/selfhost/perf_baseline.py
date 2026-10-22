@@ -295,7 +295,26 @@ def load_overlays(root=ROOT, layout=None):
         validate_overlay(int(path.stem), overlay, path.name, layout)
         overlays.append((int(path.stem), overlay))
     order = _merge_order(Path(root), [n for n, _ in overlays])
-    return sorted(overlays, key=lambda o: (order.get(o[0], math.inf), o[0]))
+    own = _own_pr()
+    # The running pull request's own overlay is its newest change whatever git says: the
+    # gate jobs check out with depth 1, where every overlay looks added by the one commit
+    # and the order would fall back to the numbers.
+    return sorted(overlays, key=lambda o: (o[0] == own, order.get(o[0], math.inf), o[0]))
+
+
+def _own_pr():
+    """The pull request this CI run is for, from the environment alone (no network)."""
+    explicit = os.environ.get('CN1_PR_NUMBER', '')
+    if explicit.isdigit():
+        return int(explicit)
+    event = os.environ.get('GITHUB_EVENT_PATH')
+    if event and Path(event).is_file():
+        try:
+            number = (json.loads(Path(event).read_text()).get('pull_request') or {}).get('number')
+            return int(number) if number else None
+        except (ValueError, OSError):
+            return None
+    return None
 
 
 def _merge_order(root, numbers):

@@ -551,7 +551,16 @@ class OverlayTests(unittest.TestCase):
                 run('commit', '-q', '-m', 'pr %d' % number,
                     GIT_AUTHOR_DATE=stamp, GIT_COMMITTER_DATE=stamp)
             (Path(tmp) / 'pr' / '5.json').write_text(json.dumps(self.rebase(5, 0.8)[1]))
-            self.assertEqual([20, 9, 5], [n for n, _ in baselines.load_overlays(tmp)])
+            saved = os.environ.pop('CN1_PR_NUMBER', None)
+            try:
+                self.assertEqual([20, 9, 5], [n for n, _ in baselines.load_overlays(tmp)])
+                os.environ['CN1_PR_NUMBER'] = '20'
+                # The running pull request's own overlay is always its newest.
+                self.assertEqual([9, 5, 20], [n for n, _ in baselines.load_overlays(tmp)])
+            finally:
+                os.environ.pop('CN1_PR_NUMBER', None)
+                if saved is not None:
+                    os.environ['CN1_PR_NUMBER'] = saved
 
     def test_bad_values_are_baseline_errors_not_crashes(self):
         number, overlay = self.rebase(12, 0.8)
