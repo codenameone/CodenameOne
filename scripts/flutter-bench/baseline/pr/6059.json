@@ -1,0 +1,51 @@
+{
+ "pr": 6059,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13338532
+     },
+     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "runs": 1,
+     "tolerance": {
+      "value": 0.005
+     },
+     "value": 13418004
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 14523602
+     },
+     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "runs": 1,
+     "value": 14591794
+    },
+    "install_bytes": {
+     "from": {
+      "value": 116342496
+     },
+     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "runs": 1,
+     "value": 116468448
+    },
+    "wire_bytes": {
+     "from": {
+      "value": 84685068
+     },
+     "reason": "The JavaScript and Linux ports ship the WebRTC bridge and P-256 ECDH (browser_bridge.js and HTML5WebRtc; the Linux crypto natives), measured on top of master",
+     "runs": 1,
+     "value": 84680126
+    }
+   }
+  }
+ }
+}
