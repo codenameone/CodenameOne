@@ -128,6 +128,10 @@ public class CSSThemeCompiler {
 
     /// The UIIDs (`$Dark` ones included) a rule of this compile styled, in first-seen order.
     private ArrayList<String> styledUiids = new ArrayList<String>();
+    /// For a base key an `A.unselected {}` rule overwrote: the value a bare `A {}` rule had set,
+    /// or NO_BARE_VALUE. Only that value is carried into the other states.
+    private Hashtable<String, Object> bareValues = new Hashtable<String, Object>();
+    private static final Object NO_BARE_VALUE = new Object();
 
     /// The style keys the build-time compiler carries from a UIID's unselected style into its
     /// selected, pressed and disabled ones. The font has its own pass in compileFonts.
@@ -196,6 +200,7 @@ public class CSSThemeCompiler {
         ownerDerives = new Hashtable<String, String>();
         styledUiids = new ArrayList<String>();
         boxSides = new Hashtable<String, Length[]>();
+        bareValues = new Hashtable<String, Object>();
         for (Rule rule : rules) {
             if (rule.legacyConstants) {
                 continue;
@@ -204,7 +209,31 @@ public class CSSThemeCompiler {
                 compileConstants(rule.declarations, theme, deferred, false);
                 continue;
             }
+            if (rule.universal || ":root".equals(rule.selector) || selector(rule.selector)[1].length() > 0) {
+                applyRule(theme, resources, rule, fonts, deferred);
+                continue;
+            }
+            // A base-state rule: remember, per key, what a bare `A {}` rule set before an
+            // `A.unselected {}` rule overwrote it, since only the bare value reaches the states.
+            String uiid = selector(rule.selector)[0];
+            boolean unselected = isUnselectedSelector(rule.selector);
+            Object[] before = new Object[STATE_INHERITED_KEYS.length];
+            for (int i = 0; i < before.length; i++) {
+                before[i] = theme.get(uiid + "." + STATE_INHERITED_KEYS[i]);
+            }
             applyRule(theme, resources, rule, fonts, deferred);
+            for (int i = 0; i < before.length; i++) {
+                String key = uiid + "." + STATE_INHERITED_KEYS[i];
+                Object after = theme.get(key);
+                if (after == null ? before[i] == null : after.equals(before[i])) {
+                    continue;
+                }
+                if (!unselected) {
+                    bareValues.remove(key);
+                } else if (!bareValues.containsKey(key)) {
+                    bareValues.put(key, before[i] == null ? NO_BARE_VALUE : before[i]);
+                }
+            }
         }
         markLiteralAliases(theme, deferred);
         compileFonts(theme, fonts);
@@ -1158,8 +1187,9 @@ public class CSSThemeCompiler {
         }
         for (String uiid : styledUiids) {
             for (String key : STATE_INHERITED_KEYS) {
-                Object value = theme.get(uiid + "." + key);
-                if (value == null) {
+                Object bare = bareValues.get(uiid + "." + key);
+                Object value = bare == null ? theme.get(uiid + "." + key) : bare;
+                if (value == null || value == NO_BARE_VALUE) {
                     continue;
                 }
                 for (String state : states) {
@@ -1169,7 +1199,7 @@ public class CSSThemeCompiler {
                         continue;
                     }
                     theme.put(uiid + "." + state + key, value);
-                    Object binding = theme.get("@cn1-bind:" + uiid + "." + key);
+                    Object binding = bare != null ? null : theme.get("@cn1-bind:" + uiid + "." + key);
                     if (binding != null) {
                         theme.put("@cn1-bind:" + uiid + "." + state + key, binding);
                     }
@@ -1975,6 +2005,9 @@ public class CSSThemeCompiler {
         return -1;
     }
 
+    // A selector written as `$DarkA` is kept as the UIID `$DarkA`, the key this compiler has
+    // always stored dark styles under, although the build-time compiler drops such a selector:
+    // themes compiled here address their dark variants that way.
     private String[] selector(String selector) {
         String statePrefix = "";
         String uiid = selector.trim();
@@ -1997,6 +2030,13 @@ public class CSSThemeCompiler {
         }
         if ("*".equals(uiid) || uiid.length() == 0) {
             uiid = "Component";
+        }
+        if (uiid.indexOf('\\') > -1) {
+            // `A\ B` names the UIID `A B`, as the build-time compiler decodes it.
+            String decoded = decodeIdentifier(uiid);
+            if (decoded != null) {
+                uiid = decoded;
+            }
         }
         return new String[]{uiid, statePrefix};
     }
@@ -2459,6 +2499,10 @@ public class CSSThemeCompiler {
                         continue;
                     }
                     nextPrefixes = mediaPrefixes(mediaQuery);
+                    if (nextPrefixes == null) {
+                        pos = close + 1;
+                        continue;
+                    }
                 }
                 parseRulesInto(css.substring(open + 1, close), out, darkContext || dark, nextPrefixes);
                 pos = close + 1;
@@ -2561,6 +2605,13 @@ public class CSSThemeCompiler {
         ArrayList<String> types = new ArrayList<String>();
         for (String entry : splitOnChar(mediaQuery, ',')) {
             String key = entry.trim();
+            for (int i = 0; i < key.length(); i++) {
+                if (key.charAt(i) <= ' ') {
+                    // `platform-ios and device-tablet`: the build-time compiler matches whole
+                    // media names only and styles nothing for such a query.
+                    return null;
+                }
+            }
             if (key.startsWith("platform-")) {
                 platforms.add(key);
             } else if (key.startsWith("density-")) {

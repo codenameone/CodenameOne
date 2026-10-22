@@ -1700,4 +1700,39 @@ public class CSSThemeCompilerTest extends UITestBase {
         org.junit.jupiter.api.Assertions.assertNull(theme.get("A > B.fgColor"));
         assertEquals("0000ff", theme.get("C.fgColor"));
     }
+
+    @Test
+    void testUnselectedRuleBesideABareRuleStaysUnselected() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("A{color:#111111;background-color:#00ff00} A.unselected{color:#ff0000;padding:1px}"
+                + " B.unselected{color:#ff0000} B{background-color:#00ff00}", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        assertEquals("ff0000", theme.get("A.fgColor"));
+        assertEquals("111111", theme.get("A.sel#fgColor"));
+        assertEquals("00ff00", theme.get("A.press#bgColor"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A.dis#padding"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("B.sel#fgColor"));
+        assertEquals("00ff00", theme.get("B.sel#bgColor"));
+    }
+
+    @Test
+    void testCompoundMediaQueryAndEscapedSpaceSelector() {
+        MutableResource res = new MutableResource();
+        new CSSThemeCompiler().compile("@media platform-ios and device-tablet { A { color: #ff0000; } }"
+                + " A\\ B { color: #00ff00; }", res, "Theme");
+        Hashtable theme = res.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("A.fgColor"));
+        assertEquals(1, countKeysContaining(theme, "fgColor"), theme.toString());
+        assertEquals("00ff00", theme.get("A B.fgColor"));
+    }
+
+    private static int countKeysContaining(Hashtable theme, String part) {
+        int n = 0;
+        for (Object k : theme.keySet()) {
+            if (k.toString().indexOf(part) > -1 && k.toString().indexOf('#') < 0) {
+                n++;
+            }
+        }
+        return n;
+    }
 }
