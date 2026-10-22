@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.MutableResource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
@@ -96,16 +97,16 @@ public class CSSThemeCompiler {
     private static final String DEFERRED_TEXT = "text";
 
     /// The `deferred` table of the compile in progress; resolveVars reads which constants are literal.
-    private Hashtable<String, String> deferredConstants = new Hashtable<String, String>();
+    private HashMap<String, String> deferredConstants = new HashMap<String, String>();
 
     /// The `cn1-derive` each UIID (with its `$Dark` prefix) declared last in any state, in source
     /// order: the build-time compiler sets every such derive on the owning UIID, so the last one wins.
-    private Hashtable<String, String> ownerDerives = new Hashtable<String, String>();
+    private HashMap<String, String> ownerDerives = new HashMap<String, String>();
 
     /// The quoted source of each string constant this compile declared. A style property that
     /// uses one gets the string token, not its text: the build-time compiler keeps the token's
     /// type, so `color: var(--accent)` with `--accent: "#f00"` is not a color there either.
-    private Hashtable<String, String> literalTokens = new Hashtable<String, String>();
+    private HashMap<String, String> literalTokens = new HashMap<String, String>();
     /// `#Constants` entries this compile declared without the `--` prefix. The build-time
     /// compiler adds only `--name` declarations to its variables, so `var(--name)` does not see
     /// these.
@@ -116,7 +117,7 @@ public class CSSThemeCompiler {
     /// alias holds `var(--base)` itself, resolved where it is used, so a later `--base` changes
     /// it while the exported `@alias` keeps the value it had where it was declared. A later
     /// plain `#Constants` entry or `:root` property of the same name changes only its own side.
-    private Hashtable<String, String> cssVars = new Hashtable<String, String>();
+    private HashMap<String, String> cssVars = new HashMap<String, String>();
     /// "@name" of every entry a `#Constants` block of this compile exported. The build-time
     /// compiler adds a custom property to its constants only inside `#Constants`, so a later
     /// `:root { --name: ... }` changes what `var(--name)` reads and leaves `@name` alone.
@@ -124,7 +125,7 @@ public class CSSThemeCompiler {
 
     /// `padding-left` and its kin, per `uiid.state#padding` key, top/right/bottom/left; null is
     /// a side not declared. Applied once every rule is read, over the box shorthand.
-    private Hashtable<String, Length[]> boxSides = new Hashtable<String, Length[]>();
+    private HashMap<String, Length[]> boxSides = new HashMap<String, Length[]>();
 
     /// The UIIDs (`$Dark` ones included) a rule of this compile styled, in first-seen order.
     private ArrayList<String> styledUiids = new ArrayList<String>();
@@ -143,7 +144,7 @@ public class CSSThemeCompiler {
     /// While set, resolveVars does not see a constant this compile declares unless it holds it:
     /// one declared further down is not defined yet. A constant only an earlier compile into the
     /// same theme declared is visible.
-    private Hashtable<String, String> declaredOnly;
+    private HashMap<String, String> declaredOnly;
     /// Every constant and custom property this compile declares, as "@name".
     private HashSet<String> declaredThisCompile = new HashSet<String>();
     /// Set by resolveVars when it met a var() naming an undefined variable with no fallback.
@@ -162,11 +163,11 @@ public class CSSThemeCompiler {
         // Keyed by "@name"; only the declaration that wins for a name decides its entry. Every
         // constant this compile declares has an entry, so constants a previous compile left in
         // the same theme are never re-resolved without the typing they were declared with.
-        Hashtable<String, String> deferred = new Hashtable<String, String>();
+        HashMap<String, String> deferred = new HashMap<String, String>();
         deferredConstants = deferred;
-        literalTokens = new Hashtable<String, String>();
+        literalTokens = new HashMap<String, String>();
         plainConstants = new HashSet<String>();
-        cssVars = new Hashtable<String, String>();
+        cssVars = new HashMap<String, String>();
         exportedConstants = new HashSet<String>();
         declaredThisCompile = new HashSet<String>();
         for (Rule rule : rules) {
@@ -197,10 +198,10 @@ public class CSSThemeCompiler {
                 compileConstants(rule.declarations, theme, deferred, true);
             }
         }
-        Hashtable<String, String[]> fonts = new Hashtable<String, String[]>();
-        ownerDerives = new Hashtable<String, String>();
+        HashMap<String, String[]> fonts = new HashMap<String, String[]>();
+        ownerDerives = new HashMap<String, String>();
         styledUiids = new ArrayList<String>();
-        boxSides = new Hashtable<String, Length[]>();
+        boxSides = new HashMap<String, Length[]>();
         for (Rule rule : rules) {
             if (rule.legacyConstants) {
                 continue;
@@ -248,7 +249,7 @@ public class CSSThemeCompiler {
 
     /// `alias: var(--literal)` where `literal` is quoted resolves to that text, not to a color:
     /// such an alias, followed through any chain of plain aliases, is not reclassified.
-    private void markLiteralAliases(Hashtable theme, Hashtable<String, String> deferred) {
+    private void markLiteralAliases(Hashtable theme, HashMap<String, String> deferred) {
         ArrayList<String> aliases = new ArrayList<String>();
         for (Map.Entry<String, String> entry : deferred.entrySet()) {
             if (DEFERRED_VAR.equals(entry.getValue())) {
@@ -375,7 +376,7 @@ public class CSSThemeCompiler {
         return false;
     }
 
-    private void resolveThemeConstantVars(Hashtable theme, Hashtable<String, String> deferred) {
+    private void resolveThemeConstantVars(Hashtable theme, HashMap<String, String> deferred) {
         for (Map.Entry<String, String> entry : deferred.entrySet()) {
             String key = entry.getKey();
             // A quoted value is a string: `"var(--name)"` is text, not a reference.
@@ -400,7 +401,7 @@ public class CSSThemeCompiler {
     }
 
     private void compileConstants(Declaration[] declarations, Hashtable theme,
-                                  Hashtable<String, String> deferred, boolean legacy) {
+                                  HashMap<String, String> deferred, boolean legacy) {
         for (Declaration declaration : declarations) {
             String declName = declaration.name;
             if (!legacy) {
@@ -635,7 +636,7 @@ public class CSSThemeCompiler {
     /// declared afterwards. Returns null, and the constant is left out, when a reference stays
     /// undefined without a fallback: the build-time compiler keeps such a var() as a function its
     /// constants emitter drops.
-    private String resolveAtDeclaration(Hashtable theme, String key, String value, Hashtable<String, String> deferred) {
+    private String resolveAtDeclaration(Hashtable theme, String key, String value, HashMap<String, String> deferred) {
         String own = deferred.remove(key);
         declaredOnly = deferred;
         unresolvedVar = false;
@@ -877,8 +878,8 @@ public class CSSThemeCompiler {
         return out.toString();
     }
 
-    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, Hashtable<String, String[]> fonts,
-                           Hashtable<String, String> deferred) {
+    private void applyRule(Hashtable theme, MutableResource resources, Rule rule, HashMap<String, String[]> fonts,
+                           HashMap<String, String> deferred) {
         if (":root".equals(rule.selector)) {
             // Unlike the build-time compiler, `:root` custom properties are also kept as `@name`
             // theme constants: that is this compiler's documented contract for `:root` (see the
@@ -960,7 +961,7 @@ public class CSSThemeCompiler {
     }
 
     private boolean applyThemeConstantProperty(Hashtable theme, String property, String value,
-                                               Hashtable<String, String> deferred) {
+                                               HashMap<String, String> deferred) {
         if (!property.startsWith("--")) {
             return false;
         }
@@ -992,7 +993,7 @@ public class CSSThemeCompiler {
 
     /// Records a `font-family` or `font-size` for one UIID state; `compileFonts` builds the fonts
     /// once every rule has been read, so the two may come from different rules.
-    private boolean applyFontProperty(Hashtable<String, String[]> fonts, String keyPrefix,
+    private boolean applyFontProperty(HashMap<String, String[]> fonts, String keyPrefix,
                                       String property, String value) {
         int slot;
         if ("font-family".equals(property)) {
@@ -1030,7 +1031,7 @@ public class CSSThemeCompiler {
     /// from is not stored, so a later compile that only changes a `cn1-derive` cannot tell which
     /// earlier fonts depended on it. Compiling the stylesheet whole, as live reload and the GUI
     /// builder do, rebuilds every font.
-    private void compileFonts(Hashtable theme, Hashtable<String, String[]> fonts) {
+    private void compileFonts(Hashtable theme, HashMap<String, String[]> fonts) {
         // A font is a live platform object, so it can only be made with a running Display.
         // Without one -- a tool that only checks that a stylesheet compiles -- every
         // declaration has still been validated as it was read.
@@ -1150,7 +1151,7 @@ public class CSSThemeCompiler {
         String[] baseStates = {"sel", "press", "dis"};
         // What the stylesheet itself declared; a value this pass copies into a state is not a
         // declaration a derived UIID's state should stop at.
-        Hashtable declared = new Hashtable(theme);
+        HashMap declared = new HashMap(theme);
         // A derived UIID's states derive from the target's matching states, as the build-time
         // compiler writes them (`Child.sel#derive=Base.sel`): UIManager reads only the state's
         // own derive key, so without it a selected Child would start from the default style.
@@ -1210,7 +1211,7 @@ public class CSSThemeCompiler {
         return name.substring(2);
     }
 
-    private boolean derivedStateDeclares(Hashtable theme, String uiid, String state, String key) {
+    private boolean derivedStateDeclares(Map theme, String uiid, String state, String key) {
         boolean dark = uiid.startsWith("$Dark");
         ArrayList<String> seen = new ArrayList<String>();
         String id = uiid;
