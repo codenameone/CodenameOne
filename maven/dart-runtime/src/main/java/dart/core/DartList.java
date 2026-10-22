@@ -709,7 +709,13 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         sort((Funcs.Func2<E, E, Long>) null);
     }
 
-    public DartIterable<E> reversed() {
+    /// Dart's `reversed` getter. Not called `reversed()`: Android API 35 gives
+    /// `java.util.List` a `reversed()` (from `SequencedCollection`) answering a
+    /// `List`, and a Flutter plugin class that extends this one then fails to
+    /// compile in the generated Android project (`reversed() in DartList cannot
+    /// implement reversed() in List`). This jar never meets that check itself; its
+    /// source subclasses do.
+    public DartIterable<E> dartReversed() {
         DartList<E> self = this;
         return DartIterable.wrap(() -> new java.util.Iterator<E>() {
             // Dart's ListIterator: the length at creation, checked on every step, so

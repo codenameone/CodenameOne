@@ -5922,7 +5922,7 @@ public final class JavaEmitter {
                 return new Out(target.code + ".last()", elem);
             }
             if (name.equals("reversed")) {
-                return new Out(target.code + ".reversed()", TypeRef.of("Iterable", elem));
+                return new Out(target.code + ".dartReversed()", TypeRef.of("Iterable", elem));
             }
         }
         if (tt.is("Map")) {

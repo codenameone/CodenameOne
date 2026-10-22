@@ -1185,7 +1185,7 @@ public class DartCoreSemanticsTest {
     public void asMapKeySetAndEntrySetIteratorsDetectConcurrentModification() {
         // Regression: asMap()'s keySet()/entrySet() iterators compared against the
         // LIVE list.size() on every step instead of the length snapshotted when the
-        // iterator was created -- mirroring DartList's own ListIterator (reversed(),
+        // iterator was created -- mirroring DartList's own ListIterator (dartReversed(),
         // getRange()), which already gets this right. A growth during iteration
         // silently started handing back keys/entries under indices that did not exist
         // yet, and a shrink truncated the iteration instead of reporting the change,
@@ -1723,7 +1723,7 @@ public class DartCoreSemanticsTest {
         grow.add(1L);
         grow.add(2L);
         assertThrows(ConcurrentModificationError.class, () -> {
-            for (Long v : grow.reversed()) {
+            for (Long v : grow.dartReversed()) {
                 grow.add(v);
             }
         });
@@ -1733,7 +1733,7 @@ public class DartCoreSemanticsTest {
         shrink.add(3L);
         // Shrinking used to read past the new end instead.
         assertThrows(ConcurrentModificationError.class, () -> {
-            for (Long v : shrink.reversed()) {
+            for (Long v : shrink.dartReversed()) {
                 shrink.removeLast();
             }
         });
@@ -1741,7 +1741,7 @@ public class DartCoreSemanticsTest {
         same.add(1L);
         same.add(2L);
         StringBuilder seen = new StringBuilder();
-        for (Long v : same.reversed()) {
+        for (Long v : same.dartReversed()) {
             same.set(0, v);
             seen.append(v);
         }

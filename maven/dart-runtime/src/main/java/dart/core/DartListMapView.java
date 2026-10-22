@@ -203,7 +203,7 @@ final class DartListMapView<E> extends DartMap<Long, E> {
             public Iterator<Long> iterator() {
                 return new Iterator<Long>() {
                     // Dart's List.asMap() keys: the length at iterator creation, checked
-                    // on every step -- mirrors DartList's own ListIterator (reversed(),
+                    // on every step -- mirrors DartList's own ListIterator (dartReversed(),
                     // getRange()). Reading the LIVE list.size() instead let a list that
                     // grew mid-iteration hand back keys under indices that did not exist
                     // when the iterator was made, and a shrink truncated the iteration
