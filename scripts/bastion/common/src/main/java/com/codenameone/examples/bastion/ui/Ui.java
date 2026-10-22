@@ -22,11 +22,14 @@ import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
@@ -84,7 +87,21 @@ public final class Ui {
     /// The lock screen itself: the one form shown while locked.
     static void showLockScreen(Form form) {
         form.putClientProperty(SENSITIVE, Boolean.TRUE);
-        display(form, true);
+        // No transition in either direction: a slide or fade would paint the
+        // form being locked, balances and all, while the lock comes in.
+        Form under = CN.getCurrentForm();
+        Transition out = under == null ? null : under.getTransitionOutAnimator();
+        if (under != null) {
+            under.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        }
+        form.setTransitionInAnimator(CommonTransitions.createEmpty());
+        try {
+            display(form, true);
+        } finally {
+            if (under != null) {
+                under.setTransitionOutAnimator(out);
+            }
+        }
     }
 
     private static void display(Form form, boolean sensitive) {

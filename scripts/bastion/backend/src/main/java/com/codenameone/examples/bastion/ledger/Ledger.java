@@ -269,8 +269,7 @@ public class Ledger {
                 // Why it was refused, asked of the table: the copy in hand
                 // was read before this update and may predate a freeze
                 // committed since, which would be answered as no money.
-                Long frozen = accounts.frozenNow(account.getId());
-                throw frozen != null && frozen.longValue() > 0
+                throw accounts.frozenNow(account.getId()) > 0
                         ? Refused.with(409, "account-frozen", "That account is frozen")
                         : Refused.with(409, "insufficient-funds", "Insufficient funds");
             }

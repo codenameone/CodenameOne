@@ -22,6 +22,7 @@ import com.codename1.security.Biometrics;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.Form;
 import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.bastion.AppConfig;
@@ -91,13 +92,18 @@ public final class Lock {
     }
 
     private static void tick() {
-        // A dialog is a form nobody called watch for: a touch in it counts too.
-        Form current = CN.getCurrentForm();
-        if (current instanceof Dialog) {
-            listen(current);
+        try {
+            // A dialog is a form nobody called watch for: a touch in it counts too.
+            Form current = CN.getCurrentForm();
+            if (current instanceof Dialog) {
+                listen(current);
+            }
+            checkIdle();
+        } finally {
+            // Re-armed whatever happened: an exception here must not end
+            // the idle lock for the rest of the run.
+            CN.setTimeout(IDLE_CHECK_MILLIS, Lock::tick);
         }
-        checkIdle();
-        CN.setTimeout(IDLE_CHECK_MILLIS, Lock::tick);
     }
 
     public static void touched() {
@@ -132,7 +138,12 @@ public final class Lock {
         if (current instanceof Dialog) {
             // A dialog cannot be put back after the lock: it is closed (as if
             // cancelled) and the unlock returns to the form it was over.
-            ((Dialog) current).dispose();
+            // Without its closing animation: the form it returns to becomes
+            // current only for the moment before showLocked replaces it, in
+            // the same EDT call, so nothing beneath is ever painted.
+            Dialog dialog = (Dialog) current;
+            dialog.setTransitionOutAnimator(CommonTransitions.createEmpty());
+            dialog.dispose();
             current = lastForm;
         }
         hidden = current;

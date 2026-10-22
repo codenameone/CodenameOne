@@ -58,9 +58,10 @@ import com.codename1.util.SuccessCallback;
 /// Turning a protection on removes the plain copy, so the weaker way in does
 /// not sit beside the stronger one.
 ///
-/// The attempt counter lives in the app's preferences: it stops a guesser at
-/// the screen, not one with root who resets it. That is the limit of a PIN
-/// checked on the device, and the reason the pepper is in the OS store.
+/// The attempt counter lives in the OS secure store beside the pepper
+/// ([#pinFailures]), so a copy or rollback of the app's files does not reset
+/// it. It is still a PIN checked on the device: someone who controls the OS
+/// store controls the counter too, which is why the pepper is there as well.
 public final class Keys {
     /// The shortest PIN the app accepts.
     public static final int MIN_PIN = 6;

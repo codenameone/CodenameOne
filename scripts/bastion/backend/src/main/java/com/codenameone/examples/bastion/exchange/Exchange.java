@@ -188,6 +188,9 @@ public class Exchange {
         return orders.findFirstByOwnerAndClientKey(owner, key);
     }
 
+    // Private and called from inside the class, and still transactional:
+    // the backend weaver moves the body behind the annotated method itself
+    // (no proxy), so a self-call and a private method get the aspect too.
     @Transactional(rollbackFor = Exception.class)
     private OrderDto placeOnce(String owner, String key, NewOrderDto r, boolean limited)
             throws IOException {
@@ -542,6 +545,10 @@ public class Exchange {
         return Markets.addExact(m.getIndexPrice(), band(m));
     }
 
+    /// The collar's half-width around the market's index price. The index is
+    /// set once, when [Markets] creates the market, and nothing that fills
+    /// moves it: the collar must never follow fills, or a run of trades at
+    /// its edge would walk it -- and the price -- as far as anyone liked.
     private long band(Market m) {
         return Markets.multiplyExact(m.getIndexPrice(), collarBps) / 10000L;
     }

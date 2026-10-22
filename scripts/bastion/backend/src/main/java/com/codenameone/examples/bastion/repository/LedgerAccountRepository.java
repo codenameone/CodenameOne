@@ -54,8 +54,13 @@ public interface LedgerAccountRepository extends CrudRepository<LedgerAccount, S
 
     /// 1 when account `id` is frozen now, 0 when not: read from the table,
     /// not the session, whose copy may predate a freeze committed since.
-    @Query("select count(a) from LedgerAccount a where a.id = :id and a.frozen = TRUE")
-    Long frozenNow(@Param("id") String id);
+    /// A no-op write rather than a select, like the `hold` queries: an
+    /// UPDATE reads the latest committed row and locks it on SQLite,
+    /// PostgreSQL and MySQL alike, where a plain select under MySQL's
+    /// REPEATABLE READ would answer from the transaction's first snapshot.
+    @Modifying
+    @Query("update LedgerAccount a set a.frozen = a.frozen where a.id = :id and a.frozen = TRUE")
+    int frozenNow(@Param("id") String id);
 
     @Modifying
     @Query("update LedgerAccount a set a.frozen = :frozen where a.id = :id")

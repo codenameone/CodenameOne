@@ -187,6 +187,11 @@ public class Money {
 
     /// What `owner` has traded since `since`, both sides, in USD cents: the
     /// quote each fill paid or received, valued like any movement.
+    /// Counting the buy side too, and filled orders' holds with the open
+    /// ones, is deliberately conservative: it can refuse a customer early,
+    /// never let one past the daily limit. Telling "value leaving" apart
+    /// per side would need a valuation of every coin, and an error there
+    /// would fail open.
     private long tradedSince(String owner, long since) throws IOException {
         long sum = 0;
         for (Trade t : trades.since(owner, since)) {
