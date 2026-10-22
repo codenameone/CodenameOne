@@ -100,8 +100,15 @@ public class Progression {
     @Transactional(rollbackFor = IOException.class)
     public ProgressDto view(String username) throws IOException {
         Profile p = profile(username);
-        Progress g = load(username);
-        progress.save(g);
+        // Reading never creates the row: the first battle's result, recorded
+        // on the match ticker's thread, may be inserting it at this moment,
+        // and a second insert of the same key fails (MySQL waits on the
+        // uncommitted row, then reports a duplicate).
+        boolean stored = progress.findById(username) != null;
+        Progress g = stored ? load(username) : fresh(username);
+        if (stored) {
+            progress.save(g);
+        }
         return dto(g, p);
     }
 
@@ -246,9 +253,7 @@ public class Progression {
         Progress g = progress.findById(username);
         long today = Clock.dayOf(Clock.now());
         if (g == null) {
-            g = new Progress();
-            g.setUsername(username);
-            g.setQuestDay(today);
+            g = fresh(username);
             progress.insert(g);
         }
         if (g.getQuestDay() != today) {
@@ -258,6 +263,13 @@ public class Progression {
             g.setQuest2(0);
             g.setClaimed(0);
         }
+        return g;
+    }
+
+    private static Progress fresh(String username) {
+        Progress g = new Progress();
+        g.setUsername(username);
+        g.setQuestDay(Clock.dayOf(Clock.now()));
         return g;
     }
 

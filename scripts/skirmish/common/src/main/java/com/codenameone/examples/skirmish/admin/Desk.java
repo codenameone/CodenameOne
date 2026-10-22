@@ -31,6 +31,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -260,15 +261,20 @@ final class Desk {
             r.addSeriesRenderer(line);
         }
         axis(r, labels, most);
-        r.setShowLegend(series.length > 1);
-        if (series.length > 1) {
-            // The legend is drawn inside the bottom margin, under the day
-            // labels: give it a row of its own or it is clipped.
-            int m = CN.convertToPixels(3);
-            r.setLegendHeight(m * 2);
-            r.setMargins(new int[] {m, m * 2, m * 4, m});
+        // The chart's own legend is drawn in its bottom margin and can fall
+        // outside the box; a row of labels under it always shows.
+        r.setShowLegend(false);
+        Component chart = wrap(name, new ChartComponent(new LineChart(data, r)));
+        if (series.length < 2) {
+            return chart;
         }
-        return wrap(name, new ChartComponent(new LineChart(data, r)));
+        Container legend = new Container(new FlowLayout(Component.CENTER));
+        for (int s = 0; s < series.length; s++) {
+            Style dot = new Style(UIManager.getInstance().getComponentStyle("DeskHelp"));
+            dot.setFgColor(colors[s % colors.length]);
+            legend.add(new Label(series[s], FontImage.createMaterial(FontImage.MATERIAL_CIRCLE, dot, 2), "DeskHelp"));
+        }
+        return BoxLayout.encloseY(chart, legend);
     }
 
     /// Bars, one per named count: a funnel, a distribution.
