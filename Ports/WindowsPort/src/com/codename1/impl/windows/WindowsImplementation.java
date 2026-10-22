@@ -3351,6 +3351,42 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new byte[][] { publicKey, privateKey };
     }
 
+    @Override
+    public byte[][] generateEcKeyPair(int bits) {
+        if (bits != 256) {
+            throw new RuntimeException("only P-256 is supported");
+        }
+        byte[] raw = cryptoResult(WindowsNative.generateEcRaw(), "EC key generation");
+        if (raw.length != 96) {
+            throw new RuntimeException("EC key generation returned a malformed pair");
+        }
+        byte[] point = new byte[65];
+        point[0] = 0x04;
+        System.arraycopy(raw, 0, point, 1, 64);
+        byte[] scalar = new byte[32];
+        System.arraycopy(raw, 64, scalar, 0, 32);
+        return new byte[][] {
+            com.codename1.impl.EcP256Codec.spkiFromPoint(point),
+            com.codename1.impl.EcP256Codec.pkcs8FromScalar(scalar, point)
+        };
+    }
+
+    @Override
+    public byte[] ecdhAgree(byte[] privateKeyPkcs8, byte[] publicKeyX509) {
+        byte[][] parts = com.codename1.impl.EcP256Codec.fromPkcs8(privateKeyPkcs8);
+        if (parts[1] == null) {
+            // BCrypt's private blob carries the public coordinates as well.
+            throw new RuntimeException("EC private key must include its public point");
+        }
+        byte[] xyd = new byte[96];
+        System.arraycopy(parts[1], 1, xyd, 0, 64);
+        System.arraycopy(parts[0], 0, xyd, 64, 32);
+        byte[] peer = com.codename1.impl.EcP256Codec.pointFromSpki(publicKeyX509);
+        byte[] xy = new byte[64];
+        System.arraycopy(peer, 1, xy, 0, 64);
+        return cryptoResult(WindowsNative.ecdhRaw(xyd, xy), "ECDH");
+    }
+
     /* ------------------------------------------------------------ platform */
 
     @Override

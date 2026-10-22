@@ -207,6 +207,32 @@ try {
     deviceScaleFactor: 2
   });
 
+  // The goldens are a phone screen. Headless Chromium reports a mouse, and the port
+  // gives a browser with ANY fine pointer desktop scrollbars (an always-visible
+  // gutter that narrows every scrollable form), which no phone shows. Answer that
+  // one query as a touch-only device would. Everything else -- including the
+  // "(any-pointer: coarse)" query isPrimaryPointerMouse() reads -- keeps
+  // Chromium's own answer, so nothing else about the page changes.
+  // (hasTouch would also flip the coarse query and with it how press-drag selects.)
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = query => {
+      const list = original(query);
+      if (String(query).replace(/\s+/g, '') !== '(any-pointer:fine)') {
+        return list;
+      }
+      return new Proxy(list, {
+        get(target, prop) {
+          if (prop === 'matches') {
+            return false;
+          }
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+      });
+    };
+  });
+
   await installCompositeCapture(page);
 
   page.on('console', msg => {

@@ -485,6 +485,98 @@ int cn1_crypto_verify(int algorithm,
     return ok ? 1 : 0;
 }
 
+/* --- P-256 ------------------------------------------------------------ */
+
+static SecKeyRef cn1_load_ec(const uint8_t* bytes, int len, int isPrivate) {
+    NSData* keyData = [NSData dataWithBytes:bytes length:len];
+    NSDictionary* attrs = @{
+        (id) kSecAttrKeyType:  (id) kSecAttrKeyTypeECSECPrimeRandom,
+        (id) kSecAttrKeyClass: (id) (isPrivate ? kSecAttrKeyClassPrivate : kSecAttrKeyClassPublic),
+        (id) kSecAttrKeySizeInBits: @256
+    };
+    CFErrorRef error = NULL;
+    SecKeyRef key = SecKeyCreateWithData((__bridge CFDataRef) keyData,
+                                         (__bridge CFDictionaryRef) attrs, &error);
+    if (error) CFRelease(error);
+    return key;
+}
+
+int cn1_crypto_ec_generate(uint8_t* out97) {
+    if (!out97) return CN1_CRYPTO_E_BAD_INPUT;
+    NSDictionary* attrs = @{
+        (id) kSecAttrKeyType: (id) kSecAttrKeyTypeECSECPrimeRandom,
+        (id) kSecAttrKeySizeInBits: @256,
+        (id) kSecPrivateKeyAttrs: @{ (id) kSecAttrIsPermanent: @NO }
+    };
+    CFErrorRef error = NULL;
+    SecKeyRef priv = SecKeyCreateRandomKey((__bridge CFDictionaryRef) attrs, &error);
+    if (!priv) {
+        if (error) CFRelease(error);
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    NSData* rep = (__bridge_transfer NSData*) SecKeyCopyExternalRepresentation(priv, &error);
+    CFRelease(priv);
+    if (!rep || [rep length] != 97) {
+        if (error) CFRelease(error);
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    memcpy(out97, [rep bytes], 97);
+    return 97;
+}
+
+int cn1_crypto_ecdh(const uint8_t* priv97, const uint8_t* point65, uint8_t* out, int outCap) {
+    SecKeyRef priv = cn1_load_ec(priv97, 97, 1);
+    if (!priv) return CN1_CRYPTO_E_BAD_KEY;
+    SecKeyRef pub = cn1_load_ec(point65, 65, 0);
+    if (!pub) {
+        CFRelease(priv);
+        return CN1_CRYPTO_E_BAD_KEY;
+    }
+    CFErrorRef error = NULL;
+    NSData* secret = (__bridge_transfer NSData*) SecKeyCopyKeyExchangeResult(
+        priv, kSecKeyAlgorithmECDHKeyExchangeStandard, pub,
+        (__bridge CFDictionaryRef) @{}, &error);
+    CFRelease(priv);
+    CFRelease(pub);
+    if (error || !secret) {
+        if (error) CFRelease(error);
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    NSUInteger len = [secret length];
+    if ((int) len > outCap) return CN1_CRYPTO_E_BAD_INPUT;
+    memcpy(out, [secret bytes], len);
+    return (int) len;
+}
+
+int cn1_crypto_ec_sign(int algorithm, const uint8_t* priv97,
+                       const uint8_t* data, int dataLen, uint8_t* out, int outCap) {
+    if (algorithm < 3) return CN1_CRYPTO_E_UNSUPPORTED;
+    SecKeyAlgorithm alg = signature_alg(algorithm);
+    if (!alg) return CN1_CRYPTO_E_UNSUPPORTED;
+    SecKeyRef key = cn1_load_ec(priv97, 97, 1);
+    if (!key) return CN1_CRYPTO_E_BAD_KEY;
+    int rc = cn1_seckey_op(key, alg, 2, data, dataLen, out, outCap);
+    CFRelease(key);
+    return rc;
+}
+
+int cn1_crypto_ec_verify(int algorithm, const uint8_t* point65,
+                         const uint8_t* data, int dataLen, const uint8_t* sig, int sigLen) {
+    if (algorithm < 3) return CN1_CRYPTO_E_UNSUPPORTED;
+    SecKeyAlgorithm alg = signature_alg(algorithm);
+    if (!alg) return CN1_CRYPTO_E_UNSUPPORTED;
+    SecKeyRef key = cn1_load_ec(point65, 65, 0);
+    if (!key) return CN1_CRYPTO_E_BAD_KEY;
+    CFErrorRef error = NULL;
+    NSData* dataObj = [NSData dataWithBytes:data length:dataLen];
+    NSData* sigObj  = [NSData dataWithBytes:sig  length:sigLen];
+    Boolean ok = SecKeyVerifySignature(key, alg, (__bridge CFDataRef) dataObj,
+                                       (__bridge CFDataRef) sigObj, &error);
+    if (error) CFRelease(error);
+    CFRelease(key);
+    return ok ? 1 : 0;
+}
+
 /* --- RSA key-pair generation ------------------------------------------ */
 
 int cn1_crypto_generate_rsa_keypair(int bits,
@@ -628,6 +720,22 @@ int cn1_crypto_generate_rsa_keypair(int bits, uint8_t* outPub, int pubCap, int* 
     (void) bits; (void) outPub; (void) pubCap; (void) outPriv; (void) privCap;
     if (pubLen) *pubLen = 0;
     if (privLen) *privLen = 0;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_ec_generate(uint8_t* out97) {
+    (void) out97;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_ecdh(const uint8_t* p, const uint8_t* q, uint8_t* out, int outCap) {
+    (void) p; (void) q; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_ec_sign(int a, const uint8_t* p, const uint8_t* d, int dl, uint8_t* out, int outCap) {
+    (void) a; (void) p; (void) d; (void) dl; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_ec_verify(int a, const uint8_t* q, const uint8_t* d, int dl, const uint8_t* s, int sl) {
+    (void) a; (void) q; (void) d; (void) dl; (void) s; (void) sl;
     return CN1_CRYPTO_E_UNSUPPORTED;
 }
 

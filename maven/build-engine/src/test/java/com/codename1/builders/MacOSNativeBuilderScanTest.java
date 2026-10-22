@@ -482,7 +482,7 @@ public class MacOSNativeBuilderScanTest {
                 "com/codename1/camera/Camera", "requestPermissions"));
     }
 
-    /// Util's crypto delegates count, and all nine of them.
+    /// Util's crypto delegates count, and all eleven of them.
     ///
     /// They reach the same natives com.codename1.security does, and the package
     /// test cannot see them. secureRandomBytes is the one that matters most:
@@ -493,7 +493,8 @@ public class MacOSNativeBuilderScanTest {
     public void theUtilCryptoDelegatesCount() {
         String[] crypto = {
             "secureRandomBytes", "aesEncrypt", "aesDecrypt", "rsaEncrypt", "rsaDecrypt",
-            "cryptoSign", "cryptoVerify", "generateRsaKeyPair", "generateSymmetricKey"
+            "cryptoSign", "cryptoVerify", "generateRsaKeyPair", "generateEcKeyPair", "ecdhAgree",
+            "generateSymmetricKey"
         };
         for (String m : crypto) {
             assertTrue("Util." + m + " reaches the crypto natives and must enable them",

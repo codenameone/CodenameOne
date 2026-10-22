@@ -1818,6 +1818,8 @@ public class MacOSNativeBuilder extends Executor {
                 || method.equals("cryptoSign")
                 || method.equals("cryptoVerify")
                 || method.equals("generateRsaKeyPair")
+                || method.equals("generateEcKeyPair")
+                || method.equals("ecdhAgree")
                 || method.equals("generateSymmetricKey");
     }
 

@@ -811,5 +811,13 @@ Kharrat
 Cinemachine
 # -----------------------------------------------------------------------------
 # The sample application the Wayline chapters walk through.
+Parley
 Savor
 Wayline
+prekey
+prekeys
+rekey
+callee
+signalling
+coturn
+unconfigured
