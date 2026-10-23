@@ -190,7 +190,7 @@ image::img/bastion-console-balance-sheet.png["The balance sheet with sections fo
 
 image::img/bastion-console-income-statement.png["The income statement with revenue and expenses and the net income in dollars",scaledwidth=95%]
 
-*Reconciliation* compares each control account with the sum of its subledger. A difference is a break, and its row is red.
+*Reconciliation* compares each control account with the sum of the customer accounts under it. A difference is a break, and its row is red.
 
 image::img/bastion-console-reconciliation.png["Reconciliation: each control account's balance against its subledger with the difference, and the list of breaks",scaledwidth=95%]
 

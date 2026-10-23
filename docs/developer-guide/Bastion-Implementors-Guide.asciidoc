@@ -97,14 +97,14 @@ The ledger stores one signed number per posting. Read as accounting, a positive 
 |9999 |Suspense |Asset |Debit |any kind the chart doesn't know, shown rather than hidden
 |===
 
-`books/Books.java` derives every report from the postings: the journal, the general ledger of one code, an account's T-account, the trial balance, the balance sheet (with the period's earnings as line 3900 until a close moves them to retained earnings) and the income statement. Each total is per asset and also valued in dollars at the index price.
+`books/Books.java` derives every report from the postings: the journal, the general ledger of one code, an account's T-account, the trial balance, the balance sheet (with the period's earnings as line 3900 until closing the period moves them to retained earnings) and the income statement. Each total is per asset and also valued in dollars at the index price.
 
 * *Period close.* Closing a period posts one closing entry per asset that moves revenue and expense into retained earnings, and records the close. From then on the ledger refuses any entry dated inside a closed period, so a closed period's statements never change.
 * *Reversals.* A posted entry is never edited. A reversal posts the opposite entry, and an entry can be reversed once; closing entries and reversals themselves can't be.
 * *Reconciliation.* Each control account (customer deposits, escrow, custody) is compared with the sum of the accounts beneath it, every journal entry with zero, and every stored balance with the sum of its postings. Each difference is reported as a break naming the account and the amounts.
 * *Roles.* An `AUDITOR` reads the books and the audit trail and can change nothing; an `ADMIN` operates. Every staff read is appended to the audit chain as `STAFF_READ` before it's answered, and `/api/audit/access-log` lists them.
 * *Four eyes.* A manual adjustment or a reversal worth more than `bastion.approval.threshold-usd-cents` waits as a pending approval until a second administrator approves it; the maker can't approve their own request, and the refused attempt stays on the audit chain. The threshold counts what the same administrator posted without a checker in the last 24 hours, so a large change split into small ones still waits. A request in an asset with no dollar price can't be shown to be small, so it waits too. Every change also asks for the administrator's password again.
-* *Evidence.* `/api/audit/evidence/{name}` exports the whole journal, the trial balance or the audit chain as CSV or JSON, with a SHA-256 digest that's itself recorded on the chain. A CSV cell that a spreadsheet would run as a formula is quoted. The chain report names the first row whose link is broken.
+* *Evidence.* `/api/audit/evidence/{name}` exports the whole journal, the trial balance or the audit chain as CSV or JSON, with its SHA-256 digest, which is itself recorded on the chain. A CSV cell that a spreadsheet would run as a formula is quoted. The chain report names the first row whose link is broken.
 * *Long ledgers.* The general ledger and a T-account list the latest 2000 postings and say when there are more; their totals and balances are summed over every posting in the period.
 
 === Charts, tables and the console
