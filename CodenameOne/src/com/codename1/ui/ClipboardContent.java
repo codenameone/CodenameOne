@@ -87,7 +87,11 @@ public class ClipboardContent {
     /// suspended or killed meanwhile. Elsewhere the application clears the clipboard when the
     /// time is up, provided it has copied nothing else since and the clipboard still holds this
     /// content -- a copy another application made meanwhile is left alone. That needs the
-    /// application to be running, so it is a best effort rather than a guarantee.
+    /// application to be running, so it is a best effort rather than a guarantee. On Android 10
+    /// and later a background application cannot read the clipboard, so it cannot tell whether
+    /// the clip is still this content; the clear then waits until the application returns to
+    /// the foreground and runs only if the clipboard still holds this content. Until then the
+    /// content can outlive the time given here.
     ///
     /// #### Parameters
     ///

@@ -423,7 +423,7 @@ class BooksTest {
         // Holds the window between reading the 24h total and posting open,
         // so the requests really overlap: without it the race is too narrow
         // for a missing lock to show on PostgreSQL.
-        Approvals.AFTER_RECENT_TOTAL.set(() -> {
+        com.codenameone.examples.bastion.books.ApprovalsTestHooks.pauseAfterRecentTotal(() -> {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException stop) {
@@ -433,7 +433,7 @@ class BooksTest {
         try {
             Race.together(calls);
         } finally {
-            Approvals.AFTER_RECENT_TOTAL.set(null);
+            com.codenameone.examples.bastion.books.ApprovalsTestHooks.pauseAfterRecentTotal(null);
         }
         // Each one read the 24h total under the maker's lock, so at most one
         // threshold's worth posted without a checker.

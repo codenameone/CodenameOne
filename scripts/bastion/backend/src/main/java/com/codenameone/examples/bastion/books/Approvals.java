@@ -214,11 +214,12 @@ public class Approvals {
         return dto(rows.get(0));
     }
 
-    /// Test seam, null in production: runs between reading the maker's 24h
+    /// Test-only seam, null in production and package-private so only test
+    /// code in this package (`ApprovalsTestHooks`) can set it: runs between reading the maker's 24h
     /// total and acting on it, so a test can hold that window open long
     /// enough for concurrent requests to overlap. Without it the race is a few
     /// microseconds wide and a missing lock still passes on PostgreSQL.
-    public static final AtomicReference<Runnable> AFTER_RECENT_TOTAL =
+    static final AtomicReference<Runnable> TEST_ONLY_AFTER_RECENT_TOTAL =
             new AtomicReference<Runnable>();
 
     /// Serializes one maker's requests: a no-op write of the maker's profile
@@ -251,7 +252,7 @@ public class Approvals {
                 "SELECT COALESCE(SUM(usd_cents), 0) AS t FROM approval WHERE maker = ? "
                 + "AND status = ? AND checker = ? AND created_at > ?", new Object[] {maker,
                     EXECUTED, "", Long.valueOf(now - Books.DAY)}), "t"));
-        Runnable pause = AFTER_RECENT_TOTAL.get();
+        Runnable pause = TEST_ONLY_AFTER_RECENT_TOTAL.get();
         if (pause != null) {
             pause.run();
         }
