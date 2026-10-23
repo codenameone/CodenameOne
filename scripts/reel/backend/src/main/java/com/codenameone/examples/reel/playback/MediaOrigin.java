@@ -164,7 +164,7 @@ public class MediaOrigin {
     /// Drops every variant taller than `maxHeight` from a master playlist,
     /// keeping the smallest when all are taller so something still plays.
     static String filterMaster(String master, int maxHeight) {
-        String[] lines = master.split("\n");
+        String[] lines = com.codenameone.examples.reel.Rows.split(master, '\n').toArray(new String[0]);
         StringBuilder out = new StringBuilder();
         StringBuilder smallest = null;
         int smallestHeight = Integer.MAX_VALUE;

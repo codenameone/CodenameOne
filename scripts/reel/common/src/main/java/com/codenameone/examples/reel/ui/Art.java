@@ -51,6 +51,14 @@ public final class Art {
         final int h = CN.convertToPixels(heightMm);
         into.setPreferredW(w);
         into.setPreferredH(h);
+        // Until the picture arrives -- and for good when there is none, as on
+        // a server that has not packaged the demo video -- a film mark in the
+        // middle says what the space is for.
+        if (into.getIcon() == null) {
+            into.getAllStyles().setAlignment(com.codename1.ui.Component.CENTER);
+            into.setIcon(com.codename1.ui.FontImage.createMaterial(com.codename1.ui.FontImage.MATERIAL_MOVIE,
+                    into.getUnselectedStyle(), Math.max(4f, Math.min(widthMm, heightMm) / 4f)));
+        }
         if (url == null) {
             return;
         }

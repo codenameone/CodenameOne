@@ -145,12 +145,69 @@ public final class Rows {
         if (value == null || value.length() == 0) {
             return out;
         }
-        String[] parts = value.split("\n");
-        for (int iter = 0; iter < parts.length; iter++) {
-            if (parts[iter].trim().length() > 0) {
-                out.add(parts[iter].trim());
+        List<String> parts = split(value, '\n');
+        for (int iter = 0; iter < parts.size(); iter++) {
+            if (parts.get(iter).trim().length() > 0) {
+                out.add(parts.get(iter).trim());
             }
         }
         return out;
+    }
+
+    // The compiled server's class library has no regular expressions, so no
+    // String.split or replaceAll: these are the cuts the server needs, by hand.
+
+    /// `value` cut at every `separator`, as `String.split` cuts it: inner
+    /// empty pieces kept, trailing ones dropped.
+    public static List<String> split(String value, char separator) {
+        List<String> out = new ArrayList<String>();
+        int from = 0;
+        for (;;) {
+            int at = value.indexOf(separator, from);
+            if (at < 0) {
+                out.add(value.substring(from));
+                while (out.size() > 1 && out.get(out.size() - 1).length() == 0) {
+                    out.remove(out.size() - 1);
+                }
+                return out;
+            }
+            out.add(value.substring(from, at));
+            from = at + 1;
+        }
+    }
+
+    /// The runs of ASCII letters and digits in `folded` (already lower case),
+    /// in order; everything else separates them.
+    public static List<String> words(String folded) {
+        List<String> out = new ArrayList<String>();
+        int start = -1;
+        for (int iter = 0; iter <= folded.length(); iter++) {
+            char c = iter < folded.length() ? folded.charAt(iter) : ' ';
+            boolean word = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+            if (word && start < 0) {
+                start = iter;
+            } else if (!word && start >= 0) {
+                out.add(folded.substring(start, iter));
+                start = -1;
+            }
+        }
+        return out;
+    }
+
+    /// The UTC calendar day of `millis` as `yyyy-MM-dd`, computed rather than
+    /// formatted: the compiled runtime's date formatting has no time zones.
+    public static String utcDay(long millis) {
+        long days = Math.floorDiv(millis, 86400000L);
+        // Howard Hinnant's days-to-civil, for the proleptic Gregorian calendar.
+        long z = days + 719468;
+        long era = Math.floorDiv(z, 146097);
+        long doe = z - era * 146097;
+        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        long mp = (5 * doy + 2) / 153;
+        long d = doy - (153 * mp + 2) / 5 + 1;
+        long m = mp < 10 ? mp + 3 : mp - 9;
+        long y = yoe + era * 400 + (m <= 2 ? 1 : 0);
+        return y + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d;
     }
 }

@@ -123,7 +123,7 @@ public class MediaTokens {
         if (subject == null) {
             return null;
         }
-        String[] parts = subject.split(":");
+        String[] parts = com.codenameone.examples.reel.Rows.split(subject, ':').toArray(new String[0]);
         if (parts.length != 4) {
             return null;
         }

@@ -304,7 +304,7 @@ public class Catalog {
         if (query.length() == 0) {
             return new SearchResultDto("", 0, new ArrayList<TitleCardDto>());
         }
-        String[] words = fold(query).split("[^a-z0-9]+");
+        String[] words = com.codenameone.examples.reel.Rows.words(fold(query)).toArray(new String[0]);
         List<Title> visible = visible(profile);
         List<Recommender.Scored> hits = new ArrayList<Recommender.Scored>();
         for (int iter = 0; iter < visible.size(); iter++) {

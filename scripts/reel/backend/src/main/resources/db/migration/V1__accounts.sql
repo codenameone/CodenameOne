@@ -3,7 +3,7 @@
 -- a time is milliseconds since the epoch in a BIGINT, and a list is a
 -- comma-separated VARCHAR.
 
--- What Reel knows about an account beyond its sign-in, keyed by the same username.
+-- What the service knows about an account beyond its sign-in, keyed by the same username.
 CREATE TABLE profile (
     username VARCHAR(190) NOT NULL PRIMARY KEY,
     display_name VARCHAR(120) NOT NULL,

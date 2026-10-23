@@ -112,7 +112,9 @@ public final class HomeForm implements Nav.Home {
         info.add(Ui.label(t.year() + Ui.DOT + t.rating(), "RlHeroMeta"));
         Container buttons = new Container(BoxLayout.x());
         buttons.add(Ui.primary("Play", "heroPlay", e -> TitleForm.play(form, t.id(), null)));
-        buttons.add(Ui.secondary("More info", "heroInfo", e -> TitleForm.show(form, t.id())));
+        com.codename1.ui.Button more = Ui.secondary("More info", "heroInfo", e -> TitleForm.show(form, t.id()));
+        more.setUIID("RlHeroMore");
+        buttons.add(more);
         info.add(buttons);
         hero.add(BorderLayout.SOUTH, info);
         return hero;

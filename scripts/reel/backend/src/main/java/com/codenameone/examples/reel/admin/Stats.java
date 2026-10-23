@@ -50,14 +50,11 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.settings.Settings;
 import com.codenameone.examples.reel.studio.Jobs;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
 /// The numbers on the admin dashboard, computed from the tables on request.
 /// Days are UTC days.
@@ -217,8 +214,6 @@ public class Stats {
     }
 
     static String day(long at) {
-        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd");
-        f.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return f.format(new Date(at));
+        return com.codenameone.examples.reel.Rows.utcDay(at);
     }
 }

@@ -482,7 +482,12 @@ public class Reviews {
         if (words.isEmpty()) {
             return out;
         }
-        String folded = " " + fold(text).replaceAll("[^a-z0-9]+", " ") + " ";
+        StringBuilder spaced = new StringBuilder(" ");
+        List<String> tokens = com.codenameone.examples.reel.Rows.words(fold(text));
+        for (int iter = 0; iter < tokens.size(); iter++) {
+            spaced.append(tokens.get(iter)).append(' ');
+        }
+        String folded = spaced.toString();
         for (int iter = 0; iter < words.size(); iter++) {
             String w = words.get(iter).getValue();
             if (w.length() > 0 && folded.indexOf(" " + w + " ") >= 0) {

@@ -430,7 +430,7 @@ SvBadge {
     font-family: "native:MainBold";
     font-size: 2.05mm;
     padding: 0.7mm 2mm 0.7mm 2mm;
-    margin: 0 0 0 2mm;
+    margin: 1.6mm 0 0.8mm 2mm;
 }
 
 SvBadgeGood {
@@ -619,7 +619,8 @@ SvAction {
     font-family: "native:MainRegular";
     font-size: 2.2mm;
     text-align: center;
-    padding: 1.8mm 0 1.8mm 0;
+    /* Side by side in a row, each word needs room of its own. */
+    padding: 1.8mm 2.5mm 1.8mm 2.5mm;
     margin: 0;
 }
 
@@ -1344,8 +1345,15 @@ RlHero {
 
 RlHeroArt {
     background-color: var(--scrim);
+    color: #6b6b74;
     padding: 0;
     margin: 0;
+}
+
+/* The second of the hero's two buttons, held off the first. */
+RlHeroMore {
+    cn1-derive: SvSecondary;
+    margin: 1.6mm 0 0.8mm 2mm;
 }
 
 RlHeroInfo {
